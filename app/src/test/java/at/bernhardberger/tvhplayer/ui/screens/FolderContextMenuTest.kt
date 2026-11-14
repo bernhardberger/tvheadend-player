@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvhplayer.testutil.testDvrMutationActions
 import at.bernhardberger.tvhplayer.testutil.setContentWithBrowsePreparation
 import android.app.Application
 import androidx.compose.runtime.collectAsState
@@ -193,7 +194,7 @@ class FolderContextMenuTest {
 
     private fun show(entries: List<DvrEntry>): FakeTvheadendSession {
         val session = FakeTvheadendSession(observation(entries))
-        val actions = DvrMutationActions(
+        val actions = testDvrMutationActions(
             updateWatchStateCommand = { _, id, watched ->
                 watchCalls += id to watched
                 watchGate?.await()

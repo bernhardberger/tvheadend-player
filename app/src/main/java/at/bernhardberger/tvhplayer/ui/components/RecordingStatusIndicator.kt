@@ -31,6 +31,7 @@ enum class RecordingRule(@StringRes val label: Int) {
     AUTOMATIC(R.string.recording_from_automatic),
 }
 
+/** ID-only fallback for callers such as Guide that cannot resolve the automatic recording's kind. */
 val DvrEntry.rule: RecordingRule?
     get() = when {
         autorecRuleId != null -> RecordingRule.AUTOMATIC

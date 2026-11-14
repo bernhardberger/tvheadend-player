@@ -20,10 +20,13 @@ import at.bernhardberger.tvheadend.sdk.core.DvrMutationResult
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.DvrMutationKind
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
+import at.bernhardberger.tvheadend.sdk.core.SessionState
+import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.AutomaticRecordingListItem
+import at.bernhardberger.tvhplayer.core.toDraft
 import at.bernhardberger.tvhplayer.core.AutomaticRecordingKind
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.notices.Notice
@@ -49,6 +52,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 import java.time.ZoneId
+import java.time.LocalDate
 import kotlin.time.Instant
 
 internal enum class RuleSurface { NEW, EDIT, MENU, DELETE }
@@ -62,6 +66,8 @@ internal data class OpenRule(
 internal class ScheduleState {
     var automaticLevelVisited = false
     private val inFlight = mutableMapOf<String, ArrayDeque<RuleRequest>>()
+
+    fun hasPending(item: AutomaticRecordingListItem): Boolean = item.rowId() in inFlight
 
     fun launchRuleMutation(
         scope: CoroutineScope,
@@ -113,7 +119,13 @@ internal fun ScheduleRuleActions(
     val scope = rememberCoroutineScope()
     val close = { onChange(null) }
     val target = opened ?: return
-    val item = target.item?.currentIn(published) ?: target.item
+    val currentItem = target.item?.currentIn(published)
+    val item = currentItem ?: target.item
+    LaunchedEffect(target, published.currentSession, currentItem) {
+        val obsolete = published.currentSession != target.session || currentItem == null
+        if ((target.surface == RuleSurface.MENU || target.surface == RuleSurface.DELETE) &&
+            obsolete) close()
+    }
     when (target.surface) {
         RuleSurface.NEW, RuleSurface.EDIT -> ScheduleRuleEditor(target, actions, notices, now, close)
         RuleSurface.MENU -> if (item != null) ScheduleRuleMenu(item, channels, close,
@@ -134,8 +146,9 @@ internal fun ScheduleRuleActions(
         RuleSurface.DELETE -> if (item != null) RecordingRuleDeleteDialog(
             item.kind, item.subject(channels), item.scheduledCount(published), onDismiss = close,
             onConfirm = {
+                val confirmed = target.copy(item = item)
                 state.launchRuleMutation(scope, item) {
-                    deleteScheduleRule(target, observation(), isCurrent, actions, notices)
+                    deleteScheduleRule(confirmed, observation(), isCurrent, actions, notices)
                 }
                 close()
             },
@@ -180,7 +193,9 @@ private fun OpenRule.readyIn(
     notices: NoticeCenter,
     kind: DvrMutationKind,
 ): Boolean {
-    val ready = isCurrent && observation.currentSession == session && observation.dvrState is DvrRepositoryState.Current
+    val writable = (observation.sessionState as? SessionState.Ready)?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
+    val ready = isCurrent && observation.currentSession == session &&
+        observation.dvrState is DvrRepositoryState.Current && writable
     if (!ready) {
         val result = DvrMutationResult.Failed(TvheadendFailure.NOT_READY, false)
         notices.post(Notice.DvrRuleActionFailed(kind, result.toDvrMutationFeedback()), notices.context())
@@ -196,21 +211,36 @@ private suspend fun deleteScheduleRule(
     notices: NoticeCenter,
 ) {
     if (!target.readyIn(observation, isCurrent, notices, DvrMutationKind.DELETE)) return
-    val action = when (val current = target.item?.currentIn(observation)) {
-        is AutomaticRecordingListItem.Automatic -> DvrMutationAction.DeleteAutorec(target.session, current.rule)
-        is AutomaticRecordingListItem.Timer -> DvrMutationAction.DeleteTimerec(target.session, current.rule)
-        null -> null
-    }
-    if (action != null) {
+    val current = target.item?.currentIn(observation) ?: return
+    if (current.sameConfirmedDraft(target.item)) {
+        val action = when (current) {
+            is AutomaticRecordingListItem.Automatic -> DvrMutationAction.DeleteAutorec(target.session, current.rule)
+            is AutomaticRecordingListItem.Timer -> DvrMutationAction.DeleteTimerec(target.session, current.rule)
+        }
         val context = notices.context()
         val result = if (action.recordingStateIsCurrent(observation)) actions.execute(action)
             else DvrMutationResult.Failed(TvheadendFailure.NOT_READY, false)
         notices.postDvrFailure(action, result, context)
+    } else {
+        val result = DvrMutationResult.Failed(TvheadendFailure.NOT_READY, false)
+        notices.post(
+            Notice.DvrRuleActionFailed(DvrMutationKind.DELETE, result.toDvrMutationFeedback()), notices.context())
     }
 }
 
+/**
+ * Confirmation covers the app's draft fields, not server metadata; enabled may change in our queue.
+ */
+private fun AutomaticRecordingListItem.sameConfirmedDraft(confirmed: AutomaticRecordingListItem?): Boolean = when {
+    this is AutomaticRecordingListItem.Automatic && confirmed is AutomaticRecordingListItem.Automatic ->
+        rule.toDraft().copy(enabled = false) == confirmed.rule.toDraft().copy(enabled = false)
+    this is AutomaticRecordingListItem.Timer && confirmed is AutomaticRecordingListItem.Timer ->
+        rule.toDraft(LocalDate.MIN).copy(enabled = false) == confirmed.rule.toDraft(LocalDate.MIN).copy(enabled = false)
+    else -> false
+}
+
 internal fun AutomaticRecordingListItem.currentIn(observation: SessionObservation): AutomaticRecordingListItem? {
-    val snapshot = (observation.dvrState as? DvrRepositoryState.Current)?.snapshot ?: return null
+    val snapshot = observation.dvrSnapshotForDisplay ?: return null
     return when (this) {
         is AutomaticRecordingListItem.Automatic -> snapshot.autorecRules.firstOrNull { it.id == rule.id }?.let {
             copy(rule = it)

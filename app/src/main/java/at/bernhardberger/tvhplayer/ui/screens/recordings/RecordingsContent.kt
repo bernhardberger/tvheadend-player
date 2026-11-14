@@ -511,7 +511,7 @@ internal fun RecordingMetadataPane(
                     androidx.compose.runtime.CompositionLocalProvider(
                         androidx.tv.material3.LocalContentColor provides TvTextColors.secondary,
                     ) { ChannelPlaybackMarker(watchingIndicator(entry.id)) }
-                    RecordingBadge(entry.state, rule = entry.rule, skipped = entry.enabled == false)
+                    RecordingBadge(entry.state, rule = recordingRule ?: entry.rule, skipped = entry.enabled == false)
                 }
             },
             title = entry.title.orEmpty(),
@@ -612,7 +612,6 @@ private fun RecordingListWithPane(
     piconForEntry: (DvrEntry) -> ChannelIcon?,
     admissionForEntry: (DvrEntry) -> RecordingPlaybackAdmission?,
     paneBottom: Dp,
-    rule: RecordingRule? = null,
     list: @Composable () -> Unit,
 ) {
     Row(Modifier.fillMaxSize()) {
@@ -630,7 +629,6 @@ private fun RecordingListWithPane(
                 admission = entry?.let(admissionForEntry),
                 modifier = Modifier.padding(bottom = paneBottom),
                 kind = kind,
-                recordingRule = rule,
             )
         }
     }
@@ -819,6 +817,7 @@ internal fun RecordingListRow(
     onClick: () -> Unit,
     kind: RecordingRowKind = RecordingRowKind.ARCHIVE,
     onOpenContextMenu: (() -> Unit)? = null,
+    recordingRule: RecordingRule? = entry.rule,
 ) {
     val problem = kind == RecordingRowKind.PROBLEM
     val metadata = recordingListMetadata(entry, problemLabel = entry.subscriptionError?.takeIf { problem }?.label())
@@ -848,7 +847,7 @@ internal fun RecordingListRow(
                     Spacer(Modifier.width(TvSpacing8))
                     RecordingStatusIndicator(
                         state = markState,
-                        rule = entry.rule,
+                        rule = recordingRule,
                         focused = focused,
                         skipped = entry.enabled == false,
                         modifier = Modifier.testTag("recording-list-state-$itemKey"),

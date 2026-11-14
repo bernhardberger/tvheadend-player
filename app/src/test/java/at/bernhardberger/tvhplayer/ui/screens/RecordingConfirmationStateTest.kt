@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvhplayer.testutil.testDvrMutationActions
 import at.bernhardberger.tvhplayer.testutil.setContentWithBrowsePreparation
 import android.app.Application
 import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
@@ -86,7 +87,7 @@ class RecordingConfirmationStateTest {
     ) {
         val session = FakeTvheadendSession(observation(DvrEntryState.COMPLETED, folder = emptyList()))
         val calls = mutableListOf<Boolean>()
-        val actions = DvrMutationActions(
+        val actions = testDvrMutationActions(
             updateWatchStateCommand = { _, id, watched ->
                 assertEquals(DvrEntryId(1), id)
                 calls += watched
@@ -131,7 +132,7 @@ class RecordingConfirmationStateTest {
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries)))
         val session = FakeTvheadendSession(snapshot(listOf(entry, neighbour)))
         var calls = 0
-        val actions = DvrMutationActions(
+        val actions = testDvrMutationActions(
             updateWatchStateCommand = { _, _, _ -> error("Unexpected watch-state update") },
             scheduleEntry = { _, _ -> error("unexpected schedule") },
             stopEntry = { _, _ -> error("unexpected stop") },
@@ -186,7 +187,7 @@ class RecordingConfirmationStateTest {
             initial.epgState, DvrRepositoryState.Current(DvrSnapshot.create(entries)))
         val session = FakeTvheadendSession(snapshot(survivors + entry))
         var calls = 0
-        val actions = DvrMutationActions(
+        val actions = testDvrMutationActions(
             updateWatchStateCommand = { _, _, _ -> error("Unexpected watch-state update") },
             scheduleEntry = { _, _ -> error("unexpected schedule") },
             stopEntry = { _, _ -> error("unexpected stop") },
@@ -247,7 +248,7 @@ class RecordingConfirmationStateTest {
         val state = RecordingsScreenState().apply { mode.value = DvrLibraryMode.SCHEDULE }
         val result = CompletableDeferred<DvrMutationResult<Unit>>()
         var calls = 0
-        val actions = DvrMutationActions(
+        val actions = testDvrMutationActions(
             updateWatchStateCommand = { _, _, _ -> error("Unexpected watch-state update") },
             scheduleEntry = { _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
             stopEntry = { _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
@@ -287,7 +288,7 @@ class RecordingConfirmationStateTest {
         val session = FakeTvheadendSession(observation(before))
         val state = RecordingsScreenState().apply { mode.value = DvrLibraryMode.SCHEDULE }
         var calls = 0
-        val actions = DvrMutationActions(
+        val actions = testDvrMutationActions(
             updateWatchStateCommand = { _, _, _ -> error("Unexpected watch-state update") },
             scheduleEntry = { _, _ -> calls++; DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
             stopEntry = { _, _ -> calls++; DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
@@ -344,7 +345,7 @@ class RecordingConfirmationStateTest {
         val stopped = mutableListOf<DvrEntryId>()
         val unexpected: suspend (CurrentSessionObservation, DvrEntryId) -> DvrMutationResult<Unit> =
             { _, _ -> error("unexpected mutation") }
-        val actions = DvrMutationActions(
+        val actions = testDvrMutationActions(
             scheduleEntry = { _, _ -> error("unexpected schedule") },
             stopEntry = { _, id -> stopped += id; DvrMutationResult.Confirmed(Unit) },
             cancelEntry = unexpected,

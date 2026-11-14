@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvhplayer.testutil.testDvrMutationActions
 import at.bernhardberger.tvhplayer.testutil.setContentWithBrowsePreparation
 import android.app.Application
 import android.graphics.Bitmap
@@ -356,7 +357,7 @@ class InProgressRecordingResumeTest {
         val observation = observation(playPositionSeconds, completed, serverPath)
         val playbackSession = requireNotNull(if (staleSession) observation(playPositionSeconds, completed).currentSession
             else observation.currentSession)
-        val actions = DvrMutationActions(
+        val actions = testDvrMutationActions(
             scheduleEntry = { _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
             stopEntry = { _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
             cancelEntry = { _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },

@@ -416,7 +416,7 @@ internal fun RecordingsScreenContent(
     }
     var relocatingKey by remember { mutableStateOf<Key?>(null) }
     var focusRecoveryGeneration by remember { mutableIntStateOf(0) }
-    val overlays = remember { RecordingOverlaysState() }
+    val overlays = remember { RecordingOverlaysState(screenState.scheduleState) }
     var menuConsumed by remember(overlays.detailsEntry?.id) { mutableStateOf(false) }
     val confirmationVisibility = remember(overlays.pendingAction) {
         MutableTransitionState(false).apply { targetState = overlays.pendingAction != null }
@@ -429,8 +429,8 @@ internal fun RecordingsScreenContent(
             latest.dvrState is DvrRepositoryState.Current
         ) latest.currentSession?.let { session ->
             if (item == null || currentItem != null) {
-                contentFocusOwned = false
                 overlays.scheduleRuleRequest = OpenRule(surface, session, currentItem)
+                if (overlays.scheduleRuleRequest != null) contentFocusOwned = false
             }
         }
     }
@@ -1170,12 +1170,8 @@ internal fun RecordingsScreenContent(
             ruleMutationBusy = true
             scope.launch {
                 try {
-                    val mutation = DvrMutationAction.SetEntryEnabled(capability, target,
-                        action == BrowseContextAction.UNSKIP)
-                    if (!mutation.recordingStateIsCurrent(latestObservationProvider())) return@launch
-                    val context = notices.context()
-                    val result = dvrMutationActions.execute(mutation)
-                    notices.postDvrFailure(mutation, result, context)
+                    dvrMutationActions.changeScheduledRecordingEnabled(
+                        target.id, capability, latestObservationProvider, action, notices)
                 } finally {
                     ruleMutationBusy = false
                 }
@@ -1733,7 +1729,7 @@ private fun RecordingsHeader(
 }
 
 /** Details, context menus and their confirmations share the screen's composition lifetime. */
-private class RecordingOverlaysState {
+private class RecordingOverlaysState(private val scheduleState: ScheduleState) {
     var optionsOpen by mutableStateOf(false)
     val optionsFocus = FocusRequester()
     // The stop the next frames move focus to: the View options button after its panel closes.
@@ -1750,7 +1746,14 @@ private class RecordingOverlaysState {
     var folderMenu by mutableStateOf<FolderMenuTarget?>(null)
     var folderDelete by mutableStateOf<FolderDeleteTarget?>(null)
     var newTimerSession by mutableStateOf<CurrentSessionObservation?>(null)
-    var scheduleRuleRequest by mutableStateOf<OpenRule?>(null)
+    private var scheduleRequest by mutableStateOf<OpenRule?>(null)
+    var scheduleRuleRequest: OpenRule?
+        get() = scheduleRequest
+        set(value) {
+            if (value?.surface != RuleSurface.EDIT || value.item?.let(scheduleState::hasPending) != true) {
+                scheduleRequest = value
+            }
+        }
     val scheduleSurfaceOpen: Boolean get() = newTimerSession != null || scheduleRuleRequest != null
 }
 

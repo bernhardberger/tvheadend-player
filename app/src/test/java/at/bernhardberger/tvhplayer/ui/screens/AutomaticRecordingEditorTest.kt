@@ -1,7 +1,13 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvhplayer.testutil.testDvrMutationActions
 import android.app.Application
 import androidx.compose.runtime.remember
+import org.koin.compose.KoinIsolatedContext
+import org.koin.dsl.koinApplication
+import org.koin.dsl.module
+import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
+import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -396,7 +402,7 @@ class AutomaticRecordingEditorTest {
         val repository = session.dvrRepository
         val requests = mutableListOf<AutorecRuleCreate>()
         repository.scriptCreateAutorecRule(DvrMutationResult.Confirmed(AutorecRuleId("created")))
-        val mutations = DvrMutationActions(
+        val mutations = testDvrMutationActions(
             repository::scheduleEntry, repository::stopEntry, repository::cancelEntry,
             repository::deleteEntry, repository::updateWatchState,
             createAutorecRule = { current, request ->
@@ -411,13 +417,17 @@ class AutomaticRecordingEditorTest {
             val observation by session.observation.collectAsState()
             val scope = rememberCoroutineScope()
             TVHeadendPlayerTheme {
-                ProgrammeDetailsHost(
-                    automaticRecordingEvents.first(), openingObservation, observation,
-                    { session.observation.value }, { automaticRecordingNow.epochSeconds },
-                    showContextMenu = false, onShowDetails = {}, mutations, notices, scope,
-                    remember { mutableStateOf(null) }, onPlay = { _, _ -> }, onPlayRecording = null,
-                    onClose = {}, settingsStore = settings, session = session, signedInUsername = null,
-                )
+                KoinIsolatedContext(remember {
+                    koinApplication { modules(module { single<TvheadendSession> { session } }) }
+                }) {
+                    ProgrammeDetailsHost(
+                        automaticRecordingEvents.first(), openingObservation, observation,
+                        { session.observation.value }, { automaticRecordingNow.epochSeconds },
+                        showContextMenu = false, onShowDetails = {}, mutations, notices, scope,
+                        remember { mutableStateOf(null) }, onPlay = { _, _ -> }, onPlayRecording = null,
+                        onClose = {}, settingsStore = settings, signedInUsername = null,
+                    )
+                }
             }
         }
         compose.onNodeWithTag("details-watch").assertIsFocused()
@@ -437,6 +447,13 @@ class AutomaticRecordingEditorTest {
         assertEquals(automaticRecordingEvents.first().seriesLinkUri, requests.single().seriesLinkUri)
         assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_CREATE_AUTOREC_RULE })
         assertTrue(notices.state.value.pending.isEmpty())
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("automatic-recording-main").assertIsFocused()
+        val ready = session.observation.value
+        compose.runOnIdle { session.publish(SessionObservation.create()) }
+        compose.onNodeWithTag("automatic-recording-main").assertDoesNotExist()
+        compose.runOnIdle { session.publish(ready) }
+        compose.onNodeWithTag("automatic-recording-main").assertDoesNotExist()
     }
 
     @Test fun timerRepeatKeepsExistingTypeAndHidesDate() {

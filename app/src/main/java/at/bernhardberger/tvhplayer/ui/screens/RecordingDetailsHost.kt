@@ -147,21 +147,12 @@ internal fun RecordingDetailsHost(
                         BrowseContextAction.SKIP, BrowseContextAction.UNSKIP -> session?.let { owner ->
                             mutationBusy = true
                             mutationScope.launch {
-                                val latest = latestObservation()
-                                val entry = latest.dvrEntry(opened.id)
-                                val writable = (latest.sessionState as? SessionState.Ready)
-                                    ?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
-                                if (latest.currentSession === owner && entry != null &&
-                                    action in recordingRuleActions(
-                                        entry, writable, latest.recordingRuleAvailable(entry))) {
-                                    val mutation = DvrMutationAction.SetEntryEnabled(
-                                        owner, entry, action == BrowseContextAction.UNSKIP)
-                                    if (mutation.recordingStateIsCurrent(latest)) {
-                                        val context = notices.context()
-                                        notices.postDvrFailure(mutation, mutations.execute(mutation), context)
-                                    }
+                                try {
+                                    mutations.changeScheduledRecordingEnabled(
+                                        opened.id, owner, latestObservation, action, notices)
+                                } finally {
+                                    mutationBusy = false
                                 }
-                                mutationBusy = false
                             }
                         }
                         BrowseContextAction.CONTINUE_WATCHING -> onContinueWatching?.invoke()

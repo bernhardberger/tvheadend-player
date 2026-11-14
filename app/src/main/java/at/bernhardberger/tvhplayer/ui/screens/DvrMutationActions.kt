@@ -48,6 +48,7 @@ import at.bernhardberger.tvhplayer.core.programmeRecordingTarget
 import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
 import at.bernhardberger.tvhplayer.core.programmeDetailsActions
 import at.bernhardberger.tvhplayer.core.recordingRuleAvailable
+import at.bernhardberger.tvhplayer.core.recordingRuleActions
 import at.bernhardberger.tvhplayer.core.programmeRecordingRecordKeyActions
 import at.bernhardberger.tvheadend.sdk.core.EpgRepository
 import at.bernhardberger.tvheadend.sdk.core.EpgSearchRequest
@@ -109,6 +110,28 @@ internal suspend fun DvrMutationActions.chooseRecordingRemoval(
             val result = execute(mutation)
             notices.postDvrFailure(mutation, result, context)
             result !is DvrMutationResult.Failed
+        }
+    }
+}
+
+internal suspend fun DvrMutationActions.changeScheduledRecordingEnabled(
+    id: DvrEntryId,
+    openingSession: CurrentSessionObservation,
+    observation: () -> SessionObservation,
+    action: BrowseContextAction,
+    notices: NoticeCenter,
+) {
+    val latest = observation()
+    val entry = latest.dvrEntry(id)
+    val writable = (latest.sessionState as? SessionState.Ready)?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
+    val changesEnabled = action == BrowseContextAction.SKIP || action == BrowseContextAction.UNSKIP
+    val current = latest.currentSession === openingSession && changesEnabled
+    if (current && entry != null &&
+        action in recordingRuleActions(entry, writable, latest.recordingRuleAvailable(entry))) {
+        val mutation = DvrMutationAction.SetEntryEnabled(openingSession, entry, action == BrowseContextAction.UNSKIP)
+        if (mutation.recordingStateIsCurrent(observation())) {
+            val context = notices.context()
+            notices.postDvrFailure(mutation, execute(mutation), context)
         }
     }
 }
@@ -367,35 +390,28 @@ internal class DvrMutationActions(
     private val createAutorecRule: suspend (
         CurrentSessionObservation,
         AutorecRuleCreate,
-    ) -> DvrMutationResult<AutorecRuleId> =
-        { _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
+    ) -> DvrMutationResult<AutorecRuleId>,
     private val updateAutorecRule: suspend (
         CurrentSessionObservation,
         AutorecRuleId,
         AutorecRuleUpdate,
-    ) -> DvrMutationResult<Unit> =
-        { _, _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
-    private val deleteAutorecRule: suspend (CurrentSessionObservation, AutorecRuleId) -> DvrMutationResult<Unit> =
-        { _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
+    ) -> DvrMutationResult<Unit>,
+    private val deleteAutorecRule: suspend (CurrentSessionObservation, AutorecRuleId) -> DvrMutationResult<Unit>,
     private val createTimerecRule: suspend (
         CurrentSessionObservation,
         TimerecRuleCreate,
-    ) -> DvrMutationResult<TimerecRuleId> =
-        { _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
+    ) -> DvrMutationResult<TimerecRuleId>,
     private val updateTimerecRule: suspend (
         CurrentSessionObservation,
         TimerecRuleId,
         TimerecRuleUpdate,
-    ) -> DvrMutationResult<Unit> =
-        { _, _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
-    private val deleteTimerecRule: suspend (CurrentSessionObservation, TimerecRuleId) -> DvrMutationResult<Unit> =
-        { _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
+    ) -> DvrMutationResult<Unit>,
+    private val deleteTimerecRule: suspend (CurrentSessionObservation, TimerecRuleId) -> DvrMutationResult<Unit>,
     private val updateEntry: suspend (
         CurrentSessionObservation,
         DvrEntryId,
         DvrEntryUpdate,
-    ) -> DvrMutationResult<Unit> =
-        { _, _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
+    ) -> DvrMutationResult<Unit>,
 ) {
     constructor(repository: DvrRepository) : this(
         scheduleEntry = repository::scheduleEntry,

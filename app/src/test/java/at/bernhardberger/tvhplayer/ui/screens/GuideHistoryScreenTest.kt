@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvhplayer.testutil.testDvrMutationActions
 import at.bernhardberger.tvhplayer.testutil.setContentWithBrowsePreparation
 import android.app.Application
 import android.graphics.Bitmap
@@ -100,7 +101,7 @@ class GuideHistoryScreenTest {
         val release = CompletableDeferred<Unit>()
         val settings = UiSettingsStore(preferences())
         runBlocking { settings.setRecordingProfile(profiles[1].id) }
-        val mutations = DvrMutationActions(
+        val mutations = testDvrMutationActions(
             scheduleEntry = { _, value -> requests++; request = value; release.await(); DvrMutationResult.Confirmed(DvrEntryId(1)) },
             stopEntry = { _, _ -> error("unexpected stop") },
             cancelEntry = { _, _ -> error("unexpected cancel") },

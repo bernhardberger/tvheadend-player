@@ -156,6 +156,7 @@ internal class AutomaticRecordingEditorState(
             try {
                 // Wait for this locked draft's preview; unavailable results retain explicit and known skip intent.
                 val submittedChoices = if (updatingRule) {
+                    refreshPreview(keepMatches = true)
                     previewJob?.join()
                     episodeChoicesForRuleUpdate()
                 } else enabledChanges

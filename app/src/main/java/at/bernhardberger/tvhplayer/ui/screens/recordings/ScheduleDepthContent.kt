@@ -155,6 +155,7 @@ private fun rememberScheduleLevels(
                             modifier = rowModifier,
                             onClick = activate,
                             onOpenContextMenu = { latestMenu.value(entry) },
+                            recordingRule = latestRule.value(entry),
                             kind = RecordingRowKind.SCHEDULE,
                         )
                         Spacer(Modifier.height(4.dp))

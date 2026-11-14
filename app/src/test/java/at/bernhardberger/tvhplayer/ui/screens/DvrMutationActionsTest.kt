@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvhplayer.testutil.testDvrMutationActions
 import at.bernhardberger.tvhplayer.notices.DvrMutationFeedback
 import at.bernhardberger.tvhplayer.notices.toDvrMutationFeedback
 
@@ -165,6 +166,7 @@ class DvrMutationActionsTest {
         assertEquals(AutorecSaveOutcome.PartiallyApplied(ruleId, setOf(EventId(7))),
             actions.createAutorecWithLeftOut(action, setOf(EventId(7)), session.observation, notices, context))
         assertTrue(testScheduler.currentTime > before)
+        assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_CREATE_AUTOREC_RULE })
         assertEquals(Notice.AutomaticRecordingEpisodesNotApplied(created = true),
             notices.state.value.candidate?.notice)
         publishAutomaticEntries(session, listOf(DvrEntry.create(DvrEntryId(10), eventId = EventId(7),
@@ -173,10 +175,12 @@ class DvrMutationActionsTest {
         assertEquals(AutorecSaveOutcome.PartiallyApplied(ruleId, setOf(EventId(7))),
             actions.createAutorecWithLeftOut(action, setOf(EventId(7)), session.observation, notices, context))
         assertEquals(afterTimeout, testScheduler.currentTime)
+        assertEquals(2, session.calls.count { it == FakeSessionCall.DVR_CREATE_AUTOREC_RULE })
         session.dvrRepository.scriptCreateAutorecRule(
             DvrMutationResult.Failed(TvheadendFailure.ACCESS_DENIED, mayHaveApplied = false))
         assertTrue(actions.createAutorecWithLeftOut(action, setOf(EventId(7)),
             session.observation, notices, context) is AutorecSaveOutcome.RuleFailed)
+        assertEquals(3, session.calls.count { it == FakeSessionCall.DVR_CREATE_AUTOREC_RULE })
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -210,14 +214,16 @@ class DvrMutationActionsTest {
         assertEquals(2, requests.size)
 
         requests.clear()
-        publishAutomaticEntries(session, listOf(old), listOf(rule))
+        publishAutomaticEntries(session, listOf(old, disabled), listOf(rule))
         session.dvrRepository.scriptUpdateAutorecRule(DvrMutationResult.Confirmed(Unit))
         var outcome: AutorecSaveOutcome? = null
         val baseline = rule.toDraft()
         val editor = AutomaticRecordingEditorState(baseline, this,
-            loadPreview = { _, _, _, _ -> AutorecPreviewState.Matches(listOf(AutorecPreviewRow(
-                old.eventId, old.id, null, null, null, automaticRecordingNow, null, AutorecEpisodeState.SKIPPED,
-            )), 0, false) },
+            loadPreview = { _, _, _, _ -> AutorecPreviewState.Matches(
+                session.observation.value.dvrSnapshotForDisplay!!.entries.map { entry ->
+                    AutorecPreviewRow(entry.eventId, entry.id, null, null, null, automaticRecordingNow, null,
+                        if (entry.enabled == false) AutorecEpisodeState.SKIPPED else AutorecEpisodeState.SCHEDULED)
+                }, 1, false) },
             saveDraft = { draft, choices ->
                 actions.updateAutorecWithEpisodes(DvrMutationAction.UpdateAutorec(
                     requireNotNull(session.observation.value.currentSession), rule, draft.toUpdateRequest(baseline)),
@@ -228,13 +234,21 @@ class DvrMutationActionsTest {
         assertFalse(editor.changed)
         editor.updateDraft { it.copy(removal = DvrRemoval.Forever) }
         runCurrent()
+        publishAutomaticEntries(session, listOf(
+            DvrEntry.create(old.id, eventId = old.eventId, autorecRuleId = rule.id,
+                state = DvrEntryState.SCHEDULED, enabled = true),
+            DvrEntry.create(disabled.id, eventId = disabled.eventId, autorecRuleId = rule.id,
+                state = DvrEntryState.SCHEDULED, enabled = false),
+        ), listOf(rule))
         editor.submit()
         runCurrent()
         val recreated = DvrEntry.create(DvrEntryId(13), eventId = old.eventId, autorecRuleId = rule.id,
             state = DvrEntryState.SCHEDULED, enabled = true)
-        publishAutomaticEntries(session, listOf(recreated), listOf(rule))
+        val newlySkipped = DvrEntry.create(DvrEntryId(14), eventId = disabled.eventId, autorecRuleId = rule.id,
+            state = DvrEntryState.SCHEDULED, enabled = true)
+        publishAutomaticEntries(session, listOf(recreated, newlySkipped), listOf(rule))
         runCurrent()
-        assertEquals(listOf(recreated.id to DvrEntryUpdate(enabled = false)), requests)
+        assertEquals(listOf(newlySkipped.id to DvrEntryUpdate(enabled = false)), requests)
         assertEquals(AutorecSaveOutcome.Applied(rule.id), outcome)
         assertTrue(editor.closed)
         editor.dispose()
@@ -339,7 +353,7 @@ class DvrMutationActionsTest {
     private fun automaticActions(
         session: FakeTvheadendSession,
         update: suspend (CurrentSessionObservation, DvrEntryId, DvrEntryUpdate) -> DvrMutationResult<Unit>,
-    ): DvrMutationActions = DvrMutationActions(
+    ): DvrMutationActions = testDvrMutationActions(
         scheduleEntry = session.dvrRepository::scheduleEntry,
         stopEntry = session.dvrRepository::stopEntry,
         cancelEntry = session.dvrRepository::cancelEntry,
@@ -420,7 +434,7 @@ class DvrMutationActionsTest {
             notices.state.value.candidate?.notice)
         val received = mutableListOf<Any>()
         var toggleResult: DvrMutationResult<Unit> = DvrMutationResult.Confirmed(Unit)
-        val toggles = DvrMutationActions(
+        val toggles = testDvrMutationActions(
             scheduleEntry = { _, _ -> error("Not scheduling") },
             stopEntry = { _, _ -> error("Not stopping") },
             cancelEntry = { _, _ -> error("Not cancelling") },
@@ -487,7 +501,7 @@ class DvrMutationActionsTest {
         val time = DvrScheduleRequest(DvrSchedule.ExplicitTime(ChannelId(1),
             Instant.fromEpochSeconds(100), Instant.fromEpochSeconds(200)), title = "Timer")
         val received = mutableListOf<Any>()
-        val actions = DvrMutationActions(
+        val actions = testDvrMutationActions(
             scheduleEntry = { s, r -> assertSame(session, s); received += r; DvrMutationResult.Confirmed(entry.id) },
             stopEntry = { _, _ -> error("Unexpected stop") },
             cancelEntry = { _, _ -> error("Unexpected cancel") },
@@ -550,7 +564,7 @@ class DvrMutationActionsTest {
         var stopped: Pair<CurrentSessionObservation, DvrEntryId>? = null
         var cancelled: Pair<CurrentSessionObservation, DvrEntryId>? = null
         var deleted: Pair<CurrentSessionObservation, DvrEntryId>? = null
-        val actions = DvrMutationActions(
+        val actions = testDvrMutationActions(
             scheduleEntry = { currentSession, request ->
                 scheduledCapability = currentSession
                 scheduledRequest = request
@@ -616,7 +630,7 @@ class DvrMutationActionsTest {
     fun stopDispatchesOnlyStopEntry() = runTest {
         val capability = currentSession()
         val calls = mutableListOf<String>()
-        val actions = DvrMutationActions(
+        val actions = testDvrMutationActions(
             scheduleEntry = { _, _ -> calls += "schedule"; DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
             stopEntry = { _, _ -> calls += "stop"; DvrMutationResult.AcceptedButUnconfirmed(Unit) },
             cancelEntry = { _, _ -> calls += "cancel"; DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
@@ -636,7 +650,7 @@ class DvrMutationActionsTest {
         val recordingId = DvrEntryId(9)
         val calls = mutableListOf<Triple<CurrentSessionObservation, DvrEntryId, Boolean>>()
         val failure = DvrProgressResult.Failed(TvheadendFailure.MALFORMED_RESPONSE, mayHaveApplied = true)
-        val actions = DvrMutationActions(
+        val actions = testDvrMutationActions(
             scheduleEntry = { _, _ -> error("Unexpected schedule") },
             stopEntry = { _, _ -> error("Unexpected stop") },
             cancelEntry = { _, _ -> error("Unexpected cancel") },
@@ -681,7 +695,7 @@ class DvrMutationActionsTest {
     @Test
     fun missingCapturedActionPresentsNotReadyWithoutDispatch() = runTest {
         var dispatchCount = 0
-        val actions = DvrMutationActions(
+        val actions = testDvrMutationActions(
             scheduleEntry = { _, _ ->
                 dispatchCount++
                 DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false)
@@ -755,7 +769,7 @@ class DvrMutationActionsTest {
     @Test
     fun malformedMutationIsUncertainAndNeverRepeated() = runTest {
         val calls = mutableListOf<String>()
-        val actions = DvrMutationActions(
+        val actions = testDvrMutationActions(
             scheduleEntry = { _, _ -> calls += "schedule"; DvrMutationResult.Failed(TvheadendFailure.MALFORMED_RESPONSE, mayHaveApplied = true) },
             stopEntry = { _, _ -> calls += "stop"; DvrMutationResult.Failed(TvheadendFailure.MALFORMED_RESPONSE, mayHaveApplied = true) },
             cancelEntry = { _, _ -> calls += "cancel"; DvrMutationResult.Failed(TvheadendFailure.MALFORMED_RESPONSE, mayHaveApplied = true) },

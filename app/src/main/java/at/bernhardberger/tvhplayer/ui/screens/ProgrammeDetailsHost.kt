@@ -55,7 +55,6 @@ internal fun ProgrammeDetailsHost(
     retainPlayerSnapshot: Boolean = false,
     onContinueWatching: (() -> Unit)? = null,
     initialAction: BrowseContextAction? = null,
-    session: TvheadendSession? = null,
     signedInUsername: String? = koinInject<AppProfileOwner>().profiles.collectAsStateWithLifecycle()
         .value.activeProfile()?.accountName(),
 ) {
@@ -100,6 +99,10 @@ internal fun ProgrammeDetailsHost(
         if (openingObservation.currentSession != null) openingObservation else displayObservation
     }
     val capability = sessionObservation.currentSession?.takeIf { it === displayObservation.currentSession }
+    LaunchedEffect(capability, displayObservation.currentSession, automaticRecording?.first) {
+        if (capability == null) editingRule = null
+        if (automaticRecording?.first != displayObservation.currentSession) automaticRecording = null
+    }
     // Opened before Ready it stays: Watch needs only the channel. A session it opened with is gone.
     val sessionLost = openingObservation.currentSession != null && capability == null
     val live = displayObservation.event(selected.id)
@@ -411,7 +414,7 @@ internal fun ProgrammeDetailsHost(
     }
     }
     automaticRecording?.let { (currentSession, programme) ->
-        val editorSession: TvheadendSession = session ?: koinInject()
+        val editorSession: TvheadendSession = koinInject()
         val zone = remember { java.time.ZoneId.systemDefault() }
         AutomaticRecordingEditorHost(
             currentSession, editorSession.observation,
@@ -424,7 +427,7 @@ internal fun ProgrammeDetailsHost(
         )
     }
     editingRule?.takeIf { capability != null }?.let { entry ->
-        val editorSession: TvheadendSession = session ?: koinInject()
+        val editorSession: TvheadendSession = koinInject()
         RecordingRuleEditorHost(entry, requireNotNull(capability), displayObservation,
             editorSession, mutations, notices,
             now = { kotlin.time.Instant.fromEpochSeconds(nowSecProvider()) }, onClose = { editingRule = null })

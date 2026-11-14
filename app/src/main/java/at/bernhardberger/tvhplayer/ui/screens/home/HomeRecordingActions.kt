@@ -161,21 +161,14 @@ internal fun HomeRecordingActions(
                     BrowseContextAction.SKIP, BrowseContextAction.UNSKIP -> {
                         mutationBusy = true
                         scope.launch {
-                            val current = session.observation.value
-                            val owner = capability?.takeIf { current.currentSession === it }
-                            val latest = current.dvrEntry(opened.id)
-                            val writable = (current.sessionState as? SessionState.Ready)
-                                ?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
-                            if (owner != null && latest != null && action in recordingRuleActions(
-                                    latest, writable, current.recordingRuleAvailable(latest))) {
-                                val mutation = DvrMutationAction.SetEntryEnabled(
-                                    owner, latest, action == BrowseContextAction.UNSKIP)
-                                if (mutation.recordingStateIsCurrent(current)) {
-                                    val context = notices.context()
-                                    notices.postDvrFailure(mutation, mutations.execute(mutation), context)
+                            try {
+                                capability?.let {
+                                    mutations.changeScheduledRecordingEnabled(
+                                        opened.id, it, { session.observation.value }, action, notices)
                                 }
+                            } finally {
+                                mutationBusy = false
                             }
-                            mutationBusy = false
                         }
                     }
                     BrowseContextAction.STOP -> capability?.let { pendingMutation = DvrMutationAction.Stop(it, opened.id) }

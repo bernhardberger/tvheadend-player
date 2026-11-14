@@ -1,6 +1,8 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
+import at.bernhardberger.tvhplayer.notices.Notice
+import at.bernhardberger.tvheadend.sdk.core.DvrMutationKind
 import at.bernhardberger.tvhplayer.notices.NoticeContext
 import at.bernhardberger.tvhplayer.testutil.tagBounds
 import at.bernhardberger.tvhplayer.testutil.labelToFocusedFillGap
@@ -1484,6 +1486,13 @@ class RecordingsVisualLayoutTest {
             useUnmergedTree = true).assertDoesNotExist()
         capture("schedule-pane", 1f)
         publish(paneEntries(long = false), autorecRules = listOf(
+            AutorecRule.create(AutorecRuleId("series"), seriesLinkUri = "series:ridge-light")))
+        val seriesOrigin = view.resources.getString(R.string.recording_from_series_rule)
+        compose.onNodeWithTag("recording-list-state-40", useUnmergedTree = true)
+            .assert(hasContentDescription(seriesOrigin))
+        compose.onNodeWithTag("recording-badge-scheduled", useUnmergedTree = true)
+            .assert(hasContentDescription(seriesOrigin))
+        publish(paneEntries(long = false), autorecRules = listOf(
             at.bernhardberger.tvheadend.sdk.core.AutorecRule.create(AutorecRuleId("series"), title = "^Ridge Light$")))
         compose.onNode(hasAnyAncestor(hasTestTag("recording-metadata-rule")) and
             hasText("Part of an automatic recording"), useUnmergedTree = true).assertIsDisplayed()
@@ -1637,10 +1646,14 @@ class RecordingsVisualLayoutTest {
         focused("automatic-recording-first")
         key(Key.Menu)
         focused("automatic-recording-menu-edit")
+        publish(emptyList(), autorecRules = rules.drop(1))
+        compose.onNodeWithTag("automatic-recording-menu").assertDoesNotExist()
+        focused("automatic-recording-second")
+        key(Key.Menu)
+        focused("automatic-recording-menu-edit")
         compose.runOnIdle { backDispatcher.onBackPressed() }
         compose.settleFrames(2)
-        focused("automatic-recording-first")
-        publish(emptyList(), autorecRules = rules.drop(1))
+        compose.onNodeWithTag("automatic-recording-menu").assertDoesNotExist()
         focused("automatic-recording-second")
         key(Key.DirectionDown)
         focused("automatic-recording-third")
@@ -1675,6 +1688,7 @@ class RecordingsVisualLayoutTest {
         val disabled = AutorecRule.create(id, title = "^Ridge Light$", enabled = false)
         val release = CompletableDeferred<Unit>()
         val releaseFailure = CompletableDeferred<Unit>()
+        var queuedToggle: CompletableDeferred<Unit>? = null
         val updates = mutableListOf<AutorecRuleUpdate>()
         var deletes = 0
         show(empty = true, autorecRules = listOf(enabled), repository = { delegate ->
@@ -1686,8 +1700,12 @@ class RecordingsVisualLayoutTest {
                         release.await()
                         return DvrMutationResult.Confirmed(Unit)
                     }
-                    releaseFailure.await()
-                    return DvrMutationResult.Failed(TvheadendFailure.ACCESS_DENIED, false)
+                    if (updates.size == 2) {
+                        releaseFailure.await()
+                        return DvrMutationResult.Failed(TvheadendFailure.ACCESS_DENIED, false)
+                    }
+                    queuedToggle?.await()
+                    return DvrMutationResult.Confirmed(Unit)
                 }
                 override suspend fun deleteAutorecRule(currentSession: CurrentSessionObservation,
                     id: AutorecRuleId): DvrMutationResult<Unit> {
@@ -1704,6 +1722,13 @@ class RecordingsVisualLayoutTest {
         key(Key.DirectionCenter)
         focused("automatic-recording-ridge")
         assertEquals(listOf(false), updates.map { it.enabled })
+        key(Key.DirectionCenter)
+        compose.onNodeWithTag("automatic-recording-main").assertDoesNotExist()
+        key(Key.Menu)
+        key(Key.DirectionCenter)
+        compose.onNodeWithTag("automatic-recording-main").assertDoesNotExist()
+        compose.runOnIdle { backDispatcher.onBackPressed() }
+        compose.settleFrames(2)
         key(Key.Menu)
         key(Key.DirectionDown)
         key(Key.DirectionCenter)
@@ -1729,6 +1754,10 @@ class RecordingsVisualLayoutTest {
             noticeCenter.state.value.pending.size)
         compose.runOnIdle { screenShown.value = true }
         compose.waitForIdle()
+        key(Key.DirectionCenter)
+        compose.onNodeWithTag("automatic-recording-main").assertIsDisplayed()
+        compose.runOnIdle { backDispatcher.onBackPressed() }
+        compose.settleFrames(2)
         val own = listOf(
             DvrEntry.create(DvrEntryId(401), state = DvrEntryState.SCHEDULED, autorecRuleId = id),
             DvrEntry.create(DvrEntryId(402), state = DvrEntryState.SCHEDULED, autorecRuleId = id, enabled = false),
@@ -1756,6 +1785,33 @@ class RecordingsVisualLayoutTest {
         publish(emptyList())
         focused("schedule-new-automatic")
         assertEquals("schedule:automatic", screenState.scheduleNavigation.stack.active.levelId)
+        for (changedElsewhere in listOf(true, false)) {
+            publish(emptyList(), autorecRules = listOf(enabled))
+            compose.onNodeWithTag("automatic-recording-ridge").requestFocus()
+            focused("automatic-recording-ridge")
+            queuedToggle = CompletableDeferred()
+            key(Key.Menu)
+            key(Key.DirectionDown)
+            key(Key.DirectionCenter)
+            key(Key.Menu)
+            repeat(2) { key(Key.DirectionDown) }
+            key(Key.DirectionCenter)
+            key(Key.DirectionRight)
+            compose.pressKey(Key.DirectionCenter, settleFrames = 1, frameMillis = PlayerMotion.PanelMs.toLong())
+            val before = deletes
+            val noticeBefore = noticeCenter.state.value.pending.singleOrNull()
+            publish(emptyList(), autorecRules = listOf(if (changedElsewhere)
+                AutorecRule.create(id, title = "^Changed elsewhere$", enabled = false) else disabled))
+            compose.runOnIdle { queuedToggle.complete(Unit) }
+            compose.waitForIdle()
+            assertEquals("Delete must use the confirmed rule apart from enabled",
+                before + if (changedElsewhere) 0 else 1, deletes)
+            val noticeAfter = noticeCenter.state.value.pending.single()
+            if (changedElsewhere) {
+                assertEquals(DvrMutationKind.DELETE, (noticeAfter.notice as Notice.DvrRuleActionFailed).action)
+                assertNotEquals(noticeBefore, noticeAfter)
+            } else assertEquals(noticeBefore, noticeAfter)
+        }
     }
 
     @Test fun recoveringScheduleKeepsAddingRowsFocusableButDisabled() {
@@ -1795,10 +1851,8 @@ class RecordingsVisualLayoutTest {
             session.replaceGeneration(SessionObservation.create(old.sessionState,
                 old.channelState, old.epgState, old.dvrState))
         }
-        key(Key.DirectionRight)
-        compose.pressKey(Key.DirectionCenter, settleFrames = 1, frameMillis = PlayerMotion.PanelMs.toLong())
-        assertEquals(1, noticeCenter.state.value.pending.size)
         compose.onNodeWithTag("automatic-recording-delete-confirm").assertDoesNotExist()
+        assertTrue(noticeCenter.state.value.pending.isEmpty())
         assertNoCommands()
     }
 
@@ -2006,6 +2060,7 @@ class RecordingsVisualLayoutTest {
         val now = System.currentTimeMillis() / 1000L
         val entry = DvrEntry.create(DvrEntryId(1), title = "Growing recording", state = DvrEntryState.RECORDING,
             start = Instant.fromEpochSeconds(now - 1_200), stop = Instant.fromEpochSeconds(now + 3_600),
+            autorecRuleId = AutorecRuleId("ridge"),
             files = listOf(DvrRecordingFile.create(start = Instant.fromEpochSeconds(now - 610))))
         compose.setContent {
             TVHeadendPlayerTheme {
@@ -2015,6 +2070,9 @@ class RecordingsVisualLayoutTest {
         val elapsed = formatRecordedDuration(600, ApplicationProvider.getApplicationContext<Application>().resources)
         compose.onNodeWithText("$elapsed recorded", substring = true).assertIsDisplayed()
         compose.onNodeWithText("until", substring = true).assertDoesNotExist()
+        val origin = ApplicationProvider.getApplicationContext<Application>().getString(R.string.recording_from_automatic)
+        compose.onNodeWithTag("recording-badge", useUnmergedTree = true)
+            .assert(hasContentDescription(origin, substring = true))
     }
 
     @Test fun missedRecordingIsListedWithTheFailuresAndSaysMissed() {
