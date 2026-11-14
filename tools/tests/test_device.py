@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import runpy
 import stat
+import shlex
 import subprocess
 import tempfile
 import unittest
@@ -256,8 +257,8 @@ class OperatorShortcutsTest(unittest.TestCase):
                 self.assertEqual(runner.call_args_list[2].kwargs,
                                  dict(capture=True, sensitive=True, announce=False))
                 activity = f"{package}/at.bernhardberger.tvhplayer.ui.MainActivity"
-                self.assertEqual(DEVICE["video_surface_layer"](package), f"SurfaceView[{activity}](BLAST)#0")
-                self.assertEqual(DEVICE["video_surface_layer"](package, "ui"), f"{activity}#0")
+                self.assertIn(f"SurfaceView[{activity}](BLAST)#0", DEVICE["video_surface_layers"](package))
+                self.assertEqual(DEVICE["video_surface_layers"](package, "ui"), (f"{activity}#0",))
 
     def test_appliance_status_binding_uses_g10_component_scoped_activity_fixtures(self):
         package = DEVICE["APPLIANCE_DEBUG_PACKAGE"]
@@ -2227,29 +2228,33 @@ class DevicePolicyTest(unittest.TestCase):
 
     def test_video_frames_counts_only_frames_presented_between_samples(self) -> None:
         pending = str(DEVICE["VIDEO_FRAME_PENDING_NS"])
-        samples = iter(
-            [
-                "16666666\n100 200 300\n0 0 0\n150 250 350\n",
-                f"16666666\n100 200 300\n150 250 350\n160 400 500\n170 {pending} 0\n",
-            ]
-        )
+        # Android 12+ names the video layer with (BLAST); Android 11 (Shield) with " - ".
+        for existing in ("SurfaceView[", "SurfaceView - "):
+            with self.subTest(layer=existing):
+                samples = iter(
+                    [
+                        "16666666\n100 200 300\n0 0 0\n150 250 350\n",
+                        f"16666666\n100 200 300\n150 250 350\n160 400 500\n170 {pending} 0\n",
+                    ]
+                )
 
-        def fake_run(command, **kwargs):
-            self.assertEqual(command[-3:-1], ["SurfaceFlinger", "--latency"])
-            self.assertIn("SurfaceView[at.bernhardberger.tvhplayer.debug/", command[-1])
-            return subprocess.CompletedProcess(command, 0, stdout=next(samples), stderr="")
+                def fake_run(command, **kwargs):
+                    self.assertEqual(command[-3:-1], ["SurfaceFlinger", "--latency"])
+                    layer = shlex.split(command[-1])[0]
+                    stdout = next(samples) if layer.startswith(existing) else "16666666\n"
+                    return subprocess.CompletedProcess(command, 0, stdout=stdout, stderr="")
 
-        output = io.StringIO()
-        with (
-            patch.object(DEVICE_GLOBALS["subprocess"], "run", side_effect=fake_run),
-            patch.object(DEVICE_GLOBALS["time"], "sleep"),
-            redirect_stdout(output),
-        ):
-            DEVICE["show_video_frames"]("adb", "test-device", "at.bernhardberger.tvhplayer.debug", 0.5)
+                output = io.StringIO()
+                with (
+                    patch.object(DEVICE_GLOBALS["subprocess"], "run", side_effect=fake_run),
+                    patch.object(DEVICE_GLOBALS["time"], "sleep"),
+                    redirect_stdout(output),
+                ):
+                    DEVICE["show_video_frames"]("adb", "test-device", "at.bernhardberger.tvhplayer.debug", 0.5)
 
-        self.assertIn("newFrames=1\n", output.getvalue())
-        self.assertIn("approxFps=2.0\n", output.getvalue())
-        self.assertIn("videoPlane=rendering\n", output.getvalue())
+                self.assertIn("newFrames=1\n", output.getvalue())
+                self.assertIn("approxFps=2.0\n", output.getvalue())
+                self.assertIn("videoPlane=rendering\n", output.getvalue())
 
     def test_video_frames_ui_plane_samples_the_activity_window(self) -> None:
         parser = DEVICE["build_parser"]()
@@ -2258,8 +2263,8 @@ class DevicePolicyTest(unittest.TestCase):
 
         self.assertEqual(args.plane, "ui")
         self.assertEqual(
-            DEVICE["video_surface_layer"]("at.bernhardberger.tvhplayer.debug", "ui"),
-            "at.bernhardberger.tvhplayer.debug/at.bernhardberger.tvhplayer.ui.MainActivity#0",
+            DEVICE["video_surface_layers"]("at.bernhardberger.tvhplayer.debug", "ui"),
+            ("at.bernhardberger.tvhplayer.debug/at.bernhardberger.tvhplayer.ui.MainActivity#0",),
         )
         with self.assertRaises(SystemExit):
             parser.parse_args(["video-frames", "--plane", "audio"])

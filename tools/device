@@ -629,11 +629,16 @@ def bounded_frame_window(value: str) -> float:
 VIDEO_FRAME_PLANES = ("video", "ui")
 
 
-def video_surface_layer(package_name: str, plane: str = "video") -> str:
+def video_surface_layers(package_name: str, plane: str = "video") -> tuple[str, ...]:
+    """SurfaceFlinger names the plane's layer may carry; only one exists on a device.
+
+    Android 12 and later name the video layer ``SurfaceView[...](BLAST)#0``;
+    Android 11 (the Shield) names it ``SurfaceView - ...#0``.
+    """
     activity = f"{package_name}/at.bernhardberger.tvhplayer.ui.MainActivity"
     if plane == "ui":
-        return f"{activity}#0"
-    return f"SurfaceView[{activity}](BLAST)#0"
+        return (f"{activity}#0",)
+    return (f"SurfaceView[{activity}](BLAST)#0", f"SurfaceView - {activity}#0")
 
 
 def presented_video_frames(
@@ -694,10 +699,17 @@ def show_video_frames(
     frames that appeared in between; it is the only bounded playback-progress
     evidence available without app instrumentation.
     """
-    layer = video_surface_layer(package_name, plane)
-    before = presented_video_frames(adb, serial, layer, announce=True)
+    layers = video_surface_layers(package_name, plane)
+
+    def sample(announce: bool) -> set[int]:
+        frames: set[int] = set()
+        for layer in layers:
+            frames |= presented_video_frames(adb, serial, layer, announce=announce)
+        return frames
+
+    before = sample(announce=True)
     time.sleep(window_seconds)
-    after = presented_video_frames(adb, serial, layer, announce=False)
+    after = sample(announce=False)
     new_frames = len(after - before)
     rate = new_frames / window_seconds
     if not before and not after:
