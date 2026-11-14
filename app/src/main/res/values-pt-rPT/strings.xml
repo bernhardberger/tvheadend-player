@@ -8,6 +8,34 @@
     <string name="automatic_recording_new_title_help">Programas com exatamente este título</string>
     <string name="automatic_recording_new_timer">Agendamento recorrente</string>
     <string name="automatic_recording_new_timer_help">Um canal a horas fixas nos dias escolhidos</string>
+    <string name="schedule_upcoming">Próximas gravações</string>
+    <string name="schedule_new_timer">Novo agendamento</string>
+    <string name="schedule_new_timer_help">Um canal a horas fixas, com ou sem repetição</string>
+    <string name="schedule_automatic_empty_help">Ainda nenhuma</string>
+    <string name="schedule_automatic_empty">Ainda não há gravações automáticas.</string>
+    <string name="schedule_automatic_new_help">Por título, palavra-chave ou horas fixas</string>
+    <string name="schedule_automatic_turn_off">Desativar</string>
+    <string name="schedule_automatic_turn_on">Ativar</string>
+    <string name="schedule_automatic_off">Desativada</string>
+    <string name="schedule_automatic_next">Próxima: %1$s • %2$s</string>
+    <string name="schedule_automatic_nothing">Nada agendado</string>
+    <string name="schedule_automatic_keep">Manter até: %1$s</string>
+    <plurals name="schedule_automatic_upcoming">
+        <item quantity="one">%1$d próxima</item>
+        <item quantity="many">%1$d próximas</item>
+        <item quantity="other">%1$d próximas</item>
+    </plurals>
+    <string name="schedule_automatic_counts">%1$s • %2$s</string>
+    <plurals name="schedule_automatic_on_count">
+        <item quantity="one">%1$d ativada</item>
+        <item quantity="many">%1$d ativadas</item>
+        <item quantity="other">%1$d ativadas</item>
+    </plurals>
+    <plurals name="schedule_automatic_off_count">
+        <item quantity="one">%1$d desativada</item>
+        <item quantity="many">%1$d desativadas</item>
+        <item quantity="other">%1$d desativadas</item>
+    </plurals>
     <string name="context_record_series">Gravar série</string>
     <string name="context_record_title">Gravar todos com este título</string>
     <string name="context_edit_series">Editar gravação de série</string>

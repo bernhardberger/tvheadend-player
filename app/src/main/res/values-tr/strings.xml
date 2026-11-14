@@ -8,6 +8,31 @@
     <string name="automatic_recording_new_title_help">Başlığı tam olarak eşleşen programlar</string>
     <string name="automatic_recording_new_timer">Yinelenen zamanlayıcı</string>
     <string name="automatic_recording_new_timer_help">Seçilen gün ve saatlerde bir kanal</string>
+    <string name="schedule_upcoming">Yaklaşan</string>
+    <string name="schedule_new_timer">Yeni zamanlayıcı</string>
+    <string name="schedule_new_timer_help">Bir kanal, belirli saatte, tek ya da yinelenen</string>
+    <string name="schedule_automatic_empty_help">Henüz yok</string>
+    <string name="schedule_automatic_empty">Henüz otomatik kayıt yok.</string>
+    <string name="schedule_automatic_new_help">Başlık, anahtar kelime veya belirli saatlerle</string>
+    <string name="schedule_automatic_turn_off">Devre dışı bırak</string>
+    <string name="schedule_automatic_turn_on">Etkinleştir</string>
+    <string name="schedule_automatic_off">Kapalı</string>
+    <string name="schedule_automatic_next">Sonraki: %1$s • %2$s</string>
+    <string name="schedule_automatic_nothing">Planlanmış kayıt yok</string>
+    <string name="schedule_automatic_keep">Saklama süresi: %1$s</string>
+    <plurals name="schedule_automatic_upcoming">
+        <item quantity="one">%1$d yaklaşan</item>
+        <item quantity="other">%1$d yaklaşan</item>
+    </plurals>
+    <string name="schedule_automatic_counts">%1$s • %2$s</string>
+    <plurals name="schedule_automatic_on_count">
+        <item quantity="one">%1$d açık</item>
+        <item quantity="other">%1$d açık</item>
+    </plurals>
+    <plurals name="schedule_automatic_off_count">
+        <item quantity="one">%1$d kapalı</item>
+        <item quantity="other">%1$d kapalı</item>
+    </plurals>
     <string name="context_record_series">Diziyi kaydet</string>
     <string name="context_record_title">Bu başlıktakilerin tümünü kaydet</string>
     <string name="context_edit_series">Dizi kaydını düzenle</string>

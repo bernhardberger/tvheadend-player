@@ -8,6 +8,43 @@
     <string name="automatic_recording_new_title_help">البرامج التي تطابق هذا العنوان تمامًا</string>
     <string name="automatic_recording_new_timer">مؤقّت متكرر</string>
     <string name="automatic_recording_new_timer_help">قناة في أوقات محددة بأيام مختارة</string>
+    <string name="schedule_upcoming">القادمة</string>
+    <string name="schedule_new_timer">مؤقّت جديد</string>
+    <string name="schedule_new_timer_help">قناة بأوقات محددة، مرة واحدة أو بتكرار</string>
+    <string name="schedule_automatic_empty_help">لا يوجد بعد</string>
+    <string name="schedule_automatic_empty">لا توجد تسجيلات تلقائية بعد.</string>
+    <string name="schedule_automatic_new_help">حسب العنوان أو الكلمة المفتاحية أو أوقات محددة</string>
+    <string name="schedule_automatic_turn_off">تعطيل</string>
+    <string name="schedule_automatic_turn_on">تفعيل</string>
+    <string name="schedule_automatic_off">معطّل</string>
+    <string name="schedule_automatic_next">التالي: %1$s • %2$s</string>
+    <string name="schedule_automatic_nothing">لا توجد تسجيلات مجدولة</string>
+    <string name="schedule_automatic_keep">الاحتفاظ: %1$s</string>
+    <plurals name="schedule_automatic_upcoming">
+        <item quantity="zero">قادمة: %1$d</item>
+        <item quantity="one">قادمة: %1$d</item>
+        <item quantity="two">قادمة: %1$d</item>
+        <item quantity="few">قادمة: %1$d</item>
+        <item quantity="many">قادمة: %1$d</item>
+        <item quantity="other">قادمة: %1$d</item>
+    </plurals>
+    <string name="schedule_automatic_counts">%1$s • %2$s</string>
+    <plurals name="schedule_automatic_on_count">
+        <item quantity="zero">المفعّلة: %1$d</item>
+        <item quantity="one">المفعّلة: %1$d</item>
+        <item quantity="two">المفعّلة: %1$d</item>
+        <item quantity="few">المفعّلة: %1$d</item>
+        <item quantity="many">المفعّلة: %1$d</item>
+        <item quantity="other">المفعّلة: %1$d</item>
+    </plurals>
+    <plurals name="schedule_automatic_off_count">
+        <item quantity="zero">المعطّلة: %1$d</item>
+        <item quantity="one">المعطّلة: %1$d</item>
+        <item quantity="two">المعطّلة: %1$d</item>
+        <item quantity="few">المعطّلة: %1$d</item>
+        <item quantity="many">المعطّلة: %1$d</item>
+        <item quantity="other">المعطّلة: %1$d</item>
+    </plurals>
     <string name="context_record_series">تسجيل المسلسل</string>
     <string name="context_record_title">تسجيل كل ما يحمل هذا العنوان</string>
     <string name="context_edit_series">تعديل تسجيل مسلسل</string>

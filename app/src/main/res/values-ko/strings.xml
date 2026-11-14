@@ -8,6 +8,28 @@
     <string name="automatic_recording_new_title_help">제목이 정확히 일치하는 프로그램</string>
     <string name="automatic_recording_new_timer">반복 타이머</string>
     <string name="automatic_recording_new_timer_help">선택한 요일의 정해진 시간에 채널 녹화</string>
+    <string name="schedule_upcoming">녹화 예정</string>
+    <string name="schedule_new_timer">새 타이머</string>
+    <string name="schedule_new_timer_help">정해진 시간에 채널을 한 번 또는 반복 녹화</string>
+    <string name="schedule_automatic_empty_help">아직 없음</string>
+    <string name="schedule_automatic_empty">아직 자동 녹화가 없습니다.</string>
+    <string name="schedule_automatic_new_help">제목, 키워드 또는 정해진 시간으로 녹화</string>
+    <string name="schedule_automatic_turn_off">사용 중지</string>
+    <string name="schedule_automatic_turn_on">사용 시작</string>
+    <string name="schedule_automatic_off">사용 안 함</string>
+    <string name="schedule_automatic_next">다음: %1$s • %2$s</string>
+    <string name="schedule_automatic_nothing">예정된 녹화 없음</string>
+    <string name="schedule_automatic_keep">보관 기간: %1$s</string>
+    <plurals name="schedule_automatic_upcoming">
+        <item quantity="other">%1$d개 녹화 예정</item>
+    </plurals>
+    <string name="schedule_automatic_counts">%1$s • %2$s</string>
+    <plurals name="schedule_automatic_on_count">
+        <item quantity="other">%1$d개 사용</item>
+    </plurals>
+    <plurals name="schedule_automatic_off_count">
+        <item quantity="other">%1$d개 사용 안 함</item>
+    </plurals>
     <string name="context_record_series">시리즈 녹화</string>
     <string name="context_record_title">이 제목의 프로그램 모두 녹화</string>
     <string name="context_edit_series">시리즈 녹화 편집</string>

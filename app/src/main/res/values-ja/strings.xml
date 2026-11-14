@@ -8,6 +8,28 @@
     <string name="automatic_recording_new_title_help">タイトルが完全に一致する番組</string>
     <string name="automatic_recording_new_timer">繰り返しタイマー</string>
     <string name="automatic_recording_new_timer_help">指定した曜日・時刻のチャンネルを録画</string>
+    <string name="schedule_upcoming">今後の録画</string>
+    <string name="schedule_new_timer">新しいタイマー</string>
+    <string name="schedule_new_timer_help">指定時刻にチャンネルを1回または繰り返し録画</string>
+    <string name="schedule_automatic_empty_help">まだありません</string>
+    <string name="schedule_automatic_empty">自動録画はまだありません。</string>
+    <string name="schedule_automatic_new_help">タイトル・キーワード・指定時刻で録画</string>
+    <string name="schedule_automatic_turn_off">無効にする</string>
+    <string name="schedule_automatic_turn_on">有効にする</string>
+    <string name="schedule_automatic_off">無効</string>
+    <string name="schedule_automatic_next">次回：%1$s • %2$s</string>
+    <string name="schedule_automatic_nothing">録画予定なし</string>
+    <string name="schedule_automatic_keep">保存期間：%1$s</string>
+    <plurals name="schedule_automatic_upcoming">
+        <item quantity="other">今後%1$d件を録画予定</item>
+    </plurals>
+    <string name="schedule_automatic_counts">%1$s • %2$s</string>
+    <plurals name="schedule_automatic_on_count">
+        <item quantity="other">%1$d件が有効</item>
+    </plurals>
+    <plurals name="schedule_automatic_off_count">
+        <item quantity="other">%1$d件が無効</item>
+    </plurals>
     <string name="context_record_series">シリーズを録画</string>
     <string name="context_record_title">このタイトルの番組をすべて録画</string>
     <string name="context_edit_series">シリーズ録画を編集</string>

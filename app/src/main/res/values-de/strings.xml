@@ -8,6 +8,31 @@
     <string name="automatic_recording_new_title_help">Sendungen mit genau diesem Titel</string>
     <string name="automatic_recording_new_timer">Wiederkehrender Timer</string>
     <string name="automatic_recording_new_timer_help">Ein Sender zu festen Zeiten an gewählten Tagen</string>
+    <string name="schedule_upcoming">Anstehende Aufnahmen</string>
+    <string name="schedule_new_timer">Neuer Timer</string>
+    <string name="schedule_new_timer_help">Sender nach Uhrzeit, einmal oder wiederholt</string>
+    <string name="schedule_automatic_empty_help">Noch keine</string>
+    <string name="schedule_automatic_empty">Noch keine automatischen Aufnahmen.</string>
+    <string name="schedule_automatic_new_help">Nach Titel, Stichwort oder festen Zeiten</string>
+    <string name="schedule_automatic_turn_off">Deaktivieren</string>
+    <string name="schedule_automatic_turn_on">Aktivieren</string>
+    <string name="schedule_automatic_off">Deaktiviert</string>
+    <string name="schedule_automatic_next">Nächste: %1$s • %2$s</string>
+    <string name="schedule_automatic_nothing">Nichts geplant</string>
+    <string name="schedule_automatic_keep">Behalten: %1$s</string>
+    <plurals name="schedule_automatic_upcoming">
+        <item quantity="one">%1$d anstehend</item>
+        <item quantity="other">%1$d anstehend</item>
+    </plurals>
+    <string name="schedule_automatic_counts">%1$s • %2$s</string>
+    <plurals name="schedule_automatic_on_count">
+        <item quantity="one">%1$d aktiviert</item>
+        <item quantity="other">%1$d aktiviert</item>
+    </plurals>
+    <plurals name="schedule_automatic_off_count">
+        <item quantity="one">%1$d deaktiviert</item>
+        <item quantity="other">%1$d deaktiviert</item>
+    </plurals>
     <string name="context_record_series">Serie aufnehmen</string>
     <string name="context_record_title">Alle mit diesem Titel aufnehmen</string>
     <string name="context_edit_series">Serienaufnahme bearbeiten</string>

@@ -8,6 +8,28 @@
     <string name="automatic_recording_new_title_help">标题完全相同的节目</string>
     <string name="automatic_recording_new_timer">重复定时录制</string>
     <string name="automatic_recording_new_timer_help">在所选日期的固定时段录制一个频道</string>
+    <string name="schedule_upcoming">即将录制</string>
+    <string name="schedule_new_timer">新建定时录制</string>
+    <string name="schedule_new_timer_help">在指定时段录制一个频道，可单次或重复</string>
+    <string name="schedule_automatic_empty_help">暂无</string>
+    <string name="schedule_automatic_empty">暂无自动录制。</string>
+    <string name="schedule_automatic_new_help">按标题、关键词或固定时段录制</string>
+    <string name="schedule_automatic_turn_off">停用</string>
+    <string name="schedule_automatic_turn_on">启用</string>
+    <string name="schedule_automatic_off">已停用</string>
+    <string name="schedule_automatic_next">下一次：%1$s • %2$s</string>
+    <string name="schedule_automatic_nothing">暂无录制计划</string>
+    <string name="schedule_automatic_keep">保留期限：%1$s</string>
+    <plurals name="schedule_automatic_upcoming">
+        <item quantity="other">%1$d项即将录制</item>
+    </plurals>
+    <string name="schedule_automatic_counts">%1$s • %2$s</string>
+    <plurals name="schedule_automatic_on_count">
+        <item quantity="other">%1$d项已启用</item>
+    </plurals>
+    <plurals name="schedule_automatic_off_count">
+        <item quantity="other">%1$d项已停用</item>
+    </plurals>
     <string name="context_record_series">录制系列</string>
     <string name="context_record_title">录制此标题的所有节目</string>
     <string name="context_edit_series">编辑系列录制</string>

@@ -8,6 +8,31 @@
     <string name="automatic_recording_new_title_help">Pontosan ilyen című műsorok</string>
     <string name="automatic_recording_new_timer">Ismétlődő időzítő</string>
     <string name="automatic_recording_new_timer_help">Egy csatorna adott időben, a kijelölt napokon</string>
+    <string name="schedule_upcoming">Közelgő</string>
+    <string name="schedule_new_timer">Új időzítő</string>
+    <string name="schedule_new_timer_help">Csatorna adott időben, egyszer vagy ismételve</string>
+    <string name="schedule_automatic_empty_help">Még nincs</string>
+    <string name="schedule_automatic_empty">Még nincs automatikus felvétel.</string>
+    <string name="schedule_automatic_new_help">Cím, kulcsszó vagy adott időpont alapján</string>
+    <string name="schedule_automatic_turn_off">Kikapcsolás</string>
+    <string name="schedule_automatic_turn_on">Bekapcsolás</string>
+    <string name="schedule_automatic_off">Kikapcsolva</string>
+    <string name="schedule_automatic_next">Következő: %1$s • %2$s</string>
+    <string name="schedule_automatic_nothing">Nincs ütemezett felvétel</string>
+    <string name="schedule_automatic_keep">Megtartás: %1$s</string>
+    <plurals name="schedule_automatic_upcoming">
+        <item quantity="one">%1$d közelgő</item>
+        <item quantity="other">%1$d közelgő</item>
+    </plurals>
+    <string name="schedule_automatic_counts">%1$s • %2$s</string>
+    <plurals name="schedule_automatic_on_count">
+        <item quantity="one">%1$d bekapcsolva</item>
+        <item quantity="other">%1$d bekapcsolva</item>
+    </plurals>
+    <plurals name="schedule_automatic_off_count">
+        <item quantity="one">%1$d kikapcsolva</item>
+        <item quantity="other">%1$d kikapcsolva</item>
+    </plurals>
     <string name="context_record_series">Sorozat felvétele</string>
     <string name="context_record_title">Összes ilyen című felvétele</string>
     <string name="context_edit_series">Sorozatfelvétel szerkesztése</string>

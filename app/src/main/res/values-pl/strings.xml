@@ -8,6 +8,37 @@
     <string name="automatic_recording_new_title_help">Programy z dokładnie takim tytułem</string>
     <string name="automatic_recording_new_timer">Cykliczny harmonogram</string>
     <string name="automatic_recording_new_timer_help">Kanał o ustalonych porach w wybrane dni</string>
+    <string name="schedule_upcoming">Nadchodzące</string>
+    <string name="schedule_new_timer">Nowy harmonogram</string>
+    <string name="schedule_new_timer_help">Kanał o ustalonych porach, raz lub cyklicznie</string>
+    <string name="schedule_automatic_empty_help">Jeszcze brak</string>
+    <string name="schedule_automatic_empty">Nie ma jeszcze automatycznego nagrywania.</string>
+    <string name="schedule_automatic_new_help">Według tytułu, słowa kluczowego lub czasu</string>
+    <string name="schedule_automatic_turn_off">Wyłącz</string>
+    <string name="schedule_automatic_turn_on">Włącz</string>
+    <string name="schedule_automatic_off">Wyłączone</string>
+    <string name="schedule_automatic_next">Następne: %1$s • %2$s</string>
+    <string name="schedule_automatic_nothing">Nic nie zaplanowano</string>
+    <string name="schedule_automatic_keep">Zachowaj: %1$s</string>
+    <plurals name="schedule_automatic_upcoming">
+        <item quantity="one">%1$d nadchodzące</item>
+        <item quantity="few">%1$d nadchodzące</item>
+        <item quantity="many">%1$d nadchodzących</item>
+        <item quantity="other">%1$d nadchodzącego</item>
+    </plurals>
+    <string name="schedule_automatic_counts">%1$s • %2$s</string>
+    <plurals name="schedule_automatic_on_count">
+        <item quantity="one">%1$d włączone</item>
+        <item quantity="few">%1$d włączone</item>
+        <item quantity="many">%1$d włączonych</item>
+        <item quantity="other">%1$d włączonego</item>
+    </plurals>
+    <plurals name="schedule_automatic_off_count">
+        <item quantity="one">%1$d wyłączone</item>
+        <item quantity="few">%1$d wyłączone</item>
+        <item quantity="many">%1$d wyłączonych</item>
+        <item quantity="other">%1$d wyłączonego</item>
+    </plurals>
     <string name="context_record_series">Nagraj serial</string>
     <string name="context_record_title">Nagraj wszystko z tym tytułem</string>
     <string name="context_edit_series">Edytuj nagrywanie serialu</string>

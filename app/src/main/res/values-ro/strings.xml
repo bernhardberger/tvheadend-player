@@ -8,6 +8,34 @@
     <string name="automatic_recording_new_title_help">Emisiuni cu exact acest titlu</string>
     <string name="automatic_recording_new_timer">Programare repetitivă</string>
     <string name="automatic_recording_new_timer_help">Un canal la ore fixe în zilele alese</string>
+    <string name="schedule_upcoming">Viitoare</string>
+    <string name="schedule_new_timer">Programare nouă</string>
+    <string name="schedule_new_timer_help">Un canal la ore fixe, o dată sau repetat</string>
+    <string name="schedule_automatic_empty_help">Încă niciuna</string>
+    <string name="schedule_automatic_empty">Încă nu există înregistrări automate.</string>
+    <string name="schedule_automatic_new_help">După titlu, cuvânt-cheie sau la ore fixe</string>
+    <string name="schedule_automatic_turn_off">Dezactivează</string>
+    <string name="schedule_automatic_turn_on">Activează</string>
+    <string name="schedule_automatic_off">Dezactivată</string>
+    <string name="schedule_automatic_next">Următoarea: %1$s • %2$s</string>
+    <string name="schedule_automatic_nothing">Nicio înregistrare programată</string>
+    <string name="schedule_automatic_keep">Păstrează până: %1$s</string>
+    <plurals name="schedule_automatic_upcoming">
+        <item quantity="one">%1$d viitoare</item>
+        <item quantity="few">%1$d viitoare</item>
+        <item quantity="other">%1$d de viitoare</item>
+    </plurals>
+    <string name="schedule_automatic_counts">%1$s • %2$s</string>
+    <plurals name="schedule_automatic_on_count">
+        <item quantity="one">%1$d activată</item>
+        <item quantity="few">%1$d activate</item>
+        <item quantity="other">%1$d de activate</item>
+    </plurals>
+    <plurals name="schedule_automatic_off_count">
+        <item quantity="one">%1$d dezactivată</item>
+        <item quantity="few">%1$d dezactivate</item>
+        <item quantity="other">%1$d de dezactivate</item>
+    </plurals>
     <string name="context_record_series">Înregistrează seria</string>
     <string name="context_record_title">Înregistrează tot cu acest titlu</string>
     <string name="context_edit_series">Editează înregistrarea de serie</string>

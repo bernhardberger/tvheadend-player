@@ -8,6 +8,28 @@
     <string name="automatic_recording_new_title_help">標題完全相同的節目</string>
     <string name="automatic_recording_new_timer">重複定時錄影</string>
     <string name="automatic_recording_new_timer_help">在指定日期的固定時段錄製一個頻道</string>
+    <string name="schedule_upcoming">即將錄影</string>
+    <string name="schedule_new_timer">新增定時錄影</string>
+    <string name="schedule_new_timer_help">在指定時段錄製一個頻道，可單次或重複</string>
+    <string name="schedule_automatic_empty_help">尚無</string>
+    <string name="schedule_automatic_empty">尚無自動錄影。</string>
+    <string name="schedule_automatic_new_help">依標題、關鍵字或固定時段錄影</string>
+    <string name="schedule_automatic_turn_off">停用</string>
+    <string name="schedule_automatic_turn_on">啟用</string>
+    <string name="schedule_automatic_off">已停用</string>
+    <string name="schedule_automatic_next">下一次：%1$s • %2$s</string>
+    <string name="schedule_automatic_nothing">尚無錄影排程</string>
+    <string name="schedule_automatic_keep">保留期限：%1$s</string>
+    <plurals name="schedule_automatic_upcoming">
+        <item quantity="other">%1$d項即將錄影</item>
+    </plurals>
+    <string name="schedule_automatic_counts">%1$s • %2$s</string>
+    <plurals name="schedule_automatic_on_count">
+        <item quantity="other">%1$d項已啟用</item>
+    </plurals>
+    <plurals name="schedule_automatic_off_count">
+        <item quantity="other">%1$d項已停用</item>
+    </plurals>
     <string name="context_record_series">錄影此系列</string>
     <string name="context_record_title">錄影此標題的所有節目</string>
     <string name="context_edit_series">編輯系列錄影</string>

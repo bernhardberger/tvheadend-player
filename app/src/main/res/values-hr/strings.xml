@@ -8,6 +8,34 @@
     <string name="automatic_recording_new_title_help">Emisije s točno ovim naslovom</string>
     <string name="automatic_recording_new_timer">Ponavljajuće vremensko snimanje</string>
     <string name="automatic_recording_new_timer_help">Kanal u zadano vrijeme odabranim danima</string>
+    <string name="schedule_upcoming">Nadolazeće</string>
+    <string name="schedule_new_timer">Novo vremensko snimanje</string>
+    <string name="schedule_new_timer_help">Kanal u zadano vrijeme, jednom ili ponavljajuće</string>
+    <string name="schedule_automatic_empty_help">Još nijedno</string>
+    <string name="schedule_automatic_empty">Još nema automatskih snimanja.</string>
+    <string name="schedule_automatic_new_help">Prema naslovu, ključnoj riječi ili vremenu</string>
+    <string name="schedule_automatic_turn_off">Isključi</string>
+    <string name="schedule_automatic_turn_on">Uključi</string>
+    <string name="schedule_automatic_off">Isključeno</string>
+    <string name="schedule_automatic_next">Sljedeće: %1$s • %2$s</string>
+    <string name="schedule_automatic_nothing">Nema zakazanih snimanja</string>
+    <string name="schedule_automatic_keep">Zadrži: %1$s</string>
+    <plurals name="schedule_automatic_upcoming">
+        <item quantity="one">%1$d nadolazeće</item>
+        <item quantity="few">%1$d nadolazeća</item>
+        <item quantity="other">%1$d nadolazećih</item>
+    </plurals>
+    <string name="schedule_automatic_counts">%1$s • %2$s</string>
+    <plurals name="schedule_automatic_on_count">
+        <item quantity="one">%1$d uključeno</item>
+        <item quantity="few">%1$d uključena</item>
+        <item quantity="other">%1$d uključenih</item>
+    </plurals>
+    <plurals name="schedule_automatic_off_count">
+        <item quantity="one">%1$d isključeno</item>
+        <item quantity="few">%1$d isključena</item>
+        <item quantity="other">%1$d isključenih</item>
+    </plurals>
     <string name="context_record_series">Snimi seriju</string>
     <string name="context_record_title">Snimi sve s ovim naslovom</string>
     <string name="context_edit_series">Uredi snimanje serije</string>

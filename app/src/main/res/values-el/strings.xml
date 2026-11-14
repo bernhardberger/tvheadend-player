@@ -8,6 +8,31 @@
     <string name="automatic_recording_new_title_help">Εκπομπές με ακριβώς αυτόν τον τίτλο</string>
     <string name="automatic_recording_new_timer">Επαναλαμβανόμενος χρονοδιακόπτης</string>
     <string name="automatic_recording_new_timer_help">Ένα κανάλι σε καθορισμένες ώρες και επιλεγμένες ημέρες</string>
+    <string name="schedule_upcoming">Προσεχείς</string>
+    <string name="schedule_new_timer">Νέος χρονοδιακόπτης</string>
+    <string name="schedule_new_timer_help">Κανάλι σε ορισμένες ώρες, μία φορά ή τακτικά</string>
+    <string name="schedule_automatic_empty_help">Καμία ακόμη</string>
+    <string name="schedule_automatic_empty">Δεν υπάρχουν αυτόματες εγγραφές ακόμη.</string>
+    <string name="schedule_automatic_new_help">Με τίτλο, λέξεις-κλειδιά ή καθορισμένες ώρες</string>
+    <string name="schedule_automatic_turn_off">Απενεργοποίηση</string>
+    <string name="schedule_automatic_turn_on">Ενεργοποίηση</string>
+    <string name="schedule_automatic_off">Ανενεργό</string>
+    <string name="schedule_automatic_next">Επόμενη: %1$s • %2$s</string>
+    <string name="schedule_automatic_nothing">Καμία προγραμματισμένη εγγραφή</string>
+    <string name="schedule_automatic_keep">Διατήρηση: %1$s</string>
+    <plurals name="schedule_automatic_upcoming">
+        <item quantity="one">%1$d προσεχής εγγραφή</item>
+        <item quantity="other">%1$d προσεχείς εγγραφές</item>
+    </plurals>
+    <string name="schedule_automatic_counts">%1$s • %2$s</string>
+    <plurals name="schedule_automatic_on_count">
+        <item quantity="one">%1$d ενεργή</item>
+        <item quantity="other">%1$d ενεργές</item>
+    </plurals>
+    <plurals name="schedule_automatic_off_count">
+        <item quantity="one">%1$d ανενεργή</item>
+        <item quantity="other">%1$d ανενεργές</item>
+    </plurals>
     <string name="context_record_series">Εγγραφή σειράς</string>
     <string name="context_record_title">Εγγραφή όλων με αυτόν τον τίτλο</string>
     <string name="context_edit_series">Επεξεργασία εγγραφής σειράς</string>

@@ -42,6 +42,8 @@ Reconciled to frozen source `6d80a8ff` for 0.3.0 by GPT-6.1 Sol (medium), retain
 
 0.5 automatic recording, timer, Keep until and expiry strings (`automatic_recording_*`, `autorec_editor_*`, `timer_editor_*`, `context_edit_*`, `context_skip_*`, `context_unskip_*`, `context_record_*`, `context_keep_until`, `recording_keep_until_*`, `recording_expir*`, `home_expiring_soon`, `recording_from_automatic`, `recording_state_and_origin`) drafted against `9e30bc99` by GPT-6.1 Sol (medium) and reviewed by Sonnet 5.5 (medium); still machine-drafted, no human reviewer. Reviewer corrections accepted for `autorec_editor_new_unknown`, `automatic_recording_kind_series`, `context_edit_series`, `autorec_editor_new_series`, `autorec_editor_delete_series`, `context_skip_series_support`, `automatic_recording_action_not_confirmed`.
 
+0.5 Schedule tab strings for timers and the list of automatic recordings (`schedule_*`) drafted against `b257da70` by GPT-6.1 Sol (medium) and reviewed by Sonnet 5.5 (medium); still machine-drafted, no human reviewer. Reviewer corrections accepted for `schedule_automatic_upcoming`, `schedule_automatic_on_count`, `schedule_automatic_off_count`.
+
 ## Open questions
 
 - Check TTS pronunciation of the × speed multiplier in `player_scrub_*`.
@@ -49,3 +51,4 @@ Reconciled to frozen source `6d80a8ff` for 0.3.0 by GPT-6.1 Sol (medium), retain
 - Check *mod aparat TV*, *Imersiv* and *redare tunelizată* for conventional terms and length.
 - `guide_time_prime_time` and long help strings may exceed soft limits.
 - The series kind is *Înregistrare de serie* (`automatic_recording_kind_series`) while `recording_from_series_rule` says *Face parte din înregistrarea unei serii*; align the two.
+- `schedule_automatic_keep` puts the Keep until heading before its value, which reads awkwardly with the Forever value (*Păstrează până: Pentru totdeauna*); check for a label that fits every value.

@@ -8,6 +8,31 @@
     <string name="automatic_recording_new_title_help">Programmer med præcis denne titel</string>
     <string name="automatic_recording_new_timer">Gentagen timer</string>
     <string name="automatic_recording_new_timer_help">En kanal på faste tidspunkter på valgte dage</string>
+    <string name="schedule_upcoming">Kommende</string>
+    <string name="schedule_new_timer">Ny timer</string>
+    <string name="schedule_new_timer_help">Kanal på faste tider, én gang eller gentaget</string>
+    <string name="schedule_automatic_empty_help">Ingen endnu</string>
+    <string name="schedule_automatic_empty">Ingen automatiske optagelser endnu.</string>
+    <string name="schedule_automatic_new_help">Efter titel, søgeord eller faste tider</string>
+    <string name="schedule_automatic_turn_off">Slå fra</string>
+    <string name="schedule_automatic_turn_on">Slå til</string>
+    <string name="schedule_automatic_off">Slået fra</string>
+    <string name="schedule_automatic_next">Næste: %1$s • %2$s</string>
+    <string name="schedule_automatic_nothing">Ingen planlagte optagelser</string>
+    <string name="schedule_automatic_keep">Bevar indtil: %1$s</string>
+    <plurals name="schedule_automatic_upcoming">
+        <item quantity="one">%1$d kommende</item>
+        <item quantity="other">%1$d kommende</item>
+    </plurals>
+    <string name="schedule_automatic_counts">%1$s • %2$s</string>
+    <plurals name="schedule_automatic_on_count">
+        <item quantity="one">%1$d slået til</item>
+        <item quantity="other">%1$d slået til</item>
+    </plurals>
+    <plurals name="schedule_automatic_off_count">
+        <item quantity="one">%1$d slået fra</item>
+        <item quantity="other">%1$d slået fra</item>
+    </plurals>
     <string name="context_record_series">Optag serie</string>
     <string name="context_record_title">Optag alle med denne titel</string>
     <string name="context_edit_series">Rediger serieoptagelse</string>

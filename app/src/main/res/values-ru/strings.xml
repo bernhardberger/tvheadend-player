@@ -8,6 +8,37 @@
     <string name="automatic_recording_new_title_help">Передачи с точно таким названием</string>
     <string name="automatic_recording_new_timer">Повторяющийся таймер</string>
     <string name="automatic_recording_new_timer_help">Канал в заданное время по выбранным дням</string>
+    <string name="schedule_upcoming">Предстоящие</string>
+    <string name="schedule_new_timer">Новый таймер</string>
+    <string name="schedule_new_timer_help">Канал по времени, разово или с повторением</string>
+    <string name="schedule_automatic_empty_help">Пока нет</string>
+    <string name="schedule_automatic_empty">Автоматических записей пока нет.</string>
+    <string name="schedule_automatic_new_help">По названию, ключевым словам или времени</string>
+    <string name="schedule_automatic_turn_off">Выключить</string>
+    <string name="schedule_automatic_turn_on">Включить</string>
+    <string name="schedule_automatic_off">Выключено</string>
+    <string name="schedule_automatic_next">Следующая: %1$s • %2$s</string>
+    <string name="schedule_automatic_nothing">Ничего не запланировано</string>
+    <string name="schedule_automatic_keep">Хранить: %1$s</string>
+    <plurals name="schedule_automatic_upcoming">
+        <item quantity="one">%1$d предстоящая запись</item>
+        <item quantity="few">%1$d предстоящие записи</item>
+        <item quantity="many">%1$d предстоящих записей</item>
+        <item quantity="other">%1$d предстоящей записи</item>
+    </plurals>
+    <string name="schedule_automatic_counts">%1$s • %2$s</string>
+    <plurals name="schedule_automatic_on_count">
+        <item quantity="one">%1$d включена</item>
+        <item quantity="few">%1$d включены</item>
+        <item quantity="many">%1$d включено</item>
+        <item quantity="other">%1$d включено</item>
+    </plurals>
+    <plurals name="schedule_automatic_off_count">
+        <item quantity="one">%1$d выключена</item>
+        <item quantity="few">%1$d выключены</item>
+        <item quantity="many">%1$d выключено</item>
+        <item quantity="other">%1$d выключено</item>
+    </plurals>
     <string name="context_record_series">Записать сериал</string>
     <string name="context_record_title">Записать всё с этим названием</string>
     <string name="context_edit_series">Изменить запись сериала</string>

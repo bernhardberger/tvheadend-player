@@ -8,6 +8,34 @@
     <string name="automatic_recording_new_title_help">תוכניות עם הכותרת הזו בדיוק</string>
     <string name="automatic_recording_new_timer">טיימר חוזר</string>
     <string name="automatic_recording_new_timer_help">ערוץ בשעות קבועות בימים שנבחרו</string>
+    <string name="schedule_upcoming">קרובות</string>
+    <string name="schedule_new_timer">טיימר חדש</string>
+    <string name="schedule_new_timer_help">ערוץ בשעות קבועות, פעם אחת או באופן חוזר</string>
+    <string name="schedule_automatic_empty_help">אין עדיין</string>
+    <string name="schedule_automatic_empty">עדיין אין הקלטות אוטומטיות.</string>
+    <string name="schedule_automatic_new_help">לפי כותרת, מילת מפתח או שעות קבועות</string>
+    <string name="schedule_automatic_turn_off">כיבוי</string>
+    <string name="schedule_automatic_turn_on">הפעלה</string>
+    <string name="schedule_automatic_off">כבויה</string>
+    <string name="schedule_automatic_next">הבאה: %1$s • %2$s</string>
+    <string name="schedule_automatic_nothing">אין הקלטות מתוזמנות</string>
+    <string name="schedule_automatic_keep">שמירה עד: %1$s</string>
+    <plurals name="schedule_automatic_upcoming">
+        <item quantity="one">%1$d קרובה</item>
+        <item quantity="two">%1$d קרובות</item>
+        <item quantity="other">%1$d קרובות</item>
+    </plurals>
+    <string name="schedule_automatic_counts">%1$s • %2$s</string>
+    <plurals name="schedule_automatic_on_count">
+        <item quantity="one">%1$d מופעלת</item>
+        <item quantity="two">%1$d מופעלות</item>
+        <item quantity="other">%1$d מופעלות</item>
+    </plurals>
+    <plurals name="schedule_automatic_off_count">
+        <item quantity="one">%1$d כבויה</item>
+        <item quantity="two">%1$d כבויות</item>
+        <item quantity="other">%1$d כבויות</item>
+    </plurals>
     <string name="context_record_series">הקלטת סדרה</string>
     <string name="context_record_title">הקלטת כל התוכניות עם הכותרת הזו</string>
     <string name="context_edit_series">עריכת הקלטת סדרה</string>

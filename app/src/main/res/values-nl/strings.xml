@@ -8,6 +8,31 @@
     <string name="automatic_recording_new_title_help">Programma’s met precies deze titel</string>
     <string name="automatic_recording_new_timer">Herhalende timer</string>
     <string name="automatic_recording_new_timer_help">Een zender op vaste tijden en gekozen dagen</string>
+    <string name="schedule_upcoming">Komende opnamen</string>
+    <string name="schedule_new_timer">Nieuwe timer</string>
+    <string name="schedule_new_timer_help">Zender op vaste tijden, eenmalig of herhaald</string>
+    <string name="schedule_automatic_empty_help">Nog geen</string>
+    <string name="schedule_automatic_empty">Nog geen automatische opnamen.</string>
+    <string name="schedule_automatic_new_help">Op titel, zoekwoord of vaste tijden</string>
+    <string name="schedule_automatic_turn_off">Uitschakelen</string>
+    <string name="schedule_automatic_turn_on">Inschakelen</string>
+    <string name="schedule_automatic_off">Uit</string>
+    <string name="schedule_automatic_next">Volgende: %1$s • %2$s</string>
+    <string name="schedule_automatic_nothing">Niets gepland</string>
+    <string name="schedule_automatic_keep">Bewaren: %1$s</string>
+    <plurals name="schedule_automatic_upcoming">
+        <item quantity="one">%1$d komende</item>
+        <item quantity="other">%1$d komende</item>
+    </plurals>
+    <string name="schedule_automatic_counts">%1$s • %2$s</string>
+    <plurals name="schedule_automatic_on_count">
+        <item quantity="one">%1$d aan</item>
+        <item quantity="other">%1$d aan</item>
+    </plurals>
+    <plurals name="schedule_automatic_off_count">
+        <item quantity="one">%1$d uit</item>
+        <item quantity="other">%1$d uit</item>
+    </plurals>
     <string name="context_record_series">Serie opnemen</string>
     <string name="context_record_title">Alles met deze titel opnemen</string>
     <string name="context_edit_series">Serieopname bewerken</string>

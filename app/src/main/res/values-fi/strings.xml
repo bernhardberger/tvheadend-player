@@ -8,6 +8,31 @@
     <string name="automatic_recording_new_title_help">Ohjelmat, joiden nimi on täsmälleen tämä</string>
     <string name="automatic_recording_new_timer">Toistuva ajastus</string>
     <string name="automatic_recording_new_timer_help">Kanava tiettyyn aikaan valittuina päivinä</string>
+    <string name="schedule_upcoming">Tulevat</string>
+    <string name="schedule_new_timer">Uusi ajastus</string>
+    <string name="schedule_new_timer_help">Kanava tiettyyn aikaan, kerran tai toistuvasti</string>
+    <string name="schedule_automatic_empty_help">Ei vielä yhtään</string>
+    <string name="schedule_automatic_empty">Ei vielä automaattisia tallennuksia.</string>
+    <string name="schedule_automatic_new_help">Nimen, hakusanan tai kellonajan mukaan</string>
+    <string name="schedule_automatic_turn_off">Ota pois käytöstä</string>
+    <string name="schedule_automatic_turn_on">Ota käyttöön</string>
+    <string name="schedule_automatic_off">Pois käytöstä</string>
+    <string name="schedule_automatic_next">Seuraava: %1$s • %2$s</string>
+    <string name="schedule_automatic_nothing">Ei ajastettuja tallennuksia</string>
+    <string name="schedule_automatic_keep">Säilytä: %1$s</string>
+    <plurals name="schedule_automatic_upcoming">
+        <item quantity="one">%1$d tuleva</item>
+        <item quantity="other">%1$d tulevaa</item>
+    </plurals>
+    <string name="schedule_automatic_counts">%1$s • %2$s</string>
+    <plurals name="schedule_automatic_on_count">
+        <item quantity="one">%1$d käytössä</item>
+        <item quantity="other">%1$d käytössä</item>
+    </plurals>
+    <plurals name="schedule_automatic_off_count">
+        <item quantity="one">%1$d pois käytöstä</item>
+        <item quantity="other">%1$d pois käytöstä</item>
+    </plurals>
     <string name="context_record_series">Tallenna sarja</string>
     <string name="context_record_title">Tallenna kaikki tällä nimellä</string>
     <string name="context_edit_series">Muokkaa sarjatallennusta</string>

@@ -8,6 +8,34 @@
     <string name="automatic_recording_new_title_help">Programmi con esattamente questo titolo</string>
     <string name="automatic_recording_new_timer">Programmazione ricorrente</string>
     <string name="automatic_recording_new_timer_help">Un canale a orari fissi nei giorni scelti</string>
+    <string name="schedule_upcoming">In arrivo</string>
+    <string name="schedule_new_timer">Nuova programmazione</string>
+    <string name="schedule_new_timer_help">Canale a orari fissi, una volta o ricorrente</string>
+    <string name="schedule_automatic_empty_help">Ancora nessuna</string>
+    <string name="schedule_automatic_empty">Ancora nessuna registrazione automatica.</string>
+    <string name="schedule_automatic_new_help">Per titolo, parola chiave o a orari fissi</string>
+    <string name="schedule_automatic_turn_off">Disattiva</string>
+    <string name="schedule_automatic_turn_on">Attiva</string>
+    <string name="schedule_automatic_off">Disattivata</string>
+    <string name="schedule_automatic_next">Prossima: %1$s • %2$s</string>
+    <string name="schedule_automatic_nothing">Nessuna registrazione programmata</string>
+    <string name="schedule_automatic_keep">Conserva fino a: %1$s</string>
+    <plurals name="schedule_automatic_upcoming">
+        <item quantity="one">%1$d in arrivo</item>
+        <item quantity="many">%1$d in arrivo</item>
+        <item quantity="other">%1$d in arrivo</item>
+    </plurals>
+    <string name="schedule_automatic_counts">%1$s • %2$s</string>
+    <plurals name="schedule_automatic_on_count">
+        <item quantity="one">%1$d attiva</item>
+        <item quantity="many">%1$d attive</item>
+        <item quantity="other">%1$d attive</item>
+    </plurals>
+    <plurals name="schedule_automatic_off_count">
+        <item quantity="one">%1$d disattiva</item>
+        <item quantity="many">%1$d disattive</item>
+        <item quantity="other">%1$d disattive</item>
+    </plurals>
     <string name="context_record_series">Registra la serie</string>
     <string name="context_record_title">Registra tutto con questo titolo</string>
     <string name="context_edit_series">Modifica registrazione di serie</string>

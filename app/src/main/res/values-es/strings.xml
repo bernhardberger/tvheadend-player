@@ -8,6 +8,34 @@
     <string name="automatic_recording_new_title_help">Programas con este título exacto</string>
     <string name="automatic_recording_new_timer">Programación periódica</string>
     <string name="automatic_recording_new_timer_help">Un canal a horas fijas los días elegidos</string>
+    <string name="schedule_upcoming">Próximas grabaciones</string>
+    <string name="schedule_new_timer">Nueva programación</string>
+    <string name="schedule_new_timer_help">Un canal a horas fijas, con o sin repetición</string>
+    <string name="schedule_automatic_empty_help">Aún ninguna</string>
+    <string name="schedule_automatic_empty">Aún no hay grabaciones automáticas.</string>
+    <string name="schedule_automatic_new_help">Por título, palabra clave u horas fijas</string>
+    <string name="schedule_automatic_turn_off">Desactivar</string>
+    <string name="schedule_automatic_turn_on">Activar</string>
+    <string name="schedule_automatic_off">Desactivada</string>
+    <string name="schedule_automatic_next">Próxima: %1$s • %2$s</string>
+    <string name="schedule_automatic_nothing">Nada programado</string>
+    <string name="schedule_automatic_keep">Conservar hasta: %1$s</string>
+    <plurals name="schedule_automatic_upcoming">
+        <item quantity="one">%1$d próxima</item>
+        <item quantity="many">%1$d próximas</item>
+        <item quantity="other">%1$d próximas</item>
+    </plurals>
+    <string name="schedule_automatic_counts">%1$s • %2$s</string>
+    <plurals name="schedule_automatic_on_count">
+        <item quantity="one">%1$d activada</item>
+        <item quantity="many">%1$d activadas</item>
+        <item quantity="other">%1$d activadas</item>
+    </plurals>
+    <plurals name="schedule_automatic_off_count">
+        <item quantity="one">%1$d desactivada</item>
+        <item quantity="many">%1$d desactivadas</item>
+        <item quantity="other">%1$d desactivadas</item>
+    </plurals>
     <string name="context_record_series">Grabar serie</string>
     <string name="context_record_title">Grabar todos con este título</string>
     <string name="context_edit_series">Editar grabación de serie</string>

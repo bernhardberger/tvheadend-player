@@ -8,6 +8,37 @@
     <string name="automatic_recording_new_title_help">Pořady s přesně tímto názvem</string>
     <string name="automatic_recording_new_timer">Opakovaný časovač</string>
     <string name="automatic_recording_new_timer_help">Kanál v určené časy ve vybrané dny</string>
+    <string name="schedule_upcoming">Nadcházející</string>
+    <string name="schedule_new_timer">Nový časovač</string>
+    <string name="schedule_new_timer_help">Kanál v daný čas, jednou nebo opakovaně</string>
+    <string name="schedule_automatic_empty_help">Zatím žádné</string>
+    <string name="schedule_automatic_empty">Zatím žádné automatické nahrávání.</string>
+    <string name="schedule_automatic_new_help">Podle názvu, klíčového slova nebo času</string>
+    <string name="schedule_automatic_turn_off">Vypnout</string>
+    <string name="schedule_automatic_turn_on">Zapnout</string>
+    <string name="schedule_automatic_off">Vypnuto</string>
+    <string name="schedule_automatic_next">Další: %1$s • %2$s</string>
+    <string name="schedule_automatic_nothing">Nic není naplánováno</string>
+    <string name="schedule_automatic_keep">Ponechat: %1$s</string>
+    <plurals name="schedule_automatic_upcoming">
+        <item quantity="one">%1$d nadcházející</item>
+        <item quantity="few">%1$d nadcházející</item>
+        <item quantity="many">%1$d nadcházejícího</item>
+        <item quantity="other">%1$d nadcházejících</item>
+    </plurals>
+    <string name="schedule_automatic_counts">%1$s • %2$s</string>
+    <plurals name="schedule_automatic_on_count">
+        <item quantity="one">%1$d zapnuté</item>
+        <item quantity="few">%1$d zapnutá</item>
+        <item quantity="many">%1$d zapnutého</item>
+        <item quantity="other">%1$d zapnutých</item>
+    </plurals>
+    <plurals name="schedule_automatic_off_count">
+        <item quantity="one">%1$d vypnuté</item>
+        <item quantity="few">%1$d vypnutá</item>
+        <item quantity="many">%1$d vypnutého</item>
+        <item quantity="other">%1$d vypnutých</item>
+    </plurals>
     <string name="context_record_series">Nahrát seriál</string>
     <string name="context_record_title">Nahrát vše s tímto názvem</string>
     <string name="context_edit_series">Upravit nahrávání seriálu</string>

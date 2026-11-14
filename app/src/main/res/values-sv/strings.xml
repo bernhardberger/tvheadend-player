@@ -8,6 +8,31 @@
     <string name="automatic_recording_new_title_help">Program med exakt denna titel</string>
     <string name="automatic_recording_new_timer">Återkommande timer</string>
     <string name="automatic_recording_new_timer_help">En kanal på fasta tider och valda dagar</string>
+    <string name="schedule_upcoming">Kommande</string>
+    <string name="schedule_new_timer">Ny timer</string>
+    <string name="schedule_new_timer_help">Kanal på fasta tider, en gång eller upprepat</string>
+    <string name="schedule_automatic_empty_help">Inga än</string>
+    <string name="schedule_automatic_empty">Inga automatiska inspelningar än.</string>
+    <string name="schedule_automatic_new_help">Efter titel, sökord eller fasta tider</string>
+    <string name="schedule_automatic_turn_off">Stäng av</string>
+    <string name="schedule_automatic_turn_on">Slå på</string>
+    <string name="schedule_automatic_off">Av</string>
+    <string name="schedule_automatic_next">Nästa: %1$s • %2$s</string>
+    <string name="schedule_automatic_nothing">Inget schemalagt</string>
+    <string name="schedule_automatic_keep">Behåll: %1$s</string>
+    <plurals name="schedule_automatic_upcoming">
+        <item quantity="one">%1$d kommande</item>
+        <item quantity="other">%1$d kommande</item>
+    </plurals>
+    <string name="schedule_automatic_counts">%1$s • %2$s</string>
+    <plurals name="schedule_automatic_on_count">
+        <item quantity="one">%1$d på</item>
+        <item quantity="other">%1$d på</item>
+    </plurals>
+    <plurals name="schedule_automatic_off_count">
+        <item quantity="one">%1$d av</item>
+        <item quantity="other">%1$d av</item>
+    </plurals>
     <string name="context_record_series">Spela in serien</string>
     <string name="context_record_title">Spela in alla med denna titel</string>
     <string name="context_edit_series">Redigera serieinspelning</string>
