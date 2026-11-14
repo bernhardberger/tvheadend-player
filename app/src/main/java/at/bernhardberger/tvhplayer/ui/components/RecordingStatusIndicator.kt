@@ -57,6 +57,7 @@ fun RecordingStatusIndicator(
     rule: RecordingRule? = null,
     announceState: Boolean = true,
     focused: Boolean = false,
+    skipped: Boolean = false,
 ) {
     val content = LocalContentColor.current
     val (@DrawableRes icon, tint) = when (state) {
@@ -65,17 +66,14 @@ fun RecordingStatusIndicator(
                 recordingMarkColor(focused)
         DvrEntryState.COMPLETED -> R.drawable.ic_video_library to content.copy(alpha = TvTextSecondaryAlpha)
         DvrEntryState.SCHEDULED ->
-            (if (rule != null) R.drawable.ic_schedule_rule else R.drawable.ic_schedule) to content
+            (when {
+                skipped -> R.drawable.ic_event_busy
+                rule != null -> R.drawable.ic_schedule_rule
+                else -> R.drawable.ic_schedule
+            }) to content
         else -> return
     }
-    val stateDescription = stringResource(
-        when (state) {
-            DvrEntryState.RECORDING_ERROR -> R.string.recording_state_recording_errors
-            DvrEntryState.RECORDING -> R.string.recording_state_recording
-            DvrEntryState.COMPLETED -> R.string.details_recorded
-            else -> rule?.label ?: R.string.recording_state_scheduled
-        }
-    )
+    val stateDescription = stringResource(recordingStatusDescription(state, rule, skipped))
     val description = if (rule != null &&
         state in listOf(DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR)) {
         stringResource(R.string.recording_state_and_origin, stateDescription, stringResource(rule.label))
@@ -86,6 +84,20 @@ fun RecordingStatusIndicator(
         modifier = modifier.size(StatusIconSize),
         tint = tint,
     )
+}
+
+@StringRes
+private fun recordingStatusDescription(
+    state: DvrEntryState,
+    rule: RecordingRule?,
+    skipped: Boolean,
+): Int = when (state) {
+    DvrEntryState.RECORDING_ERROR -> R.string.recording_state_recording_errors
+    DvrEntryState.RECORDING -> R.string.recording_state_recording
+    DvrEntryState.COMPLETED -> R.string.details_recorded
+    DvrEntryState.SCHEDULED -> if (skipped) R.string.autorec_editor_skipped
+        else rule?.label ?: R.string.recording_state_scheduled
+    else -> rule?.label ?: R.string.recording_state_scheduled
 }
 
 /** The red of a recording mark drawn outside this indicator: deeper on a focused, light row. */

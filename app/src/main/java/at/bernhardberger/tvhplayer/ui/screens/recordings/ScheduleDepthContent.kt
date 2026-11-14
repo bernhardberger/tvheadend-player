@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.Channel
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
 import at.bernhardberger.tvhplayer.R
@@ -44,8 +45,9 @@ internal fun ScheduleDepthContent(
     groups: List<DvrScheduleSection>,
     automatic: AutomaticRecordingList,
     canModify: Boolean,
+    canAdd: Boolean,
     onNewTimer: () -> Unit,
-    channels: List<Channel>,
+    channels: Map<ChannelId, Channel>,
     onNewAutomatic: () -> Unit,
     onEditRule: (AutomaticRecordingListItem) -> Unit,
     onRuleMenu: (AutomaticRecordingListItem) -> Unit,
@@ -65,15 +67,17 @@ internal fun ScheduleDepthContent(
     modifier: Modifier = Modifier,
 ) {
     val layoutDirection = LocalLayoutDirection.current
+    val channelList = remember(channels) { channels.values.toList() }
     BoxWithConstraints(modifier) {
         val paneWidth = (maxWidth - contentPadding.calculateStartPadding(layoutDirection) -
             TvBrowseColumnWidth - TvBrowseColumnGap).coerceIn(0.dp, TvBrowseColumnWidth)
         val levels = rememberScheduleLevels(
-            groups, automatic, canModify, onNewTimer,
+            groups, automatic, canModify, canAdd, onNewTimer,
             navigation.stack.frames.first().focusedItemId == null,
             contentPadding, paneWidth, onOpenRecording, onOpenContextMenu,
             piconForEntry, admissionForEntry, ruleForEntry,
-        ) + scheduleAutomaticLevels(automatic, canModify && automatic.available, channels, navigation,
+        ) + scheduleAutomaticLevels(
+            automatic, canModify && automatic.available, canAdd, channelList, channels, navigation,
             Modifier.widthIn(max = paneWidth), onNewAutomatic, onEditRule, onRuleMenu)
         DepthNavigation(
             state = navigation,
@@ -99,6 +103,7 @@ private fun rememberScheduleLevels(
     groups: List<DvrScheduleSection>,
     automatic: AutomaticRecordingList,
     canModify: Boolean,
+    canAdd: Boolean,
     onNewTimer: () -> Unit,
     initial: Boolean,
     contentPadding: PaddingValues,
@@ -115,9 +120,9 @@ private fun rememberScheduleLevels(
     val latestPicon = rememberUpdatedState(piconForEntry)
     val latestAdmission = rememberUpdatedState(admissionForEntry)
     val latestRule = rememberUpdatedState(ruleForEntry)
-    return remember(groups, automatic, canModify, initial, contentPadding, paneWidth) {
+    return remember(groups, automatic, canModify, canAdd, initial, contentPadding, paneWidth) {
         val levels = linkedMapOf<String, DepthLevel>()
-        val rows = scheduleManagementRows(canModify, automatic, groups.isEmpty(), latestNewTimer) +
+        val rows = scheduleManagementRows(canModify, canAdd, automatic, groups.isEmpty(), latestNewTimer) +
             groups.flatMapIndexed { sectionIndex, section ->
             section.entries.mapIndexed { entryIndex, entry ->
                 val key = "recording:${recordingItemKey(entry.id)}"

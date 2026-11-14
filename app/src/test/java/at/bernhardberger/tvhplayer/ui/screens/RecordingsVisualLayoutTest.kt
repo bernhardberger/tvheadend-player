@@ -87,6 +87,7 @@ import at.bernhardberger.tvhplayer.testutil.awaitScheduledWork
 import at.bernhardberger.tvhplayer.ui.components.LocalBrowsePreparationContext
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.CompletableDeferred
+import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 import org.koin.compose.KoinIsolatedContext
@@ -103,6 +104,7 @@ class RecordingsVisualLayoutTest {
     private lateinit var session: FakeTvheadendSession
     private lateinit var view: View
     private lateinit var backDispatcher: OnBackPressedDispatcher
+    private lateinit var noticeCenter: NoticeCenter
     private lateinit var oldLocale: Locale
     private lateinit var oldZone: TimeZone
     private var playbackRequests = 0
@@ -1413,7 +1415,7 @@ class RecordingsVisualLayoutTest {
         compose.onNode(hasAnyAncestor(hasTestTag("recording-metadata-eyebrow")) and hasText(skipped),
             useUnmergedTree = true).assertIsDisplayed()
         compose.onNode(hasAnyAncestor(hasTestTag("recording-metadata-rule")) and
-            hasText("$skipped • ", substring = true), useUnmergedTree = true).assertIsDisplayed()
+            hasText("$skipped • ", substring = true), useUnmergedTree = true).assertDoesNotExist()
         // The padded stop in the Schedule row's own words, and the series rule that set it up.
         compose.onNode(hasAnyAncestor(hasTestTag("recording-metadata-metadata")) and hasText("• until", substring = true),
             useUnmergedTree = true).assertIsDisplayed()
@@ -1539,6 +1541,9 @@ class RecordingsVisualLayoutTest {
             view.context.getString(R.string.automatic_recording_kind_title) +
                 " • ${view.context.getString(R.string.all_channels)}",
         ))
+        publish(listOf(entry))
+        assertEquals("schedule:", screenState.scheduleNavigation.stack.active.levelId)
+        focused("recording-list-entry-20")
         assertNoCommands()
     }
 
@@ -1549,10 +1554,20 @@ class RecordingsVisualLayoutTest {
             AutorecRule.create(AutorecRuleId("second"), title = "^Tide Watch$"),
             AutorecRule.create(AutorecRuleId("third"), title = "^Weather Watch$"),
         )
-        show(empty = true, autorecRules = rules)
+        show(empty = true)
         focused("schedule-new-timer")
+        publish(emptyList(), autorecRules = rules.drop(1))
+        publish(emptyList(), autorecRules = rules)
         key(Key.DirectionDown)
         key(Key.DirectionCenter)
+        focused("automatic-recording-first")
+        key(Key.DirectionDown)
+        focused("automatic-recording-second")
+        compose.pressKey(Key.Back)
+        focused("schedule-automatic-recordings")
+        key(Key.DirectionCenter)
+        focused("automatic-recording-second")
+        key(Key.DirectionUp)
         focused("automatic-recording-first")
         key(Key.DirectionCenter)
         compose.onNodeWithTag("automatic-recording-main").assertIsDisplayed()
@@ -1590,6 +1605,7 @@ class RecordingsVisualLayoutTest {
         val enabled = AutorecRule.create(id, title = "^Ridge Light$")
         val disabled = AutorecRule.create(id, title = "^Ridge Light$", enabled = false)
         val release = CompletableDeferred<Unit>()
+        val releaseFailure = CompletableDeferred<Unit>()
         val updates = mutableListOf<AutorecRuleUpdate>()
         var deletes = 0
         show(empty = true, autorecRules = listOf(enabled), repository = { delegate ->
@@ -1597,8 +1613,12 @@ class RecordingsVisualLayoutTest {
                 override suspend fun updateAutorecRule(currentSession: CurrentSessionObservation,
                     id: AutorecRuleId, update: AutorecRuleUpdate): DvrMutationResult<Unit> {
                     updates += update
-                    release.await()
-                    return DvrMutationResult.Confirmed(Unit)
+                    if (updates.size == 1) {
+                        release.await()
+                        return DvrMutationResult.Confirmed(Unit)
+                    }
+                    releaseFailure.await()
+                    return DvrMutationResult.Failed(TvheadendFailure.ACCESS_DENIED, false)
                 }
                 override suspend fun deleteAutorecRule(currentSession: CurrentSessionObservation,
                     id: AutorecRuleId): DvrMutationResult<Unit> {
@@ -1619,22 +1639,43 @@ class RecordingsVisualLayoutTest {
         key(Key.DirectionDown)
         key(Key.DirectionCenter)
         assertEquals("The same rule cannot submit another toggle while pending", 1, updates.size)
-        compose.runOnIdle { release.complete(Unit) }
-        publish(emptyList(), autorecRules = listOf(disabled))
         key(Key.Menu)
+        publish(emptyList(), autorecRules = listOf(disabled))
+        compose.onNodeWithTag("automatic-recording-menu-toggle").assert(hasText(
+            view.context.getString(R.string.schedule_automatic_turn_on)))
         key(Key.DirectionDown)
         key(Key.DirectionCenter)
+        assertEquals("Opposite toggle waits for the pending request", listOf(false), updates.map { it.enabled })
+        compose.runOnIdle { release.complete(Unit) }
+        compose.waitForIdle()
         assertEquals(listOf(false, true), updates.map { it.enabled })
+        compose.runOnIdle { screenShown.value = false }
+        compose.runOnIdle { releaseFailure.complete(Unit) }
+        compose.waitForIdle()
+        assertEquals("A failed confirmed action reports once even after leaving", 1,
+            noticeCenter.state.value.pending.size)
+        compose.runOnIdle { screenShown.value = true }
+        compose.waitForIdle()
+        val own = listOf(
+            DvrEntry.create(DvrEntryId(401), state = DvrEntryState.SCHEDULED, autorecRuleId = id),
+            DvrEntry.create(DvrEntryId(402), state = DvrEntryState.SCHEDULED, autorecRuleId = id, enabled = false),
+        )
+        publish(own, autorecRules = listOf(disabled))
         key(Key.Menu)
         repeat(2) { key(Key.DirectionDown) }
         key(Key.DirectionCenter)
         focused("automatic-recording-keep")
+        compose.onNodeWithText(formatAutomaticRecordingDeleteBody(view.context,
+            at.bernhardberger.tvhplayer.core.AutomaticRecordingKind.TITLE, 2, false)).assertIsDisplayed()
         assertEquals(0, deletes)
         key(Key.DirectionCenter)
         focused("automatic-recording-ridge")
+        publish(own.drop(1), autorecRules = listOf(disabled))
         key(Key.Menu)
         repeat(2) { key(Key.DirectionDown) }
         key(Key.DirectionCenter)
+        compose.onNodeWithText(formatAutomaticRecordingDeleteBody(view.context,
+            at.bernhardberger.tvhplayer.core.AutomaticRecordingKind.TITLE, 1, false)).assertIsDisplayed()
         key(Key.DirectionRight)
         focused("automatic-recording-delete-confirm")
         compose.pressKey(Key.DirectionCenter, settleFrames = 1, frameMillis = PlayerMotion.PanelMs.toLong())
@@ -1642,6 +1683,50 @@ class RecordingsVisualLayoutTest {
         publish(emptyList())
         focused("schedule-new-automatic")
         assertEquals("schedule:automatic", screenState.scheduleNavigation.stack.active.levelId)
+    }
+
+    @Test fun recoveringScheduleKeepsAddingRowsFocusableButDisabled() {
+        screenState.open(at.bernhardberger.tvhplayer.core.DvrLibraryMode.SCHEDULE)
+        show(empty = true)
+        compose.runOnIdle {
+            val old = session.observation.value
+            session.publish(SessionObservation.create(old.sessionState, old.channelState, old.epgState,
+                DvrRepositoryState.Synchronizing(old.dvrSnapshotForDisplay)))
+        }
+        focused("schedule-new-timer")
+        compose.onNodeWithTag("schedule-new-timer").assertIsNotEnabled()
+        key(Key.DirectionCenter)
+        compose.onNodeWithTag("timer-recording-main").assertDoesNotExist()
+        key(Key.DirectionDown)
+        key(Key.DirectionCenter)
+        focused("schedule-new-automatic")
+        compose.onNodeWithTag("schedule-new-automatic").assertIsNotEnabled()
+        key(Key.DirectionCenter)
+        compose.onNodeWithTag("automatic-recording-new-keyword").assertDoesNotExist()
+        assertNoCommands()
+    }
+
+    @Test fun automaticDeleteRejectsReplacedSessionAndReflectsLatestSubject() {
+        screenState.open(at.bernhardberger.tvhplayer.core.DvrLibraryMode.SCHEDULE)
+        val rule = AutorecRule.create(AutorecRuleId("ridge"), title = "^Ridge Light$")
+        show(empty = true, autorecRules = listOf(rule))
+        key(Key.DirectionDown)
+        key(Key.DirectionCenter)
+        key(Key.Menu)
+        repeat(2) { key(Key.DirectionDown) }
+        key(Key.DirectionCenter)
+        publish(emptyList(), autorecRules = listOf(AutorecRule.create(rule.id, title = "^Changed title$")))
+        compose.onNodeWithText("Changed title", substring = true).assertIsDisplayed()
+        compose.runOnIdle {
+            val old = session.observation.value
+            session.replaceGeneration(SessionObservation.create(old.sessionState,
+                old.channelState, old.epgState, old.dvrState))
+        }
+        key(Key.DirectionRight)
+        compose.pressKey(Key.DirectionCenter, settleFrames = 1, frameMillis = PlayerMotion.PanelMs.toLong())
+        assertEquals(1, noticeCenter.state.value.pending.size)
+        compose.onNodeWithTag("automatic-recording-delete-confirm").assertDoesNotExist()
+        assertNoCommands()
     }
 
     @Test @Category(VisualCapture::class) @Config(qualifiers = "en-rUS-w960dp-h540dp-land-xhdpi",
@@ -2412,6 +2497,7 @@ class RecordingsVisualLayoutTest {
         val notices = NoticeCenter(android.os.SystemClock::elapsedRealtime) {
             NoticeContext(0L, session.observation.value.currentSession?.generationIdentity)
         }
+        noticeCenter = notices
         val dependencies = module { single<TvheadendSession> { session }; single { notices } }
         compose.setContent {
             KoinIsolatedContext(remember { koinApplication { modules(dependencies) } }) {

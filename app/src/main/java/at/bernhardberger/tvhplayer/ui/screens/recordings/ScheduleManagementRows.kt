@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.offset
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
@@ -40,20 +41,21 @@ internal fun scheduleManagementKeys(canModify: Boolean, hasAutomatic: Boolean): 
 
 internal fun scheduleManagementRows(
     canModify: Boolean,
+    canAdd: Boolean,
     automatic: AutomaticRecordingList,
     empty: Boolean,
     onNewTimer: State<() -> Unit>,
 ): List<DepthRow> = buildList {
     if (canModify) add(DepthRow(
-        DepthItem(SCHEDULE_NEW_TIMER), onActivate = { onNewTimer.value() },
+        DepthItem(SCHEDULE_NEW_TIMER), onActivate = { if (canAdd) onNewTimer.value() },
     ) { modifier, activate ->
         Column {
-            Column(Modifier.testTag("schedule-upcoming-heading")) {
+            Column(Modifier.offset(y = (-4).dp).testTag("schedule-upcoming-heading")) {
                 ArchiveLevelHeading(stringResource(R.string.schedule_upcoming), { 1f }, null)
             }
             ScheduleManagementRow(SCHEDULE_NEW_TIMER, stringResource(R.string.schedule_new_timer),
                 stringResource(R.string.schedule_new_timer_help), R.drawable.ic_schedule, R.drawable.ic_add,
-                modifier, activate)
+                modifier, activate, enabled = canAdd)
             Spacer(Modifier.height(4.dp))
         }
     })
@@ -61,7 +63,9 @@ internal fun scheduleManagementRows(
         DepthItem(SCHEDULE_AUTOMATIC_ROW, SCHEDULE_AUTOMATIC_LEVEL),
     ) { modifier, activate ->
         Column {
-            if (!canModify) ArchiveLevelHeading(stringResource(R.string.schedule_upcoming), { 1f }, null)
+            if (!canModify) Column(Modifier.offset(y = (-4).dp)) {
+                ArchiveLevelHeading(stringResource(R.string.schedule_upcoming), { 1f }, null)
+            }
             ScheduleManagementRow(SCHEDULE_AUTOMATIC_ROW, stringResource(R.string.automatic_recording_new_overline),
                 automaticRecordingCountLabel(automatic), R.drawable.ic_fiber_smart_record,
                 R.drawable.ic_keyboard_arrow_right, modifier, activate)
@@ -82,10 +86,12 @@ internal fun ScheduleManagementRow(
     trailing: Int,
     modifier: Modifier,
     onClick: () -> Unit,
+    enabled: Boolean = true,
 ) {
     val owner = LocalTabOwner.current
     ListItem(
         selected = false,
+        enabled = enabled,
         onClick = { if (owner?.isCurrent != false) onClick() },
         headlineContent = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         supportingContent = { Text(support, maxLines = 1, overflow = TextOverflow.Ellipsis) },

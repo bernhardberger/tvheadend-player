@@ -553,10 +553,7 @@ internal fun RecordingMetadataPane(
                             modifier = Modifier.testTag("recording-metadata-expiry"))
                     }
                     rule?.let { (text, icon) ->
-                        val origin = if (entry.state == DvrEntryState.SCHEDULED && entry.enabled == false) {
-                            "${stringResource(R.string.autorec_editor_skipped)} • $text"
-                        } else text
-                        ProgrammeStatusLine(origin, icon, "recording-metadata-rule", maxLines = 2)
+                        ProgrammeStatusLine(text, icon, "recording-metadata-rule", maxLines = 2)
                     }
                     failure?.let {
                         ProgrammeStatusLine(it, R.drawable.ic_error_outlined, "recording-metadata-failure",
@@ -853,6 +850,7 @@ internal fun RecordingListRow(
                         state = markState,
                         rule = entry.rule,
                         focused = focused,
+                        skipped = entry.enabled == false,
                         modifier = Modifier.testTag("recording-list-state-$itemKey"),
                     )
                     if (markState == DvrEntryState.RECORDING_ERROR) {

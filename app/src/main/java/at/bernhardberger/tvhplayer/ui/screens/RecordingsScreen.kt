@@ -1000,6 +1000,7 @@ internal fun RecordingsScreenContent(
                         groups = scheduleGroups,
                         automatic = automaticRecordings,
                         canModify = canModifyRecordings,
+                        canAdd = observation.dvrState is DvrRepositoryState.Current,
                         onNewTimer = {
                             val latest = latestObservationProvider()
                             val ready = latest.sessionState as? SessionState.Ready
@@ -1012,7 +1013,7 @@ internal fun RecordingsScreenContent(
                                 }
                             }
                         },
-                        channels = channelsById.values.toList(),
+                        channels = channelsById,
                         onNewAutomatic = { if (owner.isCurrent) openScheduleRule(RuleSurface.NEW) },
                         onEditRule = { if (owner.isCurrent) openScheduleRule(RuleSurface.EDIT, it) },
                         onRuleMenu = { if (owner.isCurrent) openScheduleRule(RuleSurface.MENU, it) },
@@ -1541,15 +1542,17 @@ internal fun RecordingsScreenContent(
     RecordingDetails()
     @Composable
     fun ScheduleSurfaces() {
+        val scheduleChannels = remember(channelsById) { channelsById.values.toList() }
         ScheduleRuleActions(
             overlays.scheduleRuleRequest,
             onChange = {
                 overlays.scheduleRuleRequest = it
                 if (it == null) overlays.pendingDetailsReturn = true
             },
+            published = observation,
             observation = { latestObservationProvider() },
             isCurrent = screenState.mode.value == DvrLibraryMode.SCHEDULE,
-            channels = channelsById.values.toList(), actions = dvrMutationActions, notices = notices,
+            channels = scheduleChannels, actions = dvrMutationActions, notices = notices,
             now = { kotlin.time.Instant.fromEpochSeconds(nowSecProvider()) },
         )
         overlays.newTimerSession?.let { openingSession ->

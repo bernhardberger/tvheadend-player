@@ -17,6 +17,8 @@ import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.DvrMutationResult
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
+import at.bernhardberger.tvheadend.sdk.core.DvrMutationKind
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
@@ -24,6 +26,8 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.AutomaticRecordingListItem
 import at.bernhardberger.tvhplayer.core.AutomaticRecordingKind
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
+import at.bernhardberger.tvhplayer.notices.Notice
+import at.bernhardberger.tvhplayer.notices.toDvrMutationFeedback
 import at.bernhardberger.tvhplayer.ui.components.ConfirmationPanel
 import at.bernhardberger.tvhplayer.ui.components.ConfirmationStyles
 import at.bernhardberger.tvhplayer.ui.components.TwoColumnDialog
@@ -39,6 +43,8 @@ import at.bernhardberger.tvhplayer.ui.screens.postDvrFailure
 import at.bernhardberger.tvhplayer.ui.screens.recordingStateIsCurrent
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 import java.time.ZoneId
 import kotlin.time.Instant
@@ -55,6 +61,7 @@ internal data class OpenRule(
 internal fun ScheduleRuleActions(
     opened: OpenRule?,
     onChange: (OpenRule?) -> Unit,
+    published: SessionObservation,
     observation: () -> SessionObservation,
     isCurrent: Boolean,
     channels: List<Channel>,
@@ -62,29 +69,30 @@ internal fun ScheduleRuleActions(
     notices: NoticeCenter,
     now: () -> Instant,
 ) {
-    val inFlight = remember { mutableSetOf<String>() }
+    val inFlight = remember { mutableMapOf<String, ArrayDeque<RuleRequest>>() }
     val scope = rememberCoroutineScope()
     val close = { onChange(null) }
     val target = opened ?: return
-    val item = target.item
+    val item = target.item?.currentIn(published) ?: target.item
     when (target.surface) {
         RuleSurface.NEW, RuleSurface.EDIT -> ScheduleRuleEditor(target, actions, notices, now, close)
         RuleSurface.MENU -> if (item != null) ScheduleRuleMenu(item, channels, close,
             onEdit = { onChange(target.copy(surface = RuleSurface.EDIT)) },
             onDelete = { onChange(target.copy(surface = RuleSurface.DELETE)) },
             onToggle = {
-                scope.launchRuleMutation(inFlight, item) {
-                    val context = notices.context()
+                scope.launchRuleMutation(inFlight, item, desired = !item.enabled) {
                     val latest = observation()
-                    val current = target.currentIn(latest, isCurrent)
-                    if (current != null) {
-                        actions.setRuleEnabled(current, !item.enabled, target.session, latest, notices, context)
+                    if (target.readyIn(latest, isCurrent, notices, DvrMutationKind.UPDATE)) {
+                        target.item?.currentIn(latest)?.let { current ->
+                            actions.setRuleEnabled(current, !item.enabled, target.session, latest,
+                                notices, notices.context())
+                        }
                     }
                 }
                 close()
             })
         RuleSurface.DELETE -> if (item != null) RecordingRuleDeleteDialog(
-            item.kind, item.subject(channels), item.upcoming, onDismiss = close,
+            item.kind, item.subject(channels), item.scheduledCount(published), onDismiss = close,
             onConfirm = {
                 scope.launchRuleMutation(inFlight, item) {
                     deleteScheduleRule(target, observation(), isCurrent, actions, notices)
@@ -94,6 +102,14 @@ internal fun ScheduleRuleActions(
         )
     }
 }
+
+private fun AutomaticRecordingListItem.scheduledCount(observation: SessionObservation): Int =
+    observation.dvrSnapshotForDisplay?.entries.orEmpty().count { entry ->
+        entry.state == DvrEntryState.SCHEDULED && when (this) {
+            is AutomaticRecordingListItem.Automatic -> entry.autorecRuleId == rule.id
+            is AutomaticRecordingListItem.Timer -> entry.timerecRuleId == rule.id
+        }
+    }
 
 @Composable
 private fun ScheduleRuleEditor(
@@ -116,22 +132,51 @@ private fun ScheduleRuleEditor(
     }
 }
 
+private data class RuleRequest(val desired: Boolean?, val run: suspend () -> Unit)
+
 private fun CoroutineScope.launchRuleMutation(
-    inFlight: MutableSet<String>,
+    inFlight: MutableMap<String, ArrayDeque<RuleRequest>>,
     item: AutomaticRecordingListItem,
+    desired: Boolean? = null,
     mutation: suspend () -> Unit,
 ) {
-    if (inFlight.add(item.rowId())) launch {
-        try {
-            mutation()
-        } finally {
-            inFlight.remove(item.rowId())
+    val request = RuleRequest(desired, mutation)
+    val pending = inFlight[item.rowId()]
+    if (pending != null) {
+        if (pending.any { it.desired == desired || it.desired == null }) return
+        if (desired == null) while (pending.size > 1) pending.removeLast()
+        pending.addLast(request)
+        return
+    }
+    val queue = ArrayDeque<RuleRequest>().apply { addLast(request) }
+    inFlight[item.rowId()] = queue
+    launch {
+        withContext(NonCancellable) {
+            try {
+                while (queue.isNotEmpty()) {
+                    queue.first().run()
+                    queue.removeFirst()
+                }
+            } finally {
+                inFlight.remove(item.rowId())
+            }
         }
     }
 }
 
-private fun OpenRule.currentIn(observation: SessionObservation, isCurrent: Boolean): AutomaticRecordingListItem? =
-    if (isCurrent && observation.currentSession == session) item?.currentIn(observation) else null
+private fun OpenRule.readyIn(
+    observation: SessionObservation,
+    isCurrent: Boolean,
+    notices: NoticeCenter,
+    kind: DvrMutationKind,
+): Boolean {
+    val ready = isCurrent && observation.currentSession == session && observation.dvrState is DvrRepositoryState.Current
+    if (!ready) {
+        val result = DvrMutationResult.Failed(TvheadendFailure.NOT_READY, false)
+        notices.post(Notice.DvrRuleActionFailed(kind, result.toDvrMutationFeedback()), notices.context())
+    }
+    return ready
+}
 
 private suspend fun deleteScheduleRule(
     target: OpenRule,
@@ -140,7 +185,8 @@ private suspend fun deleteScheduleRule(
     actions: DvrMutationActions,
     notices: NoticeCenter,
 ) {
-    val action = when (val current = target.currentIn(observation, isCurrent)) {
+    if (!target.readyIn(observation, isCurrent, notices, DvrMutationKind.DELETE)) return
+    val action = when (val current = target.item?.currentIn(observation)) {
         is AutomaticRecordingListItem.Automatic -> DvrMutationAction.DeleteAutorec(target.session, current.rule)
         is AutomaticRecordingListItem.Timer -> DvrMutationAction.DeleteTimerec(target.session, current.rule)
         null -> null
@@ -177,6 +223,7 @@ private fun ScheduleRuleMenu(
     val first = remember { FocusRequester() }
     LaunchedEffect(Unit) { withFrameNanos {}; first.requestFocus() }
     val type = MaterialTheme.typography
+    val subject = item.subject(channels)
     val editLabel = when (item.kind) {
         AutomaticRecordingKind.SERIES -> R.string.context_edit_series
         AutomaticRecordingKind.TITLE -> R.string.context_edit_title
@@ -187,7 +234,7 @@ private fun ScheduleRuleMenu(
         title = item.headline.ifBlank { item.kindLabel() }, message = "", onDismiss = onClose,
         modifier = Modifier.testTag("automatic-recording-menu"),
         leading = {
-            ConfirmationPanel(item.subject(channels),
+            ConfirmationPanel(subject.copy(detail = subject.detail.replace(" • ", "\n")),
                 ConfirmationStyles(type.headlineMedium, type.bodyLarge, type.titleLarge,
                     type.labelMedium, type.bodyLarge))
         },
