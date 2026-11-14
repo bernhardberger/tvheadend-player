@@ -33,7 +33,7 @@
         <item quantity="other">%1$d pois käytöstä</item>
     </plurals>
     <string name="context_record_series">Tallenna sarja</string>
-    <string name="context_record_title">Tallenna kaikki tällä nimellä</string>
+    <string name="context_record_title">Tallenna kaikki</string>
     <string name="context_edit_series">Muokkaa sarjatallennusta</string>
     <string name="context_edit_title">Muokkaa nimitallennusta</string>
     <string name="context_edit_keyword">Muokkaa hakusanatallennusta</string>

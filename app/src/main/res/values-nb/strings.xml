@@ -33,7 +33,7 @@
         <item quantity="other">%1$d av</item>
     </plurals>
     <string name="context_record_series">Ta opp serie</string>
-    <string name="context_record_title">Ta opp alle med denne tittelen</string>
+    <string name="context_record_title">Ta opp alle</string>
     <string name="context_edit_series">Rediger serieopptak</string>
     <string name="context_edit_title">Rediger tittelopptak</string>
     <string name="context_edit_keyword">Rediger søkeordopptak</string>

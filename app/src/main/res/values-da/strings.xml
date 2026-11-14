@@ -33,7 +33,7 @@
         <item quantity="other">%1$d slået fra</item>
     </plurals>
     <string name="context_record_series">Optag serie</string>
-    <string name="context_record_title">Optag alle med denne titel</string>
+    <string name="context_record_title">Optag alle</string>
     <string name="context_edit_series">Rediger serieoptagelse</string>
     <string name="context_edit_title">Rediger titeloptagelse</string>
     <string name="context_edit_keyword">Rediger søgeordsoptagelse</string>

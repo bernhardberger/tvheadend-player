@@ -39,7 +39,7 @@
         <item quantity="other">%1$d вимкнено</item>
     </plurals>
     <string name="context_record_series">Записати серіал</string>
-    <string name="context_record_title">Записати все з цією назвою</string>
+    <string name="context_record_title">Записати все</string>
     <string name="context_edit_series">Змінити запис серіалу</string>
     <string name="context_edit_title">Змінити запис за назвою</string>
     <string name="context_edit_keyword">Змінити запис за ключовими словами</string>

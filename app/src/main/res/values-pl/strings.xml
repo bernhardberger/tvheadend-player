@@ -39,7 +39,7 @@
         <item quantity="other">%1$d wyłączonego</item>
     </plurals>
     <string name="context_record_series">Nagraj serial</string>
-    <string name="context_record_title">Nagraj wszystko z tym tytułem</string>
+    <string name="context_record_title">Nagraj wszystko</string>
     <string name="context_edit_series">Edytuj nagrywanie serialu</string>
     <string name="context_edit_title">Edytuj nagrywanie według tytułu</string>
     <string name="context_edit_keyword">Edytuj nagrywanie według słów kluczowych</string>

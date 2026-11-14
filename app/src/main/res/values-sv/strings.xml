@@ -33,7 +33,7 @@
         <item quantity="other">%1$d av</item>
     </plurals>
     <string name="context_record_series">Spela in serien</string>
-    <string name="context_record_title">Spela in alla med denna titel</string>
+    <string name="context_record_title">Spela in alla</string>
     <string name="context_edit_series">Redigera serieinspelning</string>
     <string name="context_edit_title">Redigera titelinspelning</string>
     <string name="context_edit_keyword">Redigera sökordsinspelning</string>

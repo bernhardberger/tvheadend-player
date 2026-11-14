@@ -30,7 +30,7 @@
         <item quantity="other">%1$d项已停用</item>
     </plurals>
     <string name="context_record_series">录制系列</string>
-    <string name="context_record_title">录制此标题的所有节目</string>
+    <string name="context_record_title">全部录制</string>
     <string name="context_edit_series">编辑系列录制</string>
     <string name="context_edit_title">编辑标题录制</string>
     <string name="context_edit_keyword">编辑关键词录制</string>

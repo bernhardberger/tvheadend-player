@@ -36,7 +36,7 @@
         <item quantity="other">%1$d כבויות</item>
     </plurals>
     <string name="context_record_series">הקלטת סדרה</string>
-    <string name="context_record_title">הקלטת כל התוכניות עם הכותרת הזו</string>
+    <string name="context_record_title">הקלטת הכול</string>
     <string name="context_edit_series">עריכת הקלטת סדרה</string>
     <string name="context_edit_title">עריכת הקלטה לפי כותרת</string>
     <string name="context_edit_keyword">עריכת הקלטה לפי מילת מפתח</string>

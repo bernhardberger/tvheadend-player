@@ -36,7 +36,7 @@
         <item quantity="other">%1$d disattive</item>
     </plurals>
     <string name="context_record_series">Registra la serie</string>
-    <string name="context_record_title">Registra tutto con questo titolo</string>
+    <string name="context_record_title">Registra tutto</string>
     <string name="context_edit_series">Modifica registrazione di serie</string>
     <string name="context_edit_title">Modifica registrazione per titolo</string>
     <string name="context_edit_keyword">Modifica registrazione per parola chiave</string>

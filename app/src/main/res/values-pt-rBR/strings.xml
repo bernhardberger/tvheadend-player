@@ -36,7 +36,7 @@
         <item quantity="other">%1$d desativadas</item>
     </plurals>
     <string name="context_record_series">Gravar série</string>
-    <string name="context_record_title">Gravar todos com este título</string>
+    <string name="context_record_title">Gravar tudo</string>
     <string name="context_edit_series">Editar gravação de série</string>
     <string name="context_edit_title">Editar gravação por título</string>
     <string name="context_edit_keyword">Editar gravação por palavra-chave</string>

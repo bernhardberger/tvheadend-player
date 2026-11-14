@@ -36,7 +36,7 @@
         <item quantity="other">%1$d isključenih</item>
     </plurals>
     <string name="context_record_series">Snimi seriju</string>
-    <string name="context_record_title">Snimi sve s ovim naslovom</string>
+    <string name="context_record_title">Snimi sve</string>
     <string name="context_edit_series">Uredi snimanje serije</string>
     <string name="context_edit_title">Uredi snimanje prema naslovu</string>
     <string name="context_edit_keyword">Uredi snimanje prema ključnim riječima</string>

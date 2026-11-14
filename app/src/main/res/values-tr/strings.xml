@@ -33,7 +33,7 @@
         <item quantity="other">%1$d kapalı</item>
     </plurals>
     <string name="context_record_series">Diziyi kaydet</string>
-    <string name="context_record_title">Bu başlıktakilerin tümünü kaydet</string>
+    <string name="context_record_title">Tümünü kaydet</string>
     <string name="context_edit_series">Dizi kaydını düzenle</string>
     <string name="context_edit_title">Başlık kaydını düzenle</string>
     <string name="context_edit_keyword">Anahtar kelime kaydını düzenle</string>
