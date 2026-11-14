@@ -12,6 +12,11 @@
 
 ### Recordings
 
+- The first tab is now *Browse* and opens as one list of all recordings, newest first, under date labels. The options button beside the headline groups the list by folders, channels or genres, sorts it by date, name or size in either direction, and shows only unwatched, partially watched or watched recordings (#11, #5).
+- If you browsed by folders before, choose *Folders* under *Group by* to get them back; the choice is remembered.
+- Finished recordings show their file size in the list.
+- A recording in progress carries a red dot, and so does the folder it's in. With folders, a *Recording now* folder leads the list; it can be turned off in the options.
+- Free disk space sits at the end of the tab line as *free of total* with a ring for the used share. The ring turns amber, then red, as space runs low.
 - Stop, cancel, delete and remove ask on a card that shows the recording: its picture or channel logo, name, channel and air time, and a sentence that says what happens. The other confirmations in the Guide, for folders and for connections use the same card.
 - The choice between *Play recording* and *Watch live* shows the recording's picture and says when each choice would end. For a recording that's still running, that end time counts the part still to come; before, it counted only what was recorded so far.
 - A missed or failed recording that never wrote a file offers *Remove entry* instead of *Delete recording*.
@@ -31,10 +36,6 @@
 - Switching connections shows its progress on its own page and can be canceled; leaving Settings doesn't stop it. If the connection can't be reached or rejects sign-in, the page says why and your previous connection stays in use. After a successful switch, *Go to Home* takes you straight there.
 - With more than one connection, *Channel groups* and *Stream profile* name the connection they apply to.
 - Recent channels, the *Continue watching* order, channel tags, channel aspect settings, the selected stream profile and audio choices start fresh after this update; they are now kept per connection.
-
-### Recordings
-
-- Recordings > Archive can group by folders, channels, genres or none.
 
 ### Guide
 
