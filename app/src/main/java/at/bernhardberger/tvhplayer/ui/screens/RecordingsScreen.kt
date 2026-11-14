@@ -70,6 +70,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.unit.Dp
 import at.bernhardberger.tvhplayer.ui.screens.recordings.ArchiveViewOptionsButton
 import at.bernhardberger.tvhplayer.ui.screens.recordings.ArchiveViewOptionsPanel
 import at.bernhardberger.tvhplayer.core.recordingNowEntries
@@ -413,26 +414,11 @@ internal fun RecordingsScreenContent(
     }
     var relocatingKey by remember { mutableStateOf<Key?>(null) }
     var focusRecoveryGeneration by remember { mutableIntStateOf(0) }
-    var detailsEntry by remember { mutableStateOf<DvrEntry?>(null) }
-    var showContextMenu by remember { mutableStateOf(false) }
-    var showResumeChoice by remember { mutableStateOf(false) }
-    var menuConsumed by remember(detailsEntry?.id) { mutableStateOf(false) }
-    var detailsObservation by remember { mutableStateOf<SessionObservation?>(null) }
-    var detailsInitialAction by remember {
-        mutableStateOf<RecordingDetailsAction?>(null)
+    val overlays = remember { RecordingOverlaysState() }
+    var menuConsumed by remember(overlays.detailsEntry?.id) { mutableStateOf(false) }
+    val confirmationVisibility = remember(overlays.pendingAction) {
+        MutableTransitionState(false).apply { targetState = overlays.pendingAction != null }
     }
-    var pendingAction by remember { mutableStateOf<PendingRecordingAction?>(null) }
-    val confirmationVisibility = remember(pendingAction) {
-        MutableTransitionState(false).apply { targetState = pendingAction != null }
-    }
-    var pendingMutation by remember { mutableStateOf<DvrMutationAction?>(null) }
-    var confirmationKey by remember { mutableStateOf<Key?>(null) }
-    var pendingDetailsReturn by remember { mutableStateOf(false) }
-    var folderMenu by remember { mutableStateOf<FolderMenuTarget?>(null) }
-    var folderDelete by remember { mutableStateOf<FolderDeleteTarget?>(null) }
-    var newTimerSession by remember { mutableStateOf<CurrentSessionObservation?>(null) }
-    var scheduleRuleRequest by remember { mutableStateOf<OpenRule?>(null) }
-    val scheduleRuleOverlay = scheduleRuleRequest != null
     fun openScheduleRule(surface: RuleSurface, item: AutomaticRecordingListItem? = null) {
         val latest = latestObservationProvider()
         val ready = latest.sessionState as? SessionState.Ready
@@ -442,17 +428,17 @@ internal fun RecordingsScreenContent(
         ) latest.currentSession?.let { session ->
             if (item == null || currentItem != null) {
                 contentFocusOwned = false
-                scheduleRuleRequest = OpenRule(surface, session, currentItem)
+                overlays.scheduleRuleRequest = OpenRule(surface, session, currentItem)
             }
         }
     }
 
     fun closeFolderMenu() {
-        if (folderMenu == null) return
+        if (overlays.folderMenu == null) return
         // As for a recording's menu: restore the folder row before the menu leaves.
-        pendingDetailsReturn = !runCatching { contentFocus.requestFocus() }.getOrDefault(false)
-        folderDelete = null
-        folderMenu = null
+        overlays.pendingDetailsReturn = !runCatching { contentFocus.requestFocus() }.getOrDefault(false)
+        overlays.folderDelete = null
+        overlays.folderMenu = null
     }
 
     fun runFolderAction(action: BrowseContextAction, session: CurrentSessionObservation, recordingIds: List<DvrEntryId>) {
@@ -469,7 +455,7 @@ internal fun RecordingsScreenContent(
     }
 
     // [beforePlay] runs only when the recording plays, before the request; a menu stays up through it.
-    fun openRecording(entry: DvrEntry, returnIfPlaying: Boolean = true, beforePlay: () -> Unit = { showContextMenu = false }) {
+    fun openRecording(entry: DvrEntry, returnIfPlaying: Boolean = true, beforePlay: () -> Unit = { overlays.showContextMenu = false }) {
         if (returnIfPlaying && entry.id == playingRecordingId && onReturnToRecording(entry.id, {})) return
         val current = latestObservationProvider()
         val capability = current.currentSession
@@ -485,26 +471,23 @@ internal fun RecordingsScreenContent(
                 else RecordingPlaybackStart.START_OVER)
             return
         }
-        showContextMenu = false
-        showResumeChoice = activeChoice || action == at.bernhardberger.tvhplayer.core.RecordingOpenAction.RESUME_CHOICE
+        overlays.showContextMenu = false
+        overlays.showResumeChoice = activeChoice ||
+            action == at.bernhardberger.tvhplayer.core.RecordingOpenAction.RESUME_CHOICE
         contentFocusOwned = false
-        detailsInitialAction = null
-        detailsEntry = entry
-        detailsObservation = current
+        overlays.detailsInitialAction = null
+        overlays.detailsEntry = entry
+        overlays.detailsObservation = current
     }
 
     var pendingView by rememberPendingArchiveView(view)
     val chosenView = pendingView ?: view
     val chosenGrouping = chosenView.grouping
-    var optionsOpen by remember { mutableStateOf(false) }
-    val optionsFocus = remember { FocusRequester() }
-    // The stop the next frames move focus to: the View options button after its panel closes.
-    var requestStop by remember { mutableStateOf<FocusRequester?>(null) }
     // The stop above the list: the View options button at Browse's root, else (or without a list) the selected tab.
     fun focusHeader(): Boolean {
         fun request(stop: FocusRequester) = runCatching { stop.requestFocus() }.getOrDefault(false)
         val atBrowseRoot = mode == DvrLibraryMode.ARCHIVE && !archiveNavigation.stack.canPop
-        return (atBrowseRoot && request(optionsFocus)) || request(modeFocus)
+        return (atBrowseRoot && request(overlays.optionsFocus)) || request(modeFocus)
     }
     val naming = rememberArchiveNaming(channelsById)
     // Unwatched, Partially watched and Watched read the position behind the check mark,
@@ -518,19 +501,19 @@ internal fun RecordingsScreenContent(
                 0L,
             )
         }
-    LaunchedEffect(requestStop) {
-        val stop = requestStop ?: return@LaunchedEffect
+    LaunchedEffect(overlays.requestStop) {
+        val stop = overlays.requestStop ?: return@LaunchedEffect
         repeat(8) {
             withFrameNanos { }
             if (runCatching { stop.requestFocus() }.getOrDefault(false)) {
                 contentFocusOwned = false
                 requestContentFocus = false
-                requestStop = null
+                overlays.requestStop = null
                 return@LaunchedEffect
             }
         }
         // Nothing to land on (empty or a tab without chips): the list takes it as before.
-        requestStop = null
+        overlays.requestStop = null
         requestContentFocus = true
     }
     val location = when (mode) {
@@ -555,12 +538,16 @@ internal fun RecordingsScreenContent(
     Box(Modifier.fillMaxSize().onPreviewKeyEvent { event ->
         // An observation can dismiss the confirmation between down and up.
         // Finish that key cycle here, not on the refreshed details' action.
-        if (event.key == confirmationKey && pendingAction == null) {
-            if (event.type == KeyEventType.KeyUp) confirmationKey = null
+        if (event.key == overlays.confirmationKey && overlays.pendingAction == null) {
+            if (event.type == KeyEventType.KeyUp) overlays.confirmationKey = null
             true
         } else {
-            if (pendingAction != null && event.type == KeyEventType.KeyDown) confirmationKey = event.key
-            if (event.key == confirmationKey && event.type == KeyEventType.KeyUp) confirmationKey = null
+            if (overlays.pendingAction != null && event.type == KeyEventType.KeyDown) {
+                overlays.confirmationKey = event.key
+            }
+            if (event.key == overlays.confirmationKey && event.type == KeyEventType.KeyUp) {
+                overlays.confirmationKey = null
+            }
             false
         }
     }) content@{
@@ -668,15 +655,17 @@ internal fun RecordingsScreenContent(
         requestContentFocus,
         initialFocusEnabled,
         alertShown,
-        detailsEntry,
-        pendingAction,
-        folderMenu,
-        optionsOpen,
-        newTimerSession,
-        scheduleRuleOverlay,
+        overlays.detailsEntry,
+        overlays.pendingAction,
+        overlays.folderMenu,
+        overlays.optionsOpen,
+        overlays.newTimerSession,
+        overlays.scheduleRuleRequest,
     ) {
-        if (recordingOverlayOpen(detailsEntry, pendingAction, folderMenu) || optionsOpen) return@LaunchedEffect
-        if (newTimerSession != null || scheduleRuleOverlay) return@LaunchedEffect
+        if (recordingOverlayOpen(overlays.detailsEntry, overlays.pendingAction, overlays.folderMenu) ||
+            overlays.optionsOpen
+        ) return@LaunchedEffect
+        if (overlays.scheduleSurfaceOpen) return@LaunchedEffect
         val requestedEntry = screenState.requestedScheduleEntryId.value
         // Preparation retains the last projection while the new snapshot is calculated.
         // Only the projection built from the displayed snapshot can judge this target.
@@ -736,26 +725,28 @@ internal fun RecordingsScreenContent(
     // The end of a menu or details goes back to the list.
     fun restoreAfterOverlay(): Boolean = runCatching { contentFocus.requestFocus() }.getOrDefault(false)
     LaunchedEffect(
-        detailsEntry,
-        pendingAction,
-        pendingDetailsReturn,
+        overlays.detailsEntry,
+        overlays.pendingAction,
+        overlays.pendingDetailsReturn,
         location,
         focusRecoveryGeneration,
-        folderMenu,
-        optionsOpen,
-        newTimerSession,
-        scheduleRuleOverlay,
+        overlays.folderMenu,
+        overlays.optionsOpen,
+        overlays.newTimerSession,
+        overlays.scheduleRuleRequest,
     ) {
-        if (!pendingDetailsReturn) return@LaunchedEffect
-        if (recordingOverlayOpen(detailsEntry, pendingAction, folderMenu) || optionsOpen) return@LaunchedEffect
-        if (newTimerSession != null || scheduleRuleOverlay) return@LaunchedEffect
+        if (!overlays.pendingDetailsReturn) return@LaunchedEffect
+        if (recordingOverlayOpen(overlays.detailsEntry, overlays.pendingAction, overlays.folderMenu) ||
+            overlays.optionsOpen
+        ) return@LaunchedEffect
+        if (overlays.scheduleSurfaceOpen) return@LaunchedEffect
         repeat(4) {
             withFrameNanos { }
             val restored = runCatching {
                 if (itemKeys.isEmpty() && !alertShown) focusHeader() else restoreAfterOverlay()
             }.getOrDefault(false)
             if (restored) {
-                pendingDetailsReturn = false
+                overlays.pendingDetailsReturn = false
                 requestContentFocus = false
                 return@LaunchedEffect
             }
@@ -768,11 +759,12 @@ internal fun RecordingsScreenContent(
         modifier = Modifier
             .fillMaxSize()
             .semantics {
-                if (detailsEntry != null || folderMenu != null || optionsOpen) hideFromAccessibility()
-                if (newTimerSession != null || scheduleRuleOverlay) hideFromAccessibility()
+                if (overlays.detailsEntry != null || overlays.folderMenu != null || overlays.optionsOpen)
+                    hideFromAccessibility()
+                if (overlays.scheduleSurfaceOpen) hideFromAccessibility()
             }
-            .then(if (newTimerSession != null || scheduleRuleOverlay) Modifier.focusProperties { canFocus = false } else Modifier)
-            .graphicsLayer { alpha = 1f - (detailsLayering?.detailsAlpha() ?: if (detailsEntry != null && !showContextMenu && !showResumeChoice) 1f else 0f) }
+            .then(if (overlays.scheduleSurfaceOpen) Modifier.focusProperties { canFocus = false } else Modifier)
+            .graphicsLayer { alpha = 1f - (detailsLayering?.detailsAlpha() ?: if (overlays.detailsEntry != null && !overlays.showContextMenu && !overlays.showResumeChoice) 1f else 0f) }
             .onPreviewKeyEvent { event ->
                 if (event.key == relocatingKey) {
                     if (event.type == KeyEventType.KeyUp) relocatingKey = null
@@ -807,46 +799,34 @@ internal fun RecordingsScreenContent(
             // Lists run to the bottom edge and fade there; other content keeps the safe area.
             .padding(top = contentPadding.calculateTopPadding()),
     ) {
-        TopLevelBrowseHeader(
-            title = stringResource(R.string.recordings_title),
-            modifier = Modifier
-                .padding(start = startPadding + TvBrowseLeadingInset, end = maxOf(endPadding, TvBrowseTrailingInset))
-                .heightIn(min = recordingsHeaderMinHeight())
-                .testTag("recordings-header"),
-            leading = {
-                RecordingModeTabs(
-                    selected = mode,
-                    selectedFocus = modeFocus,
-                    problemCount = problemGroups.values.sumOf { it.size },
-                    onFocused = {
-                        modeMotion.select(it, DvrLibraryMode.entries)
-                        if (mode != it) {
-                            screenState.requestedScheduleEntryId.value = null
-                            contentFocusOwned = false
-                            requestContentFocus = false
-                        }
-                        mode = it
-                    },
-                    onClick = {
-                        screenState.requestedScheduleEntryId.value = null
-                        modeMotion.select(it, DvrLibraryMode.entries)
-                        mode = it
-                        requestContentFocus = true
-                    },
-                    onMoveToContent = { requestContentFocus = true },
-                    modifier = Modifier
-                        .onPreviewKeyEvent {
-                            // A deliberate header move gives the viewer ownership, not the loading handoff.
-                            screenState.requestedScheduleEntryId.value = null
-                            loadingFocusParked = false
-                            contentFocusOwned = false
-                            false
-                        }
-                        .testTag("recordings-mode-tabs"),
-                )
-                Spacer(Modifier.weight(1f))
-                // Quiet information at the tab line's end on every tab: no focus stop.
-                RecordingStorageIndicator(observation.dvrDiskSpaceState)
+        RecordingsHeader(
+            mode = mode,
+            modeFocus = modeFocus,
+            problemCount = problemGroups.values.sumOf { it.size },
+            diskSpace = observation.dvrDiskSpaceState,
+            startPadding = startPadding,
+            endPadding = endPadding,
+            onFocused = {
+                modeMotion.select(it, DvrLibraryMode.entries)
+                if (mode != it) {
+                    screenState.requestedScheduleEntryId.value = null
+                    contentFocusOwned = false
+                    requestContentFocus = false
+                }
+                mode = it
+            },
+            onClick = {
+                screenState.requestedScheduleEntryId.value = null
+                modeMotion.select(it, DvrLibraryMode.entries)
+                mode = it
+                requestContentFocus = true
+            },
+            onMoveToContent = { requestContentFocus = true },
+            onNavigateTabs = {
+                // A deliberate header move gives the viewer ownership, not the loading handoff.
+                screenState.requestedScheduleEntryId.value = null
+                loadingFocusParked = false
+                contentFocusOwned = false
             },
         )
         TabContent(
@@ -919,10 +899,10 @@ internal fun RecordingsScreenContent(
                     ),
                     isCurrent = owner.isCurrent,
                     initialFocusEnabled = owner.isCurrent && initialFocusEnabled &&
-                        detailsEntry == null && folderMenu == null && !optionsOpen &&
+                        overlays.detailsEntry == null && overlays.folderMenu == null && !overlays.optionsOpen &&
                         (contentFocusOwned || requestContentFocus),
-                    backEnabled = backEnabled && detailsEntry == null && folderMenu == null && !optionsOpen &&
-                        contentFocusOwned,
+                    backEnabled = backEnabled && overlays.detailsEntry == null && overlays.folderMenu == null &&
+                        !overlays.optionsOpen && contentFocusOwned,
                     grouping = chosenGrouping,
                     sort = chosenView.sort,
                     fullRoot = if (owner.isCurrent) fullArchive else frame.fullArchive,
@@ -945,10 +925,10 @@ internal fun RecordingsScreenContent(
                     onOpenContextMenu = {
                         if (owner.isCurrent) {
                             contentFocusOwned = false
-                            detailsInitialAction = null
-                            detailsEntry = it
-                            detailsObservation = observation
-                            showContextMenu = true
+                            overlays.detailsInitialAction = null
+                            overlays.detailsEntry = it
+                            overlays.detailsObservation = observation
+                            overlays.showContextMenu = true
                         }
                     },
                     // Channel and genre groups are not server folders; they have no folder actions.
@@ -961,7 +941,7 @@ internal fun RecordingsScreenContent(
                             folderContextActions(folder, observation::recordingPlaybackAdmission, canModify).isNotEmpty()
                         ) {
                             contentFocusOwned = false
-                            folderMenu = FolderMenuTarget(folder.path, session)
+                            overlays.folderMenu = FolderMenuTarget(folder.path, session)
                         }
                     },
                     piconForEntry = { it.channelId?.let(channelsById::get)?.icon },
@@ -977,13 +957,13 @@ internal fun RecordingsScreenContent(
                     rootHeadingEnd = { ArchiveViewOptionsButton(
                         view = chosenView,
                         focusable = owner.isCurrent && !archiveNavigation.stack.canPop,
-                        focusRequester = if (owner.isCurrent) optionsFocus else remember { FocusRequester() },
+                        focusRequester = if (owner.isCurrent) overlays.optionsFocus else remember { FocusRequester() },
                         upFocus = modeFocus,
                         navigationFocus = drawerFocus,
                         onOpen = {
                             if (owner.isCurrent) {
                                 contentFocusOwned = false
-                                optionsOpen = true
+                                overlays.optionsOpen = true
                             }
                         },
                         // Leaving the button for the list keeps the archive focused, so its callback stays quiet.
@@ -1028,7 +1008,7 @@ internal fun RecordingsScreenContent(
                                     latest.dvrState is DvrRepositoryState.Current
                                 ) {
                                     contentFocusOwned = false
-                                    newTimerSession = latest.currentSession
+                                    overlays.newTimerSession = latest.currentSession
                                 }
                             }
                         },
@@ -1043,10 +1023,10 @@ internal fun RecordingsScreenContent(
                         ),
                         isCurrent = owner.isCurrent,
                         initialFocusEnabled = owner.isCurrent && initialFocusEnabled &&
-                            detailsEntry == null && newTimerSession == null && !scheduleRuleOverlay &&
+                            overlays.detailsEntry == null && !overlays.scheduleSurfaceOpen &&
                             (contentFocusOwned || requestContentFocus),
-                        backEnabled = backEnabled && detailsEntry == null && newTimerSession == null &&
-                            !scheduleRuleOverlay && contentFocusOwned,
+                        backEnabled = backEnabled && overlays.detailsEntry == null &&
+                            !overlays.scheduleSurfaceOpen && contentFocusOwned,
                         contentFocus = contentFocus,
                         onFirstRowUp = {
                             if (owner.isCurrent && focusHeader()) contentFocusOwned = false
@@ -1064,10 +1044,10 @@ internal fun RecordingsScreenContent(
                         onOpenContextMenu = {
                             if (owner.isCurrent) {
                                 contentFocusOwned = false
-                                detailsInitialAction = null
-                                detailsEntry = it
-                                detailsObservation = observation
-                                showContextMenu = true
+                                overlays.detailsInitialAction = null
+                                overlays.detailsEntry = it
+                                overlays.detailsObservation = observation
+                                overlays.showContextMenu = true
                             }
                         },
                         piconForEntry = { entry ->
@@ -1101,10 +1081,10 @@ internal fun RecordingsScreenContent(
                             onOpenContextMenu = {
                                 if (owner.isCurrent) {
                                     contentFocusOwned = false
-                                    detailsInitialAction = null
-                                    detailsEntry = it
-                                    detailsObservation = observation
-                                    showContextMenu = true
+                                    overlays.detailsInitialAction = null
+                                    overlays.detailsEntry = it
+                                    overlays.detailsObservation = observation
+                                    overlays.showContextMenu = true
                                 }
                             },
                             piconForEntry = { entry ->
@@ -1134,20 +1114,20 @@ internal fun RecordingsScreenContent(
     val latestRuleNow by rememberUpdatedState(nowSecProvider)
     // Refresh metadata only within the opening session. Never substitute a colliding ID
     // from a later session, including while a captured confirmation is pending.
-    val selectedCapability = detailsObservation?.currentSession
+    val selectedCapability = overlays.detailsObservation?.currentSession
         ?.takeIf { observation.currentSession === it }
-    val observed = detailsEntry?.let { entry ->
+    val observed = overlays.detailsEntry?.let { entry ->
         if (selectedCapability != null && observation.dvrState is DvrRepositoryState.Current) {
             observation.dvrEntry(entry.id)?.takeUnless(::recordingWasRemoved)
         } else entry
     }
-    val opened = observed ?: (ruleEditorEntry ?: detailsEntry.takeIf { detailsRuleEditor })
+    val opened = observed ?: (ruleEditorEntry ?: overlays.detailsEntry.takeIf { detailsRuleEditor })
         .takeIf { selectedCapability != null }
     LaunchedEffect(selectedCapability) { if (selectedCapability == null) ruleEditorEntry = null }
     // The SDK admits the opened entry with the observation it was read from; without its session nothing plays.
     val openedAdmission = opened?.let { entry ->
         selectedCapability?.let {
-            (if (observation.dvrState is DvrRepositoryState.Current) observation else detailsObservation)
+            (if (observation.dvrState is DvrRepositoryState.Current) observation else overlays.detailsObservation)
                 ?.recordingPlaybackAdmission(entry)
         }
     }
@@ -1198,15 +1178,15 @@ internal fun RecordingsScreenContent(
             }
         }
     }
-    LaunchedEffect(detailsEntry, opened) {
-        if (detailsEntry != null && opened == null) {
-            showResumeChoice = false
-            pendingAction = null
-            pendingMutation = null
-            detailsEntry = null
-            detailsObservation = null
-            detailsInitialAction = null
-            pendingDetailsReturn = true
+    LaunchedEffect(overlays.detailsEntry, opened) {
+        if (overlays.detailsEntry != null && opened == null) {
+            overlays.showResumeChoice = false
+            overlays.pendingAction = null
+            overlays.pendingMutation = null
+            overlays.detailsEntry = null
+            overlays.detailsObservation = null
+            overlays.detailsInitialAction = null
+            overlays.pendingDetailsReturn = true
         }
     }
     if (opened != null) {
@@ -1216,10 +1196,10 @@ internal fun RecordingsScreenContent(
             val closeBehindPlayer = rememberCloseBehindPlayer()
             val channel = opened.channelId?.let(channelsById::get)
             val closeResume = {
-                showResumeChoice = false
-                detailsEntry = null
-                detailsObservation = null
-                pendingDetailsReturn = true
+                overlays.showResumeChoice = false
+                overlays.detailsEntry = null
+                overlays.detailsObservation = null
+                overlays.pendingDetailsReturn = true
             }
             val play: (RecordingPlaybackStart) -> Unit = { intent ->
                 selectedCapability?.let { capability ->
@@ -1242,7 +1222,7 @@ internal fun RecordingsScreenContent(
             if (choice) RecordingPlaybackChoice(opened, openedAdmission, observation, channel, nowSec,
                 onPlay = play, onClose = closeResume, onWatchLive = watchLive, backEnabled = backEnabled)
         }
-        if (showResumeChoice) {
+        if (overlays.showResumeChoice) {
             ResumeChoice()
         } else {
         val closeBehindPlayer = rememberCloseBehindPlayer()
@@ -1251,10 +1231,10 @@ internal fun RecordingsScreenContent(
         val continueWatching = {
             val leaveBehindPlayer = {
                 closeBehindPlayer {
-                    showContextMenu = false
-                    detailsEntry = null
-                    detailsObservation = null
-                    detailsInitialAction = null
+                    overlays.showContextMenu = false
+                    overlays.detailsEntry = null
+                    overlays.detailsObservation = null
+                    overlays.detailsInitialAction = null
                     requestContentFocus = true
                 }
             }
@@ -1271,10 +1251,10 @@ internal fun RecordingsScreenContent(
         LaunchedEffect(visibility.isIdle, visibility.currentState, closing) {
             if (closing && visibility.isIdle && !visibility.currentState) {
                 val restoredBeforeDismissal = restoreAfterOverlay()
-                pendingDetailsReturn = !restoredBeforeDismissal
-                detailsEntry = null
-                detailsObservation = null
-                detailsInitialAction = null
+                overlays.pendingDetailsReturn = !restoredBeforeDismissal
+                overlays.detailsEntry = null
+                overlays.detailsObservation = null
+                overlays.detailsInitialAction = null
             }
         }
         AnimatedVisibility(visibleState = visibility, modifier = Modifier.browseDetailsViewport(),
@@ -1284,22 +1264,22 @@ internal fun RecordingsScreenContent(
         at.bernhardberger.tvhplayer.ui.player.PlayerMotionFrame(leaving = closing,
             modifier = Modifier.onPreviewKeyEvent { closing || entryPending() }) {
         // Match ProgrammeDetailsHost: keep both pages drawn while details owns its alpha.
-        AnimatedContent(targetState = showContextMenu, transitionSpec = {
+        AnimatedContent(targetState = overlays.showContextMenu, transitionSpec = {
             (if (targetState) fadeIn(tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard)) else EnterTransition.None)
                 .togetherWith(if (initialState) fadeOut(tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard)) else ExitTransition.None)
                 .using(null)
         }, label = "recording-menu-details") { menu ->
-        at.bernhardberger.tvhplayer.ui.player.PlayerMotionFrame(leaving = closing || menu != showContextMenu) {
+        at.bernhardberger.tvhplayer.ui.player.PlayerMotionFrame(leaving = closing || menu != overlays.showContextMenu) {
         if (menu) {
         AnimatedVisibility(visible = !closing && !menuConsumed,
             enter = EnterTransition.None, exit = ExitTransition.None) {
         androidx.compose.runtime.CompositionLocalProvider(
             at.bernhardberger.tvhplayer.ui.player.LocalPlayerPanelMotion provides this) {
         at.bernhardberger.tvhplayer.ui.player.PlayerMotionFrame(
-            leaving = pendingAction != null || ruleEditorEntry != null) {
+            leaving = overlays.pendingAction != null || ruleEditorEntry != null) {
         BrowseContextMenu(
-            backEnabled = backEnabled && !closing && menu == showContextMenu &&
-                pendingAction == null && ruleEditorEntry == null && !ruleMutationBusy && !keepUntilBusy,
+            backEnabled = backEnabled && !closing && menu == overlays.showContextMenu &&
+                overlays.pendingAction == null && ruleEditorEntry == null && !ruleMutationBusy && !keepUntilBusy,
             title = opened.title.orEmpty(),
             channel = opened.channelId?.let(channelsById::get)?.let {
                 at.bernhardberger.tvhplayer.ui.components.channelTitleText(it.number, it.name.orEmpty())
@@ -1363,17 +1343,17 @@ internal fun RecordingsScreenContent(
                 // Playback keeps the menu up until the player has replaced browse.
                 if (playing == null) {
                     menuConsumed = action != BrowseContextAction.DETAILS
-                    showContextMenu = action in listOf(BrowseContextAction.STOP, BrowseContextAction.CANCEL,
+                    overlays.showContextMenu = action in listOf(BrowseContextAction.STOP, BrowseContextAction.CANCEL,
                         BrowseContextAction.DELETE, BrowseContextAction.REMOVE_ENTRY)
                 }
                 when (action) {
                     BrowseContextAction.WATCH_LIVE -> opened.channelId?.let(channelsById::get)?.let { channel ->
                         if (playing != null && latestObservationProvider().currentSession === playing && onWatchChannel != null) {
                             closeBehindPlayer {
-                                showContextMenu = false
-                                detailsEntry = null
-                                detailsObservation = null
-                                detailsInitialAction = null
+                                overlays.showContextMenu = false
+                                overlays.detailsEntry = null
+                                overlays.detailsObservation = null
+                                overlays.detailsInitialAction = null
                                 requestContentFocus = true
                             }
                             onWatchChannel(channel.id, channel.name.orEmpty())
@@ -1383,10 +1363,10 @@ internal fun RecordingsScreenContent(
                     BrowseContextAction.WATCH, BrowseContextAction.PLAY,
                     BrowseContextAction.RESUME, BrowseContextAction.START_OVER -> playing?.let {
                         closeBehindPlayer {
-                            showContextMenu = false
-                            detailsEntry = null
-                            detailsObservation = null
-                            detailsInitialAction = null
+                            overlays.showContextMenu = false
+                            overlays.detailsEntry = null
+                            overlays.detailsObservation = null
+                            overlays.detailsInitialAction = null
                             requestContentFocus = true
                         }
                         onPlayRecording(RecordingPlaybackSelection(it, opened.id),
@@ -1394,19 +1374,19 @@ internal fun RecordingsScreenContent(
                                 RecordingPlaybackStart.RESUME else RecordingPlaybackStart.START_OVER)
                     }
                     BrowseContextAction.STOP -> {
-                        detailsInitialAction = RecordingDetailsAction.STOP
-                        pendingMutation = selectedCapability?.let { DvrMutationAction.Stop(it, opened.id) }
-                        pendingAction = PendingRecordingAction.STOP
+                        overlays.detailsInitialAction = RecordingDetailsAction.STOP
+                        overlays.pendingMutation = selectedCapability?.let { DvrMutationAction.Stop(it, opened.id) }
+                        overlays.pendingAction = PendingRecordingAction.STOP
                     }
                     BrowseContextAction.CANCEL -> {
-                        detailsInitialAction = RecordingDetailsAction.CANCEL
-                        pendingMutation = selectedCapability?.let { DvrMutationAction.Cancel(it, opened.id) }
-                        pendingAction = PendingRecordingAction.CANCEL
+                        overlays.detailsInitialAction = RecordingDetailsAction.CANCEL
+                        overlays.pendingMutation = selectedCapability?.let { DvrMutationAction.Cancel(it, opened.id) }
+                        overlays.pendingAction = PendingRecordingAction.CANCEL
                     }
                     BrowseContextAction.DELETE, BrowseContextAction.REMOVE_ENTRY -> {
-                        detailsInitialAction = RecordingDetailsAction.DELETE
-                        pendingMutation = selectedCapability?.let { DvrMutationAction.Delete(it, opened.id) }
-                        pendingAction = PendingRecordingAction.DELETE
+                        overlays.detailsInitialAction = RecordingDetailsAction.DELETE
+                        overlays.pendingMutation = selectedCapability?.let { DvrMutationAction.Delete(it, opened.id) }
+                        overlays.pendingAction = PendingRecordingAction.DELETE
                     }
                     BrowseContextAction.MARK_WATCHED, BrowseContextAction.MARK_UNWATCHED -> {
                         visibility.targetState = false
@@ -1441,14 +1421,14 @@ internal fun RecordingsScreenContent(
             onRuleEditorActive = { detailsRuleEditor = it },
             onShowGuide = onShowGuide,
             recording = opened,
-            openingObservation = requireNotNull(detailsObservation),
+            openingObservation = requireNotNull(overlays.detailsObservation),
             observation = observation,
             currentObservation = currentObservation,
             nowSec = nowSec,
             mutations = dvrMutationActions,
             notices = notices,
             mutationScope = scope,
-            initialAction = when (detailsInitialAction) {
+            initialAction = when (overlays.detailsInitialAction) {
                 RecordingDetailsAction.CANCEL,
                 RecordingDetailsAction.STOP -> when (opened.state) {
                     DvrEntryState.SCHEDULED -> if (opened.isRuleRecording)
@@ -1464,19 +1444,23 @@ internal fun RecordingsScreenContent(
                     if (deleteRemovesEntryOnly(opened)) BrowseContextAction.REMOVE_ENTRY else BrowseContextAction.DELETE
                 null -> null
             },
-            backEnabled = backEnabled && !closing && menu == showContextMenu && pendingAction == null,
+            backEnabled = backEnabled && !closing && menu == overlays.showContextMenu && overlays.pendingAction == null,
             visibilityAlpha = alpha,
             onPlayRecording = { selection, start ->
                 closeBehindPlayer {
-                    detailsEntry = null
-                    detailsObservation = null
-                    detailsInitialAction = null
+                    overlays.detailsEntry = null
+                    overlays.detailsObservation = null
+                    overlays.detailsInitialAction = null
                     requestContentFocus = true
                 }
                 onPlayRecording(selection, start)
             },
             onWatchChannel = onWatchChannel?.let { watch -> { id, name ->
-                closeBehindPlayer { detailsEntry = null; detailsObservation = null; requestContentFocus = true }
+                closeBehindPlayer {
+                    overlays.detailsEntry = null
+                    overlays.detailsObservation = null
+                    requestContentFocus = true
+                }
                 watch(id, name)
             } },
             onContinueWatching = continueWatching,
@@ -1497,47 +1481,25 @@ internal fun RecordingsScreenContent(
             now = { kotlin.time.Instant.fromEpochSeconds(latestRuleNow()) },
             onClose = { ruleEditorEntry = null })
     }
-    ScheduleRuleActions(
-        scheduleRuleRequest,
-        onChange = {
-            scheduleRuleRequest = it
-            if (it == null) pendingDetailsReturn = true
-        },
-        observation = { latestObservationProvider() }, isCurrent = screenState.mode.value == DvrLibraryMode.SCHEDULE,
-        channels = channelsById.values.toList(), actions = dvrMutationActions, notices = notices,
-        now = { kotlin.time.Instant.fromEpochSeconds(nowSecProvider()) },
-    )
-    newTimerSession?.let { openingSession ->
-        val editorSession: TvheadendSession = koinInject()
-        TimerRecordingEditorHost(
-            openingSession, editorSession.observation, dvrMutationActions, notices,
-            now = { kotlin.time.Instant.fromEpochSeconds(nowSecProvider()) },
-            onClose = {
-                newTimerSession = null
-                pendingDetailsReturn = true
-            },
-        )
-    }
-
-    val action = pendingAction
+    val action = overlays.pendingAction
     val target = opened
     val closeConsumedMenu = {
-        if (showContextMenu && menuConsumed) {
+        if (overlays.showContextMenu && menuConsumed) {
             // Match details dismissal: restore the mounted card before removing the dialog.
-            pendingDetailsReturn = !restoreAfterOverlay()
-            showContextMenu = false
-            detailsEntry = null
-            detailsObservation = null
-            detailsInitialAction = null
+            overlays.pendingDetailsReturn = !restoreAfterOverlay()
+            overlays.showContextMenu = false
+            overlays.detailsEntry = null
+            overlays.detailsObservation = null
+            overlays.detailsInitialAction = null
         }
     }
-    val mutationStateCurrent = pendingMutation?.recordingStateIsCurrent(observation) == true
+    val mutationStateCurrent = overlays.pendingMutation?.recordingStateIsCurrent(observation) == true
     LaunchedEffect(action, selectedCapability, mutationStateCurrent) {
         if (action != null && (selectedCapability == null || !mutationStateCurrent)) {
-            pendingAction = null
-            pendingMutation = null
+            overlays.pendingAction = null
+            overlays.pendingMutation = null
             // The dismissed dialog must not restore focus to an action whose authority expired.
-            if (selectedCapability == null) detailsInitialAction = null
+            if (selectedCapability == null) overlays.detailsInitialAction = null
             closeConsumedMenu()
         }
     }
@@ -1552,15 +1514,15 @@ internal fun RecordingsScreenContent(
             observation = observation,
             backEnabled = backEnabled,
             onDismiss = {
-                pendingAction = null
-                pendingMutation = null
+                overlays.pendingAction = null
+                overlays.pendingMutation = null
                 closeConsumedMenu()
             },
             onConfirm = {
-                pendingAction = null
-                val mutation = pendingMutation
-                pendingMutation = null
-                val mutationObservation = detailsObservation
+                overlays.pendingAction = null
+                val mutation = overlays.pendingMutation
+                overlays.pendingMutation = null
+                val mutationObservation = overlays.detailsObservation
                 closeConsumedMenu()
                 scope.launch {
                     val latestObservation = latestObservationProvider()
@@ -1578,8 +1540,34 @@ internal fun RecordingsScreenContent(
     }
     RecordingDetails()
     @Composable
+    fun ScheduleSurfaces() {
+        ScheduleRuleActions(
+            overlays.scheduleRuleRequest,
+            onChange = {
+                overlays.scheduleRuleRequest = it
+                if (it == null) overlays.pendingDetailsReturn = true
+            },
+            observation = { latestObservationProvider() },
+            isCurrent = screenState.mode.value == DvrLibraryMode.SCHEDULE,
+            channels = channelsById.values.toList(), actions = dvrMutationActions, notices = notices,
+            now = { kotlin.time.Instant.fromEpochSeconds(nowSecProvider()) },
+        )
+        overlays.newTimerSession?.let { openingSession ->
+            val editorSession: TvheadendSession = koinInject()
+            TimerRecordingEditorHost(
+                openingSession, editorSession.observation, dvrMutationActions, notices,
+                now = { kotlin.time.Instant.fromEpochSeconds(nowSecProvider()) },
+                onClose = {
+                    overlays.newTimerSession = null
+                    overlays.pendingDetailsReturn = true
+                },
+            )
+        }
+    }
+    ScheduleSurfaces()
+    @Composable
     fun FolderMenu() {
-    folderMenu?.let { menu ->
+    overlays.folderMenu?.let { menu ->
         // The menu acts with the session it opened in, on the folder as it is now.
         val session = menu.session.takeIf { observation.currentSession === it }
         val folder = archive.folderAt(menu.path)?.takeIf { menu.path.isNotEmpty() }
@@ -1604,12 +1592,12 @@ internal fun RecordingsScreenContent(
             }.orEmpty(),
             time = summary.totalSizeBytes.takeIf { it > 0 }?.let { formatFileSize(it, context) }.orEmpty(),
             actions = actions,
-            backEnabled = backEnabled && folderDelete == null,
+            backEnabled = backEnabled && overlays.folderDelete == null,
             onClose = ::closeFolderMenu,
             onAction = { action ->
                 val targets = folderActionTargets(folder, action, observation::recordingPlaybackAdmission, canModify)
                 when (action) {
-                    BrowseContextAction.DELETE_WATCHED, BrowseContextAction.DELETE_ALL -> folderDelete = FolderDeleteTarget(
+                    BrowseContextAction.DELETE_WATCHED, BrowseContextAction.DELETE_ALL -> overlays.folderDelete = FolderDeleteTarget(
                         action = action,
                         name = folder.name,
                         recordingIds = targets.map { it.id },
@@ -1632,7 +1620,7 @@ internal fun RecordingsScreenContent(
                 }
             },
         )
-        folderDelete?.let { delete ->
+        overlays.folderDelete?.let { delete ->
             val count = delete.recordingIds.size
             val size = delete.sizeBytes.takeIf { it > 0 }?.let { formatFileSize(it, context) }
             val countLabel = pluralStringResource(R.plurals.recordings_folder_recording_count, count, count)
@@ -1660,7 +1648,7 @@ internal fun RecordingsScreenContent(
     }
     }
     FolderMenu()
-    if (optionsOpen) {
+    if (overlays.optionsOpen) {
         ArchiveViewOptionsPanel(
             current = chosenView,
             onChoose = { choice ->
@@ -1683,17 +1671,80 @@ internal fun RecordingsScreenContent(
             },
             onClose = {
                 // Move focus before disposing the modal, rather than letting disposal choose a list row.
-                if (runCatching { optionsFocus.requestFocus() }.getOrDefault(false)) {
+                if (runCatching { overlays.optionsFocus.requestFocus() }.getOrDefault(false)) {
                     contentFocusOwned = false
                     requestContentFocus = false
                 } else {
-                    requestStop = optionsFocus
+                    overlays.requestStop = overlays.optionsFocus
                 }
-                optionsOpen = false
+                overlays.optionsOpen = false
             },
         )
     }
     }
+}
+
+@Composable
+private fun RecordingsHeader(
+    mode: DvrLibraryMode,
+    modeFocus: FocusRequester,
+    problemCount: Int,
+    diskSpace: at.bernhardberger.tvheadend.sdk.core.DvrDiskSpaceState,
+    startPadding: Dp,
+    endPadding: Dp,
+    onFocused: (DvrLibraryMode) -> Unit,
+    onClick: (DvrLibraryMode) -> Unit,
+    onMoveToContent: () -> Unit,
+    onNavigateTabs: () -> Unit,
+) {
+    TopLevelBrowseHeader(
+        title = stringResource(R.string.recordings_title),
+        modifier = Modifier
+            .padding(start = startPadding + TvBrowseLeadingInset, end = maxOf(endPadding, TvBrowseTrailingInset))
+            .heightIn(min = recordingsHeaderMinHeight())
+            .testTag("recordings-header"),
+        leading = {
+            RecordingModeTabs(
+                selected = mode,
+                selectedFocus = modeFocus,
+                problemCount = problemCount,
+                onFocused = onFocused,
+                onClick = onClick,
+                onMoveToContent = onMoveToContent,
+                modifier = Modifier
+                    .onPreviewKeyEvent {
+                        onNavigateTabs()
+                        false
+                    }
+                    .testTag("recordings-mode-tabs"),
+            )
+            Spacer(Modifier.weight(1f))
+            // Quiet information at the tab line's end on every tab: no focus stop.
+            RecordingStorageIndicator(diskSpace)
+        },
+    )
+}
+
+/** Details, context menus and their confirmations share the screen's composition lifetime. */
+private class RecordingOverlaysState {
+    var optionsOpen by mutableStateOf(false)
+    val optionsFocus = FocusRequester()
+    // The stop the next frames move focus to: the View options button after its panel closes.
+    var requestStop by mutableStateOf<FocusRequester?>(null)
+    var detailsEntry by mutableStateOf<DvrEntry?>(null)
+    var showContextMenu by mutableStateOf(false)
+    var showResumeChoice by mutableStateOf(false)
+    var detailsObservation by mutableStateOf<SessionObservation?>(null)
+    var detailsInitialAction by mutableStateOf<RecordingDetailsAction?>(null)
+    var pendingAction by mutableStateOf<PendingRecordingAction?>(null)
+    var pendingMutation by mutableStateOf<DvrMutationAction?>(null)
+    var confirmationKey by mutableStateOf<Key?>(null)
+    var pendingDetailsReturn by mutableStateOf(false)
+    var folderMenu by mutableStateOf<FolderMenuTarget?>(null)
+    var folderDelete by mutableStateOf<FolderDeleteTarget?>(null)
+    var newTimerSession by mutableStateOf<CurrentSessionObservation?>(null)
+    var scheduleRuleRequest by mutableStateOf<OpenRule?>(null)
+    val scheduleSurfaceOpen: Boolean get() = newTimerSession != null || scheduleRuleRequest != null
 }
 
 /** Ignore older settings echoes until the latest optimistic selection is acknowledged. */

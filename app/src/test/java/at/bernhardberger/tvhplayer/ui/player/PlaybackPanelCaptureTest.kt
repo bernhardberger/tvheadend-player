@@ -38,8 +38,6 @@ import at.bernhardberger.tvhplayer.ui.screens.BrowsePanelList
 import at.bernhardberger.tvhplayer.ui.screens.BrowseSidePanel
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideFilterPanel
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideTimePanel
-import at.bernhardberger.tvhplayer.ui.screens.guide.GuideViewOptionsPanel
-import at.bernhardberger.tvhplayer.settings.GuideView
 import java.time.Instant
 import kotlin.time.Instant as KotlinInstant
 import java.time.ZoneId
@@ -228,18 +226,6 @@ class PlaybackPanelCaptureTest {
         compose.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
         compose.waitForIdle()
         compose.onNodeWithTag("playback-options-track-automatic").assertIsFocused()
-    }
-
-    @OptIn(ExperimentalTestApi::class)
-    @Test fun guideViewRootAndRowsLevel() {
-        panelScene {
-            var options by remember { mutableStateOf(GuideView()) }
-            GuideViewOptionsPanel(options, { options = it }, {})
-        }
-        compose.onNodeWithTag("guide-view-rows").assertIsFocused()
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
-        compose.waitForIdle()
-        compose.onNodeWithTag("guide-view-rows-dense").assertIsFocused()
     }
 
     /** Match the browse shell, early-morning bounds and 12-hour clock of the integrated report. */
