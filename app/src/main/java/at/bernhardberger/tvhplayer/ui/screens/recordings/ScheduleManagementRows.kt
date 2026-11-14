@@ -22,6 +22,7 @@ import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.AutomaticRecordingList
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
+import at.bernhardberger.tvhplayer.ui.TvSpacing48
 import at.bernhardberger.tvhplayer.ui.components.LocalTabOwner
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthItem
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthLevel
@@ -36,13 +37,6 @@ internal fun scheduleManagementKeys(canModify: Boolean, hasAutomatic: Boolean): 
     if (canModify) add(SCHEDULE_NEW_TIMER)
     if (canModify || hasAutomatic) add(SCHEDULE_AUTOMATIC_ROW)
 }
-
-internal fun scheduleAutomaticLevel(automatic: AutomaticRecordingList) = DepthLevel(
-    id = SCHEDULE_AUTOMATIC_LEVEL,
-    rows = emptyList(),
-    heading = { ArchiveLevelHeading(stringResource(R.string.automatic_recording_new_overline), it, null) },
-    emptyContent = { if (automatic.items.isEmpty()) ModeEmptyState(R.string.schedule_automatic_empty) },
-)
 
 internal fun scheduleManagementRows(
     canModify: Boolean,
@@ -72,13 +66,15 @@ internal fun scheduleManagementRows(
                 automaticRecordingCountLabel(automatic), R.drawable.ic_fiber_smart_record,
                 R.drawable.ic_keyboard_arrow_right, modifier, activate)
             HorizontalDivider(Modifier.padding(vertical = TvSpacing8))
-            if (empty) ModeEmptyState(R.string.recordings_schedule_empty)
+            if (empty) Column(Modifier.fillMaxWidth().padding(vertical = TvSpacing48)) {
+                ModeEmptyState(R.string.recordings_schedule_empty)
+            }
         }
     })
 }
 
 @Composable
-private fun ScheduleManagementRow(
+internal fun ScheduleManagementRow(
     tag: String,
     title: String,
     support: String,
@@ -92,7 +88,7 @@ private fun ScheduleManagementRow(
         selected = false,
         onClick = { if (owner?.isCurrent != false) onClick() },
         headlineContent = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        supportingContent = { Text(support, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+        supportingContent = { Text(support, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         leadingContent = { Icon(painterResource(leading), null, Modifier.size(32.dp)) },
         trailingContent = { Icon(painterResource(trailing), null) },
         modifier = modifier.tabFocus().fillMaxWidth().testTag(tag),
@@ -102,7 +98,7 @@ private fun ScheduleManagementRow(
 @Composable
 internal fun automaticRecordingCountLabel(list: AutomaticRecordingList): String {
     if (list.items.isEmpty()) return stringResource(R.string.schedule_automatic_empty_help)
-    val on = pluralStringResource(R.plurals.schedule_automatic_on, list.onCount, list.onCount)
+    val on = pluralStringResource(R.plurals.schedule_automatic_on_count, list.onCount, list.onCount)
     return if (list.offCount == 0) on else stringResource(R.string.schedule_automatic_counts, on,
-        pluralStringResource(R.plurals.schedule_automatic_off, list.offCount, list.offCount))
+        pluralStringResource(R.plurals.schedule_automatic_off_count, list.offCount, list.offCount))
 }

@@ -8,19 +8,46 @@
     <string name="automatic_recording_new_title_help">Programs with exactly this title</string>
     <string name="automatic_recording_new_timer">Repeating timer</string>
     <string name="automatic_recording_new_timer_help">A channel at set times on chosen days</string>
+    <!-- Headline of the Schedule tab's list of recordings still to come. -->
     <string name="schedule_upcoming">Upcoming</string>
+    <!-- Row that adds a recording by channel and time. -->
     <string name="schedule_new_timer">New timer</string>
+    <!-- Supporting line of the row that adds a recording by channel and time. -->
     <string name="schedule_new_timer_help">A channel at set times, once or repeating</string>
-    <string name="schedule_automatic_empty_help">Series, titles, keywords and repeating timers</string>
+    <!-- Supporting line of the Automatic recordings row when there are none. -->
+    <string name="schedule_automatic_empty_help">None yet</string>
+    <!-- Empty state inside the Automatic recordings level. -->
     <string name="schedule_automatic_empty">No automatic recordings yet.</string>
-    <string name="schedule_automatic_counts">%1$s • %2$s</string>
-    <plurals name="schedule_automatic_on">
-        <item quantity="one">%d on</item>
-        <item quantity="other">%d on</item>
+    <!-- Supporting line of the row that adds an automatic recording. -->
+    <string name="schedule_automatic_new_help">By title, keyword or set times</string>
+    <!-- Menu action on one automatic recording. -->
+    <string name="schedule_automatic_turn_off">Turn off</string>
+    <!-- Menu action on one automatic recording. -->
+    <string name="schedule_automatic_turn_on">Turn on</string>
+    <!-- Badge on an automatic recording that is turned off. -->
+    <string name="schedule_automatic_off">Off</string>
+    <!-- Args: date, time span of the next recording. -->
+    <string name="schedule_automatic_next">Next: %1$s • %2$s</string>
+    <!-- Shown instead of Next when an automatic recording has nothing scheduled. -->
+    <string name="schedule_automatic_nothing">Nothing scheduled</string>
+    <!-- Arg: the keep choice, for example "1 month after recording". -->
+    <string name="schedule_automatic_keep">Keep until: %1$s</string>
+    <!-- Count of scheduled recordings of one automatic recording. -->
+    <plurals name="schedule_automatic_upcoming">
+        <item quantity="one">%1$d upcoming</item>
+        <item quantity="other">%1$d upcoming</item>
     </plurals>
-    <plurals name="schedule_automatic_off">
-        <item quantity="one">%d off</item>
-        <item quantity="other">%d off</item>
+    <!-- Args: counts of automatic recordings that are on and off, respectively. -->
+    <string name="schedule_automatic_counts">%1$s • %2$s</string>
+    <!-- Count of automatic recordings that are on; joined by schedule_automatic_counts. -->
+    <plurals name="schedule_automatic_on_count">
+        <item quantity="one">%1$d on</item>
+        <item quantity="other">%1$d on</item>
+    </plurals>
+    <!-- Count of automatic recordings that are off; joined by schedule_automatic_counts. -->
+    <plurals name="schedule_automatic_off_count">
+        <item quantity="one">%1$d off</item>
+        <item quantity="other">%1$d off</item>
     </plurals>
     <string name="context_record_series">Record series</string>
     <string name="context_record_title">Record all with this title</string>

@@ -131,14 +131,14 @@ private fun PanelText(subject: ConfirmationSubject, styles: ConfirmationStyles) 
             subject.target?.let { PanelRow(it, styles.row) }
         }
         is ConfirmationSubject.Folder -> PanelRow(subject.detail, styles.row)
-        is ConfirmationSubject.Rule -> PanelRow(subject.detail, styles.row)
+        is ConfirmationSubject.Rule -> PanelRow(subject.detail, styles.row, maxLines = 2)
         is ConfirmationSubject.Server -> PanelRow(subject.detail, styles.row)
     }
 }
 
 @Composable
-private fun PanelRow(text: String, style: TextStyle) {
-    if (text.isNotBlank()) Text(text, style = style, color = TvTextColors.secondary, maxLines = 1,
+private fun PanelRow(text: String, style: TextStyle, maxLines: Int = 1) {
+    if (text.isNotBlank()) Text(text, style = style, color = TvTextColors.secondary, maxLines = maxLines,
         overflow = TextOverflow.Ellipsis)
 }
 

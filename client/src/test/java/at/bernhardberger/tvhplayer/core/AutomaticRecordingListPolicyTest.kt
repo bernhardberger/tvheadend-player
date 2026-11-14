@@ -93,6 +93,12 @@ class AutomaticRecordingListPolicyTest {
         assertEquals(false, empty.available)
         assertEquals(0, empty.onCount)
         assertEquals(0, empty.offCount)
+        val nameless = TimerecRule.create(TimerecRuleId("blank"))
+        listOf(String.CASE_INSENSITIVE_ORDER, String.CASE_INSENSITIVE_ORDER.reversed()).forEach { comparator ->
+            assertEquals("blank", automaticRecordingList(
+                observation(rules, listOf(timer, nameless)), comparator,
+            ).items.last().id)
+        }
     }
 
     private fun observation(

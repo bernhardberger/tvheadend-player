@@ -187,6 +187,11 @@ import at.bernhardberger.tvhplayer.core.recordingDetailsActions
 import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingModeTabs
 import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingProblems
 import at.bernhardberger.tvhplayer.ui.screens.recordings.ScheduleDepthContent
+import at.bernhardberger.tvhplayer.ui.screens.recordings.OpenRule
+import at.bernhardberger.tvhplayer.ui.screens.recordings.RuleSurface
+import at.bernhardberger.tvhplayer.ui.screens.recordings.ScheduleRuleActions
+import at.bernhardberger.tvhplayer.ui.screens.recordings.currentIn
+import at.bernhardberger.tvhplayer.core.AutomaticRecordingListItem
 import at.bernhardberger.tvhplayer.ui.screens.recordings.SCHEDULE_ROOT_LEVEL
 import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingsEmptyState
 import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingsPreparationSkeleton
@@ -426,6 +431,21 @@ internal fun RecordingsScreenContent(
     var folderMenu by remember { mutableStateOf<FolderMenuTarget?>(null) }
     var folderDelete by remember { mutableStateOf<FolderDeleteTarget?>(null) }
     var newTimerSession by remember { mutableStateOf<CurrentSessionObservation?>(null) }
+    var scheduleRuleRequest by remember { mutableStateOf<OpenRule?>(null) }
+    val scheduleRuleOverlay = scheduleRuleRequest != null
+    fun openScheduleRule(surface: RuleSurface, item: AutomaticRecordingListItem? = null) {
+        val latest = latestObservationProvider()
+        val ready = latest.sessionState as? SessionState.Ready
+        val currentItem = item?.currentIn(latest)
+        if (latest.currentSession == currentSession && ready?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED &&
+            latest.dvrState is DvrRepositoryState.Current
+        ) latest.currentSession?.let { session ->
+            if (item == null || currentItem != null) {
+                contentFocusOwned = false
+                scheduleRuleRequest = OpenRule(surface, session, currentItem)
+            }
+        }
+    }
 
     fun closeFolderMenu() {
         if (folderMenu == null) return
@@ -658,9 +678,10 @@ internal fun RecordingsScreenContent(
         folderMenu,
         optionsOpen,
         newTimerSession,
+        scheduleRuleOverlay,
     ) {
-        if (recordingOverlayOpen(detailsEntry, pendingAction, folderMenu) || optionsOpen ||
-            newTimerSession != null) return@LaunchedEffect
+        if (recordingOverlayOpen(detailsEntry, pendingAction, folderMenu) || optionsOpen) return@LaunchedEffect
+        if (newTimerSession != null || scheduleRuleOverlay) return@LaunchedEffect
         val requestedEntry = screenState.requestedScheduleEntryId.value
         // Preparation retains the last projection while the new snapshot is calculated.
         // Only the projection built from the displayed snapshot can judge this target.
@@ -728,10 +749,11 @@ internal fun RecordingsScreenContent(
         folderMenu,
         optionsOpen,
         newTimerSession,
+        scheduleRuleOverlay,
     ) {
         if (!pendingDetailsReturn) return@LaunchedEffect
-        if (recordingOverlayOpen(detailsEntry, pendingAction, folderMenu) || optionsOpen ||
-            newTimerSession != null) return@LaunchedEffect
+        if (recordingOverlayOpen(detailsEntry, pendingAction, folderMenu) || optionsOpen) return@LaunchedEffect
+        if (newTimerSession != null || scheduleRuleOverlay) return@LaunchedEffect
         repeat(4) {
             withFrameNanos { }
             val restored = runCatching {
@@ -752,9 +774,9 @@ internal fun RecordingsScreenContent(
             .fillMaxSize()
             .semantics {
                 if (detailsEntry != null || folderMenu != null || optionsOpen) hideFromAccessibility()
-                if (newTimerSession != null) hideFromAccessibility()
+                if (newTimerSession != null || scheduleRuleOverlay) hideFromAccessibility()
             }
-            .then(if (newTimerSession != null) Modifier.focusProperties { canFocus = false } else Modifier)
+            .then(if (newTimerSession != null || scheduleRuleOverlay) Modifier.focusProperties { canFocus = false } else Modifier)
             .graphicsLayer { alpha = 1f - (detailsLayering?.detailsAlpha() ?: if (detailsEntry != null && !showContextMenu && !showResumeChoice) 1f else 0f) }
             .onPreviewKeyEvent { event ->
                 if (event.key == relocatingKey) {
@@ -1016,6 +1038,10 @@ internal fun RecordingsScreenContent(
                                 }
                             }
                         },
+                        channels = channelsById.values.toList(),
+                        onNewAutomatic = { if (owner.isCurrent) openScheduleRule(RuleSurface.NEW) },
+                        onEditRule = { if (owner.isCurrent) openScheduleRule(RuleSurface.EDIT, it) },
+                        onRuleMenu = { if (owner.isCurrent) openScheduleRule(RuleSurface.MENU, it) },
                         navigation = scheduleNavigation,
                         contentPadding = PaddingValues(
                             start = startPadding + TvBrowseLeadingInset,
@@ -1023,10 +1049,10 @@ internal fun RecordingsScreenContent(
                         ),
                         isCurrent = owner.isCurrent,
                         initialFocusEnabled = owner.isCurrent && initialFocusEnabled &&
-                            detailsEntry == null && newTimerSession == null &&
+                            detailsEntry == null && newTimerSession == null && !scheduleRuleOverlay &&
                             (contentFocusOwned || requestContentFocus),
                         backEnabled = backEnabled && detailsEntry == null && newTimerSession == null &&
-                            contentFocusOwned,
+                            !scheduleRuleOverlay && contentFocusOwned,
                         contentFocus = contentFocus,
                         onFirstRowUp = {
                             if (owner.isCurrent && focusHeader()) contentFocusOwned = false
@@ -1477,6 +1503,16 @@ internal fun RecordingsScreenContent(
             now = { kotlin.time.Instant.fromEpochSeconds(latestRuleNow()) },
             onClose = { ruleEditorEntry = null })
     }
+    ScheduleRuleActions(
+        scheduleRuleRequest,
+        onChange = {
+            scheduleRuleRequest = it
+            if (it == null) pendingDetailsReturn = true
+        },
+        observation = { latestObservationProvider() }, isCurrent = screenState.mode.value == DvrLibraryMode.SCHEDULE,
+        channels = channelsById.values.toList(), actions = dvrMutationActions, notices = notices,
+        now = { kotlin.time.Instant.fromEpochSeconds(nowSecProvider()) },
+    )
     newTimerSession?.let { openingSession ->
         val editorSession: TvheadendSession = koinInject()
         TimerRecordingEditorHost(

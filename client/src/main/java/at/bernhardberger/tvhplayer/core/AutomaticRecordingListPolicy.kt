@@ -71,7 +71,8 @@ fun automaticRecordingList(
             own.minWithOrNull(compareBy(nullsLast()) { entry: DvrEntry -> entry.start }))
     }
     return AutomaticRecordingList(items.sortedWith(
-        compareBy<AutomaticRecordingListItem, String>(headlineComparator) { it.headline }
+        compareBy<AutomaticRecordingListItem> { it.headline.isBlank() }
+            .thenBy(headlineComparator) { it.headline }
             .thenBy { it.kind }.thenBy { it.id },
     ), available = snapshot != null)
 }

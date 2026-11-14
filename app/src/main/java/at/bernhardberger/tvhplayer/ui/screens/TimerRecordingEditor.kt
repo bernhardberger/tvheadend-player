@@ -65,19 +65,13 @@ internal fun TimerRecordingEditor(
         mainIcon = R.drawable.ic_schedule,
         unavailableReason = timerUnavailableLabel(state),
     )
-    if (state.navigation.confirmation == AutomaticRecordingEditorConfirmation.DELETE) ConfirmationDialog(
-        question = stringResource(R.string.timer_editor_delete),
+    if (state.navigation.confirmation == AutomaticRecordingEditorConfirmation.DELETE) RecordingRuleDeleteDialog(
+        kind = AutomaticRecordingKind.TIMER,
         subject = ConfirmationSubject.Rule(R.drawable.ic_schedule, timerNameLabel(state.baseline, channels),
             listOf(timerChannelLabel(state.baseline, channels),
                 formatTimerRecordingDays(LocalContext.current, state.baseline.days),
                 "${formatClock(state.baseline.start)} – ${formatClock(state.baseline.end)}").joinToString(" • ")),
-        sentence = formatAutomaticRecordingDeleteBody(
-            LocalContext.current, AutomaticRecordingKind.TIMER, scheduledEntries.size, state.changed,
-        ),
-        safe = ConfirmationChoice(stringResource(R.string.autorec_editor_keep_recording),
-            R.drawable.ic_check, "timer-recording-keep"),
-        action = ConfirmationChoice(stringResource(R.string.autorec_editor_delete),
-            R.drawable.ic_delete_outlined, "timer-recording-delete-confirm"),
+        scheduledCount = scheduledEntries.size, changed = state.changed,
         onDismiss = state::back, onConfirm = state::confirmDestructiveAction,
     )
 }

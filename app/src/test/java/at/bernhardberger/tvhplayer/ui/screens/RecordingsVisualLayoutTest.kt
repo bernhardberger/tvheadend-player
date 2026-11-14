@@ -12,6 +12,7 @@ import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import at.bernhardberger.tvhplayer.ui.TvCardFocusedScale
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
+import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -85,6 +86,7 @@ import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 import at.bernhardberger.tvhplayer.testutil.awaitScheduledWork
 import at.bernhardberger.tvhplayer.ui.components.LocalBrowsePreparationContext
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.CompletableDeferred
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 import org.koin.compose.KoinIsolatedContext
@@ -1471,7 +1473,195 @@ class RecordingsVisualLayoutTest {
         compose.onNodeWithTag("schedule-automatic-recordings").assertExists()
         key(Key.DirectionUp)
         focused("schedule-automatic-recordings")
+        key(Key.DirectionCenter)
+        focused("automatic-recording-series")
+        compose.onNodeWithTag("schedule-new-automatic").assertDoesNotExist()
+        key(Key.DirectionCenter)
+        key(Key.Menu)
+        compose.onNodeWithTag("automatic-recording-menu").assertDoesNotExist()
+        focused("automatic-recording-series")
+        publish(listOf(entry), timerecRules = listOf(
+            TimerecRule.create(TimerecRuleId("unknown"), name = "Unknown channel", channelId = ChannelId(999)),
+            TimerecRule.create(TimerecRuleId("unset"), name = "Unset channel"),
+        ))
+        val kind = view.context.getString(R.string.automatic_recording_new_timer)
+        listOf("unknown", "unset").forEachIndexed { index, id ->
+            if (index > 0) key(Key.DirectionDown)
+            val tag = "automatic-recording-timer-$id"
+            focused(tag)
+            compose.onNodeWithTag(tag).assert(hasText(kind))
+            compose.onNode(hasText(kind) and hasAnyAncestor(hasTestTag("automatic-recording-pane")),
+                useUnmergedTree = true).assertExists()
+        }
+        publish(listOf(entry), autorecRules = listOf(
+            AutorecRule.create(AutorecRuleId("title"), title = "^Ridge Light$"),
+        ))
+        focused("automatic-recording-title")
+        compose.onNodeWithTag("automatic-recording-title").assert(hasText(
+            view.context.getString(R.string.automatic_recording_kind_title) +
+                " • ${view.context.getString(R.string.all_channels)}",
+        ))
         assertNoCommands()
+    }
+
+    @Test fun automaticLevelKeepsItsEmptyStateAndRestoresEditorsMenusAndRemovedRows() {
+        screenState.open(at.bernhardberger.tvhplayer.core.DvrLibraryMode.SCHEDULE)
+        val rules = listOf(
+            AutorecRule.create(AutorecRuleId("first"), title = "^Ridge Light$", seriesLinkUri = "ridge"),
+            AutorecRule.create(AutorecRuleId("second"), title = "^Tide Watch$"),
+            AutorecRule.create(AutorecRuleId("third"), title = "^Weather Watch$"),
+        )
+        show(empty = true, autorecRules = rules)
+        focused("schedule-new-timer")
+        key(Key.DirectionDown)
+        key(Key.DirectionCenter)
+        focused("automatic-recording-first")
+        key(Key.DirectionCenter)
+        compose.onNodeWithTag("automatic-recording-main").assertIsDisplayed()
+        compose.runOnIdle { backDispatcher.onBackPressed() }
+        compose.settleFrames(2)
+        focused("automatic-recording-first")
+        key(Key.Menu)
+        focused("automatic-recording-menu-edit")
+        compose.runOnIdle { backDispatcher.onBackPressed() }
+        compose.settleFrames(2)
+        focused("automatic-recording-first")
+        publish(emptyList(), autorecRules = rules.drop(1))
+        focused("automatic-recording-second")
+        key(Key.DirectionDown)
+        focused("automatic-recording-third")
+        publish(emptyList(), autorecRules = listOf(rules[1]))
+        focused("automatic-recording-second")
+        publish(emptyList())
+        focused("schedule-new-automatic")
+        compose.onNodeWithText("No automatic recordings yet.").assertIsDisplayed()
+        assertEquals("schedule:automatic", screenState.scheduleNavigation.stack.active.levelId)
+        key(Key.DirectionCenter)
+        compose.onNodeWithTag("automatic-recording-new-keyword").assertIsFocused()
+        compose.runOnIdle { backDispatcher.onBackPressed() }
+        compose.settleFrames(2)
+        focused("schedule-new-automatic")
+        key(Key.DirectionLeft)
+        focused("schedule-automatic-recordings")
+        assertNoCommands()
+    }
+
+    @Test fun automaticLevelSerializesTogglesAndUsesTheExistingSafeDeleteConfirmation() {
+        screenState.open(at.bernhardberger.tvhplayer.core.DvrLibraryMode.SCHEDULE)
+        val id = AutorecRuleId("ridge")
+        val enabled = AutorecRule.create(id, title = "^Ridge Light$")
+        val disabled = AutorecRule.create(id, title = "^Ridge Light$", enabled = false)
+        val release = CompletableDeferred<Unit>()
+        val updates = mutableListOf<AutorecRuleUpdate>()
+        var deletes = 0
+        show(empty = true, autorecRules = listOf(enabled), repository = { delegate ->
+            object : DvrRepository by delegate {
+                override suspend fun updateAutorecRule(currentSession: CurrentSessionObservation,
+                    id: AutorecRuleId, update: AutorecRuleUpdate): DvrMutationResult<Unit> {
+                    updates += update
+                    release.await()
+                    return DvrMutationResult.Confirmed(Unit)
+                }
+                override suspend fun deleteAutorecRule(currentSession: CurrentSessionObservation,
+                    id: AutorecRuleId): DvrMutationResult<Unit> {
+                    deletes++
+                    return DvrMutationResult.Confirmed(Unit)
+                }
+            }
+        })
+        key(Key.DirectionDown)
+        key(Key.DirectionCenter)
+        focused("automatic-recording-ridge")
+        key(Key.Menu)
+        key(Key.DirectionDown)
+        key(Key.DirectionCenter)
+        focused("automatic-recording-ridge")
+        assertEquals(listOf(false), updates.map { it.enabled })
+        key(Key.Menu)
+        key(Key.DirectionDown)
+        key(Key.DirectionCenter)
+        assertEquals("The same rule cannot submit another toggle while pending", 1, updates.size)
+        compose.runOnIdle { release.complete(Unit) }
+        publish(emptyList(), autorecRules = listOf(disabled))
+        key(Key.Menu)
+        key(Key.DirectionDown)
+        key(Key.DirectionCenter)
+        assertEquals(listOf(false, true), updates.map { it.enabled })
+        key(Key.Menu)
+        repeat(2) { key(Key.DirectionDown) }
+        key(Key.DirectionCenter)
+        focused("automatic-recording-keep")
+        assertEquals(0, deletes)
+        key(Key.DirectionCenter)
+        focused("automatic-recording-ridge")
+        key(Key.Menu)
+        repeat(2) { key(Key.DirectionDown) }
+        key(Key.DirectionCenter)
+        key(Key.DirectionRight)
+        focused("automatic-recording-delete-confirm")
+        compose.pressKey(Key.DirectionCenter, settleFrames = 1, frameMillis = PlayerMotion.PanelMs.toLong())
+        assertEquals(1, deletes)
+        publish(emptyList())
+        focused("schedule-new-automatic")
+        assertEquals("schedule:automatic", screenState.scheduleNavigation.stack.active.levelId)
+    }
+
+    @Test @Category(VisualCapture::class) @Config(qualifiers = "en-rUS-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun scheduleAutomaticPhase3Captures() {
+        val outputs = "build/outputs/slice-7b"
+        presentationLibrary(firstRow = true, scheduled = true)
+        val entries = requireNotNull(session.observation.value.dvrSnapshotForDisplay).entries
+        val ridge = entries.first { it.id == DvrEntryId(1) }
+        val rules = listOf(
+            AutorecRule.create(AutorecRuleId("ridge"), title = "^Ridge Light$", seriesLinkUri = "ridge",
+                channelId = ridge.channelId, removal = DvrRemoval.Days(30)),
+            AutorecRule.create(AutorecRuleId("tide"), title = "^Tide Watch$", enabled = false),
+            AutorecRule.create(AutorecRuleId("weather"), title = "weather"),
+        )
+        val timerChannel = requireNotNull(session.observation.value.channelCatalogForDisplay)
+            .channels.first { it.name == "Northline News" }
+        val timers = listOf(TimerecRule.create(TimerecRuleId("weekend"), name = "Weekend news",
+            channelId = timerChannel.id))
+        val scheduled = DvrEntry.create(DvrEntryId(12), title = ridge.title, state = DvrEntryState.SCHEDULED,
+            start = Instant.fromEpochSeconds(nowSeconds() + 3_600),
+            stop = Instant.fromEpochSeconds(nowSeconds() + 7_200), channelId = ridge.channelId,
+            channelName = ridge.channelName, image = ridge.image, description = ridge.description,
+            autorecRuleId = AutorecRuleId("ridge"))
+        publish(listOf(scheduled), autorecRules = rules, timerecRules = timers)
+        openScheduleScreen()
+        key(Key.DirectionUp)
+        focused("schedule-automatic-recordings")
+        capture("Bx3-automatic-recordings-focused", 1f, "Fixture pack: Ridge Light.", outputs)
+        key(Key.DirectionCenter)
+        focused("automatic-recording-ridge")
+        capture("Bx4-automatic-level", 1f, "First rule focused; next entry supplies Ridge Light artwork.", outputs)
+        key(Key.Menu)
+        key(Key.DirectionDown)
+        focused("automatic-recording-menu-toggle")
+        capture("automatic-row-menu", 1f, "Turn off focused; existing confirmation subject panel.", outputs)
+        compose.runOnIdle { backDispatcher.onBackPressed() }
+        compose.settleFrames(2)
+        key(Key.Menu)
+        repeat(2) { key(Key.DirectionDown) }
+        key(Key.DirectionCenter)
+        focused("automatic-recording-keep")
+        capture("automatic-delete-card", 1f, "Existing safe confirmation; short subject detail fits one line.", outputs)
+        compose.runOnIdle { backDispatcher.onBackPressed() }
+        compose.settleFrames(2)
+        key(Key.DirectionDown)
+        focused("automatic-recording-tide")
+        capture("automatic-off-focused", 1f, "Off item remains focusable; no next entry, so no picture.", outputs)
+        repeat(2) { key(Key.DirectionUp) }
+        focused("schedule-new-automatic")
+        capture("Bx4b-new-automatic-focused", 1f, "New row focused; intentionally blank pane.", outputs)
+        publish(emptyList())
+        focused("schedule-new-automatic")
+        capture("Bx7-empty-automatic-level", 1f, "Empty level stays open.", outputs)
+        key(Key.DirectionLeft)
+        key(Key.DirectionUp)
+        focused("schedule-new-timer")
+        capture("Bx6-empty-schedule", 1f, "One-line support and centered empty text with 48dp vertical space.", outputs)
     }
 
     @Test @Category(VisualCapture::class) @Config(qualifiers = "en-rUS-w960dp-h540dp-land-xhdpi",
@@ -2135,11 +2325,13 @@ class RecordingsVisualLayoutTest {
 
     private fun publish(entries: List<DvrEntry>, awaitPreparation: Boolean = true,
         autorecRules: List<at.bernhardberger.tvheadend.sdk.core.AutorecRule> = emptyList(),
+        timerecRules: List<TimerecRule> = emptyList(),
         afterPublish: () -> Unit = {}) {
         compose.runOnIdle {
             session.publish(session.observation.value.let {
                 SessionObservation.create(it.sessionState, it.channelState, it.epgState,
-                    DvrRepositoryState.Current(DvrSnapshot.create(entries, autorecRules = autorecRules)),
+                    DvrRepositoryState.Current(DvrSnapshot.create(entries,
+                        autorecRules = autorecRules, timerecRules = timerecRules)),
                     recordingProgressCapability = it.recordingProgressCapability,
                     dvrDiskSpaceState = it.dvrDiskSpaceState)
             })
@@ -2151,7 +2343,7 @@ class RecordingsVisualLayoutTest {
     private fun show(scale: Float = 1f, empty: Boolean = false, entries: List<DvrEntry>? = null, endPadding: Dp? = null,
         diskSpace: DvrDiskSpaceState = DvrDiskSpaceState.Unknown, channels: List<Channel> = emptyList(),
         snapshotLoaded: Boolean = true, autorecRules: List<at.bernhardberger.tvheadend.sdk.core.AutorecRule> = emptyList(),
-        canModify: Boolean = true) {
+        canModify: Boolean = true, repository: (DvrRepository) -> DvrRepository = { it }) {
         endPaddingState.value = endPadding
         val recordings = entries ?: if (empty) emptyList() else listOf(
             recording(1, LONG_TITLE, "Documentaries/northern.ts"),
@@ -2177,7 +2369,7 @@ class RecordingsVisualLayoutTest {
         session = FakeTvheadendSession(observation)
         val currentObservation = session.observation.value
         if (snapshotLoaded) assertNotNull("Exercise live capability/session guards, not cached-only rows", currentObservation.currentSession)
-        val actions = DvrMutationActions(session.dvrRepository)
+        val actions = DvrMutationActions(repository(session.dvrRepository))
         val notices = NoticeCenter(android.os.SystemClock::elapsedRealtime) {
             NoticeContext(0L, session.observation.value.currentSession?.generationIdentity)
         }

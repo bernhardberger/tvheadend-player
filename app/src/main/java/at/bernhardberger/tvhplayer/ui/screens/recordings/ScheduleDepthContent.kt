@@ -18,6 +18,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
+import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
 import at.bernhardberger.tvhplayer.R
@@ -25,6 +26,7 @@ import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.core.AutomaticRecordingList
 import at.bernhardberger.tvhplayer.core.DvrScheduleSection
 import at.bernhardberger.tvhplayer.core.offeredResumePosition
+import at.bernhardberger.tvhplayer.core.AutomaticRecordingListItem
 import at.bernhardberger.tvhplayer.ui.TvBrowseColumnGap
 import at.bernhardberger.tvhplayer.ui.TvBrowseColumnWidth
 import at.bernhardberger.tvhplayer.ui.components.RecordingRule
@@ -43,6 +45,10 @@ internal fun ScheduleDepthContent(
     automatic: AutomaticRecordingList,
     canModify: Boolean,
     onNewTimer: () -> Unit,
+    channels: List<Channel>,
+    onNewAutomatic: () -> Unit,
+    onEditRule: (AutomaticRecordingListItem) -> Unit,
+    onRuleMenu: (AutomaticRecordingListItem) -> Unit,
     navigation: DepthNavigationState,
     contentPadding: PaddingValues,
     isCurrent: Boolean,
@@ -67,7 +73,8 @@ internal fun ScheduleDepthContent(
             navigation.stack.frames.first().focusedItemId == null,
             contentPadding, paneWidth, onOpenRecording, onOpenContextMenu,
             piconForEntry, admissionForEntry, ruleForEntry,
-        )
+        ) + scheduleAutomaticLevels(automatic, canModify && automatic.available, channels, navigation,
+            Modifier.widthIn(max = paneWidth), onNewAutomatic, onEditRule, onRuleMenu)
         DepthNavigation(
             state = navigation,
             levels = levels,
@@ -157,7 +164,6 @@ private fun rememberScheduleLevels(
                 ?.let { "recording:${recordingItemKey(it.id)}" },
             emptyContent = { ModeEmptyState(R.string.recordings_schedule_empty) },
         )
-        levels[SCHEDULE_AUTOMATIC_LEVEL] = scheduleAutomaticLevel(automatic)
         levels
     }
 }

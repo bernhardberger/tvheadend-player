@@ -15,26 +15,43 @@ import at.bernhardberger.tvhplayer.ui.components.ConfirmationSubject
 internal fun AutomaticRecordingDeleteDialog(
     state: AutomaticRecordingEditorState, scheduledCount: Int, channels: List<Channel>,
 ) {
-    ConfirmationDialog(
-        question = stringResource(when (state.baseline.kind) {
-            AutomaticRecordingKind.SERIES -> R.string.autorec_editor_delete_series
-            AutomaticRecordingKind.TITLE -> R.string.autorec_editor_delete_title
-            else -> R.string.autorec_editor_delete_keyword
-        }),
+    RecordingRuleDeleteDialog(
+        kind = state.baseline.kind,
         subject = ConfirmationSubject.Rule(R.drawable.ic_fiber_smart_record, state.baseline.pattern.words,
             listOf(stringResource(when (state.baseline.kind) {
                 AutomaticRecordingKind.SERIES -> R.string.automatic_recording_kind_series
                 AutomaticRecordingKind.TITLE -> R.string.automatic_recording_kind_title
                 else -> R.string.automatic_recording_kind_keyword
             }), automaticRecordingChannelLabel(state.baseline, channels)).joinToString(" • ")),
-        sentence = formatAutomaticRecordingDeleteBody(
-            LocalContext.current, state.draft.kind, scheduledCount, state.changed,
-        ),
-        safe = ConfirmationChoice(stringResource(R.string.autorec_editor_keep_recording),
-            R.drawable.ic_check, "automatic-recording-keep"),
-        action = ConfirmationChoice(stringResource(R.string.autorec_editor_delete),
-            R.drawable.ic_delete_outlined, "automatic-recording-delete-confirm"),
+        scheduledCount = scheduledCount, changed = state.changed,
         onDismiss = state::back, onConfirm = state::confirmDestructiveAction,
+    )
+}
+
+@Composable
+internal fun RecordingRuleDeleteDialog(
+    kind: AutomaticRecordingKind,
+    subject: ConfirmationSubject.Rule,
+    scheduledCount: Int,
+    changed: Boolean = false,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    val prefix = if (kind == AutomaticRecordingKind.TIMER) "timer-recording" else "automatic-recording"
+    ConfirmationDialog(
+        question = stringResource(when (kind) {
+            AutomaticRecordingKind.SERIES -> R.string.autorec_editor_delete_series
+            AutomaticRecordingKind.TITLE -> R.string.autorec_editor_delete_title
+            AutomaticRecordingKind.KEYWORD -> R.string.autorec_editor_delete_keyword
+            AutomaticRecordingKind.TIMER -> R.string.timer_editor_delete
+        }),
+        subject = subject,
+        sentence = formatAutomaticRecordingDeleteBody(LocalContext.current, kind, scheduledCount, changed),
+        safe = ConfirmationChoice(stringResource(R.string.keep),
+            R.drawable.ic_check, "$prefix-keep"),
+        action = ConfirmationChoice(stringResource(R.string.context_delete),
+            R.drawable.ic_delete_outlined, "$prefix-delete-confirm"),
+        onDismiss = onDismiss, onConfirm = onConfirm,
     )
 }
 
