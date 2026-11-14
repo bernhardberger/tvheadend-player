@@ -3,6 +3,8 @@
 
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.di.PlayerStatsLevel
+
 import androidx.compose.ui.test.requestFocus
 import at.bernhardberger.tvhplayer.testutil.focusedTags
 import at.bernhardberger.tvhplayer.testutil.tagExists
@@ -507,7 +509,7 @@ class RecordingPlayerChromeScreenTest {
     }
 
     @Test fun aStoppedScreenLeavesNoBannerBehind() {
-        statsStore.setVisible(true)
+        statsStore.setLevel(PlayerStatsLevel.STREAM_PATH)
         screen()
         playing()
         assertEquals(3_600_000L, runtime.diagnostics.value.durationMs)
@@ -518,12 +520,12 @@ class RecordingPlayerChromeScreenTest {
         compose.runOnIdle { owner.lifecycle.currentState = Lifecycle.State.CREATED }
         settle()
         assertEquals("a stopped recording screen withdraws diagnostics", null, runtime.diagnostics.value.durationMs)
-        assertTrue(statsStore.visible.value)
+        assertTrue(statsStore.level.value.enabled)
         assertFalse("the Banner does not outlive the stop", exists("player-banner"))
         compose.runOnIdle { owner.lifecycle.currentState = Lifecycle.State.RESUMED }
         repeat(8) { settle() }
         assertEquals("a started recording screen samples again", 3_600_000L, runtime.diagnostics.value.durationMs)
-        assertTrue(statsStore.visible.value)
+        assertTrue(statsStore.level.value.enabled)
         assertFalse("no stale Banner on return", exists("player-banner"))
         assertEquals("stopping discards the scrub target", origin, positionMs)
         assertFalse("stopping a scrub preserves pause", player.playWhenReady)
@@ -784,8 +786,9 @@ class RecordingPlayerChromeScreenTest {
         compose.onNodeWithTag("playback-options-stats").performSemanticsAction(SemanticsActions.RequestFocus)
         settle()
         key(Key.DirectionCenter)
+        key(Key.DirectionDown)
         key(Key.DirectionCenter)
-        assertTrue("Stats switch is on", statsStore.visible.value)
+        assertTrue("Stats level is on", statsStore.level.value.enabled)
         assertEquals("the recording session samples while Stats are on", 3_600_000L, runtime.diagnostics.value.durationMs)
         assertTrue("Stats remain shown under their options page", exists("playback-stats-overlay"))
         key(Key.Back)
@@ -796,7 +799,7 @@ class RecordingPlayerChromeScreenTest {
         assertFalse(closed)
         key(Key.Back)
         assertTrue("Back closes without first dismissing Stats", closed)
-        assertTrue(statsStore.visible.value)
+        assertTrue(statsStore.level.value.enabled)
 
         compose.runOnIdle { playerVisible = false }
         settle()
@@ -987,6 +990,7 @@ class RecordingPlayerChromeScreenTest {
         key(Key.Menu)
         compose.onNodeWithTag("playback-options-stats").performSemanticsAction(SemanticsActions.RequestFocus)
         key(Key.DirectionCenter)
+        key(Key.DirectionDown)
         key(Key.DirectionCenter)
         key(Key.Back); key(Key.Back); key(Key.Back)
         assertTrue(texts("Stats for nerds"))

@@ -372,7 +372,7 @@ fun VideoPlayerScreen(
     statsStore: at.bernhardberger.tvhplayer.di.PlayerStatsStore = koinInject(),
 ) {
     val scope = rememberCoroutineScope()
-    val statsVisible by statsStore.visible.collectAsStateWithLifecycle()
+    val statsLevel by statsStore.level.collectAsStateWithLifecycle()
     val layerState = rememberLivePlayerLayerState()
     val playerClose = rememberPlayerClose(onClose)
     // First, before any playback effect: a user stop since the last intent closes the screen.
@@ -1760,17 +1760,20 @@ fun VideoPlayerScreen(
     )
     }
     Box(modifier = rootModifier) { ProvideArtworkSession(currentSession, observation) {
-        // Passive diagnostics sit below all chrome and foreground panels.
+        // Passive diagnostics sit below all chrome and foreground panels; while the channel is unavailable the
+        // channel message carries their text instead, whatever layer is open.
         LivePlayerDiagnostics(
             viewModel = videoPlayerViewModel,
-            enabled = statsVisible,
-            visible = statsVisible,
+            level = statsLevel,
+            visible = statsLevel.enabled && foregroundLayer != PlayerForegroundLayer.RECOVERY && !channelUnavailable,
+            accessible = foregroundLayer == PlayerForegroundLayer.NONE,
+            targetKey = currentChannelId,
             aspectRatio = targetAspect.mode,
             timeshiftState = effectiveTimeshiftState,
             playbackRuntime = playbackRuntime,
             modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 36.dp, end = 48.dp),
+                .align(Alignment.TopStart)
+                .padding(start = at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin, top = 100.dp),
         )
         // A quick step's preview plays inside the Banner; the pending or dispatched seek is its own layer.
         val bannerSeekPreview = visibleSeekPreview?.takeIf {
@@ -1998,7 +2001,7 @@ fun VideoPlayerScreen(
                     playbackState is AppPlaybackState.Starting ||
                         playbackState is AppPlaybackState.Recovering,
                 aspectRatio = aspectRatio,
-                statsVisible = statsVisible,
+                statsLevel = statsLevel,
                 onPageChange = layerState.core::showOptionsPage,
                 quickList = layerState.core.quickList.takeIf { layerState.core.optionsQuickList },
                 onQuickListClose = layerState.core::closeQuickList,
@@ -2010,7 +2013,7 @@ fun VideoPlayerScreen(
                 },
                 onQuickAudioSelection = { epoch, override -> playbackRuntime.selectQuickListAudio(epoch, override) },
                 onAspectRatioChange = targetAspect.select,
-                onStatsVisibleChange = statsStore::setVisible,
+                onStatsLevelChange = statsStore::setLevel,
             )
         }
 
@@ -2032,6 +2035,8 @@ fun VideoPlayerScreen(
             condition = channelCondition,
             modifier = Modifier.align(Alignment.Center),
             deviceFaultDetail = playbackState.deviceFaultDetail(),
+            statsFailure = (playbackState as? AppPlaybackState.Failed)?.takeIf { statsLevel.enabled },
+            statsRows = { rememberLiveStatsRows(videoPlayerViewModel, statsLevel, currentChannelId) },
         )
         LivePlayerServerWait(serverWait, currentChannel, currentChannelName, rootFocus)
         LivePlayerAlertOverlay(

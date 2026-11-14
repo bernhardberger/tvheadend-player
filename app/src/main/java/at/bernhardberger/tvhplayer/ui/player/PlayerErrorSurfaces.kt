@@ -1,5 +1,8 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import androidx.compose.ui.res.stringResource
+import at.bernhardberger.tvhplayer.playback.AppPlaybackState
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -44,7 +47,9 @@ import kotlin.time.Instant
 /**
  * The channel message: the alert's icon, the title, then why and what helps as one paragraph. A
  * failure of this device's player adds the player's own error ([deviceFaultDetail]) as a faint
- * line. It has no action and nothing focusable, so every key keeps its usual meaning. Its exit
+ * line, followed by the raw failure rows while Stats are on ([statsFailure]). Any other condition
+ * carries the Stats rows ([statsRows]), read only while the message shows. It has no action and
+ * nothing focusable, so every key keeps its usual meaning. Its exit
  * keeps what it showed while the failure clears.
  */
 @Composable
@@ -53,6 +58,8 @@ internal fun PlayerChannelMessage(
     condition: AppErrorCondition?,
     modifier: Modifier = Modifier,
     deviceFaultDetail: String? = null,
+    statsFailure: AppPlaybackState.Failed? = null,
+    statsRows: @Composable () -> List<String> = { emptyList() },
 ) {
     AnimatedVisibility(
         visible = visible,
@@ -62,7 +69,11 @@ internal fun PlayerChannelMessage(
         label = PlayerChannelMessageTag,
     ) {
         val current = condition?.takeIf { visible }
-        val currentDetail = deviceFaultDetail.takeIf { current == AppErrorCondition.CHANNEL_PLAYBACK_FAILED }
+        val currentDetail = failureFootnote(
+            deviceFaultDetail.takeIf { current == AppErrorCondition.CHANNEL_PLAYBACK_FAILED },
+            statsFailure.takeIf { current != null },
+            if (current != null && statsFailure == null) statsRows() else emptyList(),
+        )
         val (shown, detail) = rememberLastShown(current?.let { it to currentDetail }) ?: return@AnimatedVisibility
         val text = rememberAppErrorText()
         Column(
@@ -123,6 +134,7 @@ internal fun LivePlayerAlertOverlay(
     onConnectionSettings: () -> Unit,
     onClose: () -> Unit,
     deviceFaultDetail: String? = null,
+    statsFailure: AppPlaybackState.Failed? = null,
 ) {
     val current = alert.takeIf { visible }
     val currentDetail = deviceFaultDetail.takeIf {
@@ -131,7 +143,8 @@ internal fun LivePlayerAlertOverlay(
             else -> false
         }
     }
-    val last = rememberLastShown(current?.let { it to currentDetail })
+    val detail = failureFootnote(currentDetail, statsFailure.takeIf { current is LivePlayerAlert.Error })
+    val last = rememberLastShown(current?.let { it to detail })
     val shown = last?.first
     val text = rememberAppErrorText()
     // The current alert's attempt, hidden or not, so hiding the alert does not restart its countdown.
@@ -166,6 +179,22 @@ internal fun LivePlayerAlertOverlay(
             }
         },
     )
+}
+
+/**
+ * The faint detail line: the player's own error first, then the Stats failure rows on their own
+ * lines, without a row whose fact the detail already names (the error code, say), then [statsRows].
+ */
+@Composable
+private fun failureFootnote(
+    detail: String?,
+    statsFailure: AppPlaybackState.Failed?,
+    statsRows: List<String> = emptyList(),
+): String? {
+    val rows = statsFailure?.let(::failureStatRows).orEmpty()
+        .filterNot { (_, value) -> detail != null && value.removePrefix("ERROR_CODE_") in detail }
+        .map { (label, value) -> "${stringResource(label)}: $value" }
+    return (listOfNotNull(detail) + rows + statsRows).joinToString("\n").ifEmpty { null }
 }
 
 /** Whole seconds left of [remainingMillis], rounded up; null once the attempt is due. */

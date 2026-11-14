@@ -322,7 +322,6 @@
     <string name="context_mark_all_unwatched">Alle als ungesehen markieren</string>
     <string name="context_delete_watched">Gesehene löschen</string>
     <string name="context_delete_all">Alle löschen</string>
-    <string name="stats_video_buffers">Videopuffer</string>
     <string name="stats_video_buffers_value">Angezeigt %1$d • Verworfen %2$d • Übersprungen %3$d</string>
     <string name="settings_audio_nav">Ton &amp; Untertitel</string>
     <string name="audio_language_first">Audiosprache</string>
@@ -524,7 +523,6 @@
     <string name="playback_options_next_category">Nächste Optionskategorie</string>
     <string name="player_live_tv_surface">Live-TV-Wiedergabe</string>
     <string name="player_recording_surface">Aufnahmewiedergabe</string>
-    <string name="stats_on">Ein</string>
     <string name="stats_off">Aus</string>
     <string name="display_mode">Bildformat</string>
     <string name="display_mode_auto">Automatisch (Originalformat)</string>

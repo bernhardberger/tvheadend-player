@@ -1,5 +1,15 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.di.PlayerStatsLevel
+import at.bernhardberger.tvhplayer.playback.AppPlaybackSource
+import at.bernhardberger.tvhplayer.playback.AppPlaybackState
+import at.bernhardberger.tvhplayer.playback.AppPlaybackFailureReason
+import at.bernhardberger.tvhplayer.core.AppErrorCondition
+import androidx.compose.foundation.layout.offset
+import at.bernhardberger.tvhplayer.testutil.settleFrames
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
+
 import android.app.Application
 import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
@@ -27,6 +37,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
@@ -56,6 +67,8 @@ import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
+import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
+import at.bernhardberger.tvhplayer.core.deviceFaultDetail
 import at.bernhardberger.tvhplayer.R
 import androidx.compose.ui.res.stringResource
 import coil3.ImageLoader
@@ -108,6 +121,133 @@ class PlayerMotionCaptureTest {
     @Test fun headerLive() {
         show { session -> live(session, behind = false) }
         capture("header-live")
+    }
+
+    @Test fun statsStreamPathStates() {
+        var diagnostics by mutableStateOf(statsLiveDiagnostics())
+        var level by mutableStateOf(PlayerStatsLevel.STREAM_PATH)
+        var scene by mutableStateOf("dvb-healthy")
+        var window by mutableStateOf(StatsWindow())
+        show { session ->
+            Box(Modifier.fillMaxSize()) {
+                val failed = diagnostics.state as? AppPlaybackState.Failed
+                val noSignal = scene == "live-no-signal"
+                // As on the live screen: the channel message carries the Stats text instead of the card.
+                if (failed == null && !noSignal) PlaybackStatsOverlay(diagnostics, AspectRatioMode.FIT,
+                    Modifier.offset(58.dp, 100.dp), level = level, accessible = scene !in setOf("options", "controls"))
+                if (scene == "controls") live(session, false)
+                if (scene == "banner") live(session, false, mode = PlayerChromeMode.BANNER)
+                if (failed != null) PlayerChannelMessage(true, AppErrorCondition.CHANNEL_PLAYBACK_FAILED,
+                    Modifier.align(Alignment.Center), deviceFaultDetail = failed.deviceFaultDetail(), statsFailure = failed)
+                if (noSignal) PlayerChannelMessage(true,
+                    at.bernhardberger.tvhplayer.core.liveErrorCondition(at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssue.BAD_SIGNAL),
+                    Modifier.align(Alignment.Center), statsRows = { liveStatsRows(diagnostics, window, level) })
+                if (scene == "options") PlaybackOptionsSheetContent(
+                    PlaybackOptionsPage.STATS, emptyList(), emptyList(), false, AspectRatioMode.FIT, level,
+                    {}, {}, {}, {}, { level = it })
+            }
+        }
+        val report = StringBuilder("canvas=960x540 dp; locale=en; fontScale=1.0; fixture=still-ridge-light\n")
+        fun shot(name: String, playing: Boolean = true) {
+            compose.settleFrames(2)
+            if (!playing) {
+                // The tag sits inside the message's 24 dp padding; the box is what must stay TV-safe.
+                val message = compose.onNodeWithTag(PlayerChannelMessageTag).fetchSemanticsNode().boundsInRoot.inflate(24f)
+                report.append("$name: card=none; message=$message\n")
+                compose.onAllNodesWithTag(PlayerChannelMessageDetailTag, useUnmergedTree = true).fetchSemanticsNodes()
+                    .forEach { report.append("  detail: ${it.config[androidx.compose.ui.semantics.SemanticsProperties.Text]
+                        .joinToString("").replace("\n", " | ")}\n") }
+                assertTrue("$name message=$message", message.left >= TvGridHorizontalMargin.value &&
+                    message.right <= 960 - TvGridHorizontalMargin.value && message.top >= TvGridVerticalMargin.value &&
+                    message.bottom <= 540 - TvGridVerticalMargin.value)
+            } else {
+                val bounds = compose.onNodeWithTag("playback-stats-overlay").fetchSemanticsNode().boundsInRoot
+                report.append("$name: bounds=$bounds\n")
+                if (level == PlayerStatsLevel.STREAM_PATH) assertTrue("$name bottom=${bounds.bottom}", bounds.bottom <= 300f)
+            }
+            compose.onAllNodes(androidx.compose.ui.test.SemanticsMatcher.keyIsDefined(
+                androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult) and
+                androidx.compose.ui.test.hasAnyAncestor(androidx.compose.ui.test.hasTestTag("playback-stats-overlay")),
+                useUnmergedTree = true)
+                .fetchSemanticsNodes().forEach { node ->
+                    val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+                    node.config[androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult].action?.invoke(layouts)
+                    layouts.forEach { layout ->
+                        val input = layout.layoutInput
+                        // Header and audio lines wrap their content; their room is the card's content width.
+                        val card = compose.onNodeWithTag("playback-stats-overlay").fetchSemanticsNode().boundsInRoot
+                        val room = if (node.boundsInRoot.left <= card.left + 16.5f) card.width - 32f else layout.size.width.toFloat()
+                        fun spare(text: String) = room - androidx.compose.ui.text.ParagraphIntrinsics(text,
+                            input.style, emptyList(), density = input.density,
+                            fontFamilyResolver = input.fontFamilyResolver).maxIntrinsicWidth
+                        if (level == PlayerStatsLevel.STREAM_PATH && input.text.text != " !") {
+                            report.append("  row: ${input.text}; spare=${spare(input.text.text)} dp\n")
+                        }
+                        if (layout.hasVisualOverflow) report.append("ellipsis: ${input.text}\n")
+                        // The capture has no measured rate; the longest Decoder row reads with a differing one.
+                        if (name == "longest-decoder" && input.text.startsWith("HEVC")) {
+                            val longest = "HEVC • 3840×2160 • 59.94/50 fps"
+                            report.append("  with measured: $longest; spare=${spare(longest)} dp\n")
+                            assertTrue("$longest overflows by ${-spare(longest)} dp", spare(longest) >= 0f)
+                        }
+                        if (name == "dvb-degraded" && input.text.startsWith("No lock")) {
+                            assertTrue("${input.text} is ellipsized", !layout.hasVisualOverflow && spare(input.text.text) >= 0f)
+                        }
+                    }
+                }
+            capture("stats-$name", focus = if (scene == "options") "selected Stats radio" else "none",
+                directory = "stats-stream-path")
+        }
+        shot("dvb-healthy")
+        compose.runOnIdle { diagnostics = diagnostics.copy(video = diagnostics.video?.copy(
+            codec = "hvc1.2.4.L153.B0", resolution = "3840×2160", frameRate = 50f)) }
+        shot("longest-decoder")
+        compose.runOnIdle { diagnostics = statsLiveDiagnostics(locked = false, uncorrected = 4, serverDrops = 5) }
+        shot("dvb-degraded")
+        compose.runOnIdle { diagnostics = statsLiveDiagnostics(tuner = false) }
+        shot("iptv")
+        compose.runOnIdle { diagnostics = diagnostics.copy(source = AppPlaybackSource.RECORDING, live = null,
+            positionMs = 600_000, durationMs = 3_600_000) }
+        shot("recording")
+        compose.runOnIdle { diagnostics = statsLiveDiagnostics(); scene = "controls" }
+        shot("controls")
+        compose.runOnIdle { scene = "banner" }
+        shot("banner")
+        compose.runOnIdle { scene = "options" }
+        shot("options-stream-path")
+        compose.runOnIdle { scene = ""; level = PlayerStatsLevel.DEBUG; diagnostics = statsLiveDiagnostics(locked = false) }
+        shot("debug-degraded")
+        compose.runOnIdle { diagnostics = statsLiveDiagnostics(locked = false,
+            service = "Ridge Earth Documentary Extended Regional Service Original-Language Programme Feed") }
+        shot("debug-worst-height")
+        val longFailure = AppPlaybackState.Failed(AppPlaybackFailureReason.OTHER,
+            targetResult = at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult.SHUT_DOWN,
+            playerErrorCode = "ERROR_CODE_DECODING_FORMAT_EXCEEDS_CAPABILITIES",
+            playerErrorClassification = "androidx.media3.exoplayer.ExoPlaybackException · MediaCodecVideoRenderer.onInputFormatChanged",
+            recoveryReason = at.bernhardberger.tvheadend.sdk.media3.PlaybackRecoveryReason.LIVE_BUFFER_EXHAUSTED)
+        compose.runOnIdle {
+            scene = "live-failed"; level = PlayerStatsLevel.STREAM_PATH
+            diagnostics = statsLiveDiagnostics().copy(state = longFailure)
+        }
+        shot("live-failed", playing = false)
+        // This device's player: its own error leads and the error code row is not repeated.
+        compose.runOnIdle {
+            diagnostics = statsLiveDiagnostics().copy(state = longFailure.copy(playerErrorNumber = 4003, deviceFault = true))
+        }
+        shot("live-failed-device-fault", playing = false)
+        // A server-reported issue: the message borrows the Tuner and Tvheadend rows.
+        compose.runOnIdle {
+            scene = "live-no-signal"
+            diagnostics = statsLiveDiagnostics(locked = false, uncorrected = 1_234_567, serverDrops = 5)
+        }
+        shot("live-no-signal", playing = false)
+        // Debug's worst case: every tuner and queue row, with growth and a queue change on the path rows.
+        compose.runOnIdle {
+            level = PlayerStatsLevel.DEBUG
+            window = StatsWindow(uncorrected = 1_234_567, serverDrops = 5, queueChangeUs = -125_000)
+        }
+        shot("live-no-signal-debug", playing = false)
+        CaptureOutput.writeText(File("../captures/stats-stream-path/bounds.txt")) { report.toString() }
     }
 
     @Test fun headerBehindLive() {
@@ -179,12 +319,12 @@ class PlayerMotionCaptureTest {
                         subtitleTracks = emptyList(),
                         tracksResolving = false,
                         aspectRatio = AspectRatioMode.FIT,
-                        statsVisible = false,
+                        statsLevel = PlayerStatsLevel.OFF,
                         onPageChange = {},
                         onAudioTrackSelected = {},
                         onSubtitleTrackSelected = {},
                         onAspectRatioChange = {},
-                        onStatsVisibleChange = {},
+                        onStatsLevelChange = {},
                     )
                 }
             }

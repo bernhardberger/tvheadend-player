@@ -1130,8 +1130,17 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
   not Stop. Holding Back stops playback while watching, including the passive
   Banner, paused label, controls, seek feedback, recovery and errors. Stats is a
   passive, non-focusable overlay below every player layer; it never changes Back
-  or remote-key handling. Its switch is shared by live and recording players for
-  the app process, off after a cold start, and is not saved in settings.
+  or remote-key handling. Its Off, Stream path and Stream path + debug details
+  levels are shared by live and recording players for the app process, off after
+  a cold start, and are not saved in settings. The compact stream path shows
+  observed problems first; debug details add raw source and timing evidence.
+  While a live channel is unavailable the card is not drawn, whatever layer is
+  open; the channel message's faint detail line carries the Stats text instead.
+  After a failed playback that is the raw failure rows, after the player's own
+  error and without repeating it. For any other condition it is the Tuner and
+  Tvheadend rows that still have data, without flags, and debug details add the
+  tuner and server-queue rows. The recording recovery message carries the raw
+  failure rows the same way. With Stats Off both messages are unchanged.
   With Info, schedule, options, number entry, the channel drawer, recording
   markers or any dialog open, a hold acts as one short Back on release.
 - Controls auto-hide only when they are visible, playback is playing and ready,

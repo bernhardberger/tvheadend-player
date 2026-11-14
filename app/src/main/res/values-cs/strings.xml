@@ -553,13 +553,11 @@
     <string name="player_raster_spoken">Počet řádků: %1$s</string>
     <string name="player_audio_spoken">Zvuk %1$s</string>
     <string name="player_ad_short">AD</string>
-    <string name="stats_on">Zapnuto</string>
     <string name="stats_off">Vypnuto</string>
     <string name="display_mode">Režim zobrazení</string>
     <string name="display_mode_auto">Automaticky (původní poměr stran)</string>
     <string name="display_mode_16_9">Vyplnit 16:9</string>
     <string name="display_mode_4_3">Vyplnit 4:3</string>
-    <string name="stats_video_buffers">Vyrovnávací paměti videa</string>
     <string name="stats_video_buffers_value">Vykresleno %1$d • Zahozeno %2$d • Přeskočeno %3$d</string>
     <string name="epg_title">Program</string>
     <string name="header_button_value_description">%1$s, %2$s</string>

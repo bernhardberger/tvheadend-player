@@ -515,13 +515,11 @@
     <string name="player_raster_spoken">%1$s juovaa</string>
     <string name="player_audio_spoken">Ääni %1$s</string>
     <string name="player_ad_short">AD</string>
-    <string name="stats_on">Päällä</string>
     <string name="stats_off">Pois</string>
     <string name="display_mode">Näyttötila</string>
     <string name="display_mode_auto">Automaattinen (alkuperäinen kuvasuhde)</string>
     <string name="display_mode_16_9">Täytä 16:9</string>
     <string name="display_mode_4_3">Täytä 4:3</string>
-    <string name="stats_video_buffers">Videopuskurit</string>
     <string name="stats_video_buffers_value">Esitetty %1$d • Pudonnut %2$d • Ohitettu %3$d</string>
     <string name="epg_title">Ohjelmaopas</string>
     <string name="header_button_value_description">%1$s, %2$s</string>

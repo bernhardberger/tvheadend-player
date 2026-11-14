@@ -534,13 +534,11 @@
     <string name="player_raster_spoken">%1$s líneas</string>
     <string name="player_audio_spoken">Audio %1$s</string>
     <string name="player_ad_short">AD</string>
-    <string name="stats_on">Activado</string>
     <string name="stats_off">Desactivado</string>
     <string name="display_mode">Modo de visualización</string>
     <string name="display_mode_auto">Auto (proporción original)</string>
     <string name="display_mode_16_9">Rellenar 16:9</string>
     <string name="display_mode_4_3">Rellenar 4:3</string>
-    <string name="stats_video_buffers">Búferes de vídeo</string>
     <string name="stats_video_buffers_value">Mostrados %1$d • Perdidos %2$d • Omitidos %3$d</string>
     <string name="epg_title">Guía</string>
     <string name="header_button_value_description">%1$s, %2$s</string>

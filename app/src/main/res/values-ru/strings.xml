@@ -553,13 +553,11 @@
     <string name="player_raster_spoken">Строк: %1$s</string>
     <string name="player_audio_spoken">Звук %1$s</string>
     <string name="player_ad_short">AD</string>
-    <string name="stats_on">Вкл.</string>
     <string name="stats_off">Выкл.</string>
     <string name="display_mode">Режим изображения</string>
     <string name="display_mode_auto">Авто (исходные пропорции)</string>
     <string name="display_mode_16_9">Заполнить 16:9</string>
     <string name="display_mode_4_3">Заполнить 4:3</string>
-    <string name="stats_video_buffers">Видеобуферы</string>
     <string name="stats_video_buffers_value">Выведено %1$d • Потеряно %2$d • Пропущено %3$d</string>
     <string name="epg_title">Телепрограмма</string>
     <string name="header_button_value_description">%1$s, %2$s</string>

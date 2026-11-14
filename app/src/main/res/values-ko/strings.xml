@@ -496,13 +496,11 @@
     <string name="player_raster_spoken">주사선 수 %1$s</string>
     <string name="player_audio_spoken">오디오 %1$s</string>
     <string name="player_ad_short">AD</string>
-    <string name="stats_on">켜짐</string>
     <string name="stats_off">꺼짐</string>
     <string name="display_mode">화면 모드</string>
     <string name="display_mode_auto">자동(원본 화면 비율)</string>
     <string name="display_mode_16_9">16:9로 채우기</string>
     <string name="display_mode_4_3">4:3으로 채우기</string>
-    <string name="stats_video_buffers">동영상 버퍼</string>
     <string name="stats_video_buffers_value">렌더링 %1$d • 드롭 %2$d • 건너뜀 %3$d</string>
     <string name="epg_title">편성표</string>
     <string name="header_button_value_description">%1$s, %2$s</string>

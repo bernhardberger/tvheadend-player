@@ -4,6 +4,8 @@
 
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.di.PlayerStatsLevel
+
 import at.bernhardberger.tvhplayer.testutil.pressKey
 import at.bernhardberger.tvhplayer.testutil.settleFrames
 import at.bernhardberger.tvhplayer.R
@@ -27,6 +29,7 @@ import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.assertContentDescriptionEquals
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.requestFocus
 import at.bernhardberger.tvheadend.sdk.core.EventId
@@ -52,8 +55,10 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.notices.Notice
 import at.bernhardberger.tvhplayer.notices.PauseUnavailableReason
 import at.bernhardberger.tvheadend.sdk.playback.StreamIndex
+import at.bernhardberger.tvheadend.sdk.playback.SubscriptionCondition
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionConfirmation
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionEvent
+import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssue
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionSeekTarget
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionOperationResult
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionStream
@@ -70,6 +75,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -592,7 +598,7 @@ class LivePlayerChromePlaybackTest : LivePlayerChromeFixture() {
     @Test fun aStoppedAndRestartedScreenShowsNoStaleBanner() = timeshiftPlaying(mapPosition = true) { pauses ->
         forcedVideoFormat = Format.Builder().setSampleMimeType(MimeTypes.VIDEO_H264)
             .setWidth(1920).setHeight(1080).build()
-        compose.runOnIdle { statsStore.setVisible(true) }
+        compose.runOnIdle { statsStore.setLevel(PlayerStatsLevel.STREAM_PATH) }
         settle()
         assertEquals(1920, runtime.diagnostics.value.video?.width)
         key(Key.MediaPause)
@@ -601,12 +607,12 @@ class LivePlayerChromePlaybackTest : LivePlayerChromeFixture() {
         compose.runOnIdle { owner.lifecycle.currentState = Lifecycle.State.CREATED }
         settle()
         assertEquals("a stopped live screen withdraws diagnostics", null, runtime.diagnostics.value.video)
-        assertTrue(statsStore.visible.value)
+        assertTrue(statsStore.level.value.enabled)
         assertFalse("the Banner does not outlive the stop", exists("player-banner"))
         compose.runOnIdle { owner.lifecycle.currentState = Lifecycle.State.RESUMED }
         repeat(8) { settle() }
         assertEquals("a started live screen samples again", 1920, runtime.diagnostics.value.video?.width)
-        assertTrue(statsStore.visible.value)
+        assertTrue(statsStore.level.value.enabled)
         assertFalse("no stale Banner on return", exists("player-banner"))
         assertFalse(exists("player-actions"))
         assertFalse("stopping preserves pause", pauses.last())
@@ -725,6 +731,7 @@ class LivePlayerChromePlaybackTest : LivePlayerChromeFixture() {
             key(Key.DirectionCenter)
             compose.onNodeWithTag("playback-options-stats").performSemanticsAction(SemanticsActions.RequestFocus)
             key(Key.DirectionCenter)
+            key(Key.DirectionDown)
             key(Key.DirectionCenter)
             // Media3's ExoPlayer playback thread publishes the bound subscription's diagnostics.
             compose.waitUntil(5_000) { idleMainLooper(); runtime.diagnostics.value.live != null }
@@ -736,7 +743,7 @@ class LivePlayerChromePlaybackTest : LivePlayerChromeFixture() {
             assertTrue("Stats keep sampling with the chrome hidden", runtime.diagnostics.value.live != null)
             key(Key.Back)
             assertEquals(1, closes)
-            assertTrue("leaving the player keeps the process switch on", statsStore.visible.value)
+            assertTrue("leaving the player keeps the process switch on", statsStore.level.value.enabled)
             assertSubscriptionSettled("closing the player clears live diagnostics") { runtime.diagnostics.value.live == null }
             assertFalse(exists("playback-stats-overlay"))
         } finally {
@@ -783,18 +790,60 @@ class LivePlayerChromePlaybackTest : LivePlayerChromeFixture() {
 
     @Test fun playerUnavailableClaimsNeitherPlayingNorLiveInTheControlsNorTheChip() {
         screen(failing = true)
+        compose.runOnIdle { statsStore.setLevel(PlayerStatsLevel.STREAM_PATH) }
         repeat(4) { settle() }
         assertTrue("centre message", exists("player-channel-unavailable"))
+        assertFalse("the message carries the stats instead of the card", exists("playback-stats-overlay"))
         assertFalse("unavailable replaces busy", exists("player-busy-indicator"))
         assertFalse("the Banner gives way to the centre message", exists("player-banner"))
         assertFalse(exists("player-hidden-slot"))
         assertFalse(exists("player-status-slot"))
         key(Key.DirectionDown)
         assertTrue("the controls open over the message", exists("player-actions"))
+        assertFalse(exists("playback-stats-overlay"))
         assertFalse(exists("player-state"))
         assertFalse(exists("player-live-state"))
         key(Key.Back)
         assertFalse(exists("player-hidden-slot"))
         assertFalse(exists("player-state"))
+    }
+
+    /** A server-reported issue is not a failure: the message borrows the card's live rows instead. */
+    @Test fun aSubscriptionIssueMovesTheStatsIntoTheChannelMessageWhateverLayerIsOpen() {
+        val connection = ScriptedSubscriptionConnection().apply {
+            scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, null)))
+        }
+        val manager = createSubscriptionManager(connection, subscriptionDispatcher).apply { startAdmission() }
+        fun detail() = compose.onAllNodesWithTag(PlayerChannelMessageDetailTag, useUnmergedTree = true)
+            .fetchSemanticsNodes().singleOrNull()?.config?.getOrNull(SemanticsProperties.Text)?.joinToString("")
+        try {
+            screen(opener = manager)
+            compose.runOnIdle { statsStore.setLevel(PlayerStatsLevel.STREAM_PATH) }
+            // 49152 of 65535: 75 %.
+            startLiveSubscription(connection, 1080, 49_152)
+            runTest(subscriptionDispatcher) {
+                connection.emit(SubscriptionEvent.Queue(1_500, 2_000_000, 250_000, 0, 0, 0))
+                connection.emit(SubscriptionEvent.Status(SubscriptionCondition.ERROR_REPORTED, SubscriptionIssue.BAD_SIGNAL))
+            }
+            repeat(4) { settle() }
+            assertTrue("centre message", exists("player-channel-unavailable"))
+            assertFalse("no card while the channel is unavailable", exists("playback-stats-overlay"))
+            assertEquals("Tuner: 75% SNR\nTvheadend: 250.0 ms queue", detail())
+            key(Key.Menu)
+            assertTrue(exists("playback-options-display"))
+            assertFalse("the options sheet does not bring the card back", exists("playback-stats-overlay"))
+            key(Key.Back)
+            compose.runOnIdle { statsStore.setLevel(PlayerStatsLevel.DEBUG) }
+            settle()
+            assertFalse(exists("playback-stats-overlay"))
+            assertEquals(listOf("Tuner", "Tvheadend", "Frontend", "SNR", "BER / uncorrected", "Queue", "Server drops", "Client drops"),
+                detail()?.lines()?.map { it.substringBefore(":") })
+            compose.runOnIdle { statsStore.setLevel(PlayerStatsLevel.OFF) }
+            settle()
+            assertTrue(exists("player-channel-unavailable"))
+            assertNull("Off leaves the message as it was", detail())
+        } finally {
+            runTest(subscriptionDispatcher) { manager.closeAndJoin() }
+        }
     }
 }

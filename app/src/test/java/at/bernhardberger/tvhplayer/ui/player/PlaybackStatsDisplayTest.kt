@@ -37,7 +37,7 @@ class PlaybackStatsDisplayTest {
         )
 
         assertEquals(
-            "2160p: 30 • 60 / 1080p: 23.98 • 50 • 60 / 720p: 50",
+            "2160p: 30 • 60\n1080p: 23.98 • 50 • 60\n720p: 50",
             refreshRatesByResolution(modes),
         )
         assertEquals("", refreshRatesByResolution(emptyList()))
@@ -47,7 +47,7 @@ class PlaybackStatsDisplayTest {
     fun resolutionsSharingAHeightKeepTheirFullSize() {
         val modes = listOf(DisplayModeSpec(3840, 2160, 60f), DisplayModeSpec(4096, 2160, 24f))
 
-        assertEquals("4096×2160: 24 / 3840×2160: 60", refreshRatesByResolution(modes))
+        assertEquals("4096×2160: 24\n3840×2160: 60", refreshRatesByResolution(modes))
     }
 
     @Test

@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.di.PlayerStatsLevel
+
 import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -208,7 +210,7 @@ class PlaybackPanelCaptureTest {
         panelScene {
             PlaybackOptionsSheet(PlaybackOptionsPage.AUDIO,
                 PlaybackOptionsTrackListTest.player(PlaybackOptionsTrackListTest.orfTracks()),
-                false, AspectRatioMode.FIT, false, {}, {}, {}, audioAutomatic = true, onAutomaticAudio = {})
+                false, AspectRatioMode.FIT, PlayerStatsLevel.OFF, {}, {}, {}, audioAutomatic = true, onAutomaticAudio = {})
         }
         compose.onNodeWithTag("playback-options-track-automatic").assertIsFocused()
         assertTrue(compose.onNodeWithTag("playback-options-track-list").fetchSemanticsNode().config[ListBottomFadeVisible])
@@ -220,7 +222,7 @@ class PlaybackPanelCaptureTest {
             var page by remember { mutableStateOf(PlaybackOptionsPage.ROOT) }
             PlaybackOptionsSheet(page,
                 PlaybackOptionsTrackListTest.player(PlaybackOptionsTrackListTest.orfTracks()),
-                false, AspectRatioMode.FIT, false, { page = it }, {}, {}, audioAutomatic = true, onAutomaticAudio = {})
+                false, AspectRatioMode.FIT, PlayerStatsLevel.OFF, { page = it }, {}, {}, audioAutomatic = true, onAutomaticAudio = {})
         }
         compose.onNodeWithTag("playback-options-audio").assertIsFocused()
         compose.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
@@ -346,7 +348,7 @@ class PlaybackPanelCaptureTest {
                     view = LocalView.current
                     when (surface) {
                         Surface.MENU, Surface.RECORDING_MENU -> PlaybackOptionsSheet(
-                            PlaybackOptionsPage.ROOT, player, false, AspectRatioMode.FIT, false,
+                            PlaybackOptionsPage.ROOT, player, false, AspectRatioMode.FIT, PlayerStatsLevel.OFF,
                             {}, {}, {}, audioAutomatic = true, onAutomaticAudio = {},
                             recording = surface == Surface.RECORDING_MENU,
                         )
@@ -357,7 +359,7 @@ class PlaybackPanelCaptureTest {
                                 PlaybackOptionsPage.SUBTITLES
                             },
                             if (surface == Surface.SUBTITLES_QUICK_LIST_TRACKS) withSubtitles else player,
-                            false, AspectRatioMode.FIT, false,
+                            false, AspectRatioMode.FIT, PlayerStatsLevel.OFF,
                             {}, {}, {}, audioAutomatic = true, onAutomaticAudio = {},
                             quickList = PlaybackQuickListSignals(),
                         )

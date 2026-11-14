@@ -22,6 +22,8 @@ import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
 import at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition
+import at.bernhardberger.tvheadend.sdk.media3.PlaybackRecoveryReason
+import at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult
 import at.bernhardberger.tvhplayer.core.AppErrorCondition
 import at.bernhardberger.tvhplayer.core.LivePlayerAlert
 import at.bernhardberger.tvhplayer.core.PlaybackRetryCommand
@@ -102,6 +104,27 @@ class PlayerErrorSurfacesCaptureTest {
         ))
     }
 
+    @Test fun statsFailureFootnoteFit() {
+        val failed = AppPlaybackState.Failed(AppPlaybackFailureReason.RECORDING_READ_FAILED)
+        val alert = recordingPlayerAlert(
+            ConnectionState.Connected, false, failed,
+            DvrEntry.create(DvrEntryId(1), state = DvrEntryState.COMPLETED),
+            null, PlaybackRetryCommand.RESUME_RECORDING,
+        )
+        capture(listOf(
+            Scene("stats-recording-error-off", alert = alert),
+            Scene("stats-recording-error-four-long-rows", alert = alert, statsFailure = failed.copy(
+                recoveryReason = PlaybackRecoveryReason.LIVE_BUFFER_EXHAUSTED,
+                playerErrorCode = "ERROR_CODE_DECODING_FORMAT_EXCEEDS_CAPABILITIES",
+                playerErrorClassification = "androidx.media3.exoplayer.ExoPlaybackException · MediaCodecVideoRenderer.onInputFormatChanged",
+                targetResult = PlaybackTargetResult.SHUT_DOWN,
+            )),
+        ))
+        val button = compose.onNodeWithTag("tv-recovery-primary").fetchSemanticsNode().boundsInRoot
+        assertTrue("Recovery buttons bottom=${button.bottom / 2f} dp must stay above TV-safe bottom=492 dp",
+            button.bottom <= 984f)
+    }
+
     private fun capture(scenes: List<Scene>) {
         val scene = mutableStateOf(scenes.first())
         compose.setContent {
@@ -123,6 +146,7 @@ class PlayerErrorSurfacesCaptureTest {
                             onConnectionSettings = {},
                             onClose = {},
                             deviceFaultDetail = scene.value.alertDetail,
+                            statsFailure = scene.value.statsFailure,
                         )
                     }
                 }
@@ -156,6 +180,7 @@ class PlayerErrorSurfacesCaptureTest {
         val channel: AppErrorCondition? = null,
         val alert: LivePlayerAlert? = null,
         val alertDetail: String? = null,
+        val statsFailure: AppPlaybackState.Failed? = null,
     )
 
     private fun connectionAlert(

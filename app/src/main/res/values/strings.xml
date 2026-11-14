@@ -643,114 +643,19 @@
     <string name="player_raster_spoken">%1$s lines</string>
     <string name="player_audio_spoken">Audio %1$s</string>
     <string name="player_ad_short">AD</string>
-    <string name="stats_on">On</string>
     <string name="stats_off">Off</string>
     <string name="display_mode">Display mode</string>
     <string name="display_mode_auto">Auto (original aspect)</string>
     <string name="display_mode_16_9">Fill 16:9</string>
     <string name="display_mode_4_3">Fill 4:3</string>
     <string name="stats_for_nerds" translatable="false">Stats for nerds</string>
-    <string name="stats_source" translatable="false">Source</string>
-    <string name="stats_source_live" translatable="false">Live TV</string>
-    <string name="stats_source_recording" translatable="false">Recording</string>
-    <string name="stats_state" translatable="false">State</string>
-    <string name="stats_state_idle" translatable="false">Idle</string>
-    <string name="stats_state_starting" translatable="false">Starting</string>
-    <string name="stats_state_playing" translatable="false">Playing</string>
-    <string name="stats_state_paused" translatable="false">Paused</string>
-    <string name="stats_state_buffering" translatable="false">Buffering</string>
-    <string name="stats_state_finished" translatable="false">Finished</string>
-    <string name="stats_state_recovering" translatable="false">Recovering</string>
-    <string name="stats_state_failed" translatable="false">Failed</string>
+    <string name="stats_stream_path" translatable="false">Stream path</string>
+    <string name="stats_stream_path_debug" translatable="false">Stream path + debug details</string>
     <string name="stats_recovery_reason" translatable="false">Recovery reason</string>
     <string name="stats_error_code" translatable="false">Error code</string>
     <string name="stats_error_classification" translatable="false">Classification</string>
     <string name="stats_target_result" translatable="false">Target result</string>
-    <string name="stats_timing" translatable="false">Position</string>
-    <string name="stats_timing_buffered" translatable="false">%1$s • buffer %2$d s</string>
-    <string name="stats_timing_buffered_with_duration" translatable="false">%1$s / %2$s • buffer %3$d s</string>
-    <string name="stats_timeshift_live" translatable="false">Live</string>
-    <string name="stats_timeshift_behind_live" translatable="false">%1$s behind live</string>
-    <string name="stats_video" translatable="false">Video</string>
-    <string name="stats_video_buffers">Video buffers</string>
     <string name="stats_video_buffers_value">Rendered %1$d • Dropped %2$d • Skipped %3$d</string>
-    <string name="stats_video_decoder" translatable="false">Video decoder</string>
-    <string name="stats_frames" translatable="false">Frames</string>
-    <string name="stats_frame_rate" translatable="false">%1$s fps</string>
-    <string name="stats_frame_rate_label" translatable="false">Frame rate</string>
-    <string name="stats_frame_rate_declared" translatable="false">Declared %1$s ms (%2$s fps)</string>
-    <string name="stats_frame_rate_declared_none" translatable="false">Declared none</string>
-    <string name="stats_frame_rate_measured" translatable="false">Measured %1$s fps</string>
-    <string name="stats_frame_rate_measured_none" translatable="false">Measured none</string>
-    <string name="stats_same_time_frames" translatable="false">%1$d%% same-time frames</string>
-    <string name="stats_frames_value" translatable="false">%1$s rendered • %2$s dropped</string>
-    <string name="stats_frames_value_with_percentage" translatable="false">%1$s rendered • %2$s dropped (%3$s%%)</string>
-    <string name="stats_audio" translatable="false">Audio</string>
-    <string name="stats_audio_decoder" translatable="false">Audio decoder</string>
-    <string name="stats_audio_channels" translatable="false">%1$d ch</string>
-    <string name="stats_sample_rate" translatable="false">%1$s Hz</string>
-    <string name="stats_startup_buffer" translatable="false">Start-up buffer</string>
-    <string name="stats_startup_buffer_automatic" translatable="false">%1$s ms • automatic</string>
-    <string name="stats_startup_buffer_fixed" translatable="false">%1$s ms • fixed</string>
-    <string name="stats_stall_recoveries" translatable="false">Stall recoveries</string>
-    <string name="stats_fresh_decoder_per_zap" translatable="false">Fresh decoder per zap</string>
-    <string name="stats_underruns" translatable="false">Audio underruns</string>
-    <string name="stats_stream_read_rate" translatable="false">Stream read rate</string>
-    <string name="stats_file_read_rate" translatable="false">File read rate</string>
-    <string name="stats_display_mode" translatable="false">Display mode</string>
-    <string name="stats_display_mode_auto" translatable="false">Auto (original aspect)</string>
-    <string name="stats_display_mode_16_9" translatable="false">Fill 16:9</string>
-    <string name="stats_display_mode_4_3" translatable="false">Fill 4:3</string>
-    <string name="stats_unavailable" translatable="false">Unavailable</string>
-    <string name="stats_playback" translatable="false">Playback</string>
-    <string name="stats_tuner" translatable="false">Tuner</string>
-    <string name="stats_tuner_status" translatable="false">Frontend</string>
-    <string name="stats_frontend_locked" translatable="false">Locked</string>
-    <string name="stats_frontend_synchronizing" translatable="false">Synchronizing</string>
-    <string name="stats_frontend_signal" translatable="false">Signal detected</string>
-    <string name="stats_frontend_no_signal" translatable="false">No signal</string>
-    <string name="stats_signal" translatable="false">Signal</string>
-    <string name="stats_snr" translatable="false">SNR</string>
-    <string name="stats_ber" translatable="false">Bit error rate</string>
-    <string name="stats_uncorrected_blocks" translatable="false">Uncorrected blocks</string>
-    <string name="stats_server_queue" translatable="false">Tvheadend server queue</string>
-    <string name="stats_queued" translatable="false">Queued</string>
-    <string name="stats_queue_delay" translatable="false">Queue delay</string>
-    <string name="stats_queue_delay_value" translatable="false">%1$s ms</string>
-    <string name="stats_packet_count" translatable="false">%1$s packets</string>
-    <string name="stats_server_drops" translatable="false">Server frame drops</string>
-    <string name="stats_server_drops_value" translatable="false">I %1$s • P %2$s • B %3$s</string>
-    <string name="stats_client_drops" translatable="false">Client packet drops</string>
-    <string name="stats_system" translatable="false">System</string>
-    <string name="stats_output" translatable="false">Output</string>
-    <string name="stats_output_value" translatable="false">%1$d×%2$d • %3$s Hz</string>
-    <string name="stats_output_requested" translatable="false">Requested %1$s Hz</string>
-    <string name="stats_output_requested_kept" translatable="false">Requested %1$s Hz (kept)</string>
-    <string name="stats_refresh_rates" translatable="false">Refresh rates</string>
-    <string name="stats_match_frame_rate" translatable="false">Match frame rate</string>
-    <string name="stats_match_frame_rate_never" translatable="false">Never</string>
-    <string name="stats_match_frame_rate_seamless" translatable="false">Seamless only</string>
-    <string name="stats_match_frame_rate_always" translatable="false">Always</string>
-    <string name="stats_thermal" translatable="false">Thermal</string>
-    <string name="stats_app_memory" translatable="false">App memory</string>
-    <string name="stats_low_memory" translatable="false">Low-memory state</string>
-    <string name="stats_yes" translatable="false">Yes</string>
-    <string name="stats_no" translatable="false">No</string>
-    <string name="stats_thermal_none" translatable="false">None</string>
-    <string name="stats_thermal_light" translatable="false">Light</string>
-    <string name="stats_thermal_moderate" translatable="false">Moderate</string>
-    <string name="stats_thermal_severe" translatable="false">Severe</string>
-    <string name="stats_thermal_critical" translatable="false">Critical</string>
-    <string name="stats_thermal_emergency" translatable="false">Emergency</string>
-    <string name="stats_thermal_shutdown" translatable="false">Shutdown</string>
-    <string name="stats_bit_rate_mbps" translatable="false">%1$s Mbps</string>
-    <string name="stats_bit_rate_kbps" translatable="false">%1$s kbps</string>
-    <string name="stats_bit_rate_bps" translatable="false">%1$s bps</string>
-    <string name="stats_unit_dbm" translatable="false">%1$s dBm</string>
-    <string name="stats_unit_db" translatable="false">%1$s dB</string>
-    <string name="stats_bytes_mb" translatable="false">%1$s MB</string>
-    <string name="stats_bytes_kb" translatable="false">%1$s KB</string>
-    <string name="stats_bytes_b" translatable="false">%1$s B</string>
 
 
     <!-- ===== EPG ===== -->

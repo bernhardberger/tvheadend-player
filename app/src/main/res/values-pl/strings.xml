@@ -553,13 +553,11 @@
     <string name="player_raster_spoken">Liczba linii: %1$s</string>
     <string name="player_audio_spoken">Dźwięk %1$s</string>
     <string name="player_ad_short">AD</string>
-    <string name="stats_on">Włączone</string>
     <string name="stats_off">Wyłączone</string>
     <string name="display_mode">Tryb wyświetlania</string>
     <string name="display_mode_auto">Automatyczny (oryginalne proporcje)</string>
     <string name="display_mode_16_9">Wypełnij 16:9</string>
     <string name="display_mode_4_3">Wypełnij 4:3</string>
-    <string name="stats_video_buffers">Bufory wideo</string>
     <string name="stats_video_buffers_value">Wyrenderowane %1$d • Odrzucone %2$d • Pominięte %3$d</string>
     <string name="epg_title">Program TV</string>
     <string name="header_button_value_description">%1$s, %2$s</string>

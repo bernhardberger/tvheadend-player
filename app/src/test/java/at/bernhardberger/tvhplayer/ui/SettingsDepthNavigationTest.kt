@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui
 
+import at.bernhardberger.tvhplayer.di.PlayerStatsLevel
+
 import at.bernhardberger.tvhplayer.testutil.pressKey
 
 import android.app.Application
@@ -303,7 +305,19 @@ class SettingsDepthNavigationTest {
         compose.onNode(matcher).let { if (checked) it.assertIsSelected() else it.assertIsNotSelected() }
     }
 
-    @Test fun statsAccessibilityCheckedStateTracksCenter() = panelSwitchAccessibility("stats")
+    @Test fun statsAccessibilityCheckedStateTracksCenter() {
+        showPanelSwitch("stats")
+        compose.onNode(hasText("Off") and isSelectable()).assertIsFocused().assertIsSelected()
+        press(Key.DirectionDown)
+        compose.onNodeWithText("Stream path").assertIsFocused().assertIsNotSelected()
+        press(Key.DirectionCenter)
+        compose.onNode(hasText("Stream path") and isSelectable()).assertIsSelected()
+        press(Key.DirectionDown)
+        compose.onNodeWithText("Stream path + debug details").assertIsFocused().assertIsNotSelected()
+        press(Key.DirectionCenter)
+        compose.onNode(hasText("Stream path + debug details") and isSelectable()).assertIsSelected()
+        compose.onNode(hasText("Stream path") and isSelectable()).assertIsNotSelected()
+    }
     @Test fun channelArtAccessibilityCheckedStateTracksCenter() = panelSwitchAccessibility("channels-view-program-art")
     @Test fun channelNamesAccessibilityCheckedStateTracksCenter() = panelSwitchAccessibility("channels-view-channel-names")
     @Test fun guideHeadlineAccessibilityCheckedStateTracksCenter() {
@@ -331,7 +345,7 @@ class SettingsDepthNavigationTest {
 
     @OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
     private fun showPanelSwitch(tag: String) {
-        var stats by mutableStateOf(false)
+        var stats by mutableStateOf(PlayerStatsLevel.OFF)
         var channels by mutableStateOf(ChannelsView(layout = ChannelsLayout.GRID, programArt = emptySet()))
         var guide by mutableStateOf(GuideView(rows = GuideRows.REGULAR, headline = false, genreColors = false))
         compose.setContent {
@@ -341,9 +355,9 @@ class SettingsDepthNavigationTest {
                     when {
                         tag == "stats" -> PlaybackOptionsSheetContent(
                             page = PlaybackOptionsPage.STATS, audioTracks = emptyList(), subtitleTracks = emptyList(),
-                            tracksResolving = false, aspectRatio = AspectRatioMode.FIT, statsVisible = stats,
+                            tracksResolving = false, aspectRatio = AspectRatioMode.FIT, statsLevel = stats,
                             onPageChange = {}, onAudioTrackSelected = {}, onSubtitleTrackSelected = {},
-                            onAspectRatioChange = {}, onStatsVisibleChange = { stats = it })
+                            onAspectRatioChange = {}, onStatsLevelChange = { stats = it })
                         tag.startsWith("channels") -> ChannelsViewOptionsPanel(channels, { channels = it }, {})
                         else -> GuideViewOptionsPanel(guide, { guide = it }, {})
                     }

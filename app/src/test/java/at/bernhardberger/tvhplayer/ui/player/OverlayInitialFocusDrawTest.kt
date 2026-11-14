@@ -1,5 +1,8 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.di.PlayerStatsLevel
+import androidx.compose.ui.test.assertIsSelected
+
 import at.bernhardberger.tvhplayer.ui.components.PlaybackOptionsOverlayFrame
 
 import android.app.Application
@@ -36,6 +39,7 @@ import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isSelected
+import androidx.compose.ui.test.isSelectable
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -143,11 +147,11 @@ class OverlayInitialFocusDrawTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test fun statsPage() {
-        val checked = mutableStateOf(false)
+        val checked = mutableStateOf(PlayerStatsLevel.OFF)
         var toggles = 0
         var destination: PlaybackOptionsPage? = null
-        val switchRole = SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Switch)
-        val expected = hasText(string(R.string.stats_for_nerds)) and switchRole
+        val switchRole = isSelectable()
+        val expected = hasText(string(R.string.stats_off)) and isSelected()
         assertInitialFocusDrawn(expected) {
             PlaybackOptionsSheetContent(
                 page = PlaybackOptionsPage.STATS,
@@ -155,22 +159,22 @@ class OverlayInitialFocusDrawTest {
                 subtitleTracks = emptyList(),
                 tracksResolving = false,
                 aspectRatio = AspectRatioMode.FORCE_16_9,
-                statsVisible = checked.value,
+                statsLevel = checked.value,
                 onPageChange = { destination = it },
                 onAudioTrackSelected = {},
                 onSubtitleTrackSelected = {},
                 onAspectRatioChange = {},
-                onStatsVisibleChange = {
+                onStatsLevelChange = {
                     checked.value = it
                     toggles++
                 },
             )
         }
-        compose.onAllNodes(switchRole).assertCountEquals(1)
+        compose.onAllNodes(switchRole).assertCountEquals(3)
         val row = compose.onNode(expected)
-        row.assertIsFocused().assertIsOff()
+        row.assertIsFocused().assertIsSelected()
         row.performKeyInput { pressKey(Key.DirectionCenter) }
-        row.assertIsOn()
+        row.assertIsSelected()
         compose.runOnIdle { assertEquals(1, toggles) }
         row.performKeyInput { pressKey(Key.DirectionUp) }
         val back = compose.onNodeWithTag("playback-options-header-back")
@@ -214,12 +218,12 @@ class OverlayInitialFocusDrawTest {
             subtitleTracks = subtitleTracks,
             tracksResolving = false,
             aspectRatio = AspectRatioMode.FORCE_16_9,
-            statsVisible = false,
+            statsLevel = PlayerStatsLevel.OFF,
             onPageChange = {},
             onAudioTrackSelected = {},
             onSubtitleTrackSelected = {},
             onAspectRatioChange = {},
-            onStatsVisibleChange = {},
+            onStatsLevelChange = {},
         )
     }
 

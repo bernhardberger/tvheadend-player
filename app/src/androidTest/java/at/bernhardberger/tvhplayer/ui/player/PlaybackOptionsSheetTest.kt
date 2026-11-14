@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.di.PlayerStatsLevel
+
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.CompositionLocalProvider
@@ -25,6 +27,8 @@ import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isSelectable
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.onNodeWithTag
@@ -255,10 +259,10 @@ class PlaybackOptionsSheetTest {
                         player = player.player,
                         tracksResolving = tracksResolving,
                         aspectRatio = AspectRatioMode.FIT,
-                        statsVisible = false,
+                        statsLevel = PlayerStatsLevel.OFF,
                         onPageChange = {},
                         onAspectRatioChange = {},
-                        onStatsVisibleChange = {},
+                        onStatsLevelChange = {},
                         audioAutomatic = false,
                         onAutomaticAudio = {},
                     )
@@ -292,8 +296,8 @@ class PlaybackOptionsSheetTest {
 
 
     @Test
-    fun statsRowExposesTruthfulSwitchSemantics() {
-        var statsVisible by mutableStateOf(false)
+    fun statsRowsApplyTheSelectedLevelImmediately() {
+        var statsLevel by mutableStateOf(PlayerStatsLevel.OFF)
         var page by mutableStateOf(PlaybackOptionsPage.ROOT)
         composeRule.setContent {
             TVHeadendPlayerTheme {
@@ -303,23 +307,23 @@ class PlaybackOptionsSheetTest {
                     subtitleTracks = emptyList(),
                     tracksResolving = false,
                     aspectRatio = AspectRatioMode.FIT,
-                    statsVisible = statsVisible,
+                    statsLevel = statsLevel,
                     onPageChange = { page = it },
                     onAudioTrackSelected = {},
                     onSubtitleTrackSelected = {},
                     onAspectRatioChange = {},
-                    onStatsVisibleChange = { statsVisible = it },
+                    onStatsLevelChange = { statsLevel = it },
                 )
             }
         }
 
         composeRule.onNodeWithTag("playback-options-stats")
             .requestFocus().performKeyInput { pressKey(Key.Enter) }
-        composeRule.onNode(isToggleable())
-            .assertIsOff()
-            .requestFocus()
-            .performKeyInput { pressKey(Key.Enter) }
-            .assertIsOn()
+        composeRule.onNode(hasText("Off") and isSelectable()).assertIsSelected().assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionDown); pressKey(Key.Enter) }
+        composeRule.onNode(hasText("Stream path") and isSelectable()).assertIsSelected().assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionDown); pressKey(Key.Enter) }
+        composeRule.onNode(hasText("Stream path + debug details") and isSelectable()).assertIsSelected().assertIsFocused()
     }
 
     @Test
@@ -353,12 +357,12 @@ class PlaybackOptionsSheetTest {
                         subtitleTracks = emptyList(),
                         tracksResolving = false,
                         aspectRatio = AspectRatioMode.FIT,
-                        statsVisible = false,
+                        statsLevel = PlayerStatsLevel.OFF,
                         onPageChange = {},
                         onAudioTrackSelected = {},
                         onSubtitleTrackSelected = {},
                         onAspectRatioChange = {},
-                        onStatsVisibleChange = {},
+                        onStatsLevelChange = {},
                     )
                 }
             }
@@ -406,12 +410,12 @@ class PlaybackOptionsSheetTest {
                             subtitleTracks = emptyList(),
                             tracksResolving = false,
                             aspectRatio = AspectRatioMode.FIT,
-                            statsVisible = false,
+                            statsLevel = PlayerStatsLevel.OFF,
                             onPageChange = {},
                             onAudioTrackSelected = {},
                             onSubtitleTrackSelected = {},
                             onAspectRatioChange = {},
-                            onStatsVisibleChange = {},
+                            onStatsLevelChange = {},
                         )
                     }
                 }
@@ -462,12 +466,12 @@ class PlaybackOptionsSheetTest {
                     subtitleTracks = subtitleTracksProvider?.invoke() ?: subtitleTracks,
                     tracksResolving = tracksResolving(),
                     aspectRatio = AspectRatioMode.FIT,
-                    statsVisible = false,
+                    statsLevel = PlayerStatsLevel.OFF,
                     onPageChange = onPageChange,
                     onAudioTrackSelected = {},
                     onSubtitleTrackSelected = {},
                     onAspectRatioChange = {},
-                    onStatsVisibleChange = {},
+                    onStatsLevelChange = {},
                 )
             }
         }

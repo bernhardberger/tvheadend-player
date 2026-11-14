@@ -2,6 +2,8 @@
 
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.di.PlayerStatsLevel
+
 import at.bernhardberger.tvhplayer.ui.components.PlaybackOptionsOverlayFrame
 
 import android.graphics.Bitmap
@@ -127,9 +129,9 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
                             audioTracks = listOf(PlaybackOptionTrack("de", "Deutsch", "Dolby Digital 5.1", true),
                                 PlaybackOptionTrack("en", "English", "Stereo")),
                             subtitleTracks = listOf(PlaybackOptionTrack("de", "Deutsch")),
-                            tracksResolving = false, aspectRatio = AspectRatioMode.FIT, statsVisible = false,
+                            tracksResolving = false, aspectRatio = AspectRatioMode.FIT, statsLevel = PlayerStatsLevel.OFF,
                             onPageChange = {}, onAudioTrackSelected = {}, onSubtitleTrackSelected = {},
-                            onAspectRatioChange = {}, onStatsVisibleChange = {},
+                            onAspectRatioChange = {}, onStatsLevelChange = {},
                         )
                     } else if (scenario.startsWith("info") || infoOpen) {
                         PlayerDetailsSurface {

@@ -260,8 +260,8 @@ fun RecordingPlayerScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    val statsVisible by statsStore.visible.collectAsStateWithLifecycle()
-    PlayerDiagnosticsEffect(session, statsVisible)
+    val statsLevel by statsStore.level.collectAsStateWithLifecycle()
+    PlayerDiagnosticsEffect(session, statsLevel.enabled)
 
     fun stopAndClose() {
         scope.launch {
@@ -694,15 +694,19 @@ fun RecordingPlayerScreen(
     ) {
         // Passive diagnostics remain below every foreground layer, including recovery.
         PlaybackStatsVisibility(
-            visible = statsVisible,
+            visible = statsLevel.enabled && foregroundLayer != PlayerForegroundLayer.RECOVERY &&
+                foregroundLayer != PlayerForegroundLayer.TERMINAL_ERROR,
             modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 36.dp, end = 48.dp),
+                .align(Alignment.TopStart)
+                .padding(start = at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin, top = 100.dp),
         ) {
             PlaybackStatsOverlay(
                 diagnostics = diagnostics,
                 aspectRatio = aspectRatio,
                 frameRate = session.frameRate,
+                level = statsLevel,
+                accessible = foregroundLayer == PlayerForegroundLayer.NONE,
+                targetKey = activeTarget,
             )
         }
         if (playbackAvailable) {
@@ -828,6 +832,7 @@ fun RecordingPlayerScreen(
             },
             onClose = playerClose::close,
             deviceFaultDetail = playbackState.recordingFailureDetail(recordingFailure),
+            statsFailure = (playbackState as? AppPlaybackState.Failed).takeIf { statsLevel.enabled },
         )
         PlayerPanelVisibility(
             value = layers.optionsPage?.let { it to layers.optionsQuickList },
@@ -843,7 +848,7 @@ fun RecordingPlayerScreen(
                     playbackState is AppPlaybackState.Starting ||
                         playbackState is AppPlaybackState.Recovering,
                 aspectRatio = aspectRatio,
-                statsVisible = statsVisible,
+                statsLevel = statsLevel,
                 onPageChange = layers::showOptionsPage,
                 quickList = layers.quickList.takeIf { layers.optionsQuickList },
                 onQuickListClose = layers::closeQuickList,
@@ -853,7 +858,7 @@ fun RecordingPlayerScreen(
                 onQuickAudioSelection = { epoch, override -> session.selectQuickListAudio(epoch, override) },
                 recording = true,
                 onAspectRatioChange = targetAspect.select,
-                onStatsVisibleChange = statsStore::setVisible,
+                onStatsLevelChange = statsStore::setLevel,
             )
         }
     }

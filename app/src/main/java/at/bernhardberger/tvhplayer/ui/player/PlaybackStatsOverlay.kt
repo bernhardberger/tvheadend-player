@@ -1,23 +1,24 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import android.os.SystemClock
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.foundation.layout.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -25,22 +26,17 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
-import at.bernhardberger.tvheadend.sdk.playback.LiveFrontendState
-import at.bernhardberger.tvhplayer.ui.TvOverlayBoxAlpha
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.playback.AppPlaybackDiagnostics
-import at.bernhardberger.tvhplayer.playback.AppPlaybackSource
-import at.bernhardberger.tvhplayer.playback.AppPlaybackState
-import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
-import at.bernhardberger.tvhplayer.playback.PlaybackFrameRate
-import at.bernhardberger.tvhplayer.playback.AppVideoDecoderCounters
+import at.bernhardberger.tvhplayer.di.PlayerStatsLevel
+import at.bernhardberger.tvhplayer.playback.*
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation
+import at.bernhardberger.tvhplayer.ui.*
 import at.bernhardberger.tvhplayer.ui.common.formatHms
 import java.util.Locale
 import kotlin.time.DurationUnit
 
-/** Stats appear over 150 ms and leave over 100 ms, dropping semantics at once. */
+/** Visibility changes do not participate in player input or focus. */
 @Composable
 internal fun PlaybackStatsVisibility(
     visible: Boolean,
@@ -53,9 +49,7 @@ internal fun PlaybackStatsVisibility(
         exit = fadeOut(tween(PlayerMotion.FastMs, easing = PlayerMotion.StandardAccelerate)),
         modifier = Modifier.semanticsWhileShown(visible).then(modifier),
         label = "playback-stats",
-    ) {
-        content()
-    }
+    ) { content() }
 }
 
 @Composable
@@ -65,346 +59,236 @@ internal fun PlaybackStatsOverlay(
     modifier: Modifier = Modifier,
     timeshiftState: AppTimeshiftState? = null,
     frameRate: PlaybackFrameRate? = null,
+    level: PlayerStatsLevel = PlayerStatsLevel.STREAM_PATH,
+    accessible: Boolean = true,
+    targetKey: Any? = diagnostics.source,
 ) {
-    val locale = Locale.ROOT
-    val video = diagnostics.video
-    val audio = diagnostics.audio
-    val live = diagnostics.live
+    val history = remember { PlaybackStatsHistory(SystemClock::elapsedRealtime) }
+    val window = remember(targetKey, diagnostics) { history.update(targetKey, diagnostics) }
+    val output = rememberDisplayOutput()
+    val declared = frameRate?.declared?.collectAsStateWithLifecycle()?.value
+    val requested = frameRate?.requested?.collectAsStateWithLifecycle()?.value?.rate?.let(::formatRefreshRate)
+    val measured = rememberMeasuredFrameRate(frameRate)
+    val declaredRate = declared?.let { formatRefreshRate((1.0 / it.toDouble(DurationUnit.SECONDS)).toFloat()) }
+        ?: diagnostics.video?.frameRate?.let(::formatRefreshRate)
+    val path = streamPath(diagnostics, window, output?.refreshRate, requested)
+    val debug = level == PlayerStatsLevel.DEBUG
+    val foreground = MaterialTheme.colorScheme.onSurface
     Surface(
         modifier = modifier
-            .width(820.dp)
-            .testTag("playback-stats-overlay"),
-        colors = SurfaceDefaults.colors(
-            containerColor = Color.Black.copy(alpha = TvOverlayBoxAlpha),
-            contentColor = MaterialTheme.colorScheme.onSurface,
-        ),
+            .width(if (debug) TvGridColumnWidth * 12 + TvGridGutter * 11 else TvGridColumnWidth * 5 + TvGridGutter * 4)
+            .testTag("playback-stats-overlay")
+            .then(if (accessible) Modifier.semantics(mergeDescendants = true) { heading() }
+                else Modifier.clearAndSetSemantics {}),
+        colors = SurfaceDefaults.colors(containerColor = Color.Black.copy(alpha = TvOverlayBoxAlpha), contentColor = foreground),
         shape = MaterialTheme.shapes.medium,
     ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.stats_for_nerds),
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.semantics { heading() },
-            )
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(3.dp),
-            ) {
-                StatsSection(stringResource(R.string.stats_playback))
-                StatLine(
-                    stringResource(R.string.stats_source),
-                    when (diagnostics.source) {
-                        AppPlaybackSource.LIVE_TV -> stringResource(R.string.stats_source_live)
-                        AppPlaybackSource.RECORDING -> stringResource(R.string.stats_source_recording)
-                        AppPlaybackSource.NONE -> stringResource(R.string.stats_unavailable)
-                    },
-                )
-                StatLine(
-                    stringResource(R.string.stats_state),
-                    when (val state = diagnostics.state) {
-                        AppPlaybackState.Idle -> stringResource(R.string.stats_state_idle)
-                        AppPlaybackState.Starting -> stringResource(R.string.stats_state_starting)
-                        AppPlaybackState.Playing -> stringResource(
-                            if (diagnostics.isPlaying) {
-                                R.string.stats_state_playing
-                            } else {
-                                R.string.stats_state_paused
-                            },
-                        )
-                        AppPlaybackState.Buffering -> stringResource(R.string.stats_state_buffering)
-                        AppPlaybackState.Finished -> stringResource(R.string.stats_state_finished)
-                        is AppPlaybackState.Recovering ->
-                            stringResource(R.string.stats_state_recovering)
-                        is AppPlaybackState.Failed -> stringResource(R.string.stats_state_failed)
-                    },
-                )
-                (diagnostics.state as? AppPlaybackState.Failed)?.let { failed ->
-                    for ((label, value) in failureStatRows(failed)) StatLine(stringResource(label), value)
-                }
-                StatLine(
-                    stringResource(R.string.stats_timing),
-                    timeshiftState?.let { state ->
-                        if (state.available && !state.timingKnown) {
-                            stringResource(R.string.player_timing_unavailable)
-                        } else if (!state.available || timeshiftPositionPresentation(state).atLiveEdge) {
-                            stringResource(R.string.stats_timeshift_live)
-                        } else {
-                            stringResource(
-                                R.string.stats_timeshift_behind_live,
-                                formatHms(-state.positionMs / 1_000L),
-                            )
-                        }
-                    } ?: diagnostics.durationMs?.let { durationMs ->
-                        stringResource(
-                            R.string.stats_timing_buffered_with_duration,
-                            formatHms(diagnostics.positionMs / 1_000L),
-                            formatHms(durationMs / 1_000L),
-                            diagnostics.bufferedMs / 1_000L,
-                        )
-                    } ?: stringResource(
-                        R.string.stats_timing_buffered,
-                        formatHms(diagnostics.positionMs / 1_000L),
-                        diagnostics.bufferedMs / 1_000L,
-                    ),
-                )
-                StatLine(
-                    stringResource(R.string.stats_video),
-                    listOfNotNull(
-                        video?.codec,
-                        video?.resolution,
-                        video?.frameRate?.let {
-                            stringResource(R.string.stats_frame_rate, it.oneDecimal(locale))
-                        },
-                    ).joinToString(" • ").ifBlank {
-                        stringResource(R.string.stats_unavailable)
-                    },
-                )
-                frameRate?.let { FrameRateStatLine(it) }
-                StatLine(
-                    stringResource(R.string.stats_audio),
-                    listOfNotNull(
-                        audio?.codec,
-                        audio?.language,
-                        audio?.channelCount?.let {
-                            stringResource(R.string.stats_audio_channels, it)
-                        },
-                        audio?.sampleRateHz?.let {
-                            stringResource(
-                                R.string.stats_sample_rate,
-                                formatCount(it.toLong(), locale),
-                            )
-                        },
-                    ).joinToString(" • ").ifBlank {
-                        stringResource(R.string.stats_unavailable)
-                    },
-                )
-                diagnostics.videoDecoderCounters?.let { counters ->
-                    StatLine(
-                        stringResource(R.string.stats_video_buffers),
-                        formatVideoDecoderCounters(counters, stringResource(R.string.stats_video_buffers_value)),
-                    )
-                }
-                StatLine(
-                    stringResource(R.string.stats_display_mode),
-                    stringResource(
-                        when (aspectRatio) {
-                            AspectRatioMode.FIT -> R.string.stats_display_mode_auto
-                            AspectRatioMode.FORCE_16_9 -> R.string.stats_display_mode_16_9
-                            AspectRatioMode.FORCE_4_3 -> R.string.stats_display_mode_4_3
-                        },
-                    ),
-                )
-                DisplayOutputStatLines(frameRate)
-                diagnostics.startupBuffer?.let { buffer ->
-                    StatLine(
-                        stringResource(R.string.stats_startup_buffer),
-                        stringResource(
-                            if (buffer.automatic) R.string.stats_startup_buffer_automatic
-                            else R.string.stats_startup_buffer_fixed,
-                            buffer.millis.toString(),
-                        ),
-                    )
-                }
-                StatLine(stringResource(R.string.stats_stall_recoveries), diagnostics.stallRecoveries.toString())
-                StatLine(
-                    stringResource(R.string.stats_fresh_decoder_per_zap),
-                    stringResource(if (diagnostics.freshDecoderPerZap) R.string.stats_on else R.string.stats_off),
-                )
-                val tunerSource = live?.source
-                val frontend = live?.frontend
-                if (tunerSource != null || frontend != null) {
-                    StatsSection(stringResource(R.string.stats_tuner))
-                    listOfNotNull(
-                        tunerSource?.adapterName,
-                        tunerSource?.muxName,
-                        tunerSource?.networkName,
-                        tunerSource?.providerName,
-                        tunerSource?.serviceName,
-                    ).takeIf { it.isNotEmpty() }?.let { values ->
-                        StatLine(
-                            stringResource(R.string.stats_source),
-                            values.joinToString(" • "),
-                        )
-                    }
-                    frontend?.state?.let { state ->
-                        StatLine(
-                            stringResource(R.string.stats_tuner_status),
-                            stringResource(state.presentationResource()),
-                        )
-                    }
-                    frontend?.let { values ->
-                        formattedMeasurement(
-                            relativePercent = values.relativeSignalPercent,
-                            absoluteValue = values.absoluteSignalDbm,
-                            absoluteUnit = R.string.stats_unit_dbm,
-                            locale = locale,
-                        )?.let {
-                            StatLine(stringResource(R.string.stats_signal), it)
-                        }
-                        formattedMeasurement(
-                            relativePercent = values.relativeSnrPercent,
-                            absoluteValue = values.absoluteSnrDecibels,
-                            absoluteUnit = R.string.stats_unit_db,
-                            locale = locale,
-                        )?.let {
-                            StatLine(stringResource(R.string.stats_snr), it)
-                        }
-                        values.bitErrorRateRaw?.let {
-                            StatLine(
-                                stringResource(R.string.stats_ber),
-                                formatCount(it, locale),
-                            )
-                        }
-                        values.uncorrectedBlockCount?.let {
-                            StatLine(
-                                stringResource(R.string.stats_uncorrected_blocks),
-                                formatCount(it, locale),
-                            )
+        Row(Modifier.padding(TvSpacing16), horizontalArrangement = Arrangement.spacedBy(TvGridGutter)) {
+            Column(Modifier.then(if (debug) Modifier.width(324.dp) else Modifier.fillMaxWidth())) {
+                Text(stringResource(R.string.stats_for_nerds), style = MaterialTheme.typography.labelLarge)
+                StatsText(audioSummary(diagnostics), maxLines = 1)
+                if (debug && diagnostics.source == AppPlaybackSource.LIVE_TV) {
+                    diagnostics.live?.source?.let { source ->
+                        val names = listOfNotNull(source.adapterName, source.muxName, source.networkName,
+                            source.providerName, source.serviceName)
+                        // Lines break only after a separator; a name too long for the column ellipsizes alone.
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(TvSpacing4)) {
+                            names.forEachIndexed { index, name ->
+                                StatsText(if (index < names.lastIndex) "$name •" else name, maxLines = 1)
+                            }
                         }
                     }
                 }
-                live?.queue?.let { queue ->
-                    StatsSection(stringResource(R.string.stats_server_queue))
-                    StatLine(
-                        stringResource(R.string.stats_queued),
-                        listOf(
-                            stringResource(
-                                R.string.stats_packet_count,
-                                formatCount(queue.packetCount, locale),
-                            ),
-                            formatBytes(queue.byteCount, locale),
-                        ).joinToString(" • "),
-                    )
-                    queue.mediaSpanMicroseconds?.let { microseconds ->
-                        StatLine(
-                            stringResource(R.string.stats_queue_delay),
-                            stringResource(
-                                R.string.stats_queue_delay_value,
-                                formatDecimal(microseconds / 1_000.0, 1, locale),
-                            ),
-                        )
-                    }
-                    StatLine(
-                        stringResource(R.string.stats_server_drops),
-                        stringResource(
-                            R.string.stats_server_drops_value,
-                            formatCount(queue.droppedIFrameCount, locale),
-                            formatCount(queue.droppedPFrameCount, locale),
-                            formatCount(queue.droppedBFrameCount, locale),
-                        ),
+                Spacer(Modifier.height(TvSpacing4))
+                path.steps.forEachIndexed { index, step ->
+                    StatsStep(
+                        number = index + 1, first = index == 0, last = index == path.steps.lastIndex,
+                        filled = step == path.firstFlagged, flagged = step in path.flagged,
+                        name = stepName(step),
+                        value = stepValue(step, diagnostics, window, output, requested, measured, declaredRate, timeshiftState),
                     )
                 }
-                live?.clientDroppedPacketCount?.takeIf { it > 0L }?.let { dropped ->
-                    StatLine(
-                        stringResource(R.string.stats_client_drops),
-                        stringResource(R.string.stats_packet_count, formatCount(dropped, locale)),
-                    )
+            }
+            if (debug) {
+                Column(Modifier.weight(1f)) {
+                    Text("Debug details", style = MaterialTheme.typography.labelLarge)
+                    DebugDetails(diagnostics, aspectRatio, timeshiftState, output, declared?.let(::formatFrameDurationMillis),
+                        declaredRate, requested, measured, window)
                 }
             }
         }
     }
 }
 
-/** The declared frame duration that drives the display request, and the measured rate for diagnosis. */
+/** The line uses the whole row's height, with endpoints only at the first and last ring centres. */
 @Composable
-private fun FrameRateStatLine(frameRate: PlaybackFrameRate) {
-    val declared by frameRate.declared.collectAsStateWithLifecycle()
-    val measured = rememberMeasuredFrameRate(frameRate)
-    StatLine(
-        stringResource(R.string.stats_frame_rate_label),
-        listOfNotNull(
-            declared?.let {
-                stringResource(
-                    R.string.stats_frame_rate_declared,
-                    formatFrameDurationMillis(it),
-                    formatRefreshRate((1.0 / it.toDouble(DurationUnit.SECONDS)).toFloat()),
-                )
-            } ?: stringResource(R.string.stats_frame_rate_declared_none),
-            measured?.framesPerSecond?.let {
-                stringResource(R.string.stats_frame_rate_measured, formatRefreshRate(it))
-            } ?: stringResource(R.string.stats_frame_rate_measured_none),
-            measured?.sameTimePercent?.let { stringResource(R.string.stats_same_time_frames, it) },
-        ).joinToString(" • "),
-    )
-}
-
-@Composable
-private fun DisplayOutputStatLines(frameRate: PlaybackFrameRate?) {
-    val output = rememberDisplayOutput() ?: return
-    val requested = frameRate?.requested?.collectAsStateWithLifecycle()?.value?.rate
-    // A rate requested while nothing is declared is kept from an earlier declaration.
-    val kept = frameRate?.declared?.collectAsStateWithLifecycle()?.value == null
-    StatLine(
-        stringResource(R.string.stats_output),
-        listOfNotNull(
-            stringResource(R.string.stats_output_value, output.width, output.height, output.refreshRate),
-            requested?.let {
-                stringResource(
-                    if (kept) R.string.stats_output_requested_kept else R.string.stats_output_requested,
-                    formatRefreshRate(it),
-                )
-            },
-        ).joinToString(" • "),
-    )
-    if (output.refreshRatesByResolution.isNotEmpty()) {
-        StatLine(
-            stringResource(R.string.stats_refresh_rates),
-            output.refreshRatesByResolution,
-        )
-    }
-    output.matchFrameRate?.let { preference ->
-        StatLine(
-            stringResource(R.string.stats_match_frame_rate),
-            stringResource(
-                when (preference) {
-                    MatchFrameRatePreference.NEVER -> R.string.stats_match_frame_rate_never
-                    MatchFrameRatePreference.SEAMLESS_ONLY -> R.string.stats_match_frame_rate_seamless
-                    MatchFrameRatePreference.ALWAYS -> R.string.stats_match_frame_rate_always
-                },
-            ),
-        )
-    }
-}
-
-@Composable
-private fun StatsSection(title: String) {
-    Text(
-        text = title,
-        color = MaterialTheme.colorScheme.primary,
-        style = MaterialTheme.typography.labelMedium,
-        modifier = Modifier.padding(top = 5.dp).semantics { heading() },
-    )
-}
-
-@Composable
-private fun StatLine(label: String, value: String) {
+private fun StatsStep(number: Int, first: Boolean, last: Boolean, filled: Boolean, flagged: Boolean, name: String, value: String) {
+    val color = MaterialTheme.colorScheme.onSurface
     Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        Modifier.fillMaxWidth().heightIn(min = TvGridGutter).drawBehind {
+            val x = 8.dp.toPx()
+            val y = 10.dp.toPx()
+            drawLine(color.copy(alpha = TvTextTertiaryAlpha), Offset(x, if (first) y else 0f),
+                Offset(x, if (last) y else size.height), 1.dp.toPx())
+            drawCircle(if (filled) color else Color.Black, 8.dp.toPx(), Offset(x, y))
+            drawCircle(color, 8.dp.toPx(), Offset(x, y), style = Stroke(1.dp.toPx()))
+        },
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = label,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.weight(0.38f),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            text = value,
-            // Tabular figures keep changing counters from shifting sideways.
-            style = MaterialTheme.typography.bodySmall.copy(fontFeatureSettings = "tnum"),
-            modifier = Modifier.weight(0.62f),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        Text(number.toString(), Modifier.width(TvSpacing16).clearAndSetSemantics {},
+            color = if (filled) Color.Black else color,
+            style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center)
+        Spacer(Modifier.width(10.dp))
+        Text(name, modifier = Modifier.width(84.dp), style = MaterialTheme.typography.labelLarge, maxLines = 1)
+        StatsText(value, modifier = Modifier.weight(1f), maxLines = 1)
+        if (flagged) StatsText(" !", maxLines = 1)
     }
 }
 
-/** The raw values behind a failure, label and value, each only where the failure carries it. */
+@Composable
+private fun StatsText(text: String, modifier: Modifier = Modifier, maxLines: Int = Int.MAX_VALUE) {
+    Text(text, modifier, style = MaterialTheme.typography.bodySmall.copy(fontFeatureSettings = "tnum"),
+        maxLines = maxLines, overflow = TextOverflow.Ellipsis)
+}
+
+private fun decimal(value: Double, digits: Int = 1): String = String.format(Locale.ROOT, "%.${digits}f", value)
+private fun count(value: Long): String = String.format(Locale.ROOT, "%,d", value)
+private fun growth(value: Long, label: String): String? = value.takeIf { it > 0 }?.let { "+${count(it)} $label / 60 s" }
+private fun change(value: Double?, unit: String, digits: Int = 1): String? =
+    displayedStatsChange(value, digits)?.let { "${if (it > 0) "+" else ""}${decimal(it, digits)} $unit / 60 s" }
+private fun join(vararg values: String?): String = values.filterNotNull().filter { it.isNotBlank() }.joinToString(" • ")
+private fun audioSummary(d: AppPlaybackDiagnostics): String = d.audio?.let { audio ->
+    join(audio.codec, audio.language, audio.channelCount?.let { "$it ch" }, audio.sampleRateHz?.let { "${count(it.toLong())} Hz" })
+}?.takeIf { it.isNotBlank() } ?: "Audio —"
+private fun videoSummary(d: AppPlaybackDiagnostics): String = join(d.video?.codec, d.video?.resolution).ifBlank { "Video —" }
+
+private fun stepValue(
+    step: StreamPathStep, d: AppPlaybackDiagnostics, w: StatsWindow, output: DisplayOutput?, requested: String?,
+    measured: MeasuredFrameRate?, declaredRate: String?, timeshift: AppTimeshiftState?,
+): String = when (step) {
+    StreamPathStep.TUNER, StreamPathStep.SERVER -> liveStepValue(step, d, w)
+    StreamPathStep.APP -> join(growth(w.clientDrops, "drops"), "${decimal(d.bufferedMs / 1000.0)} s buffer",
+        timing(d, timeshift))
+    StreamPathStep.DECODER -> join(growth(w.decoderDrops, "drops"),
+        videoCodecFamily(d.video?.codec, d.video?.sampleMimeType), d.video?.resolution,
+        frameRateText(measured?.framesPerSecond?.let(::formatRefreshRate), declaredRate)).ifBlank { "Video —" }
+    StreamPathStep.SCREEN -> join(
+        if (requested != null && output?.refreshRate != null && requested != output.refreshRate) "Requested $requested Hz" else null,
+        output?.let { "${it.width}×${it.height} @ ${it.refreshRate} Hz" } ?: "Output —")
+}
+
+private fun stepName(step: StreamPathStep): String = when (step) {
+    StreamPathStep.TUNER -> "Tuner"
+    StreamPathStep.SERVER -> "Tvheadend"
+    StreamPathStep.APP -> "This app"
+    StreamPathStep.DECODER -> "Decoder"
+    StreamPathStep.SCREEN -> "Screen"
+}
+
+/** The Tuner and Tvheadend rows' text; other steps have none here. */
+private fun liveStepValue(step: StreamPathStep, d: AppPlaybackDiagnostics, w: StatsWindow): String = when (step) {
+    StreamPathStep.TUNER -> {
+        val f = d.live?.frontend
+        join(if (f?.state?.locked == false) "No lock" else growth(w.uncorrected, "uncorrected"),
+            if (f?.state?.locked == true) "Locked" else null,
+            f?.relativeSignalPercent?.let { "${decimal(it, 0)}% signal" },
+            f?.relativeSnrPercent?.let { "${decimal(it, 0)}% SNR" })
+    }
+    StreamPathStep.SERVER -> join(growth(w.serverDrops, "drops"),
+        d.live?.queue?.mediaSpanMicroseconds?.let { "${decimal(it / 1000.0)} ms queue" },
+        change(w.queueChangeUs?.div(1000.0), "ms"))
+    else -> ""
+}
+
+/**
+ * The card's Tuner and Tvheadend rows, without flags, for a message the card gives way to: only
+ * the steps the path has, and only with data. The debug level adds the tuner and queue groups.
+ */
+internal fun liveStatsRows(d: AppPlaybackDiagnostics, w: StatsWindow, level: PlayerStatsLevel): List<String> {
+    if (!level.enabled) return emptyList()
+    val path = streamPath(d, w, outputRate = null, requestedRate = null).steps
+        .filter { it == StreamPathStep.TUNER || it == StreamPathStep.SERVER }
+        .mapNotNull { step -> liveStepValue(step, d, w).takeIf { it.isNotEmpty() }?.let { "${stepName(step)}: $it" } }
+    return if (level == PlayerStatsLevel.DEBUG) path + liveSignalDebugRows(d) else path
+}
+
+private fun statsLine(label: String, value: String?) = "$label: ${value ?: "—"}"
+
+/** The debug card's tuner and server-queue groups. */
+private fun liveSignalDebugRows(d: AppPlaybackDiagnostics): List<String> {
+    val f = d.live?.frontend
+    val q = d.live?.queue
+    return listOfNotNull(
+        f?.let { statsLine("Frontend", join(it.state?.let { s -> when {
+            s.locked -> "Locked"
+            s.partiallySynchronized -> "Synchronizing"
+            s.signalDetected -> "Signal detected"
+            else -> "No signal"
+        } }, it.relativeSignalPercent?.let { v -> "${decimal(v)}% signal" },
+            it.absoluteSignalDbm?.let { v -> "${decimal(v)} dBm" })) },
+        f?.let { statsLine("SNR", join(it.relativeSnrPercent?.let { v -> "${decimal(v)}%" },
+            it.absoluteSnrDecibels?.let { v -> "${decimal(v)} dB" })) },
+        f?.let { statsLine("BER / uncorrected", join(it.bitErrorRateRaw?.let(::count), it.uncorrectedBlockCount?.let(::count))) },
+        q?.let { statsLine("Queue", join("${count(it.packetCount)} packets • ${count(it.byteCount)} B",
+            it.mediaSpanMicroseconds?.let { us -> "${decimal(us / 1000.0)} ms" })) },
+        q?.let { statsLine("Server drops", "I ${count(it.droppedIFrameCount)} • P ${count(it.droppedPFrameCount)} • B ${count(it.droppedBFrameCount)}") },
+        d.live?.clientDroppedPacketCount?.let { statsLine("Client drops", "${count(it)} packets") },
+    )
+}
+
+private fun timing(d: AppPlaybackDiagnostics, timeshift: AppTimeshiftState?): String =
+    timeshift?.let {
+        when {
+            it.available && !it.timingKnown -> "Timing unavailable"
+            !it.available || timeshiftPositionPresentation(it).atLiveEdge -> "Live"
+            else -> "${formatHms(-it.positionMs / 1000)} behind live"
+        }
+    } ?: join(formatHms(d.positionMs / 1000), d.durationMs?.let { "of ${formatHms(it / 1000)}" })
+
+@Composable
+private fun DebugDetails(
+    d: AppPlaybackDiagnostics, aspect: AspectRatioMode, timeshift: AppTimeshiftState?, output: DisplayOutput?,
+    duration: String?, declared: String?, requested: String?, measured: MeasuredFrameRate?, window: StatsWindow,
+) {
+    val bufferTemplate = stringResource(R.string.stats_video_buffers_value)
+    val rows = listOfNotNull(
+        statsLine("State", when (d.state) {
+            AppPlaybackState.Playing -> if (d.isPlaying) "Playing" else "Paused"
+            is AppPlaybackState.Recovering -> "Recovering"
+            else -> d.state.toString().substringAfterLast('.')
+        }),
+        statsLine("Timing", join(timing(d, timeshift), "${decimal(d.bufferedMs / 1000.0)} s buffer")),
+        statsLine("Video", join(videoSummary(d), d.video?.frameRate?.let { "${formatRefreshRate(it)} fps" })),
+        statsLine("Frame rate", join(duration?.let { "$it ms • $declared fps declared" },
+            measured?.framesPerSecond?.let { "${formatRefreshRate(it)} measured" },
+            measured?.sameTimePercent?.let { "$it% same-time" }).ifEmpty { null }),
+        d.videoDecoderCounters?.let { statsLine("Video buffers", formatVideoDecoderCounters(it, bufferTemplate)) },
+        statsLine("Display mode", when (aspect) {
+            AspectRatioMode.FIT -> "Auto (original aspect)"
+            AspectRatioMode.FORCE_16_9 -> "16:9"
+            AspectRatioMode.FORCE_4_3 -> "4:3"
+        }),
+        output?.let { statsLine("Output", join("${it.width}×${it.height} @ ${it.refreshRate} Hz",
+            requested?.let { rate -> "requested $rate Hz${if (duration == null) " (kept)" else ""}" })) },
+        output?.refreshRatesByResolution?.takeIf { it.isNotEmpty() }?.let { "Refresh rates\n$it" },
+        output?.matchFrameRate?.let { statsLine("Match frame rate", when (it) {
+            MatchFrameRatePreference.NEVER -> "Never"
+            MatchFrameRatePreference.SEAMLESS_ONLY -> "Seamless only"
+            MatchFrameRatePreference.ALWAYS -> "Always"
+        }) },
+        d.startupBuffer?.let { statsLine("Startup buffer", "${it.millis} ms (${if (it.automatic) "automatic" else "fixed"})") },
+        "Stall recoveries: ${d.stallRecoveries} • Fresh decoder per zap: ${if (d.freshDecoderPerZap) "On" else "Off"}",
+    ) + liveSignalDebugRows(d) + listOfNotNull(
+        join(growth(window.uncorrected, "uncorrected"), growth(window.bitErrors, "BER"),
+            growth(window.serverDrops, "server drops"), growth(window.clientDrops, "client drops"),
+            growth(window.decoderDrops, "decoder drops")).takeIf { it.isNotEmpty() },
+        join(change(window.bufferChangeMs / 1000.0, "s buffer"), change(window.queueChangeUs?.div(1000.0), "ms queue"),
+            change(window.signalChange, "% signal"), change(window.snrChange, "% SNR")).takeIf { it.isNotEmpty() },
+    )
+    rows.forEach { StatsText(it) }
+}
+
+/** Raw failure fields only, without synthesis or protocol interpretation. */
 internal fun failureStatRows(failed: AppPlaybackState.Failed): List<Pair<Int, String>> = listOfNotNull(
     failed.recoveryReason?.let { R.string.stats_recovery_reason to it.toString() },
     failed.playerErrorCode?.let { R.string.stats_error_code to it },
@@ -412,51 +296,6 @@ internal fun failureStatRows(failed: AppPlaybackState.Failed): List<Pair<Int, St
     failed.targetResult?.let { R.string.stats_target_result to it.toString() },
 )
 
-private fun Float.oneDecimal(locale: Locale): String = formatDecimal(toDouble(), 1, locale)
-
 internal fun formatVideoDecoderCounters(counters: AppVideoDecoderCounters, template: String): String =
-    String.format(
-        Locale.ROOT,
-        template,
-        counters.renderedOutputBufferCount,
-        counters.droppedBufferCount,
-        counters.skippedOutputBufferCount,
-    )
-
-private fun formatCount(value: Long, locale: Locale): String = String.format(locale, "%,d", value)
-
-private fun formatDecimal(value: Double, fractionDigits: Int, locale: Locale): String =
-    String.format(locale, "%.${fractionDigits}f", value)
-
-@Composable
-private fun formattedMeasurement(
-    relativePercent: Double?,
-    absoluteValue: Double?,
-    absoluteUnit: Int,
-    locale: Locale,
-): String? = listOfNotNull(
-    relativePercent?.let { "${formatDecimal(it, 1, locale)}%" },
-    absoluteValue?.let {
-        stringResource(absoluteUnit, formatDecimal(it, 1, locale))
-    },
-).takeIf { it.isNotEmpty() }?.joinToString(" • ")
-
-@Composable
-private fun formatBytes(value: Long, locale: Locale): String = when {
-    value >= 1_000_000L -> stringResource(
-        R.string.stats_bytes_mb,
-        formatDecimal(value / 1_000_000.0, 1, locale),
-    )
-    value >= 1_000L -> stringResource(
-        R.string.stats_bytes_kb,
-        formatDecimal(value / 1_000.0, 1, locale),
-    )
-    else -> stringResource(R.string.stats_bytes_b, formatCount(value, locale))
-}
-
-private fun LiveFrontendState.presentationResource(): Int = when {
-    locked -> R.string.stats_frontend_locked
-    partiallySynchronized -> R.string.stats_frontend_synchronizing
-    signalDetected -> R.string.stats_frontend_signal
-    else -> R.string.stats_frontend_no_signal
-}
+    String.format(Locale.ROOT, template, counters.renderedOutputBufferCount, counters.droppedBufferCount,
+        counters.skippedOutputBufferCount)

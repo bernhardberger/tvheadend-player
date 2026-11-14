@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.di.PlayerStatsLevel
+
 import at.bernhardberger.tvhplayer.testutil.pressKey
 import android.app.Application
 import android.graphics.Bitmap
@@ -96,7 +98,7 @@ class PlaybackOptionsTrackListTest {
                 TVHeadendPlayerTheme {
                     view = LocalView.current
                     PlaybackOptionsSheet(
-                        PlaybackOptionsPage.AUDIO, player(orfTracks()), false, AspectRatioMode.FIT, false,
+                        PlaybackOptionsPage.AUDIO, player(orfTracks()), false, AspectRatioMode.FIT, PlayerStatsLevel.OFF,
                         {}, {}, {}, audioAutomatic = true, onAutomaticAudio = {},
                     )
                 }

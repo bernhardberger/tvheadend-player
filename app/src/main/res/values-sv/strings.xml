@@ -515,13 +515,11 @@
     <string name="player_raster_spoken">%1$s linjer</string>
     <string name="player_audio_spoken">Ljud %1$s</string>
     <string name="player_ad_short">AD</string>
-    <string name="stats_on">På</string>
     <string name="stats_off">Av</string>
     <string name="display_mode">Visningsläge</string>
     <string name="display_mode_auto">Auto (ursprungligt bildformat)</string>
     <string name="display_mode_16_9">Fyll 16:9</string>
     <string name="display_mode_4_3">Fyll 4:3</string>
-    <string name="stats_video_buffers">Videobuffertar</string>
     <string name="stats_video_buffers_value">Renderade %1$d • Tappade %2$d • Överhoppade %3$d</string>
     <string name="epg_title">Tv-guide</string>
     <string name="header_button_value_description">%1$s, %2$s</string>

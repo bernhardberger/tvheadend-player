@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.di.PlayerStatsLevel
+
 import at.bernhardberger.tvhplayer.testutil.pressKey
 import at.bernhardberger.tvhplayer.testutil.settleFrames
 
@@ -679,10 +681,10 @@ class PlaybackOptionsRemoteKeyTest {
                             player = fake.player,
                             tracksResolving = false,
                             aspectRatio = AspectRatioMode.FIT,
-                            statsVisible = false,
+                            statsLevel = PlayerStatsLevel.OFF,
                             onPageChange = state.core::showOptionsPage,
                             onAspectRatioChange = {},
-                            onStatsVisibleChange = {},
+                            onStatsLevelChange = {},
                             audioAutomatic = fake.audioAutomatic,
                             onAutomaticAudio = {
                                 automaticAudioRequests++
@@ -818,10 +820,10 @@ class PlaybackOptionsRemoteKeyTest {
                             player = fake.player,
                             tracksResolving = false,
                             aspectRatio = AspectRatioMode.FIT,
-                            statsVisible = false,
+                            statsLevel = PlayerStatsLevel.OFF,
                             onPageChange = { optionsPage = it },
                             onAspectRatioChange = {},
-                            onStatsVisibleChange = {},
+                            onStatsLevelChange = {},
                             audioAutomatic = fake.audioAutomatic,
                             onAutomaticAudio = {
                                 automaticAudioRequests++

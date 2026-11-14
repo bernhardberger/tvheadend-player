@@ -496,13 +496,11 @@
     <string name="player_raster_spoken">%1$s 线</string>
     <string name="player_audio_spoken">音频 %1$s</string>
     <string name="player_ad_short">AD</string>
-    <string name="stats_on">开启</string>
     <string name="stats_off">关闭</string>
     <string name="display_mode">显示模式</string>
     <string name="display_mode_auto">自动（原始宽高比）</string>
     <string name="display_mode_16_9">填满16:9</string>
     <string name="display_mode_4_3">填满4:3</string>
-    <string name="stats_video_buffers">视频缓冲区</string>
     <string name="stats_video_buffers_value">已渲染%1$d • 已丢弃%2$d • 已跳过%3$d</string>
     <string name="epg_title">节目指南</string>
     <string name="header_button_value_description">%1$s，%2$s</string>

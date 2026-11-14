@@ -26,8 +26,6 @@ import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
 import at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition
-import at.bernhardberger.tvheadend.sdk.media3.PlaybackRecoveryReason
-import at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult
 import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackFailureCategory
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvhplayer.R
@@ -42,11 +40,8 @@ import at.bernhardberger.tvhplayer.core.recordingPlayerAlert
 import at.bernhardberger.tvhplayer.core.toAppError
 import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
 import at.bernhardberger.tvhplayer.data.ConnectionState
-import at.bernhardberger.tvhplayer.playback.AppPlaybackDiagnostics
 import at.bernhardberger.tvhplayer.playback.AppPlaybackFailureReason
-import at.bernhardberger.tvhplayer.playback.AppPlaybackSource
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
-import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.common.hintRes
 import org.junit.Assert.assertEquals
@@ -89,7 +84,12 @@ class PlayerErrorSurfacesTest {
     @Test
     fun channelMessageShowsThePlayersOwnErrorOnlyWhenThisDevicesPlayerFailed() {
         var condition by mutableStateOf(AppErrorCondition.CHANNEL_PLAYBACK_FAILED)
-        show { PlayerChannelMessage(visible = true, condition = condition, deviceFaultDetail = "DECODER_INIT_FAILED (4001)") }
+        var stats by mutableStateOf<AppPlaybackState.Failed?>(null)
+        var rows by mutableStateOf(emptyList<String>())
+        show {
+            PlayerChannelMessage(visible = true, condition = condition, deviceFaultDetail = "DECODER_INIT_FAILED (4001)",
+                statsFailure = stats, statsRows = { rows })
+        }
 
         assertInMessage(string(R.string.error_210_title))
         compose.onNodeWithTag(PlayerChannelMessageDetailTag).assert(hasText("DECODER_INIT_FAILED (4001)"))
@@ -97,6 +97,22 @@ class PlayerErrorSurfacesTest {
         compose.runOnIdle { condition = AppErrorCondition.STREAM_STOPPED }
         compose.waitForIdle()
         assertEquals(0, compose.onAllNodes(hasTestTag(PlayerChannelMessageDetailTag)).fetchSemanticsNodes().size)
+
+        // Without a failure, Stats lend the message their live path rows, one per line.
+        compose.runOnIdle { rows = listOf("Tuner: No lock • 75% signal", "Tvheadend: 250.0 ms queue") }
+        compose.onNodeWithTag(PlayerChannelMessageDetailTag).assert(hasText("Tuner: No lock • 75% signal\nTvheadend: 250.0 ms queue"))
+
+        // With Stats on, the same faint line carries the failure's rows, after the player's own error
+        // and without the error code that error already names.
+        val code = "${string(R.string.stats_error_code)}: ERROR_CODE_DECODER_INIT_FAILED"
+        val classification = "${string(R.string.stats_error_classification)}: MediaCodecRenderer.DecoderInitializationException"
+        compose.runOnIdle {
+            stats = AppPlaybackState.Failed(AppPlaybackFailureReason.OTHER, playerErrorCode = "ERROR_CODE_DECODER_INIT_FAILED",
+                playerErrorClassification = "MediaCodecRenderer.DecoderInitializationException", deviceFault = true)
+        }
+        compose.onNodeWithTag(PlayerChannelMessageDetailTag).assert(hasText("$code\n$classification"))
+        compose.runOnIdle { condition = AppErrorCondition.CHANNEL_PLAYBACK_FAILED }
+        compose.onNodeWithTag(PlayerChannelMessageDetailTag).assert(hasText("DECODER_INIT_FAILED (4001)\n$classification"))
     }
 
     @Test
@@ -359,6 +375,7 @@ class PlayerErrorSurfacesTest {
         ))
         var alert by mutableStateOf(recordingAlert(failed))
         var sdkFailure by mutableStateOf<RecordingFailureDetail?>(null)
+        var stats by mutableStateOf(false)
         show {
             LivePlayerAlertOverlay(
                 visible = true,
@@ -367,6 +384,7 @@ class PlayerErrorSurfacesTest {
                 onConnectionSettings = {},
                 onClose = {},
                 deviceFaultDetail = failed.recordingFailureDetail(sdkFailure),
+                statsFailure = failed.takeIf { stats },
             )
         }
 
@@ -399,8 +417,17 @@ class PlayerErrorSurfacesTest {
         compose.onNodeWithTag("tv-recovery-primary").assert(hasText("Close")).assertIsFocused()
         compose.onNodeWithTag("tv-recovery-secondary").assertDoesNotExist()
 
+        // Stats add the failure's rows to the same footnote, except the code the SDK's detail already names.
+        compose.runOnIdle {
+            stats = true
+            failed = failed.copy(playerErrorClassification = "IllegalStateException • Example.read:12")
+        }
+        compose.onNodeWithTag("tv-recovery-footnote").assert(hasText(
+            "$detail\n${string(R.string.stats_error_classification)}: IllegalStateException • Example.read:12"))
+
         // A lost connection replaces the alert: the player's error goes with it.
         compose.runOnIdle {
+            stats = false // The playback state is no longer Failed either.
             alert = recordingPlayerAlert(
                 ConnectionState.Disconnected, true, AppPlaybackState.Idle, null, null, PlaybackRetryCommand.NONE,
             )
@@ -464,32 +491,6 @@ class PlayerErrorSurfacesTest {
         assertEquals(1, reconnectCountdownSeconds(1L))
         assertEquals(1, reconnectCountdownSeconds(1_000L))
         assertEquals(3, reconnectCountdownSeconds(2_500L))
-    }
-
-    @Test
-    fun statsOverlayShowsEveryRawValueOfAFailure() {
-        val failed = AppPlaybackState.Failed(
-            reason = AppPlaybackFailureReason.OTHER,
-            targetResult = PlaybackTargetResult.SHUT_DOWN,
-            playerErrorCode = "ERROR_CODE_IO_UNSPECIFIED",
-            playerErrorClassification = "IllegalStateException • Example.run:12",
-            recoveryReason = PlaybackRecoveryReason.LIVE_BUFFER_EXHAUSTED,
-        )
-        show {
-            PlaybackStatsOverlay(
-                diagnostics = AppPlaybackDiagnostics(source = AppPlaybackSource.LIVE_TV, state = failed),
-                aspectRatio = AspectRatioMode.FIT,
-            )
-        }
-
-        for (value in listOf(
-            PlaybackRecoveryReason.LIVE_BUFFER_EXHAUSTED.toString(),
-            "ERROR_CODE_IO_UNSPECIFIED",
-            "IllegalStateException • Example.run:12",
-            PlaybackTargetResult.SHUT_DOWN.toString(),
-        )) {
-            compose.onNode(hasText(value)).assertExists()
-        }
     }
 
     private fun show(content: @Composable () -> Unit) {
