@@ -2,6 +2,7 @@ package at.bernhardberger.tvhplayer.ui.components
 
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -27,6 +28,7 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.TvOnRecordingContainerColor
 import at.bernhardberger.tvhplayer.ui.TvRecordingContainerColor
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
+import at.bernhardberger.tvhplayer.ui.TvTextTertiaryAlpha
 
 /** The fill of a [StatusBadge]: neutral facts, recording now, or a failure. */
 enum class StatusBadgeTone { NEUTRAL, RECORDING, ERROR, CHANGED }
@@ -39,7 +41,8 @@ private val CompactStatusBadgeHeight = 16.dp
 /**
  * The one status tag, in one size, on dark surfaces only: eyebrows, info headers, menus and image
  * corners; [compact] steps it down for the corner of a small card. Rows and grid cells use the dot
- * of [RecordingStatusIndicator] instead.
+ * of [RecordingStatusIndicator] instead. [outlined] replaces the fill with a quiet eyebrow-coloured
+ * outline and label, with 5dp horizontal padding.
  */
 @Composable
 fun StatusBadge(
@@ -49,18 +52,22 @@ fun StatusBadge(
     @DrawableRes icon: Int? = null,
     contentDescription: String? = text,
     compact: Boolean = false,
+    outlined: Boolean = false,
 ) {
-    val (container, content) = when (tone) {
-        StatusBadgeTone.NEUTRAL -> TvSurfaceColors.containerHighest to MaterialTheme.colorScheme.onSurfaceVariant
-        StatusBadgeTone.RECORDING -> TvRecordingContainerColor to TvOnRecordingContainerColor
-        // Material's badge role: the pink error fill under its dark text.
-        StatusBadgeTone.ERROR -> MaterialTheme.colorScheme.error to MaterialTheme.colorScheme.onError
-        StatusBadgeTone.CHANGED ->
-            MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.onPrimaryContainer
+    val (container, filledContent) = statusBadgeColors(tone)
+    val (surface, content, horizontalPadding) = if (outlined) {
+        Triple(
+            Modifier.border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f), StatusBadgeShape),
+            MaterialTheme.colorScheme.onSurface.copy(alpha = TvTextTertiaryAlpha),
+            5.dp,
+        )
+    } else {
+        Triple(Modifier.background(container, StatusBadgeShape), filledContent, if (compact) 4.dp else 6.dp)
     }
     Row(
-        modifier.background(container, StatusBadgeShape)
-            .height(if (compact) CompactStatusBadgeHeight else StatusBadgeHeight).padding(horizontal = if (compact) 4.dp else 6.dp)
+        modifier.then(surface)
+            .height(if (compact) CompactStatusBadgeHeight else StatusBadgeHeight)
+            .padding(horizontal = horizontalPadding)
             .clearAndSetSemantics { contentDescription?.let { this.contentDescription = it } },
         horizontalArrangement = Arrangement.spacedBy(if (compact) 3.dp else 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -74,6 +81,16 @@ fun StatusBadge(
             Text(text, style = if (compact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium, maxLines = 1, softWrap = false, color = content)
         }
     }
+}
+
+@Composable
+private fun statusBadgeColors(tone: StatusBadgeTone) = when (tone) {
+    StatusBadgeTone.NEUTRAL -> TvSurfaceColors.containerHighest to MaterialTheme.colorScheme.onSurfaceVariant
+    StatusBadgeTone.RECORDING -> TvRecordingContainerColor to TvOnRecordingContainerColor
+    // Material's badge role: the pink error fill under its dark text.
+    StatusBadgeTone.ERROR -> MaterialTheme.colorScheme.error to MaterialTheme.colorScheme.onError
+    StatusBadgeTone.CHANGED ->
+        MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.onPrimaryContainer
 }
 
 /**

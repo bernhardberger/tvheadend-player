@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.core.GlanceBadge
+
 import androidx.compose.runtime.Composable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -69,6 +71,7 @@ internal fun RecordingChromeFixture(
     restoreFocus: String? = null,
     buffering: Boolean = false,
     info: PlayerInfoBarData? = null,
+    badges: List<GlanceBadge> = emptyList(),
     picon: ArtworkId? = null,
     artwork: ArtworkId? = null,
     marks: List<RecordingMark> = emptyList(),
@@ -94,6 +97,7 @@ internal fun RecordingChromeFixture(
             info = info ?: fixtureRecordingInfo(growing = growing, positionMs = positionMs, durationMs = durationMs),
             state = playerStateCell(paused),
             recordingNow = growing,
+            badges = badges,
             picon = picon?.let { ChannelIcon.ImageCache(it) },
             artwork = artwork?.let(ChannelIcon::ImageCache),
             withoutChannel = withoutChannel,

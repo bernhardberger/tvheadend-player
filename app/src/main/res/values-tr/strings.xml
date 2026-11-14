@@ -252,6 +252,9 @@
     <string name="playback_options_next_category">Sonraki seçenek kategorisi</string>
     <string name="player_live_tv_surface">Canlı TV oynatıcısı</string>
     <string name="player_recording_surface">Kayıt oynatıcısı</string>
+    <string name="player_raster_spoken">%1$s satır</string>
+    <string name="player_audio_spoken">Ses %1$s</string>
+    <string name="player_ad_short">AD</string>
     <string name="stats_on">Açık</string>
     <string name="stats_off">Kapalı</string>
     <string name="display_mode">Görüntü modu</string>

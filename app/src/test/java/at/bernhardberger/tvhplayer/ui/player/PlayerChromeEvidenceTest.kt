@@ -118,7 +118,9 @@ class PlayerChromeEvidenceTest {
         assertTrue(spoken.contains("Channel 101 Ridge Earth HD"))
         assertTrue(spoken.contains("Now:"))
         assertTrue(spoken.contains("Recording scheduled"))
-        assertFalse("the info bar carries no stream badges", spoken.contains("1080 lines"))
+        assertTrue("the info bar announces the declared scan", spoken.contains("1080i lines"))
+        assertTrue(spoken.contains("Audio DD 5.1"))
+        assertTrue(spoken.contains("Audio description"))
         assertTrue(bar.children.isEmpty())
         compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsActions.RequestFocus), useUnmergedTree = true).assertCountEquals(0)
         compose.onAllNodes(hasClickAction(), useUnmergedTree = true).assertCountEquals(0)
@@ -294,7 +296,55 @@ class PlayerChromeEvidenceTest {
     /** The info bar with an empty artwork slot, passive as in the Banner. */
     @Composable
     private fun InfoBar(data: PlayerInfoBarData, modifier: Modifier = Modifier) {
-        PlayerInfoBar(data, modifier) { Box(it.size(196.dp, 110.dp).background(TvSurfaceColors.containerLow)) }
+        PlayerInfoBar(data, modifier, badges = glanceBadges(1080, "audio/ac3", 6, true, VideoScan.INTERLACED)) {
+            Box(it.size(196.dp, 110.dp).background(TvSurfaceColors.containerLow))
+        }
+    }
+
+    @Test fun streamBadgesFollowFactsWithoutMovingProgrammeLinesOrShrinking() {
+        var badges by mutableStateOf(emptyList<GlanceBadge>())
+        var metadata by mutableStateOf("Drama")
+        compose.setContent { TVHeadendPlayerTheme {
+            PlayerInfoBar(info(false).copy(metadata = metadata), Modifier.fillMaxWidth(), badges = badges) {
+                Box(it.size(196.dp, 110.dp))
+            }
+        } }
+        fun bounds(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val lines = listOf("player-info-programme", "player-info-title", "player-info-subtitle", "player-info-last-row")
+        val before = lines.associateWith(::bounds)
+        compose.onNodeWithTag("player-stream-badges", useUnmergedTree = true).assertDoesNotExist()
+        compose.runOnIdle { badges = glanceBadges(2160, "audio/eac3", 6, true, VideoScan.PROGRESSIVE) }
+        val group = bounds("player-stream-badges")
+        lines.forEach { assertEquals("$it keeps its vertical position", before.getValue(it).top, bounds(it).top, 0.5f) }
+        val gap = with(compose.density) { 12.dp.toPx() }
+        assertEquals("tags follow the facts with the chosen gap", bounds("player-info-programme").right + gap, group.left, 0.5f)
+        compose.runOnIdle { metadata = "Very long localized programme metadata ".repeat(30) }
+        val longGroup = bounds("player-stream-badges")
+        assertEquals("badges never shrink", group.width, longGroup.width, 0.5f)
+        assertEquals("the eyebrow yields before the badges", bounds("player-info-programme").right + gap, longGroup.left, 0.5f)
+        lines.forEach { assertEquals("$it keeps its vertical position with long facts", before.getValue(it).top, bounds(it).top, 0.5f) }
+    }
+
+    @Test fun streamBadgesRespectTheFactsLineDistanceReserveAndKeepTheirPlaceWithoutEpg() {
+        var facts by mutableStateOf("Very long localized programme metadata ".repeat(30))
+        val reserve = 180.dp
+        compose.setContent { TVHeadendPlayerTheme {
+            PlayerInfoBar(
+                info(false).copy(timeRange = facts, metadata = null, next = null, subtitle = null),
+                Modifier.fillMaxWidth(), lastLineEndReserve = reserve,
+                badges = glanceBadges(1080, "audio/ac3", 6),
+            ) { Box(it.size(196.dp, 110.dp)) }
+        } }
+        fun bounds(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val group = bounds("player-stream-badges")
+        val columnStart = bounds("player-info-title").left
+        assertTrue("the facts-line badges leave the distance room",
+            group.right <= bounds("player-info-title").right - with(compose.density) { reserve.toPx() } + 0.5f)
+        compose.runOnIdle { facts = "" }
+        val noEpg = bounds("player-stream-badges")
+        assertEquals("without facts badges start on the title keyline", columnStart, noEpg.left, 0.5f)
+        assertEquals("no facts do not change the tags' width", group.width, noEpg.width, 0.5f)
+        assertEquals("empty facts retain the eyebrow height", group.top, noEpg.top, 0.5f)
     }
 
     @Test fun liveNextRowRunsFullWidthOnTheArtworksBottomEdge() {

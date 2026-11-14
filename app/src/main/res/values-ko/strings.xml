@@ -252,6 +252,9 @@
     <string name="playback_options_next_category">다음 옵션 카테고리</string>
     <string name="player_live_tv_surface">실시간 TV 플레이어</string>
     <string name="player_recording_surface">녹화 플레이어</string>
+    <string name="player_raster_spoken">주사선 수 %1$s</string>
+    <string name="player_audio_spoken">오디오 %1$s</string>
+    <string name="player_ad_short">AD</string>
     <string name="stats_on">켜짐</string>
     <string name="stats_off">꺼짐</string>
     <string name="display_mode">화면 모드</string>

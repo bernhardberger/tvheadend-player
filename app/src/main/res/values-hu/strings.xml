@@ -252,6 +252,9 @@
     <string name="playback_options_next_category">Következő beállításkategória</string>
     <string name="player_live_tv_surface">Élő TV lejátszója</string>
     <string name="player_recording_surface">Felvételek lejátszója</string>
+    <string name="player_raster_spoken">%1$s sor</string>
+    <string name="player_audio_spoken">Hang %1$s</string>
+    <string name="player_ad_short">AD</string>
     <string name="stats_on">Be</string>
     <string name="stats_off">Ki</string>
     <string name="display_mode">Megjelenítési mód</string>

@@ -252,6 +252,9 @@
     <string name="playback_options_next_category">קטגוריית האפשרויות הבאה</string>
     <string name="player_live_tv_surface">נגן טלוויזיה בשידור חי</string>
     <string name="player_recording_surface">נגן הקלטות</string>
+    <string name="player_raster_spoken">%1$s שורות</string>
+    <string name="player_audio_spoken">שמע %1$s</string>
+    <string name="player_ad_short">AD</string>
     <string name="stats_on">פעיל</string>
     <string name="stats_off">כבוי</string>
     <string name="display_mode">מצב תצוגה</string>
