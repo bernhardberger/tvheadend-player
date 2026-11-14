@@ -116,9 +116,9 @@ internal fun BrowseSidePanel(
     title: String,
     panelTag: String,
     onClose: () -> Unit,
+    modifier: Modifier = Modifier,
     width: Dp = PlaybackPanelWidth,
     showHeader: Boolean = true,
-    modifier: Modifier = Modifier,
     atRoot: Boolean = true,
     content: @Composable () -> Unit,
 ) {

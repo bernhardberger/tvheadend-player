@@ -4,6 +4,8 @@
     <string name="appliance_setup">TV-Start einrichten</string>
     <string name="close">Schliessen</string>
     <string name="details_size">Grösse</string>
+    <!-- Swiss German uses ss rather than ß. -->
+    <string name="recordings_sort_largest" xmlns:tools="http://schemas.android.com/tools" tools:ignore="Typos">Grösste zuerst</string>
     <string name="details_cast_and_crew">Besetzung &amp; Team</string>
     <string name="action_close">Schliessen</string>
     <string name="appliance_companion">TV-Start-Begleitapp</string>

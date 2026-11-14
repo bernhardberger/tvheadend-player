@@ -1515,7 +1515,7 @@ private fun rememberPendingArchiveView(view: DvrArchiveView): MutableState<DvrAr
 private fun rememberArchiveNaming(channelsById: Map<ChannelId, Channel>): DvrArchiveNaming {
     val noChannelLabel = stringResource(R.string.recordings_group_no_channel)
     val noGenreLabel = stringResource(R.string.recordings_group_no_genre)
-    val resources = LocalContext.current.resources
+    val resources = androidx.compose.ui.platform.LocalResources.current
     return remember(channelsById, resources, noChannelLabel, noGenreLabel) {
         DvrArchiveNaming(
             channelName = { entry -> entry.channelId?.let(channelsById::get)?.name ?: entry.channelName },
