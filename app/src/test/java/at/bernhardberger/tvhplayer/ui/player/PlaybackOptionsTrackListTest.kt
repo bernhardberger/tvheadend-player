@@ -136,9 +136,9 @@ class PlaybackOptionsTrackListTest {
     ) = compose.setContent {
         TVHeadendPlayerTheme {
             PlaybackOptionsSheetContent(
-                page, audio(), subtitles(), resolving(), AspectRatioMode.FIT, false,
+                page, audio(), subtitles(), resolving(), AspectRatioMode.FIT, PlayerStatsLevel.OFF,
                 onPageChange = {}, onAudioTrackSelected = { chosen = it }, onSubtitleTrackSelected = { chosen = it },
-                onAspectRatioChange = {}, onStatsVisibleChange = {},
+                onAspectRatioChange = {}, onStatsLevelChange = {},
             )
         }
     }
