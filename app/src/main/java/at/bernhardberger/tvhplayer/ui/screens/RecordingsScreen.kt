@@ -17,6 +17,8 @@ import androidx.compose.foundation.background
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.common.formatDateRange
 import at.bernhardberger.tvhplayer.ui.common.formatFileSize
+import at.bernhardberger.tvhplayer.core.DvrProblemClearTargets
+import at.bernhardberger.tvhplayer.core.dvrProblemClearTargets
 import at.bernhardberger.tvhplayer.core.summarizeDvrFolder
 import at.bernhardberger.tvhplayer.core.recordingArtwork
 import at.bernhardberger.tvhplayer.core.runningRecordings
@@ -148,7 +150,6 @@ import at.bernhardberger.tvhplayer.core.DvrArchiveView
 import at.bernhardberger.tvhplayer.core.DvrArchiveNaming
 import at.bernhardberger.tvhplayer.core.programmeCategory
 import at.bernhardberger.tvhplayer.ui.common.programmeCategoryLabelRes
-import at.bernhardberger.tvhplayer.core.DvrProblemBucket
 import at.bernhardberger.tvhplayer.core.DvrScheduleSection
 import at.bernhardberger.tvhplayer.core.buildDvrArchive
 import at.bernhardberger.tvhplayer.core.groupDvrProblems
@@ -229,8 +230,17 @@ private data class RecordingLibraryPresentation(
     val archive: DvrArchiveFolder,
     val archiveEntries: List<DvrEntry>,
     val schedule: List<DvrScheduleSection>,
-    val problems: Map<DvrProblemBucket, List<DvrEntry>>,
 )
+
+/** Problems fall under their day as the browse clock sees it, so Today turns into Yesterday at midnight. */
+@Composable
+private fun rememberProblemSections(problems: List<DvrEntry>, nowSeconds: () -> Long): List<DvrScheduleSection> {
+    val zone = java.time.ZoneId.systemDefault()
+    val today by remember(nowSeconds, zone) {
+        derivedStateOf { java.time.Instant.ofEpochSecond(nowSeconds()).atZone(zone).toLocalDate() }
+    }
+    return remember(problems, today, zone) { groupDvrProblems(problems, nowSeconds(), zone) }
+}
 
 class RecordingsScreenState(initialMode: DvrLibraryMode = DvrLibraryMode.ARCHIVE) {
     val selectedKeys = mutableStateMapOf<String, String>()
@@ -270,7 +280,7 @@ private data class RecordingsTabBody(
     val archive: DvrArchiveFolder,
     val fullArchive: DvrArchiveFolder,
     val schedule: List<DvrScheduleSection>,
-    val problems: Map<DvrProblemBucket, List<DvrEntry>>,
+    val problems: List<DvrScheduleSection>,
     val selectedKey: String?,
     val scrollIndex: Int,
     val scrollOffset: Int,
@@ -288,6 +298,9 @@ private data class FolderDeleteTarget(
     val sizeBytes: Long,
     val keepsRunning: Boolean,
 )
+
+/** What a confirmed Clear may remove, fixed when it was asked, and the session it was asked in. */
+private data class ProblemsClearTarget(val session: CurrentSessionObservation, val targets: DvrProblemClearTargets)
 
 @Composable
 fun RecordingsScreen(
@@ -539,7 +552,6 @@ internal fun RecordingsScreenContent(
             archive = archive,
             archiveEntries = archiveEntries,
             schedule = groupDvrSchedule(library.schedule, System.currentTimeMillis() / 1000L),
-            problems = groupDvrProblems(library.problems),
         )
     }
     Box(Modifier.fillMaxSize().onPreviewKeyEvent { event ->
@@ -624,13 +636,12 @@ internal fun RecordingsScreenContent(
         archiveLevelItems(archive, archiveLevel, recordingNow) ?: archive.listItems(recordingNow)
     }
     val scheduleGroups = presentation.schedule
-    val problemGroups = presentation.problems
+    val problemGroups = rememberProblemSections(library.problems, nowSecProvider)
     val itemKeys = when (mode) {
         DvrLibraryMode.ARCHIVE -> archiveItems.map { it.key }
         DvrLibraryMode.SCHEDULE -> scheduleManagement + scheduleGroups.flatMap { it.entries }
             .map { "recording:${recordingItemKey(it.id)}" }
-        DvrLibraryMode.PROBLEMS -> DvrProblemBucket.entries
-            .flatMap { problemGroups[it].orEmpty() }
+        DvrLibraryMode.PROBLEMS -> problemGroups.flatMap { it.entries }
             .map { "recording:${recordingItemKey(it.id)}" }
     }
     val alertShown = recordingsAppError(entries.isEmpty(), connectionUiState, connectionFailure) != null
@@ -766,9 +777,10 @@ internal fun RecordingsScreenContent(
         modifier = Modifier
             .fillMaxSize()
             .semantics {
-                if (overlays.detailsEntry != null || overlays.folderMenu != null || overlays.optionsOpen)
+                if (overlays.detailsEntry != null || overlays.folderMenu != null || overlays.optionsOpen) {
                     hideFromAccessibility()
-                if (overlays.scheduleSurfaceOpen) hideFromAccessibility()
+                }
+                if (overlays.scheduleSurfaceOpen || overlays.problemsClear != null) hideFromAccessibility()
             }
             .then(if (overlays.scheduleSurfaceOpen) Modifier.focusProperties { canFocus = false } else Modifier)
             .graphicsLayer { alpha = 1f - (detailsLayering?.detailsAlpha() ?: if (overlays.detailsEntry != null && !overlays.showContextMenu && !overlays.showResumeChoice) 1f else 0f) }
@@ -788,13 +800,17 @@ internal fun RecordingsScreenContent(
                     return@onPreviewKeyEvent true
                 }
                 val firstProblemRow = mode == DvrLibraryMode.PROBLEMS && contentHasFocus &&
-                    selectedKeys[location] == itemKeys.firstOrNull()
+                    !overlays.problemsClearFocused && selectedKeys[location] == itemKeys.firstOrNull()
                 if (
                     event.type == KeyEventType.KeyDown &&
                     event.key == Key.DirectionUp &&
                     firstProblemRow
                 ) {
                     relocatingKey = event.key
+                    // Clear, where offered, is the stop between the first row and the tabs.
+                    if (runCatching { overlays.problemsClearFocus.requestFocus() }.getOrDefault(false)) {
+                        return@onPreviewKeyEvent true
+                    }
                     if (modeFocus.requestFocus()) {
                         contentFocusOwned = false
                         requestContentFocus = false
@@ -809,7 +825,7 @@ internal fun RecordingsScreenContent(
         RecordingsHeader(
             mode = mode,
             modeFocus = modeFocus,
-            problemCount = problemGroups.values.sumOf { it.size },
+            problemCount = problemGroups.sumOf { it.entries.size },
             diskSpace = observation.dvrDiskSpaceState,
             startPadding = startPadding,
             endPadding = endPadding,
@@ -1078,7 +1094,7 @@ internal fun RecordingsScreenContent(
                     key(location, frame.recoveryGeneration) {
                         val generation = frame.recoveryGeneration
                         RecordingProblems(
-                            groups = problemGroups,
+                            sections = problemGroups,
                             selectedKey = frame.selectedKey,
                             selectedFocus = contentFocus,
                             onFocused = { if (owner.isCurrent) selectedKeys[location] = it },
@@ -1106,6 +1122,16 @@ internal fun RecordingsScreenContent(
                                     archiveScrollPositions[location] = it
                                 }
                             },
+                            onClear = currentSession?.takeIf { canModifyRecordings }?.let { session ->
+                                {
+                                    val targets = dvrProblemClearTargets(problemGroups.flatMap { it.entries })
+                                    if (owner.isCurrent) overlays.problemsClear = ProblemsClearTarget(session, targets)
+                                }
+                            },
+                            clearFocus = overlays.problemsClearFocus,
+                            upFocus = modeFocus,
+                            navigationFocus = drawerFocus,
+                            onClearFocusChanged = { overlays.problemsClearFocused = it },
                         )
                     }
                 }
@@ -1658,6 +1684,71 @@ internal fun RecordingsScreenContent(
     }
     }
     FolderMenu()
+    @Composable
+    fun ProblemsClear() {
+        val clear = overlays.problemsClear ?: return
+        // Another session or lost write permission leaves nothing the choices could do: close the card.
+        if (currentSession !== clear.session || !canModifyRecordings) LaunchedEffect(clear) {
+            overlays.problemsClear = null
+            overlays.pendingDetailsReturn = true
+        }
+        val fileless = clear.targets.fileless.size
+        val partial = clear.targets.partial.size
+        // Keep, Cancel and Back return to the Clear control; a clear returns to the list as it is then.
+        fun dismiss() {
+            if (!runCatching { overlays.problemsClearFocus.requestFocus() }.getOrDefault(false)) {
+                overlays.pendingDetailsReturn = true
+            }
+            overlays.problemsClear = null
+        }
+        fun run(withPartial: Boolean) {
+            overlays.pendingDetailsReturn = !runCatching { contentFocus.requestFocus() }.getOrDefault(false)
+            overlays.problemsClear = null
+            val filelessIds = clear.targets.fileless.map { it.id }
+            val partialIds = if (withPartial) clear.targets.partial.map { it.id } else emptyList()
+            scope.launch {
+                val noticeContext = notices.context()
+                withContext(NonCancellable) {
+                    screenState.folderActionLock.withLock {
+                        dvrMutationActions.clearDvrProblems(clear.session, filelessIds, partialIds) {
+                            latestObservationProvider()
+                        }
+                    }?.let { notices.post(it, noticeContext) }
+                }
+            }
+        }
+        val sentence = listOfNotNull(
+            fileless.takeIf { it > 0 }
+                ?.let { pluralStringResource(R.plurals.problems_clear_fileless_sentence, it, it) },
+            partial.takeIf { it > 0 }?.let { pluralStringResource(R.plurals.problems_clear_partial_sentence, it, it) },
+        ).joinToString(" ")
+        val deletePartial = ConfirmationChoice(
+            pluralStringResource(
+                if (fileless > 0) R.plurals.problems_clear_also_delete_partial
+                else R.plurals.problems_clear_delete_partial, partial, partial,
+            ),
+            R.drawable.ic_delete_outlined, "problems-clear-partial",
+        )
+        val cancel = ConfirmationChoice(stringResource(R.string.cancel), R.drawable.ic_close, "problems-clear-cancel")
+        ConfirmationDialog(
+            question = stringResource(R.string.problems_clear_question),
+            // The question names what is cleared; a subject box would only repeat the tab.
+            subject = null,
+            sentence = sentence,
+            // Clearing what has no file is the safe choice; without any, the safe choice keeps everything.
+            safe = if (fileless > 0) ConfirmationChoice(
+                pluralStringResource(R.plurals.problems_clear_entries, fileless, fileless),
+                R.drawable.ic_cleaning_services, "problems-clear-fileless",
+            ) else ConfirmationChoice(stringResource(R.string.keep), R.drawable.ic_check, "problems-clear-keep"),
+            action = if (partial > 0) deletePartial else cancel,
+            cancel = cancel.takeIf { fileless > 0 && partial > 0 },
+            onSafeConfirm = { if (fileless > 0) run(withPartial = false) else dismiss() },
+            onConfirm = { if (partial > 0) run(withPartial = true) else dismiss() },
+            onDismiss = ::dismiss,
+            backEnabled = backEnabled,
+        )
+    }
+    ProblemsClear()
     if (overlays.optionsOpen) {
         ArchiveViewOptionsPanel(
             current = chosenView,
@@ -1752,6 +1843,9 @@ private class RecordingOverlaysState(private val scheduleState: ScheduleState) {
     var pendingDetailsReturn by mutableStateOf(false)
     var folderMenu by mutableStateOf<FolderMenuTarget?>(null)
     var folderDelete by mutableStateOf<FolderDeleteTarget?>(null)
+    var problemsClear by mutableStateOf<ProblemsClearTarget?>(null)
+    val problemsClearFocus = FocusRequester()
+    var problemsClearFocused by mutableStateOf(false)
     var newTimerSession by mutableStateOf<CurrentSessionObservation?>(null)
     private var scheduleRequest by mutableStateOf<OpenRule?>(null)
     var scheduleRuleRequest: OpenRule?

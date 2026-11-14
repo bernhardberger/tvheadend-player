@@ -629,6 +629,41 @@
         <item quantity="one">%2$d kaydın %1$d tanesi silinemedi</item>
         <item quantity="other">%2$d kaydın %1$d tanesi silinemedi</item>
     </plurals>
+    <plurals name="problems_clear_failed">
+        <item quantity="one">%2$d girdinin %1$d tanesi kaldırılamadı</item>
+        <item quantity="other">%2$d girdinin %1$d tanesi kaldırılamadı</item>
+    </plurals>
+    <string name="problems_clear">Sorunları kaldır</string>
+    <string name="problems_clear_question">Sorunlar kaldırılsın mı?</string>
+    <string name="problems_clear_button">Kaldır</string>
+    <plurals name="problems_count_failed">
+        <item quantity="one">%1$d başarısız</item>
+        <item quantity="other">%1$d başarısız</item>
+    </plurals>
+    <plurals name="problems_count_canceled">
+        <item quantity="one">%1$d iptal edildi</item>
+        <item quantity="other">%1$d iptal edildi</item>
+    </plurals>
+    <plurals name="problems_clear_entries">
+        <item quantity="one">%1$d girdiyi kaldır</item>
+        <item quantity="other">%1$d girdiyi kaldır</item>
+    </plurals>
+    <plurals name="problems_clear_also_delete_partial">
+        <item quantity="one">%1$d eksik kaydı da sil</item>
+        <item quantity="other">%1$d eksik kaydı da sil</item>
+    </plurals>
+    <plurals name="problems_clear_delete_partial">
+        <item quantity="one">%1$d eksik kaydı sil</item>
+        <item quantity="other">%1$d eksik kaydı sil</item>
+    </plurals>
+    <plurals name="problems_clear_fileless_sentence">
+        <item quantity="one">%1$d girdinin dosyası yok, bu yüzden kaldırmak diskten hiçbir şey silmez.</item>
+        <item quantity="other">%1$d girdinin dosyası yok, bu yüzden kaldırmak diskten hiçbir şey silmez.</item>
+    </plurals>
+    <plurals name="problems_clear_partial_sentence">
+        <item quantity="one">%1$d başarısız kaydın eksik dosyası var. Onu da silmediğiniz sürece kalır.</item>
+        <item quantity="other">%1$d başarısız kaydın eksik dosyaları var. Onları da silmediğiniz sürece kalırlar.</item>
+    </plurals>
     <plurals name="recording_notice_canceled_count">
         <item quantity="one">%d kayıt iptal edildi</item>
         <item quantity="other">%d kayıt iptal edildi</item>
@@ -718,8 +753,6 @@
         <item quantity="other">%1$d kayıt sürüyor</item>
     </plurals>
     <string name="recordings_schedule_end_duration">bitiş %1$s • %2$s</string>
-    <string name="recordings_failed">Başarısız</string>
-    <string name="recordings_cancelled">İptal edilenler</string>
     <string name="recordings_upcoming_active">Yaklaşan ve etkin</string>
     <string name="recordings_completed">Tamamlananlar</string>
     <string name="recordings_failed_cancelled">Başarısız ve iptal edilen</string>

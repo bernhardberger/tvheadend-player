@@ -607,6 +607,33 @@
     <plurals name="recording_folder_action_failed_delete">
         <item quantity="other">%2$d件の録画のうち%1$d件を削除できませんでした</item>
     </plurals>
+    <plurals name="problems_clear_failed">
+        <item quantity="other">%2$d件のうち%1$d件を一覧から外せませんでした</item>
+    </plurals>
+    <string name="problems_clear">問題を一覧から外す</string>
+    <string name="problems_clear_question">問題を一覧から外しますか？</string>
+    <string name="problems_clear_button">一覧から外す</string>
+    <plurals name="problems_count_failed">
+        <item quantity="other">失敗 %1$d件</item>
+    </plurals>
+    <plurals name="problems_count_canceled">
+        <item quantity="other">取り消し済み %1$d件</item>
+    </plurals>
+    <plurals name="problems_clear_entries">
+        <item quantity="other">%1$d件を一覧から外す</item>
+    </plurals>
+    <plurals name="problems_clear_also_delete_partial">
+        <item quantity="other">不完全な録画%1$d件も削除</item>
+    </plurals>
+    <plurals name="problems_clear_delete_partial">
+        <item quantity="other">不完全な録画%1$d件を削除</item>
+    </plurals>
+    <plurals name="problems_clear_fileless_sentence">
+        <item quantity="other">%1$d件はファイルがないため、一覧から外してもディスク上の何も削除されません。</item>
+    </plurals>
+    <plurals name="problems_clear_partial_sentence">
+        <item quantity="other">失敗した録画%1$d件に不完全なファイルがあります。一緒に削除しない限り残ります。</item>
+    </plurals>
     <plurals name="recording_notice_canceled_count">
         <item quantity="other">%d件の録画予約を取り消しました</item>
     </plurals>
@@ -691,8 +718,6 @@
         <item quantity="other">%1$d件の録画が進行中</item>
     </plurals>
     <string name="recordings_schedule_end_duration">%1$sまで • %2$s</string>
-    <string name="recordings_failed">失敗</string>
-    <string name="recordings_cancelled">取り消し済み</string>
     <string name="recordings_upcoming_active">予約済みと録画中</string>
     <string name="recordings_completed">完了</string>
     <string name="recordings_failed_cancelled">失敗と取り消し済み</string>

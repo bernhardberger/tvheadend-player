@@ -651,6 +651,49 @@
         <item quantity="many">Eliminazione non riuscita: %1$d su un totale di %2$d registrazioni</item>
         <item quantity="other">Eliminazione non riuscita: %1$d su un totale di %2$d registrazioni</item>
     </plurals>
+    <plurals name="problems_clear_failed">
+        <item quantity="one">Impossibile rimuovere %1$d voce su %2$d</item>
+        <item quantity="many">Rimozione non riuscita: %1$d su un totale di %2$d voci</item>
+        <item quantity="other">Rimozione non riuscita: %1$d su un totale di %2$d voci</item>
+    </plurals>
+    <string name="problems_clear">Rimuovi problemi</string>
+    <string name="problems_clear_question">Rimuovere i problemi?</string>
+    <string name="problems_clear_button">Rimuovi</string>
+    <plurals name="problems_count_failed">
+        <item quantity="one">%1$d non riuscita</item>
+        <item quantity="many">%1$d non riuscite</item>
+        <item quantity="other">%1$d non riuscite</item>
+    </plurals>
+    <plurals name="problems_count_canceled">
+        <item quantity="one">%1$d annullata</item>
+        <item quantity="many">%1$d annullate</item>
+        <item quantity="other">%1$d annullate</item>
+    </plurals>
+    <plurals name="problems_clear_entries">
+        <item quantity="one">Rimuovi %1$d voce</item>
+        <item quantity="many">Rimuovi %1$d voci</item>
+        <item quantity="other">Rimuovi %1$d voci</item>
+    </plurals>
+    <plurals name="problems_clear_also_delete_partial">
+        <item quantity="one">Elimina anche %1$d registrazione parziale</item>
+        <item quantity="many">Elimina anche %1$d registrazioni parziali</item>
+        <item quantity="other">Elimina anche %1$d registrazioni parziali</item>
+    </plurals>
+    <plurals name="problems_clear_delete_partial">
+        <item quantity="one">Elimina %1$d registrazione parziale</item>
+        <item quantity="many">Elimina %1$d registrazioni parziali</item>
+        <item quantity="other">Elimina %1$d registrazioni parziali</item>
+    </plurals>
+    <plurals name="problems_clear_fileless_sentence">
+        <item quantity="one">%1$d voce non ha file, quindi rimuoverla non elimina nulla dal disco.</item>
+        <item quantity="many">%1$d voci non hanno file, quindi rimuoverle non elimina nulla dal disco.</item>
+        <item quantity="other">%1$d voci non hanno file, quindi rimuoverle non elimina nulla dal disco.</item>
+    </plurals>
+    <plurals name="problems_clear_partial_sentence">
+        <item quantity="one">%1$d registrazione non riuscita ha un file parziale. Resta, a meno che tu non elimini anche quella.</item>
+        <item quantity="many">%1$d registrazioni non riuscite hanno file parziali. Restano, a meno che tu non elimini anche quelle.</item>
+        <item quantity="other">%1$d registrazioni non riuscite hanno file parziali. Restano, a meno che tu non elimini anche quelle.</item>
+    </plurals>
     <plurals name="recording_notice_canceled_count">
         <item quantity="one">%d registrazione annullata</item>
         <item quantity="many">%d registrazioni annullate</item>
@@ -745,8 +788,6 @@
         <item quantity="other">%1$d registrazioni in corso</item>
     </plurals>
     <string name="recordings_schedule_end_duration">fino alle %1$s • %2$s</string>
-    <string name="recordings_failed">Non riuscite</string>
-    <string name="recordings_cancelled">Annullate</string>
     <string name="recordings_upcoming_active">In arrivo e in corso</string>
     <string name="recordings_completed">Completate</string>
     <string name="recordings_failed_cancelled">Non riuscite e annullate</string>

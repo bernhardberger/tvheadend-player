@@ -20,6 +20,7 @@ enum class DvrScheduleSectionKind {
     RECORDING_NOW,
     TODAY,
     TOMORROW,
+    YESTERDAY,
     DATE,
 }
 
@@ -28,11 +29,6 @@ data class DvrScheduleSection(
     val date: LocalDate?,
     val entries: List<DvrEntry>,
 )
-
-enum class DvrProblemBucket {
-    FAILED,
-    CANCELLED,
-}
 
 data class DvrLibraryPartition(
     val archive: List<DvrEntry>,
@@ -196,19 +192,47 @@ fun groupDvrSchedule(
     }
 }
 
-fun groupDvrProblems(entries: List<DvrEntry>): Map<DvrProblemBucket, List<DvrEntry>> =
-    DvrProblemBucket.entries.associateWith { bucket ->
-        entries.filterNot(::recordingWasRemoved).filter {
-            when (bucket) {
-                // A missed recording failed to happen; only one never meant to happen is canceled.
-                DvrProblemBucket.FAILED -> it.state in setOf(
-                    DvrEntryState.COMPLETED_ERROR,
-                    DvrEntryState.MISSED,
-                )
-                DvrProblemBucket.CANCELLED -> it.state == DvrEntryState.INVALID
+data class DvrProblemClearTargets(val fileless: List<DvrEntry>, val partial: List<DvrEntry>)
+
+/** Only problem entries may be cleared; a partial file always needs explicit consent. */
+fun dvrProblemClearTargets(entries: List<DvrEntry>): DvrProblemClearTargets {
+    val (fileless, partial) = entries.filter(::isDvrProblem).partition(::deleteRemovesEntryOnly)
+    return DvrProblemClearTargets(fileless, partial)
+}
+
+/** A missed recording failed to happen; only one never meant to happen is canceled. */
+data class DvrProblemCounts(val failed: Int, val canceled: Int)
+
+fun dvrProblemCounts(entries: List<DvrEntry>): DvrProblemCounts {
+    val (canceled, failed) = entries.filter(::isDvrProblem).partition { it.state == DvrEntryState.INVALID }
+    return DvrProblemCounts(failed = failed.size, canceled = canceled.size)
+}
+
+/**
+ * The problems as one list, newest first, under a heading per local start day; one without a start
+ * comes last, under no day.
+ */
+fun groupDvrProblems(
+    entries: List<DvrEntry>,
+    nowSec: Long,
+    zoneId: ZoneId = ZoneId.systemDefault(),
+): List<DvrScheduleSection> {
+    val today = Instant.ofEpochSecond(nowSec).atZone(zoneId).toLocalDate()
+    return entries.filter(::isDvrProblem)
+        .sortedByDescending { it.start?.epochSeconds ?: Long.MIN_VALUE }
+        .groupBy { entry -> entry.start?.let { Instant.ofEpochSecond(it.epochSeconds).atZone(zoneId).toLocalDate() } }
+        .map { (date, dayEntries) ->
+            val kind = when (date) {
+                today -> DvrScheduleSectionKind.TODAY
+                today.minusDays(1) -> DvrScheduleSectionKind.YESTERDAY
+                else -> DvrScheduleSectionKind.DATE
             }
-        }.sortedByDescending { it.start?.epochSeconds ?: Long.MIN_VALUE }
-    }
+            DvrScheduleSection(kind, date, dayEntries)
+        }
+}
+
+private fun isDvrProblem(entry: DvrEntry): Boolean = !recordingWasRemoved(entry) &&
+    entry.state in setOf(DvrEntryState.COMPLETED_ERROR, DvrEntryState.MISSED, DvrEntryState.INVALID)
 
 fun recordingListPageTargetIndex(
     itemCount: Int,

@@ -673,6 +673,57 @@
         <item quantity="many">Nepodařilo se smazat %1$d z %2$d nahrávky</item>
         <item quantity="other">Nepodařilo se smazat %1$d z %2$d nahrávek</item>
     </plurals>
+    <plurals name="problems_clear_failed">
+        <item quantity="one">Nepodařilo se odebrat %1$d z %2$d položky</item>
+        <item quantity="few">Nepodařilo se odebrat %1$d z %2$d položek</item>
+        <item quantity="many">Nepodařilo se odebrat %1$d z %2$d položky</item>
+        <item quantity="other">Nepodařilo se odebrat %1$d z %2$d položek</item>
+    </plurals>
+    <string name="problems_clear">Odebrat problémy</string>
+    <string name="problems_clear_question">Odebrat problémy?</string>
+    <string name="problems_clear_button">Odebrat</string>
+    <plurals name="problems_count_failed">
+        <item quantity="one">Selhalo: %1$d</item>
+        <item quantity="few">Selhalo: %1$d</item>
+        <item quantity="many">Selhalo: %1$d</item>
+        <item quantity="other">Selhalo: %1$d</item>
+    </plurals>
+    <plurals name="problems_count_canceled">
+        <item quantity="one">Zrušeno: %1$d</item>
+        <item quantity="few">Zrušeno: %1$d</item>
+        <item quantity="many">Zrušeno: %1$d</item>
+        <item quantity="other">Zrušeno: %1$d</item>
+    </plurals>
+    <plurals name="problems_clear_entries">
+        <item quantity="one">Odebrat %1$d položku</item>
+        <item quantity="few">Odebrat %1$d položky</item>
+        <item quantity="many">Odebrat %1$d položky</item>
+        <item quantity="other">Odebrat %1$d položek</item>
+    </plurals>
+    <plurals name="problems_clear_also_delete_partial">
+        <item quantity="one">Smazat i %1$d neúplnou nahrávku</item>
+        <item quantity="few">Smazat i %1$d neúplné nahrávky</item>
+        <item quantity="many">Smazat i %1$d neúplné nahrávky</item>
+        <item quantity="other">Smazat i %1$d neúplných nahrávek</item>
+    </plurals>
+    <plurals name="problems_clear_delete_partial">
+        <item quantity="one">Smazat %1$d neúplnou nahrávku</item>
+        <item quantity="few">Smazat %1$d neúplné nahrávky</item>
+        <item quantity="many">Smazat %1$d neúplné nahrávky</item>
+        <item quantity="other">Smazat %1$d neúplných nahrávek</item>
+    </plurals>
+    <plurals name="problems_clear_fileless_sentence">
+        <item quantity="one">%1$d položka nemá soubor, takže se jejím odebráním na disku nic nesmaže.</item>
+        <item quantity="few">%1$d položky nemají soubor, takže se jejich odebráním na disku nic nesmaže.</item>
+        <item quantity="many">%1$d položky nemá soubor, takže se jejich odebráním na disku nic nesmaže.</item>
+        <item quantity="other">%1$d položek nemá soubor, takže se jejich odebráním na disku nic nesmaže.</item>
+    </plurals>
+    <plurals name="problems_clear_partial_sentence">
+        <item quantity="one">%1$d nezdařená nahrávka má neúplný soubor. Zůstane, pokud ji také nesmažeš.</item>
+        <item quantity="few">%1$d nezdařené nahrávky mají neúplné soubory. Zůstanou, pokud je také nesmažeš.</item>
+        <item quantity="many">%1$d nezdařené nahrávky má neúplné soubory. Zůstanou, pokud je také nesmažeš.</item>
+        <item quantity="other">%1$d nezdařených nahrávek má neúplné soubory. Zůstanou, pokud je také nesmažeš.</item>
+    </plurals>
     <plurals name="recording_notice_canceled_count">
         <item quantity="one">Zrušeno %d nahrávání</item>
         <item quantity="few">Zrušena %d nahrávání</item>
@@ -772,8 +823,6 @@
         <item quantity="other">%1$d probíhajících nahrávek</item>
     </plurals>
     <string name="recordings_schedule_end_duration">do %1$s • %2$s</string>
-    <string name="recordings_failed">Neúspěšné</string>
-    <string name="recordings_cancelled">Zrušené</string>
     <string name="recordings_upcoming_active">Nadcházející a probíhající</string>
     <string name="recordings_completed">Dokončené</string>
     <string name="recordings_failed_cancelled">Neúspěšné a zrušené</string>

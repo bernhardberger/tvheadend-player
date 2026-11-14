@@ -789,7 +789,8 @@ class BrowseContextMenuScreenTest {
     @OptIn(TvheadendTestingApi::class)
     fun recordingResumeDialogCapture() {
         val session = show(recordings = true, realRail = true,
-            recordingState = DvrEntryState.RECORDING, growingFile = true)
+            recordingState = DvrEntryState.RECORDING, growingFile = true,
+            libraryMode = at.bernhardberger.tvhplayer.core.DvrLibraryMode.ARCHIVE)
         val row = compose.onNodeWithTag("recording-list-entry-1").requestFocus()
         row.performKeyInput { pressKey(Key.DirectionCenter) }
         compose.onNodeWithTag("recording-resume").assertIsFocused()
@@ -1676,7 +1677,8 @@ class BrowseContextMenuScreenTest {
         behindLive: Boolean = false, growingFile: Boolean = false, awaitContent: Boolean = true,
         ruleMade: Boolean = false, recordingEnabled: Boolean = true,
         removal: at.bernhardberger.tvheadend.sdk.core.DvrRemoval? = null,
-        retention: at.bernhardberger.tvheadend.sdk.core.DvrRetention? = null): FakeTvheadendSession {
+        retention: at.bernhardberger.tvheadend.sdk.core.DvrRetention? = null,
+        libraryMode: at.bernhardberger.tvhplayer.core.DvrLibraryMode? = null): FakeTvheadendSession {
         val firstLeg = screenContent.value == null
         if (!firstLeg) {
             compose.runOnIdle { screenContent.value = null }
@@ -1775,7 +1777,8 @@ class BrowseContextMenuScreenTest {
         ) else mapOf(ArtworkId(1) to FixtureArt.picon("ridge-earth"), ArtworkId(2) to FixtureArt.art("ridge-light")),
             onRequest = { artworkRequests += it }))
         val state = RecordingsScreenState().apply {
-            if (recordingState == DvrEntryState.SCHEDULED || recordingState == DvrEntryState.RECORDING)
+            if (libraryMode != null) mode.value = libraryMode
+            else if (recordingState == DvrEntryState.SCHEDULED || recordingState == DvrEntryState.RECORDING)
                 mode.value = at.bernhardberger.tvhplayer.core.DvrLibraryMode.SCHEDULE
         }
         screenContent.value = {

@@ -3,6 +3,7 @@ package at.bernhardberger.tvhplayer.ui.screens.recordings
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
+import androidx.annotation.DrawableRes
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -10,6 +11,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.onFocusChanged
@@ -126,26 +128,68 @@ internal fun ArchiveViewOptionsButton(
     onFocusChanged: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val label = stringResource(R.string.channels_view_options)
+    val values = view.nonDefaultValues()
+    RecordingsHeadlineButton(
+        icon = R.drawable.ic_tune,
+        label = label,
+        description = if (values.isEmpty()) label else stringResource(
+            R.string.header_button_value_description, label, values.joinToString(", "),
+        ),
+        active = view.show != DvrArchiveView().show,
+        focusable = focusable,
+        focusRequester = focusRequester,
+        upFocus = upFocus,
+        navigationFocus = navigationFocus,
+        onClick = onOpen,
+        onDown = onDown,
+        onFocusChanged = onFocusChanged,
+        tag = "recordings-view-options",
+        modifier = modifier,
+    )
+}
+
+/**
+ * A round button at the end of a Recordings headline, centred on its capitals, its end meeting the
+ * rows'. Up goes to [upFocus], Down to [onDown], Left to [navigationFocus] and Right stays. With [value]
+ * it reads as a labelled pill; [onWidth] reports its width so the headline can end short of it.
+ */
+@Composable
+internal fun RecordingsHeadlineButton(
+    @DrawableRes icon: Int,
+    label: String,
+    description: String,
+    active: Boolean,
+    focusable: Boolean,
+    focusRequester: FocusRequester,
+    upFocus: FocusRequester,
+    navigationFocus: FocusRequester?,
+    onClick: () -> Unit,
+    onDown: () -> Unit,
+    onFocusChanged: (Boolean) -> Unit,
+    tag: String,
+    modifier: Modifier = Modifier,
+    value: String? = null,
+    onWidth: (Int) -> Unit = {},
+) {
     val style = RecordingsHeadlineStyle
     val baseline = rememberTextMeasurer().measure("Ag", style).firstBaseline
     val density = LocalDensity.current
     val top = with(density) {
         (baseline - style.fontSize.toPx() * CAP_HEIGHT_FRACTION / 2f).toDp() - TvIconButtonSize / 2
     }
-    val label = stringResource(R.string.channels_view_options)
-    val values = view.nonDefaultValues()
     Box(modifier.width(TvBrowseColumnWidth).offset(y = top), contentAlignment = Alignment.TopEnd) {
         RoundIconButton(
-            icon = painterResource(R.drawable.ic_tune),
+            icon = painterResource(icon),
             label = label,
-            description = if (values.isEmpty()) label else stringResource(
-                R.string.header_button_value_description, label, values.joinToString(", "),
-            ),
-            active = view.show != DvrArchiveView().show,
-            onClick = onOpen,
+            description = description,
+            active = active,
+            onClick = onClick,
             focusRequester = focusRequester,
             onFocused = {},
+            value = value,
             modifier = Modifier
+                .onSizeChanged { onWidth(it.width) }
                 .focusProperties {
                     canFocus = focusable
                     up = upFocus
@@ -156,7 +200,7 @@ internal fun ArchiveViewOptionsButton(
                 .onPreviewKeyEvent { event ->
                     event.type == KeyEventType.KeyDown && event.key == Key.DirectionDown && onDown().let { true }
                 }
-                .testTag("recordings-view-options"),
+                .testTag(tag),
         )
     }
 }

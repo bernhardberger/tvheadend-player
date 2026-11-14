@@ -651,6 +651,49 @@
         <item quantity="two">לא ניתן למחוק %1$d מתוך %2$d הקלטות</item>
         <item quantity="other">לא ניתן למחוק %1$d מתוך %2$d הקלטות</item>
     </plurals>
+    <plurals name="problems_clear_failed">
+        <item quantity="one">לא ניתן להסיר %1$d מתוך %2$d רשומה</item>
+        <item quantity="two">לא ניתן להסיר %1$d מתוך %2$d רשומות</item>
+        <item quantity="other">לא ניתן להסיר %1$d מתוך %2$d רשומות</item>
+    </plurals>
+    <string name="problems_clear">הסרת הבעיות</string>
+    <string name="problems_clear_question">להסיר את הבעיות?</string>
+    <string name="problems_clear_button">הסרה</string>
+    <plurals name="problems_count_failed">
+        <item quantity="one">נכשלה: %1$d</item>
+        <item quantity="two">נכשלו: %1$d</item>
+        <item quantity="other">נכשלו: %1$d</item>
+    </plurals>
+    <plurals name="problems_count_canceled">
+        <item quantity="one">בוטלה: %1$d</item>
+        <item quantity="two">בוטלו: %1$d</item>
+        <item quantity="other">בוטלו: %1$d</item>
+    </plurals>
+    <plurals name="problems_clear_entries">
+        <item quantity="one">הסרת %1$d רשומה</item>
+        <item quantity="two">הסרת %1$d רשומות</item>
+        <item quantity="other">הסרת %1$d רשומות</item>
+    </plurals>
+    <plurals name="problems_clear_also_delete_partial">
+        <item quantity="one">מחיקה גם של %1$d הקלטה חלקית</item>
+        <item quantity="two">מחיקה גם של %1$d הקלטות חלקיות</item>
+        <item quantity="other">מחיקה גם של %1$d הקלטות חלקיות</item>
+    </plurals>
+    <plurals name="problems_clear_delete_partial">
+        <item quantity="one">מחיקת %1$d הקלטה חלקית</item>
+        <item quantity="two">מחיקת %1$d הקלטות חלקיות</item>
+        <item quantity="other">מחיקת %1$d הקלטות חלקיות</item>
+    </plurals>
+    <plurals name="problems_clear_fileless_sentence">
+        <item quantity="one">ל־%1$d רשומה אין קובץ, ולכן הסרתה לא מוחקת דבר מהדיסק.</item>
+        <item quantity="two">ל־%1$d רשומות אין קובץ, ולכן הסרתן לא מוחקת דבר מהדיסק.</item>
+        <item quantity="other">ל־%1$d רשומות אין קובץ, ולכן הסרתן לא מוחקת דבר מהדיסק.</item>
+    </plurals>
+    <plurals name="problems_clear_partial_sentence">
+        <item quantity="one">ל־%1$d הקלטה שנכשלה יש קובץ חלקי. היא נשמרת, אלא אם מוחקים גם אותה.</item>
+        <item quantity="two">ל־%1$d הקלטות שנכשלו יש קבצים חלקיים. הן נשמרות, אלא אם מוחקים גם אותן.</item>
+        <item quantity="other">ל־%1$d הקלטות שנכשלו יש קבצים חלקיים. הן נשמרות, אלא אם מוחקים גם אותן.</item>
+    </plurals>
     <plurals name="recording_notice_canceled_count">
         <item quantity="one">בוטלה %d הקלטה מתוזמנת</item>
         <item quantity="two">בוטלו %d הקלטות מתוזמנות</item>
@@ -745,8 +788,6 @@
         <item quantity="other">הקלטות פעילות: %1$d</item>
     </plurals>
     <string name="recordings_schedule_end_duration">עד %1$s • %2$s</string>
-    <string name="recordings_failed">נכשלה</string>
-    <string name="recordings_cancelled">בוטלה</string>
     <string name="recordings_upcoming_active">קרובות ופעילות</string>
     <string name="recordings_completed">הושלמו</string>
     <string name="recordings_failed_cancelled">נכשלו ובוטלו</string>

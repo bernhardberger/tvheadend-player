@@ -673,6 +673,57 @@
         <item quantity="many">Nie udało się usunąć %1$d z %2$d nagrań</item>
         <item quantity="other">Nie udało się usunąć %1$d z %2$d nagrania</item>
     </plurals>
+    <plurals name="problems_clear_failed">
+        <item quantity="one">Nie udało się usunąć %1$d z %2$d wpisu</item>
+        <item quantity="few">Nie udało się usunąć %1$d z %2$d wpisów</item>
+        <item quantity="many">Nie udało się usunąć %1$d z %2$d wpisów</item>
+        <item quantity="other">Nie udało się usunąć %1$d z %2$d wpisu</item>
+    </plurals>
+    <string name="problems_clear">Wyczyść problemy</string>
+    <string name="problems_clear_question">Wyczyścić problemy?</string>
+    <string name="problems_clear_button">Wyczyść</string>
+    <plurals name="problems_count_failed">
+        <item quantity="one">Nieudane: %1$d</item>
+        <item quantity="few">Nieudane: %1$d</item>
+        <item quantity="many">Nieudane: %1$d</item>
+        <item quantity="other">Nieudane: %1$d</item>
+    </plurals>
+    <plurals name="problems_count_canceled">
+        <item quantity="one">Anulowane: %1$d</item>
+        <item quantity="few">Anulowane: %1$d</item>
+        <item quantity="many">Anulowane: %1$d</item>
+        <item quantity="other">Anulowane: %1$d</item>
+    </plurals>
+    <plurals name="problems_clear_entries">
+        <item quantity="one">Wyczyść %1$d wpis</item>
+        <item quantity="few">Wyczyść %1$d wpisy</item>
+        <item quantity="many">Wyczyść %1$d wpisów</item>
+        <item quantity="other">Wyczyść %1$d wpisu</item>
+    </plurals>
+    <plurals name="problems_clear_also_delete_partial">
+        <item quantity="one">Usuń też %1$d niepełne nagranie</item>
+        <item quantity="few">Usuń też %1$d niepełne nagrania</item>
+        <item quantity="many">Usuń też %1$d niepełnych nagrań</item>
+        <item quantity="other">Usuń też %1$d niepełnego nagrania</item>
+    </plurals>
+    <plurals name="problems_clear_delete_partial">
+        <item quantity="one">Usuń %1$d niepełne nagranie</item>
+        <item quantity="few">Usuń %1$d niepełne nagrania</item>
+        <item quantity="many">Usuń %1$d niepełnych nagrań</item>
+        <item quantity="other">Usuń %1$d niepełnego nagrania</item>
+    </plurals>
+    <plurals name="problems_clear_fileless_sentence">
+        <item quantity="one">%1$d wpis nie ma pliku, więc jego usunięcie niczego nie kasuje z dysku.</item>
+        <item quantity="few">%1$d wpisy nie mają pliku, więc ich usunięcie niczego nie kasuje z dysku.</item>
+        <item quantity="many">%1$d wpisów nie ma pliku, więc ich usunięcie niczego nie kasuje z dysku.</item>
+        <item quantity="other">%1$d wpisu nie ma pliku, więc ich usunięcie niczego nie kasuje z dysku.</item>
+    </plurals>
+    <plurals name="problems_clear_partial_sentence">
+        <item quantity="one">%1$d nieudane nagranie ma niepełny plik. Zostaje, chyba że też je usuniesz.</item>
+        <item quantity="few">%1$d nieudane nagrania mają niepełne pliki. Zostają, chyba że też je usuniesz.</item>
+        <item quantity="many">%1$d nieudanych nagrań ma niepełne pliki. Zostają, chyba że też je usuniesz.</item>
+        <item quantity="other">%1$d nieudanego nagrania ma niepełne pliki. Zostają, chyba że też je usuniesz.</item>
+    </plurals>
     <plurals name="recording_notice_canceled_count">
         <item quantity="one">Anulowano %d nagranie</item>
         <item quantity="few">Anulowano %d nagrania</item>
@@ -772,8 +823,6 @@
         <item quantity="other">%1$d nagrania w toku</item>
     </plurals>
     <string name="recordings_schedule_end_duration">do %1$s • %2$s</string>
-    <string name="recordings_failed">Nieudane</string>
-    <string name="recordings_cancelled">Anulowane</string>
     <string name="recordings_upcoming_active">Nadchodzące i aktywne</string>
     <string name="recordings_completed">Zakończone</string>
     <string name="recordings_failed_cancelled">Nieudane i anulowane</string>

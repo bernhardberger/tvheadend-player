@@ -40,6 +40,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -112,7 +113,7 @@ import at.bernhardberger.tvhplayer.ui.components.AppErrorAlert
 import at.bernhardberger.tvhplayer.ui.components.LocalBrowseNavigationFocus
 import at.bernhardberger.tvhplayer.core.DvrArchiveFolder
 import at.bernhardberger.tvhplayer.core.DvrLibraryMode
-import at.bernhardberger.tvhplayer.core.DvrProblemBucket
+import at.bernhardberger.tvhplayer.core.dvrProblemCounts
 import at.bernhardberger.tvhplayer.core.DvrScheduleSection
 import at.bernhardberger.tvhplayer.core.DvrScheduleSectionKind
 import at.bernhardberger.tvhplayer.core.recordingElapsedProgress
@@ -142,6 +143,7 @@ import at.bernhardberger.tvhplayer.ui.TvBrowseColumnWidth
 import at.bernhardberger.tvhplayer.ui.TvBrowseHeaderHeight
 import at.bernhardberger.tvhplayer.ui.TvBrowseLeadingInset
 import at.bernhardberger.tvhplayer.ui.TvSpacing12
+import at.bernhardberger.tvhplayer.ui.TvSpacing16
 import at.bernhardberger.tvhplayer.ui.TvSpacing4
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.TvTextColors
@@ -220,6 +222,7 @@ internal fun RecordingModeTabs(
     /** Recordings with a problem; the Problems tab carries the count while it is above zero. */
     problemCount: Int = 0,
 ) {
+    val navigationFocus = LocalBrowseNavigationFocus.current
     AppTabRow(
         selectedTabIndex = modes.indexOf(selected),
         style = AppTabStyle.Page,
@@ -233,7 +236,11 @@ internal fun RecordingModeTabs(
         modes.forEach { mode ->
             AppTab(
                 selected = selected == mode,
-                modifier = Modifier.testTag("recordings-mode-${mode.name.lowercase()}"),
+                modifier = Modifier.testTag("recordings-mode-${mode.name.lowercase()}").focusProperties {
+                    // The start edge leads to the rail's own entry, as Left from the lists does, not to whichever
+                    // rail item geometry finds first.
+                    if (mode == modes.first() && navigationFocus != null) start = navigationFocus
+                },
                 label = stringResource(
                     when (mode) {
                         DvrLibraryMode.ARCHIVE -> R.string.recordings_browse
@@ -602,9 +609,9 @@ private fun recordingRuleLabel(rule: RecordingRule?): Pair<String, Int>? =
     rule?.let { stringResource(it.label) to R.drawable.ic_schedule_rule }
 
 /**
- * A Schedule or Problems list in Archive's first column, with the focused recording's pane where
- * Archive shows its preview: below the heading band, level with the first row. The pane is passive;
- * focus stays in the list.
+ * The Problems list in Archive's first column, with the focused recording's pane where Schedule
+ * shows its own: at the top of the content, whatever heads the list. The pane is passive; focus
+ * stays in the list.
  */
 @Composable
 private fun RecordingListWithPane(
@@ -619,7 +626,7 @@ private fun RecordingListWithPane(
         Box(Modifier.width(TvBrowseColumnWidth).fillMaxHeight()) { list() }
         Box(
             Modifier
-                .padding(start = TvBrowseColumnGap, top = recordingsHeadingBandHeight())
+                .padding(start = TvBrowseColumnGap)
                 .width(TvBrowseColumnWidth)
                 .fillMaxHeight()
                 .focusProperties { canFocus = false },
@@ -635,10 +642,15 @@ private fun RecordingListWithPane(
     }
 }
 
+/**
+ * The Problems list, newest first under Schedule's day headings, below a headline whose quiet line
+ * counts what failed and what was canceled. With [onClear] the headline ends in Clear, through
+ * [clearFocus]; Up from there goes to [upFocus], Left to [navigationFocus].
+ */
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 internal fun RecordingProblems(
-    groups: Map<DvrProblemBucket, List<DvrEntry>>,
+    sections: List<DvrScheduleSection>,
     selectedKey: String?,
     selectedFocus: FocusRequester,
     onFocused: (String) -> Unit,
@@ -649,12 +661,24 @@ internal fun RecordingProblems(
     initialScrollIndex: Int,
     onScrollChanged: (Int) -> Unit,
     paneBottom: Dp = 0.dp,
+    onClear: (() -> Unit)? = null,
+    clearFocus: FocusRequester? = null,
+    upFocus: FocusRequester? = null,
+    navigationFocus: FocusRequester? = null,
+    onClearFocusChanged: (Boolean) -> Unit = {},
 ) {
-    val entries = DvrProblemBucket.entries.flatMap { groups[it].orEmpty() }
+    val entries = sections.flatMap { it.entries }
     if (entries.isEmpty()) {
         ModeEmptyState(R.string.recordings_problems_empty)
         return
     }
+    val counts = remember(entries) { dvrProblemCounts(entries) }
+    val countsLine = listOfNotNull(
+        counts.failed.takeIf { it > 0 }?.let { pluralStringResource(R.plurals.problems_count_failed, it, it) },
+        counts.canceled.takeIf { it > 0 }?.let { pluralStringResource(R.plurals.problems_count_canceled, it, it) },
+    ).joinToString(" · ")
+    var clearWidth by remember { mutableStateOf(0.dp) }
+    val density = LocalDensity.current
     val owner = LocalTabOwner.current
     val active = owner?.isCurrent != false
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialScrollIndex)
@@ -667,16 +691,6 @@ internal fun RecordingProblems(
         entries.map { "recording:${recordingItemKey(it.id)}" },
         pageTargetKey ?: selectedKey,
     )
-    val lazyIndexes = remember(groups) {
-        buildMap {
-            var index = 0
-            DvrProblemBucket.entries.forEach { bucket ->
-                val bucketEntries = groups[bucket].orEmpty()
-                if (bucketEntries.isNotEmpty()) index++
-                bucketEntries.forEach { entry -> put(entry.id, index++) }
-            }
-        }
-    }
     DisposableEffect(active) {
         onDispose { pageFocusJob?.cancel() }
     }
@@ -688,84 +702,95 @@ internal fun RecordingProblems(
     }
     val paneEntry = entries.firstOrNull { "recording:${recordingItemKey(it.id)}" == focusTargetKey }
     RecordingListWithPane(paneEntry, RecordingRowKind.PROBLEM, piconForEntry, admissionForEntry, paneBottom) {
-        CompositionLocalProvider(LocalBringIntoViewSpec provides bringIntoViewSpec) {
-            LazyColumn(
-                state = listState,
-                userScrollEnabled = active,
-                contentPadding = PaddingValues(bottom = ListBottomReserve),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-                modifier = Modifier
-                    .fillMaxSize()
-                    .listEdgeFades(listState)
-                    .onFocusChanged {
-                        if (!it.hasFocus) {
+        Column {
+            Box {
+                // The counts line ends short of Clear, however long its label runs.
+                ArchiveLevelHeading(
+                    stringResource(R.string.recordings_problems), { 1f }, countsLine,
+                    endReserve = if (onClear != null) clearWidth + TvSpacing16 else 0.dp,
+                )
+                if (onClear != null && clearFocus != null) RecordingsHeadlineButton(
+                    icon = R.drawable.ic_cleaning_services,
+                    label = stringResource(R.string.problems_clear),
+                    value = stringResource(R.string.problems_clear_button),
+                    description = stringResource(R.string.problems_clear),
+                    active = false,
+                    focusable = active,
+                    focusRequester = clearFocus,
+                    upFocus = upFocus ?: FocusRequester.Default,
+                    navigationFocus = navigationFocus,
+                    onClick = onClear,
+                    onDown = { runCatching { selectedFocus.requestFocus() } },
+                    onFocusChanged = onClearFocusChanged,
+                    tag = PROBLEMS_CLEAR_TAG,
+                    onWidth = { clearWidth = with(density) { it.toDp() } },
+                )
+            }
+            CompositionLocalProvider(LocalBringIntoViewSpec provides bringIntoViewSpec) {
+                LazyColumn(
+                    state = listState,
+                    userScrollEnabled = active,
+                    contentPadding = PaddingValues(bottom = ListBottomReserve),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .listEdgeFades(listState)
+                        .onFocusChanged {
+                            if (!it.hasFocus) {
+                                pageFocusJob?.cancel()
+                                pageTargetKey = null
+                                pendingPageKey = null
+                            }
+                        }
+                        .focusGroup()
+                        .focusRestorer(selectedFocus)
+                        .testTag("recordings-problems-list")
+                        .onPreviewKeyEvent { event ->
+                            if (owner?.isCurrent == false) return@onPreviewKeyEvent true
+                            if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                            // As in the Archive, nothing to the right of a row takes focus: the pane is passive.
+                            if (event.key == Key.DirectionRight) return@onPreviewKeyEvent true
                             pageFocusJob?.cancel()
                             pageTargetKey = null
-                            pendingPageKey = null
-                        }
-                    }
-                    .focusGroup()
-                    .focusRestorer(selectedFocus)
-                    .testTag("recordings-problems-list")
-                    .onPreviewKeyEvent { event ->
-                        if (owner?.isCurrent == false) return@onPreviewKeyEvent true
-                        if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                        // As in the Archive, nothing to the right of a row takes focus: the pane is passive.
-                        if (event.key == Key.DirectionRight) return@onPreviewKeyEvent true
-                        pageFocusJob?.cancel()
-                        pageTargetKey = null
-                        val direction = ChannelNavigation.pageDirectionForKeyCode(
-                            event.nativeKeyEvent.keyCode
-                        ) ?: run {
-                            pendingPageKey = null
-                            return@onPreviewKeyEvent false
-                        }
-                        val current = entries.indexOfFirst {
-                            "recording:${recordingItemKey(it.id)}" == pendingPageKey
-                        }.takeIf { it >= 0 } ?: entries.indexOfFirst {
-                            "recording:${recordingItemKey(it.id)}" == selectedKey
-                        }
-                        val target = recordingListPageTargetIndex(
-                            entries.size,
-                            current,
-                            listState.layoutInfo.visibleItemsInfo.count { it.key is Long },
-                            direction,
-                        ) ?: run {
-                            pendingPageKey = null
-                            return@onPreviewKeyEvent true
-                        }
-                        pendingPageKey = "recording:${recordingItemKey(entries[target].id)}"
-                        pageFocusJob = scope.launch {
-                            val layout = listState.layoutInfo
-                            val focusOffset = bringIntoViewSpec.calculateScrollDistance(
-                                layout.beforeContentPadding.toFloat(),
-                                (layout.visibleItemsInfo.firstOrNull { it.key is Long }?.size ?: 0).toFloat(),
-                                layout.viewportSize.height.toFloat(),
-                            ).roundToInt()
-                            listState.animateScrollToItem(lazyIndexes.getValue(entries[target].id), focusOffset)
-                            if (owner?.isCurrent == false) return@launch
-                            pageTargetKey = "recording:${recordingItemKey(entries[target].id)}"
-                        }
-                        true
-                    },
-            ) {
-                val firstBucket = DvrProblemBucket.entries.firstOrNull { groups[it].orEmpty().isNotEmpty() }
-                DvrProblemBucket.entries.forEach { bucket ->
-                    val bucketEntries = groups[bucket].orEmpty()
-                    if (bucketEntries.isNotEmpty()) {
-                        item(key = "header-$bucket") {
-                            RecordingSectionHeader(
-                                stringResource(
-                                    if (bucket == DvrProblemBucket.FAILED) {
-                                        R.string.recordings_failed
-                                    } else {
-                                        R.string.recordings_cancelled
-                                    }
-                                ),
-                                first = bucket == firstBucket,
-                            )
-                        }
-                        items(bucketEntries, key = { recordingItemKey(it.id) }) { entry ->
+                            val direction = ChannelNavigation.pageDirectionForKeyCode(
+                                event.nativeKeyEvent.keyCode
+                            ) ?: run {
+                                pendingPageKey = null
+                                return@onPreviewKeyEvent false
+                            }
+                            val current = entries.indexOfFirst {
+                                "recording:${recordingItemKey(it.id)}" == pendingPageKey
+                            }.takeIf { it >= 0 } ?: entries.indexOfFirst {
+                                "recording:${recordingItemKey(it.id)}" == selectedKey
+                            }
+                            val target = recordingListPageTargetIndex(
+                                entries.size,
+                                current,
+                                listState.layoutInfo.visibleItemsInfo.count { it.key is Long },
+                                direction,
+                            ) ?: run {
+                                pendingPageKey = null
+                                return@onPreviewKeyEvent true
+                            }
+                            pendingPageKey = "recording:${recordingItemKey(entries[target].id)}"
+                            pageFocusJob = scope.launch {
+                                val layout = listState.layoutInfo
+                                val focusOffset = bringIntoViewSpec.calculateScrollDistance(
+                                    layout.beforeContentPadding.toFloat(),
+                                    (layout.visibleItemsInfo.firstOrNull { it.key is Long }?.size ?: 0).toFloat(),
+                                    layout.viewportSize.height.toFloat(),
+                                ).roundToInt()
+                                listState.animateScrollToItem(target, focusOffset)
+                                if (owner?.isCurrent == false) return@launch
+                                pageTargetKey = "recording:${recordingItemKey(entries[target].id)}"
+                            }
+                            true
+                        },
+                ) {
+                    // Day headings as on Schedule: each opens its first row, the first sits on the list's top.
+                    sections.forEachIndexed { sectionIndex, section ->
+                        itemsIndexed(
+                            section.entries, key = { _, entry -> recordingItemKey(entry.id) },
+                        ) { entryIndex, entry ->
                             val rowKey = "recording:${recordingItemKey(entry.id)}"
                             if (active && pageTargetKey == rowKey) {
                                 LaunchedEffect(rowKey) {
@@ -776,21 +801,25 @@ internal fun RecordingProblems(
                                     }
                                 }
                             }
-                            RecordingListRow(
-                                entry = entry,
-                                piconPath = piconForEntry(entry),
-                                resumePosition = offeredResumePosition(admissionForEntry(entry)),
-                                selected = selectedKey == "recording:${recordingItemKey(entry.id)}",
-                                focusTarget =
-                                    active && focusTargetKey == "recording:${recordingItemKey(entry.id)}",
-                                selectedFocus = selectedFocus,
-                                onFocused = {
-                                    onFocused("recording:${recordingItemKey(entry.id)}")
-                                },
-                                onClick = { onOpen(entry) },
-                                onOpenContextMenu = onOpenContextMenu?.let { open -> { open(entry) } },
-                                kind = RecordingRowKind.PROBLEM,
-                            )
+                            Column {
+                                if (entryIndex == 0 && section.hasDay()) {
+                                    RecordingSectionHeader(scheduleSectionLabel(section), first = sectionIndex == 0)
+                                    if (sectionIndex != 0) Spacer(Modifier.height(4.dp))
+                                }
+                                RecordingListRow(
+                                    entry = entry,
+                                    piconPath = piconForEntry(entry),
+                                    resumePosition = offeredResumePosition(admissionForEntry(entry)),
+                                    selected = selectedKey == rowKey,
+                                    focusTarget = active && focusTargetKey == rowKey,
+                                    selectedFocus = selectedFocus,
+                                    onFocused = { onFocused(rowKey) },
+                                    onClick = { onOpen(entry) },
+                                    onOpenContextMenu = onOpenContextMenu?.let { open -> { open(entry) } },
+                                    kind = RecordingRowKind.PROBLEM,
+                                )
+                                Spacer(Modifier.height(4.dp))
+                            }
                         }
                     }
                 }
@@ -798,6 +827,11 @@ internal fun RecordingProblems(
         }
     }
 }
+
+/** Undated problems close the list without a heading. */
+private fun DvrScheduleSection.hasDay() = kind != DvrScheduleSectionKind.DATE || date != null
+
+internal const val PROBLEMS_CLEAR_TAG = "recordings-problems-clear"
 
 internal enum class RecordingRowKind {
     ARCHIVE,
@@ -1154,6 +1188,7 @@ internal fun scheduleSectionLabel(section: DvrScheduleSection): String {
         DvrScheduleSectionKind.RECORDING_NOW -> stringResource(R.string.recordings_recording_now)
         DvrScheduleSectionKind.TODAY -> stringResource(R.string.today)
         DvrScheduleSectionKind.TOMORROW -> stringResource(R.string.tomorrow)
+        DvrScheduleSectionKind.YESTERDAY -> stringResource(R.string.yesterday)
         DvrScheduleSectionKind.DATE -> section.date?.let { formatDayHeader(it, locale) }.orEmpty()
     }
 }
