@@ -17,7 +17,6 @@
     <string name="schedule_automatic_turn_off">停用</string>
     <string name="schedule_automatic_turn_on">启用</string>
     <string name="schedule_automatic_off">已停用</string>
-    <string name="schedule_automatic_next">下一次：%1$s • %2$s</string>
     <string name="schedule_automatic_nothing">暂无录制计划</string>
     <string name="schedule_automatic_keep">保留期限：%1$s</string>
     <plurals name="schedule_automatic_upcoming">

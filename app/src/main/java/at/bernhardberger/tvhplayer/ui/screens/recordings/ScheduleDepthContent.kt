@@ -52,7 +52,6 @@ internal fun ScheduleDepthContent(
     onEditRule: (AutomaticRecordingListItem) -> Unit,
     onRuleMenu: (AutomaticRecordingListItem) -> Unit,
     navigation: DepthNavigationState,
-    scheduleState: ScheduleState,
     contentPadding: PaddingValues,
     isCurrent: Boolean,
     initialFocusEnabled: Boolean,
@@ -78,7 +77,7 @@ internal fun ScheduleDepthContent(
             contentPadding, paneWidth, onOpenRecording, onOpenContextMenu,
             piconForEntry, admissionForEntry, ruleForEntry,
         ) + scheduleAutomaticLevels(
-            automatic, canModify && automatic.available, canAdd, channelList, channels, navigation, scheduleState,
+            automatic, canModify && automatic.available, canAdd, channelList, channels, navigation,
             Modifier.widthIn(max = paneWidth), onNewAutomatic, onEditRule, onRuleMenu)
         DepthNavigation(
             state = navigation,

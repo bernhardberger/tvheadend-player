@@ -17,7 +17,6 @@
     <string name="schedule_automatic_turn_off">Ota pois käytöstä</string>
     <string name="schedule_automatic_turn_on">Ota käyttöön</string>
     <string name="schedule_automatic_off">Pois käytöstä</string>
-    <string name="schedule_automatic_next">Seuraava: %1$s • %2$s</string>
     <string name="schedule_automatic_nothing">Ei ajastettuja tallennuksia</string>
     <string name="schedule_automatic_keep">Säilytä: %1$s</string>
     <plurals name="schedule_automatic_upcoming">

@@ -17,7 +17,6 @@
     <string name="schedule_automatic_turn_off">Devre dışı bırak</string>
     <string name="schedule_automatic_turn_on">Etkinleştir</string>
     <string name="schedule_automatic_off">Kapalı</string>
-    <string name="schedule_automatic_next">Sonraki: %1$s • %2$s</string>
     <string name="schedule_automatic_nothing">Planlanmış kayıt yok</string>
     <string name="schedule_automatic_keep">Saklama süresi: %1$s</string>
     <plurals name="schedule_automatic_upcoming">

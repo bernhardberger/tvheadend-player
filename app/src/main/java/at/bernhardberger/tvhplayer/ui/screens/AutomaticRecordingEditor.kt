@@ -61,9 +61,9 @@ internal fun AutomaticRecordingEditor(
         }
     }
     if (state.navigation.leaveConfirmation) RecordingEditorLeaveDialog(
-        state.navigation, automaticRecordingMainLabel(state), state.mainProblem == null,
+        state.navigation, automaticRecordingMainLabel(state),
         state::back, state::submit, state::confirmDestructiveAction,
-        mainIcon = R.drawable.ic_fiber_smart_record,
+        mainIcon = if (state.editing) R.drawable.ic_save else R.drawable.ic_fiber_smart_record,
         unavailableReason = automaticRecordingUnavailableLabel(state),
     )
     if (state.navigation.confirmation == AutomaticRecordingEditorConfirmation.DELETE)
@@ -74,11 +74,21 @@ internal fun AutomaticRecordingEditor(
 private fun AutomaticRecordingFirstLevel(state: AutomaticRecordingEditorState, channels: List<Channel>) {
     GuidedStepAction(
         title = automaticRecordingMainLabel(state), onClick = state::submit,
-        modifier = editorRowModifier(state.navigation, "main"), icon = R.drawable.ic_fiber_smart_record,
-        enabled = !state.busy && state.mainProblem == null,
+        modifier = editorRowModifier(state.navigation, "main"),
+        icon = if (state.editing) R.drawable.ic_save else R.drawable.ic_fiber_smart_record,
+        enabled = !state.busy,
         leadingIcon = if (state.busy) ({
             CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 3.dp)
         }) else null,
+    )
+    if (state.editing) GuidedStepAction(
+        title = stringResource(R.string.autorec_editor_turned_on),
+        onClick = { state.updateDraft { it.copy(enabled = !it.enabled) } },
+        modifier = editorRowModifier(state.navigation, "enabled").semantics {
+            role = Role.Switch
+            toggleableState = ToggleableState(state.draft.enabled)
+        },
+        trailingContent = { Switch(state.draft.enabled, onCheckedChange = null, Modifier.clearAndSetSemantics {}) },
     )
     val series = state.draft.kind == AutomaticRecordingKind.SERIES
     GuidedStepAction(
@@ -117,16 +127,6 @@ private fun AutomaticRecordingFirstLevel(state: AutomaticRecordingEditorState, c
         modifier = editorRowModifier(state.navigation, "more"), trailingIcon = R.drawable.ic_keyboard_arrow_right,
         trailingContent = { AutomaticRecordingChanged(state, automaticRecordingMoreFields) },
     )
-    if (state.editing) GuidedStepAction(
-        title = stringResource(R.string.autorec_editor_turned_on),
-        onClick = { state.updateDraft { it.copy(enabled = !it.enabled) } },
-        modifier = editorRowModifier(state.navigation, "enabled").semantics {
-            role = Role.Switch
-            toggleableState = ToggleableState(state.draft.enabled)
-        },
-        trailingContent = { Switch(state.draft.enabled, onCheckedChange = null, Modifier.clearAndSetSemantics {}) },
-    )
-    GuidedStepAction(stringResource(R.string.cancel), state::back, editorRowModifier(state.navigation, "cancel"))
 }
 
 @Composable

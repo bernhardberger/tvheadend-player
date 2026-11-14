@@ -17,7 +17,6 @@
     <string name="schedule_automatic_turn_off">Slå fra</string>
     <string name="schedule_automatic_turn_on">Slå til</string>
     <string name="schedule_automatic_off">Slået fra</string>
-    <string name="schedule_automatic_next">Næste: %1$s • %2$s</string>
     <string name="schedule_automatic_nothing">Ingen planlagte optagelser</string>
     <string name="schedule_automatic_keep">Bevar indtil: %1$s</string>
     <plurals name="schedule_automatic_upcoming">

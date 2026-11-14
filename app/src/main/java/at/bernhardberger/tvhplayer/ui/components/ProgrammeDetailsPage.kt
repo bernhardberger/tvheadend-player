@@ -1398,12 +1398,23 @@ private fun DetailsProgress(event: EpgEvent?, recording: DvrEntry?, recordingAdm
 internal fun ProgrammeEyebrow(
     picon: ChannelIcon?, text: String,
     modifier: Modifier = Modifier, piconModifier: Modifier = Modifier,
+    pinned: String? = null,
     trailing: @Composable () -> Unit = {},
 ) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         picon?.let { InlineLogo(it, piconModifier) }
-        Text(text, Modifier.weight(1f, fill = false), style = MaterialTheme.typography.labelMedium,
-            color = TvTextColors.tertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        if (pinned == null) {
+            Text(text, Modifier.weight(1f, fill = false), style = MaterialTheme.typography.labelMedium,
+                color = TvTextColors.tertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        } else Row(Modifier.weight(1f, fill = false).semantics(mergeDescendants = true) {},
+            verticalAlignment = Alignment.CenterVertically) {
+            if (text.isNotEmpty()) {
+                Text(text, Modifier.weight(1f, fill = false), style = MaterialTheme.typography.labelMedium,
+                    color = TvTextColors.tertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Text(if (text.isEmpty()) pinned else " • $pinned", style = MaterialTheme.typography.labelMedium,
+                color = TvTextColors.tertiary, maxLines = 1, softWrap = false)
+        }
         trailing()
     }
 }

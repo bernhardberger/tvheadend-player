@@ -17,7 +17,6 @@
     <string name="schedule_automatic_turn_off">사용 중지</string>
     <string name="schedule_automatic_turn_on">사용 시작</string>
     <string name="schedule_automatic_off">사용 안 함</string>
-    <string name="schedule_automatic_next">다음: %1$s • %2$s</string>
     <string name="schedule_automatic_nothing">예정된 녹화 없음</string>
     <string name="schedule_automatic_keep">보관 기간: %1$s</string>
     <plurals name="schedule_automatic_upcoming">

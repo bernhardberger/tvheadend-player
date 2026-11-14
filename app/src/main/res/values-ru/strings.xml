@@ -17,7 +17,6 @@
     <string name="schedule_automatic_turn_off">Выключить</string>
     <string name="schedule_automatic_turn_on">Включить</string>
     <string name="schedule_automatic_off">Выключено</string>
-    <string name="schedule_automatic_next">Следующая: %1$s • %2$s</string>
     <string name="schedule_automatic_nothing">Ничего не запланировано</string>
     <string name="schedule_automatic_keep">Хранить: %1$s</string>
     <plurals name="schedule_automatic_upcoming">

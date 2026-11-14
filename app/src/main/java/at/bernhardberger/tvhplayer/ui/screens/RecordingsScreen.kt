@@ -1020,7 +1020,6 @@ internal fun RecordingsScreenContent(
                         onEditRule = { if (owner.isCurrent) openScheduleRule(RuleSurface.EDIT, it) },
                         onRuleMenu = { if (owner.isCurrent) openScheduleRule(RuleSurface.MENU, it) },
                         navigation = scheduleNavigation,
-                        scheduleState = screenState.scheduleState,
                         contentPadding = PaddingValues(
                             start = startPadding + TvBrowseLeadingInset,
                             bottom = contentPadding.calculateBottomPadding(),

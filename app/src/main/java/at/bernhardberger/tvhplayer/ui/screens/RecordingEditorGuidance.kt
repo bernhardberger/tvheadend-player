@@ -3,6 +3,7 @@ package at.bernhardberger.tvhplayer.ui.screens
 import androidx.compose.runtime.Composable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.res.stringResource
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -28,10 +29,11 @@ internal fun recordingEditorMoreSummary(changed: Set<RecordingDraftField>, editi
     else changed.map { automaticRecordingFieldLabel(it) }.joinToString(", ")
 
 @Composable
-internal fun RecordingEditorPreviewPair(title: String, meta: String) {
+internal fun RecordingEditorPreviewPair(title: String, meta: String, titleMaxLines: Int = Int.MAX_VALUE) {
     Column {
         if (title.isNotBlank()) Text(
             title, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface,
+            maxLines = titleMaxLines, overflow = TextOverflow.Ellipsis,
         )
         RecordingEditorSecondary(meta)
     }

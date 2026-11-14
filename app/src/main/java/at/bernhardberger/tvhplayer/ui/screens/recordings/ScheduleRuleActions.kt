@@ -64,7 +64,6 @@ internal data class OpenRule(
 
 /** Kept beside Schedule navigation, so reopening joins accepted work and retains its visit. */
 internal class ScheduleState {
-    var automaticLevelVisited = false
     private val inFlight = mutableMapOf<String, ArrayDeque<RuleRequest>>()
 
     fun hasPending(id: String, kind: AutomaticRecordingKind): Boolean = scheduleRuleRowId(id, kind) in inFlight

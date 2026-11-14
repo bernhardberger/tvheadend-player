@@ -28,8 +28,6 @@
     <string name="schedule_automatic_turn_on">Turn on</string>
     <!-- Badge on an automatic recording that is turned off. -->
     <string name="schedule_automatic_off">Off</string>
-    <!-- Args: date, time span of the next recording. -->
-    <string name="schedule_automatic_next">Next: %1$s • %2$s</string>
     <!-- Shown instead of Next when an automatic recording has nothing scheduled. -->
     <string name="schedule_automatic_nothing">Nothing scheduled</string>
     <!-- Arg: the keep choice, for example "1 month after recording". -->
@@ -292,7 +290,8 @@
     <string name="autorec_editor_leave_title">Leave without saving?</string>
     <string name="autorec_editor_leave_body">Your changes have not been saved.</string>
     <string name="autorec_editor_keep_editing">Keep editing</string>
-    <string name="autorec_editor_discard">Discard</string>
+    <!-- Last button of the "Leave without saving?" card; leaves the editor and drops the unsaved changes. -->
+    <string name="autorec_editor_discard">Discard changes</string>
     <string name="record_unavailable">Can’t record this program</string>
     <string name="record_unavailable_ended">It has already ended.</string>
     <string name="record_unavailable_no_programme">There’s no program information for this channel.</string>

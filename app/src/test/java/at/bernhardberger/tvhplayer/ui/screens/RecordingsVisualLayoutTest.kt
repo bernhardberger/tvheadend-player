@@ -68,6 +68,7 @@ import at.bernhardberger.tvhplayer.core.partitionDvrLibrary
 import at.bernhardberger.tvhplayer.core.groupDvrSchedule
 import at.bernhardberger.tvhplayer.ui.screens.recordings.SCHEDULE_NEW_TIMER
 import at.bernhardberger.tvhplayer.ui.screens.recordings.SCHEDULE_AUTOMATIC_ROW
+import at.bernhardberger.tvhplayer.ui.screens.recordings.SCHEDULE_UPCOMING_SHOWN
 import at.bernhardberger.tvhplayer.ui.AppDestination
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.TvBrowseColumnWidth
@@ -923,9 +924,13 @@ class RecordingsVisualLayoutTest {
     fun theBrowseHeadlineNamesTheGroupingAndItsColumnsShareTheFirstRow() {
         show()
         focused("recordings-folder-Documentaries")
+        compose.onNodeWithTag("depth-back-hint").assertDoesNotExist()
         val active = activeHeading()
+        val rootHeadingBand = bounds("depth-heading")
+        capture("recordings-root", 1f, "hint=absent; headline=$rootHeadingBand", outputs = "build/outputs/back-hint")
         assertEquals("Folders", active.text)
         val defaultRow = firstListRow()
+        val capitalCenter = bounds(OPTIONS).center.y
         assertButtonClearOf(defaultRow)
         assertEquals(null, valuesLine())
         compose.onNodeWithTag(OPTIONS).assertContentDescriptionEquals("View options")
@@ -936,8 +941,30 @@ class RecordingsVisualLayoutTest {
         assertEquals("Both columns start their rows level", listIcon, previewIcon, 1f)
         // Below the root at the defaults: no button, no line, the same headline and rows.
         downToList()
-        key(Key.DirectionRight)
+        compose.mainClock.autoAdvance = false
+        try {
+            compose.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
+            compose.waitForIdle()
+            compose.mainClock.advanceTimeBy(160)
+            compose.waitForIdle()
+            capture("recordings-folder-transition", 1f,
+                "hint=${bounds("depth-back-hint")}; headline=${bounds("depth-heading")}; entering folder at 160ms",
+                outputs = "build/outputs/back-hint")
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+        compose.waitForIdle()
         focused("recordings-folder-Documentaries/Expeditions")
+        val hint = bounds("depth-back-hint")
+        val nestedHeading = activeHeading().bounds
+        val nestedHeadingBand = bounds("depth-heading")
+        val density = view.resources.displayMetrics.density
+        assertEquals("Hint ends in the start gutter", nestedHeading.left - 8 * density, hint.right, 1f)
+        assertEquals("Hint retains the existing headline keyline", active.bounds.left, nestedHeading.left, 1f)
+        assertEquals("Hint does not change the headline band", rootHeadingBand, nestedHeadingBand)
+        assertEquals("Hint is centered on the headline capitals like View options", capitalCenter, hint.center.y, 1f)
+        assertEquals("Hint uses the existing 24dp glyph", 24 * density, hint.width, 1f)
+        capture("recordings-folder", 1f, "hint=$hint; headline=$nestedHeadingBand", outputs = "build/outputs/back-hint")
         gone(OPTIONS)
         assertEquals(null, valuesLine())
         assertEquals(active.baseline, activeHeading().baseline, 1f)
@@ -1460,8 +1487,10 @@ class RecordingsVisualLayoutTest {
         assertNoCommands()
     }
 
-    @Test fun schedulePaneGivesThePaddedStopAndRuleAndProblemsPaneWhatWentWrong() {
-        show(entries = paneEntries(long = false, skipped = true), autorecRules = listOf(
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")
+    fun schedulePaneGivesThePaddedStopAndRuleAndProblemsPaneWhatWentWrong() {
+        val longChannel = "Ridge Earth Mountain Channel HD Extra International"
+        show(entries = paneEntries(long = false, skipped = true, channelName = longChannel), autorecRules = listOf(
             at.bernhardberger.tvheadend.sdk.core.AutorecRule.create(
                 AutorecRuleId("series"), seriesLinkUri = "series:ridge-light")))
         focused("recordings-folder-Sport")
@@ -1485,14 +1514,16 @@ class RecordingsVisualLayoutTest {
         compose.onNode(hasAnyAncestor(hasTestTag("recording-metadata-metadata")) and hasText("recorded", substring = true),
             useUnmergedTree = true).assertDoesNotExist()
         capture("schedule-pane", 1f)
-        publish(paneEntries(long = false), autorecRules = listOf(
+        publish(paneEntries(long = false, channelName = longChannel), autorecRules = listOf(
             AutorecRule.create(AutorecRuleId("series"), seriesLinkUri = "series:ridge-light")))
+        assertPaneEyebrow(longChannel, 1_791_086_400L, "recording-badge-scheduled",
+            "schedule-long-channel")
         val seriesOrigin = view.resources.getString(R.string.recording_from_series_rule)
         compose.onNodeWithTag("recording-list-state-40", useUnmergedTree = true)
             .assert(hasContentDescription(seriesOrigin))
         compose.onNodeWithTag("recording-badge-scheduled", useUnmergedTree = true)
             .assert(hasContentDescription(seriesOrigin))
-        publish(paneEntries(long = false), autorecRules = listOf(
+        publish(paneEntries(long = false, channelName = longChannel), autorecRules = listOf(
             at.bernhardberger.tvheadend.sdk.core.AutorecRule.create(AutorecRuleId("series"), title = "^Ridge Light$")))
         compose.onNode(hasAnyAncestor(hasTestTag("recording-metadata-rule")) and
             hasText("Part of an automatic recording"), useUnmergedTree = true).assertIsDisplayed()
@@ -1508,6 +1539,8 @@ class RecordingsVisualLayoutTest {
         compose.onNodeWithText("Problems").assertIsFocused()
         key(Key.DirectionDown)
         focused("recording-list-entry-60")
+        assertPaneEyebrow(longChannel, 1_791_086_400L - 86_400, "recording-badge-failed",
+            "problems-long-channel")
         // The server's reason in plain words, and what is left of the file.
         val size = formatFileSize(1_200_000_000L, ApplicationProvider.getApplicationContext<Application>())
         compose.onNode(hasAnyAncestor(hasTestTag("recording-metadata-failure")) and hasText("Recording storage full"),
@@ -1521,6 +1554,18 @@ class RecordingsVisualLayoutTest {
         compose.onNode(hasAnyAncestor(hasTestTag("recording-metadata-failure")) and hasText("Recording missed"),
             useUnmergedTree = true).assertIsDisplayed()
         compose.onNodeWithTag("recording-metadata-partial-file", useUnmergedTree = true).assertDoesNotExist()
+        key(Key.DirectionUp)
+        key(Key.DirectionUp)
+        key(Key.DirectionLeft)
+        key(Key.DirectionLeft)
+        key(Key.DirectionDown)
+        key(Key.DirectionRight)
+        focused("recording-list-entry-1")
+        publish(listOf(recording(3, "Kept match", "Sport/kept.ts")))
+        focused("recording-list-entry-3")
+        compose.onNodeWithTag("recording-metadata-time-left", useUnmergedTree = true).assertDoesNotExist()
+        assertPaneEyebrow("Ridge Earth HD", 1_791_000_000L - 3 * 86_400, null,
+            "browse-finished-short-channel", ellipsized = false)
         assertNoCommands()
     }
 
@@ -1567,10 +1612,12 @@ class RecordingsVisualLayoutTest {
         assertNoCommands()
     }
 
-    @Test fun readOnlyScheduleHasNoAddingRowsAndOnlyShowsAnExistingAutomaticRecordingsLevel() {
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")
+    fun readOnlyScheduleHasNoAddingRowsAndOnlyShowsAnExistingAutomaticRecordingsLevel() {
         screenState.open(at.bernhardberger.tvhplayer.core.DvrLibraryMode.SCHEDULE)
         val entry = recording(20, "Tomorrow's documentary", null, DvrEntryState.SCHEDULED)
-        show(entries = listOf(entry), canModify = false)
+        show(entries = listOf(entry), canModify = false,
+            channels = listOf(Channel.create(ChannelId(7), name = "Ridge Earth")))
         focused("recording-list-entry-20")
         compose.onNodeWithTag("schedule-new-timer").assertDoesNotExist()
         compose.onNodeWithTag("schedule-automatic-recordings").assertDoesNotExist()
@@ -1581,6 +1628,12 @@ class RecordingsVisualLayoutTest {
         focused("schedule-automatic-recordings")
         key(Key.DirectionCenter)
         focused("automatic-recording-series")
+        val hint = bounds("depth-back-hint")
+        val heading = bounds("depth-heading")
+        val density = view.resources.displayMetrics.density
+        assertEquals(heading.left - 8 * density, hint.right, 1f)
+        assertTrue("Hint stays beside the headline", hint.top >= heading.top && hint.bottom <= heading.bottom)
+        capture("schedule-automatic-level", 1f, "hint=$hint; headline=$heading", outputs = "build/outputs/back-hint")
         compose.onNodeWithTag("schedule-new-automatic").assertDoesNotExist()
         key(Key.DirectionCenter)
         key(Key.Menu)
@@ -1607,6 +1660,53 @@ class RecordingsVisualLayoutTest {
             view.context.getString(R.string.automatic_recording_kind_title) +
                 " • ${view.context.getString(R.string.all_channels)}",
         ))
+        val upcoming = (1L..7L).map { index ->
+            DvrEntry.create(DvrEntryId(700 + index), title = "Programme $index", subtitle = "Episode $index",
+                state = DvrEntryState.SCHEDULED, autorecRuleId = AutorecRuleId("title"),
+                channelId = ChannelId(7), channelName = "Ridge Earth",
+                start = Instant.fromEpochSeconds(nowSeconds() + index * 3_600),
+                stop = Instant.fromEpochSeconds(nowSeconds() + index * 3_600 + 1_800))
+        }
+        publish(upcoming.reversed(), autorecRules = listOf(AutorecRule.create(
+            AutorecRuleId("title"), title = "^Ridge Light across the northern frontier and the winter mountains$",
+            seriesLinkUri = "ridge", enabled = false)))
+        val sectionHeading = view.context.getString(R.string.timer_editor_next_recordings)
+        val more = view.context.getString(R.string.timer_editor_more_removed, upcoming.size - SCHEDULE_UPCOMING_SHOWN)
+        compose.onNodeWithText(sectionHeading, useUnmergedTree = true).assertExists()
+        val pairs = (1..SCHEDULE_UPCOMING_SHOWN).map { index ->
+            compose.onNode(hasText("Episode $index") and hasAnyAncestor(hasTestTag("automatic-recording-pane")),
+                useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        }
+        assertTrue("Upcoming pairs follow start order", pairs.zipWithNext().all { (a, b) -> a.bottom <= b.top })
+        val moreNode = compose.onNodeWithText(more, useUnmergedTree = true)
+        moreNode.assertExists()
+        val meta = compose.onAllNodes(hasText(" • Ridge Earth", substring = true) and
+            hasAnyAncestor(hasTestTag("automatic-recording-pane")), useUnmergedTree = true)
+            .fetchSemanticsNodes().first().boundsInRoot
+        val headingBounds = compose.onNodeWithText(sectionHeading, useUnmergedTree = true)
+            .fetchSemanticsNode().boundsInRoot
+        assertTrue("Pairs have more separation than the two lines within a pair",
+            pairs[1].top - meta.bottom > meta.top - pairs[0].bottom)
+        val statusGap = bounds("automatic-recording-pane-keep").top - bounds("automatic-recording-pane-when").bottom
+        assertTrue("The section heading separates itself from the status lines",
+            headingBounds.top - bounds("automatic-recording-pane-keep").bottom > statusGap)
+        assertTrue("The heading separates itself from the first pair", pairs[0].top - headingBounds.bottom > statusGap)
+        val safeBottom = compose.onRoot().fetchSemanticsNode().boundsInRoot.bottom -
+            35 * view.resources.displayMetrics.density
+        val lowest = moreNode.fetchSemanticsNode().boundsInRoot.bottom
+        assertTrue("Lowest upcoming text fits the safe preview column: bottom=$lowest, safe=$safeBottom",
+            lowest <= safeBottom)
+        compose.onAllNodes(hasText(" • Ridge Earth", substring = true) and
+            hasAnyAncestor(hasTestTag("automatic-recording-pane")), useUnmergedTree = true)
+            .assertCountEquals(SCHEDULE_UPCOMING_SHOWN)
+        publish(upcoming, autorecRules = listOf(AutorecRule.create(
+            AutorecRuleId("title"), title = "^Ridge Light$", channelId = ChannelId(7))))
+        compose.onAllNodes(hasText(" • Ridge Earth", substring = true) and
+            hasAnyAncestor(hasTestTag("automatic-recording-pane")), useUnmergedTree = true).assertCountEquals(1)
+        publish(listOf(entry), autorecRules = listOf(AutorecRule.create(AutorecRuleId("title"), title = "^Ridge Light$")))
+        compose.onNodeWithText(sectionHeading, useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithText(view.context.getString(R.string.schedule_automatic_nothing),
+            useUnmergedTree = true).assertExists()
         publish(listOf(entry))
         assertEquals("schedule:", screenState.scheduleNavigation.stack.active.levelId)
         focused("recording-list-entry-20")
@@ -1625,9 +1725,15 @@ class RecordingsVisualLayoutTest {
         publish(emptyList(), autorecRules = rules.drop(1))
         publish(emptyList(), autorecRules = rules)
         key(Key.DirectionDown)
-        key(Key.DirectionCenter)
+        key(Key.DirectionRight)
+        focused("schedule-new-automatic")
+        key(Key.DirectionDown)
         focused("automatic-recording-first")
         key(Key.DirectionDown)
+        focused("automatic-recording-second")
+        compose.pressKey(Key.Back)
+        focused("schedule-automatic-recordings")
+        key(Key.DirectionCenter)
         focused("automatic-recording-second")
         compose.pressKey(Key.Back)
         focused("schedule-automatic-recordings")
@@ -1677,7 +1783,7 @@ class RecordingsVisualLayoutTest {
         key(Key.DirectionUp)
         focused("schedule-automatic-recordings")
         key(Key.DirectionCenter)
-        focused("automatic-recording-first")
+        focused("schedule-new-automatic")
         assertNoCommands()
     }
 
@@ -1722,6 +1828,8 @@ class RecordingsVisualLayoutTest {
         })
         key(Key.DirectionDown)
         key(Key.DirectionCenter)
+        focused("schedule-new-automatic")
+        key(Key.DirectionDown)
         focused("automatic-recording-ridge")
         key(Key.Menu)
         key(Key.DirectionDown)
@@ -1870,6 +1978,7 @@ class RecordingsVisualLayoutTest {
         show(empty = true, autorecRules = listOf(rule))
         key(Key.DirectionDown)
         key(Key.DirectionCenter)
+        key(Key.DirectionDown)
         key(Key.Menu)
         repeat(2) { key(Key.DirectionDown) }
         key(Key.DirectionCenter)
@@ -1960,10 +2069,10 @@ class RecordingsVisualLayoutTest {
         focused("schedule-automatic-recordings")
         capture("Bx3-automatic-recordings-focused", 1f, "Fixture pack: Ridge Light.", outputs)
         key(Key.DirectionCenter)
+        focused("schedule-new-automatic")
+        capture("Bx4-automatic-level", 1f, "First row focused on entry; intentionally blank pane.", outputs)
+        key(Key.DirectionDown)
         focused("automatic-recording-ridge")
-        capture("Bx4-automatic-level", 1f, activeHeading().let {
-            "First rule focused; no pane artwork. Heading=${it.bounds}; baseline=${it.baseline}"
-        }, outputs)
         key(Key.Menu)
         key(Key.DirectionDown)
         focused("automatic-recording-menu-toggle")
@@ -1992,6 +2101,35 @@ class RecordingsVisualLayoutTest {
         capture("Bx6-empty-schedule", 1f, "One-line support and centered empty text with 48dp vertical space.", outputs)
     }
 
+    @Test @Category(VisualCapture::class) @Config(qualifiers = "en-rUS-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun upcomingAutomaticRecordingFrames() {
+        presentationLibrary(firstRow = true, scheduled = true)
+        val channel = requireNotNull(session.observation.value.channelCatalogForDisplay)
+            .channels.first { it.name == "Ridge Earth" }
+        val id = AutorecRuleId("ridge")
+        val title = "^Ridge Light across the northern frontier and the winter mountains$"
+        val upcoming = (1L..7L).map { index ->
+            DvrEntry.create(DvrEntryId(700 + index), title = "Ridge Light", subtitle = "The winter journey $index",
+                state = DvrEntryState.SCHEDULED, autorecRuleId = id, channelId = channel.id,
+                start = Instant.fromEpochSeconds(nowSeconds() + index * 86_400),
+                stop = Instant.fromEpochSeconds(nowSeconds() + index * 86_400 + 1_800))
+        }
+        publish(upcoming, autorecRules = listOf(AutorecRule.create(id, title = title,
+            seriesLinkUri = "ridge", channelId = channel.id)))
+        openScheduleScreen()
+        key(Key.DirectionUp)
+        key(Key.DirectionCenter)
+        key(Key.DirectionDown)
+        focused("automatic-recording-ridge")
+        val outputs = "../captures/autorec-impl/emulator-feedback-1"
+        capture("series-upcoming-five", 1f, "Two-line series name, four ordered pairs and remaining count.", outputs)
+        publish(upcoming, autorecRules = listOf(AutorecRule.create(id, title = title, seriesLinkUri = "ridge")))
+        capture("all-channels-upcoming-five", 1f, "Known channel appears on each upcoming pair.", outputs)
+        publish(emptyList(), autorecRules = listOf(AutorecRule.create(id, title = title, seriesLinkUri = "ridge")))
+        capture("automatic-nothing-scheduled", 1f, "No upcoming heading or list.", outputs)
+    }
+
     @Test
     @Category(VisualCapture::class)
     @Config(qualifiers = "en-rUS-w960dp-h540dp-land-xhdpi")
@@ -2003,6 +2141,7 @@ class RecordingsVisualLayoutTest {
         openScheduleScreen()
         compose.pressKey(Key.DirectionDown)
         compose.pressKey(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionDown)
         compose.onNodeWithTag("automatic-recording-long-expression").assertIsFocused()
         val outputs = "../captures/autorec-impl/g10-first-look"
         capture("long-expression-schedule", 1f, "Approved expression; native row focused.", outputs)
@@ -2120,6 +2259,7 @@ class RecordingsVisualLayoutTest {
         val origin = ApplicationProvider.getApplicationContext<Application>().getString(R.string.recording_from_automatic)
         compose.onNodeWithTag("recording-badge", useUnmergedTree = true)
             .assert(hasContentDescription(origin, substring = true))
+        compose.onNodeWithTag("recording-metadata-time-left", useUnmergedTree = true).assertDoesNotExist()
     }
 
     @Test fun missedRecordingIsListedWithTheFailuresAndSaysMissed() {
@@ -2185,11 +2325,12 @@ class RecordingsVisualLayoutTest {
             compose.onNodeWithTag(it, useUnmergedTree = true).assertIsDisplayed()
             assertTrue("$it ends inside the pane", bounds(it).bottom <= pane.bottom + 0.5f)
         }
-        // The title gives way to one line first; the subtitle says what the recording is.
+        // The title gives way first; removing the watching-end hint leaves room for more title.
         val title = mutableListOf<TextLayoutResult>()
         compose.onNodeWithTag("recording-metadata-title", useUnmergedTree = true)
             .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(title) }
-        assertEquals(1, title.single().lineCount)
+        assertTrue("The title shortens rather than clipping the subtitle or status",
+            title.single().isLineEllipsized(title.single().lineCount - 1))
     }
 
     @Test fun zeroLengthIsAbsentFromRowsAndPane() {
@@ -2655,8 +2796,8 @@ class RecordingsVisualLayoutTest {
         assertWatchMark(1, "Partly watched")
         assertWatchMark(2, "Watched")
         compose.onNodeWithTag("recording-list-watched-3", useUnmergedTree = true).assertDoesNotExist()
-        // 1:02:03 into 90 minutes leaves 27:57, rounded up, ending that long from now.
-        assertTimeLeft("28m left • Ends at ")
+        // 1:02:03 into 90 minutes leaves 27:57, rounded up, without a predicted watching-end clock.
+        assertTimeLeft("28m left")
         capture("archive-watch-partly", 1f)
         key(Key.DirectionDown)
         focused("recording-list-entry-2")
@@ -2667,7 +2808,8 @@ class RecordingsVisualLayoutTest {
         key(Key.DirectionDown)
         focused("recording-list-entry-3")
         compose.onNodeWithTag("recording-metadata-watched", useUnmergedTree = true).assertDoesNotExist()
-        assertTimeLeft("Ends at ")
+        compose.onNodeWithTag("recording-metadata-time-left", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithText("Ends at ", substring = true, useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithText("left", substring = true).assertDoesNotExist()
         capture("archive-watch-marks", 1f)
         assertNoCommands()
@@ -2991,11 +3133,36 @@ class RecordingsVisualLayoutTest {
         }
     }
 
-    private fun paneEntries(long: Boolean, skipped: Boolean = false): List<DvrEntry> {
+    private fun assertPaneEyebrow(channel: String, start: Long, badgeTag: String?, frame: String,
+        ellipsized: Boolean = true) {
+        val date = formatRecordingDate(start, dateOnly = true, locale = Locale.US)
+        fun textNode(text: String) = compose.onNode(
+            hasAnyAncestor(hasTestTag("recording-metadata-eyebrow")) and hasText(text, substring = true),
+            useUnmergedTree = true)
+        val dateNode = textNode(date)
+        val layouts = mutableListOf<TextLayoutResult>()
+        dateNode.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        assertFalse("The pane date must not be ellipsized", layouts.single().isLineEllipsized(0))
+        assertFalse("The pane date must not overflow", layouts.single().hasVisualOverflow)
+        val dateBounds = dateNode.fetchSemanticsNode().boundsInRoot
+        val nameNode = textNode(channel)
+        layouts.clear()
+        nameNode.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        assertEquals("Only the channel gives way", ellipsized, layouts.single().isLineEllipsized(0))
+        val nameBounds = nameNode.fetchSemanticsNode().boundsInRoot
+        val badgeBounds = badgeTag?.let { bounds(it) }
+        assertTrue("Name ends before date", nameBounds.right <= dateBounds.left)
+        assertTrue("Date ends before badge or pane edge",
+            dateBounds.right <= (badgeBounds?.left ?: bounds("recording-metadata-pane").right))
+        capture(frame, 1f, "name=$nameBounds; date=$dateBounds; badge=$badgeBounds",
+            outputs = "build/outputs/pane-eyebrow")
+    }
+
+    private fun paneEntries(long: Boolean, skipped: Boolean = false, channelName: String? = null): List<DvrEntry> {
         val start = 1_791_086_400L
         val title = if (long) "Die außergewöhnliche Reise der Polarlichter: Eine Winterexpedition durch die Arktis"
             else "Coastal Final"
-        val channel = if (long) "Ridge Earth Mountain Channel HD Extra" else "Ridge Earth HD"
+        val channel = channelName ?: if (long) "Ridge Earth Mountain Channel HD Extra" else "Ridge Earth HD"
         return listOf(
             recording(1, "Kept match", "Sport/kept.ts"),
             DvrEntry.create(DvrEntryId(40), title = title, state = DvrEntryState.SCHEDULED,
