@@ -629,6 +629,7 @@ fun AppRoot(
     val uiSettingsStore: UiSettingsStore = koinInject()
     val context = LocalContext.current
     val uiSettings by uiSettingsStore.settings.collectAsStateWithLifecycle(initialValue = UiSettings())
+    val settingsScope = rememberCoroutineScope()
     var lastUpdateTime by remember { mutableStateOf<Long?>(null) }
     LaunchedEffect(uiSettingsStore) {
         val packageInfo = withContext(Dispatchers.IO) {
@@ -1239,6 +1240,8 @@ fun AppRoot(
                             },
                             playingRecordingId = warmRecordingId,
                             onReturnToRecording = returnToWarmRecording,
+                            view = uiSettings.recordingsView,
+                            onViewChange = { settingsScope.launch { uiSettingsStore.setRecordingsView(it) } },
                             onWatchChannel = requestLivePlayer,
                             contentAllowed = contentAllowed,
                             contentPadding = contentPadding,
@@ -1567,6 +1570,10 @@ fun AppRoot(
                                     activeChannelId = playingChannelId,
                                     activeRecordingId = playingRecordingId,
                                 )
+                                // The drawer opens the library; the Schedule screen is reached from its pill.
+                                if (destination == AppDestination.RECORDINGS) {
+                                    recordingsScreenState.open(at.bernhardberger.tvhplayer.core.DvrLibraryMode.ARCHIVE)
+                                }
                                 navigateTopLevel(
                                     destination.toTopLevelKey(
                                         settingsSection = backStack.lastSettingsSection(),

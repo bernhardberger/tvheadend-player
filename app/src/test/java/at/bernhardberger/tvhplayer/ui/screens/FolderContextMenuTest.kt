@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvhplayer.testutil.testDvrMutationActions
 import at.bernhardberger.tvhplayer.testutil.setContentWithBrowsePreparation
 import android.app.Application
 import androidx.compose.runtime.collectAsState
@@ -176,12 +177,6 @@ class FolderContextMenuTest {
         compose.onNodeWithTag("recordings-folder-supporting-Seen", useUnmergedTree = true).assertTextEquals("2 recordings")
     }
 
-    @Test fun theRecordingNowFolderHasNoMenu() {
-        show(seriesFolder())
-        compose.onNodeWithTag("recordings-recording-now-folder").requestFocus().performKeyInput { pressKey(Key.Menu) }
-        compose.onNodeWithTag("browse-context-menu").assertDoesNotExist()
-    }
-
     private lateinit var notices: NoticeCenter
 
     private fun openFolderMenu() {
@@ -199,7 +194,7 @@ class FolderContextMenuTest {
 
     private fun show(entries: List<DvrEntry>): FakeTvheadendSession {
         val session = FakeTvheadendSession(observation(entries))
-        val actions = DvrMutationActions(
+        val actions = testDvrMutationActions(
             updateWatchStateCommand = { _, id, watched ->
                 watchCalls += id to watched
                 watchGate?.await()
@@ -215,7 +210,7 @@ class FolderContextMenuTest {
         val state = RecordingsScreenState()
         compose.setContentWithBrowsePreparation {
             TVHeadendPlayerTheme {
-                if (screenShown.value) RecordingsScreenContent(observation = session.observation.collectAsState().value,
+                if (screenShown.value) RecordingsScreenContent(view = at.bernhardberger.tvhplayer.core.DvrArchiveView(at.bernhardberger.tvhplayer.core.DvrArchiveGrouping.FOLDERS), observation = session.observation.collectAsState().value,
                     currentObservation = { session.observation.value }, state = state,
                     dvrMutationActions = actions, notices = notices)
             }

@@ -19,6 +19,8 @@ import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.BrowseContextAction
+import at.bernhardberger.tvhplayer.core.AutomaticRecordingKind
+import at.bernhardberger.tvhplayer.core.RecordingKeepUntilOption
 
 internal class BrowseContextMenuTrigger(val modifier: Modifier, val onLongClick: (() -> Unit)?)
 
@@ -71,7 +73,15 @@ internal fun BrowseContextMenu(
     backEnabled: Boolean = true,
     recordingState: DvrEntryState? = null,
     recordingRule: RecordingRule? = null,
+    recordingKind: AutomaticRecordingKind? = null,
+    recordingEnabled: Boolean? = null,
     resumePositionMs: Long? = null,
+    keepUntilOptions: List<RecordingKeepUntilOption>? = null,
+    keepUntilBusy: Boolean = false,
+    keepUntilSupport: String? = null,
+    nowSec: Long = 0,
+    onKeepUntilChoose: (RecordingKeepUntilOption) -> Unit = {},
+    onKeepUntilBack: () -> Unit = {},
     /** The playing item's mark, drawn as Continue watching's icon. */
     playbackIndicator: ChannelPlaybackIndicator = ChannelPlaybackIndicator.NONE,
     artwork: @Composable () -> Unit,
@@ -79,41 +89,34 @@ internal fun BrowseContextMenu(
     val requesters = remember { BrowseContextAction.entries.associateWith { FocusRequester() } }
     var focusedAction by remember { mutableStateOf<BrowseContextAction?>(null) }
     var focusedIndex by remember { mutableIntStateOf(0) }
-    LaunchedEffect(actions, backEnabled) {
-        if (!backEnabled) return@LaunchedEffect
+    val restoreAction = if (focusedAction in actions) focusedAction
+        else actions.getOrNull(focusedIndex) ?: actions.firstOrNull()
+    LaunchedEffect(actions, backEnabled, keepUntilOptions != null) {
+        if (!backEnabled || keepUntilOptions != null) return@LaunchedEffect
         withFrameNanos { }
-        val target = if (focusedAction in actions) focusedAction
-            else actions.getOrNull(focusedIndex) ?: actions.firstOrNull()
-        target?.let { requesters.getValue(it).requestFocus() }
+        restoreAction?.let { requesters.getValue(it).requestFocus() }
     }
-    TwoColumnDialog(title, "", onClose, modifier.testTag("browse-context-menu"), backEnabled,
-        onPreviewKeyEvent = { it.key == Key.Menu },
+    TwoColumnDialog(title, "", if (keepUntilOptions != null) onKeepUntilBack else onClose,
+        modifier.testTag("browse-context-menu"), backEnabled,
+        onPreviewKeyEvent = { it.key == Key.Menu || keepUntilBusy &&
+            it.key in listOf(Key.DirectionCenter, Key.Enter, Key.NumPadEnter) },
         itemCardLayout = true,
+        dismissLevel = keepUntilOptions != null,
         leading = {
-            val subtitle = listOf(channel, time).filter(String::isNotBlank).joinToString(" • ")
-            val description = listOf(episode, summary).filter(String::isNotBlank).joinToString("\n")
-            Column(Modifier.fillMaxWidth().testTag("browse-context-item")) {
-                Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f)) { artwork() }
-                Spacer(Modifier.height(8.dp))
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(title, Modifier.semantics { heading() }, style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    if (subtitle.isNotBlank()) Text(subtitle, style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    RecordingBadge(recordingState, Modifier.testTag("browse-context-recording"), rule = recordingRule)
-                    if (description.isNotBlank()) Text(description, style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), maxLines = 3, overflow = TextOverflow.Ellipsis)
-                }
-            }
+            BrowseContextRecordingCard(title, channel, episode, time, summary,
+                recordingState, recordingRule, recordingEnabled, artwork)
         }) {
+        if (keepUntilOptions != null) {
+            RecordingKeepUntilChoices(keepUntilOptions, nowSec, keepUntilBusy, onKeepUntilChoose)
+        } else {
         actions.forEachIndexed { index, action ->
             key(action) {
                 TwoColumnDialogButton(
                     stringResource(when {
                         programDetailsLabel && action == BrowseContextAction.DETAILS -> R.string.details_program
-                        else -> action.label(watchChannel)
+                        else -> action.label(watchChannel, recordingKind)
                     }),
-                    { onAction(action) },
+                    { focusedAction = action; focusedIndex = index; onAction(action) },
                     Modifier.testTag("browse-context-action-${action.name.lowercase()}")
                         .focusRequester(requesters.getValue(action))
                         .onFocusChanged { if (it.isFocused) { focusedAction = action; focusedIndex = index } }
@@ -122,7 +125,9 @@ internal fun BrowseContextMenu(
                             down = actions.getOrNull(index + 1)?.let(requesters::get) ?: FocusRequester.Cancel
                             left = FocusRequester.Cancel; right = FocusRequester.Cancel
                         },
-                    subtitle = resumePositionMs?.takeIf { action == BrowseContextAction.RESUME && it > 0 }
+                    subtitle = keepUntilSupport?.takeIf { action == BrowseContextAction.KEEP_UNTIL }
+                        ?: contextActionSupport(action, recordingKind)?.let { stringResource(it) }
+                        ?: resumePositionMs?.takeIf { action == BrowseContextAction.RESUME && it > 0 }
                         ?.let { stringResource(at.bernhardberger.tvhplayer.R.string.context_resume_from,
                             at.bernhardberger.tvhplayer.core.formatPlaybackDuration(it)) },
                 ) {
@@ -130,6 +135,7 @@ internal fun BrowseContextMenu(
                         action == BrowseContextAction.CONTINUE_WATCHING } ?: ChannelPlaybackIndicator.NONE, 24.dp)
                 }
             }
+        }
         }
     }
 }
@@ -141,10 +147,28 @@ internal fun BrowseContextActionIcon(action: BrowseContextAction, indicator: Cha
     else Icon(painterResource(action.icon()), null, Modifier.size(size))
 }
 
-internal fun BrowseContextAction.label(watchChannel: Boolean): Int = when (this) {
+internal fun BrowseContextAction.label(watchChannel: Boolean, kind: AutomaticRecordingKind? = null): Int = when (this) {
     BrowseContextAction.WATCH -> if (watchChannel) R.string.context_watch_channel else R.string.context_watch
     BrowseContextAction.DETAILS -> R.string.context_details
     BrowseContextAction.RECORD -> R.string.context_record
+    BrowseContextAction.RECORD_SERIES -> R.string.context_record_series
+    BrowseContextAction.RECORD_TITLE -> R.string.context_record_title
+    BrowseContextAction.EDIT_RULE -> when (kind) {
+        AutomaticRecordingKind.SERIES -> R.string.context_edit_series
+        AutomaticRecordingKind.KEYWORD -> R.string.context_edit_keyword
+        AutomaticRecordingKind.TIMER -> R.string.context_edit_timer
+        else -> R.string.context_edit_title
+    }
+    BrowseContextAction.SKIP -> when (kind) {
+        AutomaticRecordingKind.SERIES -> R.string.context_skip_episode
+        AutomaticRecordingKind.TIMER -> R.string.context_skip_timer
+        else -> R.string.context_skip_program
+    }
+    BrowseContextAction.UNSKIP -> when (kind) {
+        AutomaticRecordingKind.SERIES -> R.string.context_unskip_episode
+        AutomaticRecordingKind.TIMER -> R.string.context_unskip_timer
+        else -> R.string.context_unskip_program
+    }
     BrowseContextAction.STOP -> R.string.stop_recording
     BrowseContextAction.CANCEL -> R.string.cancel_recording
     BrowseContextAction.SHOW_GUIDE -> R.string.context_show_guide
@@ -156,6 +180,7 @@ internal fun BrowseContextAction.label(watchChannel: Boolean): Int = when (this)
     BrowseContextAction.MARK_WATCHED -> R.string.context_mark_watched
     BrowseContextAction.MARK_UNWATCHED -> R.string.context_mark_unwatched
     BrowseContextAction.DELETE -> R.string.context_delete
+    BrowseContextAction.KEEP_UNTIL -> R.string.context_keep_until
     BrowseContextAction.REMOVE_ENTRY -> R.string.remove_entry
     BrowseContextAction.MARK_ALL_WATCHED -> R.string.context_mark_all_watched
     BrowseContextAction.MARK_ALL_UNWATCHED -> R.string.context_mark_all_unwatched
@@ -163,18 +188,37 @@ internal fun BrowseContextAction.label(watchChannel: Boolean): Int = when (this)
     BrowseContextAction.DELETE_ALL -> R.string.context_delete_all
 }
 
+private fun contextActionSupport(action: BrowseContextAction, kind: AutomaticRecordingKind?): Int? = when (action) {
+    BrowseContextAction.UNSKIP -> R.string.context_unskip_support
+    BrowseContextAction.SKIP -> when (kind) {
+        AutomaticRecordingKind.SERIES -> R.string.context_skip_series_support
+        AutomaticRecordingKind.TIMER -> R.string.context_skip_timer_support
+        else -> R.string.context_skip_automatic_support
+    }
+    else -> null
+}
+
 internal fun BrowseContextAction.icon(): Int = when (this) {
     BrowseContextAction.DETAILS -> R.drawable.ic_info
     BrowseContextAction.RECORD -> R.drawable.ic_fiber_manual_record
+    BrowseContextAction.RECORD_SERIES, BrowseContextAction.RECORD_TITLE -> R.drawable.ic_fiber_smart_record
+    BrowseContextAction.KEEP_UNTIL, BrowseContextAction.EDIT_RULE,
+    BrowseContextAction.SKIP, BrowseContextAction.UNSKIP -> recordingActionIcon(this)
     BrowseContextAction.STOP, BrowseContextAction.CANCEL -> R.drawable.ic_stop
     BrowseContextAction.DELETE, BrowseContextAction.REMOVE_ENTRY, BrowseContextAction.DELETE_WATCHED ->
         R.drawable.ic_delete_outlined
     BrowseContextAction.DELETE_ALL -> R.drawable.ic_delete_sweep_outlined
     BrowseContextAction.SHOW_GUIDE -> R.drawable.ic_event
-    BrowseContextAction.CONTINUE_WATCHING -> R.drawable.ic_play_arrow
     BrowseContextAction.WATCH_LIVE -> R.drawable.ic_live_tv_outlined
     BrowseContextAction.START_OVER -> R.drawable.ic_replay
     BrowseContextAction.MARK_WATCHED, BrowseContextAction.MARK_ALL_WATCHED -> R.drawable.ic_check_circle_outlined
     BrowseContextAction.MARK_UNWATCHED, BrowseContextAction.MARK_ALL_UNWATCHED -> R.drawable.ic_unpublished_outlined
     else -> R.drawable.ic_play_arrow
+}
+
+private fun recordingActionIcon(action: BrowseContextAction): Int = when (action) {
+    BrowseContextAction.KEEP_UNTIL -> R.drawable.ic_hourglass_bottom
+    BrowseContextAction.SKIP -> R.drawable.ic_event_busy
+    BrowseContextAction.UNSKIP -> R.drawable.ic_fiber_manual_record
+    else -> R.drawable.ic_edit
 }

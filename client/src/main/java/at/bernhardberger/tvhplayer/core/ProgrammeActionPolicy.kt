@@ -10,6 +10,8 @@ import at.bernhardberger.tvhplayer.notices.RecordUnavailableReason
 enum class ProgrammeAction {
     WATCH,
     RECORD,
+    RECORD_SERIES,
+    RECORD_TITLE,
     CANCEL_RECORDING,
     STOP_RECORDING,
     WATCH_FROM_START,
@@ -47,7 +49,15 @@ fun programmeActions(
             recording != null && recordingPlaybackOffered(recordingAdmission) -> listOf(ProgrammeAction.WATCH_FROM_START)
         else -> emptyList()
     }
-    if (canModifyRecordings) return actions
+    if (canModifyRecordings) {
+        val oneOff = recording?.autorecRuleId == null && recording?.timerecRuleId == null
+        val automatic = if (oneOff && (ProgrammeAction.RECORD in actions ||
+                recording?.state in listOf(DvrEntryState.SCHEDULED, DvrEntryState.RECORDING,
+                    DvrEntryState.RECORDING_ERROR))) {
+            if (event.seriesLinkUri.isNullOrBlank()) ProgrammeAction.RECORD_TITLE else ProgrammeAction.RECORD_SERIES
+        } else null
+        return if (automatic == null) actions else actions + automatic
+    }
     return actions.filter {
         it != ProgrammeAction.RECORD &&
             it != ProgrammeAction.CANCEL_RECORDING &&

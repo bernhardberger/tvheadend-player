@@ -1,0 +1,301 @@
+package at.bernhardberger.tvhplayer.ui.screens.recordings
+
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.painterResource
+import androidx.tv.material3.Icon
+import androidx.tv.material3.MaterialTheme
+import at.bernhardberger.tvheadend.sdk.core.Channel
+import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
+import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
+import at.bernhardberger.tvheadend.sdk.core.DvrMutationResult
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
+import at.bernhardberger.tvheadend.sdk.core.DvrMutationKind
+import at.bernhardberger.tvheadend.sdk.core.SessionObservation
+import at.bernhardberger.tvheadend.sdk.core.SessionState
+import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
+import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
+import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
+import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.core.AutomaticRecordingListItem
+import at.bernhardberger.tvhplayer.core.toDraft
+import at.bernhardberger.tvhplayer.core.AutomaticRecordingKind
+import at.bernhardberger.tvhplayer.notices.NoticeCenter
+import at.bernhardberger.tvhplayer.notices.Notice
+import at.bernhardberger.tvhplayer.notices.toDvrMutationFeedback
+import at.bernhardberger.tvhplayer.ui.components.ConfirmationPanel
+import at.bernhardberger.tvhplayer.ui.components.ConfirmationStyles
+import at.bernhardberger.tvhplayer.ui.components.TwoColumnDialog
+import at.bernhardberger.tvhplayer.ui.components.TwoColumnDialogButton
+import at.bernhardberger.tvhplayer.ui.screens.AutomaticRecordingEditorHost
+import at.bernhardberger.tvhplayer.ui.screens.AutorecPreviewLoader
+import at.bernhardberger.tvhplayer.ui.screens.DvrMutationAction
+import at.bernhardberger.tvhplayer.ui.screens.DvrMutationActions
+import at.bernhardberger.tvhplayer.ui.screens.NewAutomaticRecordingHost
+import at.bernhardberger.tvhplayer.ui.screens.RecordingRuleDeleteDialog
+import at.bernhardberger.tvhplayer.ui.screens.TimerRecordingEditorHost
+import at.bernhardberger.tvhplayer.ui.screens.postDvrFailure
+import at.bernhardberger.tvhplayer.ui.screens.recordingStateIsCurrent
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
+import org.koin.compose.koinInject
+import java.time.ZoneId
+import java.time.LocalDate
+import kotlin.time.Instant
+
+internal enum class RuleSurface { NEW, EDIT, MENU, DELETE }
+internal data class OpenRule(
+    val surface: RuleSurface,
+    val session: CurrentSessionObservation,
+    val item: AutomaticRecordingListItem? = null,
+)
+
+/** Kept beside Schedule navigation, so reopening joins accepted work and retains its visit. */
+internal class ScheduleState {
+    var automaticLevelVisited = false
+    private val inFlight = mutableMapOf<String, ArrayDeque<RuleRequest>>()
+
+    fun hasPending(id: String, kind: AutomaticRecordingKind): Boolean = scheduleRuleRowId(id, kind) in inFlight
+
+    fun launchRuleMutation(
+        scope: CoroutineScope,
+        item: AutomaticRecordingListItem,
+        desired: Boolean? = null,
+        mutation: suspend () -> Unit,
+    ) {
+        val request = RuleRequest(desired, mutation)
+        val pending = inFlight[item.rowId()]
+        if (pending != null) {
+            if (pending.any { it.desired == desired || it.desired == null }) return
+            if (desired == null) while (pending.size > 1) pending.removeLast()
+            pending.addLast(request)
+            return
+        }
+        val queue = ArrayDeque<RuleRequest>().apply { addLast(request) }
+        inFlight[item.rowId()] = queue
+        // Accepted work must reach its non-cancellable loop even if the screen leaves before dispatch.
+        @OptIn(DelicateCoroutinesApi::class)
+        scope.launch(start = CoroutineStart.ATOMIC) {
+            withContext(NonCancellable) {
+                try {
+                    while (queue.isNotEmpty()) {
+                        queue.first().run()
+                        queue.removeFirst()
+                    }
+                } finally {
+                    inFlight.remove(item.rowId())
+                }
+            }
+        }
+    }
+}
+
+/** The Schedule consumer keeps its row mounted while an existing editor or dialog owns focus. */
+@Composable
+internal fun ScheduleRuleActions(
+    opened: OpenRule?,
+    onChange: (OpenRule?) -> Unit,
+    published: SessionObservation,
+    observation: () -> SessionObservation,
+    isCurrent: Boolean,
+    channels: List<Channel>,
+    actions: DvrMutationActions,
+    notices: NoticeCenter,
+    now: () -> Instant,
+    state: ScheduleState,
+) {
+    val scope = rememberCoroutineScope()
+    val close = { onChange(null) }
+    val target = opened ?: return
+    val currentItem = target.item?.currentIn(published)
+    val item = currentItem ?: target.item
+    LaunchedEffect(target, published.currentSession, currentItem) {
+        val obsolete = published.currentSession != target.session || currentItem == null
+        if ((target.surface == RuleSurface.MENU || target.surface == RuleSurface.DELETE) &&
+            obsolete) close()
+    }
+    when (target.surface) {
+        RuleSurface.NEW, RuleSurface.EDIT -> ScheduleRuleEditor(target, actions, notices, now, close)
+        RuleSurface.MENU -> if (item != null) ScheduleRuleMenu(item, channels, close,
+            onEdit = { onChange(target.copy(surface = RuleSurface.EDIT)) },
+            onDelete = { onChange(target.copy(surface = RuleSurface.DELETE)) },
+            onToggle = {
+                state.launchRuleMutation(scope, item, desired = !item.enabled) {
+                    val latest = observation()
+                    if (target.readyIn(latest, isCurrent, notices, DvrMutationKind.UPDATE)) {
+                        target.item?.currentIn(latest)?.let { current ->
+                            actions.setRuleEnabled(current, !item.enabled, target.session, latest,
+                                notices, notices.context())
+                        }
+                    }
+                }
+                close()
+            })
+        RuleSurface.DELETE -> if (item != null) RecordingRuleDeleteDialog(
+            item.kind, item.subject(channels), item.scheduledCount(published), onDismiss = close,
+            onConfirm = {
+                val confirmed = target.copy(item = item)
+                state.launchRuleMutation(scope, item) {
+                    deleteScheduleRule(confirmed, observation(), isCurrent, actions, notices)
+                }
+                close()
+            },
+        )
+    }
+}
+
+private fun AutomaticRecordingListItem.scheduledCount(observation: SessionObservation): Int =
+    observation.dvrSnapshotForDisplay?.entries.orEmpty().count { entry ->
+        entry.state == DvrEntryState.SCHEDULED && when (this) {
+            is AutomaticRecordingListItem.Automatic -> entry.autorecRuleId == rule.id
+            is AutomaticRecordingListItem.Timer -> entry.timerecRuleId == rule.id
+        }
+    }
+
+@Composable
+private fun ScheduleRuleEditor(
+    target: OpenRule,
+    actions: DvrMutationActions,
+    notices: NoticeCenter,
+    now: () -> Instant,
+    close: () -> Unit,
+) {
+    val session: TvheadendSession = koinInject()
+    val loader = remember(session) { AutorecPreviewLoader(session.epgRepository) }
+    val zone = remember { ZoneId.systemDefault() }
+    when (val item = target.item) {
+        null -> NewAutomaticRecordingHost(target.session, session.observation, loader, actions,
+            notices, now, zone, close)
+        is AutomaticRecordingListItem.Automatic -> AutomaticRecordingEditorHost(
+            target.session, session.observation, loader, actions, notices, now, zone, close, rule = item.rule)
+        is AutomaticRecordingListItem.Timer -> TimerRecordingEditorHost(
+            target.session, session.observation, actions, notices, now, close, rule = item.rule)
+    }
+}
+
+private data class RuleRequest(val desired: Boolean?, val run: suspend () -> Unit)
+
+private fun OpenRule.readyIn(
+    observation: SessionObservation,
+    isCurrent: Boolean,
+    notices: NoticeCenter,
+    kind: DvrMutationKind,
+): Boolean {
+    val writable = (observation.sessionState as? SessionState.Ready)?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
+    val ready = isCurrent && observation.currentSession == session &&
+        observation.dvrState is DvrRepositoryState.Current && writable
+    if (!ready) {
+        val result = DvrMutationResult.Failed(TvheadendFailure.NOT_READY, false)
+        notices.post(Notice.DvrRuleActionFailed(kind, result.toDvrMutationFeedback()), notices.context())
+    }
+    return ready
+}
+
+private suspend fun deleteScheduleRule(
+    target: OpenRule,
+    observation: SessionObservation,
+    isCurrent: Boolean,
+    actions: DvrMutationActions,
+    notices: NoticeCenter,
+) {
+    if (!target.readyIn(observation, isCurrent, notices, DvrMutationKind.DELETE)) return
+    val current = target.item?.currentIn(observation) ?: return
+    if (current.sameConfirmedDraft(target.item)) {
+        val action = when (current) {
+            is AutomaticRecordingListItem.Automatic -> DvrMutationAction.DeleteAutorec(target.session, current.rule)
+            is AutomaticRecordingListItem.Timer -> DvrMutationAction.DeleteTimerec(target.session, current.rule)
+        }
+        val context = notices.context()
+        val result = if (action.recordingStateIsCurrent(observation)) actions.execute(action)
+            else DvrMutationResult.Failed(TvheadendFailure.NOT_READY, false)
+        notices.postDvrFailure(action, result, context)
+    } else {
+        val result = DvrMutationResult.Failed(TvheadendFailure.NOT_READY, false)
+        notices.post(
+            Notice.DvrRuleActionFailed(DvrMutationKind.DELETE, result.toDvrMutationFeedback()), notices.context())
+    }
+}
+
+/**
+ * Confirms draft fields apart from enabled, plus automatic min/max duration, approximate start and
+ * retention, and timer title and retention. Excludes comment, directory, owner and creator;
+ * enabled may change in our queue.
+ */
+private fun AutomaticRecordingListItem.sameConfirmedDraft(confirmed: AutomaticRecordingListItem?): Boolean = when {
+    this is AutomaticRecordingListItem.Automatic && confirmed is AutomaticRecordingListItem.Automatic ->
+        rule.toDraft().copy(enabled = false) == confirmed.rule.toDraft().copy(enabled = false) &&
+            rule.minDuration == confirmed.rule.minDuration && rule.maxDuration == confirmed.rule.maxDuration &&
+            rule.approximateStartMinutesSinceMidnight == confirmed.rule.approximateStartMinutesSinceMidnight &&
+            rule.retention == confirmed.rule.retention
+    this is AutomaticRecordingListItem.Timer && confirmed is AutomaticRecordingListItem.Timer ->
+        rule.toDraft(LocalDate.MIN).copy(enabled = false) ==
+            confirmed.rule.toDraft(LocalDate.MIN).copy(enabled = false) &&
+            rule.title == confirmed.rule.title && rule.retention == confirmed.rule.retention
+    else -> false
+}
+
+internal fun AutomaticRecordingListItem.currentIn(observation: SessionObservation): AutomaticRecordingListItem? {
+    val snapshot = observation.dvrSnapshotForDisplay ?: return null
+    return when (this) {
+        is AutomaticRecordingListItem.Automatic -> snapshot.autorecRules.firstOrNull { it.id == rule.id }?.let {
+            copy(rule = it)
+        }
+        is AutomaticRecordingListItem.Timer -> snapshot.timerecRules.firstOrNull { it.id == rule.id }?.let {
+            copy(rule = it)
+        }
+    }
+}
+
+@Composable
+private fun ScheduleRuleMenu(
+    item: AutomaticRecordingListItem,
+    channels: List<Channel>,
+    onClose: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    onToggle: () -> Unit,
+) {
+    val first = remember { FocusRequester() }
+    LaunchedEffect(Unit) { withFrameNanos {}; first.requestFocus() }
+    val type = MaterialTheme.typography
+    val subject = item.subject(channels)
+    val editLabel = when (item.kind) {
+        AutomaticRecordingKind.SERIES -> R.string.context_edit_series
+        AutomaticRecordingKind.TITLE -> R.string.context_edit_title
+        AutomaticRecordingKind.KEYWORD -> R.string.context_edit_keyword
+        AutomaticRecordingKind.TIMER -> R.string.context_edit_timer
+    }
+    TwoColumnDialog(
+        title = item.headline.ifBlank { item.kindLabel() }, message = "", onDismiss = onClose,
+        modifier = Modifier.testTag("automatic-recording-menu"),
+        leading = {
+            ConfirmationPanel(subject.copy(detail = subject.detail.replace(" • ", "\n")),
+                ConfirmationStyles(type.headlineMedium, type.bodyLarge, type.titleLarge,
+                    type.labelMedium, type.bodyLarge))
+        },
+        itemCardLayout = true,
+    ) {
+        TwoColumnDialogButton(stringResource(editLabel), onEdit,
+            Modifier.focusRequester(first).testTag("automatic-recording-menu-edit"),
+            icon = { Icon(painterResource(R.drawable.ic_edit), null) })
+        TwoColumnDialogButton(stringResource(if (item.enabled) R.string.schedule_automatic_turn_off
+            else R.string.schedule_automatic_turn_on), onToggle,
+            Modifier.testTag("automatic-recording-menu-toggle"),
+            icon = { Icon(painterResource(if (item.enabled) R.drawable.ic_power_off else R.drawable.ic_power), null) })
+        TwoColumnDialogButton(stringResource(R.string.context_delete), onDelete,
+            Modifier.testTag("automatic-recording-menu-delete"),
+            icon = { Icon(painterResource(R.drawable.ic_delete_outlined), null) })
+    }
+}

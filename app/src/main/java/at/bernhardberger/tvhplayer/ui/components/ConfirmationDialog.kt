@@ -72,6 +72,8 @@ internal sealed interface ConfirmationSubject {
 
     data class Folder(val name: String, val detail: String) : ConfirmationSubject
 
+    data class Rule(@DrawableRes val icon: Int, val name: String, val detail: String) : ConfirmationSubject
+
     data class Server(val look: ServerAvatarLook, val name: String, val detail: String) : ConfirmationSubject
 }
 
@@ -212,11 +214,7 @@ private fun confirmationPanelNeedsMoreWidth(
 ): Boolean = with(density) {
     fun overflows(text: String?, style: TextStyle, width: Int) =
         text != null && measure(text, style, width).lineCount > 1
-    val name = when (subject) {
-        is ConfirmationSubject.Programme -> subject.name
-        is ConfirmationSubject.Folder -> subject.name
-        is ConfirmationSubject.Server -> subject.name
-    }
+    val name = confirmationSubjectName(subject)
     if (measure(name, styles.name, panelText).lineCount > 2) return true
     when (subject) {
         is ConfirmationSubject.Programme -> {
@@ -225,8 +223,16 @@ private fun confirmationPanelNeedsMoreWidth(
                 overflows(subject.target, styles.row, panelText)
         }
         is ConfirmationSubject.Folder -> overflows(subject.detail, styles.row, panelText)
+        is ConfirmationSubject.Rule -> overflows(subject.detail, styles.row, panelText)
         is ConfirmationSubject.Server -> overflows(subject.detail, styles.row, panelText)
     }
+}
+
+internal fun confirmationSubjectName(subject: ConfirmationSubject): String = when (subject) {
+    is ConfirmationSubject.Programme -> subject.name
+    is ConfirmationSubject.Folder -> subject.name
+    is ConfirmationSubject.Rule -> subject.name
+    is ConfirmationSubject.Server -> subject.name
 }
 
 /**

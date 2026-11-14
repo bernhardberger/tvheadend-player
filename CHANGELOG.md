@@ -4,6 +4,7 @@
 
 ### Playback
 
+- The player shows resolution and scan type, audio format and layout as the stream is decoded, including mid-stream changes, and an AD badge for audio description.
 - A recording that's still running can be played when it's made with Tvheadend's built-in Matroska profile, not only as MPEG-TS. Right at the end of what's recorded so far, the player buffers every few seconds for about the first minute and then follows a few seconds behind. Running MP4 recordings and recordings from the libav Matroska profile can't be played (#24).
 - A recording file the player can't read says *The recording file couldn't be read* and shows the player's error underneath, instead of *Recording interrupted* with a retry that fails the same way.
 - Matroska recordings start with subtitles off until you choose a subtitle track.
@@ -11,10 +12,27 @@
 
 ### Recordings
 
+- The first tab is now *Browse* and opens as one list of all recordings, newest first, under date labels. The options button beside the headline groups the list by folders, channels or genres, sorts it by date, name or size in either direction, and shows only unwatched, partially watched or watched recordings (#11, #5).
+- If you browsed by folders before, choose *Folders* under *Group by* to get them back; the choice is remembered.
+- Finished recordings show their file size in the list.
+- A recording in progress carries a red dot, and so does the folder it's in. With folders, a *Recording now* folder leads the list; it can be turned off in the options.
+- Free disk space sits at the end of the tab line as *free of total* with a ring for the used share. The ring turns amber, then red, as space runs low.
 - Stop, cancel, delete and remove ask on a card that shows the recording: its picture or channel logo, name, channel and air time, and a sentence that says what happens. The other confirmations in the Guide, for folders and for connections use the same card.
 - The choice between *Play recording* and *Watch live* shows the recording's picture and says when each choice would end. For a recording that's still running, that end time counts the part still to come; before, it counted only what was recorded so far.
 - A missed or failed recording that never wrote a file offers *Remove entry* instead of *Delete recording*.
 - A removed recording no longer hides another recording of the same program, and retention cleanup no longer repeats the “Recording deleted” notice.
+
+### Automatic recordings and timers
+
+- Program details offer *Record series* when the guide marks the program as part of a series, and *Record all with this title* otherwise. Either opens a page where you choose the channel, the days, a start window and how long recordings are kept. *More options* holds priority, recording profile, padding, duplicate detection and a maximum number of recordings. The page lists the upcoming programs it would record, and you can untick the ones you don't want (#17).
+- The *Schedule* tab starts with two rows, *New timer* and *Automatic recordings*. *New timer* records a channel at set times, once or repeating on chosen days.
+- *Automatic recordings* lists your series, title and keyword recordings and your repeating timers, including the ones made in Tvheadend's web interface. You can add one by keyword, by title or as a repeating timer, edit it, turn it off or delete it. The side pane shows what the focused one records, how long it keeps recordings and what's next.
+- A scheduled recording that comes from an automatic recording offers *Skip this episode* in place of *Cancel recording*, and *Record this episode* to take that back. A skipped one stays in the Schedule, marked *Skipped*. *Edit series recording* opens the automatic recording from any of its entries.
+- Turning an automatic recording off removes its scheduled entries. Turning it on again schedules them afresh, without the skips you had set.
+- While it records, an entry that comes from an automatic recording shows the red dot with a half ring.
+- *Keep until…* on a finished recording, in its menu and on its details page, changes when Tvheadend removes it: in 1 week, 1 month, 3 months, 6 months or 1 year from today, until space is needed, or forever.
+- A recording that expires within a week shows an hourglass with the time left on its Home card and in the list, where it takes the place of the file size. The side pane and the details page give the date and time; *Available until* is now *Expires*.
+- Home has an *Expiring soon* row for unwatched recordings that expire within a week. Like the other rows, it can be hidden in Home's options.
 
 ### Remote buttons
 

@@ -4,6 +4,7 @@ import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackMarker
 import at.bernhardberger.tvhplayer.ui.components.errorMarkColor
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
 import at.bernhardberger.tvhplayer.ui.components.rule
+import at.bernhardberger.tvhplayer.ui.components.RecordingRule
 import at.bernhardberger.tvhplayer.ui.components.watchingIndicator
 import at.bernhardberger.tvhplayer.ui.components.recordingViewerPosition
 import at.bernhardberger.tvhplayer.ui.components.progressColor
@@ -32,6 +33,7 @@ import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -53,12 +55,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
@@ -75,6 +72,14 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.tv.material3.NavigationDrawerItemDefaults
+import at.bernhardberger.tvhplayer.ui.components.recordingMarkColor
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
@@ -114,6 +119,12 @@ import at.bernhardberger.tvhplayer.core.recordingElapsedProgress
 import at.bernhardberger.tvhplayer.core.recordingFocusTargetKey
 import at.bernhardberger.tvhplayer.core.RecordingWatchState
 import at.bernhardberger.tvhplayer.core.recordingIsRunning
+import at.bernhardberger.tvhplayer.core.recordingExpiryTimeLeft
+import at.bernhardberger.tvhplayer.core.recordingExpiryTime
+import at.bernhardberger.tvhplayer.ui.common.formatRecordingExpiry
+import at.bernhardberger.tvhplayer.ui.common.formatRecordingExpiryDate
+import at.bernhardberger.tvhplayer.ui.components.StatusBadge
+import at.bernhardberger.tvhplayer.ui.components.StatusBadgeTone
 import at.bernhardberger.tvhplayer.core.recordingWatchState
 import at.bernhardberger.tvhplayer.core.recordingLengthSeconds
 import at.bernhardberger.tvhplayer.core.offeredResumePosition
@@ -126,7 +137,6 @@ import at.bernhardberger.tvhplayer.core.recordingListMetadata
 import at.bernhardberger.tvhplayer.core.recordingListPageTargetIndex
 import at.bernhardberger.tvhplayer.core.summarizeDvrFolder
 import at.bernhardberger.tvhplayer.core.watchedCount
-import at.bernhardberger.tvhplayer.core.runningRecordings
 import at.bernhardberger.tvhplayer.ui.TvBrowseColumnGap
 import at.bernhardberger.tvhplayer.ui.TvBrowseColumnWidth
 import at.bernhardberger.tvhplayer.ui.TvBrowseHeaderHeight
@@ -141,6 +151,7 @@ import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.LocalTabOwner
 import at.bernhardberger.tvhplayer.ui.components.tabFocus
 import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
+import at.bernhardberger.tvhplayer.core.runningRecordings
 import at.bernhardberger.tvhplayer.ui.components.RecordingBadge
 import at.bernhardberger.tvhplayer.ui.components.StatusIconSize
 import at.bernhardberger.tvhplayer.ui.components.ListBottomReserve
@@ -148,7 +159,6 @@ import at.bernhardberger.tvhplayer.ui.components.SkeletonLine
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthListTopReserve
 import at.bernhardberger.tvhplayer.ui.components.listEdgeFades
 import at.bernhardberger.tvhplayer.ui.components.rememberListEdgeBringIntoView
-import at.bernhardberger.tvhplayer.ui.components.recordingMarkColor
 import at.bernhardberger.tvhplayer.ui.common.formatDayHeader
 import at.bernhardberger.tvhplayer.ui.common.formatFileSize
 import at.bernhardberger.tvhplayer.ui.common.rememberDetailsEpochSeconds
@@ -174,6 +184,7 @@ import kotlinx.coroutines.launch
 internal sealed interface ArchiveListItem {
     val key: String
 
+    /** The Recording now folder at the top of the Folders root; each running recording also stays in its own folder. */
     data class RecordingNow(val entries: List<DvrEntry>) : ArchiveListItem {
         override val key = "meta:recording-now"
     }
@@ -189,10 +200,9 @@ internal sealed interface ArchiveListItem {
 
 internal fun recordingItemKey(id: DvrEntryId): Long = id.value
 
-internal fun DvrArchiveFolder.listItems(): List<ArchiveListItem> = buildList {
-    if (path.isEmpty()) {
-        runningRecordings().takeIf { it.isNotEmpty() }?.let { add(ArchiveListItem.RecordingNow(it)) }
-    }
+/** A level's rows; [recordingNow] are the running recordings of the Recording now folder that opens a Folders root. */
+internal fun DvrArchiveFolder.listItems(recordingNow: List<DvrEntry> = emptyList()): List<ArchiveListItem> = buildList {
+    if (recordingNow.isNotEmpty()) add(ArchiveListItem.RecordingNow(recordingNow))
     addAll(folders.map(ArchiveListItem::Folder))
     addAll(recordings.map(ArchiveListItem::Recording))
 }
@@ -202,12 +212,16 @@ internal fun RecordingModeTabs(
     selected: DvrLibraryMode,
     selectedFocus: FocusRequester,
     modifier: Modifier = Modifier,
+    /** The modes the row offers; the Schedule screen's subnav leaves the Archive out. */
+    modes: List<DvrLibraryMode> = DvrLibraryMode.entries,
     onFocused: (DvrLibraryMode) -> Unit,
     onClick: (DvrLibraryMode) -> Unit,
     onMoveToContent: () -> Unit,
+    /** Recordings with a problem; the Problems tab carries the count while it is above zero. */
+    problemCount: Int = 0,
 ) {
     AppTabRow(
-        selectedTabIndex = selected.ordinal,
+        selectedTabIndex = modes.indexOf(selected),
         style = AppTabStyle.Page,
         selectedTabFocus = selectedFocus,
         modifier = modifier.onPreviewKeyEvent { event ->
@@ -216,13 +230,13 @@ internal fun RecordingModeTabs(
                 onMoveToContent().let { true }
         },
     ) {
-        DvrLibraryMode.entries.forEach { mode ->
+        modes.forEach { mode ->
             AppTab(
                 selected = selected == mode,
                 modifier = Modifier.testTag("recordings-mode-${mode.name.lowercase()}"),
                 label = stringResource(
                     when (mode) {
-                        DvrLibraryMode.ARCHIVE -> R.string.recordings_archive
+                        DvrLibraryMode.ARCHIVE -> R.string.recordings_browse
                         DvrLibraryMode.SCHEDULE -> R.string.recordings_schedule
                         DvrLibraryMode.PROBLEMS -> R.string.recordings_problems
                     }
@@ -230,10 +244,79 @@ internal fun RecordingModeTabs(
                 onFocus = { onFocused(mode) },
                 onClick = { onClick(mode) },
                 // Nothing focusable follows the tabs in the header row.
-                last = mode == DvrLibraryMode.entries.last(),
+                last = mode == modes.last(),
+                trailing = if (mode == DvrLibraryMode.PROBLEMS && problemCount > 0) {
+                    {
+                        Box(Modifier.testTag("recordings-problems-badge")) {
+                            NavigationDrawerItemDefaults.TrailingBadge(
+                                text = problemCount.toString(),
+                                containerColor = MaterialTheme.colorScheme.error,
+                                contentColor = MaterialTheme.colorScheme.onError,
+                            )
+                        }
+                    }
+                } else null,
             )
         }
     }
+}
+
+private val FolderRecordingDotRadius = 5.dp
+private val FolderRecordingDotGap = 1.5.dp
+
+/**
+ * The red dot of a folder holding a running recording: the channel rows' 10 dp recording dot on the
+ * icon's top-right corner, cut out of the icon by a thin gap.
+ */
+private fun Modifier.folderRecordingDot(focused: () -> Boolean): Modifier {
+    val center = { size: Size -> Offset(size.width * 0.915f, size.height * 0.25f) }
+    return drawWithContent {
+        drawContent()
+        drawCircle(recordingMarkColor(focused()), radius = FolderRecordingDotRadius.toPx(), center = center(size))
+    }
+        .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
+        .drawWithContent {
+            drawContent()
+            drawCircle(Color.Black, radius = (FolderRecordingDotRadius + FolderRecordingDotGap).toPx(),
+                center = center(size), blendMode = BlendMode.Clear)
+        }
+}
+
+/** The Recording now folder: how many recordings are running, with the recording dot on its folder icon. */
+@Composable
+internal fun RecordingNowFolderRow(
+    recordingCount: Int,
+    modifier: Modifier,
+    onClick: () -> Unit,
+) {
+    val owner = LocalTabOwner.current
+    var focused by remember { mutableStateOf(false) }
+    ListItem(
+        selected = false,
+        onClick = { if (owner?.isCurrent != false) onClick() },
+        headlineContent = {
+            Text(stringResource(R.string.recordings_recording_now), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        },
+        supportingContent = {
+            Text(pluralStringResource(R.plurals.recordings_in_progress_count, recordingCount, recordingCount),
+                maxLines = 1, overflow = TextOverflow.Ellipsis)
+        },
+        leadingContent = {
+            Icon(
+                painterResource(R.drawable.ic_folder),
+                contentDescription = null,
+                modifier = Modifier.size(32.dp).folderRecordingDot { focused },
+            )
+        },
+        trailingContent = {
+            Icon(painterResource(R.drawable.ic_keyboard_arrow_right), contentDescription = null)
+        },
+        modifier = modifier
+            .tabFocus()
+            .fillMaxWidth()
+            .onFocusChanged { focused = it.isFocused }
+            .testTag("recordings-recording-now-folder"),
+    )
 }
 
 /**
@@ -248,7 +331,13 @@ internal fun FolderListRow(
     onClick: () -> Unit,
     resumePosition: (DvrEntry) -> Duration? = { null },
     onOpenContextMenu: (() -> Unit)? = null,
+    /** A channel folder shows the channel's logo where other folders show the folder icon. */
+    picon: ChannelIcon? = null,
+    /** Optional genre colors; other folders keep the native icon tint in both states. */
+    iconTint: Color? = null,
+    focusedIconTint: Color? = null,
 ) {
+    var focused by remember { mutableStateOf(false) }
     val summary = remember(folder) { summarizeDvrFolder(folder) }
     val latestResumePosition by rememberUpdatedState(resumePosition)
     // Resume positions arrive with the entries, so a new folder is the only reason to count again.
@@ -258,6 +347,8 @@ internal fun FolderListRow(
         watched == summary.recordingCount -> RecordingWatchState.Watched
         else -> RecordingWatchState.PartlyWatched(watched.toDouble() / summary.recordingCount)
     }
+    // A running recording anywhere below the folder puts the red dot on the folder's icon or logo.
+    val hasRunning = remember(folder) { folder.runningRecordings().isNotEmpty() }
     val owner = LocalTabOwner.current
     val contextMenu = at.bernhardberger.tvhplayer.ui.components.rememberBrowseContextMenuTrigger(
         onOpenContextMenu, enabled = { owner?.isCurrent != false })
@@ -300,12 +391,26 @@ internal fun FolderListRow(
             )
         },
         leadingContent = {
-            Icon(
-                painter = painterResource(R.drawable.ic_folder),
-                contentDescription = null,
-                tint = androidx.tv.material3.LocalContentColor.current,
-                modifier = Modifier.size(32.dp),
-            )
+            // The dot sits on a box of its own so the logo keeps its tag.
+            val dot = if (hasRunning) Modifier.folderRecordingDot { focused }.testTag("recordings-folder-running-$tag")
+                else Modifier
+            Box(dot) {
+                if (folder.channelId != null) {
+                    PiconBox(
+                        piconPath = picon,
+                        placeholderTint = androidx.tv.material3.LocalContentColor.current,
+                        ground = if (focused) MaterialTheme.colorScheme.inverseSurface else MaterialTheme.colorScheme.background,
+                        prefetchGround = if (focused) MaterialTheme.colorScheme.background else MaterialTheme.colorScheme.inverseSurface,
+                        modifier = Modifier.size(32.dp).testTag("recordings-folder-logo-$tag"),
+                    )
+                } else Icon(
+                    painter = painterResource(R.drawable.ic_folder),
+                    contentDescription = null,
+                    tint = (if (focused) focusedIconTint else iconTint)
+                        ?: androidx.tv.material3.LocalContentColor.current,
+                    modifier = Modifier.size(32.dp).testTag("recordings-folder-icon-$tag"),
+                )
+            }
         },
         trailingContent = {
             Icon(painterResource(R.drawable.ic_keyboard_arrow_right), contentDescription = null)
@@ -314,61 +419,29 @@ internal fun FolderListRow(
             .tabFocus()
             .fillMaxWidth()
             .testTag("recordings-folder-$tag")
-            .then(contextMenu.modifier),
+            .then(contextMenu.modifier)
+            .onFocusChanged { focused = it.isFocused },
     )
 }
 
-private val RecordingNowDotRadius = 5.dp
-private val RecordingNowDotGap = 1.5.dp
-
+/**
+ * The shared section label that opens a day or month in the flat list. It is only drawn:
+ * the recording row under it is the focus stop, so Down from a day's last row lands on the next day's first.
+ */
 @Composable
-internal fun RecordingNowFolderRow(
-    recordingCount: Int,
-    modifier: Modifier,
-    onClick: () -> Unit,
-) {
-    val owner = LocalTabOwner.current
-    var focused by remember { mutableStateOf(false) }
-    ListItem(
-        selected = false,
-        onClick = { if (owner?.isCurrent != false) onClick() },
-        headlineContent = {
-            Text(stringResource(R.string.recordings_recording_now_folder), maxLines = 1, overflow = TextOverflow.Ellipsis)
-        },
-        supportingContent = {
-            Text(pluralStringResource(R.plurals.recordings_in_progress_count, recordingCount, recordingCount),
-                maxLines = 1, overflow = TextOverflow.Ellipsis)
-        },
-        leadingContent = {
-            // The red dot sits on the folder's top-right corner, cut out of the folder by a thin gap. It
-            // is the channel rows' 10dp recording dot.
-            val dotCenter = { size: Size -> Offset(size.width * 0.915f, size.height * 0.25f) }
-            Icon(
-                painterResource(R.drawable.ic_folder),
-                contentDescription = null,
-                tint = androidx.tv.material3.LocalContentColor.current,
-                modifier = Modifier
-                    .size(32.dp)
-                    .drawWithContent {
-                        drawContent()
-                        drawCircle(recordingMarkColor(focused), radius = RecordingNowDotRadius.toPx(), center = dotCenter(size))
-                    }
-                    .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
-                    .drawWithContent {
-                        drawContent()
-                        drawCircle(Color.Black, radius = (RecordingNowDotRadius + RecordingNowDotGap).toPx(), center = dotCenter(size), blendMode = BlendMode.Clear)
-                    },
-            )
-        },
-        trailingContent = {
-            Icon(painterResource(R.drawable.ic_keyboard_arrow_right), contentDescription = null)
-        },
-        modifier = modifier
-            .tabFocus()
-            .fillMaxWidth()
-            .onFocusChanged { focused = it.isFocused }
-            .testTag("recordings-recording-now-folder"),
-    )
+internal fun ArchiveDateDivider(label: String, first: Boolean, modifier: Modifier = Modifier) {
+    // Keep the first date band's occupied height: changing label typography must not move its row.
+    val firstBandHeight = if (first) {
+        val previousLabelHeight = rememberTextMeasurer().measure(
+            label, style = MaterialTheme.typography.titleSmall, maxLines = 1,
+        ).size.height
+        with(LocalDensity.current) { previousLabelHeight.toDp() } + TvSpacing4
+    } else 0.dp
+    Box(modifier.then(if (first) Modifier.heightIn(min = firstBandHeight) else Modifier)) {
+        at.bernhardberger.tvhplayer.ui.components.ListSectionLabel(
+            label, Modifier.testTag("archive-date-divider"), first = first,
+        )
+    }
 }
 
 /**
@@ -385,6 +458,7 @@ internal fun RecordingMetadataPane(
     admission: RecordingPlaybackAdmission?,
     modifier: Modifier = Modifier,
     kind: RecordingRowKind = RecordingRowKind.ARCHIVE,
+    recordingRule: RecordingRule? = null,
 ) {
     if (entry == null) {
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -401,6 +475,8 @@ internal fun RecordingMetadataPane(
     val locale = LocalConfiguration.current.locales[0]
     // The minute clock moves a running recording's length and the end of watching it from now.
     val nowSec = rememberDetailsEpochSeconds()
+    val expiry = recordingExpiryTime(entry, nowSec)
+        ?.let { formatRecordingExpiryDate(it, nowSec, resources, locale) }
     val watchState = recordingWatchState(entry, offeredResumePosition(admission), nowSec)
     val timeLeft = remember(entry, admission) { recordingTimeLeft(entry, admission) }
     val facts = remember(entry, resources, locale) {
@@ -412,7 +488,7 @@ internal fun RecordingMetadataPane(
     val watched = watchState == RecordingWatchState.Watched
     val viewerFraction = recordingViewerPosition(entry.id)?.fraction ?: (watchState as? RecordingWatchState.PartlyWatched)?.fraction?.toFloat()
     val running = recordingIsRunning(entry)
-    val rule = if (kind == RecordingRowKind.SCHEDULE) recordingRuleLabel(entry) else null
+    val rule = if (kind == RecordingRowKind.SCHEDULE) recordingRuleLabel(recordingRule) else null
     val partialSize = if (kind == RecordingRowKind.PROBLEM) recordingSizeBytes(entry)?.takeIf { it > 0 } else null
     // The Schedule row's own words for the padded stop, when the padding moves it.
     val paddedStop = recordingPaddedStop(entry)?.takeIf {
@@ -435,7 +511,7 @@ internal fun RecordingMetadataPane(
                     androidx.compose.runtime.CompositionLocalProvider(
                         androidx.tv.material3.LocalContentColor provides TvTextColors.secondary,
                     ) { ChannelPlaybackMarker(watchingIndicator(entry.id)) }
-                    RecordingBadge(entry.state, rule = entry.rule)
+                    RecordingBadge(entry.state, rule = recordingRule ?: entry.rule, skipped = entry.enabled == false)
                 }
             },
             title = entry.title.orEmpty(),
@@ -469,9 +545,13 @@ internal fun RecordingMetadataPane(
             titleStyle = MaterialTheme.typography.titleLarge,
             synopsisStyle = MaterialTheme.typography.bodyMedium,
             // Under its time, how it ended and how watching it would go, each with its row's mark.
-            status = if (failure == null && !stoppedEarly && !watched && timeLeft == null && rule == null &&
-                partialSize == null) null else { statusModifier ->
+            status = if (listOf(failure, timeLeft, rule, partialSize, expiry).all { it == null } &&
+                !stoppedEarly && !watched) null else { statusModifier ->
                 Column(statusModifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    expiry?.let {
+                        StatusBadge(it, StatusBadgeTone.NEUTRAL, icon = R.drawable.ic_hourglass_bottom,
+                            modifier = Modifier.testTag("recording-metadata-expiry"))
+                    }
                     rule?.let { (text, icon) ->
                         ProgrammeStatusLine(text, icon, "recording-metadata-rule", maxLines = 2)
                     }
@@ -517,8 +597,8 @@ private fun problemStateLabel(state: DvrEntryState?): String? = when (state) {
 
 /** The rule a scheduled recording comes from, with its mark, when the server says it has one. */
 @Composable
-private fun recordingRuleLabel(entry: DvrEntry): Pair<String, Int>? =
-    entry.rule?.let { stringResource(it.label) to R.drawable.ic_schedule_rule }
+private fun recordingRuleLabel(rule: RecordingRule?): Pair<String, Int>? =
+    rule?.let { stringResource(it.label) to R.drawable.ic_schedule_rule }
 
 /**
  * A Schedule or Problems list in Archive's first column, with the focused recording's pane where
@@ -550,158 +630,6 @@ private fun RecordingListWithPane(
                 modifier = Modifier.padding(bottom = paneBottom),
                 kind = kind,
             )
-        }
-    }
-}
-
-@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
-@Composable
-internal fun RecordingSchedule(
-    groups: List<DvrScheduleSection>,
-    selectedKey: String?,
-    selectedFocus: FocusRequester,
-    onFocused: (String) -> Unit,
-    onOpen: (DvrEntry) -> Unit,
-    onOpenContextMenu: ((DvrEntry) -> Unit)? = null,
-    piconForEntry: (DvrEntry) -> ChannelIcon?,
-    admissionForEntry: (DvrEntry) -> RecordingPlaybackAdmission?,
-    initialScrollIndex: Int,
-    onScrollChanged: (Int) -> Unit,
-    paneBottom: Dp = 0.dp,
-) {
-    if (groups.isEmpty()) {
-        ModeEmptyState(R.string.recordings_schedule_empty)
-        return
-    }
-    val owner = LocalTabOwner.current
-    val active = owner?.isCurrent != false
-    val entries = groups.flatMap { it.entries }
-    var pageTargetKey by remember { mutableStateOf<String?>(null) }
-    var pendingPageKey by remember { mutableStateOf<String?>(null) }
-    val focusTargetKey = recordingFocusTargetKey(
-        entries.map { "recording:${recordingItemKey(it.id)}" },
-        pageTargetKey ?: selectedKey,
-    )
-    val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialScrollIndex)
-    val bringIntoViewSpec = rememberListEdgeBringIntoView(listState, 0.dp)
-    val scope = rememberCoroutineScope()
-    var pageFocusJob by remember { mutableStateOf<Job?>(null) }
-    val lazyIndexes = remember(groups) {
-        buildMap {
-            var index = 0
-            groups.forEach { section ->
-                index++
-                section.entries.forEach { entry -> put(entry.id, index++) }
-            }
-        }
-    }
-    DisposableEffect(active) {
-        onDispose { pageFocusJob?.cancel() }
-    }
-    LaunchedEffect(listState, active) {
-        if (!active) return@LaunchedEffect
-        snapshotFlow { listState.firstVisibleItemIndex }.collect {
-            if (owner?.isCurrent != false) onScrollChanged(it)
-        }
-    }
-    val paneEntry = entries.firstOrNull { "recording:${recordingItemKey(it.id)}" == focusTargetKey }
-    RecordingListWithPane(paneEntry, RecordingRowKind.SCHEDULE, piconForEntry, admissionForEntry, paneBottom) {
-        CompositionLocalProvider(LocalBringIntoViewSpec provides bringIntoViewSpec) {
-            LazyColumn(
-                state = listState,
-                userScrollEnabled = active,
-                contentPadding = PaddingValues(bottom = ListBottomReserve),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-                modifier = Modifier
-                    .fillMaxSize()
-                    .listEdgeFades(listState)
-                    .onFocusChanged {
-                        if (!it.hasFocus) {
-                            pageFocusJob?.cancel()
-                            pageTargetKey = null
-                            pendingPageKey = null
-                        }
-                    }
-                    .focusGroup()
-                    .focusRestorer(selectedFocus)
-                    .testTag("recordings-schedule-list")
-                    .onPreviewKeyEvent { event ->
-                        if (owner?.isCurrent == false) return@onPreviewKeyEvent true
-                        if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                        // As in the Archive, nothing to the right of a row takes focus: the pane is passive.
-                        if (event.key == Key.DirectionRight) return@onPreviewKeyEvent true
-                        pageFocusJob?.cancel()
-                        pageTargetKey = null
-                        val direction = ChannelNavigation.pageDirectionForKeyCode(
-                            event.nativeKeyEvent.keyCode
-                        ) ?: run {
-                            pendingPageKey = null
-                            return@onPreviewKeyEvent false
-                        }
-                        val current = entries.indexOfFirst {
-                            "recording:${recordingItemKey(it.id)}" == pendingPageKey
-                        }.takeIf { it >= 0 } ?: entries.indexOfFirst {
-                            "recording:${recordingItemKey(it.id)}" == selectedKey
-                        }
-                        val target = recordingListPageTargetIndex(
-                            entries.size,
-                            current,
-                            listState.layoutInfo.visibleItemsInfo.count { it.key is Long },
-                            direction,
-                        ) ?: run {
-                            pendingPageKey = null
-                            return@onPreviewKeyEvent true
-                        }
-                        pendingPageKey = "recording:${recordingItemKey(entries[target].id)}"
-                        pageFocusJob = scope.launch {
-                            val layout = listState.layoutInfo
-                            val focusOffset = bringIntoViewSpec.calculateScrollDistance(
-                                layout.beforeContentPadding.toFloat(),
-                                (layout.visibleItemsInfo.firstOrNull { it.key is Long }?.size ?: 0).toFloat(),
-                                layout.viewportSize.height.toFloat(),
-                            ).roundToInt()
-                            listState.animateScrollToItem(lazyIndexes.getValue(entries[target].id), focusOffset)
-                            if (owner?.isCurrent == false) return@launch
-                            pageTargetKey = "recording:${recordingItemKey(entries[target].id)}"
-                        }
-                        true
-                    },
-            ) {
-                groups.forEachIndexed { index, section ->
-                    item(key = "header-${section.kind}-${section.date}") {
-                        RecordingSectionHeader(
-                            text = scheduleSectionLabel(section),
-                            first = index == 0,
-                        )
-                    }
-                    items(section.entries, key = { recordingItemKey(it.id) }) { entry ->
-                        val rowKey = "recording:${recordingItemKey(entry.id)}"
-                        if (active && pageTargetKey == rowKey) {
-                            LaunchedEffect(rowKey) {
-                                if (owner?.isCurrent != false && pageTargetKey == rowKey) {
-                                    runCatching { selectedFocus.requestFocus() }
-                                    pageTargetKey = null
-                                    pendingPageKey = null
-                                }
-                            }
-                        }
-                        RecordingListRow(
-                            entry = entry,
-                            piconPath = piconForEntry(entry),
-                            resumePosition = offeredResumePosition(admissionForEntry(entry)),
-                            selected = selectedKey == "recording:${recordingItemKey(entry.id)}",
-                            focusTarget = active && focusTargetKey == "recording:${recordingItemKey(entry.id)}",
-                            selectedFocus = selectedFocus,
-                            onFocused = {
-                                onFocused("recording:${recordingItemKey(entry.id)}")
-                            },
-                            onClick = { onOpen(entry) },
-                            onOpenContextMenu = onOpenContextMenu?.let { open -> { open(entry) } },
-                            kind = RecordingRowKind.SCHEDULE,
-                        )
-                    }
-                }
-            }
         }
     }
 }
@@ -889,6 +817,7 @@ internal fun RecordingListRow(
     onClick: () -> Unit,
     kind: RecordingRowKind = RecordingRowKind.ARCHIVE,
     onOpenContextMenu: (() -> Unit)? = null,
+    recordingRule: RecordingRule? = entry.rule,
 ) {
     val problem = kind == RecordingRowKind.PROBLEM
     val metadata = recordingListMetadata(entry, problemLabel = entry.subscriptionError?.takeIf { problem }?.label())
@@ -918,8 +847,9 @@ internal fun RecordingListRow(
                     Spacer(Modifier.width(TvSpacing8))
                     RecordingStatusIndicator(
                         state = markState,
-                        rule = entry.rule,
+                        rule = recordingRule,
                         focused = focused,
+                        skipped = entry.enabled == false,
                         modifier = Modifier.testTag("recording-list-state-$itemKey"),
                     )
                     if (markState == DvrEntryState.RECORDING_ERROR) {
@@ -981,7 +911,7 @@ internal fun RecordingListRow(
 }
 
 @Composable
-private fun RecordingSectionHeader(
+internal fun RecordingSectionHeader(
     text: String,
     first: Boolean = false,
 ) {
@@ -997,17 +927,17 @@ private fun RecordingSectionHeader(
 }
 
 /**
- * The row's overline: the programme start and length (a running recording says when it stops), then
- * symbols for an early stop, a failure or a cancellation whose words are read out by accessibility
- * services. Only a failure is drawn in the error colour; the others stay muted.
+ * The row's overline: the programme start, length (a running recording says when it stops) and
+ * finished file size, then symbols for an early stop, a failure or a cancellation whose words are
+ * read out by accessibility services. Only a failure is drawn in the error colour; the others stay muted.
  */
 @Composable
 private fun RecordingOverline(entry: DvrEntry, focused: Boolean) {
-    val leading = buildList {
-        entry.start?.epochSeconds.recordingDateTime(androidx.compose.ui.platform.LocalConfiguration.current.locales[0])
-            .takeIf(String::isNotBlank)?.let(::add)
-        recordingLengthLabel(entry)?.let(::add)
-    }.joinToString(" • ")
+    val nowSec = rememberDetailsEpochSeconds()
+    val expiry = recordingExpiryTimeLeft(recordingExpiryTime(entry, nowSec), nowSec)
+        ?.let { formatRecordingExpiry(it, LocalContext.current.resources) }
+    val expiryMark = stringResource(R.string.recording_expires)
+    val leading = recordingOverlineLeading(entry, showFileSize = expiry == null)
     val marks = buildList {
         if (recordingIsRunning(entry)) return@buildList
         // The pane spells the early stop out with the planned times.
@@ -1021,6 +951,12 @@ private fun RecordingOverline(entry: DvrEntry, focused: Boolean) {
             marks.forEach { (mark, label) ->
                 if (length > 0) append(' ')
                 appendInlineContent(mark.name, label)
+            }
+            expiry?.let {
+                if (length > 0) append(" • ")
+                appendInlineContent(RecordingOverlineMark.EXPIRY.name, expiryMark)
+                append(' ')
+                append(it)
             }
         },
         inlineContent = remember(failedTint) {
@@ -1041,10 +977,24 @@ private fun RecordingOverline(entry: DvrEntry, focused: Boolean) {
     )
 }
 
+@Composable
+private fun recordingOverlineLeading(entry: DvrEntry, showFileSize: Boolean): String = buildList {
+    if (entry.state == DvrEntryState.SCHEDULED && entry.enabled == false) {
+        add(stringResource(R.string.autorec_editor_skipped))
+    }
+    entry.start?.epochSeconds.recordingDateTime(androidx.compose.ui.platform.LocalConfiguration.current.locales[0])
+        .takeIf(String::isNotBlank)?.let(::add)
+    recordingLengthLabel(entry)?.let(::add)
+    if (showFileSize && !recordingIsRunning(entry) && entry.state != DvrEntryState.SCHEDULED) {
+        recordingSizeBytes(entry)?.takeIf { it > 0 }?.let { add(formatFileSize(it, LocalContext.current)) }
+    }
+}.joinToString(" • ")
+
 private enum class RecordingOverlineMark(@DrawableRes val icon: Int, val tag: String) {
     STOPPED_EARLY(R.drawable.ic_warning_outlined, "recording-list-stopped-early"),
     FAILED(R.drawable.ic_error_outlined, "recording-list-state-failed"),
     CANCELLED(R.drawable.ic_cancel_outlined, "recording-list-state-cancelled"),
+    EXPIRY(R.drawable.ic_hourglass_bottom, "recording-list-expiry"),
 }
 
 /** A completed recording is the normal case and carries no mark; running and scheduled ones carry theirs at the row's end. */
@@ -1186,7 +1136,7 @@ internal fun RecordingsEmptyState(
 }
 
 @Composable
-private fun ModeEmptyState(message: Int) {
+internal fun ModeEmptyState(message: Int) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Text(
             stringResource(message),
@@ -1197,7 +1147,7 @@ private fun ModeEmptyState(message: Int) {
 }
 
 @Composable
-private fun scheduleSectionLabel(section: DvrScheduleSection): String {
+internal fun scheduleSectionLabel(section: DvrScheduleSection): String {
     val locale = LocalConfiguration.current.locales[0]
     return when (section.kind) {
         DvrScheduleSectionKind.RECORDING_NOW -> stringResource(R.string.recordings_recording_now)

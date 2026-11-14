@@ -40,6 +40,10 @@ Reconciled to frozen source `6d80a8ff` for 0.3.0 by GPT-6.1 Sol (medium), retain
 
 0.5 confirmation and playback card strings (`server_switch_question`, `server_remove_*`, `*_confirm_body`, `delete_folder_*_confirm_question`, `recording_recorded_of`) drafted against `90078f81` by GPT-6.1 Sol (medium) and reviewed by Sonnet 5.5 (medium); still machine-drafted, no human reviewer.
 
+0.5 automatic recording, timer, Keep until and expiry strings (`automatic_recording_*`, `autorec_editor_*`, `timer_editor_*`, `context_edit_*`, `context_skip_*`, `context_unskip_*`, `context_record_*`, `context_keep_until`, `recording_keep_until_*`, `recording_expir*`, `home_expiring_soon`, `recording_from_automatic`, `recording_state_and_origin`) drafted against `9e30bc99` by GPT-6.1 Sol (medium) and reviewed by Sonnet 5.5 (medium); still machine-drafted, no human reviewer. Reviewer corrections accepted for `autorec_editor_duplicate_episode_help`, `autorec_editor_duplicate_subtitle_help`, `autorec_editor_duplicate_description_help`, `autorec_editor_broadcast_unavailable`, `autorec_editor_no_matches`, `autorec_editor_words_empty_summary`, `recording_keep_until_week`, `recording_keep_until_month`, `recording_keep_until_three_months`, `recording_keep_until_six_months`, `recording_keep_until_year`, `context_unskip_timer`. Wording also changed after the review for `autorec_editor_after`, `autorec_editor_before`, `autorec_editor_after_time`, `autorec_editor_before_time`.
+
+0.5 Schedule tab strings for timers and the list of automatic recordings (`schedule_*`) drafted against `b257da70` by GPT-6.1 Sol (medium) and reviewed by Sonnet 5.5 (medium); still machine-drafted, no human reviewer. Reviewer corrections accepted for `schedule_automatic_keep`.
+
 ## Open questions
 
 - Check TTS pronunciation of the × speed multiplier in `player_scrub_*`.

@@ -1,4 +1,42 @@
 <resources>
+    <string name="automatic_recording_new_keyword_help">Programmes that mention your words</string>
+    <string name="automatic_recording_new_title_help">Programmes with exactly this title</string>
+    <string name="context_skip_program">Skip this programme</string>
+    <string name="context_unskip_program">Record this programme</string>
+    <string name="autorec_editor_title_description">Records every programme whose title exactly matches “%1$s”.</string>
+    <string name="autorec_editor_title_full_description">Uses “%1$s” to find programmes by title, subtitle and description.</string>
+    <string name="autorec_editor_keyword_description">Records every programme whose title contains “%1$s”.</string>
+    <string name="autorec_editor_keyword_full_description">Records every programme whose title, subtitle or description contains “%1$s”.</string>
+    <plurals name="autorec_editor_words_titles_summary">
+        <item quantity="one">“%1$s” in titles · %2$d programme</item>
+        <item quantity="other">“%1$s” in titles · %2$d programmes</item>
+    </plurals>
+    <plurals name="autorec_editor_words_full_summary">
+        <item quantity="one">“%1$s” in all text · %2$d programme</item>
+        <item quantity="other">“%1$s” in all text · %2$d programmes</item>
+    </plurals>
+    <plurals name="autorec_editor_delete_programs">
+        <item quantity="one">Its %1$d scheduled programme will be removed.</item>
+        <item quantity="other">Its %1$d scheduled programmes will be removed.</item>
+    </plurals>
+    <plurals name="autorec_editor_upcoming_programs">
+        <item quantity="one">Records %1$d upcoming programme</item>
+        <item quantity="other">Records %1$d upcoming programmes</item>
+    </plurals>
+    <plurals name="autorec_editor_programs_all">
+        <item quantity="one">In the guide: %1$d programme, all to be recorded</item>
+        <item quantity="other">In the guide: %1$d programmes, all to be recorded</item>
+    </plurals>
+    <plurals name="autorec_editor_programs_selected">
+        <item quantity="one">In the guide: %1$d programme, %2$d to be recorded</item>
+        <item quantity="other">In the guide: %1$d programmes, %2$d to be recorded</item>
+    </plurals>
+    <string name="autorec_editor_duplicate_subtitle_help">Leaves out programmes with a subtitle already recorded.</string>
+    <string name="autorec_editor_duplicate_description_help">Leaves out programmes with a description already recorded.</string>
+    <string name="autorec_editor_duplicate_day_help">Records at most one matching programme each day.</string>
+    <string name="autorec_editor_duplicate_week_help">Records at most one matching programme each week.</string>
+    <string name="autorec_editor_empty_words">Enter words and the programmes they find appear here</string>
+    <string name="autorec_editor_broadcast_unavailable">May include programmes this automatic recording leaves out.</string>
     <string name="record_unavailable">Can’t record this programme</string>
     <string name="record_unavailable_no_programme">There’s no programme information for this channel.</string>
     <string name="settings_channel_numbers">Channel numbers</string>

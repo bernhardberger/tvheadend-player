@@ -48,6 +48,10 @@ is retained. No human reviewer; remains labeled machine-drafted.
 - `player_tuning` Kanal değiştiriliyor, not scanning.
 - Register: neutral labels (Kaydet, Sil, Kapat) and polite plural imperatives (seçin, deneyin) in instructions.
 
+0.5 automatic recording, timer, Keep until and expiry strings (`automatic_recording_*`, `autorec_editor_*`, `timer_editor_*`, `context_edit_*`, `context_skip_*`, `context_unskip_*`, `context_record_*`, `context_keep_until`, `recording_keep_until_*`, `recording_expir*`, `home_expiring_soon`, `recording_from_automatic`, `recording_state_and_origin`) drafted against `9e30bc99` by GPT-6.1 Sol (medium) and reviewed by Sonnet 5.5 (medium); still machine-drafted, no human reviewer. Reviewer corrections accepted for `autorec_editor_duplicate`, `autorec_editor_duplicate_default_help`, `autorec_editor_duplicate_state`, `autorec_editor_no_matches`, `autorec_editor_words_empty_summary`, `autorec_editor_discard`, `autorec_editor_off_after_save`, `autorec_editor_after_time`, `autorec_editor_before_time`.
+
+0.5 Schedule tab strings for timers and the list of automatic recordings (`schedule_*`) drafted against `b257da70` by GPT-6.1 Sol (medium) and reviewed by Sonnet 5.5 (medium); still machine-drafted, no human reviewer. Wording also changed after the review for `schedule_automatic_turn_off`, `schedule_automatic_turn_on`.
+
 ## Open questions
 
 - Check TTS pronunciation of `player_scrub_*` speed multipliers.

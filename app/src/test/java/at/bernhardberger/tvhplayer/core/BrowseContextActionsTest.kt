@@ -1,6 +1,8 @@
 package at.bernhardberger.tvhplayer.core
 
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.AutorecRuleId
+import at.bernhardberger.tvheadend.sdk.core.TimerecRuleId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
@@ -29,8 +31,12 @@ class BrowseContextActionsTest {
         files: List<DvrRecordingFile>? = null,
         dataSize: Long? = null,
         playCount: Long? = 0,
+        autorec: AutorecRuleId? = null,
+        timer: TimerecRuleId? = null,
+        enabled: Boolean? = null,
     ) = DvrEntry.create(DvrEntryId(1), state = state, playPosition = position.seconds, files = files,
-        dataSizeBytes = dataSize, playCount = playCount)
+        dataSizeBytes = dataSize, playCount = playCount, autorecRuleId = autorec, timerecRuleId = timer,
+        enabled = enabled)
 
     @Test fun channelsWithoutProgrammeOrPermissionDoNotOfferRecording() {
         assertEquals(listOf(WATCH, SHOW_GUIDE), channelContextActions(null, 100, null, null, true))
@@ -111,6 +117,23 @@ class BrowseContextActionsTest {
         assertEquals(listOf(RESUME, START_OVER, DETAILS, MARK_WATCHED, DELETE), actions(recording(DvrEntryState.COMPLETED, 20)))
     }
 
+    @Test fun keepUntilRequiresFinishedFileAndWritePermissionBeforeDelete() {
+        listOf(DvrEntryState.SCHEDULED, DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR,
+            DvrEntryState.COMPLETED, DvrEntryState.COMPLETED_ERROR, DvrEntryState.MISSED,
+            DvrEntryState.INVALID).forEach { state ->
+            listOf(false, true).forEach { hasFile ->
+                listOf(false, true).forEach { writable ->
+                    val entry = recording(state, files = if (hasFile) listOf(file()) else emptyList())
+                    val names = actions(entry, canModify = writable).map { it.name }
+                    val expected = writable && hasFile &&
+                        state in listOf(DvrEntryState.COMPLETED, DvrEntryState.COMPLETED_ERROR)
+                    assertEquals("$state file=$hasFile writable=$writable", expected, "KEEP_UNTIL" in names)
+                    if (expected) assertEquals(names.indexOf("DELETE") - 1, names.indexOf("KEEP_UNTIL"))
+                }
+            }
+        }
+    }
+
     @Test fun completedWatchedRecordingsOfferOnlyMarkUnwatchedAfterDetails() {
         assertEquals(listOf(PLAY, DETAILS, MARK_UNWATCHED, DELETE),
             actions(recording(DvrEntryState.COMPLETED, playCount = 2)))
@@ -131,6 +154,21 @@ class BrowseContextActionsTest {
         assertEquals(listOf(WATCH, START_OVER, DETAILS, STOP), actions(recording(DvrEntryState.RECORDING, 20, listOf(file()))))
         assertEquals(listOf(WATCH, DETAILS, STOP), actions(recording(DvrEntryState.RECORDING, files = listOf(file()))))
         assertEquals(listOf(DETAILS, CANCEL), actions(recording(DvrEntryState.SCHEDULED)))
+        listOf(false, true).forEach { timer ->
+            fun owned(state: DvrEntryState, enabled: Boolean = true) = recording(state,
+                autorec = AutorecRuleId("series").takeUnless { timer },
+                timer = TimerecRuleId("timer").takeIf { timer }, enabled = enabled)
+            assertEquals(listOf("DETAILS", "SKIP", "EDIT_RULE"),
+                actions(owned(DvrEntryState.SCHEDULED), ruleAvailable = true).map { it.name })
+            assertEquals(listOf("DETAILS", "UNSKIP", "EDIT_RULE"),
+                actions(owned(DvrEntryState.SCHEDULED, false), ruleAvailable = true).map { it.name })
+            assertEquals(listOf("DETAILS", "SKIP"),
+                actions(owned(DvrEntryState.SCHEDULED)).map { it.name })
+            assertEquals(listOf("DETAILS", "STOP", "EDIT_RULE"),
+                actions(owned(DvrEntryState.RECORDING), ruleAvailable = true).map { it.name })
+            assertEquals(listOf(DETAILS), actions(owned(DvrEntryState.SCHEDULED), canModify = false,
+                ruleAvailable = true))
+        }
     }
 
     @Test fun watchChannelFollowsPlaybackOnlyForRunningRecordingsWithATunePath() {
@@ -162,7 +200,9 @@ class BrowseContextActionsTest {
             assertEquals("$it", listOf(DETAILS, REMOVE_ENTRY), actions(recording(it, 20, files = emptyList())))
         }
         listOf(DvrEntryState.MISSED, DvrEntryState.COMPLETED_ERROR).forEach {
-            assertEquals("$it", listOf(DETAILS, DELETE), actions(recording(it, 20, listOf(file()), dataSize = 0)))
+            val expected = if (it == DvrEntryState.COMPLETED_ERROR) listOf(DETAILS, KEEP_UNTIL, DELETE)
+                else listOf(DETAILS, DELETE)
+            assertEquals("$it", expected, actions(recording(it, 20, listOf(file()), dataSize = 0)))
         }
         listOf(DvrEntryState.INVALID).forEach {
             assertEquals("$it", listOf(DETAILS, DELETE), actions(recording(it, 20, listOf(file()))))
@@ -187,9 +227,12 @@ class BrowseContextActionsTest {
 
     @Test fun failedRecordingWithAFilePlaysLikeACompletedOne() {
         val failed = DvrEntryState.COMPLETED_ERROR
-        assertEquals(listOf(PLAY, DETAILS, MARK_WATCHED, DELETE), actions(recording(failed, files = listOf(file()))))
-        assertEquals(listOf(RESUME, START_OVER, DETAILS, MARK_WATCHED, DELETE), actions(recording(failed, 20, listOf(file()))))
-        assertEquals(listOf(RESUME, START_OVER, DETAILS, MARK_WATCHED, DELETE), actions(recording(failed, 20, listOf(file()), dataSize = 1)))
+        assertEquals(listOf(PLAY, DETAILS, MARK_WATCHED, KEEP_UNTIL, DELETE),
+            actions(recording(failed, files = listOf(file()))))
+        assertEquals(listOf(RESUME, START_OVER, DETAILS, MARK_WATCHED, KEEP_UNTIL, DELETE),
+            actions(recording(failed, 20, listOf(file()))))
+        assertEquals(listOf(RESUME, START_OVER, DETAILS, MARK_WATCHED, KEEP_UNTIL, DELETE),
+            actions(recording(failed, 20, listOf(file()), dataSize = 1)))
     }
 
     @Test fun missedRecordingWithAFileOnlyOffersPlay() {
@@ -292,6 +335,7 @@ class BrowseContextActionsTest {
         canModify: Boolean = true,
         capability: RecordingProgressCapability = RecordingProgressCapability.SUPPORTED,
         playing: Boolean = false,
+        ruleAvailable: Boolean = false,
     ) = recordingContextActions(entry, SessionObservation.create(recordingProgressCapability = capability)
-        .recordingPlaybackAdmission(entry), canModify, playing)
+        .recordingPlaybackAdmission(entry), canModify, playing, ruleAvailable = ruleAvailable)
 }

@@ -192,6 +192,7 @@ abstract class LivePlayerChromeFixture {
 
     /** Listeners on the runtime's player, so tests can drive states the fake stream never reaches. */
     protected val playerListeners = mutableListOf<Player.Listener>()
+    protected val formatListeners = mutableListOf<androidx.media3.exoplayer.analytics.AnalyticsListener>()
 
     /** The player reports READY and playing, as when the tune's stream has started. */
     protected var forcedReady = false
@@ -879,6 +880,14 @@ abstract class LivePlayerChromeFixture {
             override fun getCurrentTracks(): Tracks = forcedTracks ?: base.currentTracks
             override fun getVideoFormat(): Format? = forcedVideoFormat ?: base.videoFormat
             override fun getAudioFormat(): Format? = forcedAudioFormat ?: base.audioFormat
+            override fun addAnalyticsListener(listener: androidx.media3.exoplayer.analytics.AnalyticsListener) {
+                formatListeners += listener
+                base.addAnalyticsListener(listener)
+            }
+            override fun removeAnalyticsListener(listener: androidx.media3.exoplayer.analytics.AnalyticsListener) {
+                formatListeners -= listener
+                base.removeAnalyticsListener(listener)
+            }
             override fun play() {
                 base.play()
                 afterTargetPlay()

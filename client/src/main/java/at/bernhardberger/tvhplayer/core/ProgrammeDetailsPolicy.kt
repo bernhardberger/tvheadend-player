@@ -32,26 +32,32 @@ fun programmeDetailsActions(
     liveProgramme: Boolean = true,
     playing: Boolean = false,
     behindLive: Boolean = false,
+    ruleAvailable: Boolean = false,
 ): List<BrowseContextAction> = buildList {
     if (playing) {
         add(BrowseContextAction.CONTINUE_WATCHING)
         // Continue watching returns to where the viewer is; behind live, live is its own choice.
         if (behindLive) add(BrowseContextAction.WATCH_LIVE)
     } else if (canWatchChannel) add(BrowseContextAction.WATCH)
-    programmeActions(event, nowSec, recording,
+    addAll(programmeActions(event, nowSec, recording,
         canModifyRecordings = canModifyRecordings,
-        recordingAdmission = recordingAdmission).forEach {
-        when (it) {
-            ProgrammeAction.WATCH -> Unit
-            ProgrammeAction.RECORD -> if (liveProgramme) add(BrowseContextAction.RECORD)
-            ProgrammeAction.STOP_RECORDING -> add(BrowseContextAction.STOP)
-            ProgrammeAction.CANCEL_RECORDING -> add(BrowseContextAction.CANCEL)
-            ProgrammeAction.WATCH_FROM_START -> if (recording != null) {
-                add(if (nowSec < event.stop.epochSeconds) BrowseContextAction.START_OVER else BrowseContextAction.PLAY)
-            }
-        }
-    }
+        recordingAdmission = recordingAdmission).mapNotNull {
+        programmeDetailsAction(it, event, nowSec, recording, liveProgramme)
+    })
+    addAll(recordingRuleActions(recording, canModifyRecordings, ruleAvailable))
     if (canWatchChannel) add(BrowseContextAction.SHOW_GUIDE)
+}
+
+private fun programmeDetailsAction(action: ProgrammeAction, event: EpgEvent, nowSec: Long,
+    recording: DvrEntry?, liveProgramme: Boolean): BrowseContextAction? = when (action) {
+    ProgrammeAction.WATCH -> null
+    ProgrammeAction.RECORD -> BrowseContextAction.RECORD.takeIf { liveProgramme }
+    ProgrammeAction.RECORD_SERIES -> BrowseContextAction.RECORD_SERIES.takeIf { liveProgramme }
+    ProgrammeAction.RECORD_TITLE -> BrowseContextAction.RECORD_TITLE.takeIf { liveProgramme }
+    ProgrammeAction.STOP_RECORDING -> BrowseContextAction.STOP
+    ProgrammeAction.CANCEL_RECORDING -> BrowseContextAction.CANCEL.takeUnless { recording?.isRuleRecording == true }
+    ProgrammeAction.WATCH_FROM_START -> if (recording == null) null else
+        if (nowSec < event.stop.epochSeconds) BrowseContextAction.START_OVER else BrowseContextAction.PLAY
 }
 
 fun recordingDetailsActions(
@@ -61,9 +67,10 @@ fun recordingDetailsActions(
     canWatchChannel: Boolean,
     playing: Boolean = false,
     nowSec: Long,
+    ruleAvailable: Boolean = false,
 ): List<BrowseContextAction> = buildList {
     if (!playing && recording.state == DvrEntryState.SCHEDULED && canWatchChannel) add(BrowseContextAction.WATCH)
-    addAll(recordingContextActions(recording, admission, canModifyRecordings, playing)
+    addAll(recordingContextActions(recording, admission, canModifyRecordings, playing, ruleAvailable = ruleAvailable)
         .filter { it != BrowseContextAction.DETAILS })
     if (canWatchChannel && recording.state in listOf(DvrEntryState.SCHEDULED, DvrEntryState.RECORDING,
             DvrEntryState.RECORDING_ERROR) && recording.stop?.epochSeconds?.let { it > nowSec } == true) {

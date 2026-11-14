@@ -31,7 +31,9 @@ from Google's Material Symbols set (Apache License 2.0), sourced from
 grade 0, optical size 24) and the project modifications
 (removal of the vector-level tint, selective `autoMirrored`, resource renaming)
 are recorded in `artwork/material-symbols-LICENSE.txt`, which retains the
-upstream Apache License text.
+upstream Apache License text. The `ic_sort_*` sort-order icons are the
+project's own drawings that adapt Material Symbols arrows and letters, as
+recorded there.
 
 The application consumes the Tvheadend SDK (`at.bernhardberger.tvheadend:sdk-*`,
 [`bernhardberger/tvheadend-sdk`](https://github.com/bernhardberger/tvheadend-sdk))

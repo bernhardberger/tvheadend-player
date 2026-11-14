@@ -1534,7 +1534,7 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
         assertNoPlayback()
     }
 
-    @Test fun aRecordingScheduledByARuleSaysSoUntilItRuns() {
+    @Test fun aRuleRecordingKeepsItsOriginWhileItRuns() {
         val series = AutorecRuleId("series")
         show(recordings = listOf(
             DvrEntry.create(DvrEntryId(1), eventId = EventId(110), state = DvrEntryState.RECORDING, autorecRuleId = series),
@@ -1543,11 +1543,11 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
         ))
         fun description(offset: Int) = compose.onNode(hasContentDescription(title(1, offset), substring = true))
             .fetchSemanticsNode().config.getOrElseNullable(SemanticsProperties.ContentDescription) { null }.orEmpty().joinToString()
-        val rule = context().getString(R.string.recording_from_series_rule)
+        val rule = context().getString(R.string.recording_from_automatic)
         assertTrue(description(1), description(1).contains(rule))
         assertFalse("A one-off is plainly scheduled", description(2).contains(rule))
         assertTrue(description(2), description(2).contains(context().getString(R.string.recording_state_scheduled)))
-        assertFalse("A running recording is the dot, whatever scheduled it", description(0).contains(rule))
+        assertTrue("A running rule recording keeps its origin", description(0).contains(rule))
         assertTrue(description(0), description(0).contains(context().getString(R.string.recording_state_recording)))
         assertNoPlayback()
     }

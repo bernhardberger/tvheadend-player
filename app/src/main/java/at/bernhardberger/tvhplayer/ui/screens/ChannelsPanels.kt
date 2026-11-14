@@ -33,15 +33,12 @@ internal fun ChannelsTagsPanel(
             ))
         }
     }
-    BrowseSidePanel(stringResource(R.string.browse_tags), "channels-tags-panel", onClose) {
-        BrowsePanelList(entries, radio = false)
-    }
+    BrowseLevelsPanel(stringResource(R.string.browse_tags), "channels-tags-panel", onClose, entries)
 }
 
 /**
- * View options: the layouts, then the current layout's program art and channel names switches
- * where it has them. Each
- * change applies at once; Back closes the panel.
+ * View options: the three layout choices, then the current layout's program art and channel names
+ * switches where it has them, in one flat list. Each change applies at once; Left or Back closes.
  */
 @Composable
 internal fun ChannelsViewOptionsPanel(
@@ -79,9 +76,8 @@ internal fun ChannelsViewOptionsPanel(
             ))
         }
     }
-    BrowseSidePanel(stringResource(R.string.channels_view_options), "channels-view-panel", onClose) {
-        BrowsePanelList(entries, radio = true)
-    }
+    BrowseLevelsPanel(
+        stringResource(R.string.channels_view_options), "channels-view-panel", onClose, entries, radio = true)
 }
 
 private fun ChannelsLayout.label(): Int = when (this) {

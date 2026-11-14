@@ -5,8 +5,7 @@ import androidx.compose.ui.res.stringResource
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.HomeSectionKind
 import at.bernhardberger.tvhplayer.ui.screens.BrowsePanelEntry
-import at.bernhardberger.tvhplayer.ui.screens.BrowsePanelList
-import at.bernhardberger.tvhplayer.ui.screens.BrowseSidePanel
+import at.bernhardberger.tvhplayer.ui.screens.BrowseLevelsPanel
 
 @Composable
 internal fun HomeViewOptionsPanel(
@@ -24,9 +23,10 @@ internal fun HomeViewOptionsPanel(
             ))
         }
     }
-    BrowseSidePanel(stringResource(R.string.channels_view_options), "home-view-panel", onClose) {
-        BrowsePanelList(entries, radio = false, focusKey = "home-view-${HomeSectionKind.CURRENT_ACTIVITY.name}")
-    }
+    BrowseLevelsPanel(
+        stringResource(R.string.channels_view_options), "home-view-panel", onClose, entries,
+        focusKey = "home-view-${HomeSectionKind.CURRENT_ACTIVITY.name}",
+    )
 }
 
 private fun HomeSectionKind.homeLabel() = when (this) {
@@ -35,6 +35,7 @@ private fun HomeSectionKind.homeLabel() = when (this) {
     HomeSectionKind.ON_NOW -> R.string.home_on_now
     HomeSectionKind.GENRES -> R.string.home_browse_by_genre
     HomeSectionKind.CONTINUE_WATCHING -> R.string.home_continue_watching
+    HomeSectionKind.EXPIRING_SOON -> R.string.home_expiring_soon
     HomeSectionKind.RECENTLY_RECORDED -> R.string.home_recently_recorded
     HomeSectionKind.UPCOMING -> R.string.home_upcoming_recordings
 }

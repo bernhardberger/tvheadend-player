@@ -93,6 +93,7 @@ import coil3.request.transformations
 import at.bernhardberger.tvhplayer.images.ProgrammeArtworkTransformation
 import coil3.request.allowHardware
 import at.bernhardberger.tvhplayer.ui.common.formatFirstAired
+import at.bernhardberger.tvhplayer.ui.common.formatRecordingExpiryDate
 import at.bernhardberger.tvhplayer.ui.common.formatFileSize
 import at.bernhardberger.tvhplayer.ui.common.formatMetadataNumber
 import java.util.Locale
@@ -129,6 +130,7 @@ internal fun ProgrammeDetailsPage(
     recordingConfigurations: List<DvrConfiguration> = emptyList(),
     /** The SDK's admission of a [recording] shown without [event]; its time left follows the Resume it offers. */
     recordingAdmission: RecordingPlaybackAdmission? = null,
+    recordingKind: AutomaticRecordingKind? = null,
 ) {
     val layering = LocalBrowseContentLayering.current
     val pageKey = remember { Any() }
@@ -195,6 +197,14 @@ internal fun ProgrammeDetailsPage(
     val scope = rememberCoroutineScope()
     // The action last focused, or its replacement after an action changed the row.
     fun actionFocus() = (lastAction?.takeIf { it in actions }?.let(requesters::get)
+            ?: BrowseContextAction.EDIT_RULE.takeIf {
+                lastAction in listOf(BrowseContextAction.RECORD_SERIES, BrowseContextAction.RECORD_TITLE) &&
+                    it in actions
+            }?.let(requesters::get)
+            ?: actions.firstOrNull {
+                lastAction in listOf(BrowseContextAction.SKIP, BrowseContextAction.UNSKIP) &&
+                    it in listOf(BrowseContextAction.SKIP, BrowseContextAction.UNSKIP)
+            }?.let(requesters::get)
             ?: actions.firstOrNull { lastAction in listOf(BrowseContextAction.MARK_WATCHED, BrowseContextAction.MARK_UNWATCHED) &&
                 it in listOf(BrowseContextAction.MARK_WATCHED, BrowseContextAction.MARK_UNWATCHED) }?.let(requesters::get)
             ?: actions.firstOrNull { lastAction in listOf(BrowseContextAction.RECORD, BrowseContextAction.CANCEL, BrowseContextAction.STOP) &&
@@ -312,7 +322,7 @@ internal fun ProgrammeDetailsPage(
                     !backEnabled -> true
                     event != null && key.nativeKeyEvent.keyCode == android.view.KeyEvent.KEYCODE_MEDIA_RECORD -> {
                         val action = actions.firstOrNull {
-                            it == BrowseContextAction.STOP || it == BrowseContextAction.CANCEL
+                            it in programmeRecordingRecordKeyActions
                         }
                         if (key.type == KeyEventType.KeyDown && key.nativeKeyEvent.repeatCount == 0 && action != null) {
                             lastAction = action
@@ -452,7 +462,7 @@ internal fun ProgrammeDetailsPage(
                                     .size(PlayerChromeTokens.channelCardWidth, PlayerChromeTokens.channelCardHeight)
                                     .clip(PlayerChromeTokens.heroShape).testTag("details-framed-art"))
                         }
-                        DetailsInformation(event, recording, recordingAdmission, channel, nowSec,
+                        DetailsInformation(event, recording, recordingAdmission, channel, nowSec, recordingKind,
                             corner = when {
                                 glowChannel != null -> DetailsHeroLogoSize.first
                                 framedChannel != null -> PlayerChromeTokens.channelCardWidth
@@ -481,7 +491,8 @@ internal fun ProgrammeDetailsPage(
                         CompositionLocalProvider(LocalBringIntoViewSpec provides rowSpec) {
                             Box(Modifier.focusProperties { onEnter = { actionFocus().requestFocus() } }.focusGroup()
                                 .onGloballyPositioned { textArea("actions", it.boundsInRoot(), true) }) {
-                                DetailsActions(actions, event, recording, nowSec, requesters, { if (backEnabled) onAction(it) }) {
+                                DetailsActions(actions, event, recording, nowSec, recordingKind, requesters,
+                                    { if (backEnabled) onAction(it) }) {
                                     lastAction = it; section = DetailsSection.ACTIONS; onActionFocused(it)
                                 }
                             }
@@ -1252,6 +1263,7 @@ internal fun programmeHeaderMetadata(facts: List<Pair<String, String>>, resource
 private fun DetailsInformation(
     event: EpgEvent?, recording: DvrEntry?, recordingAdmission: RecordingPlaybackAdmission?,
     channel: Channel?, nowSec: Long,
+    recordingKind: AutomaticRecordingKind?,
     corner: Dp?,
     textArea: (String, androidx.compose.ui.geometry.Rect, Boolean) -> Unit,
     synopsis: @Composable () -> Unit,
@@ -1261,11 +1273,24 @@ private fun DetailsInformation(
     Column(Modifier.fillMaxWidth().testTag("details-information")) {
         ProgrammeEyebrow(channel?.icon, channelTitleText(channel?.number, channel?.name.orEmpty()),
             Modifier.widthIn(max = 470.dp).onGloballyPositioned { textArea("eyebrow", it.boundsInRoot(), false) }) {
-            val removal = recording?.takeIf { event == null }?.let { recordingRemovalTime(it, nowSec) }
+            val removal = recording?.takeIf { event == null }?.let { recordingExpiryTime(it, nowSec) }
             if (removal != null) {
-                DetailsStatusBadge(null, stringResource(R.string.details_available_until,
-                    formatRecordingDate(removal, dateOnly = true, locale = LocalConfiguration.current.locales[0], nowSec = nowSec)))
-            } else detailsStatus(event, recording, nowSec)?.let { DetailsStatusBadge(it, rule = recording?.rule) }
+                StatusBadge(
+                    formatRecordingExpiryDate(
+                        removal, nowSec, LocalContext.current.resources, LocalConfiguration.current.locales[0]),
+                    StatusBadgeTone.NEUTRAL, icon = R.drawable.ic_hourglass_bottom,
+                )
+            } else detailsStatus(event, recording, nowSec)?.let {
+                DetailsStatusBadge(it, rule = recordingRule(recordingKind) ?: recording?.rule,
+                    skipped = recording?.enabled == false)
+            }
+        }
+        if (recording?.state in listOf(DvrEntryState.SCHEDULED, DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR)) {
+            (recordingRule(recordingKind) ?: recording?.rule)?.let {
+                Text(stringResource(it.label), style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 8.dp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
         Spacer(Modifier.height(8.dp))
         var titleInk by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
@@ -1433,6 +1458,7 @@ private fun DetailsTimeline(
 @Composable
 private fun DetailsActions(
     actions: List<BrowseContextAction>, event: EpgEvent?, recording: DvrEntry?, nowSec: Long,
+    recordingKind: AutomaticRecordingKind?,
     requesters: Map<BrowseContextAction, FocusRequester>, onAction: (BrowseContextAction) -> Unit,
     onFocused: (BrowseContextAction) -> Unit,
 ) {
@@ -1459,7 +1485,7 @@ private fun DetailsActions(
                     Spacer(Modifier.width(ButtonDefaults.IconSpacing))
                     Text(stringResource(action.label(action == BrowseContextAction.WATCH &&
                         (event == null && recording?.state == DvrEntryState.SCHEDULED ||
-                            event != null && !event.isRunning(nowSec)))),
+                            event != null && !event.isRunning(nowSec)), recordingKind)),
                         maxLines = 1, softWrap = false)
                 }
                  if (index == 0 && action != BrowseContextAction.DELETE && action != BrowseContextAction.REMOVE_ENTRY) Button(onClick = { onAction(action) }, modifier = modifier,
@@ -1473,11 +1499,13 @@ private fun DetailsActions(
 
 /** The page's status in the eyebrow: the recording badges, or a neutral fact badge. */
 @Composable
-private fun DetailsStatusBadge(status: DetailsStatus?, label: String? = null, rule: RecordingRule? = null) {
+private fun DetailsStatusBadge(
+    status: DetailsStatus?, label: String? = null, rule: RecordingRule? = null, skipped: Boolean = false,
+) {
     when (status) {
-        DetailsStatus.RECORDING -> RecordingBadge(DvrEntryState.RECORDING)
-        DetailsStatus.RECORDING_ERRORS -> RecordingBadge(DvrEntryState.RECORDING_ERROR)
-        DetailsStatus.SCHEDULED -> RecordingBadge(DvrEntryState.SCHEDULED, rule = rule)
+        DetailsStatus.RECORDING -> RecordingBadge(DvrEntryState.RECORDING, rule = rule)
+        DetailsStatus.RECORDING_ERRORS -> RecordingBadge(DvrEntryState.RECORDING_ERROR, rule = rule)
+        DetailsStatus.SCHEDULED -> RecordingBadge(DvrEntryState.SCHEDULED, rule = rule, skipped = skipped)
         DetailsStatus.MISSED -> RecordingBadge(DvrEntryState.MISSED)
         DetailsStatus.CANCELLED -> RecordingBadge(DvrEntryState.INVALID)
         DetailsStatus.FAILED -> RecordingBadge(DvrEntryState.COMPLETED_ERROR)

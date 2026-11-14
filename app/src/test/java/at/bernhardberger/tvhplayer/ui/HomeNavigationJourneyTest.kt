@@ -3,6 +3,7 @@
 package at.bernhardberger.tvhplayer.ui
 
 import android.app.Application
+import at.bernhardberger.tvhplayer.testutil.pressKey
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
@@ -364,9 +365,24 @@ class HomeNavigationJourneyTest {
         fixture.key(Key.Enter)
         compose.onNodeWithTag("recordings-schedule-list").assertExists()
         compose.onNodeWithTag("recording-list-entry-9").assertIsFocused().assertIsDisplayed()
+        // The Schedule tab lives in Recordings: Left enters the rail on Recordings, never on Home first.
+        compose.mainClock.autoAdvance = false
+        try {
+            compose.onRoot().performKeyInput { pressKey(Key.DirectionLeft) }
+            repeat(8) {
+                compose.onNodeWithTag("nav-home").assertIsNotFocused()
+                compose.mainClock.advanceTimeByFrame()
+                compose.waitForIdle()
+            }
+            compose.onNodeWithTag("nav-recordings").assertIsFocused()
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+        fixture.key(Key.DirectionRight)
+        compose.onNodeWithTag("recording-list-entry-9").assertIsFocused()
         compose.runOnIdle { fixture.back.onBackPressed() }
         fixture.settle()
-        compose.onNodeWithTag("nav-recordings").assertIsFocused()
+        compose.onNodeWithTag("nav-recordings").assertIsFocused().assertIsSelected()
         compose.runOnIdle { fixture.back.onBackPressed() }
         fixture.settle()
         compose.onNodeWithTag("nav-home").assertIsFocused()

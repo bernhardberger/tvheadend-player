@@ -9,12 +9,36 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredWidth
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.key.*
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.dialog
 import androidx.compose.ui.semantics.heading
@@ -22,8 +46,17 @@ import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.tv.material3.*
-import at.bernhardberger.tvhplayer.ui.player.*
+import androidx.tv.material3.LocalContentColor
+import androidx.tv.material3.ButtonDefaults
+import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.Text
+import androidx.tv.material3.WideButton
+import androidx.tv.material3.WideButtonDefaults
+import at.bernhardberger.tvhplayer.ui.player.LocalPlayerPanelMotion
+import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
+import at.bernhardberger.tvhplayer.ui.player.PlayerMotionFrame
+import at.bernhardberger.tvhplayer.ui.player.RegisterPlayerModal
+import at.bernhardberger.tvhplayer.ui.player.animateShown
 
 /** Kit Two Column action column and LongButton width. */
 private val TwoColumnActionWidth = 268.dp
@@ -39,6 +72,7 @@ internal fun TwoColumnDialog(
     onPreviewKeyEvent: (KeyEvent) -> Boolean = { false },
     leading: (@Composable ColumnScope.() -> Unit)? = null,
     itemCardLayout: Boolean = false,
+    dismissLevel: Boolean = false,
     actions: @Composable ColumnScope.() -> Unit,
 ) {
     var openingReleasePending by remember { mutableStateOf(true) }
@@ -48,7 +82,7 @@ internal fun TwoColumnDialog(
     RegisterPlayerModal(backEnabled)
     BackHandler(enabled = backEnabled) {
         if (!closing) {
-            if (parentMotion != null) onDismiss() else visibility.targetState = false
+            if (dismissLevel || parentMotion != null) onDismiss() else visibility.targetState = false
         }
     }
     LaunchedEffect(closing, visibility.isIdle, visibility.currentState) {
@@ -118,9 +152,11 @@ internal fun TwoColumnDialogButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
+    trailingContent: (@Composable () -> Unit)? = null,
     icon: (@Composable () -> Unit)? = null,
 ) {
     val interaction = remember { MutableInteractionSource() }
+    val horizontalPadding = 16.dp
     WideButton(onClick = onClick, modifier = modifier.width(TwoColumnActionWidth),
         interactionSource = interaction,
         background = {
@@ -131,14 +167,23 @@ internal fun TwoColumnDialogButton(
                 WideButtonDefaults.Background(enabled = true, interactionSource = interaction)
             }
         },
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = if (subtitle == null) 10.dp else 4.dp),
+        contentPadding = PaddingValues(horizontal = horizontalPadding,
+            vertical = if (subtitle == null) 10.dp else 4.dp),
         // Keep the compact stack in the title slot: native subtitle mode top-aligns
         // the icon and reserves a taller row. Single-line actions retain native padding.
         title = {
-            Column(verticalArrangement = Arrangement.Center) {
-                Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.labelSmall,
-                    color = LocalContentColor.current.copy(alpha = 0.6f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            // Fill the Surface's padded width, not the native title's 240dp minimum.
+            val rowModifier = if (trailingContent == null) Modifier else Modifier
+                .wrapContentWidth(Alignment.Start, unbounded = true)
+                .requiredWidth(TwoColumnActionWidth - horizontalPadding * 2)
+            Row(rowModifier, verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
+                    Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.labelSmall,
+                        color = LocalContentColor.current.copy(alpha = 0.6f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                if (trailingContent != null) Box(Modifier.size(ButtonDefaults.IconSize),
+                    contentAlignment = Alignment.Center) { trailingContent() }
             }
         },
         icon = icon)

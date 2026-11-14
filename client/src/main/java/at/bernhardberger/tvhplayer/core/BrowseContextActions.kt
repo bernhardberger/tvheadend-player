@@ -4,14 +4,22 @@ import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
+import at.bernhardberger.tvheadend.sdk.core.SessionObservation
+import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 
 enum class BrowseContextAction {
     CONTINUE_WATCHING, WATCH_LIVE,
-    WATCH, DETAILS, RECORD, STOP, CANCEL, SHOW_GUIDE,
-    RESUME, START_OVER, PLAY, MARK_WATCHED, MARK_UNWATCHED, DELETE, REMOVE_ENTRY,
+    EDIT_RULE, SKIP, UNSKIP,
+    WATCH, DETAILS, RECORD, RECORD_SERIES, RECORD_TITLE, STOP, CANCEL, SHOW_GUIDE,
+    RESUME, START_OVER, PLAY, MARK_WATCHED, MARK_UNWATCHED, KEEP_UNTIL, DELETE, REMOVE_ENTRY,
     MARK_ALL_WATCHED, MARK_ALL_UNWATCHED, DELETE_WATCHED, DELETE_ALL,
 }
+
+/** Actions a programme's existing recording entry answers the Record key with. */
+val programmeRecordingRecordKeyActions: Set<BrowseContextAction> = setOf(
+    BrowseContextAction.STOP, BrowseContextAction.CANCEL, BrowseContextAction.SKIP, BrowseContextAction.UNSKIP,
+)
 
 /**
  * One order for every channel and programme menu, so a held OK always lands on Watch.
@@ -43,8 +51,11 @@ fun channelContextActions(
             when (it) {
                 ProgrammeAction.RECORD -> BrowseContextAction.RECORD
                 ProgrammeAction.STOP_RECORDING -> BrowseContextAction.STOP
-                ProgrammeAction.CANCEL_RECORDING -> BrowseContextAction.CANCEL
-                ProgrammeAction.WATCH, ProgrammeAction.WATCH_FROM_START -> null
+                ProgrammeAction.CANCEL_RECORDING -> BrowseContextAction.CANCEL.takeUnless {
+                    recording?.isRuleRecording == true
+                }
+                ProgrammeAction.WATCH, ProgrammeAction.WATCH_FROM_START,
+                ProgrammeAction.RECORD_SERIES, ProgrammeAction.RECORD_TITLE -> null
             }
         }
     }
@@ -62,6 +73,7 @@ fun recordingContextActions(
     canModifyRecordings: Boolean,
     playing: Boolean = false,
     canWatchChannel: Boolean = false,
+    ruleAvailable: Boolean = false,
 ): List<BrowseContextAction> = buildList {
     if (playing) add(BrowseContextAction.CONTINUE_WATCHING)
     if (recordingPlaybackOffered(admission)) {
@@ -81,15 +93,53 @@ fun recordingContextActions(
     }
     if (canWatchChannel && recordingIsRunning(entry)) add(BrowseContextAction.WATCH_LIVE)
     add(BrowseContextAction.DETAILS)
+    val ruleActions = recordingRuleActions(entry, canModifyRecordings, ruleAvailable)
     recordingWatchStateAction(entry, admission, canModifyRecordings)?.let(::add)
+    if (recordingKeepUntilAvailable(entry, canModifyRecordings)) add(BrowseContextAction.KEEP_UNTIL)
     if (canModifyRecordings) when (entry.state) {
         DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR -> add(BrowseContextAction.STOP)
-        DvrEntryState.SCHEDULED -> add(BrowseContextAction.CANCEL)
+        DvrEntryState.SCHEDULED -> if (entry.isRuleRecording) {
+            addAll(ruleActions.filter { it != BrowseContextAction.EDIT_RULE })
+        } else add(BrowseContextAction.CANCEL)
         DvrEntryState.COMPLETED, DvrEntryState.MISSED, DvrEntryState.INVALID,
         DvrEntryState.COMPLETED_ERROR -> add(
             if (deleteRemovesEntryOnly(entry)) BrowseContextAction.REMOVE_ENTRY else BrowseContextAction.DELETE)
         else -> Unit
     }
+    if (BrowseContextAction.EDIT_RULE in ruleActions) add(BrowseContextAction.EDIT_RULE)
+}
+
+fun recordingKeepUntilAvailable(entry: DvrEntry, canModifyRecordings: Boolean): Boolean =
+    canModifyRecordings && !entry.files.isNullOrEmpty() &&
+        entry.state in listOf(DvrEntryState.COMPLETED, DvrEntryState.COMPLETED_ERROR)
+
+val DvrEntry.isRuleRecording: Boolean get() = autorecRuleId != null || timerecRuleId != null
+
+fun recordingRuleActions(
+    entry: DvrEntry?,
+    canModifyRecordings: Boolean,
+    ruleAvailable: Boolean,
+): List<BrowseContextAction> = buildList {
+    if (!canModifyRecordings || entry?.isRuleRecording != true || entry.state !in listOf(
+            DvrEntryState.SCHEDULED, DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR)) return@buildList
+    if (entry.state == DvrEntryState.SCHEDULED) {
+        add(if (entry.enabled == false) BrowseContextAction.UNSKIP else BrowseContextAction.SKIP)
+    }
+    if (ruleAvailable) add(BrowseContextAction.EDIT_RULE)
+}
+
+fun SessionObservation.recordingRuleAvailable(entry: DvrEntry): Boolean {
+    val snapshot = (dvrState as? DvrRepositoryState.Current)?.snapshot ?: return false
+    return snapshot.autorecRules.any { it.id == entry.autorecRuleId } ||
+        snapshot.timerecRules.any { it.id == entry.timerecRuleId }
+}
+
+/** Missing automatic-rule metadata still truthfully identifies the entry as automatically recorded. */
+fun SessionObservation.recordingRuleKind(entry: DvrEntry): AutomaticRecordingKind? = when {
+    entry.autorecRuleId != null -> dvrSnapshotForDisplay?.autorecRules
+        ?.firstOrNull { it.id == entry.autorecRuleId }?.let(::autorecKind) ?: AutomaticRecordingKind.TITLE
+    entry.timerecRuleId != null -> AutomaticRecordingKind.TIMER
+    else -> null
 }
 
 /**

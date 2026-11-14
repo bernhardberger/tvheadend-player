@@ -214,6 +214,20 @@ class PlaybackPanelCaptureTest {
         assertTrue(compose.onNodeWithTag("playback-options-track-list").fetchSemanticsNode().config[ListBottomFadeVisible])
     }
 
+    @OptIn(ExperimentalTestApi::class)
+    @Test fun playerRootAndAudioLevel() {
+        panelScene {
+            var page by remember { mutableStateOf(PlaybackOptionsPage.ROOT) }
+            PlaybackOptionsSheet(page,
+                PlaybackOptionsTrackListTest.player(PlaybackOptionsTrackListTest.orfTracks()),
+                false, AspectRatioMode.FIT, false, { page = it }, {}, {}, audioAutomatic = true, onAutomaticAudio = {})
+        }
+        compose.onNodeWithTag("playback-options-audio").assertIsFocused()
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
+        compose.waitForIdle()
+        compose.onNodeWithTag("playback-options-track-automatic").assertIsFocused()
+    }
+
     /** Match the browse shell, early-morning bounds and 12-hour clock of the integrated report. */
     @Test fun guideTimeCurrentDayKeepsFirstRowBelowTitle() {
         val previousClock = AppClock.systemUses24Hour

@@ -236,7 +236,8 @@ internal fun HomeScreenContent(
     val mutationScope = rememberCoroutineScope()
     fun recordFocusedProgramme(channelId: ChannelId) {
         when (val action = onRecordKey(channelId)) {
-            BrowseContextAction.STOP, BrowseContextAction.CANCEL -> {
+            BrowseContextAction.STOP, BrowseContextAction.CANCEL,
+            BrowseContextAction.SKIP, BrowseContextAction.UNSKIP -> {
                 recordInitialAction = action
                 channelDetails = true
                 channelMenu = channelId
@@ -283,6 +284,9 @@ internal fun HomeScreenContent(
                 if (!menu) onRecordings(DvrLibraryMode.ARCHIVE, null)
             } else section.items.getOrNull(key.position)?.let { openRecording(it.entry, menu) }
             is HomeSection.RecentlyRecorded -> if (key.item == "all-recordings") {
+                if (!menu) onRecordings(DvrLibraryMode.ARCHIVE, null)
+            } else section.items.getOrNull(key.position)?.let { openRecording(it.entry, menu) }
+            is HomeSection.ExpiringSoon -> if (key.item == "all-recordings") {
                 if (!menu) onRecordings(DvrLibraryMode.ARCHIVE, null)
             } else section.items.getOrNull(key.position)?.let { openRecording(it.entry, menu) }
             is HomeSection.Upcoming -> if (!menu) {

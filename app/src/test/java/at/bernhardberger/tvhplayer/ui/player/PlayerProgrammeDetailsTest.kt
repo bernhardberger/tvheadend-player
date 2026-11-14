@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.testutil.testDvrMutationActions
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
 import android.app.Application
 import androidx.compose.runtime.*
@@ -270,7 +271,7 @@ class PlayerProgrammeDetailsTest {
             epgState = EpgRepositoryState.Current(EpgSnapshot.create(listOf(watched))),
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = listOf(entry))),
         )).observation.value
-        val mutations = DvrMutationActions(
+        val mutations = testDvrMutationActions(
             scheduleEntry = { _, _ -> error("Unexpected DVR mutation") },
             stopEntry = { _, _ -> error("Unexpected DVR mutation") },
             cancelEntry = { _, _ -> error("Unexpected DVR mutation") },

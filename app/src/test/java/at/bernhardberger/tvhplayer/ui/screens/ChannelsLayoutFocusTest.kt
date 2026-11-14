@@ -262,7 +262,7 @@ class ChannelsLayoutFocusTest {
         fixture.awaitFocus(option("layout-grid"))
         fixture.key(Key.DirectionUp)
         fixture.key(Key.DirectionCenter)
-        fixture.key(Key.Back)
+        fixture.key(Key.DirectionLeft)
         fixture.awaitFocus(viewButton)
         assertEquals(ChannelsLayout.LIST, fixture.channelsView.layout)
         fixture.key(Key.DirectionDown)

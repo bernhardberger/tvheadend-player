@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.testutil.testDvrMutationActions
 import at.bernhardberger.tvhplayer.testutil.holdBack
 
 import android.app.Application
@@ -455,7 +456,7 @@ class ChannelScheduleFocusTest {
                 }
             }
         }
-        val mutations = DvrMutationActions(
+        val mutations = testDvrMutationActions(
             scheduleEntry = { _, _ -> error("Unexpected DVR mutation") },
             stopEntry = { _, _ -> error("Unexpected DVR mutation") },
             cancelEntry = { _, _ -> error("Unexpected DVR mutation") },

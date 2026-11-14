@@ -1,5 +1,8 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.core.glanceBadges
+import at.bernhardberger.tvhplayer.core.VideoScan
+
 import androidx.compose.ui.res.stringResource
 import at.bernhardberger.tvhplayer.R
 import androidx.compose.ui.semantics.getOrNull
@@ -255,7 +258,7 @@ class PlayerChromeCaptureTest {
                     Box(Modifier.fillMaxSize()) {
                         Image(still.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                         // Composed after the first frame, as the capture scenes are; the resting rail scrolls inside layout otherwise.
-                        if (shown) Controls(
+                        val player: @Composable () -> Unit = { if (shown) Controls(
                             timeshift = AppTimeshiftState(available = true, bufferStartMs = -600_000, positionMs = 0,
                                 liveEdgeMs = 0, timingKnown = true),
                             behind = false, paused = false,
@@ -273,6 +276,7 @@ class PlayerChromeCaptureTest {
                                 65f / 180f, 75f / 180f, 75f / 180f, true)
                             else ProgrammeWindow(programme, Instant.fromEpochSeconds(now), 0.25f, 5f / 60f, 0.25f, 0.25f, true),
                             programme = programme, peek = !railOpen,
+                            browser = if (railOpen) remember { PlayerChannelBrowserState() } else null,
                             tray = if (railOpen) {
                                 { ProvideArtworkSession(session) { QuickZapTrayPreview(lineUp[0], programme, next, now,
                                     Modifier.padding(horizontal = TvGridHorizontalMargin)) } }
@@ -280,7 +284,16 @@ class PlayerChromeCaptureTest {
                             tracks = PlayerTrackButtons(audio = "English"),
                             nowSec = now, peekChannels = lineUp, peekEvent = { id -> events.firstOrNull { it.channelId == id } },
                             recordingChannels = setOf(ChannelId(2)),
-                        )
+                        ) }
+                        if (railOpen) PlayerPage<Unit>(
+                            details = null, railExpanded = true,
+                            nowPlaying = { ProvideArtworkSession(session) {
+                                NowPlayingStrip(lineUp[0].id, lineUp[0].number?.toString(), lineUp[0].name.orEmpty(),
+                                    lineUp[0].icon, programme, now,
+                                    playbackIndicator = ChannelPlaybackIndicator.PLAYING)
+                            } },
+                            player = { player() }, programme = {},
+                        ) else player()
                     }
                 }
             }
@@ -312,7 +325,7 @@ class PlayerChromeCaptureTest {
         // Player (i) focus and the channel rail's Recent row.
         INFO_FOCUSED, RECORDING_INFO_FOCUSED, RECENT_OPEN, BROWSER_NOW, BROWSER_EMPTY,
         // The audio button beside Info, focused.
-        AUDIO_FOCUSED, RECORDING_STARTING, RECORDING_STARTING_CONTROLS,
+        AUDIO_FOCUSED, RECORDING_STARTING, RECORDING_STARTING_CONTROLS, BANNER_LONG_EYEBROW,
     }
 
     /** [Scene.CONTROLS_REVEAL_MID] composes the Banner, then the controls take it over. */
@@ -557,9 +570,24 @@ class PlayerChromeCaptureTest {
         val content = PlayerChromeContent(
             clock = formatClock(NOW),
             info = liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 101, "Ridge Earth HD", programme.takeUnless { noEpg }, next.takeUnless { noEpg }, nextScheduled = true, nowSec = NOW,
-                unavailableTitle = "No program information"),
+                unavailableTitle = "No program information").let { info ->
+                when (scene) {
+                    Scene.BANNER_LIVE -> info.copy(title = "Ridge Light")
+                    Scene.BANNER_LONG_EYEBROW -> info.copy(metadata =
+                        "Drama • A journey through mountain communities and their remarkable histories ".repeat(4))
+                    else -> info
+                }
+            },
             state = state,
             recordingNow = scene == Scene.CONTROLS_BEHIND || scene == Scene.BANNER_BEHIND,
+            badges = when (scene) {
+                Scene.BANNER_TUNING -> emptyList()
+                Scene.CONTROLS_BEHIND, Scene.BANNER_BEHIND ->
+                    glanceBadges(2160, "audio/eac3", 6, true, VideoScan.PROGRESSIVE)
+                Scene.BANNER_NO_EPG_BEHIND ->
+                    glanceBadges(1080, "audio/ac3", 6)
+                else -> glanceBadges(1080, "audio/ac3", 6, scan = VideoScan.INTERLACED)
+            },
             picon = if (scene == Scene.CONTROLS_NO_LOGO) null else ChannelIcon.ImageCache(LOGO),
             artwork = programme.image.takeUnless { noEpg }?.let(ChannelIcon::ImageCache),
         )
@@ -597,9 +625,10 @@ class PlayerChromeCaptureTest {
                 recordingChannels = setOf(ChannelId(1)), tray = {}, previewFollowsFocus = true)
             Scene.BANNER_TUNING -> Banner(PlayerChromeMode.BANNER, content,
                 PlayerChromeTimeline.Live(AppTimeshiftState(), NOW, programme, motionKey = ChannelId(1), tuning = true))
-            Scene.BANNER_LIVE -> Banner(PlayerChromeMode.BANNER, content, PlayerChromeTimeline.Live(timeshift, NOW, programme,
-                committedWindow = ProgrammeWindow(programme, Instant.fromEpochSeconds(NOW), 0.57f, 0.46f, 0.57f, 0.57f, true),
-                motionKey = ChannelId(1)))
+            Scene.BANNER_LIVE, Scene.BANNER_LONG_EYEBROW -> Banner(PlayerChromeMode.BANNER, content,
+                PlayerChromeTimeline.Live(timeshift, NOW, programme,
+                    committedWindow = ProgrammeWindow(programme, Instant.fromEpochSeconds(NOW), 0.57f, 0.46f, 0.57f, 0.57f, true),
+                    motionKey = ChannelId(1)))
             Scene.BANNER_BEHIND, Scene.BANNER_PAUSED -> Banner(PlayerChromeMode.BANNER, content, PlayerChromeTimeline.Live(timeshift, NOW, programme,
                 committedWindow = ProgrammeWindow(programme, Instant.fromEpochSeconds(NOW - 203), 0.53f, 0.46f, 0.57f, 0.57f, true),
                 motionKey = ChannelId(1)))
@@ -710,6 +739,7 @@ class PlayerChromeCaptureTest {
                     // Stepping in the full controls: the focused timeline.
                     restoreFocus = if (scene == Scene.RECORDING_INFO_FOCUSED) "player-info" else "player-seekbar".takeIf { scene == Scene.RECORDING_CONTROLS_STEP || scene == Scene.RECORDING_CONTROLS_STEP_FORWARD },
                     growing = growing,
+                    badges = glanceBadges(1080, "audio/ac3", 6, scan = VideoScan.INTERLACED),
                     info = fixtureRecordingInfo(programme.title.orEmpty(), growing, subtitle = programme.subtitle,
                          positionMs = position, durationMs = duration, nowSec = NOW)
                          .copy(channelName = "Ridge Earth HD", channelNumber = "101"),
@@ -886,9 +916,9 @@ class PlayerChromeCaptureTest {
                             PlayerChannelBrowser(peekRows, peekChannels, peekChannels.drop(1), peekChannels[0].id, emptySet(),
                                 peekEvent ?: railEvent, nowSec, false, {}, {}, { _, _, _ -> }, {})
                         }
-                        else if (browser != null) ProvideArtworkSession(session) { PlayerChannelBrowser(browser, channels, if (emptyRecent) emptyList() else channels.drop(1),
-                            channels[0].id, emptySet(), { if (it == channels[0].id) programme else if (it == channels[1].id) trayProgramme else null },
-                            NOW, true, {}, {}, { _, _, _ -> }, {}) }
+                        else if (browser != null) ProvideArtworkSession(session) { PlayerChannelBrowser(browser, peekChannels, if (emptyRecent) emptyList() else peekChannels.drop(1),
+                            peekChannels[0].id, recordingChannels, peekEvent ?: railEvent,
+                            nowSec, true, { railFocus = it }, {}, { _, _, _ -> }, {}) }
                         else if (tray != null) ProvideArtworkSession(session) { ChannelDrawer(
                             channels = peekChannels, selectedId = ChannelId(1), playingChannelId = ChannelId(1),
                             recordingChannelIds = recordingChannels, nowEvent = peekEvent ?: railEvent,

@@ -40,6 +40,10 @@ Reconciled to frozen source `6d80a8ff` for 0.3.0 by GPT-6.1 Sol (medium), retain
 
 0.5 confirmation and playback card strings (`server_switch_question`, `server_remove_*`, `*_confirm_body`, `delete_folder_*_confirm_question`, `recording_recorded_of`) drafted against `90078f81` by GPT-6.1 Sol (medium) and reviewed by Sonnet 5.5 (medium); still machine-drafted, no human reviewer. Reviewer corrections accepted for `stop_recording_confirm_body`, `stop_recording_confirm_body_open`, `recording_recorded_of`.
 
+0.5 automatic recording, timer, Keep until and expiry strings (`automatic_recording_*`, `autorec_editor_*`, `timer_editor_*`, `context_edit_*`, `context_skip_*`, `context_unskip_*`, `context_record_*`, `context_keep_until`, `recording_keep_until_*`, `recording_expir*`, `home_expiring_soon`, `recording_from_automatic`, `recording_state_and_origin`) drafted against `9e30bc99` by GPT-6.1 Sol (medium) and reviewed by Sonnet 5.5 (medium); still machine-drafted, no human reviewer. Reviewer corrections accepted for `autorec_editor_channel_unavailable`, `autorec_editor_after`, `autorec_editor_before`, `autorec_editor_after_time`, `autorec_editor_before_time`, `autorec_editor_keep_week`, `autorec_editor_days_after_recording`. Wording also changed after the review for `autorec_editor_keep_month`, `autorec_editor_keep_three_months`, `autorec_editor_keep_six_months`, `autorec_editor_keep_year`.
+
+0.5 Schedule tab strings for timers and the list of automatic recordings (`schedule_*`) drafted against `b257da70` by GPT-6.1 Sol (medium) and reviewed by Sonnet 5.5 (medium); still machine-drafted, no human reviewer. Reviewer corrections accepted for `schedule_automatic_turn_off`.
+
 ## Open questions
 
 - Check TTS pronunciation of the hyphenated speed multipliers in `player_scrub_*`.
@@ -47,3 +51,4 @@ Reconciled to frozen source `6d80a8ff` for 0.3.0 by GPT-6.1 Sol (medium), retain
 - Confirm *Uppoutuva* (immersive layout) and the TV-mode service wording with native reviewers.
 - Screen-reader phrasing of duration ratios is unverified.
 - The one-line `recording_recorded_of` status needs a capture check at 400 dp.
+- `recording_expires*` use *Vanhenee*; check it against how Finnish TV services word a recording's removal date.

@@ -255,14 +255,26 @@ internal class PlayerLayerState(
             return opened
         }
         if (infoOpen || optionsPage != null) {
-            if (keyCode == AndroidKeyEvent.KEYCODE_DPAD_LEFT && foregroundLayer != PlayerForegroundLayer.CONFIRMATION) {
-                beginOpeningKeyCycle(keyCode)
-                onBack()
-                return true
-            }
-            return false
+            return handleInfoLeft(keyCode, foregroundLayer, onBack)
         }
         return null
+    }
+
+    private fun handleInfoLeft(
+        keyCode: Int,
+        foregroundLayer: PlayerForegroundLayer,
+        onBack: () -> Unit,
+    ): Boolean {
+        // Options handle logical Left after their focused control, mirroring it in RTL.
+        // Info retains its existing parent-owned Left step.
+        if (infoOpen && keyCode == AndroidKeyEvent.KEYCODE_DPAD_LEFT &&
+            foregroundLayer != PlayerForegroundLayer.CONFIRMATION
+        ) {
+            beginOpeningKeyCycle(keyCode)
+            onBack()
+            return true
+        }
+        return false
     }
 
     /** Applies a Back step on a shared layer; false leaves [action] to the screen. */

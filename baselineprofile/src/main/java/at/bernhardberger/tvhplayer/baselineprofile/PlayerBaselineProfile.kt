@@ -183,6 +183,8 @@ class PlayerBaselineProfile {
     }
 
     private fun MacrobenchmarkScope.browseArchiveAndPlay() {
+        // Up from the first root row visits View options before reaching the tabs.
+        await(By.res("recordings-mode-tabs"), "Recordings tabs must draw")
         focusToward(By.res("recordings-mode-tabs").hasDescendant(By.focused(true)), KeyEvent.KEYCODE_DPAD_UP, focused = false)
         focusToward(By.res("recordings-mode-archive"), KeyEvent.KEYCODE_DPAD_LEFT)
         key(KeyEvent.KEYCODE_DPAD_DOWN)

@@ -118,9 +118,9 @@ Meaning of colour:
     while recording a red `● REC` plus an `error` "Errors" badge. "On now"
     and "Available until" are neutral badges. The Guide headline badges what
     its cells mark: also a neutral "Recorded" with the library mark.
-    "Scheduled" carries stacked clocks wherever a rule scheduled it. Where a recording
-    came from shows only while it is scheduled: running is the red dot,
-    whatever scheduled it (decided 2026-11-09, following Kodi and TiVo).
+    "Scheduled" carries stacked clocks wherever a rule scheduled it. Running uses a
+    red dot with a half ring for a rule, otherwise the plain dot. The origin stays
+    visible because a running rule-made recording now offers "Edit …".
   - In Recordings overlines a failure, missed recordings included, is an
     `error` "!" symbol; cancelled and stopped early are muted symbols. Problems
     lists missed recordings under "Failed"; only invalid entries are "Canceled"
@@ -962,6 +962,16 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
   buffering.
 - The programme block groups its title and subtitle closely: 4dp from the
   metadata row to the title, 2dp from title to subtitle, and 8dp before Next.
+  The metadata row's text is followed by passive compact outlined StatusBadges for resolution and declared scan type,
+  the decoded audio format and layout, and AD for the selected audio-description track, in that order.
+  Resolution, scan and audio format follow the decoded stream, including mid-stream changes. Its text
+  ellipsizes before the badges; the badges keep their width, with a 12dp gap after the text and 6dp
+  between tags. Without EPG they start on the title's left keyline, without a leading gap.
+  The tags have no fill: a 16dp box, 4dp corners, 1dp outline at on-surface 40%, 5dp horizontal
+  padding, and label-small text in the eyebrow's own colour. They are centred on the eyebrow
+  without changing any line's height, and leave
+  the behind-live distance its reserved room when it shares this line. The info bar announces
+  these facts together; the badges are not focusable.
   The live subtitle uses body-medium type; Next and recording episodes use
   label-large type, retaining their medium weight for scanning. Recordings retain the
   same overall block height with the 8dp gap before their empty final line.

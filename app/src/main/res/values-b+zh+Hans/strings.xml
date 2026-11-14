@@ -1,4 +1,244 @@
 <resources>
+    <string name="automatic_recording_new_overline">自动录制</string>
+    <string name="automatic_recording_new_title">新建自动录制</string>
+    <string name="automatic_recording_new_choose">选择决定录制内容的方式。</string>
+    <string name="automatic_recording_new_keyword">关键词</string>
+    <string name="automatic_recording_new_keyword_help">包含所填关键词的节目</string>
+    <string name="automatic_recording_new_title_kind">标题</string>
+    <string name="automatic_recording_new_title_help">标题完全相同的节目</string>
+    <string name="automatic_recording_new_timer">重复定时录制</string>
+    <string name="automatic_recording_new_timer_help">在所选日期的固定时段录制一个频道</string>
+    <string name="schedule_upcoming">即将录制</string>
+    <string name="schedule_new_timer">新建定时录制</string>
+    <string name="schedule_new_timer_help">在指定时段录制一个频道，可单次或重复</string>
+    <string name="schedule_automatic_empty_help">暂无</string>
+    <string name="schedule_automatic_empty">暂无自动录制。</string>
+    <string name="schedule_automatic_new_help">按标题、关键词或固定时段录制</string>
+    <string name="schedule_automatic_turn_off">停用</string>
+    <string name="schedule_automatic_turn_on">启用</string>
+    <string name="schedule_automatic_off">已停用</string>
+    <string name="schedule_automatic_next">下一次：%1$s • %2$s</string>
+    <string name="schedule_automatic_nothing">暂无录制计划</string>
+    <string name="schedule_automatic_keep">保留期限：%1$s</string>
+    <plurals name="schedule_automatic_upcoming">
+        <item quantity="other">%1$d项即将录制</item>
+    </plurals>
+    <string name="schedule_automatic_counts">%1$s • %2$s</string>
+    <plurals name="schedule_automatic_on_count">
+        <item quantity="other">%1$d项已启用</item>
+    </plurals>
+    <plurals name="schedule_automatic_off_count">
+        <item quantity="other">%1$d项已停用</item>
+    </plurals>
+    <string name="context_record_series">录制系列</string>
+    <string name="context_record_title">录制此标题的所有节目</string>
+    <string name="context_edit_series">编辑系列录制</string>
+    <string name="context_edit_title">编辑标题录制</string>
+    <string name="context_edit_keyword">编辑关键词录制</string>
+    <string name="context_edit_timer">编辑重复定时录制</string>
+    <string name="context_skip_episode">跳过此集</string>
+    <string name="context_unskip_episode">录制此集</string>
+    <string name="context_skip_program">跳过此节目</string>
+    <string name="context_unskip_program">录制此节目</string>
+    <string name="recording_state_and_origin">%1$s，%2$s</string>
+    <string name="context_skip_timer">跳过此次录制</string>
+    <string name="context_unskip_timer">录制这一次</string>
+    <string name="context_skip_series_support">系列录制仍保持启用</string>
+    <string name="context_skip_automatic_support">自动录制仍保持启用</string>
+    <string name="context_skip_timer_support">重复定时录制仍保持启用</string>
+    <string name="context_unskip_support">撤销跳过</string>
+    <string name="recording_from_automatic">自动录制的一部分</string>
+    <string name="timer_editor_title">按时间录制</string>
+    <string name="timer_editor_new">新建定时录制</string>
+    <string name="timer_editor_create">创建重复定时录制</string>
+    <string name="timer_editor_name">名称</string>
+    <string name="timer_editor_repeat">重复</string>
+    <string name="timer_editor_never">从不</string>
+    <string name="timer_editor_every_day">每天</string>
+    <string name="timer_editor_weekdays">周一至周五</string>
+    <string name="timer_editor_weekends">周末</string>
+    <string name="timer_editor_date">日期</string>
+    <string name="timer_editor_start">开始时间</string>
+    <string name="timer_editor_end">结束时间</string>
+    <string name="timer_editor_next_day">次日</string>
+    <string name="timer_editor_next_day_time">%1$s · 次日</string>
+    <string name="timer_editor_next_day_date">次日 · %1$s</string>
+    <string name="timer_editor_ends">%1$s %2$s结束</string>
+    <string name="timer_editor_no_padding">重复定时录制不延长录制时间</string>
+    <string name="timer_editor_next_recordings">接下来的录制</string>
+    <string name="timer_editor_none_upcoming">没有即将开始的录制</string>
+    <string name="timer_editor_channel_required">请先选择频道</string>
+    <string name="timer_editor_channel_not_chosen">尚未选择</string>
+    <string name="timer_editor_name_default">与频道同名</string>
+    <string name="timer_editor_no_channel_description">在固定时段录制一个频道，不限节目。</string>
+    <string name="timer_editor_empty_span">开始与结束时间相同</string>
+    <string name="timer_editor_time_passed">该时间已过</string>
+    <string name="timer_editor_repeat_required">请至少选择一天</string>
+    <string name="timer_editor_starts_now">确认后立即开始录制</string>
+    <string name="timer_editor_description">从%2$s到%3$s录制%1$s，不限节目。</string>
+    <string name="timer_editor_repeat_help">勾选每周重复录制的日期。</string>
+    <string name="timer_editor_clock_help">先选择小时，再选择分钟。</string>
+    <string name="timer_editor_minute_help">以5分钟为间隔。</string>
+    <string name="timer_editor_name_help">名称留空时使用频道名称。</string>
+    <string name="timer_editor_keep_help">选择这些录制内容的保留时长。</string>
+    <string name="timer_editor_more_help">这些设置适用于此定时录制生成的录制内容。</string>
+    <string name="timer_editor_undo">撤销此处的更改</string>
+    <string name="timer_editor_delete">删除重复定时录制？</string>
+    <string name="timer_editor_deleting">正在删除重复定时录制…</string>
+    <string name="timer_editor_more_removed">另有%1$d项</string>
+    <plurals name="timer_editor_delete_scheduled">
+        <item quantity="other">其%1$d项录制预约将被移除。</item>
+    </plurals>
+    <string name="autorec_editor_search_in">搜索范围</string>
+    <string name="autorec_editor_titles_only">仅标题</string>
+    <string name="autorec_editor_full_text">标题、副标题和描述</string>
+    <string name="autorec_editor_raw_value">%1$s · 来自Tvheadend的表达式</string>
+    <string name="autorec_editor_words_empty_summary">“%1$s” · 节目指南中暂无匹配</string>
+    <string name="autorec_editor_raw_help">原样使用此Tvheadend表达式。</string>
+    <string name="autorec_editor_title_description">录制标题与“%1$s”完全相同的所有节目。</string>
+    <string name="autorec_editor_title_full_description">使用“%1$s”在标题、副标题和描述中查找节目。</string>
+    <string name="autorec_editor_keyword_description">录制标题包含“%1$s”的所有节目。</string>
+    <string name="autorec_editor_keyword_full_description">录制标题、副标题或描述包含“%1$s”的所有节目。</string>
+    <string name="autorec_editor_delete_series">删除系列录制？</string>
+    <string name="automatic_recording_kind_series">系列录制</string>
+    <string name="automatic_recording_kind_title">标题录制</string>
+    <string name="automatic_recording_kind_keyword">关键词录制</string>
+    <string name="autorec_editor_delete_title">删除标题录制？</string>
+    <string name="autorec_editor_delete_keyword">删除关键词录制？</string>
+    <string name="autorec_editor_delete_finished">已完成的录制内容会保留。</string>
+    <string name="autorec_editor_delete_unsaved">未保存的更改将被舍弃。</string>
+    <string name="autorec_editor_deleting">正在删除自动录制…</string>
+    <plurals name="autorec_editor_words_titles_summary">
+        <item quantity="other">标题中含“%1$s” · %2$d个节目</item>
+    </plurals>
+    <plurals name="autorec_editor_words_full_summary">
+        <item quantity="other">全文中含“%1$s” · %2$d个节目</item>
+    </plurals>
+    <plurals name="autorec_editor_delete_episodes">
+        <item quantity="other">其已预约的%1$d集将从录制计划中移除。</item>
+    </plurals>
+    <plurals name="autorec_editor_delete_programs">
+        <item quantity="other">其已预约的%1$d个节目将从录制计划中移除。</item>
+    </plurals>
+    <plurals name="autorec_editor_upcoming_episodes">
+        <item quantity="other">将录制接下来的%1$d集</item>
+    </plurals>
+    <plurals name="autorec_editor_upcoming_programs">
+        <item quantity="other">将录制接下来的%1$d个节目</item>
+    </plurals>
+    <plurals name="autorec_editor_episodes_all">
+        <item quantity="other">节目指南中有%1$d集，将全部录制</item>
+    </plurals>
+    <plurals name="autorec_editor_episodes_selected">
+        <item quantity="other">节目指南中有%1$d集，将录制%2$d集</item>
+    </plurals>
+    <plurals name="autorec_editor_programs_all">
+        <item quantity="other">节目指南中有%1$d个节目，将全部录制</item>
+    </plurals>
+    <plurals name="autorec_editor_programs_selected">
+        <item quantity="other">节目指南中有%1$d个节目，将录制%2$d个</item>
+    </plurals>
+    <string name="autorec_editor_new_series">新建系列录制</string>
+    <string name="autorec_editor_new_title">新建标题录制</string>
+    <string name="autorec_editor_new_keyword">新建关键词录制</string>
+    <string name="autorec_editor_save">保存更改</string>
+    <string name="autorec_editor_series_description">录制节目指南中属于此系列的每一集，不限标题。</string>
+    <string name="autorec_editor_keep_help">选择此自动录制生成的录制内容的保留时长。</string>
+    <string name="autorec_editor_channel_time_help">限制此自动录制使用的频道、日期或节目开始时间。</string>
+    <string name="autorec_editor_more_help">这些设置适用于此自动录制生成的录制内容。</string>
+    <string name="autorec_editor_upcoming">即将播出的集</string>
+    <string name="autorec_editor_words">搜索文字</string>
+    <string name="autorec_editor_channel_time">频道与时间</string>
+    <string name="autorec_editor_channel">频道</string>
+    <string name="autorec_editor_days">星期</string>
+    <string name="autorec_editor_any_day">不限星期</string>
+    <string name="autorec_editor_no_day">未选星期</string>
+    <string name="autorec_editor_start_window">开始时段</string>
+    <string name="autorec_editor_any_time">不限时间</string>
+    <string name="autorec_editor_after">开始时间晚于…</string>
+    <string name="autorec_editor_before">开始时间早于…</string>
+    <string name="autorec_editor_after_time">开始时间晚于%1$s</string>
+    <string name="autorec_editor_before_time">开始时间早于%1$s</string>
+    <string name="autorec_editor_current">当前 · %1$s</string>
+    <string name="autorec_editor_current_setting">Tvheadend中的当前设置</string>
+    <string name="autorec_editor_channel_unavailable">频道不可用</string>
+    <string name="autorec_editor_keep_week">录制后1周</string>
+    <string name="autorec_editor_keep_month">录制后1个月</string>
+    <string name="autorec_editor_keep_three_months">录制后3个月</string>
+    <string name="autorec_editor_keep_six_months">录制后6个月</string>
+    <string name="autorec_editor_keep_year">录制后1年</string>
+    <plurals name="autorec_editor_days_after_recording">
+        <item quantity="other">录制后%1$d天</item>
+    </plurals>
+    <string name="autorec_editor_more">更多选项</string>
+    <string name="autorec_editor_defaults">全部使用默认值</string>
+    <string name="autorec_editor_unchanged_options">此处无更改</string>
+    <string name="autorec_editor_changed">已更改</string>
+    <plurals name="autorec_editor_reset_options">
+        <item quantity="other">重置这%1$d个选项</item>
+    </plurals>
+    <string name="autorec_editor_duplicate">重复检测</string>
+    <string name="autorec_editor_duplicate_all">全部录制</string>
+    <string name="autorec_editor_duplicate_episode">集数相同</string>
+    <string name="autorec_editor_duplicate_subtitle">副标题相同</string>
+    <string name="autorec_editor_duplicate_description">描述相同</string>
+    <string name="autorec_editor_duplicate_day">每天一次</string>
+    <string name="autorec_editor_duplicate_week">每周一次</string>
+    <string name="autorec_editor_duplicate_default_help">使用录制配置中的重复检测设置。</string>
+    <string name="autorec_editor_duplicate_all_help">录制每次匹配的播出。</string>
+    <string name="autorec_editor_duplicate_episode_help">不录制集数与已录内容相同的集。</string>
+    <string name="autorec_editor_duplicate_subtitle_help">不录制副标题与已录内容相同的节目。</string>
+    <string name="autorec_editor_duplicate_description_help">不录制描述与已录内容相同的节目。</string>
+    <string name="autorec_editor_duplicate_day_help">每天最多录制一个匹配的节目。</string>
+    <string name="autorec_editor_duplicate_week_help">每周最多录制一个匹配的节目。</string>
+    <string name="autorec_editor_current_help">保留Tvheadend中的此设置，除非另选一项。</string>
+    <string name="autorec_editor_priority">优先级</string>
+    <string name="autorec_editor_default">默认</string>
+    <string name="autorec_editor_priority_important">重要</string>
+    <string name="autorec_editor_priority_high">高</string>
+    <string name="autorec_editor_priority_normal">普通</string>
+    <string name="autorec_editor_priority_low">低</string>
+    <string name="autorec_editor_priority_unimportant">不重要</string>
+    <string name="autorec_editor_priority_unset">未设置</string>
+    <string name="autorec_editor_padding_before">提前录制</string>
+    <string name="autorec_editor_padding_after">延后录制</string>
+    <plurals name="autorec_editor_minutes">
+        <item quantity="other">%1$d分钟</item>
+    </plurals>
+    <string name="autorec_editor_broadcast">播出类型</string>
+    <string name="autorec_editor_any">不限</string>
+    <string name="autorec_editor_new_only">仅首播</string>
+    <string name="autorec_editor_repeats_only">仅重播</string>
+    <string name="autorec_editor_new_unknown">首播或未知</string>
+    <string name="autorec_editor_maximum">录制保留上限</string>
+    <plurals name="autorec_editor_maximum_choice">
+        <item quantity="other">%1$d项录制</item>
+    </plurals>
+    <string name="autorec_editor_no_limit">不限</string>
+    <plurals name="autorec_editor_maximum_help">
+        <item quantity="other">此自动录制生成的录制内容最多保留%1$d项。</item>
+    </plurals>
+    <string name="autorec_editor_turned_on">启用</string>
+    <string name="autorec_editor_off_after_save">保存后停用</string>
+    <string name="autorec_editor_off_help">正在进行的录制会继续，已完成的录制内容会保留。</string>
+    <string name="autorec_editor_done">完成</string>
+    <string name="autorec_editor_unchanged">尚无更改</string>
+    <string name="autorec_editor_enter_words">请先输入搜索文字</string>
+    <string name="autorec_editor_searching">正在搜索节目指南…</string>
+    <string name="autorec_editor_search_failed">无法搜索节目指南</string>
+    <string name="autorec_editor_no_matches">节目指南中暂无匹配</string>
+    <string name="autorec_editor_empty_words">输入查找文字，匹配的节目将显示在此处</string>
+    <string name="autorec_editor_more_preview">另有%1$d个 · 全部列于%2$s</string>
+    <string name="autorec_editor_guide_horizon">节目指南仅涵盖未来几天。</string>
+    <string name="autorec_editor_broadcast_unavailable">可能包含此自动录制不会录制的节目。</string>
+    <string name="autorec_editor_duplicate_state">与已录内容重复，不录制</string>
+    <string name="autorec_editor_skipped">已跳过</string>
+    <string name="autorec_editor_left_out">未勾选</string>
+    <string name="autorec_editor_removed">已移除</string>
+    <string name="autorec_editor_leave_title">不保存就离开？</string>
+    <string name="autorec_editor_leave_body">更改尚未保存。</string>
+    <string name="autorec_editor_keep_editing">继续编辑</string>
+    <string name="autorec_editor_discard">舍弃</string>
     <string name="record_unavailable">无法录制此节目</string>
     <string name="record_unavailable_ended">节目已结束。</string>
     <string name="record_unavailable_no_programme">此频道暂无节目信息。</string>
@@ -24,7 +264,8 @@
     <string name="recording_profile_default">默认配置</string>
     <string name="recording_space_title">录制空间</string>
     <string name="recording_space_value">可用%1$s，共%2$s</string>
-    <string name="recording_space_line_description">录制空间：%1$s</string>
+    <string name="recording_space_unknown">磁盘空间未知</string>
+    <string name="recording_space_description">可用%1$s，共%2$s，已用%3$d%%</string>
     <string name="recording_confirmation_profile">录制配置：%1$s</string>
     <string name="recording_confirmation_owner">录制所有者：%1$s</string>
     <string name="context_watch">观看</string>
@@ -252,6 +493,9 @@
     <string name="playback_options_next_category">下一组选项</string>
     <string name="player_live_tv_surface">电视直播播放器</string>
     <string name="player_recording_surface">录制内容播放器</string>
+    <string name="player_raster_spoken">%1$s 线</string>
+    <string name="player_audio_spoken">音频 %1$s</string>
+    <string name="player_ad_short">AD</string>
     <string name="stats_on">开启</string>
     <string name="stats_off">关闭</string>
     <string name="display_mode">显示模式</string>
@@ -348,6 +592,13 @@
     <string name="recording_action_failed_cancel">无法取消录制</string>
     <string name="recording_action_failed_delete">无法删除录制内容</string>
     <string name="recording_action_failed_change">无法更改录制</string>
+    <string name="automatic_recording_action_failed_create">无法创建自动录制</string>
+    <string name="automatic_recording_action_failed_delete">无法删除自动录制</string>
+    <string name="automatic_recording_action_failed_change">无法更改自动录制</string>
+    <string name="automatic_recording_action_not_confirmed">自动录制更改尚未确认</string>
+    <string name="automatic_recording_action_check_first">请检查后再重试。</string>
+    <string name="automatic_recording_episodes_not_applied_create">自动录制已创建，但部分未勾选的集可能仍会录制。</string>
+    <string name="automatic_recording_episodes_not_applied_change">自动录制已更改，但部分集的录制选择无法应用。</string>
     <string name="recording_action_not_confirmed">录制更改尚未确认</string>
     <plurals name="recording_folder_action_failed_change"><item quantity="other">共%2$d项录制中有%1$d项无法更改</item></plurals>
     <plurals name="recording_folder_action_failed_delete"><item quantity="other">共%2$d项录制中有%1$d项无法删除</item></plurals>
@@ -376,12 +627,45 @@
     <string name="recording_action_connection">未连接服务器。</string>
     <string name="recording_already_scheduled">此节目正在录制或已预约录制。</string>
     <string name="recordings_title">录制</string>
-    <string name="recordings_archive">存档</string>
+    <string name="recordings_browse">浏览</string>
     <string name="recordings_archive_all">所有录制</string>
-    <string name="recordings_recording_now_folder">正在录制</string>
-    <plurals name="recordings_in_progress_count"><item quantity="other">%1$d项正在录制</item></plurals>
     <string name="recordings_schedule">录制计划</string>
     <string name="recordings_problems">问题</string>
+    <string name="recordings_grouping_group_by">分组方式</string>
+    <string name="recordings_grouping_folders">文件夹</string>
+    <string name="recordings_grouping_channels">频道</string>
+    <string name="recordings_grouping_genres">类型</string>
+    <string name="recordings_grouping_flat">不分组</string>
+    <string name="recordings_grouping_folders_detail">服务器的文件夹树</string>
+    <string name="recordings_grouping_channels_detail">每个频道一个文件夹</string>
+    <string name="recordings_grouping_genres_detail">每种类型一个文件夹</string>
+    <string name="recordings_grouping_none_detail">一个列表，无文件夹</string>
+    <string name="recordings_sort_title">排序</string>
+    <string name="recordings_sort_newest">最新优先</string>
+    <string name="recordings_sort_oldest">最早优先</string>
+    <string name="recordings_sort_name">名称 A–Z</string>
+    <string name="recordings_sort_name_descending">名称 Z–A</string>
+    <string name="recordings_sort_largest">最大优先</string>
+    <string name="recordings_sort_smallest">最小优先</string>
+    <string name="recordings_show_title">显示</string>
+    <string name="recordings_show_option_all">全部</string>
+    <string name="recordings_show_unwatched">未看完</string>
+    <string name="recordings_show_partially_watched">已看部分</string>
+    <string name="recordings_show_watched">已看完</string>
+    <string name="recordings_show_unwatched_detail">未播放到结尾</string>
+    <string name="recordings_show_partially_watched_detail">已开始但未看完</string>
+    <string name="recordings_show_watched_detail">已播放到结尾</string>
+    <string name="recordings_empty_not_watched_root">这里的内容都已播放过。</string>
+    <string name="recordings_empty_started">尚未开始播放任何内容。</string>
+    <string name="recordings_empty_watched">尚未看完任何内容。</string>
+    <plurals name="recordings_hidden_count">
+        <item quantity="other">已隐藏%1$d项录制。</item>
+    </plurals>
+    <string name="recordings_group_no_channel">无频道</string>
+    <string name="recordings_group_no_genre">无类型</string>
+    <string name="recordings_date_today">今天</string>
+    <string name="recordings_date_yesterday">昨天</string>
+    <string name="recordings_date_unknown">日期未知</string>
     <string name="recordings_archive_empty">此文件夹中没有可播放的录制内容。</string>
     <string name="recordings_schedule_empty">没有正在进行或已预约的录制。</string>
     <string name="recordings_problems_empty">没有录制问题。</string>
@@ -391,6 +675,10 @@
     <string name="recording_watched">已看</string>
     <string name="recording_partly_watched">已看部分</string>
     <string name="recordings_recording_now">正在录制</string>
+    <string name="recordings_recording_now_folder">正在录制的文件夹</string>
+    <plurals name="recordings_in_progress_count">
+        <item quantity="other">%1$d项录制正在进行</item>
+    </plurals>
     <string name="recordings_schedule_end_duration">至%1$s • %2$s</string>
     <string name="recordings_failed">失败</string>
     <string name="recordings_cancelled">已取消</string>
@@ -554,7 +842,6 @@
     <string name="details_read_more">更多信息</string>
     <string name="details_important_information">详情</string>
     <string name="details_cast_and_crew">演职人员</string>
-    <string name="details_available_until">可用至%1$s</string>
     <string name="details_size">大小</string>
     <string name="details_recording_profile">录制配置</string>
     <string name="details_picture">画面</string>
@@ -563,6 +850,32 @@
     <string name="details_no_errors">无错误</string>
     <string name="details_retention">保留期限</string>
     <string name="details_kept_until_space_needed">保留至需要腾出空间时</string>
+    <string name="context_keep_until">保留至…</string>
+    <string name="recording_keep_until_heading">保留期限</string>
+    <string name="recording_keep_until_current">当前期限</string>
+    <string name="recording_keep_until_week">1周后</string>
+    <string name="recording_keep_until_month">1个月后</string>
+    <string name="recording_keep_until_three_months">3个月后</string>
+    <string name="recording_keep_until_six_months">6个月后</string>
+    <string name="recording_keep_until_year">1年后</string>
+    <string name="recording_keep_until_space_needed">需要腾出空间时</string>
+    <string name="recording_keep_until_forever">永久</string>
+    <string name="recording_expires_in">到期：%1$s</string>
+    <string name="recording_expires">到期</string>
+    <string name="recording_expiry_date_relative">%1$s • %2$s</string>
+    <string name="home_expiring_soon">即将到期</string>
+    <plurals name="recording_expiry_minutes">
+        <item quantity="other">%d分钟后</item>
+    </plurals>
+    <plurals name="recording_expiry_hours">
+        <item quantity="other">%d小时后</item>
+    </plurals>
+    <plurals name="recording_expiry_days">
+        <item quantity="other">%d天后</item>
+    </plurals>
+    <string name="recording_expiry_minutes_short">%1$d分钟</string>
+    <string name="recording_expiry_hours_short">%1$d小时</string>
+    <string name="recording_expiry_days_short">%1$d天</string>
     <plurals name="details_error_count"><item quantity="other">%1$d个错误</item></plurals>
     <plurals name="details_cast"><item quantity="other">演员</item></plurals>
     <plurals name="details_guests"><item quantity="other">嘉宾</item></plurals>

@@ -1,6 +1,19 @@
 package at.bernhardberger.tvhplayer.core
 
-import at.bernhardberger.tvheadend.sdk.core.*
+import at.bernhardberger.tvheadend.sdk.core.Channel
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.ContentGenre
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
+import at.bernhardberger.tvheadend.sdk.core.DvrRecordingFile
+import at.bernhardberger.tvheadend.sdk.core.DvrRemoval
+import at.bernhardberger.tvheadend.sdk.core.EpgEvent
+import at.bernhardberger.tvheadend.sdk.core.EventId
+import at.bernhardberger.tvheadend.sdk.core.RecordingProgressCapability
+import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
+import at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi
+import at.bernhardberger.tvheadend.sdk.core.TvheadendTestResultFactory
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
@@ -12,6 +25,47 @@ import org.junit.Test
 @OptIn(ExperimentalTvheadendApi::class, TvheadendTestingApi::class)
 class HomeSectionsPolicyTest {
     private val nowSec = 1_000_000_000L
+
+    @Test fun expiringSoonUsesTheSharedWindowFinishedFilesAndWatchStateInExpiryOrder() {
+        fun expiring(id: Long, seconds: Long, state: DvrEntryState = DvrEntryState.COMPLETED,
+            file: Boolean = true, plays: Long? = null, removal: DvrRemoval? = DvrRemoval.Days(30)) =
+            DvrEntry.create(DvrEntryId(id), state = state, playCount = plays, removal = removal,
+                stop = Instant.fromEpochSeconds(nowSec + seconds - 30L * 86400),
+                files = listOf(DvrRecordingFile.create(sizeBytes = 1)).takeIf { file })
+        val entries = listOf(
+            expiring(1, 7L * 86400), expiring(2, 60, DvrEntryState.COMPLETED_ERROR),
+            expiring(3, 3600, plays = 1), expiring(4, 120, plays = 1),
+            expiring(5, 0), expiring(6, 7L * 86400 + 1), expiring(7, -1),
+            expiring(8, 60, file = false), expiring(9, 60, removal = DvrRemoval.Forever),
+            expiring(10, 60, removal = DvrRemoval.UntilSpaceNeeded), expiring(11, 60, removal = null),
+        ) + listOf(DvrEntryState.SCHEDULED, DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR,
+            DvrEntryState.MISSED, DvrEntryState.INVALID).mapIndexed { index, state -> expiring(20L + index, 60, state) }
+        val input = homeInput(dvrEntries = entries, admission = admissions(mapOf(4L to 60L)))
+        val sections = homeSections(input)
+        val expiring = sections.filterIsInstance<HomeSection.ExpiringSoon>().single()
+        assertEquals(listOf(2L, 1L), expiring.items.map { it.entry.id.value })
+        assertEquals(sections.indexOfFirst { it is HomeSection.ContinueWatching } + 1, sections.indexOf(expiring))
+        assertTrue(homeSections(input.copy(hiddenSections = setOf(HomeSectionKind.EXPIRING_SOON)))
+            .none { it is HomeSection.ExpiringSoon })
+        assertTrue(homeSections(input.copy(dvrEntries = entries.filter { it.id.value == 3L }))
+            .none { it is HomeSection.ExpiringSoon })
+        val previous = HomeFocusKey(HomeSectionKind.EXPIRING_SOON, "recording:2", 0)
+        val remaining = homeSections(input.copy(dvrEntries = entries.filterNot { it.id.value == 2L }))
+        assertEquals(HomeFocusKey(HomeSectionKind.EXPIRING_SOON, "recording:1", 0), homeRestoreFocus(remaining, previous))
+        val empty = homeSections(input.copy(dvrEntries = emptyList()))
+        assertEquals(homeInitialFocus(empty), homeRestoreFocus(empty, previous))
+        val resumed = (100L..111L).map { expiring(it, 3600) }
+        val capped = homeSections(homeInput(dvrEntries = resumed,
+            admission = admissions(resumed.associate { it.id.value to 60L }))
+            .copy(recentRecordingIds = resumed.map { it.id }))
+        val continued = capped.filterIsInstance<HomeSection.ContinueWatching>().single()
+        assertEquals((100L..109L).toList(), continued.items.map { it.entry.id.value })
+        assertEquals(listOf(110L, 111L),
+            capped.filterIsInstance<HomeSection.ExpiringSoon>().single().items.map { it.entry.id.value })
+        assertEquals(listOf(2L, 4L, 1L), homeSections(input.copy(
+            hiddenSections = setOf(HomeSectionKind.CONTINUE_WATCHING)))
+            .filterIsInstance<HomeSection.ExpiringSoon>().single().items.map { it.entry.id.value })
+    }
 
     @Test fun hiddenSectionsAreOmittedBeforeInitialAndRestoreFocusSelection() {
         val input = homeInput(playing = HomePlaying.LiveChannel(ChannelId(1)))

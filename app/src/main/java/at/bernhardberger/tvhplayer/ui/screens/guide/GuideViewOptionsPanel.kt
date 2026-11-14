@@ -6,12 +6,11 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.settings.GuideRows
 import at.bernhardberger.tvhplayer.settings.GuideView
 import at.bernhardberger.tvhplayer.ui.screens.BrowsePanelEntry
-import at.bernhardberger.tvhplayer.ui.screens.BrowsePanelList
-import at.bernhardberger.tvhplayer.ui.screens.BrowseSidePanel
+import at.bernhardberger.tvhplayer.ui.screens.BrowseLevelsPanel
 
 /**
- * The Guide's View options: the row density as a single choice, then the headline and genre colors switches. Each
- * change applies at once; Back closes.
+ * The Guide's View options: the row density choices, then the headline and genre colors switches,
+ * in one flat list. Each change applies at once; Left or Back closes.
  */
 @Composable
 internal fun GuideViewOptionsPanel(
@@ -45,9 +44,8 @@ internal fun GuideViewOptionsPanel(
             checked = view.genreColors,
         ))
     }
-    BrowseSidePanel(stringResource(R.string.channels_view_options), "guide-view-panel", onClose) {
-        BrowsePanelList(entries, radio = true)
-    }
+    BrowseLevelsPanel(
+        stringResource(R.string.channels_view_options), "guide-view-panel", onClose, entries, radio = true)
 }
 
 private fun GuideRows.label(): Int = when (this) {

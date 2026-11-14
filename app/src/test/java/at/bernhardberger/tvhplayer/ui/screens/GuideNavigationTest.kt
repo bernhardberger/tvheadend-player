@@ -145,17 +145,19 @@ import kotlinx.coroutines.test.StandardTestDispatcher
     instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class GuideNavigationTest : GuideScreenFixture() {
-    @Test fun recordKeyOnScheduledProgrammeOpensCancelWithoutConfirming() {
+    @Test fun recordKeyOnScheduledProgrammeOpensItsOwnActionWithoutConfirming() {
         show(recordings = listOf(DvrEntry.create(DvrEntryId(1), eventId = EventId(110),
-            channelId = ChannelId(1), state = DvrEntryState.SCHEDULED)))
+            channelId = ChannelId(1), state = DvrEntryState.SCHEDULED, enabled = false,
+            autorecRuleId = at.bernhardberger.tvheadend.sdk.core.AutorecRuleId("series"))))
         key(Key.DirectionDown)
         focused(title(1, 0))
         key(Key(android.view.KeyEvent.KEYCODE_MEDIA_RECORD))
-        compose.onNodeWithTag("details-cancel").assertIsFocused()
+        compose.onNodeWithTag("details-unskip").assertIsFocused()
         key(Key(android.view.KeyEvent.KEYCODE_MEDIA_RECORD))
-        compose.onNodeWithTag("details-cancel").assertIsFocused()
+        compose.onNodeWithTag("details-unskip").assertIsFocused()
         compose.onNodeWithTag("two-column-first").assertDoesNotExist()
         assertNoPlayback()
+        compose.runOnIdle { assertEquals(0, session.calls.count { it == FakeSessionCall.DVR_UPDATE_ENTRY }) }
     }
 
     @Test fun retainedEntryWaitsForRowsWhenNewCoverageArrivesBeforePreparation() {
@@ -1106,6 +1108,10 @@ class GuideNavigationTest : GuideScreenFixture() {
         assertTrue("Dense rows are shorter than regular rows", bounds("epg-channel-row-1").height < regularHeight)
         compose.onAllNodesWithTag("guide-cell-time", useUnmergedTree = true).assertCountEquals(0)
         assertEquals(GuideRows.DENSE, runBlocking { uiSettings.settings.first() }.guideView.rows)
+        compose.onNodeWithTag("guide-view-panel").assertIsDisplayed()
+        key(Key.DirectionLeft)
+        compose.onNodeWithTag("guide-view-panel").assertDoesNotExist()
+        tagFocused("channels-view-button")
         assertNoPlayback()
     }
 
@@ -1202,9 +1208,6 @@ class GuideNavigationTest : GuideScreenFixture() {
         show()
         key(Key.Enter)
         tagFocused("guide-time-day-0")
-        // Left on the days and Right on Now go nowhere.
-        key(Key.DirectionLeft)
-        tagFocused("guide-time-day-0")
         key(Key.DirectionDown)
         tagFocused("guide-time-day-1")
         key(Key.DirectionRight)
@@ -1218,7 +1221,12 @@ class GuideNavigationTest : GuideScreenFixture() {
         tagFocused("guide-time-preset-20")
         key(Key.DirectionUp)
         tagFocused("guide-time-preset-18")
-        key(Key.DirectionLeft)
+        // A held Left stays in this pane until release, then returns exactly one step.
+        compose.onRoot().performKeyInput { keyDown(Key.DirectionLeft) }
+        compose.waitForIdle()
+        tagFocused("guide-time-preset-18")
+        compose.onRoot().performKeyInput { keyUp(Key.DirectionLeft) }
+        compose.waitForIdle()
         tagFocused("guide-time-day-1")
         compose.onNodeWithTag("guide-time-day-1").assertIsNotSelected()
         key(Key.DirectionRight)
@@ -1229,9 +1237,14 @@ class GuideNavigationTest : GuideScreenFixture() {
         key(Key.DirectionUp)
         key(Key.DirectionUp)
         tagFocused("guide-time-now")
+        // Right on Now goes nowhere.
         key(Key.DirectionRight)
         tagFocused("guide-time-now")
-        key(Key.Back)
+        compose.onRoot().performKeyInput { keyDown(Key.DirectionLeft) }
+        compose.waitForIdle()
+        tagFocused("guide-time-now")
+        compose.onRoot().performKeyInput { keyUp(Key.DirectionLeft) }
+        compose.waitForIdle()
         compose.onNodeWithTag("guide-time-panel").assertDoesNotExist()
         dateFocused()
         assertDateButtonNow()
@@ -1242,8 +1255,6 @@ class GuideNavigationTest : GuideScreenFixture() {
         show(direction = LayoutDirection.Rtl)
         key(Key.Enter)
         tagFocused("guide-time-day-0")
-        key(Key.DirectionRight)
-        tagFocused("guide-time-day-0")
         key(Key.DirectionDown)
         tagFocused("guide-time-day-1")
         key(Key.DirectionLeft)
@@ -1252,7 +1263,10 @@ class GuideNavigationTest : GuideScreenFixture() {
         tagFocused("guide-time-preset-20")
         key(Key.DirectionRight)
         tagFocused("guide-time-day-1")
-        assertEquals(0, playbackRequests)
+        key(Key.DirectionRight)
+        compose.onNodeWithTag("guide-time-panel").assertDoesNotExist()
+        dateFocused()
+        assertNoPlayback()
     }
 
     @Test fun aTimeJumpsToItsStartClosesThePanelAndKeepsTheChannel() {

@@ -198,6 +198,7 @@ internal fun PlaybackChoiceButton(
     filled: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
@@ -210,10 +211,11 @@ internal fun PlaybackChoiceButton(
     }
     val buttonModifier = modifier.fillMaxWidth().height(40.dp)
         .semantics { if (endsAt != null) stateDescription = endsAt }
-    if (filled) Button(onClick, buttonModifier, scale = ButtonDefaults.scale(focusedScale = 1f),
+    if (filled) Button(onClick, buttonModifier, enabled = enabled, scale = ButtonDefaults.scale(focusedScale = 1f),
         contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
         interactionSource = interaction, content = content)
-    else OutlinedButton(onClick, buttonModifier, scale = OutlinedButtonDefaults.scale(focusedScale = 1f),
+    else OutlinedButton(onClick, buttonModifier, enabled = enabled,
+        scale = OutlinedButtonDefaults.scale(focusedScale = 1f),
         contentPadding = OutlinedButtonDefaults.ButtonWithIconContentPadding,
         interactionSource = interaction, content = content)
 }

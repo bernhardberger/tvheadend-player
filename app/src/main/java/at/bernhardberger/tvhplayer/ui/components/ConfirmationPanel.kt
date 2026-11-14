@@ -56,15 +56,21 @@ internal fun ConfirmationPanel(subject: ConfirmationSubject, styles: Confirmatio
         verticalAlignment = Alignment.CenterVertically) {
         when (subject) {
             is ConfirmationSubject.Programme -> ProgrammeLead(subject)
-            is ConfirmationSubject.Folder -> Box(Modifier.size(ObjectLeadSize), contentAlignment = Alignment.Center) {
-                Icon(painterResource(R.drawable.ic_folder), null, Modifier.size(40.dp), tint = TvTextColors.secondary)
-            }
+            is ConfirmationSubject.Folder -> ObjectLead(R.drawable.ic_folder)
+            is ConfirmationSubject.Rule -> ObjectLead(subject.icon)
             is ConfirmationSubject.Server -> ServerAvatar(subject.look, ObjectLeadSize)
         }
         Spacer(Modifier.width(PanelTextGap))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             PanelText(subject, styles)
         }
+    }
+}
+
+@Composable
+private fun ObjectLead(icon: Int) {
+    Box(Modifier.size(ObjectLeadSize), contentAlignment = Alignment.Center) {
+        Icon(painterResource(icon), null, Modifier.size(40.dp), tint = TvTextColors.secondary)
     }
 }
 
@@ -107,11 +113,7 @@ private fun ProgrammeLead(subject: ConfirmationSubject.Programme) {
 
 @Composable
 private fun PanelText(subject: ConfirmationSubject, styles: ConfirmationStyles) {
-    val name = when (subject) {
-        is ConfirmationSubject.Programme -> subject.name
-        is ConfirmationSubject.Folder -> subject.name
-        is ConfirmationSubject.Server -> subject.name
-    }
+    val name = confirmationSubjectName(subject)
     Text(name, style = styles.name, color = MaterialTheme.colorScheme.onSurface, maxLines = 2,
         overflow = TextOverflow.Ellipsis)
     when (subject) {
@@ -129,13 +131,14 @@ private fun PanelText(subject: ConfirmationSubject, styles: ConfirmationStyles) 
             subject.target?.let { PanelRow(it, styles.row) }
         }
         is ConfirmationSubject.Folder -> PanelRow(subject.detail, styles.row)
+        is ConfirmationSubject.Rule -> PanelRow(subject.detail, styles.row, maxLines = 2)
         is ConfirmationSubject.Server -> PanelRow(subject.detail, styles.row)
     }
 }
 
 @Composable
-private fun PanelRow(text: String, style: TextStyle) {
-    if (text.isNotBlank()) Text(text, style = style, color = TvTextColors.secondary, maxLines = 1,
+private fun PanelRow(text: String, style: TextStyle, maxLines: Int = 1) {
+    if (text.isNotBlank()) Text(text, style = style, color = TvTextColors.secondary, maxLines = maxLines,
         overflow = TextOverflow.Ellipsis)
 }
 
@@ -143,6 +146,7 @@ private fun confirmationSubjectDescription(subject: ConfirmationSubject): String
     is ConfirmationSubject.Programme -> listOfNotNull(subject.name,
         channelTitleText(subject.channelNumber, subject.channelName), subject.airTime, subject.target)
     is ConfirmationSubject.Folder -> listOf(subject.name, subject.detail)
+    is ConfirmationSubject.Rule -> listOf(subject.name, subject.detail)
     is ConfirmationSubject.Server -> listOf(subject.name, subject.detail)
 }.filter(String::isNotBlank).joinToString(", ")
 

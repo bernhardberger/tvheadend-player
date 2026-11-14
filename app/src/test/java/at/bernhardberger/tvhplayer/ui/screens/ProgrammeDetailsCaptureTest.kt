@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvhplayer.testutil.testDvrMutationActions
 import android.app.Application
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import android.graphics.Bitmap
@@ -130,7 +131,7 @@ class ProgrammeDetailsCaptureTest {
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = listOf(entry))),
             recordingProgressCapability = RecordingProgressCapability.SUPPORTED,
         )
-        val mutations = DvrMutationActions(scheduleEntry = { _, _ -> error("Unexpected mutation") },
+        val mutations = testDvrMutationActions(scheduleEntry = { _, _ -> error("Unexpected mutation") },
             stopEntry = { _, _ -> error("Unexpected mutation") }, cancelEntry = { _, _ -> error("Unexpected mutation") },
             deleteEntry = { _, _ -> error("Unexpected mutation") }, updateWatchStateCommand = { _, _, _ -> error("Unexpected mutation") })
         val notices = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) {

@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvhplayer.testutil.testDvrMutationActions
 import android.app.Application
 import androidx.activity.OnBackPressedDispatcher
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
@@ -107,7 +108,7 @@ class ProgrammeDvrSdkAdoptionTest {
             }
             DvrMutationResult.Failed(TvheadendFailure.SERVER_REJECTED, false, null)
         }
-        val actions = DvrMutationActions(scheduleEntry = { _, _ -> result() }, stopEntry = { _, _ -> result() },
+        val actions = testDvrMutationActions(scheduleEntry = { _, _ -> result() }, stopEntry = { _, _ -> result() },
             cancelEntry = { _, _ -> result() }, deleteEntry = { _, _ -> error("unexpected delete") },
             updateWatchStateCommand = { _, _, _ -> error("Unexpected watch-state update") })
         val notices = NoticeCenter({ 0L }) { NoticeContext(0, opening.currentSession?.generationIdentity) }
@@ -177,7 +178,7 @@ class ProgrammeDvrSdkAdoptionTest {
                 DvrConfiguration(DvrConfigId("one"), "One", ""), DvrConfiguration(DvrConfigId("two"), "Two", ""))),
         )
         var stopped: DvrEntryId? = null
-        val actions = DvrMutationActions(
+        val actions = testDvrMutationActions(
             scheduleEntry = { _, _ -> error("unexpected schedule") },
             stopEntry = { _, id -> stopped = id; DvrMutationResult.Confirmed(Unit) },
             cancelEntry = { _, _ -> error("unexpected cancel") },
@@ -238,7 +239,7 @@ class ProgrammeDvrSdkAdoptionTest {
             TVHeadendPlayerTheme {
                 ProgrammeDetailsHost(event, opening, opening, { session.observation.value }, { 5000L },
                     showContextMenu = true, onShowDetails = {},
-                    mutations = DvrMutationActions(scheduleEntry = { _, _ -> error("unexpected schedule") },
+                    mutations = testDvrMutationActions(scheduleEntry = { _, _ -> error("unexpected schedule") },
                         stopEntry = { _, _ -> error("unexpected stop") }, cancelEntry = { _, _ -> error("unexpected cancel") },
                         deleteEntry = { _, _ -> error("unexpected delete") },
                         updateWatchStateCommand = { _, _, _ -> error("Unexpected watch-state update") }),
@@ -265,7 +266,7 @@ class ProgrammeDvrSdkAdoptionTest {
             TVHeadendPlayerTheme {
                 ProgrammeDetailsHost(event, opening, opening, { session.observation.value }, { 2000L },
                     showContextMenu = true, onShowDetails = {},
-                    mutations = DvrMutationActions(
+                    mutations = testDvrMutationActions(
                         scheduleEntry = { _, _ -> withContext(dispatcher) {
                             scheduled++; DvrMutationResult.Confirmed(DvrEntryId(3))
                         } },
@@ -293,7 +294,7 @@ class ProgrammeDvrSdkAdoptionTest {
             epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create()))
         val action = DvrMutationAction.Stop(requireNotNull(observation.currentSession), DvrEntryId(2))
-        val actions = DvrMutationActions(
+        val actions = testDvrMutationActions(
             scheduleEntry = { _, _ -> error("unexpected schedule") },
             stopEntry = { _, _ -> DvrMutationResult.Failed(failure, false, message) },
             cancelEntry = { _, _ -> error("unexpected cancel") }, deleteEntry = { _, _ -> error("unexpected delete") },

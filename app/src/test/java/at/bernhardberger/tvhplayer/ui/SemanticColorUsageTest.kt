@@ -17,10 +17,6 @@ class SemanticColorUsageTest {
             "ui/components/ProgrammeDetailsLayout.kt",
             "color = MaterialTheme.colorScheme.onSurfaceVariant",
         )
-        assertContains(
-            "ui/components/ProgrammeDetailsPage.kt",
-            "DetailsStatus.RECORDING -> RecordingBadge(DvrEntryState.RECORDING)",
-        )
         assertContains("ui/components/StatusBadge.kt", "StatusBadgeTone.RECORDING -> TvRecordingContainerColor")
 
         val scopedSources = listOf(
@@ -67,6 +63,26 @@ class SemanticColorUsageTest {
             .map { it.relativeTo(repositoryRoot).invariantSeparatorsPath }
             .toList()
         assertTrue("Recording reds used outside the shared badge and dot: $offenders", offenders.isEmpty())
+    }
+
+    @Test
+    fun theWarningAmberIsDrawnOnlyByTheStorageIndicator() {
+        val owners = setOf(
+            "app/src/main/java/at/bernhardberger/tvhplayer/ui/screens/recordings/RecordingStorageIndicator.kt",
+            "brand/src/main/java/at/bernhardberger/tvhplayer/ui/Theme.kt",
+        )
+        val offenders = listOf("app/src/main/java", "brand/src/main/java")
+            .asSequence()
+            .flatMap { File(repositoryRoot, it).walkTopDown() }
+            .filter { it.isFile && it.extension == "kt" }
+            .filter { it.relativeTo(repositoryRoot).invariantSeparatorsPath !in owners && it.readText().contains("TvWarningColor") }
+            .map { it.relativeTo(repositoryRoot).invariantSeparatorsPath }
+            .toList()
+        assertTrue("The warning amber is used outside the storage indicator: $offenders", offenders.isEmpty())
+        assertFalse(
+            "The warning state must not borrow the tertiary orange",
+            File(repositoryRoot, owners.first()).readText().contains("colorScheme.tertiary"),
+        )
     }
 
     private fun assertContains(relativePath: String, expected: String) {

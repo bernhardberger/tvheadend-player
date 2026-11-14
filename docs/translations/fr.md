@@ -43,9 +43,15 @@ Reconciled to frozen source `6d80a8ff` for 0.3.0 by GPT-6.1 Sol (medium), retain
 
 0.5 confirmation and playback card strings (`server_switch_question`, `server_remove_*`, `*_confirm_body`, `delete_folder_*_confirm_question`, `recording_recorded_of`) drafted against `90078f81` by GPT-6.1 Sol (medium) and reviewed by Sonnet 5.5 (medium); still machine-drafted, no human reviewer.
 
+0.5 automatic recording, timer, Keep until and expiry strings (`automatic_recording_*`, `autorec_editor_*`, `timer_editor_*`, `context_edit_*`, `context_skip_*`, `context_unskip_*`, `context_record_*`, `context_keep_until`, `recording_keep_until_*`, `recording_expir*`, `home_expiring_soon`, `recording_from_automatic`, `recording_state_and_origin`) drafted against `9e30bc99` by GPT-6.1 Sol (medium) and reviewed by Sonnet 5.5 (medium); still machine-drafted, no human reviewer. Reviewer corrections accepted for `autorec_editor_any_time`, `home_expiring_soon`, `autorec_editor_delete_programs`, `recording_keep_until_forever`, `autorec_editor_more_preview`.
+
+0.5 Schedule tab strings for timers and the list of automatic recordings (`schedule_*`) drafted against `b257da70` by GPT-6.1 Sol (medium) and reviewed by Sonnet 5.5 (medium); still machine-drafted, no human reviewer. Reviewer corrections accepted for `schedule_new_timer_help`.
+
 ## Open questions
 
 - Check TTS pronunciation of `player_scrub_*` speed multipliers.
 
 - *Mode téléviseur* and the retained English key labels in `player_channel_card_hint` need review.
 - `guide_time_prime_time` (24 characters) exceeds the old soft limit; fit unchecked.
+- Skipping one episode or recording uses *Ignorer* (`context_skip_*`), playback skips use *Passer*; check that the split reads as intended.
+- `schedule_automatic_keep` puts the Keep until heading before its value, which reads awkwardly with the Forever value (*Conserver jusqu’à : Pour toujours*); check for a label that fits every value.

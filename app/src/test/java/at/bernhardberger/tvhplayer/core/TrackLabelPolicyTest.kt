@@ -36,6 +36,10 @@ class TrackLabelPolicyTest {
     fun enhancedAc3IsNotLabelledAsPlainDolbyDigital() {
         assertEquals("Dolby Digital Plus", humanCodecName("audio/eac3"))
         assertEquals("Dolby Digital", humanCodecName("audio/ac3"))
+        mapOf("audio/ac3" to "DD", "audio/mpeg-L2" to "MP2", "audio/mp4a-latm" to "AAC",
+            "audio/eac3" to "DD+", "audio/ac4" to "AC-4").forEach { (mime, label) ->
+            assertEquals(label, shortCodecName(mime))
+        }
     }
 
     @Test

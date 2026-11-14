@@ -41,30 +41,39 @@ class ProgrammeActionPolicyTest {
 
     @Test
     fun airingProgrammeOffersWatchThenRecord() {
-        assertEquals(listOf(ProgrammeAction.WATCH, ProgrammeAction.RECORD),
-            programmeActions(event, event.start.epochSeconds, null))
+        assertEquals(listOf("WATCH", "RECORD", "RECORD_TITLE"),
+            programmeActions(event, event.start.epochSeconds, null).map { it.name })
+        val series = EpgEvent.create(id = event.id, start = event.start, stop = event.stop, channelId = event.channelId,
+            seriesLinkUri = "series-link")
+        assertEquals(listOf(ProgrammeAction.RECORD, ProgrammeAction.RECORD_SERIES),
+            programmeActions(series, beforeStart, null))
+        assertEquals(listOf(ProgrammeAction.WATCH, ProgrammeAction.CANCEL_RECORDING),
+            programmeActions(series, series.start.epochSeconds, DvrEntry.create(
+                DvrEntryId(31), state = DvrEntryState.SCHEDULED,
+                autorecRuleId = at.bernhardberger.tvheadend.sdk.core.AutorecRuleId("series"))))
     }
 
     @Test
     fun airingRecordingOffersWatchThenStopKeepingThePartialRecording() {
         for (state in listOf(DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR)) {
-            assertEquals("$state", listOf(ProgrammeAction.WATCH, ProgrammeAction.STOP_RECORDING),
+            assertEquals("$state", listOf(ProgrammeAction.WATCH, ProgrammeAction.STOP_RECORDING, ProgrammeAction.RECORD_TITLE),
                 programmeActions(event, event.start.epochSeconds, recording(state)))
             val entry = recording(state, files = listOf(file("/rec/a.ts")))
             val admission = SessionObservation.create(recordingProgressCapability = RecordingProgressCapability.SUPPORTED)
                 .recordingPlaybackAdmission(entry)
-            assertEquals("$state", listOf(ProgrammeAction.WATCH, ProgrammeAction.WATCH_FROM_START, ProgrammeAction.STOP_RECORDING),
+            assertEquals("$state", listOf(ProgrammeAction.WATCH, ProgrammeAction.WATCH_FROM_START,
+                ProgrammeAction.STOP_RECORDING, ProgrammeAction.RECORD_TITLE),
                 programmeActions(event, event.start.epochSeconds, entry, recordingAdmission = admission))
             assertEquals(listOf(ProgrammeAction.WATCH, ProgrammeAction.WATCH_FROM_START),
                 programmeActions(event, event.start.epochSeconds, entry, canModifyRecordings = false, recordingAdmission = admission))
-            assertEquals(listOf(ProgrammeAction.STOP_RECORDING),
+            assertEquals(listOf(ProgrammeAction.STOP_RECORDING, ProgrammeAction.RECORD_TITLE),
                 programmeActions(event, beforeStart, entry, recordingAdmission = admission))
         }
     }
 
     @Test
     fun airingScheduledRecordingOffersWatchThenCancelAtThePaddingEdge() {
-        assertEquals(listOf(ProgrammeAction.WATCH, ProgrammeAction.CANCEL_RECORDING),
+        assertEquals(listOf(ProgrammeAction.WATCH, ProgrammeAction.CANCEL_RECORDING, ProgrammeAction.RECORD_TITLE),
             programmeActions(event, event.start.epochSeconds, recording(DvrEntryState.SCHEDULED)))
     }
 
@@ -104,7 +113,7 @@ class ProgrammeActionPolicyTest {
     @Test
     fun endedProgrammeWithAFailingRecordingWatchesFromStartOnlyWithOnePlayableGrowingFile() {
         for (path in listOf("/rec/a.ts", "/rec/a.mkv")) {
-            assertEquals(path, listOf(ProgrammeAction.WATCH_FROM_START),
+            assertEquals(path, listOf(ProgrammeAction.WATCH_FROM_START, ProgrammeAction.RECORD_TITLE),
                 ended(recording(DvrEntryState.RECORDING_ERROR, files = listOf(file(path)))))
         }
         mapOf(
@@ -115,10 +124,10 @@ class ProgrammeActionPolicyTest {
             "no path" to listOf(DvrRecordingFile.create(fileId = 1)),
             "deferred container" to listOf(file("/rec/a.mp4")),
         ).forEach { (case, files) ->
-            assertEquals(case, emptyList<ProgrammeAction>(),
+            assertEquals(case, listOf(ProgrammeAction.RECORD_TITLE),
                 ended(recording(DvrEntryState.RECORDING_ERROR, files = files)))
             val entry = recording(DvrEntryState.RECORDING_ERROR, files = files)
-            assertEquals(case, listOf(ProgrammeAction.WATCH, ProgrammeAction.STOP_RECORDING),
+            assertEquals(case, listOf(ProgrammeAction.WATCH, ProgrammeAction.STOP_RECORDING, ProgrammeAction.RECORD_TITLE),
                 programmeActions(event, event.start.epochSeconds, entry,
                     recordingAdmission = SessionObservation.create(recordingProgressCapability = RecordingProgressCapability.SUPPORTED)
                         .recordingPlaybackAdmission(entry)))
@@ -129,8 +138,8 @@ class ProgrammeActionPolicyTest {
     fun endedProgrammeWithAGrowingRecordingNeedsSupportedProgress() {
         val growing = recording(DvrEntryState.RECORDING_ERROR, files = listOf(file("/rec/a.ts")))
         listOf(RecordingProgressCapability.UNKNOWN, RecordingProgressCapability.UNSUPPORTED).forEach {
-            assertEquals("$it", emptyList<ProgrammeAction>(), ended(growing, capability = it))
-            assertEquals("$it", listOf(ProgrammeAction.WATCH, ProgrammeAction.STOP_RECORDING),
+            assertEquals("$it", listOf(ProgrammeAction.RECORD_TITLE), ended(growing, capability = it))
+            assertEquals("$it", listOf(ProgrammeAction.WATCH, ProgrammeAction.STOP_RECORDING, ProgrammeAction.RECORD_TITLE),
                 programmeActions(event, event.start.epochSeconds, growing,
                     recordingAdmission = SessionObservation.create(recordingProgressCapability = it).recordingPlaybackAdmission(growing)))
         }
@@ -139,7 +148,7 @@ class ProgrammeActionPolicyTest {
     @Test
     fun runningRecordingOfUpcomingProgrammeOffersStopInsteadOfCancel() {
         for (state in listOf(DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR)) {
-            assertEquals("$state", listOf(ProgrammeAction.STOP_RECORDING),
+            assertEquals("$state", listOf(ProgrammeAction.STOP_RECORDING, ProgrammeAction.RECORD_TITLE),
                 programmeActions(event, beforeStart, recording(state)))
         }
     }
@@ -147,7 +156,7 @@ class ProgrammeActionPolicyTest {
     @Test
     fun scheduledRecordingOfUpcomingProgrammeKeepsCancel() {
         assertEquals(
-            listOf(ProgrammeAction.CANCEL_RECORDING),
+            listOf(ProgrammeAction.CANCEL_RECORDING, ProgrammeAction.RECORD_TITLE),
             programmeActions(event, beforeStart, recording(DvrEntryState.SCHEDULED)),
         )
     }

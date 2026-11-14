@@ -46,8 +46,10 @@ class ProgrammeDetailsPolicyTest {
     }
 
     private val event = EpgEvent.create(EventId(1), ChannelId(1), Instant.fromEpochSeconds(100), Instant.fromEpochSeconds(200))
-    private fun recording(state: DvrEntryState, position: Long = 0, files: List<DvrRecordingFile>? = null) = DvrEntry.create(
-        DvrEntryId(1), state = state, start = event.start, stop = event.stop, playPosition = position.seconds, files = files)
+    private fun recording(state: DvrEntryState, position: Long = 0, files: List<DvrRecordingFile>? = null,
+        autorec: AutorecRuleId? = null) = DvrEntry.create(
+        DvrEntryId(1), state = state, start = event.start, stop = event.stop, playPosition = position.seconds,
+        files = files, autorecRuleId = autorec)
 
     private fun file(path: String = "/rec/a.ts", start: Instant? = null, stop: Instant? = null) =
         TvheadendTestResultFactory.recordingFile(fileId = 1, serverPath = path, start = start, stop = stop)
@@ -62,15 +64,17 @@ class ProgrammeDetailsPolicyTest {
         recordingDetailsFacts(entry, admission(entry, capability), nowSec = 300)
 
     @Test fun programmeActionsPreservePermissionAndTime() {
-        assertEquals(listOf(WATCH, RECORD, SHOW_GUIDE), programmeDetailsActions(event, 150, null, null, true, true))
-        assertEquals(listOf(WATCH, RECORD, SHOW_GUIDE), programmeDetailsActions(event, 50, null, null, true, true))
+        assertEquals(listOf(WATCH, RECORD, BrowseContextAction.RECORD_TITLE, SHOW_GUIDE),
+            programmeDetailsActions(event, 150, null, null, true, true))
+        assertEquals(listOf(WATCH, RECORD, BrowseContextAction.RECORD_TITLE, SHOW_GUIDE),
+            programmeDetailsActions(event, 50, null, null, true, true))
         assertEquals(listOf(WATCH, SHOW_GUIDE), programmeDetailsActions(event, 150, null, null, false, true))
         assertEquals(listOf(WATCH, SHOW_GUIDE), programmeDetailsActions(event, 200, null, null, true, true))
         assertEquals(emptyList<BrowseContextAction>(), programmeDetailsActions(event, 150, null, null, false, false))
         assertFalse(programmeDetailsActions(event, 150, null, null, true, true, liveProgramme = false).contains(RECORD))
         for (state in listOf(DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR)) {
             val entry = recording(state, files = listOf(file()))
-            assertEquals(listOf(WATCH, START_OVER, STOP, SHOW_GUIDE),
+            assertEquals(listOf(WATCH, START_OVER, STOP, BrowseContextAction.RECORD_TITLE, SHOW_GUIDE),
                 programmeDetailsActions(event, 150, entry, admission(entry), true, true))
             assertEquals(listOf(CONTINUE_WATCHING, WATCH_LIVE, START_OVER, SHOW_GUIDE),
                 programmeDetailsActions(event, 150, entry, admission(entry), false, true, playing = true, behindLive = true))
@@ -79,19 +83,19 @@ class ProgrammeDetailsPolicyTest {
     }
 
     @Test fun livePlayerReplacesWatchWithContinueAndKeepsGuardedRecordingAndGuide() {
-        assertEquals(listOf(CONTINUE_WATCHING, RECORD, SHOW_GUIDE),
+        assertEquals(listOf(CONTINUE_WATCHING, RECORD, BrowseContextAction.RECORD_TITLE, SHOW_GUIDE),
             programmeDetailsActions(event, 150, null, null, true, true, playing = true))
         assertEquals(listOf(CONTINUE_WATCHING, SHOW_GUIDE),
             programmeDetailsActions(event, 150, null, null, false, true, playing = true))
-        assertEquals(listOf(CONTINUE_WATCHING, CANCEL, SHOW_GUIDE),
+        assertEquals(listOf(CONTINUE_WATCHING, CANCEL, BrowseContextAction.RECORD_TITLE, SHOW_GUIDE),
             programmeDetailsActions(event, 150, recording(DvrEntryState.SCHEDULED), null,
                 true, true, playing = true))
     }
 
     @Test fun behindLiveOffersLiveBesideContinueWatchingOnlyForThePlayingProgramme() {
-        assertEquals(listOf(CONTINUE_WATCHING, WATCH_LIVE, RECORD, SHOW_GUIDE),
+        assertEquals(listOf(CONTINUE_WATCHING, WATCH_LIVE, RECORD, BrowseContextAction.RECORD_TITLE, SHOW_GUIDE),
             programmeDetailsActions(event, 150, null, null, true, true, playing = true, behindLive = true))
-        assertEquals(listOf(WATCH, RECORD, SHOW_GUIDE),
+        assertEquals(listOf(WATCH, RECORD, BrowseContextAction.RECORD_TITLE, SHOW_GUIDE),
             programmeDetailsActions(event, 150, null, null, true, true, behindLive = true))
     }
 
@@ -140,6 +144,11 @@ class ProgrammeDetailsPolicyTest {
     }
 
     @Test fun recordingActionsFollowLifecycleAndPlaybackAuthority() {
+        for (state in listOf(DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR)) {
+            val owned = recording(state, autorec = AutorecRuleId("series"))
+            assertEquals(listOf(STOP, EDIT_RULE, SHOW_GUIDE),
+                recordingDetailsActions(owned, null, true, true, nowSec = 150, ruleAvailable = true))
+        }
         assertEquals(listOf(PLAY, MARK_WATCHED, DELETE), actions(recording(DvrEntryState.COMPLETED)))
         assertEquals(listOf(RESUME, START_OVER, MARK_WATCHED, DELETE), actions(recording(DvrEntryState.COMPLETED, 20)))
         assertEquals(listOf(WATCH, STOP), actions(recording(DvrEntryState.RECORDING, files = listOf(file()))))
@@ -209,7 +218,8 @@ class ProgrammeDetailsPolicyTest {
         assertFalse(facts(recording(DvrEntryState.COMPLETED_ERROR, 20, listOf(file()))).any { it.kind == DetailsFactKind.LEFT })
         assertFalse(facts(recording(DvrEntryState.MISSED, 20, listOf(file()))).any { it.kind == DetailsFactKind.LEFT })
         assertFalse(facts(recording(DvrEntryState.COMPLETED_ERROR, 20)).any { it.kind == DetailsFactKind.LEFT })
-        assertEquals(listOf(RESUME, START_OVER, MARK_WATCHED, DELETE), actions(recording(DvrEntryState.COMPLETED_ERROR, 20, listOf(file()))))
+        assertEquals(listOf(RESUME, START_OVER, MARK_WATCHED, KEEP_UNTIL, DELETE),
+            actions(recording(DvrEntryState.COMPLETED_ERROR, 20, listOf(file()))))
         assertEquals(listOf(PLAY, DELETE), actions(recording(DvrEntryState.MISSED, 20, listOf(file()))))
         assertEquals(listOf(REMOVE_ENTRY), actions(recording(DvrEntryState.MISSED, 20)))
     }

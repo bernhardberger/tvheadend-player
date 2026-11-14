@@ -94,6 +94,26 @@ sealed interface Notice {
         override fun toString(): String = "DvrActionFailed(action=$action, failure=$failure)"
     }
 
+    data class DvrRuleActionFailed(
+        val action: DvrMutationKind,
+        val failure: DvrMutationFeedback,
+        /** SDK-sanitized, display-only text; never include in diagnostics. */
+        val serverMessage: String? = null,
+    ) : Notice {
+        init {
+            require(failure.isFailure)
+            require(serverMessage == null || failure == DvrMutationFeedback.REJECTED)
+        }
+        override val key = "dvr-action"
+        override val severity = NoticeSeverity.FAILURE
+        override fun toString(): String = "DvrRuleActionFailed(action=$action, failure=$failure)"
+    }
+
+    data class AutomaticRecordingEpisodesNotApplied(val created: Boolean) : Notice {
+        override val key = "dvr-action"
+        override val severity = NoticeSeverity.FAILURE
+    }
+
     /** A folder action that [failed] on some of the [total] recordings it set out to change. */
     data class DvrFolderActionFailed(
         val action: DvrMutationKind,

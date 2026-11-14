@@ -6,17 +6,10 @@ import at.bernhardberger.tvhplayer.ui.components.PlaybackOptionsOverlayFrame
 
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.updateTransition
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
@@ -460,49 +453,24 @@ internal fun PlaybackOptionsSheetContent(
 
     PlaybackOptionsOverlayFrame(
         paneTitle = sheetTitle,
-        modifier = Modifier.onPreviewKeyEvent { event ->
-            event.key == Key.DirectionRight &&
-                (event.type == KeyEventType.KeyUp || page != PlaybackOptionsPage.ROOT)
-        },
+        modifier = Modifier.optionsPageKeys(atRoot = page == PlaybackOptionsPage.ROOT,
+            onBack = optionsBackStep()),
     ) {
-        if (quickList != null) {
-            // A quick list switches pages at once: closing one applies its focused row as it
-            // leaves, and list keys must reach only the list that is open.
-            pageContent(page)
-        } else {
-            // A deeper page arrives from the end and a shallower one from the start; the
-            // outgoing page leaves the other way, already without focus or semantics. Each
-            // visit composes its page afresh, so returning to a page that is still leaving
-            // focuses its intended row again.
-            val pageTransition = updateTransition(rememberVisit(page), label = "playback-options-page")
-            pageTransition.AnimatedContent(
-                transitionSpec = {
-                    (fadeIn(tween(PlayerMotion.MediumMs, easing = PlayerMotion.EmphasizedDecelerate)) togetherWith
-                        fadeOut(tween(PlayerMotion.FastMs, easing = PlayerMotion.StandardAccelerate))).using(null)
-                },
-            ) { visit ->
-                val travel = animateShown(
-                    enter = tween(PlayerMotion.MediumMs, easing = PlayerMotion.EmphasizedDecelerate),
-                    exit = tween(PlayerMotion.FastMs, easing = PlayerMotion.StandardAccelerate),
-                    label = "playback-options-page-travel",
-                )
-                PlayerMotionFrame(
-                    leaving = leaving,
-                    modifier = Modifier.graphicsLayer {
-                        val deeper = playbackOptionsPageDepth(pageTransition.targetState.value) >
-                            playbackOptionsPageDepth(pageTransition.currentState.value)
-                        val towardEnd = if (deeper) 1f else -1f
-                        val side = if (leaving) -towardEnd else towardEnd
-                        translationX = side * PlayerMotion.PageOffset.toPx() * (1f - travel.value)
-                    },
-                ) { pageContent(visit.value) }
-            }
-        }
+        // A quick list switches pages at once: closing one applies its focused row as it
+        // leaves, and list keys must reach only the list that is open.
+        OptionsPageHost(page, ::playbackOptionsPageDepth, animate = quickList == null, content = pageContent)
     }
 }
 
 private fun playbackOptionsPageDepth(page: PlaybackOptionsPage): Int =
     if (page == PlaybackOptionsPage.ROOT) 0 else 1
+
+/** Keep Left on the same Back-policy path, including quick-list restoration and focus return. */
+@Composable
+private fun optionsBackStep(): () -> Unit {
+    val dispatcher = androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
+    return { dispatcher?.onBackPressed() }
+}
 
 /** Width of the floating side panel (Material for TV kit, modal drawer). */
 internal val PlaybackPanelWidth = 320.dp
@@ -1074,6 +1042,7 @@ internal fun PlaybackOptionRow(
     leadingLabel: String? = null,
     trailingLabel: String? = null,
 ) {
+    val endKey = optionsPageEndKey()
     ListItem(
         enabled = enabled,
         // Compose maps ListItem's Selected to platform checked, even for a Switch.
@@ -1143,7 +1112,7 @@ internal fun PlaybackOptionRow(
                 toggleableState = ToggleableState(checked)
             })
             .onPreviewKeyEvent { event ->
-                if (event.key != Key.DirectionRight || !showChevron) {
+                if (event.key != endKey || !showChevron) {
                     false
                 } else {
                     if (enabled && event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
