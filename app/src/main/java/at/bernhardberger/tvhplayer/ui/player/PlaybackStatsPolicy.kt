@@ -1,9 +1,18 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.di.PlayerStatsLevel
 import at.bernhardberger.tvhplayer.playback.AppPlaybackDiagnostics
 import at.bernhardberger.tvhplayer.playback.AppPlaybackSource
+import at.bernhardberger.tvhplayer.playback.AppPlaybackFormatDiagnostics
 import java.util.ArrayDeque
 import kotlin.math.round
+
+/**
+ * The level the card draws. The lower chrome's programme rows reach into the debug card's height, so
+ * under the controls or the Banner the debug level draws the stream path card; the level stays.
+ */
+internal fun presentedStatsLevel(level: PlayerStatsLevel, lowerChromeShown: Boolean): PlayerStatsLevel =
+    if (level == PlayerStatsLevel.DEBUG && lowerChromeShown) PlayerStatsLevel.STREAM_PATH else level
 
 internal enum class StreamPathStep { TUNER, SERVER, APP, DECODER, SCREEN }
 
@@ -17,7 +26,11 @@ internal data class StatsWindow(
     val queueChangeUs: Long? = null,
     val signalChange: Double? = null,
     val snrChange: Double? = null,
-)
+    /** When the oldest counted growth leaves the 60 s span; null without growth. */
+    val growthExpiresAtMillis: Long? = null,
+) {
+    val hasGrowth: Boolean get() = uncorrected > 0 || bitErrors > 0 || serverDrops > 0 || clientDrops > 0 || decoderDrops > 0
+}
 
 internal data class StreamPath(
     val steps: List<StreamPathStep>,
@@ -54,6 +67,22 @@ internal fun streamPath(
     return StreamPath(steps, flagged)
 }
 
+/** The growth fact a stream path row leads with; Screen has none. */
+internal fun pathGrowth(step: StreamPathStep, window: StatsWindow): Long = when (step) {
+    StreamPathStep.TUNER -> window.uncorrected
+    StreamPathStep.SERVER -> window.serverDrops
+    StreamPathStep.APP -> window.clientDrops
+    StreamPathStep.DECODER -> window.decoderDrops
+    StreamPathStep.SCREEN -> 0
+}
+
+/** Digits up to 9999, then whole thousands (12k) and tenths of millions (1.2M), never rounded up. */
+internal fun compactCount(value: Long): String = when {
+    value < 10_000 -> value.toString()
+    value < 1_000_000 -> "${value / 1_000}k"
+    else -> "${value / 1_000_000}.${value / 100_000 % 10}M"
+}
+
 /** The codec family the stream path names; anything unknown stays as reported. */
 internal fun videoCodecFamily(codec: String?, mimeType: String?): String? {
     val family = when (mimeType) {
@@ -74,6 +103,18 @@ internal fun videoCodecFamily(codec: String?, mimeType: String?): String? {
 }
 
 /** Measured/nominal, the nominal alone without a measurement, and one value where both read the same. */
+/**
+ * The video size as its height where that is a standard raster, with the scan letter only when
+ * [raster] (the chrome's declared raster badge, "1080i") is for the same height; else width×height.
+ */
+internal fun videoSizeLabel(video: AppPlaybackFormatDiagnostics?, raster: String?): String? {
+    val height = video?.height ?: return video?.resolution
+    if (height !in StandardHeights) return video.resolution
+    return raster?.takeIf { it.trimEnd('i', 'p') == height.toString() } ?: height.toString()
+}
+
+private val StandardHeights = setOf(480, 576, 720, 1080, 1440, 2160, 4320)
+
 internal fun frameRateText(measured: String?, nominal: String?): String? = when {
     measured == null && nominal == null -> null
     measured == null -> "$nominal fps"
@@ -141,6 +182,7 @@ internal class PlaybackStatsHistory(private val nowMillis: () -> Long) {
             queueChangeUs = change(baseline.live?.queue?.mediaSpanMicroseconds, currentQueue?.mediaSpanMicroseconds),
             signalChange = change(baseline.live?.frontend?.relativeSignalPercent, diagnostics.live?.frontend?.relativeSignalPercent),
             snrChange = change(baseline.live?.frontend?.relativeSnrPercent, diagnostics.live?.frontend?.relativeSnrPercent),
+            growthExpiresAtMillis = intervals.filter { it.growth.hasGrowth }.minOfOrNull { it.at + 60_000L },
         )
     }
 

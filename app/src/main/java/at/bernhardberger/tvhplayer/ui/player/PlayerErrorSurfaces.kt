@@ -183,7 +183,7 @@ internal fun LivePlayerAlertOverlay(
 
 /**
  * The faint detail line: the player's own error first, then the Stats failure rows on their own
- * lines, without a row whose fact the detail already names (the error code, say), then [statsRows].
+ * lines, without the error code row when the detail already names that code, then [statsRows].
  */
 @Composable
 private fun failureFootnote(
@@ -191,8 +191,10 @@ private fun failureFootnote(
     statsFailure: AppPlaybackState.Failed?,
     statsRows: List<String> = emptyList(),
 ): String? {
+    // Only the error code can repeat the detail, and only as a whole code token.
+    val detailTokens = detail?.split(Regex("[^A-Za-z0-9_]+"))?.filter { it.isNotEmpty() }?.toSet().orEmpty()
     val rows = statsFailure?.let(::failureStatRows).orEmpty()
-        .filterNot { (_, value) -> detail != null && value.removePrefix("ERROR_CODE_") in detail }
+        .filterNot { (label, value) -> label == R.string.stats_error_code && value.removePrefix("ERROR_CODE_") in detailTokens }
         .map { (label, value) -> "${stringResource(label)}: $value" }
     return (listOfNotNull(detail) + rows + statsRows).joinToString("\n").ifEmpty { null }
 }

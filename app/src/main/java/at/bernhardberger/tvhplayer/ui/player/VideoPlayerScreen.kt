@@ -29,6 +29,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
 import at.bernhardberger.tvheadend.sdk.core.EventId
+import at.bernhardberger.tvhplayer.core.GlanceBadgeKind
 import at.bernhardberger.tvhplayer.core.recordingIsRunning
 import at.bernhardberger.tvhplayer.core.programmeArtwork
 import at.bernhardberger.tvhplayer.core.deviceFaultDetail
@@ -1760,27 +1761,37 @@ fun VideoPlayerScreen(
     )
     }
     Box(modifier = rootModifier) { ProvideArtworkSession(currentSession, observation) {
-        // Passive diagnostics sit below all chrome and foreground panels; while the channel is unavailable the
-        // channel message carries their text instead, whatever layer is open.
-        LivePlayerDiagnostics(
-            viewModel = videoPlayerViewModel,
-            level = statsLevel,
-            visible = statsLevel.enabled && foregroundLayer != PlayerForegroundLayer.RECOVERY && !channelUnavailable,
-            accessible = foregroundLayer == PlayerForegroundLayer.NONE,
-            targetKey = currentChannelId,
-            aspectRatio = targetAspect.mode,
-            timeshiftState = effectiveTimeshiftState,
-            playbackRuntime = playbackRuntime,
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(start = at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin, top = 100.dp),
-        )
         // A quick step's preview plays inside the Banner; the pending or dispatched seek is its own layer.
         val bannerSeekPreview = visibleSeekPreview?.takeIf {
             foregroundLayer == PlayerForegroundLayer.PENDING_SEEK_PREVIEW ||
                 foregroundLayer == PlayerForegroundLayer.DISPATCHED_SEEK_PREVIEW
         }
+        // A pending or dispatched step holds the Banner up after its own timer ran out.
+        val bannerShown = bannerSeekPreview != null ||
+            (layerState.core.chrome.bannerVisible && chromeLayer == PlayerForegroundLayer.NONE)
         val channelRailOpen = foregroundLayer == PlayerForegroundLayer.CHANNEL_DRAWER
+        // The channel drawer opens with the controls; the page's own Info never holds them here (no details).
+        val controlsLayerShown = chromeLayer == PlayerForegroundLayer.CONTROLS || channelRailOpen
+        val chromePanelOpen = layerState.core.optionsPage != null || layerState.core.infoOpen || layerState.scheduleOpen
+        // Passive diagnostics sit below all chrome and foreground panels; while the channel is unavailable the
+        // channel message carries their text instead, whatever layer is open. The channel drawer's browse surface
+        // takes the card's place. While the lower chrome is drawn the debug level draws the stream path card only.
+        LivePlayerDiagnostics(
+            viewModel = videoPlayerViewModel,
+            level = presentedStatsLevel(statsLevel,
+                (controlsLayerShown || !channelUnavailable && bannerShown) && !chromePanelOpen),
+            visible = statsLevel.enabled && foregroundLayer != PlayerForegroundLayer.RECOVERY && !channelUnavailable &&
+                !channelRailOpen,
+            accessible = foregroundLayer == PlayerForegroundLayer.NONE,
+            targetKey = currentChannelId,
+            aspectRatio = targetAspect.mode,
+            timeshiftState = effectiveTimeshiftState,
+            playbackRuntime = playbackRuntime,
+            raster = trackGlance.badges.firstOrNull { it.kind == GlanceBadgeKind.RASTER }?.value,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(start = at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin, top = 100.dp),
+        )
         // Trial: Down from the action row opens the channel rows below on the playing channel, so
         // closing returns to the action it came from.
         val openRailFromActions: () -> Unit = {
@@ -1796,8 +1807,7 @@ fun VideoPlayerScreen(
         // The same availability as the options sheet's quick lists the buttons open.
         val trackButtons = rememberPlayerTrackButtons(
             player, available = !channelFailed && playingLiveChannelId == currentChannelId)
-        val controlsShown = chromeLayer == PlayerForegroundLayer.CONTROLS || channelRailOpen || keepControls
-        val chromePanelOpen = layerState.core.optionsPage != null || layerState.core.infoOpen || layerState.scheduleOpen
+        val controlsShown = controlsLayerShown || keepControls
         // Composed beside the controls rather than in their layer: the closed rail's cards are not
         // built again inside every reveal's first frame.
         val quickZap = rememberQuickZapRail(
@@ -1806,9 +1816,7 @@ fun VideoPlayerScreen(
         PlayerChrome(
             mode = playerChromeMode(
                 controls = controlsShown,
-                // A pending or dispatched step holds the Banner up after its own timer ran out.
-                banner = !channelUnavailable && (bannerSeekPreview != null ||
-                    (layerState.core.chrome.bannerVisible && chromeLayer == PlayerForegroundLayer.NONE)),
+                banner = !channelUnavailable && bannerShown,
                 stepPreview = bannerSeekPreview != null,
             ),
             content = chromeContent(),
@@ -2045,6 +2053,7 @@ fun VideoPlayerScreen(
             onRetry = onRecoveryRetry,
             onConnectionSettings = serverWait::openConnectionSettings,
             onClose = playerClose::close,
+            statsFailure = (playbackState as? AppPlaybackState.Failed)?.takeIf { statsLevel.enabled },
         )
     } }
     }

@@ -2,6 +2,7 @@ package at.bernhardberger.tvhplayer.ui.player
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.key
 
+import at.bernhardberger.tvhplayer.core.GlanceBadgeKind
 import at.bernhardberger.tvhplayer.ui.components.PlaybackOptionsOverlayFrame
 import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 
@@ -692,6 +693,7 @@ fun RecordingPlayerScreen(
             .playerRootSemantics(stringResource(R.string.player_recording_surface))
             .focusable(),
     ) {
+        val chromePanelOpen = layers.optionsPage != null || layers.infoOpen
         // Passive diagnostics remain below every foreground layer, including recovery.
         PlaybackStatsVisibility(
             visible = statsLevel.enabled && foregroundLayer != PlayerForegroundLayer.RECOVERY &&
@@ -704,9 +706,12 @@ fun RecordingPlayerScreen(
                 diagnostics = diagnostics,
                 aspectRatio = aspectRatio,
                 frameRate = session.frameRate,
-                level = statsLevel,
+                // While the lower chrome is drawn the debug level draws the stream path card only.
+                level = presentedStatsLevel(statsLevel,
+                    playbackAvailable && chromeMode(foregroundLayer) != PlayerChromeMode.HIDDEN && !chromePanelOpen),
                 accessible = foregroundLayer == PlayerForegroundLayer.NONE,
                 targetKey = activeTarget,
+                raster = trackGlance.badges.firstOrNull { it.kind == GlanceBadgeKind.RASTER }?.value,
             )
         }
         if (playbackAvailable) {
@@ -758,7 +763,7 @@ fun RecordingPlayerScreen(
                     tracks = trackButtons,
                 ),
                 entry = chrome.controlsEntry,
-                panelOpen = layers.optionsPage != null || layers.infoOpen,
+                panelOpen = chromePanelOpen,
                 modifier = Modifier.align(Alignment.BottomCenter),
                 onTogglePause = ::togglePlayPause,
                 onSeek = ::seekBy,

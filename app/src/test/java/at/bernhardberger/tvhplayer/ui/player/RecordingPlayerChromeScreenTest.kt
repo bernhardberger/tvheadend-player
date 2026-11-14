@@ -327,8 +327,10 @@ class RecordingPlayerChromeScreenTest {
     }
 
     @Test fun entersWithAPassiveBannerAndDownLandsOnPause() {
+        statsStore.setLevel(PlayerStatsLevel.DEBUG)
         screen()
         assertTrue("Banner on entry", exists("player-banner"))
+        val underBanner = statsWidth()
         assertFalse("no actions in the Banner", exists("player-actions"))
         assertEquals("nothing in the Banner is focusable", 0,
             compose.onAllNodes(hasAnyAncestor(hasTestTag("player-banner")) and isFocusable()).fetchSemanticsNodes().size)
@@ -341,6 +343,11 @@ class RecordingPlayerChromeScreenTest {
         assertFalse("recordings have no Go live", exists("player-go-live"))
         assertTrue(exists("player-stop") && exists("player-settings") && exists(PlayerTopIdentityTag))
         assertTrue("the action row exposes Info", exists("player-info"))
+        assertEquals("the controls draw the same stream path card as the Banner", underBanner, statsWidth())
+        key(Key.Back)
+        assertFalse(exists("player-actions") || exists("player-banner"))
+        assertTrue("without the lower chrome the debug card is wider", statsWidth() > underBanner)
+        assertEquals("the level itself stays", PlayerStatsLevel.DEBUG, statsStore.level.value)
     }
 
     @Test fun backHidesTheBannerAndASecondBackCloses() {
@@ -1162,6 +1169,8 @@ class RecordingPlayerChromeScreenTest {
         }
         settle()
     }
+
+    private fun statsWidth() = compose.onNodeWithTag("playback-stats-overlay").fetchSemanticsNode().boundsInRoot.width
 
     private fun settle() {
         compose.settleFrames(20)

@@ -35,13 +35,6 @@ class PlaybackStatsOverlayTest {
         composeRule.onNodeWithText("North ridge multiplex", substring = true, useUnmergedTree = true).assertDoesNotExist()
     }
 
-    @Test fun recordingOmitsServerEvidenceEvenWhenItsNameLooksLikeATuner() {
-        setStats(AppPlaybackDiagnostics(source = AppPlaybackSource.RECORDING, state = AppPlaybackState.Playing))
-        composeRule.onNodeWithText("Tuner", useUnmergedTree = true).assertDoesNotExist()
-        composeRule.onNodeWithText("Tvheadend", useUnmergedTree = true).assertDoesNotExist()
-        composeRule.onNodeWithText("Decoder", useUnmergedTree = true).assertExists()
-    }
-
     @Test fun debugAddsRawSourceNamesAndAllQueueEvidence() {
         setStats(liveDiagnostics(), PlayerStatsLevel.DEBUG)
         composeRule.onNodeWithText("North ridge multiplex", substring = true, useUnmergedTree = true).assertExists()

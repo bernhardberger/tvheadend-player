@@ -1,9 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.player
 
-import android.os.SystemClock
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
@@ -20,6 +18,7 @@ internal fun LivePlayerDiagnostics(
     aspectRatio: at.bernhardberger.tvhplayer.settings.AspectRatioMode,
     timeshiftState: AppTimeshiftState,
     playbackRuntime: at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime,
+    raster: String?,
     modifier: Modifier,
 ) {
     val diagnostics by viewModel.diagnostics.collectAsStateWithLifecycle()
@@ -33,6 +32,7 @@ internal fun LivePlayerDiagnostics(
             level = level,
             accessible = accessible,
             targetKey = targetKey,
+            raster = raster,
         )
     }
 }
@@ -42,7 +42,5 @@ internal fun LivePlayerDiagnostics(
 internal fun rememberLiveStatsRows(viewModel: VideoPlayerViewModel, level: PlayerStatsLevel, targetKey: Any?): List<String> {
     if (!level.enabled) return emptyList()
     val diagnostics by viewModel.diagnostics.collectAsStateWithLifecycle()
-    val history = remember { PlaybackStatsHistory(SystemClock::elapsedRealtime) }
-    val window = remember(targetKey, diagnostics) { history.update(targetKey, diagnostics) }
-    return liveStatsRows(diagnostics, window, level)
+    return liveStatsRows(diagnostics, rememberStatsWindow(targetKey, diagnostics), level)
 }

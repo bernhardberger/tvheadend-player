@@ -47,9 +47,9 @@ class PlaybackStatsPolicyTest {
 
     @Test fun theChannelMessageCarriesTheTunerAndServerRowsWithDataAndDebugAddsTheirGroups() {
         val noLock = statsLiveDiagnostics(locked = false)
-        assertEquals(listOf("Tuner: No lock • 75% signal • 75% SNR", "Tvheadend: 250.0 ms queue"),
+        assertEquals(listOf("Tuner: No lock • 75% signal", "Tvheadend: 250 ms queue"),
             liveStatsRows(noLock, StatsWindow(), PlayerStatsLevel.STREAM_PATH))
-        assertEquals(listOf("Tvheadend: 250.0 ms queue"),
+        assertEquals(listOf("Tvheadend: 250 ms queue"),
             liveStatsRows(statsLiveDiagnostics(tuner = false), StatsWindow(), PlayerStatsLevel.STREAM_PATH))
         assertEquals(emptyList<String>(), liveStatsRows(noLock.copy(live = null), StatsWindow(), PlayerStatsLevel.DEBUG))
         assertEquals(emptyList<String>(), liveStatsRows(noLock, StatsWindow(), PlayerStatsLevel.OFF))
@@ -66,10 +66,43 @@ class PlaybackStatsPolicyTest {
         val growth = history.update("channel", statsLiveDiagnostics(uncorrected = 13, serverDrops = 5))
         assertEquals(3L, growth.uncorrected)
         assertEquals(3L, growth.serverDrops)
+        assertEquals(61_000L, growth.growthExpiresAtMillis)
         now = 2_000
-        assertEquals(3L, history.update("channel", statsLiveDiagnostics(uncorrected = 1)).uncorrected)
+        val reset = history.update("channel", statsLiveDiagnostics(uncorrected = 1))
+        assertEquals(3L, reset.uncorrected)
+        assertEquals("a reset adds no growth of its own", 61_000L, reset.growthExpiresAtMillis)
         now = 61_000
-        assertEquals(0L, history.update("channel", statsLiveDiagnostics(uncorrected = 1)).uncorrected)
+        val expired = history.update("channel", statsLiveDiagnostics(uncorrected = 1))
+        assertEquals(0L, expired.uncorrected)
+        assertNull(expired.growthExpiresAtMillis)
+    }
+
+    @Test fun aRowWithGrowthShowsThatFactAndOneRelatedValueInCompactCounts() {
+        val d = statsLiveDiagnostics()
+        fun row(step: StreamPathStep, w: StatsWindow, diagnostics: AppPlaybackDiagnostics = d) =
+            stepValue(step, diagnostics, w, output = null, requested = null, measuredRate = "59.94", declaredRate = "50", timeshift = null)
+        assertEquals("+9999 uncorrected • 75% SNR", row(StreamPathStep.TUNER, StatsWindow(uncorrected = 9_999)))
+        assertEquals("No lock • 75% signal", row(StreamPathStep.TUNER, StatsWindow(), statsLiveDiagnostics(locked = false)))
+        assertEquals("No lock • +9999 uncorrected",
+            row(StreamPathStep.TUNER, StatsWindow(uncorrected = 9_999), statsLiveDiagnostics(locked = false)))
+        assertEquals("+12k drops • 250 ms queue", row(StreamPathStep.SERVER, StatsWindow(serverDrops = 12_345)))
+        assertEquals("250 ms queue", row(StreamPathStep.SERVER, StatsWindow(queueChangeUs = 100_000)))
+        assertEquals("+1.2M drops • 5.0 s buffer", row(StreamPathStep.APP, StatsWindow(clientDrops = 1_299_999)))
+        assertEquals("+9999 drops • 59.94/50 fps", row(StreamPathStep.DECODER, StatsWindow(decoderDrops = 9_999)))
+        assertEquals("H.264 • 1080 • 59.94/50 fps", row(StreamPathStep.DECODER, StatsWindow()))
+        assertEquals("the declared scan letter of the same height", "H.264 • 1080i • 59.94/50 fps",
+            stepValue(StreamPathStep.DECODER, d, StatsWindow(), null, null, "59.94", "50", null, raster = "1080i"))
+        assertEquals("a stale raster of another height", "1080", videoSizeLabel(d.video, raster = "720p"))
+        assertEquals("1440×1088", videoSizeLabel(d.video?.copy(resolution = "1440×1088", width = 1440, height = 1088), null))
+        val output = DisplayOutput(1920, 1080, "23.98", "", matchFrameRate = null)
+        assertEquals("23.98 Hz • requested 59.94 Hz",
+            stepValue(StreamPathStep.SCREEN, d, StatsWindow(), output, "59.94", null, null, null))
+        assertEquals("1920×1080 @ 23.98 Hz", stepValue(StreamPathStep.SCREEN, d, StatsWindow(), output, "23.98", null, null, null))
+        val recording = d.copy(source = AppPlaybackSource.RECORDING, live = null, positionMs = 10_799_000, durationMs = 10_800_000)
+        assertEquals("5.0 s buffer • 2:59:59/3:00:00", row(StreamPathStep.APP, StatsWindow(), recording))
+        assertEquals(0L, pathGrowth(StreamPathStep.SCREEN, StatsWindow(uncorrected = 1, serverDrops = 1)))
+        assertEquals(listOf("9999", "10k", "999k", "1.0M", "12.3M"),
+            listOf(9_999L, 10_000L, 999_999L, 1_000_000L, 12_399_999L).map(::compactCount))
     }
 
     @Test fun newTargetSourceOrAWindowWithoutObservationsStartsABaseline() {
@@ -119,7 +152,7 @@ internal fun statsLiveDiagnostics(
         bFrameDropCount = serverDrops, pFrameDropCount = 0, iFrameDropCount = 0))
     return AppPlaybackDiagnostics(source = AppPlaybackSource.LIVE_TV, state = AppPlaybackState.Playing,
         isPlaying = true, bufferedMs = 5_000,
-        video = AppPlaybackFormatDiagnostics(codec = "H.264", resolution = "1920×1080", frameRate = 50f),
+        video = AppPlaybackFormatDiagnostics(codec = "H.264", resolution = "1920×1080", frameRate = 50f, width = 1920, height = 1080),
         audio = AppPlaybackFormatDiagnostics(codec = "E-AC-3", language = "English", channelCount = 6, sampleRateHz = 48_000),
         videoDecoderCounters = AppVideoDecoderCounters(12_000, 0, 2), live = live)
 }

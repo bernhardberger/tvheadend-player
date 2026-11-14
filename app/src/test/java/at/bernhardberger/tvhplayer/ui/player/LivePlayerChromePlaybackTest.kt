@@ -557,6 +557,7 @@ class LivePlayerChromePlaybackTest : LivePlayerChromeFixture() {
     }
 
     @Test fun playerBannerHidesFiveSecondsAfterThisTunesFirstFrame() {
+        statsStore.setLevel(PlayerStatsLevel.DEBUG)
         screen()
         playerReady()
         assertMainSettled("the driven player reports Playing") { runtime.state.value is AppPlaybackState.Playing }
@@ -571,10 +572,27 @@ class LivePlayerChromePlaybackTest : LivePlayerChromeFixture() {
         compose.waitForIdle()
         assertTrue("before 5000 ms after the first frame", exists("player-banner"))
         assertFalse("the first frame removes tuning", exists("player-busy-indicator"))
+        val underBanner = statsWidth()
         settle()
         assertFalse("5000 ms after the first frame the Banner hides", exists("player-banner"))
         assertFalse(exists("player-actions"))
+        val debugCard = statsWidth()
+        assertTrue("without the lower chrome the debug card is wider than under the Banner", debugCard > underBanner)
+        key(Key.DirectionDown)
+        assertTrue(exists("player-actions"))
+        assertEquals("the controls draw the same stream path card as the Banner", underBanner, statsWidth())
+        key(Key.Back)
+        assertFalse(exists("player-actions"))
+        assertEquals("the debug card returns after the controls close", debugCard, statsWidth())
+        key(Key(android.view.KeyEvent.KEYCODE_TV_CONTENTS_MENU))
+        assertTrue(railOpen())
+        assertFalse("the channel drawer draws no Stats card", exists("playback-stats-overlay"))
+        key(Key.Back)
+        assertFalse(railOpen() || exists("player-actions"))
+        assertEquals("the debug card returns after the drawer closes", debugCard, statsWidth())
     }
+
+    private fun statsWidth() = compose.onNodeWithTag("playback-stats-overlay").fetchSemanticsNode().boundsInRoot.width
 
     @Test fun playerAudioOnlyServiceStartsTheBannerTimerWhenPlaying() {
         screen()
@@ -828,7 +846,7 @@ class LivePlayerChromePlaybackTest : LivePlayerChromeFixture() {
             repeat(4) { settle() }
             assertTrue("centre message", exists("player-channel-unavailable"))
             assertFalse("no card while the channel is unavailable", exists("playback-stats-overlay"))
-            assertEquals("Tuner: 75% SNR\nTvheadend: 250.0 ms queue", detail())
+            assertEquals("Tuner: 75% SNR\nTvheadend: 250 ms queue", detail())
             key(Key.Menu)
             assertTrue(exists("playback-options-display"))
             assertFalse("the options sheet does not bring the card back", exists("playback-stats-overlay"))

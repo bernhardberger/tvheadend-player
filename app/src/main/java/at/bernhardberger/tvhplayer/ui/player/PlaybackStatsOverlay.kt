@@ -18,11 +18,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.ProvideTextStyle
 import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
@@ -35,6 +37,7 @@ import at.bernhardberger.tvhplayer.ui.*
 import at.bernhardberger.tvhplayer.ui.common.formatHms
 import java.util.Locale
 import kotlin.time.DurationUnit
+import kotlinx.coroutines.delay
 
 /** Visibility changes do not participate in player input or focus. */
 @Composable
@@ -62,9 +65,9 @@ internal fun PlaybackStatsOverlay(
     level: PlayerStatsLevel = PlayerStatsLevel.STREAM_PATH,
     accessible: Boolean = true,
     targetKey: Any? = diagnostics.source,
+    raster: String? = null,
 ) {
-    val history = remember { PlaybackStatsHistory(SystemClock::elapsedRealtime) }
-    val window = remember(targetKey, diagnostics) { history.update(targetKey, diagnostics) }
+    val window = rememberStatsWindow(targetKey, diagnostics)
     val output = rememberDisplayOutput()
     val declared = frameRate?.declared?.collectAsStateWithLifecycle()?.value
     val requested = frameRate?.requested?.collectAsStateWithLifecycle()?.value?.rate?.let(::formatRefreshRate)
@@ -74,6 +77,8 @@ internal fun PlaybackStatsOverlay(
     val path = streamPath(diagnostics, window, output?.refreshRate, requested)
     val debug = level == PlayerStatsLevel.DEBUG
     val foreground = MaterialTheme.colorScheme.onSurface
+    val bodySmall = MaterialTheme.typography.bodySmall
+    val valueStyle = remember(bodySmall) { bodySmall.copy(fontFeatureSettings = "tnum") }
     Surface(
         modifier = modifier
             .width(if (debug) TvGridColumnWidth * 12 + TvGridGutter * 11 else TvGridColumnWidth * 5 + TvGridGutter * 4)
@@ -82,21 +87,22 @@ internal fun PlaybackStatsOverlay(
                 else Modifier.clearAndSetSemantics {}),
         colors = SurfaceDefaults.colors(containerColor = Color.Black.copy(alpha = TvOverlayBoxAlpha), contentColor = foreground),
         shape = MaterialTheme.shapes.medium,
-    ) {
+    ) { ProvideTextStyle(valueStyle) {
         Row(Modifier.padding(TvSpacing16), horizontalArrangement = Arrangement.spacedBy(TvGridGutter)) {
             Column(Modifier.then(if (debug) Modifier.width(324.dp) else Modifier.fillMaxWidth())) {
-                Text(stringResource(R.string.stats_for_nerds), style = MaterialTheme.typography.labelLarge)
+                Row {
+                    Text(stringResource(R.string.stats_for_nerds), Modifier.weight(1f).alignByBaseline(),
+                        style = MaterialTheme.typography.labelLarge)
+                    // The rows' growth facts no longer name their window; the header does, while one shows.
+                    if (path.steps.any { pathGrowth(it, window) > 0 }) StatsText("last 60 s", Modifier.alignByBaseline(), maxLines = 1)
+                }
                 StatsText(audioSummary(diagnostics), maxLines = 1)
                 if (debug && diagnostics.source == AppPlaybackSource.LIVE_TV) {
                     diagnostics.live?.source?.let { source ->
                         val names = listOfNotNull(source.adapterName, source.muxName, source.networkName,
                             source.providerName, source.serviceName)
-                        // Lines break only after a separator; a name too long for the column ellipsizes alone.
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(TvSpacing4)) {
-                            names.forEachIndexed { index, name ->
-                                StatsText(if (index < names.lastIndex) "$name •" else name, maxLines = 1)
-                            }
-                        }
+                        // One name per line; a name too long for the column ellipsizes alone.
+                        names.forEach { StatsText(it, maxLines = 1) }
                     }
                 }
                 Spacer(Modifier.height(TvSpacing4))
@@ -105,7 +111,8 @@ internal fun PlaybackStatsOverlay(
                         number = index + 1, first = index == 0, last = index == path.steps.lastIndex,
                         filled = step == path.firstFlagged, flagged = step in path.flagged,
                         name = stepName(step),
-                        value = stepValue(step, diagnostics, window, output, requested, measured, declaredRate, timeshiftState),
+                        value = stepValue(step, diagnostics, window, output, requested,
+                            measured?.framesPerSecond?.let(::formatRefreshRate), declaredRate, timeshiftState, raster),
                     )
                 }
             }
@@ -117,7 +124,24 @@ internal fun PlaybackStatsOverlay(
                 }
             }
         }
+    } }
+}
+
+/**
+ * The target's 60 s window. It is evaluated again when its oldest growth leaves the span, since
+ * an unchanged observation arrives as no observation; nothing runs while there is no growth.
+ */
+@Composable
+internal fun rememberStatsWindow(targetKey: Any?, diagnostics: AppPlaybackDiagnostics): StatsWindow {
+    val history = remember { PlaybackStatsHistory(SystemClock::elapsedRealtime) }
+    var expiries by remember { mutableIntStateOf(0) }
+    val window = remember(targetKey, diagnostics, expiries) { history.update(targetKey, diagnostics) }
+    val expiresAt = window.growthExpiresAtMillis
+    if (expiresAt != null) LaunchedEffect(expiresAt, expiries) {
+        delay(expiresAt - SystemClock.elapsedRealtime())
+        expiries++
     }
+    return window
 }
 
 /** The line uses the whole row's height, with endpoints only at the first and last ring centres. */
@@ -125,7 +149,9 @@ internal fun PlaybackStatsOverlay(
 private fun StatsStep(number: Int, first: Boolean, last: Boolean, filled: Boolean, flagged: Boolean, name: String, value: String) {
     val color = MaterialTheme.colorScheme.onSurface
     Row(
-        Modifier.fillMaxWidth().heightIn(min = TvGridGutter).drawBehind {
+        Modifier.fillMaxWidth().heightIn(min = TvGridGutter).semantics {
+            if (flagged) stateDescription = "Problem: $name"
+        }.drawBehind {
             val x = 8.dp.toPx()
             val y = 10.dp.toPx()
             drawLine(color.copy(alpha = TvTextTertiaryAlpha), Offset(x, if (first) y else 0f),
@@ -141,14 +167,16 @@ private fun StatsStep(number: Int, first: Boolean, last: Boolean, filled: Boolea
         Spacer(Modifier.width(10.dp))
         Text(name, modifier = Modifier.width(84.dp), style = MaterialTheme.typography.labelLarge, maxLines = 1)
         StatsText(value, modifier = Modifier.weight(1f), maxLines = 1)
-        if (flagged) StatsText(" !", maxLines = 1)
+        // The flag's own gutter at the inner edge, kept in every row so values end at the same place.
+        Text(if (flagged) "!" else "", Modifier.width(TvSpacing16).clearAndSetSemantics {},
+            style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.End, maxLines = 1)
     }
 }
 
 @Composable
 private fun StatsText(text: String, modifier: Modifier = Modifier, maxLines: Int = Int.MAX_VALUE) {
-    Text(text, modifier, style = MaterialTheme.typography.bodySmall.copy(fontFeatureSettings = "tnum"),
-        maxLines = maxLines, overflow = TextOverflow.Ellipsis)
+    // The card provides the tabular value style once.
+    Text(text, modifier, maxLines = maxLines, overflow = TextOverflow.Ellipsis)
 }
 
 private fun decimal(value: Double, digits: Int = 1): String = String.format(Locale.ROOT, "%.${digits}f", value)
@@ -162,19 +190,35 @@ private fun audioSummary(d: AppPlaybackDiagnostics): String = d.audio?.let { aud
 }?.takeIf { it.isNotBlank() } ?: "Audio —"
 private fun videoSummary(d: AppPlaybackDiagnostics): String = join(d.video?.codec, d.video?.resolution).ifBlank { "Video —" }
 
-private fun stepValue(
+/** A path row's growth fact: compact, and without its window, which the header names. */
+private fun pathGrowthFact(step: StreamPathStep, w: StatsWindow, label: String): String? =
+    pathGrowth(step, w).takeIf { it > 0 }?.let { "+${compactCount(it)} $label" }
+
+/**
+ * A stream path row's text. A row with a growth fact shows that fact and one related value only,
+ * so it fits beside the flag; the debug details keep every full value.
+ */
+internal fun stepValue(
     step: StreamPathStep, d: AppPlaybackDiagnostics, w: StatsWindow, output: DisplayOutput?, requested: String?,
-    measured: MeasuredFrameRate?, declaredRate: String?, timeshift: AppTimeshiftState?,
+    measuredRate: String?, declaredRate: String?, timeshift: AppTimeshiftState?, raster: String? = null,
 ): String = when (step) {
     StreamPathStep.TUNER, StreamPathStep.SERVER -> liveStepValue(step, d, w)
-    StreamPathStep.APP -> join(growth(w.clientDrops, "drops"), "${decimal(d.bufferedMs / 1000.0)} s buffer",
-        timing(d, timeshift))
-    StreamPathStep.DECODER -> join(growth(w.decoderDrops, "drops"),
-        videoCodecFamily(d.video?.codec, d.video?.sampleMimeType), d.video?.resolution,
-        frameRateText(measured?.framesPerSecond?.let(::formatRefreshRate), declaredRate)).ifBlank { "Video —" }
-    StreamPathStep.SCREEN -> join(
-        if (requested != null && output?.refreshRate != null && requested != output.refreshRate) "Requested $requested Hz" else null,
-        output?.let { "${it.width}×${it.height} @ ${it.refreshRate} Hz" } ?: "Output —")
+    StreamPathStep.APP -> {
+        val buffer = "${decimal(d.bufferedMs / 1000.0)} s buffer"
+        pathGrowthFact(step, w, "drops")?.let { join(it, buffer) } ?: join(buffer, timing(d, timeshift))
+    }
+    StreamPathStep.DECODER -> {
+        val rate = frameRateText(measuredRate, declaredRate)
+        val size = videoSizeLabel(d.video, raster)
+        pathGrowthFact(step, w, "drops")?.let { join(it, rate ?: size) }
+            ?: join(videoCodecFamily(d.video?.codec, d.video?.sampleMimeType), size, rate).ifBlank { "Video —" }
+    }
+    // A mismatch names the output rate, then the request; the resolution then stays in debug.
+    StreamPathStep.SCREEN -> when {
+        output == null -> "Output —"
+        requested != null && requested != output.refreshRate -> "${output.refreshRate} Hz • requested $requested Hz"
+        else -> "${output.width}×${output.height} @ ${output.refreshRate} Hz"
+    }
 }
 
 private fun stepName(step: StreamPathStep): String = when (step) {
@@ -189,14 +233,19 @@ private fun stepName(step: StreamPathStep): String = when (step) {
 private fun liveStepValue(step: StreamPathStep, d: AppPlaybackDiagnostics, w: StatsWindow): String = when (step) {
     StreamPathStep.TUNER -> {
         val f = d.live?.frontend
-        join(if (f?.state?.locked == false) "No lock" else growth(w.uncorrected, "uncorrected"),
-            if (f?.state?.locked == true) "Locked" else null,
-            f?.relativeSignalPercent?.let { "${decimal(it, 0)}% signal" },
-            f?.relativeSnrPercent?.let { "${decimal(it, 0)}% SNR" })
+        val noLock = f?.state?.locked == false
+        val snr = f?.relativeSnrPercent?.let { "${decimal(it, 0)}% SNR" }
+        val growth = pathGrowthFact(step, w, "uncorrected")
+        when {
+            growth != null && noLock -> join("No lock", growth)
+            growth != null -> join(growth, snr)
+            // Without lock the signal is the fact; its SNR stays in debug.
+            else -> join(if (noLock) "No lock" else if (f?.state?.locked == true) "Locked" else null,
+                f?.relativeSignalPercent?.let { "${decimal(it, 0)}% signal" }, snr.takeUnless { noLock })
+        }
     }
-    StreamPathStep.SERVER -> join(growth(w.serverDrops, "drops"),
-        d.live?.queue?.mediaSpanMicroseconds?.let { "${decimal(it / 1000.0)} ms queue" },
-        change(w.queueChangeUs?.div(1000.0), "ms"))
+    StreamPathStep.SERVER -> join(pathGrowthFact(step, w, "drops"),
+        d.live?.queue?.mediaSpanMicroseconds?.let { "${decimal(it / 1000.0, 0)} ms queue" })
     else -> ""
 }
 
@@ -241,9 +290,9 @@ private fun timing(d: AppPlaybackDiagnostics, timeshift: AppTimeshiftState?): St
         when {
             it.available && !it.timingKnown -> "Timing unavailable"
             !it.available || timeshiftPositionPresentation(it).atLiveEdge -> "Live"
-            else -> "${formatHms(-it.positionMs / 1000)} behind live"
+            else -> "${formatHms(-it.positionMs / 1000)} behind"
         }
-    } ?: join(formatHms(d.positionMs / 1000), d.durationMs?.let { "of ${formatHms(it / 1000)}" })
+    } ?: (formatHms(d.positionMs / 1000) + (d.durationMs?.let { "/${formatHms(it / 1000)}" } ?: ""))
 
 @Composable
 private fun DebugDetails(
@@ -270,7 +319,7 @@ private fun DebugDetails(
         }),
         output?.let { statsLine("Output", join("${it.width}×${it.height} @ ${it.refreshRate} Hz",
             requested?.let { rate -> "requested $rate Hz${if (duration == null) " (kept)" else ""}" })) },
-        output?.refreshRatesByResolution?.takeIf { it.isNotEmpty() }?.let { "Refresh rates\n$it" },
+        output?.refreshRatesByResolution?.takeIf { it.isNotEmpty() }?.let { statsLine("Refresh rates", it) },
         output?.matchFrameRate?.let { statsLine("Match frame rate", when (it) {
             MatchFrameRatePreference.NEVER -> "Never"
             MatchFrameRatePreference.SEAMLESS_ONLY -> "Seamless only"
