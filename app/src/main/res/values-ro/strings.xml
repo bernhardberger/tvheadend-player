@@ -99,7 +99,7 @@
     <string name="autorec_editor_search_in">Caută în</string>
     <string name="autorec_editor_titles_only">Doar titluri</string>
     <string name="autorec_editor_full_text">Titluri, subtitluri și descrieri</string>
-    <string name="autorec_editor_raw_value">%1$s · Expresie din Tvheadend</string>
+    <string name="autorec_editor_raw_value">Expresie din Tvheadend · %1$s</string>
     <string name="autorec_editor_words_empty_summary">„%1$s” · Încă nimic în ghidul TV</string>
     <string name="autorec_editor_raw_help">Folosește această expresie din Tvheadend exact cum este afișată.</string>
     <string name="autorec_editor_title_description">Înregistrează fiecare emisiune al cărei titlu este exact „%1$s”.</string>

@@ -99,7 +99,7 @@
     <string name="autorec_editor_search_in">Traži u</string>
     <string name="autorec_editor_titles_only">Samo naslovi</string>
     <string name="autorec_editor_full_text">Naslovi, podnaslovi i opisi</string>
-    <string name="autorec_editor_raw_value">%1$s · Izraz iz sustava Tvheadend</string>
+    <string name="autorec_editor_raw_value">Izraz iz sustava Tvheadend · %1$s</string>
     <string name="autorec_editor_words_empty_summary">„%1$s” · Još ništa u TV vodiču</string>
     <string name="autorec_editor_raw_help">Upotrebljava ovaj izraz iz sustava Tvheadend točno kako je prikazan.</string>
     <string name="autorec_editor_title_description">Snima svaku emisiju čiji je naslov točno „%1$s”.</string>

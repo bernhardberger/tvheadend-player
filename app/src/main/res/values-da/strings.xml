@@ -95,7 +95,7 @@
     <string name="autorec_editor_search_in">Søg i</string>
     <string name="autorec_editor_titles_only">Kun titler</string>
     <string name="autorec_editor_full_text">Titler, undertitler og beskrivelser</string>
-    <string name="autorec_editor_raw_value">%1$s · Udtryk fra Tvheadend</string>
+    <string name="autorec_editor_raw_value">Udtryk fra Tvheadend · %1$s</string>
     <string name="autorec_editor_words_empty_summary">”%1$s” · Ingen i tv-guiden endnu</string>
     <string name="autorec_editor_raw_help">Bruger dette udtryk fra Tvheadend præcis som vist.</string>
     <string name="autorec_editor_title_description">Optager alle programmer med præcis titlen ”%1$s”.</string>

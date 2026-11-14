@@ -95,7 +95,7 @@
     <string name="autorec_editor_search_in">Suchen in</string>
     <string name="autorec_editor_titles_only">Nur Titel</string>
     <string name="autorec_editor_full_text">Titel, Untertitel und Beschreibungen</string>
-    <string name="autorec_editor_raw_value">%1$s · Ausdruck aus Tvheadend</string>
+    <string name="autorec_editor_raw_value">Ausdruck aus Tvheadend · %1$s</string>
     <string name="autorec_editor_words_empty_summary">„%1$s“ · Noch nichts im TV-Programm</string>
     <string name="autorec_editor_raw_help">Verwendet diesen Ausdruck aus Tvheadend genau wie angezeigt.</string>
     <string name="autorec_editor_title_description">Nimmt jede Sendung auf, deren Titel genau „%1$s“ entspricht.</string>

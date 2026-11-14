@@ -26,15 +26,17 @@ internal fun AutomaticRecordingWords(state: AutomaticRecordingEditorState) {
             GuidedStepAction(
                 stringResource(R.string.autorec_editor_done), state::back, editorRowModifier(state.navigation, "done"),
             )
+            // An expression from Tvheadend is shown as it is and edited only in the web interface.
+            val raw = state.draft.pattern.rawExpression
             GuidedStepAction(
                 stringResource(R.string.autorec_editor_words),
-                { state.navigation.open(AutomaticRecordingEditorLevel.WORDS_ENTRY, "words-input") },
+                { if (!raw) state.navigation.open(AutomaticRecordingEditorLevel.WORDS_ENTRY, "words-input") },
                 editorRowModifier(state.navigation, "words"),
                 subtitleMaxLines = 2,
-                subtitle = if (state.draft.pattern.rawExpression)
+                subtitle = if (raw)
                     stringResource(R.string.autorec_editor_raw_value, state.draft.pattern.words)
                 else state.draft.pattern.words.ifBlank { stringResource(R.string.autorec_editor_enter_words) },
-                trailingIcon = R.drawable.ic_edit,
+                trailingIcon = R.drawable.ic_edit.takeUnless { raw },
             )
             if (state.draft.kind == AutomaticRecordingKind.KEYWORD) GuidedStepAction(
                 stringResource(R.string.autorec_editor_search_in),

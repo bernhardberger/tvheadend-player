@@ -95,7 +95,7 @@
     <string name="autorec_editor_search_in">Zoeken in</string>
     <string name="autorec_editor_titles_only">Alleen titels</string>
     <string name="autorec_editor_full_text">Titels, subtitels en beschrijvingen</string>
-    <string name="autorec_editor_raw_value">%1$s · Expressie uit Tvheadend</string>
+    <string name="autorec_editor_raw_value">Expressie uit Tvheadend · %1$s</string>
     <string name="autorec_editor_words_empty_summary">“%1$s” · Nog niets in de tv-gids</string>
     <string name="autorec_editor_raw_help">Gebruikt deze expressie uit Tvheadend precies zoals getoond.</string>
     <string name="autorec_editor_title_description">Neemt elk programma op waarvan de titel precies overeenkomt met “%1$s”.</string>

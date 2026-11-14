@@ -103,7 +103,7 @@
     <string name="autorec_editor_search_in">Hledat v</string>
     <string name="autorec_editor_titles_only">Jen názvy</string>
     <string name="autorec_editor_full_text">Názvy, podnázvy a popisy</string>
-    <string name="autorec_editor_raw_value">%1$s · Výraz z Tvheadend</string>
+    <string name="autorec_editor_raw_value">Výraz z Tvheadend · %1$s</string>
     <string name="autorec_editor_words_empty_summary">„%1$s“ · Zatím nic v programu</string>
     <string name="autorec_editor_raw_help">Používá tento výraz z Tvheadend přesně tak, jak je zobrazen.</string>
     <string name="autorec_editor_title_description">Nahrává každý pořad, jehož název přesně odpovídá „%1$s“.</string>

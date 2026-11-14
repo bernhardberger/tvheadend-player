@@ -99,7 +99,7 @@
     <string name="autorec_editor_search_in">חיפוש בתוך</string>
     <string name="autorec_editor_titles_only">כותרות בלבד</string>
     <string name="autorec_editor_full_text">כותרות, כותרות משנה ותיאורים</string>
-    <string name="autorec_editor_raw_value">%1$s · ביטוי מ-Tvheadend</string>
+    <string name="autorec_editor_raw_value">ביטוי מ-Tvheadend · %1$s</string>
     <string name="autorec_editor_words_empty_summary">״%1$s״ · אין עדיין תוכניות תואמות במדריך</string>
     <string name="autorec_editor_raw_help">משתמשת בביטוי הזה מ-Tvheadend בדיוק כפי שהוא מוצג.</string>
     <string name="autorec_editor_title_description">מקליטה כל תוכנית שהכותרת שלה תואמת בדיוק ל-״%1$s״.</string>

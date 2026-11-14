@@ -95,7 +95,7 @@
     <string name="autorec_editor_search_in">Keresés helye</string>
     <string name="autorec_editor_titles_only">Csak a címekben</string>
     <string name="autorec_editor_full_text">Címekben, alcímekben és leírásokban</string>
-    <string name="autorec_editor_raw_value">%1$s · Kifejezés a Tvheadendből</string>
+    <string name="autorec_editor_raw_value">Kifejezés a Tvheadendből · %1$s</string>
     <string name="autorec_editor_words_empty_summary">„%1$s” · Még nincs találat a műsorújságban</string>
     <string name="autorec_editor_raw_help">A Tvheadendből származó kifejezést pontosan a megjelenített formában használja.</string>
     <string name="autorec_editor_title_description">Minden műsort felvesz, amelynek címe pontosan „%1$s”.</string>

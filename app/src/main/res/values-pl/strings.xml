@@ -103,7 +103,7 @@
     <string name="autorec_editor_search_in">Szukaj w</string>
     <string name="autorec_editor_titles_only">Tylko tytuły</string>
     <string name="autorec_editor_full_text">Tytuły, podtytuły i opisy</string>
-    <string name="autorec_editor_raw_value">%1$s · Wyrażenie z Tvheadend</string>
+    <string name="autorec_editor_raw_value">Wyrażenie z Tvheadend · %1$s</string>
     <string name="autorec_editor_words_empty_summary">„%1$s” · Na razie nic w programie TV</string>
     <string name="autorec_editor_raw_help">Używa tego wyrażenia z Tvheadend dokładnie w pokazanej postaci.</string>
     <string name="autorec_editor_title_description">Nagrywa każdy program, którego tytuł to dokładnie „%1$s”.</string>

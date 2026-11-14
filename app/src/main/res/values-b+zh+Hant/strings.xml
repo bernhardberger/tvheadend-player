@@ -91,7 +91,7 @@
     <string name="autorec_editor_search_in">搜尋範圍</string>
     <string name="autorec_editor_titles_only">僅標題</string>
     <string name="autorec_editor_full_text">標題、副標題及描述</string>
-    <string name="autorec_editor_raw_value">%1$s · 來自Tvheadend的運算式</string>
+    <string name="autorec_editor_raw_value">來自Tvheadend的運算式 · %1$s</string>
     <string name="autorec_editor_words_empty_summary">「%1$s」 · 節目表中尚無符合的節目</string>
     <string name="autorec_editor_raw_help">原樣使用此Tvheadend運算式。</string>
     <string name="autorec_editor_title_description">錄製標題與「%1$s」完全相同的所有節目。</string>

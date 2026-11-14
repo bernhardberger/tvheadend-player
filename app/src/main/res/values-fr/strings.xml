@@ -99,7 +99,7 @@
     <string name="autorec_editor_search_in">Rechercher dans</string>
     <string name="autorec_editor_titles_only">Titres uniquement</string>
     <string name="autorec_editor_full_text">Titres, sous-titres et descriptions</string>
-    <string name="autorec_editor_raw_value">%1$s · Expression de Tvheadend</string>
+    <string name="autorec_editor_raw_value">Expression de Tvheadend · %1$s</string>
     <string name="autorec_editor_words_empty_summary">« %1$s » · Aucun résultat dans le guide pour le moment</string>
     <string name="autorec_editor_raw_help">Utilise cette expression de Tvheadend telle qu’elle est affichée.</string>
     <string name="autorec_editor_title_description">Enregistre chaque programme dont le titre est exactement « %1$s ».</string>

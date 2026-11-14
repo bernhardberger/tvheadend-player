@@ -95,7 +95,7 @@
     <string name="autorec_editor_search_in">Αναζήτηση σε</string>
     <string name="autorec_editor_titles_only">Μόνο τίτλους</string>
     <string name="autorec_editor_full_text">Τίτλους, υπότιτλους και περιγραφές</string>
-    <string name="autorec_editor_raw_value">%1$s · Έκφραση από το Tvheadend</string>
+    <string name="autorec_editor_raw_value">Έκφραση από το Tvheadend · %1$s</string>
     <string name="autorec_editor_words_empty_summary">«%1$s» · Κανένα αποτέλεσμα στον οδηγό ακόμη</string>
     <string name="autorec_editor_raw_help">Χρησιμοποιεί αυτή την έκφραση από το Tvheadend ακριβώς όπως εμφανίζεται.</string>
     <string name="autorec_editor_title_description">Εγγράφει κάθε εκπομπή με τίτλο ακριβώς «%1$s».</string>

@@ -95,7 +95,7 @@
     <string name="autorec_editor_search_in">Hakukohde</string>
     <string name="autorec_editor_titles_only">Vain nimet</string>
     <string name="autorec_editor_full_text">Nimet, alaotsikot ja kuvaukset</string>
-    <string name="autorec_editor_raw_value">%1$s · Tvheadendin lauseke</string>
+    <string name="autorec_editor_raw_value">Tvheadendin lauseke · %1$s</string>
     <string name="autorec_editor_words_empty_summary">”%1$s” · Ei vielä ohjelmaoppaassa</string>
     <string name="autorec_editor_raw_help">Käyttää tätä Tvheadendin lauseketta täsmälleen näytetyssä muodossa.</string>
     <string name="autorec_editor_title_description">Tallentaa kaikki ohjelmat, joiden nimi on täsmälleen ”%1$s”.</string>

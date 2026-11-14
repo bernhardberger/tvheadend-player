@@ -103,7 +103,7 @@
     <string name="autorec_editor_search_in">Шукати в</string>
     <string name="autorec_editor_titles_only">Лише в назвах</string>
     <string name="autorec_editor_full_text">У назвах, підзаголовках і описах</string>
-    <string name="autorec_editor_raw_value">%1$s · Вираз із Tvheadend</string>
+    <string name="autorec_editor_raw_value">Вираз із Tvheadend · %1$s</string>
     <string name="autorec_editor_words_empty_summary">«%1$s» · У телепрограмі ще немає збігів</string>
     <string name="autorec_editor_raw_help">Використовує цей вираз із Tvheadend без змін.</string>
     <string name="autorec_editor_title_description">Записує всі передачі, назва яких точно збігається з «%1$s».</string>

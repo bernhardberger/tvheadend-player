@@ -91,7 +91,7 @@
     <string name="autorec_editor_search_in">搜索范围</string>
     <string name="autorec_editor_titles_only">仅标题</string>
     <string name="autorec_editor_full_text">标题、副标题和描述</string>
-    <string name="autorec_editor_raw_value">%1$s · 来自Tvheadend的表达式</string>
+    <string name="autorec_editor_raw_value">来自Tvheadend的表达式 · %1$s</string>
     <string name="autorec_editor_words_empty_summary">“%1$s” · 节目指南中暂无匹配</string>
     <string name="autorec_editor_raw_help">原样使用此Tvheadend表达式。</string>
     <string name="autorec_editor_title_description">录制标题与“%1$s”完全相同的所有节目。</string>

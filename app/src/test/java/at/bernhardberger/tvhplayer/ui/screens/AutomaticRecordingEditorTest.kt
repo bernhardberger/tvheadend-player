@@ -63,6 +63,7 @@ import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -705,15 +706,24 @@ class AutomaticRecordingEditorTest {
         compose.onNodeWithTag("automatic-recording-episode-1")
             .assertTextContains(requireNotNull(automaticRecordingMatches.rows.first().title))
         compose.pressKey(Key.DirectionDown)
+        compose.onNodeWithTag("automatic-recording-words").assertIsFocused()
+        // An expression from Tvheadend is shown as it is but never opens the text entry.
+        val rawDraft = compose.runOnIdle { state.draft }
         compose.pressKey(Key.DirectionCenter)
-        compose.onNodeWithTag("automatic-recording-words-input").assertTextContains("A|B")
+        compose.onNodeWithTag("automatic-recording-words-input").assertDoesNotExist()
+        compose.onNodeWithTag("automatic-recording-words").assertIsFocused()
+        compose.runOnIdle { assertEquals(rawDraft, state.draft) }
+        // Plain words still open it.
+        compose.runOnIdle { state.updateDraft { it.copy(pattern = readRecordingPattern("Tide Watch")) } }
         compose.pressKey(Key.DirectionCenter)
-        compose.onNodeWithTag("automatic-recording-words-input").performTextReplacement("A|B$")
+        compose.onNodeWithTag("automatic-recording-words-input").assertTextContains("Tide Watch")
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("automatic-recording-words-input").performTextReplacement("Tide Watcher")
         compose.onNodeWithTag("automatic-recording-words-input").performImeAction()
         compose.onNodeWithTag("automatic-recording-words").assertIsFocused()
         compose.runOnIdle {
-            assertTrue(state.draft.pattern.rawExpression)
-            assertEquals("A|B$", state.draft.toUpdateRequest(state.baseline)?.title)
+            assertFalse(state.draft.pattern.rawExpression)
+            assertEquals("Tide Watcher", state.draft.pattern.words)
         }
         compose.pressKey(Key.DirectionDown)
         compose.pressKey(Key.DirectionCenter)
@@ -729,7 +739,7 @@ class AutomaticRecordingEditorTest {
         compose.pressKey(Key.Back)
         compose.onNodeWithTag("automatic-recording-words").assertIsFocused()
         compose.runOnIdle {
-            assertEquals("A|B$", state.draft.pattern.words)
+            assertEquals("Tide Watcher", state.draft.pattern.words)
             assertTrue(fixture.submissions.isEmpty())
         }
         for (kind in listOf(AutomaticRecordingKind.KEYWORD, AutomaticRecordingKind.TITLE)) {
