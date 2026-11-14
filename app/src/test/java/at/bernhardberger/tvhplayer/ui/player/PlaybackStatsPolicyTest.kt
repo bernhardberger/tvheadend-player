@@ -82,6 +82,7 @@ class PlaybackStatsPolicyTest {
         fun row(step: StreamPathStep, w: StatsWindow, diagnostics: AppPlaybackDiagnostics = d) =
             stepValue(step, diagnostics, w, output = null, requested = null, measuredRate = "59.94", declaredRate = "50", timeshift = null)
         assertEquals("+9999 uncorrected • 75% SNR", row(StreamPathStep.TUNER, StatsWindow(uncorrected = 9_999)))
+        assertEquals("lock is the normal state and goes unsaid", "75% signal • 75% SNR", row(StreamPathStep.TUNER, StatsWindow()))
         assertEquals("No lock • 75% signal", row(StreamPathStep.TUNER, StatsWindow(), statsLiveDiagnostics(locked = false)))
         assertEquals("No lock • +9999 uncorrected",
             row(StreamPathStep.TUNER, StatsWindow(uncorrected = 9_999), statsLiveDiagnostics(locked = false)))
@@ -89,11 +90,22 @@ class PlaybackStatsPolicyTest {
         assertEquals("250 ms queue", row(StreamPathStep.SERVER, StatsWindow(queueChangeUs = 100_000)))
         assertEquals("+1.2M drops • 5.0 s buffer", row(StreamPathStep.APP, StatsWindow(clientDrops = 1_299_999)))
         assertEquals("+9999 drops • 59.94/50 fps", row(StreamPathStep.DECODER, StatsWindow(decoderDrops = 9_999)))
-        assertEquals("H.264 • 1080 • 59.94/50 fps", row(StreamPathStep.DECODER, StatsWindow()))
-        assertEquals("the declared scan letter of the same height", "H.264 • 1080i • 59.94/50 fps",
+        assertEquals("a second rate takes the family's room", "1080 • 59.94/50 fps", row(StreamPathStep.DECODER, StatsWindow()))
+        assertEquals("the declared scan letter of the same height", "1080i • 59.94/50 fps",
             stepValue(StreamPathStep.DECODER, d, StatsWindow(), null, null, "59.94", "50", null, raster = "1080i"))
+        listOf("50", null).forEach { measured ->
+            assertEquals("one rate keeps the family", "H.264 • 1080i • 50 fps",
+                stepValue(StreamPathStep.DECODER, d, StatsWindow(), null, null, measured, "50", null, raster = "1080i"))
+        }
+        assertEquals("a measurement without a declared rate is a second rate", "1080 • 50/— fps",
+            stepValue(StreamPathStep.DECODER, d, StatsWindow(), null, null, "50", null, null))
         assertEquals("a stale raster of another height", "1080", videoSizeLabel(d.video, raster = "720p"))
         assertEquals("1440×1088", videoSizeLabel(d.video?.copy(resolution = "1440×1088", width = 1440, height = 1088), null))
+        // A non-standard size takes the codec family's room.
+        listOf(3840 to 1600, 1920 to 1088, 1280 to 800).forEach { (width, height) ->
+            val odd = d.copy(video = d.video?.copy(resolution = "$width×$height", width = width, height = height))
+            assertEquals("$width×$height • 59.94/50 fps", row(StreamPathStep.DECODER, StatsWindow(), odd))
+        }
         val output = DisplayOutput(1920, 1080, "23.98", "", matchFrameRate = null)
         assertEquals("23.98 Hz • requested 59.94 Hz",
             stepValue(StreamPathStep.SCREEN, d, StatsWindow(), output, "59.94", null, null, null))
@@ -137,6 +149,9 @@ internal fun statsLiveDiagnostics(
     uncorrected: Long = 0,
     serverDrops: Long = 0,
     service: String = "Ridge Earth",
+    signal: Long = 49_152,
+    snr: Long = 49_152,
+    queueDelayUs: Long = 250_000,
 ): AppPlaybackDiagnostics {
     var live = LiveSubscriptionDiagnostics.update(null, SubscriptionEvent.Started(
         source = LiveSubscriptionSource.create(adapterName = if (tuner) "DVB-T adapter" else null,
@@ -144,11 +159,11 @@ internal fun statsLiveDiagnostics(
             providerName = "Ridge", serviceName = service),
         streams = null, codecMetadata = null))
     if (tuner) live = LiveSubscriptionDiagnostics.update(live, SubscriptionEvent.Signal(
-        relativeSnr = 49_152, absoluteSnr = 31_250, relativeSignal = 49_152, absoluteSignal = -63_500,
+        relativeSnr = snr, absoluteSnr = 31_250, relativeSignal = signal, absoluteSignal = -63_500,
         bitErrorRate = 0, uncorrectedBlockCount = uncorrected, frontendStatusReported = true,
         frontendState = LiveFrontendState.create(signalDetected = true, partiallySynchronized = true, locked = locked)))
     live = LiveSubscriptionDiagnostics.update(live, SubscriptionEvent.Queue(
-        packetCount = 1_500, byteCount = 2_000_000, delay = 250_000,
+        packetCount = 1_500, byteCount = 2_000_000, delay = queueDelayUs,
         bFrameDropCount = serverDrops, pFrameDropCount = 0, iFrameDropCount = 0))
     return AppPlaybackDiagnostics(source = AppPlaybackSource.LIVE_TV, state = AppPlaybackState.Playing,
         isPlaying = true, bufferedMs = 5_000,

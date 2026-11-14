@@ -113,13 +113,15 @@ internal fun videoSizeLabel(video: AppPlaybackFormatDiagnostics?, raster: String
     return raster?.takeIf { it.trimEnd('i', 'p') == height.toString() } ?: height.toString()
 }
 
-private val StandardHeights = setOf(480, 576, 720, 1080, 1440, 2160, 4320)
+internal val StandardHeights = setOf(480, 576, 720, 1080, 1440, 2160, 4320)
+
+/** Whether [frameRateText] shows the measured and the declared rate, because they read differently. */
+internal fun showsTwoRates(measured: String?, nominal: String?): Boolean = measured != null && measured != nominal
 
 internal fun frameRateText(measured: String?, nominal: String?): String? = when {
+    showsTwoRates(measured, nominal) -> "$measured/${nominal ?: "—"} fps"
     measured == null && nominal == null -> null
-    measured == null -> "$nominal fps"
-    measured == nominal -> "$nominal fps"
-    else -> "$measured/${nominal ?: "—"} fps"
+    else -> "${nominal ?: measured} fps"
 }
 
 /** A displayed change is absent, rather than a misleading "+0", at that value's precision. */

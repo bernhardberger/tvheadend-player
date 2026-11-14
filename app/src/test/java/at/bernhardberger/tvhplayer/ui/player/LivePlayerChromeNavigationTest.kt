@@ -210,6 +210,7 @@ class LivePlayerChromeNavigationTest : LivePlayerChromeFixture() {
         key(Key.Menu)
         compose.onNodeWithTag("playback-options-stats").performSemanticsAction(SemanticsActions.RequestFocus)
         key(Key.DirectionCenter)
+        key(Key.DirectionDown)
         key(Key.DirectionCenter)
         key(Key.Back); key(Key.Back); key(Key.Back)
         assertTrue(compose.onAllNodesWithText("Stats for nerds").fetchSemanticsNodes().isNotEmpty())

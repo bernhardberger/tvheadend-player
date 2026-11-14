@@ -1773,13 +1773,20 @@ fun VideoPlayerScreen(
         // The channel drawer opens with the controls; the page's own Info never holds them here (no details).
         val controlsLayerShown = chromeLayer == PlayerForegroundLayer.CONTROLS || channelRailOpen
         val chromePanelOpen = layerState.core.optionsPage != null || layerState.core.infoOpen || layerState.scheduleOpen
+        // The lower chrome's mode, for the chrome itself and for the Stats card under it.
+        fun lowerChromeMode(keepControls: Boolean) = playerChromeMode(
+            controls = controlsLayerShown || keepControls,
+            banner = !channelUnavailable && bannerShown,
+            stepPreview = bannerSeekPreview != null,
+        )
         // Passive diagnostics sit below all chrome and foreground panels; while the channel is unavailable the
         // channel message carries their text instead, whatever layer is open. The channel drawer's browse surface
         // takes the card's place. While the lower chrome is drawn the debug level draws the stream path card only.
         LivePlayerDiagnostics(
             viewModel = videoPlayerViewModel,
+            // PlayerPage keeps the controls only while its details compose; this page has none (details = null).
             level = presentedStatsLevel(statsLevel,
-                (controlsLayerShown || !channelUnavailable && bannerShown) && !chromePanelOpen),
+                lowerChromeMode(keepControls = false) != PlayerChromeMode.HIDDEN && !chromePanelOpen),
             visible = statsLevel.enabled && foregroundLayer != PlayerForegroundLayer.RECOVERY && !channelUnavailable &&
                 !channelRailOpen,
             accessible = foregroundLayer == PlayerForegroundLayer.NONE,
@@ -1814,11 +1821,7 @@ fun VideoPlayerScreen(
             // Keep the departing rail expanded throughout its vertical step.
             expanded = layerState.channelRailPresented, detached = true)
         PlayerChrome(
-            mode = playerChromeMode(
-                controls = controlsShown,
-                banner = !channelUnavailable && bannerShown,
-                stepPreview = bannerSeekPreview != null,
-            ),
+            mode = lowerChromeMode(keepControls),
             content = chromeContent(),
             timeline = PlayerChromeTimeline.Live(
                 timeshift = visibleSeekPreview?.let {

@@ -1,6 +1,8 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import at.bernhardberger.tvhplayer.di.PlayerStatsLevel
+import at.bernhardberger.tvhplayer.playback.AppPlaybackDiagnostics
+import at.bernhardberger.tvhplayer.playback.AppPlaybackFormatDiagnostics
 import at.bernhardberger.tvhplayer.playback.AppPlaybackSource
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackFailureReason
@@ -157,17 +159,52 @@ class PlayerMotionCaptureTest {
             }
         }
         val report = StringBuilder("canvas=960x540 dp; locale=en; fontScale=1.0; fixture=still-ridge-light\n")
-        // Every stream-path row at its widest, as the step-value formatter writes it.
-        val worstRows = listOf(
-            "+9999 uncorrected • 100% SNR", "+999k uncorrected • 100% SNR", "+99.9M uncorrected • 100% SNR",
-            "No lock • 100% signal", "No lock • +9999 uncorrected", "No lock • +99.9M uncorrected",
-            "+9999 drops • 9999 ms queue", "+999k drops • 9999 ms queue", "+99.9M drops • 9999 ms queue",
-            "+9999 drops • 30.0 s buffer", "+99.9M drops • 30.0 s buffer",
-            "+9999 drops • 59.94/23.98 fps", "+99.9M drops • 59.94/23.98 fps",
-            "HEVC • 2160p • 59.94/50 fps", "HEVC • 2160p • 59.94/23.98 fps", "MPEG-2 • 1080i • 59.94/50 fps",
-            "30.0 s buffer • 2:59:59/3:00:00", "30.0 s buffer • 2:59:59 behind",
-            "59.94 Hz • requested 23.98 Hz", "3840×2160 @ 59.94 Hz",
-        )
+        // Every stream-path row at its widest, written by the step-value formatter from extreme inputs.
+        val worstRows = run {
+            val full = 65_535L
+            val dvb = statsLiveDiagnostics(signal = full, snr = full, queueDelayUs = 9_999_000).copy(bufferedMs = 30_000)
+            fun video(codec: String, mime: String, width: Int, height: Int) = dvb.copy(video = AppPlaybackFormatDiagnostics(
+                codec, "$width×$height", 23.976f, sampleMimeType = mime, width = width, height = height))
+            fun row(step: StreamPathStep, d: AppPlaybackDiagnostics = dvb, w: StatsWindow = StatsWindow(),
+                output: DisplayOutput? = null, requested: String? = null, declared: String = "23.98",
+                timeshift: AppTimeshiftState? = null, raster: String? = null) =
+                stepValue(step, d, w, output, requested, measuredRate = "59.94", declaredRate = declared, timeshift, raster)
+            val locked = dvb
+            val unlocked = statsLiveDiagnostics(locked = false, signal = full, snr = full, queueDelayUs = 9_999_000)
+                .copy(bufferedMs = 30_000)
+            val odd = video("hvc1.2.4.L153.B0", "video/hevc", 3840, 1600)
+            fun MutableList<Pair<String, String>>.add(shape: String, text: String) = add(shape to text)
+            buildList {
+                add("tuner", row(StreamPathStep.TUNER, locked)); add("tuner", row(StreamPathStep.TUNER, unlocked))
+                add("queue", row(StreamPathStep.SERVER))
+                listOf(9_999L, 999_999L, 99_999_999L).forEach { n ->
+                    add("growth", row(StreamPathStep.TUNER, locked, StatsWindow(uncorrected = n)))
+                    add("growth", row(StreamPathStep.TUNER, unlocked, StatsWindow(uncorrected = n)))
+                    add("growth", row(StreamPathStep.SERVER, w = StatsWindow(serverDrops = n)))
+                    add("growth", row(StreamPathStep.APP, w = StatsWindow(clientDrops = n)))
+                    add("growth", row(StreamPathStep.DECODER, w = StatsWindow(decoderDrops = n)))
+                }
+                add("timing", row(StreamPathStep.APP, timeshift = AppTimeshiftState(available = true,
+                    bufferStartMs = -10_800_000, positionMs = -10_799_000, liveEdgeMs = 0)))
+                add("timing", row(StreamPathStep.APP, dvb.copy(source = AppPlaybackSource.RECORDING, live = null,
+                    positionMs = 10_799_000, durationMs = 10_800_000)))
+                val families = listOf("avc1.640028" to "video/avc", "hvc1.2.4.L153.B0" to "video/hevc",
+                    "av01.0.08M.08" to "video/av01", "vp09.00.40.08" to "video/x-vnd.on2.vp9", "mp2v" to "video/mpeg2")
+                listOf(Triple(3840, 2160, "2160p"), Triple(1920, 1080, "1080i")).forEach { (width, height, raster) ->
+                    families.forEach { (codec, mime) ->
+                        add("family + one rate", row(StreamPathStep.DECODER, video(codec, mime, width, height),
+                            declared = "59.94", raster = raster))
+                    }
+                    add("two rates", row(StreamPathStep.DECODER, video("mp2v", "video/mpeg2", width, height), raster = raster))
+                }
+                add("two rates", row(StreamPathStep.DECODER, odd))
+                add("one rate, no family", row(StreamPathStep.DECODER, odd, declared = "59.94"))
+                add("growth", row(StreamPathStep.DECODER, odd, StatsWindow(decoderDrops = 99_999_999)))
+                add("screen", row(StreamPathStep.SCREEN, output = DisplayOutput(3840, 2160, "23.98", "", null), requested = "59.94"))
+                add("screen", row(StreamPathStep.SCREEN, output = DisplayOutput(3840, 2160, "59.94", "", null), requested = "23.98"))
+                add("screen", row(StreamPathStep.SCREEN, output = DisplayOutput(3840, 2160, "59.94", "", null), requested = "59.94"))
+            }.distinctBy { it.second }
+        }
         fun shot(name: String, playing: Boolean = true) {
             compose.settleFrames(2)
             if (scene == "channel-drawer") {
@@ -193,7 +230,6 @@ class PlayerMotionCaptureTest {
                 report.append("$name: bounds=$bounds\n")
                 if (drawn == PlayerStatsLevel.STREAM_PATH) assertTrue("$name bottom=${bounds.bottom}", bounds.bottom <= 300f)
             }
-            val misfits = mutableListOf<String>()
             val cardInk = mutableListOf<Pair<String, androidx.compose.ui.geometry.Rect>>()
             textInk(underCard = true).forEach { (node, layout) ->
                 val input = layout.layoutInput
@@ -209,16 +245,7 @@ class PlayerMotionCaptureTest {
                 }
                 if (layout.hasVisualOverflow) report.append("ellipsis: ${input.text}\n")
                 cardInk += input.text.text to ink(node, layout)
-                // Worst cases in a value column's own style and width (beside the flag gutter), not fixture values.
-                if (name == "dvb-healthy" && input.text.text == "250 ms queue") {
-                    worstRows.forEach { row ->
-                        val s = spare(row)
-                        report.append("  worst: $row; spare=$s dp\n")
-                        if (s < 0f) misfits += "$row overflows by ${-s} dp"
-                    }
-                }
             }
-            assertTrue(misfits.joinToString("; "), misfits.isEmpty())
             if (playing && drawn == PlayerStatsLevel.DEBUG) {
                 val card = compose.onNodeWithTag("playback-stats-overlay").fetchSemanticsNode().boundsInRoot
                 val (left, right) = cardInk.map { it.second }.partition { it.left < card.left + 16f + 324f }
@@ -251,6 +278,32 @@ class PlayerMotionCaptureTest {
                 directory = "stats-stream-path")
         }
         shot("dvb-healthy")
+        // Worst cases in a value column's own style and width (left of the flag gutter), found by position.
+        run {
+            val card = compose.onNodeWithTag("playback-stats-overlay").fetchSemanticsNode().boundsInRoot
+            val values = textInk(underCard = true).filter { (node, _) ->
+                kotlin.math.abs(node.boundsInRoot.left - (card.left + 126f)) < 1f
+            }.map { it.second }
+            assertEquals("one value column per DVB step", 5, values.size)
+            assertTrue("the value columns share one width", values.all { it.size.width == values.first().size.width })
+            val input = values.first().layoutInput
+            val room = values.first().size.width.toFloat()
+            report.append("worst-case value room=$room dp\n")
+            val misfits = mutableListOf<String>()
+            var measured = 0
+            val smallest = mutableMapOf<String, Pair<String, Float>>()
+            worstRows.forEach { (shape, row) ->
+                val s = room - androidx.compose.ui.text.ParagraphIntrinsics(row, input.style, emptyList(),
+                    density = input.density, fontFamilyResolver = input.fontFamilyResolver).maxIntrinsicWidth
+                measured++
+                report.append("  worst ($shape): $row; spare=$s dp\n")
+                if (s < 0f) misfits += "$row overflows by ${-s} dp"
+                if (smallest[shape].let { it == null || s < it.second }) smallest[shape] = row to s
+            }
+            smallest.forEach { (shape, worst) -> report.append("  smallest spare ($shape): ${worst.first}; ${worst.second} dp\n") }
+            assertTrue("the worst cases were measured", measured > 0 && measured == worstRows.size)
+            assertTrue(misfits.joinToString("; "), misfits.isEmpty())
+        }
         compose.runOnIdle { diagnostics = diagnostics.copy(video = diagnostics.video?.copy(
             codec = "hvc1.2.4.L153.B0", resolution = "3840×2160", frameRate = 50f, width = 3840, height = 2160)); raster = "2160p" }
         shot("longest-decoder")

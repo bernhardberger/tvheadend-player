@@ -210,8 +210,11 @@ internal fun stepValue(
     StreamPathStep.DECODER -> {
         val rate = frameRateText(measuredRate, declaredRate)
         val size = videoSizeLabel(d.video, raster)
+        // A non-standard width×height or a second rate takes the codec family's room; debug keeps the codec.
+        val family = videoCodecFamily(d.video?.codec, d.video?.sampleMimeType)
+            .takeIf { (size == null || d.video?.height in StandardHeights) && !showsTwoRates(measuredRate, declaredRate) }
         pathGrowthFact(step, w, "drops")?.let { join(it, rate ?: size) }
-            ?: join(videoCodecFamily(d.video?.codec, d.video?.sampleMimeType), size, rate).ifBlank { "Video —" }
+            ?: join(family, size, rate).ifBlank { "Video —" }
     }
     // A mismatch names the output rate, then the request; the resolution then stays in debug.
     StreamPathStep.SCREEN -> when {
@@ -239,8 +242,8 @@ private fun liveStepValue(step: StreamPathStep, d: AppPlaybackDiagnostics, w: St
         when {
             growth != null && noLock -> join("No lock", growth)
             growth != null -> join(growth, snr)
-            // Without lock the signal is the fact; its SNR stays in debug.
-            else -> join(if (noLock) "No lock" else if (f?.state?.locked == true) "Locked" else null,
+            // Lock is the normal state and goes unsaid; without lock the signal is the fact, its SNR stays in debug.
+            else -> join(if (noLock) "No lock" else null,
                 f?.relativeSignalPercent?.let { "${decimal(it, 0)}% signal" }, snr.takeUnless { noLock })
         }
     }
