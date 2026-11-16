@@ -103,11 +103,7 @@ class GuideMagazineCaptureTest {
         })
     }
 
-    private fun show(
-        separation: MagazineSeparation,
-        spaceColumnCount: Int = 4,
-        picturePlacement: MagazinePicturePlacement = MagazinePicturePlacement.BELOW,
-    ) {
+    private fun show() {
         val art = buildMap {
             lineUp.forEachIndexed { c, row ->
                 put(ArtworkId(c + 1), FixtureArt.picon(row[1]))
@@ -143,14 +139,12 @@ class GuideMagazineCaptureTest {
                                     onMoveToContent = { first.requestFocus() },
                                 )
                                 GuideMagazine(
-                                    columns, now, separation, { opened = it.id },
+                                    columns, now, { opened = it.id },
                                     Modifier.weight(1f).padding(
                                         start = padding.calculateLeftPadding(androidx.compose.ui.unit.LayoutDirection.Ltr) + TvBrowseLeadingInset,
                                         top = TvSpacing16,
                                     ),
                                     navigationFocus = rail ?: FocusRequester.Default, headerFocus = date, initialFocus = first,
-                                    spaceColumnCount = spaceColumnCount,
-                                    picturePlacement = picturePlacement,
                                 )
                             }
                         }
@@ -162,25 +156,9 @@ class GuideMagazineCaptureTest {
         compose.settleFrames(3)
     }
 
-    @Test @Category(VisualCapture::class) fun linesFrames() = frames(MagazineSeparation.LINES)
-    @Test @Category(VisualCapture::class) fun lanesFrames() = frames(MagazineSeparation.LANES)
-    @Test @Category(VisualCapture::class) fun space4Frames() = frames(MagazineSeparation.SPACE, 4)
-    @Test @Category(VisualCapture::class) fun space3BelowFrames() =
-        frames(MagazineSeparation.SPACE, 3, MagazinePicturePlacement.BELOW)
-    @Test @Category(VisualCapture::class) fun space3BesideFrames() =
-        frames(MagazineSeparation.SPACE, 3, MagazinePicturePlacement.BESIDE)
-
-    private fun frames(
-        separation: MagazineSeparation,
-        spaceColumnCount: Int = 4,
-        picturePlacement: MagazinePicturePlacement = MagazinePicturePlacement.BELOW,
-    ) {
-        show(separation, spaceColumnCount, picturePlacement)
-        val prefix = separation.name.lowercase() +
-            (if (separation == MagazineSeparation.SPACE) spaceColumnCount else "") +
-            if (separation == MagazineSeparation.SPACE && spaceColumnCount == 3) {
-                "-${picturePlacement.name.lowercase()}"
-            } else ""
+    @Test @Category(VisualCapture::class) fun magazineFrames() {
+        show()
+        val prefix = "magazine"
         capture("$prefix-resting")
         repeat(2) { compose.pressKey(Key.DirectionDown) }
         compose.settleFrames(2)
@@ -188,10 +166,18 @@ class GuideMagazineCaptureTest {
         compose.pressKey(Key.DirectionRight)
         compose.settleFrames(2)
         capture("$prefix-right")
+        compose.pressKey(Key.DirectionLeft)
+        // Left returns to the second entry by nearest start time; four Down presses reach the sixth.
+        repeat(4) { compose.pressKey(Key.DirectionDown) }
+        compose.settleFrames(2)
+        capture("$prefix-scrolled")
+        compose.pressKey(Key.DirectionRight)
+        compose.settleFrames(2)
+        capture("$prefix-scrolled-right")
     }
 
     @Test fun horizontalMovementUsesNearestStartAndOkOpensDetails() {
-        show(MagazineSeparation.LINES)
+        show()
         compose.pressKey(Key.DirectionCenter)
         compose.runOnIdle { assertEquals(EventId(0), opened) }
         compose.pressKey(Key.DirectionDown)
@@ -202,6 +188,10 @@ class GuideMagazineCaptureTest {
         compose.pressKey(Key.DirectionLeft)
         compose.pressKey(Key.DirectionCenter)
         compose.runOnIdle { assertEquals(EventId(1), opened) }
+        repeat(4) { compose.pressKey(Key.DirectionDown) }
+        compose.pressKey(Key.DirectionRight)
+        compose.pressKey(Key.DirectionCenter)
+        compose.runOnIdle { assertEquals(EventId(106), opened) }
     }
 
     private fun capture(name: String) {
