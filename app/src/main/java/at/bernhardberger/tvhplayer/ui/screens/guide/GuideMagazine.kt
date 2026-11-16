@@ -50,7 +50,6 @@ import kotlin.math.abs
 
 internal data class MagazineEntry(
     val event: EpgEvent,
-    val priority: Boolean = false,
     val recording: DvrEntryState? = null,
 )
 
@@ -200,7 +199,7 @@ private fun MagazineProgram(
     val list = ListItemDefaults.colors()
     val listShape = ListItemDefaults.shape()
     val listScale = ListItemDefaults.scale()
-    val art = programmeArtwork(event)?.takeIf { entry.priority }
+    val art = programmeArtwork(event)?.takeIf { magazineShowsPicture(event) }
     Surface(
         onClick = onOpen,
         modifier = modifier.onFocusChanged { focused = it.isFocused },

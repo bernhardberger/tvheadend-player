@@ -95,7 +95,7 @@ class GuideMagazineCaptureTest {
                 start = Instant.fromEpochSeconds(now + boundaries[e] * 60),
                 stop = Instant.fromEpochSeconds(now + boundaries[e + 1] * 60),
                 title = title, image = picture,
-            ), priority = (c == 1 && (e == 0 || e == 2)) || (c == 0 && e == 2), recording = when {
+            ), recording = when {
                 c == 1 && e == 0 -> DvrEntryState.RECORDING
                 c == 0 && e == 1 -> DvrEntryState.SCHEDULED
                 else -> null
