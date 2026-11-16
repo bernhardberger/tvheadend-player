@@ -924,6 +924,11 @@
     <string name="player_current_broadcast">Bieżąca emisja</string>
     <string name="timeshift_setting">Przesunięcie w czasie</string>
     <string name="timeshift_setting_description">Wstrzymuj i przewijaj telewizję na żywo</string>
+    <string name="display_refresh_rate_setting">Częstotliwość odświeżania ekranu</string>
+    <string name="display_refresh_rate_description">Częstotliwość odświeżania ekranów aplikacji. Ustawienie „Dopasuj do liczby klatek materiału” nadal może ją zmieniać dla wideo.</string>
+    <string name="display_refresh_rate_system">Domyślne ustawienie systemu</string>
+    <string name="display_refresh_rate_system_help">Pozostawia wybór częstotliwości odświeżania telewizorowi.</string>
+    <string name="display_refresh_rate_value">%1$s Hz</string>
     <string name="refresh_rate_matching_setting">Dopasuj do liczby klatek materiału</string>
     <string name="frame_rate_switching_always">Zawsze</string>
     <string name="frame_rate_switching_seamless_only">Tylko bez zakłóceń</string>

@@ -25,6 +25,7 @@ import kotlinx.coroutines.launch
 
 data class SettingsPlayerUiState(
     val autoStartPlayback: Boolean = false,
+    val displayRefreshRate: Float? = null,
     val audioLanguages: List<String> = emptyList(),
     val audioFormat: AudioFormatPreference = AudioFormatPreference.AUTOMATIC,
     val audioDescription: Boolean = false,
@@ -89,13 +90,17 @@ class SettingsPlayerViewModel(
     ) { state, learnedMillis ->
         state.copy(startupBufferLearnedMillis = learnedMillis)
     }.combine(uiSettingsStore.settings) { state, settings ->
-        state.copy(autoStartPlayback = settings.autoStartPlayback)
+        state.copy(autoStartPlayback = settings.autoStartPlayback, displayRefreshRate = settings.displayRefreshRate)
     }.combine(playbackRuntime.tunnelingFallbackActive) { state, fallback ->
         state.copy(tunnelingFallbackActive = fallback)
     }.stateIn(viewModelScope, SharingStarted.Eagerly, SettingsPlayerUiState())
 
     fun onAutoStartPlaybackChanged(enabled: Boolean) {
         viewModelScope.launch { uiSettingsStore.setAutoStartPlayback(enabled) }
+    }
+
+    fun onDisplayRefreshRateChanged(rate: Float?) {
+        viewModelScope.launch { uiSettingsStore.setDisplayRefreshRate(rate) }
     }
 
     fun onAudioLanguageSelected(slot: Int, language: String?) {

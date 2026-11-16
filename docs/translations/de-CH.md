@@ -24,6 +24,8 @@ Not overridden; inherits German (`one`, `other`).
 
 Reconciled to frozen source `6d80a8ff` for 0.3.0. GPT-6.1 Sol (medium) supplied the regional assessment; the five applicable German `ß` → `ss` overrides were checked against every frozen German resource and reviewed by Sonnet 5.5 (medium). Other strings inherit reviewed `de`. No human reviewer; the override locale is labeled machine-drafted.
 
+0.5 settings strings `display_refresh_rate_*` drafted against `27523c0b` by GPT-6.1 Sol (medium) and reviewed by Sonnet 5.5 (medium); still machine-drafted, no human reviewer. All five keys inherit German unchanged; no Swiss overrides.
+
 ## Open questions
 
 - Check TTS pronunciation of the inherited `player_scrub_*` speed multipliers.

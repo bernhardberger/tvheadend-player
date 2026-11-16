@@ -889,6 +889,11 @@
     <string name="player_current_broadcast">השידור הנוכחי</string>
     <string name="timeshift_setting">השהיית שידור חי</string>
     <string name="timeshift_setting_description">השהיה והרצה לאחור של שידור חי</string>
+    <string name="display_refresh_rate_setting">קצב רענון המסך</string>
+    <string name="display_refresh_rate_description">קצב הרענון של מסכי האפליקציה. ההגדרה “התאמה לקצב התמונות של התוכן” עדיין יכולה לשנות אותו עבור סרטון.</string>
+    <string name="display_refresh_rate_system">ברירת המחדל של המערכת</string>
+    <string name="display_refresh_rate_system_help">משאיר את קביעת קצב הרענון לטלוויזיה.</string>
+    <string name="display_refresh_rate_value">%1$s Hz</string>
     <string name="refresh_rate_matching_setting">התאמה לקצב התמונות של התוכן</string>
     <string name="frame_rate_switching_always">תמיד</string>
     <string name="frame_rate_switching_seamless_only">רק ללא הפרעה</string>

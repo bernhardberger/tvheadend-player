@@ -854,6 +854,11 @@
     <string name="player_current_broadcast">Aktuel udsendelse</string>
     <string name="timeshift_setting">Tidsforskydning</string>
     <string name="timeshift_setting_description">Sæt live-tv på pause og spol tilbage</string>
+    <string name="display_refresh_rate_setting">Skærmens opdateringsfrekvens</string>
+    <string name="display_refresh_rate_description">Opdateringsfrekvensen for appens skærmbilleder. Indstillingen ”Match indholdets billedfrekvens” kan stadig skifte frekvens for en video.</string>
+    <string name="display_refresh_rate_system">Systemstandard</string>
+    <string name="display_refresh_rate_system_help">Lader tv’et bestemme opdateringsfrekvensen.</string>
+    <string name="display_refresh_rate_value">%1$s Hz</string>
     <string name="refresh_rate_matching_setting">Match indholdets billedfrekvens</string>
     <string name="frame_rate_switching_always">Altid</string>
     <string name="frame_rate_switching_seamless_only">Kun uden afbrydelse</string>

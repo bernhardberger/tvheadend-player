@@ -924,6 +924,11 @@
     <string name="player_current_broadcast">Поточна передача</string>
     <string name="timeshift_setting">Відкладений перегляд</string>
     <string name="timeshift_setting_description">Пауза й перемотування прямого ефіру</string>
+    <string name="display_refresh_rate_setting">Частота оновлення екрана</string>
+    <string name="display_refresh_rate_description">Частота оновлення екранів застосунку. Налаштування «Узгодження частоти кадрів» і далі може змінювати її для відео.</string>
+    <string name="display_refresh_rate_system">Типове значення системи</string>
+    <string name="display_refresh_rate_system_help">Залишає вибір частоти оновлення телевізору.</string>
+    <string name="display_refresh_rate_value">%1$s Гц</string>
     <string name="refresh_rate_matching_setting">Узгодження частоти кадрів</string>
     <string name="frame_rate_switching_always">Завжди</string>
     <string name="frame_rate_switching_seamless_only">Лише без переривань</string>

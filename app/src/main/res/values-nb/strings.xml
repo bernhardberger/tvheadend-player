@@ -854,6 +854,11 @@
     <string name="player_current_broadcast">Nåværende sending</string>
     <string name="timeshift_setting">Tidsforskyvning</string>
     <string name="timeshift_setting_description">Pause og spol tilbake direktesendt TV</string>
+    <string name="display_refresh_rate_setting">Skjermens oppdateringsfrekvens</string>
+    <string name="display_refresh_rate_description">Oppdateringsfrekvensen for appens skjermbilder. «Tilpass til innholdets bildefrekvens» kan fortsatt bytte frekvens for en video.</string>
+    <string name="display_refresh_rate_system">Systemstandard</string>
+    <string name="display_refresh_rate_system_help">Lar TV-en bestemme oppdateringsfrekvensen.</string>
+    <string name="display_refresh_rate_value">%1$s Hz</string>
     <string name="refresh_rate_matching_setting">Tilpass til innholdets bildefrekvens</string>
     <string name="frame_rate_switching_always">Alltid</string>
     <string name="frame_rate_switching_seamless_only">Bare sømløst</string>

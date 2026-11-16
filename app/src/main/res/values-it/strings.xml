@@ -889,6 +889,11 @@
     <string name="player_current_broadcast">Trasmissione attuale</string>
     <string name="timeshift_setting">Riproduzione differita</string>
     <string name="timeshift_setting_description">Pausa e riavvolgimento della TV in diretta</string>
+    <string name="display_refresh_rate_setting">Frequenza di aggiornamento dello schermo</string>
+    <string name="display_refresh_rate_description">La frequenza di aggiornamento delle schermate dell’app. «Adatta alla frequenza del contenuto» può comunque cambiarla per un video.</string>
+    <string name="display_refresh_rate_system">Predefinito di sistema</string>
+    <string name="display_refresh_rate_system_help">Lascia al televisore la scelta della frequenza di aggiornamento.</string>
+    <string name="display_refresh_rate_value">%1$s Hz</string>
     <string name="refresh_rate_matching_setting">Adatta alla frequenza del contenuto</string>
     <string name="frame_rate_switching_always">Sempre</string>
     <string name="frame_rate_switching_seamless_only">Solo senza interruzioni</string>

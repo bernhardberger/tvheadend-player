@@ -833,6 +833,11 @@
     <string name="player_current_broadcast">Emissão atual</string>
     <string name="timeshift_setting">Timeshift</string>
     <string name="timeshift_setting_description">Pausar e recuar na TV em direto</string>
+    <string name="display_refresh_rate_setting">Taxa de atualização do ecrã</string>
+    <string name="display_refresh_rate_description">A taxa de atualização dos ecrãs da aplicação. «Ajustar à taxa de fotogramas do conteúdo» pode continuar a mudar a taxa para um vídeo.</string>
+    <string name="display_refresh_rate_system">Predefinição do sistema</string>
+    <string name="display_refresh_rate_system_help">Deixa o televisor determinar a taxa de atualização.</string>
+    <string name="display_refresh_rate_value">%1$s Hz</string>
     <string name="refresh_rate_matching_setting">Ajustar à taxa de fotogramas do conteúdo</string>
     <string name="frame_rate_switching_always">Sempre</string>
     <string name="frame_rate_switching_seamless_only">Só sem interrupções</string>
