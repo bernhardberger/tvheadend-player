@@ -31,10 +31,11 @@ import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.visibleChannelNumber
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
+import at.bernhardberger.tvhplayer.ui.components.InlineLogo
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
 import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
 
-/** Trial-only status composition; the reserved artwork box never changes the group's width. */
+/** Trial-only status composition; artwork joins the line only once its trimmed size is known. */
 @Composable
 internal fun TuningStatus(channel: Channel, motionEnabled: Boolean, announce: Boolean) {
     val title = channelTitleText(channel.visibleChannelNumber, channel.name.orEmpty())
@@ -49,10 +50,12 @@ internal fun TuningStatus(channel: Channel, motionEnabled: Boolean, announce: Bo
         verticalAlignment = Alignment.CenterVertically) {
         Text(stringResource(R.string.main_startup_message_tuning, "").trim(),
             style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.width(8.dp))
-        PiconBox(channel.icon, Modifier.size(54.dp, 24.dp).graphicsLayer { this.alpha = alpha },
-            onLogoSize = { ready = true }, onError = { ready = true })
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(4.dp))
+        val icon = channel.icon
+        if (icon == null) PiconBox(null, Modifier.size(20.dp))
+        else InlineLogo(icon, Modifier.graphicsLayer { this.alpha = alpha },
+            collapseUntilLoaded = true, onLogoReady = { ready = true })
+        if (ready) Spacer(Modifier.width(4.dp))
         Text(title, Modifier.weight(1f, fill = false), style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
