@@ -577,6 +577,7 @@ class RecordingRecoveryPositionTest {
 
     @Test fun backgroundReturnNearTheEndContinuesPlayingOrPaused() {
         for ((playing, granted) in listOf(true to true, false to true, true to false)) exercise {
+            if (!playing) settings.setTunnelingEnabled(true)
             play(FIRST)
             runtime.seekTo(TWENTY_NINE_MINUTES)
             awaitPlayback { near(TWENTY_NINE_MINUTES, player.currentPosition) }
@@ -601,6 +602,24 @@ class RecordingRecoveryPositionTest {
             assertEquals(AppPlaybackTarget.Recording(FIRST), runtime.activeTarget.value)
             if (playing && granted) assertEventuallyNear(position) else assertFalse(player.isPlaying)
             if (!granted) assertTrue(runtime.hasAudioInterruption)
+            if (!playing) {
+                awaitPlayback { coordinator.pendingRecordingRecoveryPosition.value == null }
+                assertTrue(player.trackSelectionParameters.tunnelingRequested)
+                val continued = player.currentMediaItem
+                player.failAudioTrackInitialization()
+                driver.advanceLive(player, clock, 100)
+                driver.await("tunneled output rejected") {
+                    !player.trackSelectionParameters.tunnelingRequested
+                }
+                driver.settleLive(player)
+                assertNotSame("paused continuation must recover without tunneling", continued, player.currentMediaItem)
+                awaitPlayback {
+                    near(position, player.currentPosition) && player.playbackState == Player.STATE_READY
+                }
+                assertFalse(player.trackSelectionParameters.tunnelingRequested)
+                assertFalse("untunneled recovery must preserve Pause", player.playWhenReady)
+                assertFalse(player.isPlaying)
+            }
         }
     }
 

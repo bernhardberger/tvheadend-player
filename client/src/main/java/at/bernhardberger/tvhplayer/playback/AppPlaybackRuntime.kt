@@ -764,7 +764,7 @@ class AppPlaybackRuntime(
         }
         val playerSettings = settings.playerSettings.first()
         if (!targetCommands.isOpen()) return PlaybackTargetResult.SHUT_DOWN
-        if (recoveryFence != null && !canContinueRecoveryLocked(recoveryFence)) return null
+        if (recoveryFence != null && !canContinueRecoveryLocked(recoveryFence, playWhenReady)) return null
         // An explicit first request configures persisted output even when its target is
         // unavailable. Recovery defers all Player configuration until its reads are rechecked.
         if (recoveryFence == null) audioTracks.configureAudioOutputBeforeFirstTargetLocked(effectiveAudioPassthrough(
@@ -799,14 +799,14 @@ class AppPlaybackRuntime(
         }
         val streamProfileId = profileOwner.selectedStreamProfileIdFor(profileSelection.currentSession, channelId)
         val audioResult = audioTracks.loadStoredAudioLocked(channelId) {
-            recoveryFence == null || canContinueRecoveryLocked(recoveryFence)
+            recoveryFence == null || canContinueRecoveryLocked(recoveryFence, playWhenReady)
         }
-        if (recoveryFence != null && !canContinueRecoveryLocked(recoveryFence)) return null
+        if (recoveryFence != null && !canContinueRecoveryLocked(recoveryFence, playWhenReady)) return null
         audioResult?.let { return it }
         val subtitleResult = subtitleTracks.loadStoredSubtitlesLocked(channelId) {
-            recoveryFence == null || canContinueRecoveryLocked(recoveryFence)
+            recoveryFence == null || canContinueRecoveryLocked(recoveryFence, playWhenReady)
         }
-        if (recoveryFence != null && !canContinueRecoveryLocked(recoveryFence)) return null
+        if (recoveryFence != null && !canContinueRecoveryLocked(recoveryFence, playWhenReady)) return null
         subtitleResult?.let { return it }
         val selection = currentLivePlaybackSelection(session.observation.value, channelId)
         if (selection == null) {
@@ -848,7 +848,8 @@ class AppPlaybackRuntime(
         val result = try { installTargetForPresentation(
             expectedPresentationEpoch = expectedPresentationEpoch,
             canInstall = {
-                reconnectAdmitted() && (recoveryFence == null || canContinueRecoveryLocked(recoveryFence))
+                reconnectAdmitted() &&
+                    (recoveryFence == null || canContinueRecoveryLocked(recoveryFence, playWhenReady))
             },
             keptTarget = keptTarget,
             installTarget = {
@@ -2318,14 +2319,19 @@ class AppPlaybackRuntime(
         )
     }
 
-    private suspend fun retryLiveRecoveryLocked(fence: LiveRecoveryFence): PlaybackTargetResult? {
-        if (recoveryPlaybackBlocked(fence.targetEpoch) || !liveRecoveryFenceMatches(fence)) return null
+    private suspend fun retryLiveRecoveryLocked(
+        fence: LiveRecoveryFence, playWhenReady: Boolean = true,
+    ): PlaybackTargetResult? {
+        if (recoveryPlaybackBlocked(fence.targetEpoch, allowPaused = !playWhenReady) ||
+            !liveRecoveryFenceMatches(fence)
+        ) return null
         return playLive(
             channelId = fence.selection.channelId,
             recovering = true,
             expectedPresentationEpoch = fence.targetEpoch,
             recoverySelection = fence.selection,
             recoveryFence = fence,
+            playWhenReady = playWhenReady,
             // A reconnect retry stays within the profile its retune was admitted for.
             reconnectGeneration = activeLiveProfileGeneration.takeIf { reconnectRecoveryEpoch == fence.targetEpoch },
         )
@@ -2348,8 +2354,8 @@ class AppPlaybackRuntime(
     private fun viewerPausedLocked(epoch: Long): Boolean =
         !player.playWhenReady || livePauseController.pendingLivePauseEpoch == epoch
 
-    private fun recoveryPlaybackBlocked(epoch: Long): Boolean =
-        !foreground || audioInterruptions.interruptionPaused || viewerPausedLocked(epoch) ||
+    private fun recoveryPlaybackBlocked(epoch: Long, allowPaused: Boolean = false): Boolean =
+        !foreground || audioInterruptions.interruptionPaused || (!allowPaused && viewerPausedLocked(epoch)) ||
             player.playbackSuppressionReason != Player.PLAYBACK_SUPPRESSION_REASON_NONE
 
     private fun hasExhaustedRecovery(): Boolean =
@@ -2359,13 +2365,14 @@ class AppPlaybackRuntime(
                 it.reason == PlaybackRecoveryReason.LIVE_BUFFER_EXHAUSTED_PLAYER_CLEANUP_FAILED
         }
 
-    private fun canContinueRecoveryLocked(fence: LiveRecoveryFence): Boolean {
+    private fun canContinueRecoveryLocked(fence: LiveRecoveryFence, playWhenReady: Boolean = true): Boolean {
         if (!liveRecoveryFenceMatches(fence)) return false
         if (player.currentMediaItem?.let { it !== ownedMediaItem } == true) {
             withdrawDepartedTargetLocked()
             return false
         }
-        if (recoveryPlaybackBlocked(fence.targetEpoch)) {
+        if (!playWhenReady && player.playWhenReady) return false
+        if (recoveryPlaybackBlocked(fence.targetEpoch, allowPaused = !playWhenReady)) {
             liveRecovery.oweAgainLocked(fence)
             return false
         }
@@ -3246,19 +3253,21 @@ class AppPlaybackRuntime(
         val currentSession = checkNotNull(session.observation.value.currentSession)
         val item = checkNotNull(ownedMediaItem)
         val intent = if (target is AppPlaybackTarget.Live) servedIntent.get() else playbackRequests.get()
+        val playWhenReady = player.playWhenReady
+        val allowPaused = !playWhenReady
         fun canRecover() = tunnelingRecoveryMatches(target, epoch, currentSession, item, intent) &&
-            !recoveryPlaybackBlocked(epoch)
+            player.playWhenReady == playWhenReady && !recoveryPlaybackBlocked(epoch, allowPaused)
         val selection = activeLiveSelection
         tunnelingRecoveryError.value = error
         audioTracks.noteTunnelingRefused()
         presentation.publishDiagnostics()
         if (target is AppPlaybackTarget.Recording) noteRecordingInterruptionLocked()
-        if (!recoveryPlaybackBlocked(epoch)) presentation.publishStarting()
+        if (!recoveryPlaybackBlocked(epoch, allowPaused)) presentation.publishStarting()
         scope.launch {
             try {
                 targetCommands.serialize(onClosed = {}) {
                     if (tunnelingFallbackActive.value && canRecover()) {
-                        retryWithoutTunnelingLocked(target, epoch, intent, selection, ::canRecover)
+                        retryWithoutTunnelingLocked(target, epoch, intent, selection, playWhenReady, ::canRecover)
                     }
                 }
             } finally {
@@ -3274,20 +3283,20 @@ class AppPlaybackRuntime(
 
     private suspend fun retryWithoutTunnelingLocked(
         target: AppPlaybackTarget, epoch: Long, intent: Long,
-        selection: LivePlaybackSelection?, canInstall: () -> Boolean,
+        selection: LivePlaybackSelection?, playWhenReady: Boolean, canInstall: () -> Boolean,
     ) {
         when (target) {
             is AppPlaybackTarget.Live -> {
                 val liveSelection = selection ?: return
                 retryLiveRecoveryLocked(LiveRecoveryFence(
                     null, liveSelection, epoch, intent,
-                ))
+                ), playWhenReady = playWhenReady)
             }
             is AppPlaybackTarget.Recording -> {
                 val request = lastRecordingRequest?.takeIf { it.first == target.recordingId } ?: return
                 playRecordingLocked(
                     target.recordingId, request.second, recoverAt = recordingRecovery,
-                    continuesTarget = true, canInstall = canInstall,
+                    continuesTarget = true, playWhenReady = playWhenReady, canInstall = canInstall,
                 )
             }
         }

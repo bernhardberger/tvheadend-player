@@ -126,6 +126,7 @@ class BackgroundPlaybackRuntimeTest {
     }
 
     @Test fun serverPausedChannelRemainsPausedOnReturn() = exercise {
+        settings.setTunnelingEnabled(true)
         live()
         connection.emit(SubscriptionEvent.Speed(0))
         await { !player.playWhenReady }
@@ -138,6 +139,36 @@ class BackgroundPlaybackRuntimeTest {
         assertEquals(speeds, connection.speeds)
         assertFalse(player.playWhenReady)
         assertEquals(1, focus.requests.size)
+        val playTransitions = mutableListOf<Boolean>()
+        player.addListener(object : Player.Listener {
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                playTransitions += playWhenReady
+            }
+        })
+        val keptItem = player.currentMediaItem
+        afterPause = {
+            if (player.currentMediaItem !== keptItem && runtime.activeTarget.value != null) {
+                afterPause = {}
+                scope.launch {
+                    await { connection.subscribeCount == 2 }
+                    connection.awaitCollectionRegistered()
+                    startSubscription()
+                }
+            }
+        }
+        player.failAudioTrackInitialization()
+        await { !player.trackSelectionParameters.tunnelingRequested }
+        settle()
+        assertNotSame("paused kept-live refusal must retune without tunneling", keptItem, player.currentMediaItem)
+        await { runtime.livePause.value == LivePauseState(LivePauseAvailability.READY, pending = true) }
+        playerReady()
+        await { connection.speeds.size > speeds.size }
+        settle()
+        assertEquals(0, connection.speeds.last())
+        assertFalse(player.playWhenReady)
+        assertFalse(playTransitions.contains(true))
+        assertEquals(1, focus.requests.size)
+        assertFalse(player.trackSelectionParameters.tunnelingRequested)
     }
 
     @Test fun expiryUsesVirtualTimeReleasesThenRetunesExactlyOnceWithNotice() = exercise {
