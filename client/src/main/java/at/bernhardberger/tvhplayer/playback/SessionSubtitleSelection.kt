@@ -65,9 +65,22 @@ internal class SessionSubtitleSelection {
 
     fun restore(player: Player) {
         val saved = choices[channel] ?: return
+        val parameters = player.trackSelectionParameters
         val override = when (saved) {
-            SubtitleChoice.Off -> null
+            SubtitleChoice.Off -> {
+                if (C.TRACK_TYPE_TEXT in parameters.disabledTrackTypes) return
+                null
+            }
             is SubtitleChoice.Track -> {
+                val current = parameters.overrides.values.singleOrNull { it.type == C.TRACK_TYPE_TEXT }
+                val selected = current?.trackIndices?.singleOrNull()
+                if (C.TRACK_TYPE_TEXT !in parameters.disabledTrackTypes && selected != null &&
+                    player.currentTracks.groups.any { group ->
+                        group.type == C.TRACK_TYPE_TEXT && group.mediaTrackGroup === current?.mediaTrackGroup &&
+                            selected in 0 until group.length && group.isTrackSupported(selected) &&
+                            choice(group.getTrackFormat(selected)) == saved
+                    }
+                ) return
                 val matches = player.currentTracks.groups.flatMap { group ->
                     if (group.type != C.TRACK_TYPE_TEXT) return@flatMap emptyList()
                     (0 until group.length).mapNotNull { index ->

@@ -13,6 +13,9 @@ import at.bernhardberger.tvhplayer.settings.SubtitleChoice
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import java.io.IOException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import org.junit.Assert.*
 import org.junit.Test
@@ -70,8 +73,14 @@ internal class SubtitleSelectionRuntimeTest : AudioInterruptionFixture() {
         installSubtitleTracks("de")
         assertTrue(runtime.subtitlesDefault.value)
         assertEquals(english, settings.subtitleChoices.read("test-profile", 1))
-        installSubtitleTracks("en", "en")
+        val identical = installSubtitleTracks("en", "en")
         assertTrue(runtime.subtitlesDefault.value)
+        select(identical[1])
+        settle()
+        signalTracksChanged()
+        assertSame("a live pick among identically keyed subtitles survives a tracks change",
+            identical[1], textOverride()?.mediaTrackGroup)
+        assertEquals(english, settings.subtitleChoices.read("test-profile", 1))
         installSubtitleTracks("en", supported = false)
         assertTrue(runtime.subtitlesDefault.value)
         installSubtitleTracks("en", mimeType = MimeTypes.TEXT_VTT)
@@ -92,9 +101,22 @@ internal class SubtitleSelectionRuntimeTest : AudioInterruptionFixture() {
         select(installSubtitleTracks("en").single())
         scheduler.runCurrent()
         assertTrue(writing.isCompleted)
-        val caller = scope.launch { runtime.useDefaultSubtitles() }
+        val releaseCommand = CompletableDeferred<Unit>()
+        val blocker = scope.launch { commands.serialize(onClosed = {}) { releaseCommand.await() } }
         scheduler.runCurrent()
-        caller.cancel()
+        lateinit var default: Job
+        val caller = scope.launch {
+            default = runtime.useDefaultSubtitles()
+            awaitCancellation()
+        }
+        scheduler.runCurrent()
+        assertFalse(default.isCompleted)
+        caller.cancelAndJoin()
+        assertFalse(runtime.subtitlesDefault.value)
+        releaseCommand.complete(Unit)
+        blocker.join()
+        settle()
+        assertFalse(default.isCancelled)
         assertTrue(runtime.subtitlesDefault.value)
         gate.complete(Unit)
         settle()
@@ -127,10 +149,6 @@ internal class SubtitleSelectionRuntimeTest : AudioInterruptionFixture() {
         val group = installSubtitleTracks("en").single()
         select(group)
         settle()
-        val commands = AppPlaybackRuntime::class.java.getDeclaredField("targetCommands").let {
-            it.isAccessible = true
-            it.get(runtime) as PlaybackTargetCommandSerialization
-        }
         val release = CompletableDeferred<Unit>()
         val blocker = scope.launch { commands.serialize(onClosed = {}) { release.await() } }
         scheduler.runCurrent()

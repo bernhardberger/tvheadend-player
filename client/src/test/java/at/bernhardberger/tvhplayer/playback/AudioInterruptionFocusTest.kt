@@ -10,6 +10,9 @@ import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 
 import android.app.Application
 import androidx.media3.common.C
+import androidx.media3.common.TrackGroup
+import androidx.media3.common.TrackSelectionOverride
+import androidx.media3.common.Tracks
 import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvheadend.sdk.media3.*
 import at.bernhardberger.tvheadend.sdk.playback.*
@@ -584,6 +587,25 @@ internal class AudioInterruptionFocusTest : AudioInterruptionFixture() {
         assertFalse(player.playWhenReady)
         assertFalse(audioDisabled())
         assertEquals(listOf(0), connection.speeds)
+    }
+
+    @Test fun livePickAmongIdenticallyKeyedAudioTracksSurvivesATracksChange() = exercise {
+        live(timeshift = false)
+        val first = installManualAudio().mediaTrackGroup
+        settle()
+        val saved = requireNotNull(settings.audioChoices.read("test-profile", 1))
+        val second = TrackGroup("second-audio", first.getFormat(0))
+        audioTracks = Tracks(listOf(first, second).map {
+            Tracks.Group(it, false, intArrayOf(C.FORMAT_HANDLED), booleanArrayOf(false))
+        })
+        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+            .clearOverridesOfType(C.TRACK_TYPE_AUDIO)
+            .addOverride(TrackSelectionOverride(second, listOf(0))).build()
+        settle()
+        signalTracksChanged()
+        assertSame("a live pick among identically keyed audio tracks survives a tracks change",
+            second, player.trackSelectionParameters.overrides.values.singleOrNull { it.type == C.TRACK_TYPE_AUDIO }?.mediaTrackGroup)
+        assertEquals(saved, settings.audioChoices.read("test-profile", 1))
     }
 
     @Test fun queuedAutomaticPreviewThenBackRestoresExactManualAndRememberedChoice() = exercise {

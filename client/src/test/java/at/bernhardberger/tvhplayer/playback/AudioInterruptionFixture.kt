@@ -362,8 +362,11 @@ internal open class AudioInterruptionFixture {
                     intArrayOf(if (supported) C.FORMAT_HANDLED else C.FORMAT_UNSUPPORTED_SUBTYPE),
                     booleanArrayOf(false))
             })
-            playerListeners.toList().forEach { it.onTracksChanged(requireNotNull(audioTracks)) }
+            signalTracksChanged()
             return groups
+        }
+        fun signalTracksChanged() {
+            playerListeners.toList().forEach { it.onTracksChanged(requireNotNull(audioTracks)) }
         }
         private fun recover(reason: PlaybackRecoveryReason) { runtime.onRecoveryRequired(reason) }
 
