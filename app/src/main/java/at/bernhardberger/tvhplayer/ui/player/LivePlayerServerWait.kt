@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import android.os.SystemClock
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -50,6 +51,8 @@ import at.bernhardberger.tvhplayer.core.visibleChannelNumber
 import at.bernhardberger.tvhplayer.core.MainStartupMessageKind
 import at.bernhardberger.tvhplayer.core.MainStartupPresentation
 import at.bernhardberger.tvhplayer.core.WaitingConnectionFailure
+import at.bernhardberger.tvhplayer.core.CHANNEL_START_CONNECTION_GRACE_MILLIS
+import at.bernhardberger.tvhplayer.core.channelStartConnectionFailure
 import at.bernhardberger.tvhplayer.core.toAppError
 import at.bernhardberger.tvhplayer.core.toConnectionUiState
 import at.bernhardberger.tvhplayer.core.waitingConnectionFailurePresentation
@@ -59,11 +62,12 @@ import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 import at.bernhardberger.tvhplayer.ui.components.TvRecoveryAction
 import at.bernhardberger.tvhplayer.ui.components.TvRecoveryOverlay
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
+import kotlinx.coroutines.delay
 
 /**
- * A live screen opened before its session was playable waits here for the server; its entry
- * start then tunes the channel. Only until the screen first sees a current session: after that
- * the player's own recovery owns a lost connection. [connection] is AppRoot's profile-aware
+ * A live entry or foreground resume waits here while it has no session. The runtime owns
+ * the start's lifetime; a connection lost after its first picture uses normal player recovery.
+ * [connection] is AppRoot's profile-aware
  * state, so a missing or unavailable profile shows its recovery instead of connecting forever.
  */
 @Stable
@@ -74,16 +78,17 @@ internal class LivePlayerServerWaitState(
     private val close: PlayerClose,
     private val onReconnect: State<() -> Unit>,
     private val onOpenConnectionSettings: State<() -> Unit>,
+    private val channelStartAtMillis: Long?,
+    private val nowMillis: State<Long>,
 ) {
     /** The observation the wait shows its channel logo for: its profile names the saved copy. */
     val artworkObservation: SessionObservation get() = observation.value
-    private var sessionSeen by mutableStateOf(false)
     private var failures by mutableStateOf(WaitingConnectionFailure())
 
     /** Passive while connecting, Actionable once it failed (its buttons are [failure]'s); null when not waiting. */
     val presentation: MainStartupPresentation?
-        get() = if (sessionSeen || hasSession.value) null else {
-            failures.shown(connection.value)?.let(::waitingConnectionFailurePresentation)
+        get() = if (channelStartAtMillis == null || hasSession.value) null else {
+            failureState?.let(::waitingConnectionFailurePresentation)
                 ?: MainStartupPresentation.Passive(MainStartupMessageKind.CONNECTING)
         }
 
@@ -92,11 +97,16 @@ internal class LivePlayerServerWaitState(
      * offers: no Retry while the connection retries by itself. Null while connecting or not waiting.
      */
     val failure: AppError?
-        get() = if (sessionSeen || hasSession.value) null else failures.shown(connection.value)?.toAppError()
+        get() = if (channelStartAtMillis == null || hasSession.value) null else failureState?.toAppError()
+
+    private val failureState: ConnectionUiState?
+        get() = channelStartAtMillis?.let {
+            channelStartConnectionFailure(failures.shown(connection.value), it, nowMillis.value)
+        }
 
     /** Applied after each composition. */
     fun observed() {
-        if (hasSession.value) sessionSeen = true else failures = failures.observe(connection.value)
+        failures = if (hasSession.value) WaitingConnectionFailure() else failures.observe(connection.value)
     }
 
     fun retry() {
@@ -133,13 +143,25 @@ internal fun rememberLivePlayerServerWait(
     close: PlayerClose,
     onReconnect: () -> Unit,
     onOpenConnectionSettings: () -> Unit,
+    channelStartAtMillis: Long?,
 ): LivePlayerServerWaitState {
     val hasSession = rememberUpdatedState(observation.currentSession != null)
     val latest = rememberUpdatedState(observation)
     val connection = rememberUpdatedState(connectionUiState ?: observation.sessionState.toConnectionUiState())
     val reconnect = rememberUpdatedState(onReconnect)
     val connectionSettings = rememberUpdatedState(onOpenConnectionSettings)
-    val state = remember(close) { LivePlayerServerWaitState(hasSession, latest, connection, close, reconnect, connectionSettings) }
+    val now = remember(channelStartAtMillis) { mutableStateOf(SystemClock.elapsedRealtime()) }
+    LaunchedEffect(channelStartAtMillis) {
+        if (channelStartAtMillis != null) {
+            delay((channelStartAtMillis + CHANNEL_START_CONNECTION_GRACE_MILLIS - now.value).coerceAtLeast(0L))
+            now.value = channelStartAtMillis + CHANNEL_START_CONNECTION_GRACE_MILLIS
+        }
+    }
+    val state = remember(close, channelStartAtMillis) {
+        LivePlayerServerWaitState(
+            hasSession, latest, connection, close, reconnect, connectionSettings, channelStartAtMillis, now,
+        )
+    }
     SideEffect { state.observed() }
     return state
 }

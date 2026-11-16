@@ -8,6 +8,21 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class ColdStartPresentationTest {
+    @Test fun channelStartGraceOnlyDefersAutomaticRecoveryUntilItsDeadline() {
+        val started = 700L
+        val automatic = ConnectionUiState.Error(ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.AUTOMATIC_BACKOFF)
+        assertEquals(null, channelStartConnectionFailure(automatic, started, started + CHANNEL_START_CONNECTION_GRACE_MILLIS - 1))
+        assertEquals(automatic, channelStartConnectionFailure(automatic, started, started + CHANNEL_START_CONNECTION_GRACE_MILLIS))
+        for (failure in listOf(
+            ConnectionUiState.NeedsConfiguration,
+            ConnectionUiState.CredentialUnavailable,
+            ConnectionUiState.Error(ConnectionFailureKind.AUTHENTICATION, SessionRecoveryDisposition.PROFILE_CHANGE_REQUIRED),
+            ConnectionUiState.Error(ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.EXPLICIT_RETRY),
+        )) {
+            assertEquals(failure, channelStartConnectionFailure(failure, started, started))
+        }
+    }
+
     private val channels = listOf(Channel.create(ChannelId(1)))
     private val unreachable = ConnectionUiState.Error(ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.AUTOMATIC_BACKOFF)
     private fun actionable(condition: AppErrorCondition, vararg actions: AppErrorAction) =

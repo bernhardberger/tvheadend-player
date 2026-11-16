@@ -38,7 +38,10 @@ import org.robolectric.annotation.Config
 @Config(sdk = [34], application = Application::class)
 class BackgroundPlaybackRuntimeTest {
     @Test fun keepAndReturnOrdersCommandsAndReacquiresFocusWithoutRetune() = exercise {
+        runtime.enterPlayerScreen(livePlayerOwner = this)
         live()
+        playerListeners.toList().forEach { it.onRenderedFirstFrame() }
+        assertTrue(runtime.videoPresentation.value.visible)
         val commands = connection.calls.size
         runtime.onAppBackgrounded()
         await { connection.priorityChanges == listOf(LiveSubscriptionPriority.YIELD) }
@@ -46,8 +49,21 @@ class BackgroundPlaybackRuntimeTest {
         assertTrue(focus.abandons > 0)
         assertEquals(listOf(ScriptedSubscriptionCall.SPEED, ScriptedSubscriptionCall.PRIORITY), controlCalls(commands))
         scheduler.advanceTimeBy(60_000)
+        val resuming = CompletableDeferred<Unit>()
+        val finishResume = CompletableDeferred<Unit>()
+        beforePriority = { priority ->
+            if (priority == LiveSubscriptionPriority.NORMAL) {
+                resuming.complete(Unit)
+                finishResume.await()
+            }
+        }
         runtime.onAppForegrounded()
+        await { resuming.isCompleted }
+        assertNotNull(runtime.videoPresentation.value.channelStartAtMillis)
+        beforePriority = {}
+        finishResume.complete(Unit)
         await { player.playWhenReady && connection.speeds == listOf(0, 100) }
+        assertNull(runtime.videoPresentation.value.channelStartAtMillis)
         assertEquals(listOf(LiveSubscriptionPriority.YIELD, LiveSubscriptionPriority.NORMAL), connection.priorityChanges)
         assertEquals(listOf(ScriptedSubscriptionCall.SPEED, ScriptedSubscriptionCall.PRIORITY,
             ScriptedSubscriptionCall.PRIORITY, ScriptedSubscriptionCall.SPEED), controlCalls(commands))
@@ -108,16 +124,93 @@ class BackgroundPlaybackRuntimeTest {
     }
 
     @Test fun standbyReleasesWithoutNoticeAndNoninteractiveBackgroundNeverYields() = exercise {
+        runtime.enterPlayerScreen(livePlayerOwner = this)
         live()
+        val start = runtime.videoPresentation.value.channelStartAtMillis
+        val guardedLoss = scope.async { runtime.stopAfterLoss(unlessChannelStarting = true) }
+        await { guardedLoss.isCompleted }
+        assertNull(guardedLoss.await())
+        assertNotNull(runtime.activeTarget.value)
+        assertEquals(start, runtime.videoPresentation.value.channelStartAtMillis)
         runtime.onAppBackgrounded()
         await { connection.priorityChanges.size == 1 }
         runtime.onDeviceStandby()
         await { runtime.activeTarget.value == null }
+        assertNull(runtime.videoPresentation.value.channelStartAtMillis)
         returnAndRetune()
+        assertNotNull(runtime.videoPresentation.value.channelStartAtMillis)
         assertNull(runtime.backgroundNotice.value)
         runtime.onAppBackgrounded(interactive = false)
         await { runtime.activeTarget.value == null }
+        assertNull(runtime.videoPresentation.value.channelStartAtMillis)
         assertEquals(listOf(LiveSubscriptionPriority.YIELD), connection.priorityChanges)
+    }
+
+    @Test fun aClosedLiveSurfaceCannotBeRestartedByAQueuedForegroundReturn() = exercise {
+        val owner = Any()
+        runtime.enterPlayerScreen(owner)
+        live()
+        runtime.onAppBackgrounded(interactive = false)
+        await { runtime.activeTarget.value == null }
+        val release = holdCommands()
+        runtime.onAppForegrounded()
+        runtime.onLivePlayerClosed(owner)
+        release.complete(Unit)
+        await { connection.subscribeCount == 2 }
+        settle()
+        assertNull(runtime.videoPresentation.value.channelStartAtMillis)
+    }
+
+    @Test fun foregroundPlaybackWithoutALiveSurfaceCreatesNoChannelStart() = exercise {
+        live()
+        runtime.onAppBackgrounded(interactive = false)
+        await { runtime.activeTarget.value == null }
+        returnAndRetune()
+        assertNull(runtime.videoPresentation.value.channelStartAtMillis)
+    }
+
+    @Test fun closingAnOlderSurfaceCannotWithdrawItsReplacementAndStopEndsTheStart() = exercise {
+        val older = Any()
+        val current = Any()
+        runtime.enterPlayerScreen(older)
+        runtime.enterPlayerScreen(current)
+        val start = runtime.videoPresentation.value.channelStartAtMillis
+        assertNotNull(start)
+        runtime.onLivePlayerClosed(older)
+        assertEquals(start, runtime.videoPresentation.value.channelStartAtMillis)
+        runtime.onLivePlayerClosed(current)
+        assertNull(runtime.videoPresentation.value.channelStartAtMillis)
+        runtime.enterPlayerScreen(current)
+        val stop = scope.async { runtime.stop() }
+        await { stop.isCompleted }
+        assertNull(runtime.videoPresentation.value.channelStartAtMillis)
+    }
+
+    @Test fun cancelledStartsKeepTheirSurfaceWaitUntilItCloses() {
+        for (queueAnother in listOf(false, true)) exercise {
+            val owner = Any()
+            runtime.enterPlayerScreen(owner)
+            val entered = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            beforeSettingsRead = { entered.complete(Unit); release.await() }
+            val start = scope.async {
+                runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(1))))
+            }
+            await { entered.isCompleted }
+            // The second start is cancelled before admission; its cleanup runs after the first's.
+            val queued = if (queueAnother) scope.async {
+                runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(1))))
+            } else null
+            scheduler.runCurrent()
+            queued?.cancel()
+            start.cancel()
+            await { start.isCompleted && queued?.isCompleted != false }
+            settle()
+            assertNull(runtime.activeTarget.value)
+            assertNotNull(runtime.videoPresentation.value.channelStartAtMillis)
+            runtime.onLivePlayerClosed(owner)
+            assertNull(runtime.videoPresentation.value.channelStartAtMillis)
+        }
     }
 
     @Test fun rejectedPauseAndUnsupportedYieldReleaseWithoutNotice() = exercise {
@@ -476,11 +569,19 @@ class BackgroundPlaybackRuntimeTest {
     }
 
     @Test fun rejectedNormalPriorityRetunesOnceRatherThanResumingYieldedTarget() = exercise {
+        runtime.enterPlayerScreen(livePlayerOwner = this)
         live()
         runtime.onAppBackgrounded()
         await { connection.priorityChanges.size == 1 }
+        var resumeStart: Long? = null
+        beforePriority = { priority ->
+            if (priority == LiveSubscriptionPriority.NORMAL) {
+                resumeStart = runtime.videoPresentation.value.channelStartAtMillis
+            }
+        }
         connection.scriptPriority(SubscriptionOperationResult.Failed(TvheadendFailure.NOT_SUPPORTED))
         returnAndRetune()
+        assertEquals(resumeStart, runtime.videoPresentation.value.channelStartAtMillis)
         runtime.onAppForegrounded()
         settle()
         assertEquals(2, connection.subscribeCount)

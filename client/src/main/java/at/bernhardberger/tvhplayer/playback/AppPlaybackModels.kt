@@ -211,6 +211,8 @@ data class AppVideoPresentation(
     val epoch: Long = 0L,
     val visible: Boolean = false,
     val soundSinceMillis: Long? = null,
+    /** A live entry/resume without its picture yet; the runtime's monotonic clock. */
+    val channelStartAtMillis: Long? = null,
 )
 
 /** One installed live target's presentation evidence, read together under the target access lock. */
@@ -222,7 +224,7 @@ data class AppLiveTargetPresentation(
 )
 
 internal fun AppVideoPresentation.beginTarget(epoch: Long) =
-    AppVideoPresentation(epoch = epoch)
+    AppVideoPresentation(epoch = epoch, channelStartAtMillis = channelStartAtMillis)
 
 internal fun AppVideoPresentation.onFirstFrame(
     frameEpoch: Long,
@@ -230,7 +232,7 @@ internal fun AppVideoPresentation.onFirstFrame(
 ): AppVideoPresentation = if (
     epoch == frameEpoch && activeTargetEpoch == frameEpoch
 ) {
-    copy(visible = true)
+    copy(visible = true, channelStartAtMillis = null)
 } else {
     this
 }

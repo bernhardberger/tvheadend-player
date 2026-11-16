@@ -147,6 +147,18 @@ data class WaitingConnectionFailure(
     fun retry(): WaitingConnectionFailure = WaitingConnectionFailure(retrying = true)
 }
 
+internal const val CHANNEL_START_CONNECTION_GRACE_MILLIS = 15_000L
+
+/** Only automatic connection recovery is quiet during a live channel entry/resume. */
+internal fun channelStartConnectionFailure(
+    failure: ConnectionUiState?,
+    startedAtMillis: Long,
+    nowMillis: Long,
+): ConnectionUiState? = failure.takeUnless {
+    it?.toAppError()?.condition == AppErrorCondition.RECONNECTING &&
+        nowMillis - startedAtMillis < CHANNEL_START_CONNECTION_GRACE_MILLIS
+}
+
 /**
  * The recovery of a surface waiting for its first connection: the catalog's error for [failure]
  * with the buttons the SDK's guidance offers. While the connection retries by itself (110) that is

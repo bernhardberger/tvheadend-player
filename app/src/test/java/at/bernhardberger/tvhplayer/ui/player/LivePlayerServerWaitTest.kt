@@ -3,6 +3,8 @@
 
 package at.bernhardberger.tvhplayer.ui.player
 
+import kotlinx.coroutines.flow.onStart
+
 import at.bernhardberger.tvhplayer.testutil.settleFrames
 import at.bernhardberger.tvhplayer.testutil.pressKey
 import android.app.Application
@@ -117,6 +119,9 @@ class LivePlayerServerWaitTest {
     private lateinit var session: FakeTvheadendSession
     private lateinit var runtime: AppPlaybackRuntime
     private lateinit var profiles: AppProfileOwner
+    private val owner = object : LifecycleOwner {
+        override val lifecycle = LifecycleRegistry.createUnsafe(this)
+    }
     private var closes = 0
     /** Key events no player handler consumed. */
     private var unconsumed = 0
@@ -209,6 +214,53 @@ class LivePlayerServerWaitTest {
         assertMainSettled("the reconnect binds a new stream") { binds() > before }
     }
 
+    @Test fun aFailedEntryWaitsForANewSessionInsteadOfRetryingCatalogUpdates() {
+        screen()
+        session.scriptLivePlaybackFailure(at.bernhardberger.tvheadend.sdk.core.PlaybackBindingResult.TargetUnavailable)
+        session.publish(ready())
+        compose.waitForIdle()
+        assertEquals("the failed entry is attempted once", 1, binds())
+        compose.runOnIdle { owner.lifecycle.currentState = Lifecycle.State.CREATED }
+        compose.waitForIdle()
+        compose.runOnIdle { owner.lifecycle.currentState = Lifecycle.State.RESUMED }
+        compose.waitForIdle()
+        assertEquals("re-keying the failed entry does not retry the same selection", 1, binds())
+        session.publish(ready())
+        compose.waitForIdle()
+        assertEquals("catalog updates do not retry a failed entry", 1, binds())
+        val retryEntered = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val finishRetry = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val retryCancelled = kotlinx.coroutines.CompletableDeferred<Unit>()
+        beforeSettingsRead = {
+            retryEntered.complete(Unit)
+            try {
+                finishRetry.await()
+            } finally {
+                retryCancelled.complete(Unit)
+            }
+        }
+        session.replaceGeneration(session.observation.value)
+        compose.waitForIdle()
+        assertMainSettled("the new-session start reaches settings before installation") { retryEntered.isCompleted }
+        compose.runOnIdle { owner.lifecycle.currentState = Lifecycle.State.CREATED }
+        compose.waitForIdle()
+        assertMainSettled("backgrounding cancels the pending start") { retryCancelled.isCompleted }
+        assertMainSettled("the cancelled start settles before the next foreground") {
+            runtime.state.value is at.bernhardberger.tvhplayer.playback.AppPlaybackState.Idle
+        }
+        assertNull(runtime.activeTarget.value)
+        assertNotNull(runtime.videoPresentation.value.channelStartAtMillis)
+        beforeSettingsRead = {}
+        session.scriptLivePlaybackSuccess()
+        finishRetry.complete(Unit)
+        compose.runOnIdle { owner.lifecycle.currentState = Lifecycle.State.RESUMED }
+        compose.waitForIdle()
+        assertMainSettled("foreground return restarts the same session's cancelled start") {
+            runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(1))
+        }
+        assertEquals("a new session retries the channel", 2, binds())
+    }
+
     @Test fun aProfileSavedDuringTheOutageRetunesNothingAway() {
         screen(initial = ready())
         compose.runOnIdle {
@@ -263,6 +315,10 @@ class LivePlayerServerWaitTest {
             connection.value = ConnectionUiState.Error(ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.AUTOMATIC_BACKOFF)
         }
         compose.settleFrames(10)
+        assertEquals("an automatic retry starts with the channel wait, not error 110", 1, waits())
+        compose.onNode(hasText(string(R.string.error_110_title))).assertDoesNotExist()
+        compose.mainClock.advanceTimeBy(15_000L)
+        compose.settleFrames(2)
         compose.onNode(hasText(string(R.string.error_110_title))).assertExists()
         compose.onNodeWithTag("tv-recovery-primary").assert(hasText("Connection settings")).assertIsFocused()
         assertEquals(0, compose.onAllNodes(hasText("Retry"), useUnmergedTree = true).fetchSemanticsNodes().size)
@@ -283,7 +339,62 @@ class LivePlayerServerWaitTest {
         compose.onNodeWithTag("tv-recovery-secondary").assert(hasText("Connection settings"))
     }
 
+    @Test fun standbyReturnWithNoConnectionWaitsInsteadOfShowingTheLiveAlert() {
+        screen(initial = ready())
+        assertMainSettled("the initial channel is installed") { runtime.activeTarget.value != null }
+        compose.runOnIdle {
+            owner.lifecycle.currentState = Lifecycle.State.CREATED
+            runtime.onAppBackgrounded(interactive = false)
+        }
+        assertMainSettled("standby releases the channel") { runtime.activeTarget.value == null }
+        session.publish(SessionObservation.create(sessionState = SessionState.Connecting, channelState = ChannelRepositoryState.Stale(catalog)))
+        compose.settleFrames(2)
+        compose.runOnIdle {
+            runtime.onAppForegrounded()
+            connection.value = ConnectionUiState.Error(ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.AUTOMATIC_BACKOFF)
+            owner.lifecycle.currentState = Lifecycle.State.RESUMED
+        }
+        assertMainSettled("foreground begins a new channel start") { runtime.videoPresentation.value.channelStartAtMillis != null }
+        compose.settleFrames(2)
+        assertEquals(1, waits())
+        compose.onNode(hasText(string(R.string.error_110_title))).assertDoesNotExist()
+        compose.pressKey(Key.DirectionCenter)
+        assertEquals(1, waits())
+        val beforeReconnect = binds()
+        session.publish(ready())
+        compose.runOnIdle { connection.value = null }
+        compose.settleFrames(10)
+        assertEquals("the resumed channel is retuned exactly once when its session arrives", beforeReconnect + 1, binds())
+        compose.onNodeWithTag("player-footer").assertDoesNotExist()
+        compose.runOnIdle { playerListeners.toList().forEach { it.onRenderedFirstFrame() } }
+        compose.settleFrames(2)
+        assertNull(runtime.videoPresentation.value.channelStartAtMillis)
+        assertEquals(0, waits())
+        compose.pressKey(Key.Back)
+        assertEquals(1, closes)
+        assertNull(runtime.videoPresentation.value.channelStartAtMillis)
+    }
+
+    @Test fun aConnectionLostAfterTheChannelStartEndsKeepsTheExistingAlert() {
+        screen(initial = ready())
+        assertMainSettled("the live target is installed") { runtime.activeTarget.value != null }
+        compose.runOnIdle {
+            player.pause()
+            playerListeners.toList().forEach { it.onPlaybackStateChanged(androidx.media3.common.Player.STATE_READY) }
+            playerListeners.toList().forEach { it.onRenderedFirstFrame() }
+        }
+        assertNull(runtime.videoPresentation.value.channelStartAtMillis)
+        org.junit.Assert.assertTrue(runtime.videoPresentation.value.visible)
+        session.publish(SessionObservation.create(
+            sessionState = SessionState.Connecting, channelState = ChannelRepositoryState.Stale(catalog),
+        ))
+        compose.settleFrames(4)
+        assertEquals(0, waits())
+        compose.onNode(hasText(string(R.string.error_110_title))).assertExists()
+    }
+
     private val visible = MutableStateFlow(true)
+    private val playerListeners = mutableListOf<androidx.media3.common.Player.Listener>()
     /** AppRoot's connection state; null derives it from the observation. */
     private val connection = mutableStateOf<ConnectionUiState?>(null)
 
@@ -303,6 +414,8 @@ class LivePlayerServerWaitTest {
         dvrState = DvrRepositoryState.Current(DvrSnapshot.create()),
     )
 
+    private var beforeSettingsRead: suspend () -> Unit = {}
+
     private fun screen(
         initial: SessionObservation = SessionObservation.create(
             sessionState = SessionState.Connecting,
@@ -320,7 +433,9 @@ class LivePlayerServerWaitTest {
                 }))), profile)
         }
         val data = InMemoryPreferencesDataStore()
-        val settings = PlayerSettingsStore(data)
+        val settings = PlayerSettingsStore(object : androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences> by data {
+            override val data = data.data.onStart { beforeSettingsRead() }
+        })
         profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.Main.immediate,
             readProfileForEditing = { ServerProfileEditReadResult.Missing })
         scope.launch { profiles.run() }
@@ -329,14 +444,21 @@ class LivePlayerServerWaitTest {
         assertMainSettled("the fake channel catalog is collected") { channels.scope.value.scope.visibleChannels.size == 3 }
         player = ExoPlayer.Builder(context).build()
         val coordinator = createTvheadendPlaybackCoordinator(player).also { it.launchIn(scope) }
-        runtime = AppPlaybackRuntime(player, session, coordinator, settings, profiles, scope,
+        val controlled = object : ExoPlayer by player {
+            override fun addListener(listener: androidx.media3.common.Player.Listener) {
+                playerListeners += listener
+                player.addListener(listener)
+            }
+            override fun removeListener(listener: androidx.media3.common.Player.Listener) {
+                playerListeners -= listener
+                player.removeListener(listener)
+            }
+        }
+        runtime = AppPlaybackRuntime(controlled, session, coordinator, settings, profiles, scope,
             TvheadendAudioOutputProvider(context), PlaybackAudioFocus.None, PlaybackRuntimePolicy.fromPlayerSettings(),
             noticeCenter = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) { at.bernhardberger.tvhplayer.notices.NoticeContext(0, null) })
         val video = VideoPlayerViewModel(runtime, session)
         models.put("video", video)
-        val owner = object : LifecycleOwner {
-            override val lifecycle = LifecycleRegistry.createUnsafe(this)
-        }
         owner.lifecycle.currentState = Lifecycle.State.RESUMED
         val notices = NoticeCenter(android.os.SystemClock::elapsedRealtime) {
             NoticeContext(profiles.configurationGeneration.value, session.observation.value.currentSession?.generationIdentity)
