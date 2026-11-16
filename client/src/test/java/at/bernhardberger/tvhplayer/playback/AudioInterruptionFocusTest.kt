@@ -602,7 +602,7 @@ internal class AudioInterruptionFocusTest : AudioInterruptionFixture() {
         blocker.join(); preview.join(); back.join()
         settle()
         assertSame(manual.mediaTrackGroup, player.trackSelectionParameters.overrides.values.single().mediaTrackGroup)
-        assertNotNull(settings.audioChoices.read("test-profile", ChannelId(1)))
+        assertNotNull(settings.audioChoices.read("test-profile", 1))
         // Retain the session choice, not just the immediate player parameters.
         player.trackSelectionParameters = player.trackSelectionParameters.buildUpon().clearOverridesOfType(C.TRACK_TYPE_AUDIO).build()
         audioSelection.restore(runtimePlayer)
@@ -612,8 +612,8 @@ internal class AudioInterruptionFocusTest : AudioInterruptionFixture() {
     @Test fun queuedAutomaticFromPredecessorCannotClearSuccessorManualChoice() = exercise {
         live(timeshift = false)
         val manual = installManualAudio()
-        await { runBlocking { settings.audioChoices.read("test-profile", ChannelId(1)) != null } }
-        settings.audioChoices.write("test-profile", ChannelId(2), requireNotNull(settings.audioChoices.read("test-profile", ChannelId(1))))
+        await { runBlocking { settings.audioChoices.read("test-profile", 1) != null } }
+        settings.audioChoices.set("test-profile", 2, requireNotNull(settings.audioChoices.read("test-profile", 1)))
         val oldEpoch = runtime.videoPresentation.value.epoch
         val release = CompletableDeferred<Unit>()
         val entered = CompletableDeferred<Unit>()
@@ -636,7 +636,7 @@ internal class AudioInterruptionFocusTest : AudioInterruptionFixture() {
         connection.awaitCollectionRegistered()
         settle()
         assertSame(manual.mediaTrackGroup, player.trackSelectionParameters.overrides.values.single().mediaTrackGroup)
-        assertNotNull(settings.audioChoices.read("test-profile", ChannelId(2)))
+        assertNotNull(settings.audioChoices.read("test-profile", 2))
         assertFalse(runtime.isQuickListTargetCurrent(oldEpoch))
         val epoch = runtime.videoPresentation.value.epoch
         assertTrue(runtime.isQuickListTargetCurrent(epoch))
@@ -658,7 +658,7 @@ internal class AudioInterruptionFocusTest : AudioInterruptionFixture() {
         settle()
         audioSelection.restore(runtimePlayer)
         assertTrue(player.trackSelectionParameters.overrides.isEmpty())
-        assertNull(settings.audioChoices.read("test-profile", ChannelId(1)))
+        assertNull(settings.audioChoices.read("test-profile", 1))
     }
 
     @Test fun startupBufferKnowsTheTargetKindBeforePreparation() = exercise {

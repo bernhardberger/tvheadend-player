@@ -65,7 +65,7 @@ class TargetAspectTest {
     private fun mode() = compose.runOnIdle { aspect.mode }
 
     private fun stored(store: PlayerSettingsStore, channel: ChannelId) =
-        runBlocking { store.channelAspects.choices.first().modeFor(channel) }
+        runBlocking { store.channelAspects.choices.first()[channel.value] ?: AspectRatioMode.FIT }
 
     @Test fun aChoiceIsStoredForThePlayingChannelAndAZapSwitchesToTheNewChannelsMode() {
         val store = store(identity = true)

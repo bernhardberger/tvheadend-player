@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
@@ -52,6 +53,12 @@ class ItemChoiceStore<T : Any>(
             )
         }
         .distinctUntilChanged()
+
+    /** Reads the captured server's choice even before that server becomes active. */
+    suspend fun read(profile: String, item: Long): T? =
+        decode(dataStore.data.first()[key]).lastOrNull {
+            it.profile == profile && it.item == item
+        }?.value
 
     /**
      * Remembers [value] for [item] in the [profile] captured with the choice; null forgets it.

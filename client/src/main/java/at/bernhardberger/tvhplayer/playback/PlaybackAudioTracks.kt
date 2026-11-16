@@ -68,7 +68,7 @@ internal class PlaybackAudioTracks(
         audioWriteJob = scope.launch {
             previous?.join()
             try {
-                settings.audioChoices.write(profileId, selected.first, selected.second)
+                settings.audioChoices.set(profileId, selected.first.value, selected.second)
             } catch (_: java.io.IOException) {
                 // A storage failure must not interrupt otherwise valid playback.
             }
@@ -90,7 +90,7 @@ internal class PlaybackAudioTracks(
         val audioProfileId = profileOwner.audioProfileId
         audioWriteJob?.join()
         val storedAudio = try {
-            audioProfileId?.let { settings.audioChoices.read(it, channelId) }
+            audioProfileId?.let { settings.audioChoices.read(it, channelId.value) }
         } catch (_: java.io.IOException) {
             null
         }
@@ -189,7 +189,7 @@ internal class PlaybackAudioTracks(
             audioWriteJob = scope.launch {
                 previous?.join()
                 try {
-                    settings.audioChoices.remove(profileId, channel)
+                    settings.audioChoices.set(profileId, channel.value, null)
                 } catch (_: java.io.IOException) {
                     // Storage failure must not interrupt playback; the session choice is still forgotten.
                 }

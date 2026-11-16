@@ -11,7 +11,6 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
-import at.bernhardberger.tvhplayer.settings.ChannelAspects
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import kotlin.math.abs
 import kotlinx.coroutines.launch
@@ -78,22 +77,24 @@ internal fun rememberTargetAspect(
     recordingChannel: (DvrEntryId) -> ChannelId?,
 ): TargetAspect {
     val scope = rememberCoroutineScope()
-    val aspects by store.channelAspects.choices.collectAsStateWithLifecycle(ChannelAspects.None)
+    val aspects by store.channelAspects.choices.collectAsStateWithLifecycle(null)
     val channel = aspectChannel(target, recordingChannel)
-    val profile = aspects.profile
+    val profile = aspects?.profile
     var unsaved by remember(store, profile, target) { mutableStateOf<AspectRatioMode?>(null) }
     val select = remember(store, scope, profile, target, channel) {
         { mode: AspectRatioMode ->
             if (target != null) {
                 scope.launch {
-                    val stored = channel != null && store.channelAspects.set(profile, channel, mode)
+                    val stored = channel != null && store.channelAspects.set(
+                        profile, channel.value, mode.takeUnless { it == AspectRatioMode.FIT },
+                    )
                     unsaved = if (stored) null else mode
                 }
             }
             Unit
         }
     }
-    val mode = unsaved ?: aspects.modeFor(channel)
+    val mode = unsaved ?: aspects?.get(channel?.value) ?: AspectRatioMode.FIT
     // One instance per (mode, select) so the player screens it is passed to can still skip.
     return remember(mode, select) { TargetAspect(mode, select) }
 }

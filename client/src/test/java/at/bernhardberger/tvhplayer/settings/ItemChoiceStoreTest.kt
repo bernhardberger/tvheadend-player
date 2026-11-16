@@ -2,18 +2,72 @@ package at.bernhardberger.tvhplayer.settings
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileId
+import java.io.File
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 
 class ItemChoiceStoreTest {
+    @get:Rule val temporary = TemporaryFolder()
+
+    @Test
+    fun aChoiceSurvivesClosingAndReopeningTheDiskStore() = runTest {
+        val file = File(temporary.root, "choices.preferences_pb")
+        val firstJob = SupervisorJob()
+        val first = PreferenceDataStoreFactory.create(
+            scope = CoroutineScope(firstJob + StandardTestDispatcher(testScheduler)), produceFile = { file },
+        )
+        val profile = try {
+            selectProfile(first).also { store(first).set(it, 5, AdBreakMode.OFF) }
+        } finally {
+            firstJob.cancelAndJoin()
+        }
+        val secondJob = SupervisorJob()
+        val second = PreferenceDataStoreFactory.create(
+            scope = CoroutineScope(secondJob + StandardTestDispatcher(testScheduler)), produceFile = { file },
+        )
+        try {
+            assertEquals(AdBreakMode.OFF, store(second).read(profile, 5))
+        } finally {
+            secondJob.cancelAndJoin()
+        }
+    }
+
+    @Test
+    fun legacyChannelFormatsRemainReadableAndUnknownAudioFieldsMeanNoChoice() = runTest {
+        val data = InMemoryPreferencesDataStore()
+        val profile = selectProfile(data)
+        data.edit {
+            it[stringPreferencesKey("channel_aspect_modes_v1")] =
+                """[{"profile":"$profile","channel":5,"mode":"FORCE_16_9"}]"""
+            it[stringPreferencesKey("explicit_audio_choices_v1")] =
+                """[{"profile":"$profile","channel":1,"choice":{"language":"de","mimeType":"audio/mpeg","roleFlags":0,"channelCount":2,"sampleRate":48000}}]"""
+        }
+        val settings = PlayerSettingsStore(data)
+        assertEquals(AspectRatioMode.FORCE_16_9, settings.channelAspects.choices.first()[5])
+        val choice = AudioTrackChoice("de", "audio/mpeg", 0, 2, 48000)
+        assertEquals(choice, settings.audioChoices.read(profile, 1))
+        data.edit {
+            it[stringPreferencesKey("explicit_audio_choices_v1")] =
+                """[{"profile":"$profile","channel":1,"choice":{"id":"0","language":"de","mimeType":"audio/mpeg","roleFlags":0,"channelCount":2,"sampleRate":48000}}]"""
+        }
+        assertNull(settings.audioChoices.read(profile, 1))
+    }
+
     @Test
     fun anItemWithoutAChoiceHasNoneAndEachItemKeepsItsOwn() = runTest {
         val data = InMemoryPreferencesDataStore()
@@ -56,10 +110,15 @@ class ItemChoiceStoreTest {
         val replacementId = ServerProfileId.generate().also { PlayerSettingsStore(data).useProfile(it) }
         val replacement = replacementId.value
         assertNull(store.choices.first()[1])
+        assertEquals("read is independent of the active server", AdBreakMode.AUTOMATIC, store.read(original, 1))
+        assertNull(store.read(original, 2))
+        assertNull(store.read(replacement, 1))
         assertFalse("captured before the switch", store.set(original, 1, AdBreakMode.OFF))
+        assertFalse("forgetting also rejects a replaced server", store.set(original, 1, null))
         assertFalse("no server identity", store.set(null, 1, AdBreakMode.OFF))
         store.set(replacement, 1, AdBreakMode.ASK)
         assertEquals(AdBreakMode.ASK, store.choices.first()[1])
+        assertEquals(AdBreakMode.ASK, store.read(replacement, 1))
 
         data.edit { it[activeProfileKey] = original }
         assertEquals(AdBreakMode.AUTOMATIC, store.choices.first()[1])
