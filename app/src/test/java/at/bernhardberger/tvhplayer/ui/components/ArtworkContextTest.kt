@@ -159,6 +159,9 @@ class ArtworkContextTest {
         // The SDK makes a cache selector and a remote URL mutually exclusive for one image.
         val cached = EpgEvent.create(event.id, event.channelId, event.start, event.stop, image = LOGO)
         assertEquals(AppArtworkSource(null, LOGO), programmeArtwork(cached)?.let { programmeArtworkModel(it, null) })
+        // Tvheadend passes XML-escaped ampersands through; the image host needs the real separators.
+        val escaped = ChannelIcon.parse("https://192.0.2.1/image.ashx?a=1&amp;b=2&amp;amp;c=3")
+        assertEquals("https://192.0.2.1/image.ashx?a=1&b=2&c=3", programmeArtworkModel(requireNotNull(escaped), null))
         val observation = observation(ready, guide = 1)
         show(FakeTvheadendSession(observation)) {
             ProgrammeContextMenu(event, null, null, 0, false, observation.currentSession, observation,

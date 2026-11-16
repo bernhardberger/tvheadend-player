@@ -359,6 +359,7 @@
     <string name="audio_description">Zvučni opis</string>
     <string name="audio_description_description">Daje prednost zapisima s audiodeskripcijom kada su dostupni.</string>
     <string name="subtitle_follow_system">Prati sustavne postavke podnaslova</string>
+    <string name="subtitle_follow_system_short">Sustavni podnaslovi</string>
     <string name="player_status_rec">SNIM</string>
     <string name="setup_connection">Uredi vezu</string>
     <string name="setup_connection_description">Adresa poslužitelja, priključak i račun</string>
@@ -838,6 +839,8 @@
     <string name="ad_breaks_automatic_help">Svaki reklamni blok preskače jednom. Ako premotaš natrag u njega, reproducirat će se.</string>
     <string name="ad_breaks_off">Isključeno</string>
     <string name="ad_breaks_off_help">Reklamni blokovi reproduciraju se kao i ostatak. I dalje su vidljivi na vremenskoj crti.</string>
+    <string name="ad_breaks_none_marked">Nema označenih</string>
+    <string name="playback_option_default">Zadano (%1$s)</string>
     <string name="skip_cuts_setting">Preskoči rezove</string>
     <string name="skip_cuts_setting_description">Preskače dijelove označene kao rezovi. Sama snimka ne skraćuje se.</string>
     <string name="skip_landing_setting">Mjesto nastavka</string>
@@ -897,6 +900,7 @@
     <string name="refresh_rate_matching_setting_description">Dopusti Androidu da uskladi frekvenciju osvježavanja zaslona s videom kad je podržano.</string>
     <string name="tunneling_setting">Tunelirana reprodukcija</string>
     <string name="tunneling_setting_description">Šalje video izravno TV-u ako dekoder to podržava. Može nakratko prekinuti sliku.</string>
+    <string name="tunneling_setting_fallback">Ne koristi se do ponovnog pokretanja aplikacije. Ovaj uređaj nije mogao reproducirati zvuk u tom načinu.</string>
     <string name="play">Reproduciraj</string>
     <string name="play_recording">Reproduciraj snimku</string>
     <string name="status_disconnected_reconnecting">Veza prekinuta. Ponovno povezivanje\u2026</string>

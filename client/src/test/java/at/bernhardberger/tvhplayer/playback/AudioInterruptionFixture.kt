@@ -104,12 +104,13 @@ internal open class AudioInterruptionFixture {
     internal fun exercise(
         granted: Boolean = true,
         recoveryPolicy: PlaybackRecoveryPolicy = PlaybackRecoveryPolicy(),
+        streamProfiles: List<StreamProfile>? = null,
         block: suspend Fixture.() -> Unit,
     ) = runTest(timeout = 15.seconds) {
         val scheduler = testScheduler
         val dispatcher = StandardTestDispatcher(scheduler)
         val fixture = Fixture(CoroutineScope(dispatcher + SupervisorJob()), granted, scheduler,
-            dispatcher, recoveryPolicy)
+            dispatcher, recoveryPolicy, streamProfiles)
         try {
             fixture.driver.exercise(this, settle = fixture::settle) { fixture.block() }
         }
@@ -160,6 +161,7 @@ internal open class AudioInterruptionFixture {
         val scheduler: TestCoroutineScheduler,
         private val workDispatcher: CoroutineDispatcher,
         recoveryPolicy: PlaybackRecoveryPolicy,
+        streamProfiles: List<StreamProfile>? = null,
     ) {
         val driver = PlaybackTestDriver(scheduler)
         private val context = ApplicationProvider.getApplicationContext<Application>()
@@ -179,6 +181,7 @@ internal open class AudioInterruptionFixture {
         val pendingSessions: Int get() = registeredSessions.count { it !in cleanedSessions }
         /** The channel of each subscribe: a failed switch may subscribe its target before rolling back. */
         val subscribedChannels = java.util.concurrent.ConcurrentLinkedQueue<Long>()
+        val subscribedProfiles = java.util.concurrent.ConcurrentLinkedQueue<SubscriptionOptions>()
         val manager = createSubscriptionManager(object : SubscriptionConnection by connection {
             override fun events(id: SubscriptionId): Flow<SubscriptionEvent> {
                 registeredSessions += id
@@ -190,6 +193,7 @@ internal open class AudioInterruptionFixture {
                 options: SubscriptionOptions,
             ): SubscriptionOperationResult<SubscriptionConfirmation> {
                 subscribedChannels += channelId.value
+                subscribedProfiles += options
                 return connection.subscribe(id, channelId, options)
             }
             override suspend fun unsubscribe(id: SubscriptionId): SubscriptionOperationResult<Unit> =
@@ -205,11 +209,19 @@ internal open class AudioInterruptionFixture {
         )).apply {
             scriptLivePlaybackSuccess(manager)
             scriptRecordingPlaybackSuccess()
+            if (streamProfiles != null) scriptStreamProfiles(streamProfiles)
         }
         var beforeSettingsRead: suspend () -> Unit = {}
+        var beforeSettingsWrite: suspend () -> Unit = {}
         private val settingsData = InMemoryPreferencesDataStore()
         val settings = PlayerSettingsStore(settingsData.let { store ->
             object : androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences> by store {
+                override suspend fun updateData(
+                    transform: suspend (androidx.datastore.preferences.core.Preferences) -> androidx.datastore.preferences.core.Preferences,
+                ): androidx.datastore.preferences.core.Preferences {
+                    beforeSettingsWrite()
+                    return store.updateData(transform)
+                }
                 override val data = kotlinx.coroutines.flow.flow {
                     beforeSettingsRead()
                     emitAll(store.data)
@@ -278,6 +290,7 @@ internal open class AudioInterruptionFixture {
         private val playerListeners = mutableListOf<Player.Listener>()
         var audioTracks: Tracks? = null
         var reportedPlaybackState: Int? = null
+        var reportedIsPlaying: Boolean? = null
         /** Stands in for the ended stream's own error, which reaches the player at no predictable time. */
         private var reportedPlayerError: ExoPlaybackException? = null
         private var suppression = Player.PLAYBACK_SUPPRESSION_REASON_NONE
@@ -286,6 +299,7 @@ internal open class AudioInterruptionFixture {
             override fun getPlaybackSuppressionReason(): Int = suppression
             override fun getCurrentTracks(): Tracks = audioTracks ?: player.currentTracks
             override fun getPlaybackState(): Int = reportedPlaybackState ?: player.playbackState
+            override fun isPlaying(): Boolean = reportedIsPlaying ?: player.isPlaying
             override fun addListener(listener: Player.Listener) {
                 playerListeners += listener
                 player.addListener(listener)
@@ -328,6 +342,38 @@ internal open class AudioInterruptionFixture {
             return TrackSelectionOverride(group, listOf(0)).also {
                 player.trackSelectionParameters = player.trackSelectionParameters.buildUpon().addOverride(it).build()
             }
+        }
+        suspend fun useChoiceProfile(id: String = "test-profile") {
+            AppProfileOwner::class.java.getDeclaredField("audioProfileId").apply {
+                isAccessible = true; set(profiles, id)
+            }
+            settingsData.updateData { current -> current.toMutablePreferences().apply {
+                this[androidx.datastore.preferences.core.stringPreferencesKey("activeServerProfileId")] = id
+            } }
+        }
+
+        private var subtitleGeneration = 0
+        fun installSubtitleTracks(
+            vararg languages: String,
+            mimeType: String = MimeTypes.APPLICATION_DVBSUBS,
+            roleFlags: Int = 0,
+            supported: Boolean = true,
+        ): List<TrackGroup> {
+            val generation = subtitleGeneration++
+            val groups = languages.mapIndexed { index, language ->
+                TrackGroup("text-$generation-$index", Format.Builder().setLanguage(language)
+                    .setSampleMimeType(mimeType).setRoleFlags(roleFlags).build())
+            }
+            audioTracks = Tracks(groups.map { group ->
+                Tracks.Group(group, false,
+                    intArrayOf(if (supported) C.FORMAT_HANDLED else C.FORMAT_UNSUPPORTED_SUBTYPE),
+                    booleanArrayOf(false))
+            })
+            signalTracksChanged()
+            return groups
+        }
+        fun signalTracksChanged() {
+            playerListeners.toList().forEach { it.onTracksChanged(requireNotNull(audioTracks)) }
         }
         private fun recover(reason: PlaybackRecoveryReason) { runtime.onRecoveryRequired(reason) }
 
@@ -469,4 +515,14 @@ internal open class AudioInterruptionFixture {
 
         fun advanceRecoveryTime(millis: Long = 2_500) = driver.advanceLive(player, clock, millis)
     }
+}
+
+/** A nonrecoverable renderer failure, dispatched by Media3 as on a refused tunneled output. */
+internal fun ExoPlayer.failAudioTrackInitialization() {
+    createMessage { _, _ ->
+        throw ExoPlaybackException.createForRenderer(
+            UnsupportedOperationException("Builder.build"), "audio", 0, null,
+            C.FORMAT_HANDLED, false, PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED,
+        )
+    }.send()
 }

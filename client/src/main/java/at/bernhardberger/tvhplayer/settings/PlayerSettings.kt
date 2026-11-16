@@ -14,10 +14,12 @@ import at.bernhardberger.tvhplayer.playback.StartupBufferVerdict
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.serializer
 
-enum class AspectRatioMode { FIT, FORCE_16_9, FORCE_4_3 }
+@Serializable enum class AspectRatioMode { FIT, FORCE_16_9, FORCE_4_3 }
 enum class AudioFormatPreference { AUTOMATIC, PREFER_DOLBY, PREFER_STEREO }
-enum class AdBreakMode { ASK, AUTOMATIC, OFF }
+@Serializable enum class AdBreakMode { ASK, AUTOMATIC, OFF }
 enum class SkipLanding(val beforeEndMs: Long) { END(0), TWO_SECONDS_BEFORE(2_000), FIVE_SECONDS_BEFORE(5_000) }
 
 /** Presentation while browsing; AUDIO_ONLY keeps the same player and video decoding. */
@@ -129,8 +131,23 @@ data class StartupBufferLearningState(
 class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
     constructor(context: Context) : this(context.dataStore)
 
-    internal val audioChoices = AudioChoiceStore(dataStore)
-    val channelAspects = ChannelAspectStore(dataStore)
+    internal val audioChoices = ItemChoiceStore(
+        dataStore, "explicit_audio_choices_v1", "channel", "choice", AudioTrackChoice.serializer(), maxEntries = 64,
+    )
+    internal val subtitleChoices = ItemChoiceStore(
+        dataStore, "channel_subtitle_choices_v1", "channel", "choice", SubtitleChoice.serializer(), maxEntries = 64,
+    )
+    val channelAspects = ItemChoiceStore(
+        dataStore, "channel_aspect_modes_v1", "channel", "mode", AspectRatioMode.serializer(), maxEntries = 256,
+    )
+    val channelStreamProfiles = ItemChoiceStore(
+        dataStore, "channel_stream_profiles_v1", "channel", "streamProfile", String.serializer(), maxEntries = 256,
+    )
+
+    /** A recording's own ad-break handling; a recording without an entry follows the setting. */
+    val recordingAdBreaks = ItemChoiceStore(
+        dataStore, "recording_ad_break_modes_v1", "recording", "mode", AdBreakMode.serializer(), maxEntries = 256,
+    )
 
     internal suspend fun useProfile(id: ServerProfileId?) {
         dataStore.edit { if (id == null) it.remove(activeProfileKey) else it[activeProfileKey] = id.value }
@@ -138,7 +155,10 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
 
     internal suspend fun removeProfile(id: ServerProfileId) {
         audioChoices.removeProfile(id.value)
+        subtitleChoices.removeProfile(id.value)
         channelAspects.removeProfile(id.value)
+        channelStreamProfiles.removeProfile(id.value)
+        recordingAdBreaks.removeProfile(id.value)
         dataStore.edit { p ->
             p.asMap().keys.filter { it.name.startsWith(profilePreferencePrefix(id)) }.forEach { p.remove(it) }
         }

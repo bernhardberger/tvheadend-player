@@ -65,7 +65,7 @@ class TargetAspectTest {
     private fun mode() = compose.runOnIdle { aspect.mode }
 
     private fun stored(store: PlayerSettingsStore, channel: ChannelId) =
-        runBlocking { store.channelAspects.choices.first().modeFor(channel) }
+        runBlocking { store.channelAspects.choices.first()[channel.value] ?: AspectRatioMode.FIT }
 
     @Test fun aChoiceIsStoredForThePlayingChannelAndAZapSwitchesToTheNewChannelsMode() {
         val store = store(identity = true)
@@ -123,6 +123,24 @@ class TargetAspectTest {
         assertEquals(AspectRatioMode.FORCE_16_9, mode())
         assertEquals(AspectRatioMode.FIT, stored(store, one))
 
+        switchTo(AppPlaybackTarget.Live(two))
+        assertEquals(AspectRatioMode.FIT, mode())
+    }
+
+    @Test fun aFailedWriteKeepsTheChoiceForOnlyTheCurrentPlayback() {
+        val data = InMemoryPreferencesDataStore(
+            preferencesOf(stringPreferencesKey("activeServerProfileId") to "server"),
+        )
+        val failing = object : DataStore<Preferences> by data {
+            override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences {
+                throw java.io.IOException("storage unavailable")
+            }
+        }
+        val store = PlayerSettingsStore(failing)
+        show(store)
+        choose(AspectRatioMode.FORCE_4_3)
+        assertEquals(AspectRatioMode.FORCE_4_3, mode())
+        assertEquals(AspectRatioMode.FIT, stored(store, one))
         switchTo(AppPlaybackTarget.Live(two))
         assertEquals(AspectRatioMode.FIT, mode())
     }

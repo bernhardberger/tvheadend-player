@@ -55,6 +55,10 @@ Review corrections: past-tense recorded dates, singular TV/GUIDE button, channel
 
 0.5 details action `context_record_title` shortened to "Record all" (English) against `e00c95bb`, reusing this file's `autorec_editor_duplicate_all` wording where it fits, reviewed by Sonnet 5.5 (medium); still machine-drafted, no human reviewer.
 
+0.5 player options strings `playback_option_default`, `ad_breaks_none_marked` and `subtitle_follow_system_short` drafted against `350475f8` by GPT-6.1 Sol (medium) and reviewed by Sonnet 5.5 (medium); still machine-drafted, no human reviewer.
+
+0.5 settings string `tunneling_setting_fallback` drafted against `b9b18bf8` by GPT-6.1 Sol (medium) and reviewed by Sonnet 5.5 (medium); still machine-drafted, no human reviewer.
+
 ## Open questions
 
 - Review `player_scrub_backward` إرجاع as the media rewind term, RTL speed placement and TTS pronunciation of × in `player_scrub_*`.
@@ -63,3 +67,4 @@ Review corrections: past-tense recorded dates, singular TV/GUIDE button, channel
 - Actual RTL layout, focus mirroring and digit presentation need captures and a TV check.
 - Mixed-direction rendering of `server_confirmation_anonymous_detail` and the duration strings is unverified.
 - `recording_expires*` use *ينتهي*, which also reads as "ends"; check for a term that says the recording is removed.
+- Native check of `subtitle_follow_system_short` ("ترجمة النظام"): does it read as the system's caption settings, or as captions the system provides?

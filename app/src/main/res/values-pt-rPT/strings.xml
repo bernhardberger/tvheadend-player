@@ -359,6 +359,7 @@
     <string name="audio_description">Audiodescrição</string>
     <string name="audio_description_description">Dá preferência a faixas com audiodescrição, quando disponíveis.</string>
     <string name="subtitle_follow_system">Seguir as definições de legendas do sistema</string>
+    <string name="subtitle_follow_system_short">Legendas do sistema</string>
     <string name="player_status_rec">GRAV</string>
     <string name="setup_connection">Editar ligação</string>
     <string name="setup_connection_description">Endereço do servidor, porta e conta</string>
@@ -782,6 +783,8 @@
     <string name="ad_breaks_automatic_help">Salta cada intervalo uma vez. Se recuares para dentro dele, o intervalo é reproduzido.</string>
     <string name="ad_breaks_off">Desativado</string>
     <string name="ad_breaks_off_help">Os intervalos publicitários são reproduzidos como o resto. Continuam visíveis na linha temporal.</string>
+    <string name="ad_breaks_none_marked">Nenhum marcado</string>
+    <string name="playback_option_default">Predefinição (%1$s)</string>
     <string name="skip_cuts_setting">Saltar cortes</string>
     <string name="skip_cuts_setting_description">Salta as partes marcadas como cortes. A gravação em si não é encurtada.</string>
     <string name="skip_landing_setting">Ponto de retoma</string>
@@ -841,6 +844,7 @@
     <string name="refresh_rate_matching_setting_description">Deixar o Android ajustar a taxa de atualização do ecrã ao vídeo, quando suportado.</string>
     <string name="tunneling_setting">Reprodução em túnel</string>
     <string name="tunneling_setting_description">Envia o vídeo diretamente para a TV quando o descodificador o suporta. Pode interromper brevemente a imagem.</string>
+    <string name="tunneling_setting_fallback">Sem uso até reiniciar a aplicação. Este dispositivo não conseguiu reproduzir áudio neste modo.</string>
     <string name="play">Reproduzir</string>
     <string name="play_recording">Reproduzir gravação</string>
     <string name="status_disconnected_reconnecting">Sem ligação. A restabelecer ligação\u2026</string>

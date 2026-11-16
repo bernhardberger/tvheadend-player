@@ -378,6 +378,7 @@
     <string name="audio_description">Zvukový popis</string>
     <string name="audio_description_description">Upřednostňuje stopy s komentářem pro nevidomé, pokud jsou dostupné.</string>
     <string name="subtitle_follow_system">Podle systémového nastavení titulků</string>
+    <string name="subtitle_follow_system_short">Systémové titulky</string>
     <string name="player_status_rec">NAHR</string>
     <string name="setup_connection">Upravit připojení</string>
     <string name="setup_connection_description">Adresa serveru, port a účet</string>
@@ -873,6 +874,8 @@
     <string name="ad_breaks_automatic_help">Každou přestávku přeskočí jednou. Když se vrátíš zpět do přestávky, přehraje se.</string>
     <string name="ad_breaks_off">Vypnuto</string>
     <string name="ad_breaks_off_help">Reklamní přestávky se přehrávají jako zbytek nahrávky. Na časové ose zůstávají viditelné.</string>
+    <string name="ad_breaks_none_marked">Žádné označené</string>
+    <string name="playback_option_default">Výchozí (%1$s)</string>
     <string name="skip_cuts_setting">Přeskakovat střihy</string>
     <string name="skip_cuts_setting_description">Přeskakuje části označené jako střihy. Samotná nahrávka se nezkrátí.</string>
     <string name="skip_landing_setting">Místo pokračování</string>
@@ -932,6 +935,7 @@
     <string name="refresh_rate_matching_setting_description">Povolit Androidu přizpůsobit obnovovací frekvenci obrazovky videu, pokud je to podporováno.</string>
     <string name="tunneling_setting">Tunelové přehrávání</string>
     <string name="tunneling_setting_description">Posílá video přímo do TV, pokud to dekodér podporuje. Může krátce přerušit obraz.</string>
+    <string name="tunneling_setting_fallback">Do restartu aplikace se nepoužívá. Toto zařízení v tomto režimu nedokázalo přehrát zvuk.</string>
     <string name="play">Přehrát</string>
     <string name="play_recording">Přehrát nahrávku</string>
     <string name="status_disconnected_reconnecting">Odpojeno. Obnovování připojení\u2026</string>

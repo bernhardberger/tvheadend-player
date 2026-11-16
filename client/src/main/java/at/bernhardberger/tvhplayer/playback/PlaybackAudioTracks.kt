@@ -45,6 +45,9 @@ internal class PlaybackAudioTracks(
     private val _audioPassthroughChangeFailed = MutableStateFlow(false)
     val audioPassthroughChangeFailed = _audioPassthroughChangeFailed.asStateFlow()
     private var audioWriteJob: Job? = null
+    private var storedTunneling: Boolean? = null
+    private val _tunnelingFallbackActive = MutableStateFlow(false)
+    val tunnelingFallbackActive = _tunnelingFallbackActive.asStateFlow()
     private val _audioAutomatic = MutableStateFlow(player.trackSelectionParameters.overrides.values.none { it.type == C.TRACK_TYPE_AUDIO })
     val audioAutomatic = _audioAutomatic.asStateFlow()
 
@@ -68,7 +71,7 @@ internal class PlaybackAudioTracks(
         audioWriteJob = scope.launch {
             previous?.join()
             try {
-                settings.audioChoices.write(profileId, selected.first, selected.second)
+                settings.audioChoices.set(profileId, selected.first.value, selected.second)
             } catch (_: java.io.IOException) {
                 // A storage failure must not interrupt otherwise valid playback.
             }
@@ -90,7 +93,7 @@ internal class PlaybackAudioTracks(
         val audioProfileId = profileOwner.audioProfileId
         audioWriteJob?.join()
         val storedAudio = try {
-            audioProfileId?.let { settings.audioChoices.read(it, channelId) }
+            audioProfileId?.let { settings.audioChoices.read(it, channelId.value) }
         } catch (_: java.io.IOException) {
             null
         }
@@ -189,7 +192,7 @@ internal class PlaybackAudioTracks(
             audioWriteJob = scope.launch {
                 previous?.join()
                 try {
-                    settings.audioChoices.remove(profileId, channel)
+                    settings.audioChoices.set(profileId, channel.value, null)
                 } catch (_: java.io.IOException) {
                     // Storage failure must not interrupt playback; the session choice is still forgotten.
                 }
@@ -197,12 +200,34 @@ internal class PlaybackAudioTracks(
         }
     }
 
+    /** Observe switches even while a serialized installation or settings application is suspended. */
+    fun observeTunnelingSetting(enabled: Boolean) {
+        targetCommands.runIfOpen {
+            if (storedTunneling != null && storedTunneling != enabled) _tunnelingFallbackActive.value = false
+            storedTunneling = enabled
+        }
+    }
+
+    fun tunnelingState(): AppTunnelingState = when {
+        _tunnelingFallbackActive.value -> AppTunnelingState.OFF_AFTER_AUDIO_ERROR
+        storedTunneling != true -> AppTunnelingState.OFF
+        player.isTunnelingEnabled -> AppTunnelingState.ON
+        else -> AppTunnelingState.REQUESTED_NOT_ACTIVE
+    }
+
     fun applyPlayerSettingsLocked(value: PlayerSettings) {
         targetCommands.runIfOpen {
             player.trackSelectionParameters = trackPreferences(
-                player.trackSelectionParameters, value,
+                player.trackSelectionParameters,
+                value.copy(tunnelingEnabled = value.tunnelingEnabled && !_tunnelingFallbackActive.value),
             )
             frameRate.setSwitching(value.frameRateSwitching)
         }
+    }
+
+    /** Device output rejection is run-local; only changing the stored switch opts back in. */
+    fun noteTunnelingRefused() {
+        player.trackSelectionParameters = player.trackSelectionParameters.withTunneling(false)
+        _tunnelingFallbackActive.value = true
     }
 }

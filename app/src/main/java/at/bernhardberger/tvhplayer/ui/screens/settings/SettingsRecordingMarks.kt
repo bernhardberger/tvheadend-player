@@ -41,7 +41,7 @@ internal fun settingsRecordingMarksRows(ui: SettingsPlayerUiState, onSkipCutsCha
 )
 
 @Composable
-private fun adBreakModeLabel(mode: AdBreakMode): String = stringResource(when (mode) {
+internal fun adBreakModeLabel(mode: AdBreakMode): String = stringResource(when (mode) {
     AdBreakMode.ASK -> R.string.ad_breaks_ask
     AdBreakMode.AUTOMATIC -> R.string.ad_breaks_automatic
     AdBreakMode.OFF -> R.string.ad_breaks_off

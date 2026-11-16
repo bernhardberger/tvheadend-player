@@ -340,6 +340,7 @@
     <string name="audio_description">Sesli betimleme</string>
     <string name="audio_description_description">Varsa sesli betimlemeli ses parçalarını tercih eder.</string>
     <string name="subtitle_follow_system">Sistemin altyazı ayarlarını izle</string>
+    <string name="subtitle_follow_system_short">Sistem altyazıları</string>
     <string name="player_status_rec">REC</string>
     <string name="setup_connection">Bağlantıyı düzenle</string>
     <string name="setup_connection_description">Sunucu adresi, bağlantı noktası ve hesap</string>
@@ -803,6 +804,8 @@
     <string name="ad_breaks_automatic_help">Her reklam arasını bir kez atlar. Geri sararak reklam arasına dönerseniz reklamlar oynatılır.</string>
     <string name="ad_breaks_off">Kapalı</string>
     <string name="ad_breaks_off_help">Reklam araları kaydın geri kalanı gibi oynatılır. Zaman çizelgesinde görünmeye devam eder.</string>
+    <string name="ad_breaks_none_marked">İşaretli ara yok</string>
+    <string name="playback_option_default">Varsayılan (%1$s)</string>
     <string name="skip_cuts_setting">Kesilecek bölümleri atla</string>
     <string name="skip_cuts_setting_description">Kesilecek olarak işaretlenen bölümleri atlar. Kaydın kendisi kısaltılmaz.</string>
     <string name="skip_landing_setting">Devam noktası</string>
@@ -862,6 +865,7 @@
     <string name="refresh_rate_matching_setting_description">Desteklendiğinde Android, ekranın yenileme hızını videoyla eşleştirsin.</string>
     <string name="tunneling_setting">Tünelli oynatma</string>
     <string name="tunneling_setting_description">Kod çözücü desteklediğinde videoyu doğrudan TV ekranına gönderir. Görüntüyü kısa süreliğine kesebilir.</string>
+    <string name="tunneling_setting_fallback">Uygulama yeniden başlatılana kadar kullanılmaz. Bu cihaz, bu modda ses oynatamadı.</string>
     <string name="play">Oynat</string>
     <string name="play_recording">Kaydı oynat</string>
     <string name="status_disconnected_reconnecting">Bağlantı kesildi. Yeniden bağlanılıyor\u2026</string>

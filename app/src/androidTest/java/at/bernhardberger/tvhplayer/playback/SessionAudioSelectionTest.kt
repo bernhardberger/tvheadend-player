@@ -11,8 +11,11 @@ import androidx.media3.common.Tracks
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
-import at.bernhardberger.tvhplayer.settings.AudioChoiceStore
+import at.bernhardberger.tvhplayer.settings.AudioTrackChoice
+import at.bernhardberger.tvhplayer.settings.ItemChoiceStore
 import at.bernhardberger.tvhplayer.ui.player.collectTracks
 import at.bernhardberger.tvhplayer.ui.player.selectAudioTrack
 import java.lang.reflect.Proxy
@@ -38,16 +41,20 @@ class SessionAudioSelectionTest {
         val job = SupervisorJob()
         val file = File(InstrumentationRegistry.getInstrumentation().targetContext.cacheDir,
             "audio-eviction-${java.util.UUID.randomUUID()}.preferences_pb")
-        val store = AudioChoiceStore(PreferenceDataStoreFactory.create(
+        val data = PreferenceDataStoreFactory.create(
             scope = CoroutineScope(job + Dispatchers.IO), produceFile = { file },
-        ))
+        )
+        val store = ItemChoiceStore(
+            data, "explicit_audio_choices_v1", "channel", "choice", AudioTrackChoice.serializer(), maxEntries = 64,
+        )
         try {
+            data.edit { it[stringPreferencesKey("activeServerProfileId")] = "profile" }
             val fixture = Fixture()
             suspend fun choose(id: Long) {
                 fixture.tune(id)
                 selectAudioTrack(fixture.player, collectTracks(fixture.tracks, C.TRACK_TYPE_AUDIO).last())
                 val selected = checkNotNull(fixture.owner.rememberExplicitChoice(fixture.player))
-                store.write("profile", selected.first, selected.second)
+                store.set("profile", selected.first.value, selected.second)
             }
             for (id in 1L..64L) choose(id)
             fixture.tune(1)
@@ -55,11 +62,11 @@ class SessionAudioSelectionTest {
                 .setPreferredTextLanguage("fr").build()
             // Same callback used by the runtime, including deferred restore notifications.
             fixture.owner.rememberExplicitChoice(fixture.player)?.let {
-                store.write("profile", it.first, it.second)
+                store.set("profile", it.first.value, it.second)
             }
             choose(65)
-            assertNull(store.read("profile", ChannelId(1)))
-            assertEquals("en", store.read("profile", ChannelId(2))?.language)
+            assertNull(store.read("profile", 1))
+            assertEquals("en", store.read("profile", 2)?.language)
         } finally {
             job.cancelAndJoin()
             file.delete()

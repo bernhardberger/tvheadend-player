@@ -6,6 +6,8 @@ import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult
 import at.bernhardberger.tvheadend.sdk.android.TvheadendServerProfileStore
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
+import at.bernhardberger.tvheadend.sdk.core.SessionObservation
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileAuthenticationMode
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileReadResult
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileStore
@@ -365,7 +367,7 @@ class AppProfileOwner(
                         } else if (committed && caller.isActive)
                             // The retained outcome: no rollback ran. Generic connection notices stay suppressed
                             // until the switch ends, so this is the only one.
-                            reportSwitch(onOutcome, switchedNotice)
+                            reportSwitch(noticeCenter, onOutcome, switchedNotice)
                     } finally {
                         switchIdentity.unlock()
                     }
@@ -374,10 +376,6 @@ class AppProfileOwner(
                 endSwitch()
             }
         }
-
-    private fun reportSwitch(onOutcome: ((Notice) -> Unit)?, notice: Notice?) {
-        if (onOutcome != null) notice?.let(onOutcome) else postSwitchNotice(noticeCenter, notice)
-    }
 
     private fun availableProfiles() = profiles.value as? ServerProfileListResult.Available
 
@@ -419,7 +417,7 @@ class AppProfileOwner(
         if (committed) mutableConfigurationGeneration.value += 1
         if (rollbackFailed) postSwitchNotice(noticeCenter, Notice.ServerProfileWriteFailed)
         // A cancelled attempt has no switch outcome; rollback write failures still need feedback.
-        if (caller.isActive) reportSwitch(onOutcome, failureNotice)
+        if (caller.isActive) reportSwitch(noticeCenter, onOutcome, failureNotice)
     }
 
     suspend fun remove(id: ServerProfileId): ServerProfileWriteResult = mutate { removeProfile(id) }
@@ -486,15 +484,16 @@ class AppProfileOwner(
 
     suspend fun selectedStreamProfileIdFor(
         observation: CurrentSessionObservation,
+        channelId: ChannelId? = null,
     ): StreamProfileId? {
-        combine(mutableSettledStreamProfilesFor, session.observation) { settledFor, current ->
-            settledFor === observation || current.currentSession !== observation
-        }.first { it }
+        awaitStreamProfileDiscovery(mutableSettledStreamProfilesFor, session.observation, observation)
+        val profile = audioProfileId
+        val channelChoice = readChannelStreamProfileChoice(playerSettings, profile, channelId)
         return streamMutex.withLock {
-            mutableSelectedStreamProfileId.value.takeIf {
-                availableForObservation === observation &&
-                    session.observation.value.currentSession === observation
-            }
+            if (availableForObservation !== observation ||
+                session.observation.value.currentSession !== observation || audioProfileId != profile
+            ) return@withLock null
+            listedStreamProfile(mutableStreamProfiles.value, channelChoice, mutableSelectedStreamProfileId.value)
         }
     }
 
@@ -733,6 +732,37 @@ class AppProfileOwner(
         mutableServerProfile.value = profile
         setSetupTrialConnection(false)
     }
+}
+
+private fun reportSwitch(noticeCenter: () -> NoticeCenter?, onOutcome: ((Notice) -> Unit)?, notice: Notice?) {
+    if (onOutcome != null) notice?.let(onOutcome) else postSwitchNotice(noticeCenter, notice)
+}
+
+private suspend fun awaitStreamProfileDiscovery(
+    settled: StateFlow<CurrentSessionObservation?>,
+    current: StateFlow<SessionObservation>,
+    observation: CurrentSessionObservation,
+) {
+    combine(settled, current) { settledFor, session ->
+        settledFor === observation || session.currentSession !== observation
+    }.first { it }
+}
+
+private fun listedStreamProfile(
+    profiles: StreamProfilesResult,
+    channelChoice: String?,
+    connectionChoice: StreamProfileId?,
+): StreamProfileId? = (profiles as? StreamProfilesResult.Available)?.profiles
+    ?.firstOrNull { it.id.value == channelChoice }?.id ?: connectionChoice
+
+private suspend fun readChannelStreamProfileChoice(
+    settings: PlayerSettingsStore,
+    profile: String?,
+    channelId: ChannelId?,
+): String? = try {
+    if (profile != null && channelId != null) settings.channelStreamProfiles.read(profile, channelId.value) else null
+} catch (_: java.io.IOException) {
+    null
 }
 
 private sealed class ProfileCommand {

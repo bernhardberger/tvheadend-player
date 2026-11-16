@@ -10,6 +10,9 @@ import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 
 import android.app.Application
 import androidx.media3.common.C
+import androidx.media3.common.TrackGroup
+import androidx.media3.common.TrackSelectionOverride
+import androidx.media3.common.Tracks
 import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvheadend.sdk.media3.*
 import at.bernhardberger.tvheadend.sdk.playback.*
@@ -586,6 +589,25 @@ internal class AudioInterruptionFocusTest : AudioInterruptionFixture() {
         assertEquals(listOf(0), connection.speeds)
     }
 
+    @Test fun livePickAmongIdenticallyKeyedAudioTracksSurvivesATracksChange() = exercise {
+        live(timeshift = false)
+        val first = installManualAudio().mediaTrackGroup
+        settle()
+        val saved = requireNotNull(settings.audioChoices.read("test-profile", 1))
+        val second = TrackGroup("second-audio", first.getFormat(0))
+        audioTracks = Tracks(listOf(first, second).map {
+            Tracks.Group(it, false, intArrayOf(C.FORMAT_HANDLED), booleanArrayOf(false))
+        })
+        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+            .clearOverridesOfType(C.TRACK_TYPE_AUDIO)
+            .addOverride(TrackSelectionOverride(second, listOf(0))).build()
+        settle()
+        signalTracksChanged()
+        assertSame("a live pick among identically keyed audio tracks survives a tracks change",
+            second, player.trackSelectionParameters.overrides.values.singleOrNull { it.type == C.TRACK_TYPE_AUDIO }?.mediaTrackGroup)
+        assertEquals(saved, settings.audioChoices.read("test-profile", 1))
+    }
+
     @Test fun queuedAutomaticPreviewThenBackRestoresExactManualAndRememberedChoice() = exercise {
         live(timeshift = false)
         val manual = installManualAudio()
@@ -602,7 +624,7 @@ internal class AudioInterruptionFocusTest : AudioInterruptionFixture() {
         blocker.join(); preview.join(); back.join()
         settle()
         assertSame(manual.mediaTrackGroup, player.trackSelectionParameters.overrides.values.single().mediaTrackGroup)
-        assertNotNull(settings.audioChoices.read("test-profile", ChannelId(1)))
+        assertNotNull(settings.audioChoices.read("test-profile", 1))
         // Retain the session choice, not just the immediate player parameters.
         player.trackSelectionParameters = player.trackSelectionParameters.buildUpon().clearOverridesOfType(C.TRACK_TYPE_AUDIO).build()
         audioSelection.restore(runtimePlayer)
@@ -612,8 +634,8 @@ internal class AudioInterruptionFocusTest : AudioInterruptionFixture() {
     @Test fun queuedAutomaticFromPredecessorCannotClearSuccessorManualChoice() = exercise {
         live(timeshift = false)
         val manual = installManualAudio()
-        await { runBlocking { settings.audioChoices.read("test-profile", ChannelId(1)) != null } }
-        settings.audioChoices.write("test-profile", ChannelId(2), requireNotNull(settings.audioChoices.read("test-profile", ChannelId(1))))
+        await { runBlocking { settings.audioChoices.read("test-profile", 1) != null } }
+        settings.audioChoices.set("test-profile", 2, requireNotNull(settings.audioChoices.read("test-profile", 1)))
         val oldEpoch = runtime.videoPresentation.value.epoch
         val release = CompletableDeferred<Unit>()
         val entered = CompletableDeferred<Unit>()
@@ -636,7 +658,7 @@ internal class AudioInterruptionFocusTest : AudioInterruptionFixture() {
         connection.awaitCollectionRegistered()
         settle()
         assertSame(manual.mediaTrackGroup, player.trackSelectionParameters.overrides.values.single().mediaTrackGroup)
-        assertNotNull(settings.audioChoices.read("test-profile", ChannelId(2)))
+        assertNotNull(settings.audioChoices.read("test-profile", 2))
         assertFalse(runtime.isQuickListTargetCurrent(oldEpoch))
         val epoch = runtime.videoPresentation.value.epoch
         assertTrue(runtime.isQuickListTargetCurrent(epoch))
@@ -658,7 +680,7 @@ internal class AudioInterruptionFocusTest : AudioInterruptionFixture() {
         settle()
         audioSelection.restore(runtimePlayer)
         assertTrue(player.trackSelectionParameters.overrides.isEmpty())
-        assertNull(settings.audioChoices.read("test-profile", ChannelId(1)))
+        assertNull(settings.audioChoices.read("test-profile", 1))
     }
 
     @Test fun startupBufferKnowsTheTargetKindBeforePreparation() = exercise {

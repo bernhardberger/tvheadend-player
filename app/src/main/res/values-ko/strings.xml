@@ -321,6 +321,7 @@
     <string name="audio_description">화면 해설</string>
     <string name="audio_description_description">화면 해설 트랙이 있으면 우선 사용합니다.</string>
     <string name="subtitle_follow_system">시스템 자막 설정 따르기</string>
+    <string name="subtitle_follow_system_short">시스템 자막</string>
     <string name="player_status_rec">녹화 중</string>
     <string name="setup_connection">연결 편집</string>
     <string name="setup_connection_description">서버 주소, 포트 및 계정</string>
@@ -768,6 +769,8 @@
     <string name="ad_breaks_automatic_help">각 광고 구간을 한 번씩 건너뜁니다. 되감기로 해당 구간 안으로 돌아가면 광고가 재생됩니다.</string>
     <string name="ad_breaks_off">꺼짐</string>
     <string name="ad_breaks_off_help">광고 구간도 나머지 부분처럼 재생됩니다. 타임라인에는 계속 표시됩니다.</string>
+    <string name="ad_breaks_none_marked">표시된 구간 없음</string>
+    <string name="playback_option_default">기본값(%1$s)</string>
     <string name="skip_cuts_setting">잘라낼 구간 건너뛰기</string>
     <string name="skip_cuts_setting_description">잘라낼 구간으로 표시된 부분을 건너뜁니다. 녹화 자체가 짧아지지는 않습니다.</string>
     <string name="skip_landing_setting">건너뛴 후 재생 위치</string>
@@ -827,6 +830,7 @@
     <string name="refresh_rate_matching_setting_description">지원되는 경우 Android가 화면 주사율을 동영상에 맞추도록 합니다.</string>
     <string name="tunneling_setting">터널링 재생</string>
     <string name="tunneling_setting_description">디코더가 지원하면 동영상을 TV로 직접 보냅니다. 화면이 잠시 끊길 수 있습니다.</string>
+    <string name="tunneling_setting_fallback">앱을 다시 시작할 때까지 사용하지 않습니다. 이 기기에서 이 모드로 오디오를 재생하지 못했습니다.</string>
     <string name="play">재생</string>
     <string name="play_recording">녹화 재생</string>
     <string name="status_disconnected_reconnecting">연결이 끊겼습니다. 다시 연결 중\u2026</string>

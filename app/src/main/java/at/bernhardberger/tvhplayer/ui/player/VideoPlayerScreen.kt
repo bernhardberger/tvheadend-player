@@ -1345,12 +1345,17 @@ fun VideoPlayerScreen(
      * session lacks keeps it. A retune that does not start gives the request its failure back
      * while that request is still the current one.
      */
-    fun retryLive(viewerRetry: Boolean) {
+    fun retryLive(
+        viewerRetry: Boolean,
+        start: ((PlaybackTargetResult?) -> Unit) -> Unit = { onResult ->
+            videoPlayerViewModel.retryLiveNow(viewerRetry, onResult)
+        },
+    ) {
         val retunesRequest = authorizedLiveSelection != null
         val cleared = requestedChannelFailed && retunesRequest
         if (cleared) requestedChannelFailed = false
         val request = liveRequestToken
-        videoPlayerViewModel.retryLiveNow(viewerRetry) { result ->
+        start { result ->
             liveRetryRequestFailure(retunesRequest, cleared, result, request == liveRequestToken)
                 ?.let { requestedChannelFailed = it }
         }
@@ -2007,12 +2012,24 @@ fun VideoPlayerScreen(
             // A quick list applies its focused row when it leaves; that must not wait.
             closesAtOnce = { (_, quick) -> quick },
         ) { (page, _) ->
+            val liveOptions = rememberLivePlaybackOptions(
+                currentChannelId, observation.currentSession != null, playbackRuntime,
+            ) { id ->
+                retryLive(viewerRetry = true) { onResult ->
+                    playbackRuntime.selectChannelStreamProfile(currentChannelId, id, onResult)
+                }
+            }
             val audioAutomatic by playbackRuntime.audioAutomatic.collectAsStateWithLifecycle()
             PlaybackOptionsSheet(
                 page = page,
                 player = player,
                 audioAutomatic = audioAutomatic,
                 onAutomaticAudio = { playbackRuntime.useAutomaticAudio() },
+                subtitlesDefault = liveOptions.subtitlesDefault,
+                onDefaultSubtitles = { playbackRuntime.useDefaultSubtitles() },
+                onSubtitleSelection = { override, off, epoch -> playbackRuntime.selectSubtitles(override, off, epoch) },
+                subtitleLanguage = liveOptions.subtitleLanguage,
+                streamProfile = liveOptions.streamProfile,
                 tracksResolving =
                     playbackState is AppPlaybackState.Starting ||
                         playbackState is AppPlaybackState.Recovering,

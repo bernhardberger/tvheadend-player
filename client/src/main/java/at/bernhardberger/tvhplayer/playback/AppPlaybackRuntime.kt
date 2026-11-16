@@ -6,6 +6,7 @@ import android.os.Handler
 import android.os.SystemClock
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
 import androidx.media3.common.TrackSelectionParameters
@@ -13,6 +14,9 @@ import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.DecoderCounters
 import androidx.media3.exoplayer.ExoPlayer
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
+import at.bernhardberger.tvheadend.sdk.core.StreamProfileId
+import at.bernhardberger.tvheadend.sdk.core.StreamProfilesResult
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.PlaybackBinding
 import at.bernhardberger.tvheadend.sdk.core.PlaybackBindingResult
@@ -39,7 +43,10 @@ import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssue
 import at.bernhardberger.tvhplayer.core.RecordingFailureDetail
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.FrameRateSwitching
+import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
+import at.bernhardberger.tvhplayer.settings.ItemChoices
+import java.io.IOException
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -52,11 +59,14 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -201,6 +211,7 @@ class AppPlaybackRuntime(
         elapsedRealtime = elapsedRealtime,
         stallRecoveries = { stallRecoveries },
         freshDecoderPerZap = { freshDecoderPerZap },
+        tunneling = { audioTracks.tunnelingState() },
     )
     private val livePauseController = LivePauseController(
         player = player,
@@ -238,6 +249,12 @@ class AppPlaybackRuntime(
     )
     val audioPassthroughChangeFailed = audioTracks.audioPassthroughChangeFailed
     val audioAutomatic = audioTracks.audioAutomatic
+    val tunnelingFallbackActive = audioTracks.tunnelingFallbackActive
+    private val subtitleTracks = PlaybackSubtitleTracks(
+        player, settings, profileOwner, scope, targetCommands, _activeTarget,
+        targetInstallationInProgress = { targetInstallationInProgress },
+    )
+    val subtitlesDefault = subtitleTracks.subtitlesDefault
     private val _recordingSelection = MutableStateFlow<RecordingPlaybackSelection?>(null)
     private val _recordingAdmission = MutableStateFlow<RecordingPlaybackAdmission?>(null)
     @OptIn(ExperimentalTvheadendApi::class)
@@ -283,6 +300,7 @@ class AppPlaybackRuntime(
     /** Exact installed item, never a media-id match against an application replacement. */
     @Volatile
     private var ownedMediaItem: MediaItem? = null
+    private val tunnelingRecoveryError = MutableStateFlow<PlaybackException?>(null)
     private var departedEpoch: Long? = null
     private var bufferRecovery: LiveRecoveryFence? = null
     @Volatile
@@ -307,6 +325,7 @@ class AppPlaybackRuntime(
         var committedEpoch: Long? = null
     }
     private var lastLiveChannelId: ChannelId? = null
+    private var installedLiveStreamProfileId: StreamProfileId? = null
     private var lastRecordingRequest: Pair<DvrEntryId, RecordingPlaybackStart>? = null
     /** A released source, not a stopped viewing target; only foreground may reopen it. */
     private var backgroundRecordingEpoch: Long? = null
@@ -371,8 +390,10 @@ class AppPlaybackRuntime(
     val recordingSelection = _recordingSelection.asStateFlow()
     val recordingAdmission = _recordingAdmission.asStateFlow()
     @OptIn(ExperimentalTvheadendApi::class)
-    val recordingPlaybackFailure = coordinator.recordingPlaybackFailure.map { failure ->
-        failure?.let { RecordingFailureDetail(it.category, it.detail) }
+    val recordingPlaybackFailure = coordinator.recordingPlaybackFailure.combine(tunnelingRecoveryError) { _, _ ->
+        // Read both current values: a retired SDK failure must not pair with a released claim.
+        coordinator.recordingPlaybackFailure.value?.takeIf { tunnelingRecoveryError.value == null }
+            ?.let { RecordingFailureDetail(it.category, it.detail) }
     }.stateIn(scope, SharingStarted.Eagerly, null)
     val livePlaybackObservation = coordinator.livePlaybackObservation
     val diagnostics = presentation.diagnostics
@@ -380,14 +401,30 @@ class AppPlaybackRuntime(
 
     private val settingsJob = scope.launch {
         launch {
+            settings.playerSettings.map { it.tunnelingEnabled }.distinctUntilChanged().collect {
+                audioTracks.observeTunnelingSetting(it)
+            }
+        }
+        launch {
             settings.playerSettings.distinctUntilChanged().collect {
                 targetCommands.serialize(onClosed = {}) {
                     val latest = settings.playerSettings.first()
-                    recordingMarkers.applySettings(latest)
+                    recordingMarkers.applySettings(recordingMarkSettings(latest, playingRecording()))
                     audioTracks.applyPlayerSettingsLocked(latest)
                     audioTracks.applyAudioPassthroughLocked(effectiveAudioPassthrough(
                         latest.audioPassthroughEnabled, audioOutputs.personalOutputConnected.value,
                     ))
+                    presentation.publishDiagnostics()
+                }
+            }
+        }
+        launch {
+            settings.recordingAdBreaks.choices.collect {
+                targetCommands.serialize(onClosed = {}) {
+                    // Only the marks follow this choice: track preferences are not reapplied.
+                    recordingMarkers.applySettings(
+                        recordingMarkSettings(settings.playerSettings.first(), playingRecording()),
+                    )
                 }
             }
         }
@@ -489,11 +526,17 @@ class AppPlaybackRuntime(
         }
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-            if (livePlaybackObservation.value != LivePlaybackObservation.Departed) audioTracks.onMediaItemTransition()
+            if (livePlaybackObservation.value != LivePlaybackObservation.Departed) {
+                audioTracks.onMediaItemTransition()
+                subtitleTracks.onMediaItemTransition()
+            }
         }
 
         override fun onTrackSelectionParametersChanged(parameters: TrackSelectionParameters) {
-            if (livePlaybackObservation.value != LivePlaybackObservation.Departed) audioTracks.onTrackSelectionParametersChanged(parameters)
+            if (livePlaybackObservation.value != LivePlaybackObservation.Departed) {
+                audioTracks.onTrackSelectionParametersChanged(parameters)
+                subtitleTracks.onTrackSelectionParametersChanged(parameters)
+            }
         }
 
         override fun onTracksChanged(tracks: Tracks) {
@@ -505,7 +548,10 @@ class AppPlaybackRuntime(
                 // Video again after a reset: the declaration may be unchanged, so the flow says nothing.
                 frameRate.onDeclared(declaredVideoFrameDuration.value)
             }
-            if (livePlaybackObservation.value != LivePlaybackObservation.Departed) audioTracks.onTracksChanged()
+            if (livePlaybackObservation.value != LivePlaybackObservation.Departed) {
+                audioTracks.onTracksChanged()
+                subtitleTracks.onTracksChanged()
+            }
             stallWatch.reset()
         }
 
@@ -542,6 +588,10 @@ class AppPlaybackRuntime(
             ) {
                 publishPlayerError()
             }
+        }
+
+        override fun onPlayerError(error: PlaybackException) {
+            targetCommands.runIfOpen { recoverRefusedTunneling(error) }
         }
     }
 
@@ -747,12 +797,17 @@ class AppPlaybackRuntime(
                 keptTarget = keptTarget,
             )
         }
-        val streamProfileId = profileOwner.selectedStreamProfileIdFor(profileSelection.currentSession)
+        val streamProfileId = profileOwner.selectedStreamProfileIdFor(profileSelection.currentSession, channelId)
         val audioResult = audioTracks.loadStoredAudioLocked(channelId) {
             recoveryFence == null || canContinueRecoveryLocked(recoveryFence)
         }
         if (recoveryFence != null && !canContinueRecoveryLocked(recoveryFence)) return null
         audioResult?.let { return it }
+        val subtitleResult = subtitleTracks.loadStoredSubtitlesLocked(channelId) {
+            recoveryFence == null || canContinueRecoveryLocked(recoveryFence)
+        }
+        if (recoveryFence != null && !canContinueRecoveryLocked(recoveryFence)) return null
+        subtitleResult?.let { return it }
         val selection = currentLivePlaybackSelection(session.observation.value, channelId)
         if (selection == null) {
             return completeUnavailableTarget(
@@ -844,6 +899,7 @@ class AppPlaybackRuntime(
                         _activeTarget.value == AppPlaybackTarget.Live(selection.channelId)
                     activeTargetEpoch = epoch
                     activeLiveSelection = selection
+                    installedLiveStreamProfileId = streamProfileId
                     activeLiveProfileGeneration = profileGeneration
                     // Whichever target this is, its epoch is new: no reconnect retry owns it.
                     reconnectRecoveryEpoch = null
@@ -1150,6 +1206,15 @@ class AppPlaybackRuntime(
         } ?: recordingRecovery
     }
 
+    private fun playingRecording(): DvrEntryId? =
+        (_activeTarget.value as? AppPlaybackTarget.Recording)?.recordingId
+
+    /** The settings [recording]'s marks follow: its own ad-break choice replaces the setting. */
+    private suspend fun recordingMarkSettings(base: PlayerSettings, recording: DvrEntryId?): PlayerSettings {
+        val choice = settings.recordingAdBreaks.choices.first()[recording?.value] ?: return base
+        return base.copy(adBreakMode = choice)
+    }
+
     /** A new play, live, or Stop: nothing from an earlier recording target carries over. */
     private fun forgetRecordingRecoveryLocked() {
         recordingRecovery = null
@@ -1165,10 +1230,13 @@ class AppPlaybackRuntime(
         requestedSelection: RecordingPlaybackSelection? = null,
         playWhenReady: Boolean = true,
         continueReleased: Boolean = false,
+        canInstall: () -> Boolean = { true },
     ): PlaybackTargetResult? {
         if (!targetCommands.isOpen()) return PlaybackTargetResult.SHUT_DOWN
         val playerSettings = settings.playerSettings.first()
+        val markSettings = recordingMarkSettings(playerSettings, recordingId)
         if (!targetCommands.isOpen()) return PlaybackTargetResult.SHUT_DOWN
+        if (!canInstall()) return PlaybackTargetResult.NOT_READY
         audioTracks.configureAudioOutputBeforeFirstTargetLocked(effectiveAudioPassthrough(
             playerSettings.audioPassthroughEnabled, audioOutputs.personalOutputConnected.value,
         ))
@@ -1214,6 +1282,7 @@ class AppPlaybackRuntime(
         if (!continueReleased) backgroundRecordingEpoch = null
         val result = installTargetForPresentation(
             expectedPresentationEpoch = expectedPresentationEpoch,
+            canInstall = canInstall,
             installTarget = {
                 if (!targetCommands.isOpen()) return@installTargetForPresentation PlaybackTargetResult.SHUT_DOWN
                 when (
@@ -1290,7 +1359,7 @@ class AppPlaybackRuntime(
                     _liveStartUndisturbed.value = false
                     _recordingSelection.value = selection
                     _recordingAdmission.value = admission
-                    recordingMarkers.applySettings(playerSettings)
+                    recordingMarkers.applySettings(markSettings)
                     recordingMarkers.observeRecordingMarkersLocked(requireNotNull(installedBinding), continuesTarget = preservesMarkerHistory)
                     presentation.publishStarting()
                     presentation.beginTargetPresentationLocked(epoch)
@@ -1603,6 +1672,76 @@ class AppPlaybackRuntime(
         }
     }
 
+    /** A committed channel choice outlives its sheet, but never its target or connection. */
+    fun selectChannelStreamProfile(
+        channelId: ChannelId,
+        id: StreamProfileId?,
+        onResult: (PlaybackTargetResult?) -> Unit = {},
+    ): Job {
+        val targetEpoch = activeTargetEpoch
+        val presentation = presentationEpoch.snapshot()
+        val currentSession = session.observation.value.currentSession
+        val profile = profileOwner.audioProfileId
+        val request = playbackRequests.get()
+        return scope.launch {
+            val result = targetCommands.serialize(onClosed = { null }) {
+                fun current() = channelStreamProfileRequestCurrent(
+                    channelId, request, currentSession, profile, targetEpoch, presentation,
+                )
+                if (!current()) return@serialize null
+                if (!channelStreamProfileAvailable(id)) return@serialize null
+                try {
+                    if (!settings.channelStreamProfiles.set(profile, channelId.value, id?.value)) return@serialize null
+                } catch (_: java.io.IOException) {
+                    return@serialize null
+                }
+                val effective = profileOwner.selectedStreamProfileIdFor(currentSession!!, channelId)
+                if (!current()) return@serialize null
+                // A rejected zap can keep a healthy predecessor, including its Playing state.
+                // lastLiveChannelId still names the viewer's requested channel, not that target.
+                if (!channelStreamProfileUnavailable(channelId) && effective == installedLiveStreamProfileId) {
+                    return@serialize null
+                }
+                // A viewer choice is a fresh live start, including recovery from a bad profile.
+                retryLiveCommandLocked(playbackRequests.incrementAndGet(), viewerRetry = true)
+            }
+            onResult(result)
+        }
+    }
+
+    private fun channelStreamProfileRequestCurrent(
+        channelId: ChannelId,
+        request: Long,
+        currentSession: CurrentSessionObservation?,
+        profile: String?,
+        targetEpoch: Long?,
+        presentation: Long,
+    ): Boolean = lastLiveChannelId == channelId && request == playbackRequests.get() &&
+        currentSession != null && currentSession === session.observation.value.currentSession &&
+        profile == profileOwner.audioProfileId && targetEpoch == activeTargetEpoch &&
+        presentation == presentationEpoch.snapshot() && !targetInstallationInProgress
+
+    private fun channelStreamProfileAvailable(id: StreamProfileId?): Boolean =
+        id == null || (profileOwner.streamProfiles.value as? StreamProfilesResult.Available)
+            ?.profiles?.none { it.id == id } == false
+
+    private fun channelStreamProfileUnavailable(channelId: ChannelId): Boolean {
+        val live = livePlaybackObservation.value as? LivePlaybackObservation.Active
+        return _activeTarget.value != AppPlaybackTarget.Live(channelId) ||
+            state.value is AppPlaybackState.Failed || healthyActiveTarget() == null ||
+            live?.serverStopped == true || live?.subscriptionIssue != null
+    }
+
+    val streamProfiles = profileOwner.streamProfiles
+    val selectedStreamProfileId = profileOwner.selectedStreamProfileId
+    val channelStreamProfiles: StateFlow<ItemChoices<String>?> = settings.channelStreamProfiles.choices
+        .catch { if (it !is IOException) throw it }
+        .stateIn(scope, SharingStarted.Eagerly, null)
+    val subtitleLanguage: StateFlow<String?> = settings.playerSettings.map { it.subtitleLanguage }
+        .distinctUntilChanged()
+        .catch { if (it !is IOException) throw it }
+        .stateIn(scope, SharingStarted.Eagerly, null)
+
     /**
      * Retunes the last live channel. [viewerRetry]: the viewer pressed Retry, which is a fresh
      * start: without a playable target it shows Starting at once, and once the new target
@@ -1620,9 +1759,13 @@ class AppPlaybackRuntime(
     ): PlaybackTargetResult? = targetCommands.serialize(
         onClosed = { PlaybackTargetResult.SHUT_DOWN },
     ) {
+        retryLiveCommandLocked(generation, viewerRetry)
+    }
+
+    private suspend fun retryLiveCommandLocked(generation: Long, viewerRetry: Boolean): PlaybackTargetResult? {
         // An explicit retry is a user decision, so it refills the budget an exhausted target used.
         liveRecovery.resetBackoffLocked()
-        lastLiveChannelId?.let { channelId ->
+        return lastLiveChannelId?.let { channelId ->
             val startEpoch = presentationEpoch.snapshot()
             try {
                 playLive(
@@ -2125,10 +2268,14 @@ class AppPlaybackRuntime(
      */
     @OptIn(ExperimentalTvheadendApi::class)
     private fun dispatchLiveRecovery(
-        reason: PlaybackRecoveryReason,
+        reason: PlaybackRecoveryReason?,
         origin: LiveRecoveryFence?,
         install: LiveInstallAttribution? = null,
     ) {
+        if (reason == null) {
+            publishPlayerError()
+            return
+        }
         val reportedEpoch = activeTargetEpoch
         liveRecovery.dispatch(
             reason = reason,
@@ -2154,13 +2301,13 @@ class AppPlaybackRuntime(
                 }
                 val attempt = liveRecovery.nextAttemptLocked()
                 if (attempt == null) {
-                    publishRecoveryExhausted(fence.reason)
+                    publishRecoveryExhausted(reason)
                     return@admit null
                 }
                 liveRecovery.admitLocked(fence)
                 presentationEpoch.publishIfCurrent(fence.targetEpoch) {
                     presentation.publishRecovering(
-                        reason = fence.reason,
+                        reason = reason,
                         retryDelayMillis = attempt.delay.inWholeMilliseconds,
                     )
                     presentation.publishDiagnostics()
@@ -2335,7 +2482,9 @@ class AppPlaybackRuntime(
         if (liveRecovery.interruptedRecovery != null) {
             liveRecovery.resumeInterruptedLocked(::retryResumedLiveRecoveryLocked) { fence ->
                 presentationEpoch.publishIfCurrent(fence.targetEpoch) {
-                    presentation.publishRecovering(reason = fence.reason, retryDelayMillis = 0L)
+                    val reason = fence.reason
+                    if (reason == null) presentation.publishStarting()
+                    else presentation.publishRecovering(reason = reason, retryDelayMillis = 0L)
                     presentation.publishDiagnostics()
                 }
             }
@@ -2584,8 +2733,10 @@ class AppPlaybackRuntime(
             frameRate.close()
             presentation.seekDiagnosticsListener?.let(player::removeAnalyticsListener)
             audioTracks.clearSessionAudioLocked()
+            subtitleTracks.clearSessionLocked()
         }
         audioTracks.joinAudioWrites()
+        subtitleTracks.joinWrites()
     }
 
     private suspend fun installTargetForPresentation(
@@ -2652,6 +2803,7 @@ class AppPlaybackRuntime(
             }
             if (_activeTarget.value != null && livePlaybackObservation.value != LivePlaybackObservation.Departed) {
                 audioTracks.activateAudioAfterInstallLocked()
+                subtitleTracks.activateAfterInstallLocked()
             }
         }
     }
@@ -2958,6 +3110,25 @@ class AppPlaybackRuntime(
         }
     }
 
+    fun useDefaultSubtitles() = selectSubtitles(null, off = false)
+
+    /** Subtitle choices stay ordered with Default and belong to the target on which they were made. */
+    fun selectSubtitles(
+        override: androidx.media3.common.TrackSelectionOverride?,
+        off: Boolean,
+        quickListEpoch: Long? = null,
+    ): Job {
+        // Full-panel choices outlive their sheet too, but must not follow a queued channel switch.
+        val epoch = quickListEpoch ?: activeTargetEpoch
+        return scope.launch {
+            targetCommands.serialize(onClosed = {}) {
+                if (epoch == null || epoch != activeTargetEpoch || targetInstallationInProgress) return@serialize
+                if (quickListEpoch != null && !isQuickListTargetCurrent(quickListEpoch)) return@serialize
+                subtitleTracks.selectLocked(override, off)
+            }
+        }
+    }
+
     /** Installed and presented target, including same-channel retunes; never pending/stale tracks. */
     fun isQuickListTargetCurrent(epoch: Long): Boolean =
         targetCommands.isOpen() && !targetInstallationInProgress && activeTargetEpoch == epoch &&
@@ -3011,6 +3182,7 @@ class AppPlaybackRuntime(
 
     private fun publishPlayerErrorFromPlayer() {
         val error = player.playerError ?: return
+        if (error === tunnelingRecoveryError.value || holdInterruptedTunnelingError(error)) return
         // A failed target never completes a pause pressed before its grant. A paused kept-channel
         // retune still has to fail closed, so its pending pause resolves (and stops) serialized.
         val failClosedPauseEpoch = livePauseController.onPlayerErrorUnderAccessLock()
@@ -3041,6 +3213,84 @@ class AppPlaybackRuntime(
         livePauseController.publishLivePause()
         presentation.publishDiagnosticsUnderAccessLock()
         if (failClosedPauseEpoch != null) livePauseController.launchPendingLivePauseResolution(failClosedPauseEpoch)
+    }
+
+    private fun holdInterruptedTunnelingError(error: PlaybackException): Boolean {
+        val interrupted = liveRecovery.interruptedRecovery
+        val held = interrupted != null && interrupted.reason == null && interrupted.targetEpoch == activeTargetEpoch
+        if (held) presentation.publishPlayerState(recoveryResolved = true, heldRecoveryError = error)
+        return held
+    }
+
+    private fun canFallbackFrom(error: PlaybackException): Boolean =
+        error.errorCode == PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED &&
+            player.trackSelectionParameters.tunnelingRequested && tunnelingRecoveryError.value == null &&
+            _activeTarget.value != null && activeTargetEpoch != null &&
+            session.observation.value.currentSession != null && ownedMediaItem != null &&
+            !targetInstallationInProgress && !coordinator.playerCleanupPending.value
+
+    private fun tunnelingRecoveryMatches(
+        target: AppPlaybackTarget, epoch: Long, currentSession: CurrentSessionObservation,
+        item: MediaItem, intent: Long,
+    ): Boolean = targetCommands.isOpen() && !targetInstallationInProgress &&
+        !coordinator.playerCleanupPending.value && _activeTarget.value == target &&
+        activeTargetEpoch == epoch && departedEpoch != epoch &&
+        session.observation.value.currentSession === currentSession &&
+        playbackRequests.get() == intent && !isPlaybackIntentStopped(intent) &&
+        player.currentMediaItem === item
+
+    private fun recoverRefusedTunneling(error: PlaybackException) {
+        if (!canFallbackFrom(error)) return
+        val target = checkNotNull(_activeTarget.value)
+        val epoch = checkNotNull(activeTargetEpoch)
+        val currentSession = checkNotNull(session.observation.value.currentSession)
+        val item = checkNotNull(ownedMediaItem)
+        val intent = if (target is AppPlaybackTarget.Live) servedIntent.get() else playbackRequests.get()
+        fun canRecover() = tunnelingRecoveryMatches(target, epoch, currentSession, item, intent) &&
+            !recoveryPlaybackBlocked(epoch)
+        val selection = activeLiveSelection
+        tunnelingRecoveryError.value = error
+        audioTracks.noteTunnelingRefused()
+        presentation.publishDiagnostics()
+        if (target is AppPlaybackTarget.Recording) noteRecordingInterruptionLocked()
+        if (!recoveryPlaybackBlocked(epoch)) presentation.publishStarting()
+        scope.launch {
+            try {
+                targetCommands.serialize(onClosed = {}) {
+                    if (tunnelingFallbackActive.value && canRecover()) {
+                        retryWithoutTunnelingLocked(target, epoch, intent, selection, ::canRecover)
+                    }
+                }
+            } finally {
+                tunnelingRecoveryError.value = null
+                targetCommands.runIfOpen {
+                    if (player.playerError === error && _activeTarget.value == target && activeTargetEpoch == epoch) {
+                        publishPlayerErrorFromPlayer()
+                    }
+                }
+            }
+        }
+    }
+
+    private suspend fun retryWithoutTunnelingLocked(
+        target: AppPlaybackTarget, epoch: Long, intent: Long,
+        selection: LivePlaybackSelection?, canInstall: () -> Boolean,
+    ) {
+        when (target) {
+            is AppPlaybackTarget.Live -> {
+                val liveSelection = selection ?: return
+                retryLiveRecoveryLocked(LiveRecoveryFence(
+                    null, liveSelection, epoch, intent,
+                ))
+            }
+            is AppPlaybackTarget.Recording -> {
+                val request = lastRecordingRequest?.takeIf { it.first == target.recordingId } ?: return
+                playRecordingLocked(
+                    target.recordingId, request.second, recoverAt = recordingRecovery,
+                    continuesTarget = true, canInstall = canInstall,
+                )
+            }
+        }
     }
 
     /** Reports a server skip to the start-up buffer; a cancelled or failed request counts as not accepted. */

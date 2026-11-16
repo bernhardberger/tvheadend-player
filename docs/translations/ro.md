@@ -48,6 +48,10 @@ Reconciled to frozen source `6d80a8ff` for 0.3.0 by GPT-6.1 Sol (medium), retain
 
 0.5 details action `context_record_title` shortened to "Record all" (English) against `e00c95bb`, reusing this file's `autorec_editor_duplicate_all` wording where it fits, reviewed by Sonnet 5.5 (medium); still machine-drafted, no human reviewer.
 
+0.5 player options strings `playback_option_default`, `ad_breaks_none_marked` and `subtitle_follow_system_short` drafted against `350475f8` by GPT-6.1 Sol (medium) and reviewed by Sonnet 5.5 (medium); still machine-drafted, no human reviewer. `playback_option_default` uses the masculine form of `profile_server_default` after review.
+
+0.5 settings string `tunneling_setting_fallback` drafted against `b9b18bf8` by GPT-6.1 Sol (medium) and reviewed by Sonnet 5.5 (medium); still machine-drafted, no human reviewer.
+
 ## Open questions
 
 - Check TTS pronunciation of the × speed multiplier in `player_scrub_*`.

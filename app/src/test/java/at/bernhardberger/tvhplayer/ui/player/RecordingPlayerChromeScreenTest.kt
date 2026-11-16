@@ -1249,6 +1249,7 @@ class RecordingPlayerChromeScreenTest {
         }
         val noticeModule = module {
             single { LastPlayedChannelStore(context) }
+            single { settings }
             single { NoticeCenter({ 0L }) { NoticeContext(0, session.observation.value.currentSession?.generationIdentity) } }
         }
         if (!settleEntry) compose.mainClock.autoAdvance = false

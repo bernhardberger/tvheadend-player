@@ -321,6 +321,7 @@
     <string name="audio_description">音声解説</string>
     <string name="audio_description_description">利用できる場合は音声解説付きのトラックを優先します。</string>
     <string name="subtitle_follow_system">システムの字幕設定に従う</string>
+    <string name="subtitle_follow_system_short">システムの字幕</string>
     <string name="player_status_rec">録画中</string>
     <string name="setup_connection">接続を編集</string>
     <string name="setup_connection_description">サーバーアドレス、ポート、アカウント</string>
@@ -768,6 +769,8 @@
     <string name="ad_breaks_automatic_help">各CM区間を1回だけスキップします。巻き戻して区間内に戻ると、そのCMが再生されます。</string>
     <string name="ad_breaks_off">オフ</string>
     <string name="ad_breaks_off_help">CM区間も他の部分と同じように再生します。タイムライン上の表示は残ります。</string>
+    <string name="ad_breaks_none_marked">マークなし</string>
+    <string name="playback_option_default">デフォルト（%1$s）</string>
     <string name="skip_cuts_setting">カット区間をスキップ</string>
     <string name="skip_cuts_setting_description">カットとしてマークされた部分をスキップします。録画自体は短くなりません。</string>
     <string name="skip_landing_setting">スキップ後の再生位置</string>
@@ -827,6 +830,7 @@
     <string name="refresh_rate_matching_setting_description">対応している場合に、Androidがディスプレイのリフレッシュレートを映像に合わせます。</string>
     <string name="tunneling_setting">トンネル再生</string>
     <string name="tunneling_setting_description">デコーダーが対応している場合に、映像をテレビに直接送ります。映像が一時的に途切れることがあります。</string>
+    <string name="tunneling_setting_fallback">アプリを再起動するまで使用しません。この端末では、このモードで音声を再生できませんでした。</string>
     <string name="play">再生</string>
     <string name="play_recording">録画を再生</string>
     <string name="status_disconnected_reconnecting">接続が切れました。再接続中\u2026</string>

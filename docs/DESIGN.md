@@ -1272,6 +1272,31 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
 - The Audio and Subtitle short lists: focus switches the track after 300 ms,
   OK keeps it and closes, Back reverts, and the list closes 5 s after the last
   key and keeps the track. Menu opens the full panel.
+- A choice the player remembers for one channel or one recording lists
+  `Default (<the setting's current value>)` first; choosing it forgets the
+  choice, and the item follows the setting again. The recording player's
+  options carry Ad breaks this way (Ask, Skip automatically, Off), remembered
+  per recording and per connection. The row stays in the list for a recording
+  without marked ad breaks, dimmed and out of the focus order, reading
+  `None marked`; it opens once marks arrive.
+- The Subtitles list of an item with subtitle tracks reads `Default (<the
+  Subtitles setting>)`, Off, then the tracks, and checks exactly one row:
+  Default until the viewer picks Off or a track, even when the setting itself
+  shows a track; the header names what is shown. A pick on a live channel is
+  remembered for that channel and connection, like its audio track, and comes
+  back when exactly one track matches it. It never carries to the next
+  channel or recording; a recording keeps a pick only while it plays.
+- The live player's options carry Stream profile after Display mode:
+  `Default (<the connection's profile>)`, then the server's profiles in the
+  server's order, labelled as in Settings. A pick is remembered for that
+  channel and connection and tunes the channel again at once when the profile
+  it would send changes, which drops that channel's timeshift buffer. A
+  remembered profile the server no longer lists is not sent; the channel
+  follows the connection's. While the server's profiles aren't available the
+  row is dimmed and out of the focus order and reads why, as in Settings. The
+  options, and with them this row, stay reachable on a channel that failed to
+  play, and a pick there always tunes it again, so a profile that broke a
+  channel can be taken back. The recording player has no such row.
 
 ### Context menus and dialogs (accepted 2026-10-15)
 

@@ -39,7 +39,7 @@ directly. `:client` mirrors the app build types (`debug`, `release`, `profile`,
   and `PlaybackPresentation`, plus the start-up buffer files
   `StartupBufferController` and `StartupBufferPolicy`.
 - `di/SdkRuntimeOwner`.
-- `settings/`: `AppProfileOwner`, `AudioChoiceStore`, `ChannelTagSettings`,
+- `settings/`: `AppProfileOwner`, `ItemChoiceStore`, `ChannelTagSettings`,
   `PlayerSettings`, `ServerSettings` (owns the single `Context.dataStore`
   delegate for `tvhplayer_settings`).
 - `stores/`: `LastPlayedChannelStore` (owns `tvhplayer_appliance`), `ChannelSelectionStore`.

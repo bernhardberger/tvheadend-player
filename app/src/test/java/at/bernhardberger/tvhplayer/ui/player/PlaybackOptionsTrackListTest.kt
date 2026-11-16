@@ -7,6 +7,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import android.app.Application
+import androidx.test.core.app.ApplicationProvider
+import at.bernhardberger.tvhplayer.R
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.view.View
@@ -24,7 +26,14 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.isSelected
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -40,6 +49,9 @@ import androidx.media3.common.TrackGroup
 import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.Tracks
 import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
+import at.bernhardberger.tvheadend.sdk.core.*
+import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
+import at.bernhardberger.tvhplayer.settings.AdBreakMode
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
@@ -124,6 +136,218 @@ class PlaybackOptionsTrackListTest {
             compose.changeState { subtitles = choices("x", "y", selected = selected) }
             assertFocused("y")
         }
+    }
+
+    @Test fun subtitleDefaultOffAndTracksHaveOneCheckedRowAndStayInDpadOrder() {
+        var default by mutableStateOf(true)
+        var off by mutableStateOf(false)
+        var selected by mutableStateOf<String?>("x")
+        var defaults = 0
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                PlaybackOptionsSheetContent(
+                    PlaybackOptionsPage.SUBTITLES, emptyList(), choices("x", "y", selected = selected),
+                    false, AspectRatioMode.FIT, PlayerStatsLevel.OFF,
+                    onPageChange = {}, onAudioTrackSelected = {},
+                    onSubtitleTrackSelected = { default = false; off = it == null; selected = it },
+                    onAspectRatioChange = {}, onStatsLevelChange = {},
+                    subtitlesDefault = default, subtitlesOff = off,
+                    onDefaultSubtitles = { defaults++; default = true; off = false },
+                    subtitleLanguage = "de",
+                )
+            }
+        }
+        val defaultRow = compose.onNodeWithTag("playback-options-subtitles-default")
+        val resources = ApplicationProvider.getApplicationContext<Application>().resources
+        val language = java.util.Locale.forLanguageTag("de").getDisplayLanguage(resources.configuration.locales[0])
+        defaultRow.assertIsFocused().assertIsSelected()
+            .assert(hasText(resources.getString(R.string.playback_option_default, language)))
+        compose.onNodeWithTag("playback-options-track-x").assertIsNotSelected()
+        compose.onAllNodes(isSelected()).assertCountEquals(1)
+        compose.pressKey(Key.DirectionDown)
+        compose.onNodeWithTag("playback-options-subtitles-off").assertIsFocused()
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("playback-options-subtitles-off").assertIsSelected()
+        compose.onAllNodes(isSelected()).assertCountEquals(1)
+        compose.pressKey(Key.DirectionDown)
+        assertFocused("x")
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("playback-options-track-x").assertIsSelected()
+        compose.onAllNodes(isSelected()).assertCountEquals(1)
+        compose.pressKey(Key.DirectionDown)
+        assertFocused("y")
+        repeat(3) { compose.pressKey(Key.DirectionUp) }
+        defaultRow.assertIsFocused()
+        compose.pressKey(Key.DirectionCenter)
+        assertEquals(1, defaults)
+        defaultRow.assertIsSelected().assertIsFocused()
+        compose.onAllNodes(isSelected()).assertCountEquals(1)
+    }
+
+    @Test fun subtitleDefaultLabelsSystemCaptionsAndHeaderStillNamesThePlayingTrack() {
+        var defaults = 0
+        val tracks = Tracks(listOf(Tracks.Group(
+            TrackGroup("text", Format.Builder().setId("subtitles")
+                .setSampleMimeType(MimeTypes.APPLICATION_DVBSUBS).setLanguage("de").build()),
+            false, intArrayOf(C.FORMAT_HANDLED), booleanArrayOf(true),
+        )))
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                PlaybackOptionsSheet(
+                    PlaybackOptionsPage.SUBTITLES, player(tracks), false, AspectRatioMode.FIT, PlayerStatsLevel.OFF,
+                    {}, {}, {}, audioAutomatic = true, onAutomaticAudio = {}, subtitlesDefault = true,
+                    onDefaultSubtitles = { defaults++ },
+                )
+            }
+        }
+        compose.onNodeWithTag("playback-options-subtitles-default")
+            .assertIsFocused().assertIsSelected()
+        val resources = ApplicationProvider.getApplicationContext<Application>().resources
+        compose.onNodeWithTag("playback-options-subtitles-default").assert(hasText(
+            resources.getString(R.string.playback_option_default, resources.getString(R.string.subtitle_follow_system_short)),
+        ))
+        compose.onNodeWithTag("playback-options-current-value").assert(hasText(
+            java.util.Locale.forLanguageTag("de").getDisplayLanguage(resources.configuration.locales[0]),
+        ))
+        compose.onAllNodes(isSelected()).assertCountEquals(1)
+        compose.pressKey(Key.DirectionCenter)
+        assertEquals(1, defaults)
+    }
+
+    @Test fun subtitleQuickListBackQueuesDefaultEvenBeforeThePreviewReachesThePlayer() {
+        val quickList = PlaybackQuickListSignals()
+        val requests = mutableListOf<Pair<Boolean, Long?>>()
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                PlaybackOptionsSheet(
+                    PlaybackOptionsPage.SUBTITLES,
+                    player(Tracks(listOf(audio("text", "en", MimeTypes.TEXT_VTT, 0, 0)))),
+                    false, AspectRatioMode.FIT, PlayerStatsLevel.OFF, {}, {}, {},
+                    audioAutomatic = true, onAutomaticAudio = {}, subtitlesDefault = true,
+                    quickList = quickList, quickListTargetEpoch = 7L,
+                    onSubtitleSelection = { _, off, epoch -> requests += off to epoch },
+                )
+            }
+        }
+        compose.onNodeWithTag("playback-options-subtitles-default").assertIsFocused()
+        compose.pressKey(Key.DirectionDown)
+        compose.mainClock.advanceTimeBy(PLAYBACK_QUICK_LIST_SETTLE_MS + 32)
+        compose.waitForIdle()
+        assertEquals(listOf(true to 7L), requests)
+        compose.runOnIdle { quickList.restoreStart() }
+        assertEquals(listOf(true to 7L, false to 7L), requests)
+    }
+
+    /**
+     * A recording without marked ad breaks shows the row dimmed and focus passes it by; once
+     * breaks are marked it opens on the recording's own choice, and its first row goes back
+     * to the setting.
+     */
+    @Test fun adBreaksRowOpensOnlyWithMarkedBreaksAndItsFirstRowFollowsTheSettingAgain() {
+        var page by mutableStateOf(PlaybackOptionsPage.ROOT)
+        val selections = mutableListOf<AdBreakMode?>()
+        fun option(marked: Boolean) =
+            RecordingAdBreakOption(marked, AdBreakMode.ASK, AdBreakMode.AUTOMATIC, select = { selections += it })
+        var adBreaks by mutableStateOf(option(marked = false))
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                PlaybackOptionsSheetContent(
+                    page, emptyList(), emptyList(), false, AspectRatioMode.FIT, PlayerStatsLevel.OFF,
+                    onPageChange = { page = it }, onAudioTrackSelected = {}, onSubtitleTrackSelected = {},
+                    onAspectRatioChange = {}, onStatsLevelChange = {}, recording = true, adBreaks = adBreaks,
+                )
+            }
+        }
+        val row = "playback-options-ad-breaks"
+        val resources = ApplicationProvider.getApplicationContext<Application>().resources
+        compose.onNodeWithTag(row).assertIsNotEnabled().assert(hasText(resources.getString(R.string.ad_breaks_none_marked)))
+        compose.onNodeWithTag("playback-options-audio").assertIsFocused()
+        compose.pressKey(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
+        compose.onNodeWithTag("playback-options-stats").assertIsFocused()
+
+        compose.changeState { adBreaks = option(marked = true) }
+        compose.onNodeWithTag(row).assertIsEnabled()
+        compose.pressKey(Key.DirectionUp)
+        compose.onNodeWithTag(row).assertIsFocused()
+        compose.pressKey(Key.DirectionCenter)
+        assertEquals(PlaybackOptionsPage.AD_BREAKS, page)
+        compose.onNodeWithTag("$row-AUTOMATIC").assertIsFocused()
+        compose.pressKey(Key.DirectionUp)
+        compose.pressKey(Key.DirectionUp)
+        compose.onNodeWithTag("$row-DEFAULT").assertIsFocused()
+        compose.pressKey(Key.DirectionCenter)
+        assertEquals(listOf<AdBreakMode?>(null), selections)
+    }
+
+    @Test fun liveStreamProfilesFollowServerOrderAndDefaultAndDisappearFromRecordings() {
+        val observation = SessionObservation.create(
+            SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
+            ChannelRepositoryState.Current(ChannelCatalog.create()),
+            EpgRepositoryState.Current(EpgSnapshot.create()),
+            DvrRepositoryState.Current(DvrSnapshot.create()),
+        )
+        val profiles = (listOf("htsp", "A long server profile name") + (3..18).map { "Profile $it" }).mapIndexed { index, name ->
+            StreamProfile(StreamProfileId((index + 1).toString().padStart(32, '0')), name, "")
+        }
+        val available = StreamProfilesResult.Available.create(profiles, requireNotNull(observation.currentSession))
+        var result by mutableStateOf<StreamProfilesResult>(StreamProfilesResult.Failed(TvheadendFailure.NOT_READY))
+        var choice by mutableStateOf<String?>(profiles[1].id.value)
+        var recording by mutableStateOf(false)
+        var page by mutableStateOf(PlaybackOptionsPage.ROOT)
+        val picks = mutableListOf<StreamProfileId?>()
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                PlaybackOptionsSheetContent(
+                    page, emptyList(), emptyList(), false, AspectRatioMode.FIT, PlayerStatsLevel.OFF,
+                    { page = it }, {}, {}, {}, {}, recording = recording,
+                    streamProfile = LiveStreamProfileOption(result, true, profiles[0].id, choice) {
+                        picks += it; choice = it?.value
+                    },
+                )
+            }
+        }
+        val root = "playback-options-stream-profile"
+        compose.onNodeWithTag(root).assertIsNotEnabled()
+        compose.pressKey(Key.DirectionDown)
+        compose.onNodeWithTag("playback-options-display").assertIsFocused()
+        compose.pressKey(Key.DirectionDown)
+        compose.onNodeWithTag("playback-options-stats").assertIsFocused()
+        compose.changeState { result = available }
+        compose.onNodeWithTag(root).assertIsEnabled().assert(hasText(profiles[1].name))
+        compose.pressKey(Key.DirectionUp)
+        compose.onNodeWithTag(root).assertIsFocused()
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("$root-${profiles[1].id.value}").assertIsFocused().assertIsSelected()
+        compose.onAllNodes(isSelected()).assertCountEquals(1)
+        compose.pressKey(Key.DirectionUp)
+        compose.onNodeWithTag("$root-${profiles[0].id.value}").assertIsFocused().assert(hasText("htsp"))
+        compose.pressKey(Key.DirectionUp)
+        compose.onNodeWithTag("$root-default").assertIsFocused()
+        compose.pressKey(Key.DirectionCenter)
+        assertEquals(listOf<StreamProfileId?>(null), picks)
+        compose.onNodeWithTag("$root-default").assertIsFocused().assertIsSelected()
+        compose.onAllNodes(isSelected()).assertCountEquals(1)
+        compose.changeState { choice = profiles.last().id.value; page = PlaybackOptionsPage.ROOT }
+        compose.onNodeWithTag(root).performSemanticsAction(SemanticsActions.RequestFocus)
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("$root-${profiles.last().id.value}").assertIsFocused().assertIsSelected()
+        compose.pressKey(Key.DirectionDown)
+        compose.onNodeWithTag("$root-${profiles.last().id.value}").assertIsFocused()
+        compose.pressKey(Key.DirectionUp)
+        compose.onNodeWithTag("$root-${profiles[profiles.lastIndex - 1].id.value}").assertIsFocused()
+        compose.changeState { result = StreamProfilesResult.Failed(TvheadendFailure.NOT_READY) }
+        compose.onNodeWithTag("$root-default").assertDoesNotExist()
+        assertEquals(PlaybackOptionsPage.ROOT, page)
+        compose.onNodeWithTag(root).assertIsNotEnabled()
+        compose.onNodeWithTag("playback-options-display").assertIsFocused()
+        compose.changeState { result = available; choice = null }
+        val resources = ApplicationProvider.getApplicationContext<Application>().resources
+        compose.onNodeWithTag(root).assert(hasText(
+            resources.getString(R.string.playback_option_default, resources.getString(R.string.profile_direct_streaming)),
+        ))
+        compose.changeState { recording = true }
+        compose.onNodeWithTag(root).assertDoesNotExist()
     }
 
     private var chosen: String? = null

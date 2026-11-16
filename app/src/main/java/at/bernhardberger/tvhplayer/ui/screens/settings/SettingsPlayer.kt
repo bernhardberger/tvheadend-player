@@ -162,7 +162,9 @@ internal fun settingsStreamProfileLevel(
     val direct = stringResource(R.string.profile_direct_streaming)
     val profiles = ui.profiles as? StreamProfilesResult.Available
     val rows = if (profiles == null) {
-        listOf(settingsRow("profiles-status", streamProfilesStatus(ui).orEmpty(), enabled = false))
+        listOf(settingsRow(
+            "profiles-status", streamProfilesStatus(ui.profiles, ui.connected).orEmpty(), enabled = false,
+        ))
     } else buildList {
         add(settingsRow(STREAM_PROFILE_DEFAULT, stringResource(R.string.profile_server_default),
             selected = ui.selectedProfileId == null, onClick = { onSelect(null) }))
@@ -182,17 +184,17 @@ private fun streamProfileRowId(id: StreamProfileId) = "profile-${id.value}"
 
 /** Why the profiles can't be chosen yet, or null once the server has listed them. */
 @Composable
-private fun streamProfilesStatus(ui: SettingsPlayerUiState): String? = when (ui.profiles) {
+internal fun streamProfilesStatus(profiles: StreamProfilesResult, connected: Boolean): String? = when (profiles) {
     StreamProfilesResult.Failed(TvheadendFailure.NOT_READY) ->
-        stringResource(if (ui.connected) R.string.loading_wait else R.string.not_connected)
+        stringResource(if (connected) R.string.loading_wait else R.string.not_connected)
     is StreamProfilesResult.Available -> null
     else -> stringResource(R.string.stream_profiles_unavailable)
 }
 
 /** The chosen profile's name; a saved profile the server no longer lists reads as Server default. */
 @Composable
-private fun streamProfileLabel(ui: SettingsPlayerUiState): String {
-    val selected = (ui.profiles as? StreamProfilesResult.Available)?.profiles?.firstOrNull { it.id == ui.selectedProfileId }
+internal fun streamProfileLabel(profiles: StreamProfilesResult, selectedProfileId: StreamProfileId?): String {
+    val selected = (profiles as? StreamProfilesResult.Available)?.profiles?.firstOrNull { it.id == selectedProfileId }
         ?: return stringResource(R.string.profile_server_default)
     return streamProfilePresentation(selected.name, stringResource(R.string.profile_direct_streaming)).primaryLabel
 }
@@ -220,7 +222,7 @@ internal fun settingsPlayerLevel(
     onTunnelingEnabledChanged: (Boolean) -> Unit = {},
     onSkipCutsChanged: (Boolean) -> Unit = {},
 ): DepthLevel {
-    val profilesStatus = streamProfilesStatus(ui)
+    val profilesStatus = streamProfilesStatus(ui.profiles, ui.connected)
     return settingsLevel(SettingsSection.PLAYER.name, stringResource(R.string.settings_player), listOf(
         settingsRow("autoplay", stringResource(R.string.auto_start_playback), checked = ui.autoStartPlayback,
             onClick = { onAutoStartPlaybackChanged(!ui.autoStartPlayback) }),
@@ -235,7 +237,8 @@ internal fun settingsPlayerLevel(
                 else stringResource(R.string.keep_channel_needs_timeshift, stringResource(R.string.timeshift_setting)),
             child = KEEP_CHANNEL_LEVEL.takeIf { ui.timeshiftEnabled }, enabled = ui.timeshiftEnabled),
     ) + settingsRecordingMarksRows(ui, onSkipCutsChanged) + listOf(
-        settingsRow(STREAM_PROFILE_LEVEL, stringResource(R.string.profile), profilesStatus ?: streamProfileLabel(ui),
+        settingsRow(STREAM_PROFILE_LEVEL, stringResource(R.string.profile),
+            profilesStatus ?: streamProfileLabel(ui.profiles, ui.selectedProfileId),
             child = STREAM_PROFILE_LEVEL.takeIf { profilesStatus == null }, enabled = profilesStatus == null,
             section = stringResource(R.string.settings_section_streaming)),
         settingsRow(STARTUP_BUFFER_LEVEL, stringResource(R.string.startup_buffer_setting),
@@ -244,7 +247,9 @@ internal fun settingsPlayerLevel(
             frameRateSwitchingLabel(ui.frameRateSwitching), child = FRAME_RATE_LEVEL,
             section = stringResource(R.string.settings_section_picture)),
         settingsRow("tunneling", stringResource(R.string.tunneling_setting),
-            supporting = stringResource(R.string.tunneling_setting_description), checked = ui.tunnelingEnabled,
+            supporting = stringResource(
+                if (ui.tunnelingEnabled && ui.tunnelingFallbackActive) R.string.tunneling_setting_fallback
+                else R.string.tunneling_setting_description), checked = ui.tunnelingEnabled,
             section = stringResource(R.string.settings_section_experimental),
             onClick = { onTunnelingEnabledChanged(!ui.tunnelingEnabled) }),
     ))

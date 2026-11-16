@@ -342,6 +342,7 @@
     <string name="audio_description">Audiodeskription</string>
     <string name="audio_description_description">Bevorzugt Tonspuren mit Bildbeschreibung, wenn vorhanden.</string>
     <string name="subtitle_follow_system">Untertiteleinstellungen des Systems verwenden</string>
+    <string name="subtitle_follow_system_short">Systemuntertitel</string>
     <string name="player_status_rec">REC</string>
     <string name="setup_connection">Verbindung bearbeiten</string>
     <string name="setup_connection_description">Serveradresse, Port und Konto</string>
@@ -842,6 +843,7 @@
     <string name="refresh_rate_matching_setting_description">Android darf die Bildwiederholrate des Displays an das Video anpassen, wenn dies unterstützt wird.</string>
     <string name="tunneling_setting">Tunnel-Wiedergabe</string>
     <string name="tunneling_setting_description">Leitet das Video direkt an den Fernseher, wenn der Decoder das unterstützt. Kann das Bild kurz unterbrechen.</string>
+    <string name="tunneling_setting_fallback">Wird bis zum Neustart der App nicht verwendet. Dieses Gerät konnte damit keinen Ton wiedergeben.</string>
     <string name="play">Abspielen</string>
     <string name="play_recording">Aufnahme abspielen</string>
 
@@ -1124,6 +1126,8 @@
     <string name="ad_breaks_automatic_help">Überspringt jede Werbepause einmal. Wenn du in die Pause zurückspulst, wird sie abgespielt.</string>
     <string name="ad_breaks_off">Aus</string>
     <string name="ad_breaks_off_help">Werbepausen werden wie der Rest abgespielt. Sie bleiben in der Zeitleiste sichtbar.</string>
+    <string name="ad_breaks_none_marked">Keine markiert</string>
+    <string name="playback_option_default">Standard (%1$s)</string>
     <string name="skip_cuts_setting">Schnitte überspringen</string>
     <string name="skip_cuts_setting_description">Überspringt als Schnitte markierte Abschnitte. Die Aufnahme selbst wird nicht gekürzt.</string>
     <string name="skip_landing_setting">Sprungziel</string>

@@ -8,6 +8,10 @@ enum class PlaybackOptionsPage {
     AUDIO,
     SUBTITLES,
     DISPLAY,
+    STREAM_PROFILE,
+
+    /** A recording's own ad-break handling; the live player has no such page. */
+    AD_BREAKS,
     STATS,
 }
 
@@ -20,6 +24,7 @@ enum class PlaybackTrackContentState {
 sealed interface PlaybackTrackFocusTarget {
     data object HeaderBack : PlaybackTrackFocusTarget
     data object SubtitlesOff : PlaybackTrackFocusTarget
+    data object SubtitlesDefault : PlaybackTrackFocusTarget
     data class Track(
         val key: String,
         val lazyIndex: Int,
@@ -47,12 +52,15 @@ fun playbackTrackFocusTarget(
     trackKeys: List<String>,
     selectedTrackKey: String?,
     subtitles: Boolean,
+    subtitleDefaultOffered: Boolean = false,
+    subtitlesDefault: Boolean = false,
 ): PlaybackTrackFocusTarget {
+    if (subtitles && subtitleDefaultOffered && subtitlesDefault) return PlaybackTrackFocusTarget.SubtitlesDefault
     val selectedIndex = selectedTrackKey?.let(trackKeys::indexOf)?.takeIf { it >= 0 }
     if (selectedIndex != null) {
         return PlaybackTrackFocusTarget.Track(
             key = trackKeys[selectedIndex],
-            lazyIndex = selectedIndex + if (subtitles) 1 else 0,
+            lazyIndex = selectedIndex + if (subtitles) (if (subtitleDefaultOffered) 2 else 1) else 0,
         )
     }
     if (subtitles) return PlaybackTrackFocusTarget.SubtitlesOff
@@ -70,10 +78,15 @@ fun playbackQuickListOffered(page: PlaybackOptionsPage, trackCount: Int): Boolea
     else -> false
 }
 
-fun playbackOptionsCategories(): List<PlaybackOptionsPage> =
-        listOf(
-            PlaybackOptionsPage.AUDIO,
-            PlaybackOptionsPage.SUBTITLES,
-            PlaybackOptionsPage.DISPLAY,
-            PlaybackOptionsPage.STATS,
-        )
+/** The root's pages in row order; [adBreaks] adds the recording player's ad-break page. */
+fun playbackOptionsCategories(
+    adBreaks: Boolean = false,
+    streamProfiles: Boolean = false,
+): List<PlaybackOptionsPage> = buildList {
+    add(PlaybackOptionsPage.AUDIO)
+    add(PlaybackOptionsPage.SUBTITLES)
+    add(PlaybackOptionsPage.DISPLAY)
+    if (streamProfiles) add(PlaybackOptionsPage.STREAM_PROFILE)
+    if (adBreaks) add(PlaybackOptionsPage.AD_BREAKS)
+    add(PlaybackOptionsPage.STATS)
+}

@@ -17,6 +17,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import at.bernhardberger.tvhplayer.playback.PlaybackFrameRate
+import at.bernhardberger.tvhplayer.playback.AppTunnelingState
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -24,6 +25,13 @@ import kotlin.time.Duration
 import kotlinx.coroutines.delay
 
 internal enum class MatchFrameRatePreference { NEVER, SEAMLESS_ONLY, ALWAYS }
+
+internal fun tunnelingText(state: AppTunnelingState): String = when (state) {
+    AppTunnelingState.OFF -> "off"
+    AppTunnelingState.ON -> "on"
+    AppTunnelingState.REQUESTED_NOT_ACTIVE -> "requested, not active"
+    AppTunnelingState.OFF_AFTER_AUDIO_ERROR -> "off after audio output error"
+}
 
 /** The active display mode and what the panel offers at its resolution, already formatted. */
 internal data class DisplayOutput(

@@ -10,6 +10,17 @@ class PlaybackOptionsPolicyTest {
             listOf(PlaybackOptionsPage.AUDIO, PlaybackOptionsPage.SUBTITLES, PlaybackOptionsPage.DISPLAY, PlaybackOptionsPage.STATS),
             playbackOptionsCategories(),
         )
+        assertEquals(
+            "a recording's ad breaks sit between the picture and the stats",
+            listOf(PlaybackOptionsPage.AUDIO, PlaybackOptionsPage.SUBTITLES, PlaybackOptionsPage.DISPLAY,
+                PlaybackOptionsPage.AD_BREAKS, PlaybackOptionsPage.STATS),
+            playbackOptionsCategories(adBreaks = true),
+        )
+        assertEquals(
+            listOf(PlaybackOptionsPage.AUDIO, PlaybackOptionsPage.SUBTITLES, PlaybackOptionsPage.DISPLAY,
+                PlaybackOptionsPage.STREAM_PROFILE, PlaybackOptionsPage.STATS),
+            playbackOptionsCategories(streamProfiles = true),
+        )
     }
 
     @Test
@@ -58,6 +69,20 @@ class PlaybackOptionsPolicyTest {
 
     @Test
     fun subtitleFocusUsesSelectionThenFallsBackToOff() {
+        assertEquals(
+            PlaybackTrackFocusTarget.SubtitlesDefault,
+            playbackTrackFocusTarget(
+                trackKeys = listOf("sub-en"), selectedTrackKey = "sub-en", subtitles = true,
+                subtitleDefaultOffered = true, subtitlesDefault = true,
+            ),
+        )
+        assertEquals(
+            PlaybackTrackFocusTarget.track(key = "sub-de", lazyIndex = 3),
+            playbackTrackFocusTarget(
+                trackKeys = listOf("sub-en", "sub-de"), selectedTrackKey = "sub-de", subtitles = true,
+                subtitleDefaultOffered = true,
+            ),
+        )
         assertEquals(
             PlaybackTrackFocusTarget.track(key = "sub-de", lazyIndex = 2),
             playbackTrackFocusTarget(

@@ -416,6 +416,7 @@
     <string name="audio_description">الوصف الصوتي</string>
     <string name="audio_description_description">تفضيل المسارات ذات الوصف الصوتي عند توفرها.</string>
     <string name="subtitle_follow_system">اتباع إعدادات الترجمة في النظام</string>
+    <string name="subtitle_follow_system_short">ترجمة النظام</string>
     <string name="player_status_rec">جارٍ التسجيل</string>
     <string name="setup_connection">تعديل الاتصال</string>
     <string name="setup_connection_description">عنوان الخادم والمنفذ والحساب</string>
@@ -943,6 +944,8 @@
     <string name="ad_breaks_automatic_help">يتم تخطي كل فاصل مرة واحدة. عند الرجوع إلى موضع داخل الفاصل، يتم تشغيله.</string>
     <string name="ad_breaks_off">إيقاف</string>
     <string name="ad_breaks_off_help">يتم تشغيل الفواصل الإعلانية مثل بقية التسجيل. وتظل ظاهرة على المخطط الزمني.</string>
+    <string name="ad_breaks_none_marked">لا فواصل محددة</string>
+    <string name="playback_option_default">افتراضي (%1$s)</string>
     <string name="skip_cuts_setting">تخطي المقاطع المستبعدة</string>
     <string name="skip_cuts_setting_description">يتم تخطي الأجزاء المحددة كمقاطع مستبعدة. ولا يتم تقصير التسجيل نفسه.</string>
     <string name="skip_landing_setting">موضع الاستئناف</string>
@@ -1002,6 +1005,7 @@
     <string name="refresh_rate_matching_setting_description">يتيح لـ Android مطابقة معدل تحديث الشاشة مع الفيديو عند الدعم.</string>
     <string name="tunneling_setting">تشغيل نفقي</string>
     <string name="tunneling_setting_description">يرسل الفيديو مباشرةً إلى التلفزيون عندما يدعم مفكك الترميز ذلك. قد تنقطع الصورة للحظة.</string>
+    <string name="tunneling_setting_fallback">لا يُستخدم حتى إعادة تشغيل التطبيق. تعذّر على هذا الجهاز تشغيل الصوت بهذا الوضع.</string>
     <string name="play">تشغيل</string>
     <string name="play_recording">تشغيل التسجيل</string>
     <string name="status_disconnected_reconnecting">فُقد الاتصال. جارٍ إعادة الاتصال\u2026</string>

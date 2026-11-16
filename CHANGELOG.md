@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Playback
+
+- A channel can have its own stream profile: *Stream profile* in the live player's options lists the server's profiles, and the one you pick is used every time you tune that channel. *Default* follows the profile under Settings → Playback again. Picking a profile tunes the channel again, so what you paused or could rewind to is gone (#38).
+- A subtitle track, or *Off*, picked on a channel comes back the next time you watch that channel, the same way its audio track does. *Default* at the top of the list follows the Subtitles setting again (#38).
+- Turning subtitles off on one channel no longer turns them off on every channel and recording that follows.
+- On a channel with two audio tracks of the same language and format, the one you pick stays selected instead of switching back.
+- With *Tunneled playback* on, a device that can't open its audio output that way no longer stops with audio error 5001. The player turns tunneling off until the app restarts and starts the channel or recording again; on live TV, what you paused or could rewind to is gone. The setting stays on and says that it isn't in use, and *Stats for nerds* with debug details shows the tunneling state (#43).
+
+### Recordings
+
+- The playback options of a recording have an *Ad breaks* entry: *Ask*, *Skip automatically* or *Off* for this recording only, remembered the next time you play it. *Default* follows the setting under Settings → Playback again. The entry is dimmed while the recording has no marked ad breaks (#38).
+
 ### Remote buttons
 
 - The GUIDE button opens the Guide from every screen, not only from the startup screen and the live player, where it still shows the channel's schedule. The TV button starts live TV on the last channel from every screen (#33).

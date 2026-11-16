@@ -339,7 +339,9 @@ class SettingsDepthNavigationTest {
                             settingsPlayerLevel(ui,
                                 onTimeshiftEnabledChanged = { ui = ui.copy(timeshiftEnabled = it) },
                                 onAutoStartPlaybackChanged = { ui = ui.copy(autoStartPlayback = it) },
-                                onTunnelingEnabledChanged = { ui = ui.copy(tunnelingEnabled = it) }),
+                                onTunnelingEnabledChanged = {
+                                    ui = ui.copy(tunnelingEnabled = it, tunnelingFallbackActive = false)
+                                }),
                             settingsAudioLevel(ui,
                                 onAudioPassthroughEnabledChanged = { ui = ui.copy(audioPassthroughEnabled = it) },
                                 onAudioDescriptionChanged = { ui = ui.copy(audioDescription = it) }),
@@ -363,6 +365,12 @@ class SettingsDepthNavigationTest {
         assertAccessibleSwitch(tag, checked = false)
         press(Key.DirectionCenter)
         assertAccessibleSwitch(tag, checked = true)
+        if (rowId == "tunneling") {
+            compose.runOnIdle { ui = ui.copy(tunnelingFallbackActive = true) }
+            compose.onNodeWithTag(tag).assert(hasText(RuntimeEnvironment.getApplication()
+                .getString(at.bernhardberger.tvhplayer.R.string.tunneling_setting_fallback)))
+            assertAccessibleSwitch(tag, checked = true)
+        }
         press(Key.Back)
         compose.onNodeWithTag("settings-row-${section.name}").assertIsFocused()
         press(Key.DirectionCenter)

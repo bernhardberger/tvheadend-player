@@ -359,6 +359,7 @@
     <string name="audio_description">תיאור קולי</string>
     <string name="audio_description_description">העדפת רצועות עם תיאור קולי, כשיש כאלה.</string>
     <string name="subtitle_follow_system">בהתאם להגדרות הכתוביות במערכת</string>
+    <string name="subtitle_follow_system_short">כתוביות המערכת</string>
     <string name="player_status_rec">הקלטה פעילה</string>
     <string name="setup_connection">עריכת חיבור</string>
     <string name="setup_connection_description">כתובת שרת, יציאה וחשבון</string>
@@ -838,6 +839,8 @@
     <string name="ad_breaks_automatic_help">כל הפסקה מדולגת פעם אחת. חזרה לאחור לתוך ההפסקה תפעיל את הניגון שלה.</string>
     <string name="ad_breaks_off">כבוי</string>
     <string name="ad_breaks_off_help">הפסקות פרסומות מנוגנות כמו שאר ההקלטה. הן עדיין מופיעות בציר הזמן.</string>
+    <string name="ad_breaks_none_marked">אין הפסקות מסומנות</string>
+    <string name="playback_option_default">ברירת מחדל (%1$s)</string>
     <string name="skip_cuts_setting">דילוג על קטעים לחיתוך</string>
     <string name="skip_cuts_setting_description">דילוג על חלקים שסומנו לחיתוך. ההקלטה עצמה אינה מתקצרת.</string>
     <string name="skip_landing_setting">נקודת המשך הניגון</string>
@@ -897,6 +900,7 @@
     <string name="refresh_rate_matching_setting_description">מאפשר ל-Android להתאים את קצב רענון המסך לסרטון, כאשר יש תמיכה.</string>
     <string name="tunneling_setting">ניגון במנהור</string>
     <string name="tunneling_setting_description">שולח וידאו ישירות לטלוויזיה כאשר המפענח תומך בכך. ייתכן ניתוק קצר בתמונה.</string>
+    <string name="tunneling_setting_fallback">אינו בשימוש עד להפעלה מחדש של האפליקציה. המכשיר לא הצליח לנגן שמע במצב זה.</string>
     <string name="play">ניגון</string>
     <string name="play_recording">ניגון ההקלטה</string>
     <string name="status_disconnected_reconnecting">החיבור אבד. מתבצע חיבור מחדש\u2026</string>

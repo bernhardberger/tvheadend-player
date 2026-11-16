@@ -445,6 +445,8 @@
     <string name="audio_description">Audio description</string>
     <string name="audio_description_description">Prefers narrated tracks when available.</string>
     <string name="subtitle_follow_system">Follow system caption settings</string>
+    <!-- Short Subtitles setting value inside the player’s “Default (%1$s)” row. -->
+    <string name="subtitle_follow_system_short">System captions</string>
     <string name="player_status_rec">REC</string>
     <string name="setup_connection">Edit connection</string>
     <string name="setup_connection_description">Server address, port and account</string>
@@ -968,6 +970,10 @@
     <string name="ad_breaks_automatic_help">Jumps over each break once. Seeking back into it plays it.</string>
     <string name="ad_breaks_off">Off</string>
     <string name="ad_breaks_off_help">Ad breaks play like the rest. They still show on the timeline.</string>
+    <!-- Value of the recording player's Ad breaks option when the recording has no marked ad breaks. -->
+    <string name="ad_breaks_none_marked">None marked</string>
+    <!-- A player option that follows the setting; %1$s is the setting's current value, such as Ask. -->
+    <string name="playback_option_default">Default (%1$s)</string>
     <string name="skip_cuts_setting">Skip cuts</string>
     <string name="skip_cuts_setting_description">Skips parts marked as cuts. The recording itself is not shortened.</string>
     <string name="skip_landing_setting">Skip lands</string>
@@ -1029,6 +1035,8 @@
     <string name="refresh_rate_matching_setting_description">Let Android match the display refresh rate to the video when supported.</string>
     <string name="tunneling_setting">Tunneled playback</string>
     <string name="tunneling_setting_description">Sends video straight to the TV when the decoder supports it. May briefly interrupt the picture.</string>
+    <!-- Supporting text while tunneled playback is disabled for this app run after audio output failed. -->
+    <string name="tunneling_setting_fallback">Not in use until the app restarts. This device couldn\'t play audio with it.</string>
 
     <string name="play">Play</string>
     <string name="play_recording">Play recording</string>
