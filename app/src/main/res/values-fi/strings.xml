@@ -340,6 +340,7 @@
     <string name="audio_description">Kuvailutulkkaus</string>
     <string name="audio_description_description">Suosii kuvailutulkattuja ääniraitoja, kun niitä on saatavilla.</string>
     <string name="subtitle_follow_system">Noudata järjestelmän tekstitysasetuksia</string>
+    <string name="subtitle_follow_system_short">Järjestelmän tekstitys</string>
     <string name="player_status_rec">REC</string>
     <string name="setup_connection">Muokkaa yhteyttä</string>
     <string name="setup_connection_description">Palvelimen osoite, portti ja tili</string>
@@ -803,6 +804,8 @@
     <string name="ad_breaks_automatic_help">Ohittaa jokaisen katkon kerran. Jos kelaat takaisin katkon kohdalle, se toistetaan.</string>
     <string name="ad_breaks_off">Pois</string>
     <string name="ad_breaks_off_help">Mainoskatkot toistetaan kuten muukin sisältö. Ne näkyvät edelleen aikajanalla.</string>
+    <string name="ad_breaks_none_marked">Ei merkittyjä</string>
+    <string name="playback_option_default">Oletus (%1$s)</string>
     <string name="skip_cuts_setting">Ohita leikkaukset</string>
     <string name="skip_cuts_setting_description">Ohittaa leikkauksiksi merkityt osat. Itse tallennetta ei lyhennetä.</string>
     <string name="skip_landing_setting">Toiston jatkokohta</string>

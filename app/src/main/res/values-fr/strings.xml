@@ -359,6 +359,7 @@
     <string name="audio_description">Audiodescription</string>
     <string name="audio_description_description">Privilégie les pistes avec audiodescription si disponibles.</string>
     <string name="subtitle_follow_system">Suivre les réglages système des sous-titres</string>
+    <string name="subtitle_follow_system_short">Sous-titres système</string>
     <string name="player_status_rec">ENR</string>
     <string name="setup_connection">Modifier la connexion</string>
     <string name="setup_connection_description">Adresse du serveur, port et compte</string>
@@ -838,6 +839,8 @@
     <string name="ad_breaks_automatic_help">Passe chaque pause une fois. Si tu reviens en arrière dans la pause, elle est lue.</string>
     <string name="ad_breaks_off">Désactivé</string>
     <string name="ad_breaks_off_help">Les pauses publicitaires sont lues comme le reste. Elles restent visibles sur la chronologie.</string>
+    <string name="ad_breaks_none_marked">Aucune marquée</string>
+    <string name="playback_option_default">Par défaut (%1$s)</string>
     <string name="skip_cuts_setting">Passer les coupures</string>
     <string name="skip_cuts_setting_description">Passe les parties marquées comme coupures. L’enregistrement lui-même n’est pas raccourci.</string>
     <string name="skip_landing_setting">Point de reprise</string>

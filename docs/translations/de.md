@@ -48,6 +48,8 @@ Existing German strings predate this workflow; they are kept and only changed fo
 
 0.5 details action `context_record_title` shortened to "Record all" (English) against `e00c95bb`, reusing this file's `autorec_editor_duplicate_all` wording where it fits, reviewed by Sonnet 5.5 (medium); still machine-drafted, no human reviewer.
 
+0.5 player options strings `playback_option_default`, `ad_breaks_none_marked` and `subtitle_follow_system_short` drafted against `350475f8` by GPT-6.1 Sol (medium) and reviewed by Sonnet 5.5 (medium); still machine-drafted, no human reviewer.
+
 ## Open questions
 
 - Check TTS pronunciation of the hyphenated speed multipliers in `player_scrub_*`.

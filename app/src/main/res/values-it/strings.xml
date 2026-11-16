@@ -359,6 +359,7 @@
     <string name="audio_description">Audiodescrizione</string>
     <string name="audio_description_description">Preferisce le tracce con audiodescrizione, se disponibili.</string>
     <string name="subtitle_follow_system">Segui le impostazioni di sistema per i sottotitoli</string>
+    <string name="subtitle_follow_system_short">Sottotitoli di sistema</string>
     <string name="player_status_rec">REC</string>
     <string name="setup_connection">Modifica connessione</string>
     <string name="setup_connection_description">Indirizzo del server, porta e account</string>
@@ -838,6 +839,8 @@
     <string name="ad_breaks_automatic_help">Salta ogni pausa una volta. Se torni indietro nella pausa, viene riprodotta.</string>
     <string name="ad_breaks_off">Disattivo</string>
     <string name="ad_breaks_off_help">Le pause pubblicitarie vengono riprodotte come il resto. Restano visibili sulla sequenza temporale.</string>
+    <string name="ad_breaks_none_marked">Nessuna segnalata</string>
+    <string name="playback_option_default">Predefinito (%1$s)</string>
     <string name="skip_cuts_setting">Salta tagli</string>
     <string name="skip_cuts_setting_description">Salta le parti segnate come tagli. La registrazione stessa non viene accorciata.</string>
     <string name="skip_landing_setting">Punto di ripresa</string>

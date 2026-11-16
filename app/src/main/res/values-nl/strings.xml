@@ -340,6 +340,7 @@
     <string name="audio_description">Audiodescriptie</string>
     <string name="audio_description_description">Geeft waar beschikbaar de voorkeur aan audiodescriptie.</string>
     <string name="subtitle_follow_system">Ondertitelinstellingen van het systeem volgen</string>
+    <string name="subtitle_follow_system_short">Systeemondertiteling</string>
     <string name="player_status_rec">REC</string>
     <string name="setup_connection">Verbinding bewerken</string>
     <string name="setup_connection_description">Serveradres, poort en account</string>
@@ -803,6 +804,8 @@
     <string name="ad_breaks_automatic_help">Slaat elk reclameblok één keer over. Als je erin terugspoelt, wordt het afgespeeld.</string>
     <string name="ad_breaks_off">Uit</string>
     <string name="ad_breaks_off_help">Reclameblokken worden net als de rest afgespeeld. Ze blijven zichtbaar op de tijdlijn.</string>
+    <string name="ad_breaks_none_marked">Geen gemarkeerd</string>
+    <string name="playback_option_default">Standaard (%1$s)</string>
     <string name="skip_cuts_setting">Knippen overslaan</string>
     <string name="skip_cuts_setting_description">Slaat delen over die als knip zijn gemarkeerd. De opname zelf wordt niet ingekort.</string>
     <string name="skip_landing_setting">Hervatpunt</string>

@@ -321,6 +321,7 @@
     <string name="audio_description">口述影像</string>
     <string name="audio_description_description">有口述影像音軌時優先使用。</string>
     <string name="subtitle_follow_system">依照系統字幕設定</string>
+    <string name="subtitle_follow_system_short">系統字幕</string>
     <string name="player_status_rec">錄影中</string>
     <string name="setup_connection">編輯連線</string>
     <string name="setup_connection_description">伺服器位址、連接埠及帳號</string>
@@ -740,6 +741,8 @@
     <string name="ad_breaks_automatic_help">每個廣告時段只略過一次。倒轉回該時段內即可播放。</string>
     <string name="ad_breaks_off">關閉</string>
     <string name="ad_breaks_off_help">廣告時段與其他內容一樣正常播放，仍會顯示在時間軸上。</string>
+    <string name="ad_breaks_none_marked">未標記</string>
+    <string name="playback_option_default">預設（%1$s）</string>
     <string name="skip_cuts_setting">略過剪除片段</string>
     <string name="skip_cuts_setting_description">略過標記為剪除的片段。錄影本身不會縮短。</string>
     <string name="skip_landing_setting">略過後的位置</string>

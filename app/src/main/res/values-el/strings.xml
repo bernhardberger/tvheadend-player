@@ -340,6 +340,7 @@
     <string name="audio_description">Ηχητική περιγραφή</string>
     <string name="audio_description_description">Προτιμά ηχητικά κομμάτια με περιγραφή, όταν είναι διαθέσιμα.</string>
     <string name="subtitle_follow_system">Χρήση ρυθμίσεων υποτίτλων συστήματος</string>
+    <string name="subtitle_follow_system_short">Υπότιτλοι συστήματος</string>
     <string name="player_status_rec">ΕΓΓ</string>
     <string name="setup_connection">Επεξεργασία σύνδεσης</string>
     <string name="setup_connection_description">Διεύθυνση διακομιστή, θύρα και λογαριασμός</string>
@@ -803,6 +804,8 @@
     <string name="ad_breaks_automatic_help">Παραλείπει κάθε διάλειμμα μία φορά. Αν επιστρέψεις σε αυτό με μετακίνηση προς τα πίσω, αναπαράγεται.</string>
     <string name="ad_breaks_off">Ανενεργό</string>
     <string name="ad_breaks_off_help">Τα διαφημιστικά διαλείμματα αναπαράγονται όπως το υπόλοιπο περιεχόμενο. Παραμένουν ορατά στη γραμμή χρόνου.</string>
+    <string name="ad_breaks_none_marked">Κανένα σημειωμένο</string>
+    <string name="playback_option_default">Προεπιλογή (%1$s)</string>
     <string name="skip_cuts_setting">Παράλειψη περικοπών</string>
     <string name="skip_cuts_setting_description">Παραλείπει τα τμήματα που έχουν σημειωθεί ως περικοπές. Η ίδια η εγγραφή δεν συντομεύεται.</string>
     <string name="skip_landing_setting">Σημείο συνέχισης</string>

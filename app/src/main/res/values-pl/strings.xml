@@ -378,6 +378,7 @@
     <string name="audio_description">Audiodeskrypcja</string>
     <string name="audio_description_description">Preferuje ścieżki z audiodeskrypcją, jeśli są dostępne.</string>
     <string name="subtitle_follow_system">Zgodnie z systemowymi ustawieniami napisów</string>
+    <string name="subtitle_follow_system_short">Napisy systemowe</string>
     <string name="player_status_rec">NAGR</string>
     <string name="setup_connection">Edytuj połączenie</string>
     <string name="setup_connection_description">Adres serwera, port i konto</string>
@@ -873,6 +874,8 @@
     <string name="ad_breaks_automatic_help">Pomija każdą przerwę raz. Jeśli przewiniesz z powrotem do przerwy, zostanie odtworzona.</string>
     <string name="ad_breaks_off">Wyłączone</string>
     <string name="ad_breaks_off_help">Przerwy reklamowe są odtwarzane tak jak reszta. Nadal są widoczne na osi czasu.</string>
+    <string name="ad_breaks_none_marked">Brak oznaczonych</string>
+    <string name="playback_option_default">Domyślne (%1$s)</string>
     <string name="skip_cuts_setting">Pomijaj cięcia</string>
     <string name="skip_cuts_setting_description">Pomija części oznaczone jako cięcia. Samo nagranie nie jest skracane.</string>
     <string name="skip_landing_setting">Punkt wznowienia</string>

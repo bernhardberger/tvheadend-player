@@ -340,6 +340,7 @@
     <string name="audio_description">Synstolking</string>
     <string name="audio_description_description">Foretrekker lydspor med synstolking når de er tilgjengelige.</string>
     <string name="subtitle_follow_system">Følg systemets innstillinger for undertekster</string>
+    <string name="subtitle_follow_system_short">Systemets undertekster</string>
     <string name="player_status_rec">REC</string>
     <string name="setup_connection">Rediger tilkobling</string>
     <string name="setup_connection_description">Serveradresse, port og konto</string>
@@ -803,6 +804,8 @@
     <string name="ad_breaks_automatic_help">Hopper over hver pause én gang. Spoler du tilbake inn i den, spilles den av.</string>
     <string name="ad_breaks_off">Av</string>
     <string name="ad_breaks_off_help">Reklamepauser spilles av som resten. De vises fortsatt på tidslinjen.</string>
+    <string name="ad_breaks_none_marked">Ingen merkede</string>
+    <string name="playback_option_default">Standard (%1$s)</string>
     <string name="skip_cuts_setting">Hopp over klipp</string>
     <string name="skip_cuts_setting_description">Hopper over deler merket som klipp. Selve opptaket forkortes ikke.</string>
     <string name="skip_landing_setting">Fortsett etter hopp</string>

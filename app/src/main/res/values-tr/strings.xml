@@ -340,6 +340,7 @@
     <string name="audio_description">Sesli betimleme</string>
     <string name="audio_description_description">Varsa sesli betimlemeli ses parçalarını tercih eder.</string>
     <string name="subtitle_follow_system">Sistemin altyazı ayarlarını izle</string>
+    <string name="subtitle_follow_system_short">Sistem altyazıları</string>
     <string name="player_status_rec">REC</string>
     <string name="setup_connection">Bağlantıyı düzenle</string>
     <string name="setup_connection_description">Sunucu adresi, bağlantı noktası ve hesap</string>
@@ -803,6 +804,8 @@
     <string name="ad_breaks_automatic_help">Her reklam arasını bir kez atlar. Geri sararak reklam arasına dönerseniz reklamlar oynatılır.</string>
     <string name="ad_breaks_off">Kapalı</string>
     <string name="ad_breaks_off_help">Reklam araları kaydın geri kalanı gibi oynatılır. Zaman çizelgesinde görünmeye devam eder.</string>
+    <string name="ad_breaks_none_marked">İşaretli ara yok</string>
+    <string name="playback_option_default">Varsayılan (%1$s)</string>
     <string name="skip_cuts_setting">Kesilecek bölümleri atla</string>
     <string name="skip_cuts_setting_description">Kesilecek olarak işaretlenen bölümleri atlar. Kaydın kendisi kısaltılmaz.</string>
     <string name="skip_landing_setting">Devam noktası</string>

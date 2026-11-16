@@ -340,6 +340,7 @@
     <string name="audio_description">Syntolkning</string>
     <string name="audio_description_description">Föredrar ljudspår med syntolkning när de finns.</string>
     <string name="subtitle_follow_system">Följ systemets textningsinställningar</string>
+    <string name="subtitle_follow_system_short">Systemets textning</string>
     <string name="player_status_rec">REC</string>
     <string name="setup_connection">Redigera anslutning</string>
     <string name="setup_connection_description">Serveradress, port och konto</string>
@@ -803,6 +804,8 @@
     <string name="ad_breaks_automatic_help">Hoppar över varje paus en gång. Spolar du tillbaka in i den spelas den upp.</string>
     <string name="ad_breaks_off">Av</string>
     <string name="ad_breaks_off_help">Reklampauser spelas upp som resten. De visas fortfarande på tidslinjen.</string>
+    <string name="ad_breaks_none_marked">Inga markerade</string>
+    <string name="playback_option_default">Standard (%1$s)</string>
     <string name="skip_cuts_setting">Hoppa över klipp</string>
     <string name="skip_cuts_setting_description">Hoppar över delar markerade som klipp. Själva inspelningen kortas inte.</string>
     <string name="skip_landing_setting">Fortsätt efter hopp</string>

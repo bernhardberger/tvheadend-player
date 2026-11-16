@@ -321,6 +321,7 @@
     <string name="audio_description">音频描述</string>
     <string name="audio_description_description">有音频描述音轨时优先使用。</string>
     <string name="subtitle_follow_system">遵循系统字幕设置</string>
+    <string name="subtitle_follow_system_short">系统字幕</string>
     <string name="player_status_rec">录制中</string>
     <string name="setup_connection">编辑连接</string>
     <string name="setup_connection_description">服务器地址、端口和账号</string>
@@ -740,6 +741,8 @@
     <string name="ad_breaks_automatic_help">每个广告时段只跳过一次。回退到该时段内即可播放。</string>
     <string name="ad_breaks_off">关闭</string>
     <string name="ad_breaks_off_help">广告时段与其他内容一样正常播放，仍会显示在时间轴上。</string>
+    <string name="ad_breaks_none_marked">未标记</string>
+    <string name="playback_option_default">默认（%1$s）</string>
     <string name="skip_cuts_setting">跳过剪切片段</string>
     <string name="skip_cuts_setting_description">跳过标记为剪切的片段。录制内容本身不会缩短。</string>
     <string name="skip_landing_setting">跳过后的位置</string>

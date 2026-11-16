@@ -378,6 +378,7 @@
     <string name="audio_description">Тифлокомментарий</string>
     <string name="audio_description_description">Предпочитать дорожки с тифлокомментарием, если они доступны.</string>
     <string name="subtitle_follow_system">Использовать системные настройки субтитров</string>
+    <string name="subtitle_follow_system_short">Системные субтитры</string>
     <string name="player_status_rec">ЗАП</string>
     <string name="setup_connection">Редактировать подключение</string>
     <string name="setup_connection_description">Адрес сервера, порт и учётная запись</string>
@@ -873,6 +874,8 @@
     <string name="ad_breaks_automatic_help">Пропускает каждую паузу один раз. Если перемотать назад внутрь паузы, она будет воспроизведена.</string>
     <string name="ad_breaks_off">Выкл.</string>
     <string name="ad_breaks_off_help">Рекламные паузы воспроизводятся как остальная запись. Они по-прежнему видны на шкале времени.</string>
+    <string name="ad_breaks_none_marked">Нет отмеченных</string>
+    <string name="playback_option_default">По умолчанию (%1$s)</string>
     <string name="skip_cuts_setting">Пропускать вырезанные фрагменты</string>
     <string name="skip_cuts_setting_description">Пропускает фрагменты, помеченные как вырезанные. Сама запись не сокращается.</string>
     <string name="skip_landing_setting">Точка продолжения</string>

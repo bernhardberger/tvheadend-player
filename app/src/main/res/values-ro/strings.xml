@@ -359,6 +359,7 @@
     <string name="audio_description">Descriere audio</string>
     <string name="audio_description_description">Preferă pistele cu descriere audio, când sunt disponibile.</string>
     <string name="subtitle_follow_system">Urmează setările de subtitrare ale sistemului</string>
+    <string name="subtitle_follow_system_short">Subtitrări de sistem</string>
     <string name="player_status_rec">REC</string>
     <string name="setup_connection">Editează conexiunea</string>
     <string name="setup_connection_description">Adresa serverului, port și cont</string>
@@ -838,6 +839,8 @@
     <string name="ad_breaks_automatic_help">Sare peste fiecare pauză o dată. Dacă derulezi înapoi în pauză, aceasta este redată.</string>
     <string name="ad_breaks_off">Dezactivat</string>
     <string name="ad_breaks_off_help">Pauzele publicitare sunt redate ca restul înregistrării. Rămân vizibile pe cronologie.</string>
+    <string name="ad_breaks_none_marked">Nicio pauză marcată</string>
+    <string name="playback_option_default">Implicit (%1$s)</string>
     <string name="skip_cuts_setting">Sari peste tăieturi</string>
     <string name="skip_cuts_setting_description">Sare peste părțile marcate ca tăieturi. Înregistrarea în sine nu este scurtată.</string>
     <string name="skip_landing_setting">Punct de reluare</string>

@@ -378,6 +378,7 @@
     <string name="audio_description">Аудіоопис</string>
     <string name="audio_description_description">Надає перевагу доріжкам з аудіоописом, якщо вони доступні.</string>
     <string name="subtitle_follow_system">Використовувати системні налаштування субтитрів</string>
+    <string name="subtitle_follow_system_short">Системні субтитри</string>
     <string name="player_status_rec">ЗАП</string>
     <string name="setup_connection">Редагувати підключення</string>
     <string name="setup_connection_description">Адреса сервера, порт і обліковий запис</string>
@@ -873,6 +874,8 @@
     <string name="ad_breaks_automatic_help">Пропускає кожну паузу один раз. Якщо перемотати назад усередину паузи, вона відтворюватиметься.</string>
     <string name="ad_breaks_off">Вимк.</string>
     <string name="ad_breaks_off_help">Рекламні паузи відтворюються як решта запису. Вони й далі відображаються на часовій шкалі.</string>
+    <string name="ad_breaks_none_marked">Немає позначених</string>
+    <string name="playback_option_default">Типове (%1$s)</string>
     <string name="skip_cuts_setting">Пропускати вирізані фрагменти</string>
     <string name="skip_cuts_setting_description">Пропускає частини, позначені як вирізані. Сам запис не скорочується.</string>
     <string name="skip_landing_setting">Точка продовження</string>
