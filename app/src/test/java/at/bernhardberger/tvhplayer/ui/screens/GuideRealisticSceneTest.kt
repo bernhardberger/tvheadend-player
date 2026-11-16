@@ -733,7 +733,7 @@ class GuideRealisticSceneTest {
                                         lastPlayed, at.bernhardberger.tvhplayer.ui.player.TargetAspect(
                                             at.bernhardberger.tvhplayer.settings.AspectRatioMode.FIT) {}, model, session,
                                         id, channels.single { it.id == id }.name.orEmpty(), {}, { playerChannel = null },
-                                        runtime, notices = notices, uiSettingsStore = uiSettings, playerSettingsStore = settings)
+                                        runtime, notices = notices, uiSettingsStore = uiSettings)
                                 }
                             }
                         }

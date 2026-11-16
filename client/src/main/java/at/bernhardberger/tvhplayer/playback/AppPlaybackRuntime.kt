@@ -43,6 +43,8 @@ import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.FrameRateSwitching
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
+import at.bernhardberger.tvhplayer.settings.ItemChoices
+import java.io.IOException
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -55,6 +57,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
@@ -1658,6 +1662,13 @@ class AppPlaybackRuntime(
 
     val streamProfiles = profileOwner.streamProfiles
     val selectedStreamProfileId = profileOwner.selectedStreamProfileId
+    val channelStreamProfiles: StateFlow<ItemChoices<String>?> = settings.channelStreamProfiles.choices
+        .catch { if (it !is IOException) throw it }
+        .stateIn(scope, SharingStarted.Eagerly, null)
+    val subtitleLanguage: StateFlow<String?> = settings.playerSettings.map { it.subtitleLanguage }
+        .distinctUntilChanged()
+        .catch { if (it !is IOException) throw it }
+        .stateIn(scope, SharingStarted.Eagerly, null)
 
     /**
      * Retunes the last live channel. [viewerRetry]: the viewer pressed Retry, which is a fresh

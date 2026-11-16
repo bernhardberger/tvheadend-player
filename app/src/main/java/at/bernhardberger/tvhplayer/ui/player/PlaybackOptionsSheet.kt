@@ -67,6 +67,9 @@ import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import androidx.tv.material3.Icon
 import androidx.tv.material3.IconButton
 import androidx.tv.material3.ListItem
@@ -128,6 +131,35 @@ internal data class LiveStreamProfileOption(
     val choice: String?,
     val select: (StreamProfileId?) -> Unit,
 )
+
+internal data class LivePlaybackOptions(
+    val streamProfile: LiveStreamProfileOption,
+    val subtitlesDefault: Boolean,
+    val subtitleLanguage: String?,
+)
+
+@Composable
+internal fun rememberLivePlaybackOptions(
+    channel: ChannelId,
+    connected: Boolean,
+    runtime: AppPlaybackRuntime,
+    onSelect: (StreamProfileId?) -> Unit,
+): LivePlaybackOptions {
+    val choices by runtime.channelStreamProfiles.collectAsStateWithLifecycle()
+    val profiles by runtime.streamProfiles.collectAsStateWithLifecycle()
+    val setting by runtime.selectedStreamProfileId.collectAsStateWithLifecycle()
+    val latestSelect by rememberUpdatedState(onSelect)
+    val select = remember { { id: StreamProfileId? -> latestSelect(id) } }
+    val choice = choices?.get(channel.value)
+    val profile = remember(profiles, connected, setting, choice, select) {
+        LiveStreamProfileOption(profiles, connected, setting, choice, select)
+    }
+    val language by runtime.subtitleLanguage.collectAsStateWithLifecycle()
+    val subtitlesDefault by runtime.subtitlesDefault.collectAsStateWithLifecycle()
+    return remember(profile, language, subtitlesDefault) {
+        LivePlaybackOptions(profile, subtitlesDefault, language)
+    }
+}
 
 /**
  * Compact playback-dependent overlay with a structured root and detail pages.

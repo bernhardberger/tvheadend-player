@@ -163,7 +163,6 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.ensureActive
@@ -171,8 +170,6 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
-import at.bernhardberger.tvhplayer.settings.PlayerSettings
-import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import org.koin.compose.koinInject
 
 // An outgoing player can remain composed during the root's route transition.
@@ -375,15 +372,8 @@ fun VideoPlayerScreen(
     guideEntryRequestId: Long? = null,
     consumeGuideEntry: () -> Boolean = { false },
     statsStore: at.bernhardberger.tvhplayer.di.PlayerStatsStore = koinInject(),
-    playerSettingsStore: PlayerSettingsStore = koinInject(),
 ) {
     val scope = rememberCoroutineScope()
-    val playerSettings by playerSettingsStore.playerSettings.collectAsStateWithLifecycle(PlayerSettings())
-    val channelStreamProfiles = remember(playerSettingsStore) {
-        playerSettingsStore.channelStreamProfiles.choices.catch { if (it !is java.io.IOException) throw it }
-    }.collectAsStateWithLifecycle(null).value
-    val streamProfiles by playbackRuntime.streamProfiles.collectAsStateWithLifecycle()
-    val selectedStreamProfile by playbackRuntime.selectedStreamProfileId.collectAsStateWithLifecycle()
     val statsLevel by statsStore.level.collectAsStateWithLifecycle()
     val layerState = rememberLivePlayerLayerState()
     val playerClose = rememberPlayerClose(onClose)
@@ -2022,28 +2012,24 @@ fun VideoPlayerScreen(
             // A quick list applies its focused row when it leaves; that must not wait.
             closesAtOnce = { (_, quick) -> quick },
         ) { (page, _) ->
+            val liveOptions = rememberLivePlaybackOptions(
+                currentChannelId, observation.currentSession != null, playbackRuntime,
+            ) { id ->
+                retryLive(viewerRetry = true) { onResult ->
+                    playbackRuntime.selectChannelStreamProfile(currentChannelId, id, onResult)
+                }
+            }
             val audioAutomatic by playbackRuntime.audioAutomatic.collectAsStateWithLifecycle()
-            val subtitlesDefault by playbackRuntime.subtitlesDefault.collectAsStateWithLifecycle()
             PlaybackOptionsSheet(
                 page = page,
                 player = player,
                 audioAutomatic = audioAutomatic,
                 onAutomaticAudio = { playbackRuntime.useAutomaticAudio() },
-                subtitlesDefault = subtitlesDefault,
+                subtitlesDefault = liveOptions.subtitlesDefault,
                 onDefaultSubtitles = { playbackRuntime.useDefaultSubtitles() },
                 onSubtitleSelection = { override, off, epoch -> playbackRuntime.selectSubtitles(override, off, epoch) },
-                subtitleLanguage = playerSettings.subtitleLanguage,
-                streamProfile = LiveStreamProfileOption(
-                    profiles = streamProfiles,
-                    connected = observation.currentSession != null,
-                    setting = selectedStreamProfile,
-                    choice = channelStreamProfiles?.get(currentChannelId?.value),
-                    select = { id ->
-                        retryLive(viewerRetry = true) { onResult ->
-                            playbackRuntime.selectChannelStreamProfile(currentChannelId, id, onResult)
-                        }
-                    },
-                ),
+                subtitleLanguage = liveOptions.subtitleLanguage,
+                streamProfile = liveOptions.streamProfile,
                 tracksResolving =
                     playbackState is AppPlaybackState.Starting ||
                         playbackState is AppPlaybackState.Recovering,
