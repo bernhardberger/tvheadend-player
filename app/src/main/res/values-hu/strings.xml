@@ -852,6 +852,11 @@
     <string name="player_current_broadcast">Jelenlegi adás</string>
     <string name="timeshift_setting">Időeltolás</string>
     <string name="timeshift_setting_description">Élő TV-adás szüneteltetése és visszatekerése</string>
+    <string name="display_refresh_rate_setting">Kijelző képfrissítési frekvenciája</string>
+    <string name="display_refresh_rate_description">Az alkalmazás képernyőinek képfrissítési frekvenciája. Az „Igazítás a tartalom képkockasebességéhez” beállítás továbbra is módosíthatja ezt a videóhoz.</string>
+    <string name="display_refresh_rate_system">Rendszer alapértelmezése</string>
+    <string name="display_refresh_rate_system_help">A képfrissítési frekvenciát a TV-re bízza.</string>
+    <string name="display_refresh_rate_value">%1$s Hz</string>
     <string name="refresh_rate_matching_setting">Igazítás a tartalom képkockasebességéhez</string>
     <string name="frame_rate_switching_always">Mindig</string>
     <string name="frame_rate_switching_seamless_only">Csak zökkenőmentesen</string>

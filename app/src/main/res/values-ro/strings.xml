@@ -887,6 +887,11 @@
     <string name="player_current_broadcast">Difuzarea curentă</string>
     <string name="timeshift_setting">Redare decalată</string>
     <string name="timeshift_setting_description">Pauză și derulare înapoi pentru TV în direct</string>
+    <string name="display_refresh_rate_setting">Rata de reîmprospătare a ecranului</string>
+    <string name="display_refresh_rate_description">Rata de reîmprospătare a ecranelor aplicației. Setarea „Potrivește frecvența cadrelor” o poate schimba în continuare pentru un videoclip.</string>
+    <string name="display_refresh_rate_system">Setare implicită de sistem</string>
+    <string name="display_refresh_rate_system_help">Lasă televizorul să stabilească rata de reîmprospătare.</string>
+    <string name="display_refresh_rate_value">%1$s Hz</string>
     <string name="refresh_rate_matching_setting">Potrivește frecvența cadrelor</string>
     <string name="frame_rate_switching_always">Întotdeauna</string>
     <string name="frame_rate_switching_seamless_only">Doar fără întreruperi</string>

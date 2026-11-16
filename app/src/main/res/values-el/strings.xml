@@ -852,6 +852,11 @@
     <string name="player_current_broadcast">Τρέχουσα μετάδοση</string>
     <string name="timeshift_setting">Χρονική μετατόπιση</string>
     <string name="timeshift_setting_description">Παύση και επανατύλιξη ζωντανής TV</string>
+    <string name="display_refresh_rate_setting">Ρυθμός ανανέωσης οθόνης</string>
+    <string name="display_refresh_rate_description">Ο ρυθμός ανανέωσης για τις οθόνες της εφαρμογής. Η ρύθμιση «Αντιστοίχιση ρυθμού καρέ» μπορεί ακόμα να τον αλλάζει για ένα βίντεο.</string>
+    <string name="display_refresh_rate_system">Προεπιλογή συστήματος</string>
+    <string name="display_refresh_rate_system_help">Αφήνει τον ρυθμό ανανέωσης στην τηλεόραση.</string>
+    <string name="display_refresh_rate_value">%1$s Hz</string>
     <string name="refresh_rate_matching_setting">Αντιστοίχιση ρυθμού καρέ</string>
     <string name="frame_rate_switching_always">Πάντα</string>
     <string name="frame_rate_switching_seamless_only">Μόνο χωρίς διακοπή</string>

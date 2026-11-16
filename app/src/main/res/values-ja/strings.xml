@@ -817,6 +817,11 @@
     <string name="player_current_broadcast">現在の放送</string>
     <string name="timeshift_setting">タイムシフト</string>
     <string name="timeshift_setting_description">ライブ放送の一時停止と巻き戻し</string>
+    <string name="display_refresh_rate_setting">ディスプレイのリフレッシュレート</string>
+    <string name="display_refresh_rate_description">アプリの画面のリフレッシュレートです。「コンテンツのフレームレートに合わせる」は、動画の再生時にリフレッシュレートを切り替えることがあります。</string>
+    <string name="display_refresh_rate_system">システムのデフォルト</string>
+    <string name="display_refresh_rate_system_help">リフレッシュレートの決定をテレビに任せます。</string>
+    <string name="display_refresh_rate_value">%1$s Hz</string>
     <string name="refresh_rate_matching_setting">コンテンツのフレームレートに合わせる</string>
     <string name="frame_rate_switching_always">常に</string>
     <string name="frame_rate_switching_seamless_only">シームレスな場合のみ</string>
