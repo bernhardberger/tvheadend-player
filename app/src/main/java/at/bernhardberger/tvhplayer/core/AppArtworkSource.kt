@@ -49,7 +49,7 @@ internal fun channelLogoModel(
     tvheadend: TvheadendSession?,
     observation: SessionObservation?,
 ): Any = when (icon) {
-    is ChannelIcon.RemoteUrl -> icon.url
+    is ChannelIcon.RemoteUrl -> icon.url.withXmlAmpersandsDecoded()
     is ChannelIcon.ImageCache -> {
         val id = icon.artworkId
         if (current != null) AppArtworkSource(current, id)
@@ -57,4 +57,15 @@ internal fun channelLogoModel(
         else AppArtworkSource(null, id, TvheadendArtwork.cached(tvheadend, observation, id),
             tvheadend.artwork.cachedArtwork(observation, id)?.cacheKey)
     }
+}
+
+/**
+ * Tvheadend keeps XML attribute values undecoded, so an XMLTV `<icon src>` with a query string
+ * arrives with `&amp;` (or `&amp;amp;` from a double-escaping grabber) between its parameters
+ * (tvheadend/tvheadend#2316). The image host then ignores every parameter after the first.
+ */
+internal fun String.withXmlAmpersandsDecoded(): String {
+    var url = this
+    while ("&amp;" in url) url = url.replace("&amp;", "&")
+    return url
 }
