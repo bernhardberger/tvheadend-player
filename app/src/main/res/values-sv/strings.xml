@@ -484,6 +484,7 @@
     <string name="appliance_back_for_menu">Tryck på Back för kanaler och inställningar.</string>
     <string name="main_startup_message_preparing">Förbereder appen</string>
     <string name="main_startup_message_connecting">Ansluter</string>
+    <string name="main_startup_message_starting">Startar</string>
     <string name="main_startup_message_syncing_metadata">Synkroniserar kanaler och tv-guide</string>
     <string name="main_startup_message_waiting_for_current_channel_metadata">Förbereder kanaler</string>
     <string name="main_startup_message_reconnecting">Återansluter</string>

@@ -65,8 +65,6 @@ import org.koin.androidx.viewmodel.ext.android.viewModel
 
 data class MainStartupActivityKeyContract(
     val mode: MainStartupKeyMode,
-    /** Called for each fresh key down the contract consumes; that key's whole cycle stays consumed. */
-    val onConsumedKeyDown: (() -> Unit)? = null,
 )
 
 internal class MainStartupActivityKeyDispatcher(
@@ -94,10 +92,7 @@ internal class MainStartupActivityKeyDispatcher(
             repeatCount = repeatCount,
         )
         when (decision) {
-            MainStartupKeyDecision.CONSUME -> {
-                if (action == KeyEvent.ACTION_DOWN && repeatCount == 0) contract.onConsumedKeyDown?.invoke()
-                return true
-            }
+            MainStartupKeyDecision.CONSUME -> return true
             MainStartupKeyDecision.PASS_THROUGH -> Unit
         }
         if (action == KeyEvent.ACTION_UP && keyCode in forwardedActivationKeyCodes) {

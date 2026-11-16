@@ -522,6 +522,7 @@
     <string name="appliance_back_for_menu">Нажмите Back для перехода к каналам и настройкам.</string>
     <string name="main_startup_message_preparing">Подготовка приложения</string>
     <string name="main_startup_message_connecting">Подключение</string>
+    <string name="main_startup_message_starting">Запуск</string>
     <string name="main_startup_message_syncing_metadata">Синхронизация каналов и телепрограммы</string>
     <string name="main_startup_message_waiting_for_current_channel_metadata">Подготовка каналов</string>
     <string name="main_startup_message_reconnecting">Повторное подключение</string>

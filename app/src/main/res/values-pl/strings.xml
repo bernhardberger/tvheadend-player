@@ -522,6 +522,7 @@
     <string name="appliance_back_for_menu">Naciśnij Wstecz, aby otworzyć kanały i ustawienia.</string>
     <string name="main_startup_message_preparing">Przygotowywanie aplikacji</string>
     <string name="main_startup_message_connecting">Łączenie</string>
+    <string name="main_startup_message_starting">Uruchamianie</string>
     <string name="main_startup_message_syncing_metadata">Synchronizacja kanałów i programu TV</string>
     <string name="main_startup_message_waiting_for_current_channel_metadata">Przygotowywanie kanałów</string>
     <string name="main_startup_message_reconnecting">Ponowne łączenie</string>

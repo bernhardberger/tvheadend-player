@@ -28,6 +28,8 @@ fun mainStartupPresentation(
     launchState: ApplianceLaunchState,
     connectionState: ConnectionUiState,
     currentChannelReadiness: CurrentChannelReadiness,
+    channelStartAtMillis: Long? = null,
+    nowMillis: Long = 0L,
 ): MainStartupPresentation {
     if (startupState is MainStartupState.ResolvingLocal) {
         return MainStartupPresentation.Passive(MainStartupMessageKind.PREPARING)
@@ -60,13 +62,15 @@ fun mainStartupPresentation(
                 MainStartupPresentation.Enter(pendingLaunch.request)
             }
         }
-        // While the SDK retries by itself this is 110, with Connection settings and no Retry;
-        // saved channels never block, so autoplay then waits as reconnecting.
+        // A pending LIVE request and its player share one automatic-recovery deadline.
         ConnectionUiState.NeedsConfiguration,
         ConnectionUiState.CredentialUnavailable,
         is ConnectionUiState.Error -> {
             val failure = waitingConnectionFailurePresentation(connectionState)
-            if (failure.error.condition == AppErrorCondition.RECONNECTING && currentChannelReadiness.channelsAvailable()) {
+            val deferred = pendingLaunch.request.destination == ApplianceEntryDestination.LIVE &&
+                channelStartAtMillis != null &&
+                channelStartConnectionFailure(connectionState, channelStartAtMillis, nowMillis) == null
+            if (deferred) {
                 MainStartupPresentation.Passive(MainStartupMessageKind.RECONNECTING)
             } else {
                 failure

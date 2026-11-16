@@ -193,25 +193,45 @@ class LivePlayerServerWaitTest {
         assertEquals(0, compose.onAllNodes(hasTestTag("player-actions"), useUnmergedTree = true).fetchSemanticsNodes().size)
     }
 
-    @Test fun startingAllowsDirectChannelZap() {
+    @Test fun channelStartupConsumesKeysExceptSystemAndBack() {
         screen()
-        session.publish(ready())
-        compose.settleFrames(10)
-        assertMainSettled("the first target is installed") { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(1)) }
-        compose.settleFrames(4)
-        compose.pressKey(Key.VolumeUp)
-        assertEquals("unrelated keys do not dismiss Starting", 1, waits())
-        compose.pressKey(Key.ChannelUp)
-        compose.settleFrames(10)
-        assertEquals("Starting must not trap channel keys", AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
-        assertEquals(1, waits())
-        compose.pressKey(Key.DirectionCenter)
-        compose.settleFrames(3)
-        assertEquals("a revealing key first releases Starting", 0, waits())
-        compose.onNodeWithTag("player-actions").assertDoesNotExist()
-        compose.pressKey(Key.Menu)
-        compose.settleFrames(3)
-        compose.onNodeWithTag("playback-options-title").assertExists()
+        for (connected in listOf(false, true)) {
+            if (connected) {
+                session.publish(ready())
+                compose.settleFrames(10)
+                assertMainSettled("the first target is installed") {
+                    runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(1))
+                }
+            }
+            val target = runtime.activeTarget.value
+            val count = binds()
+            val playing = player.playWhenReady
+            for ((key, passes) in listOf(
+                Key.VolumeUp to true, Key.VolumeDown to true, Key.VolumeMute to true,
+                Key.Power to true, Key.SystemHome to true, Key.MediaPlayPause to false, Key.MediaPlay to false,
+                Key.MediaPause to false, Key.MediaFastForward to false, Key.MediaRewind to false,
+                Key.MediaStop to false, Key.Guide to false, Key.ChannelUp to false, Key.ChannelDown to false,
+                Key.Two to false, Key.DirectionUp to false, Key.DirectionDown to false,
+                Key.DirectionLeft to false, Key.DirectionRight to false, Key.DirectionCenter to false,
+                Key.Info to false, Key.Menu to false, Key.Unknown to false,
+            )) {
+                val before = unconsumed
+                compose.onRoot().performKeyInput {
+                    keyDown(key)
+                    advanceEventTime(800)
+                    keyUp(key)
+                }
+                assertEquals("$key passes only system keys", passes, unconsumed > before)
+                assertEquals("$key keeps the channel startup surface", 1, waits())
+                assertEquals("$key issues no playback command", playing, player.playWhenReady)
+                assertEquals("$key starts no new subscription", count, binds())
+                assertEquals(target, runtime.activeTarget.value)
+                compose.onNodeWithTag("player-actions").assertDoesNotExist()
+                compose.onNodeWithTag("playback-options-title").assertDoesNotExist()
+            }
+        }
+        compose.pressKey(Key.Back)
+        assertEquals(1, closes)
     }
 
     @Test fun aSubscriptionIssueReleasesStartingToTheChannelMessage() {
@@ -413,7 +433,7 @@ class LivePlayerServerWaitTest {
         compose.settleFrames(10)
         compose.pressKey(Key.DirectionCenter)
         compose.settleFrames(3)
-        assertEquals("the viewer can dismiss Starting", 0, waits())
+        assertEquals("Starting remains until a frame", 1, waits())
         compose.runOnIdle {
             session.publish(SessionObservation.create(sessionState = SessionState.Connecting,
                 channelState = ChannelRepositoryState.Stale(catalog)))
@@ -525,6 +545,22 @@ class LivePlayerServerWaitTest {
 
     private var beforeSettingsRead: suspend () -> Unit = {}
 
+    @Test fun aRecoveryHandoffKeepsTheDeadlineAndItsFocusedAction() {
+        val origin = mutableStateOf<Long?>(android.os.SystemClock.elapsedRealtime() - 5_000L)
+        screen(startupOrigin = origin)
+        compose.runOnIdle {
+            connection.value = ConnectionUiState.Error(ConnectionFailureKind.UNREACHABLE,
+                SessionRecoveryDisposition.AUTOMATIC_BACKOFF)
+        }
+        compose.mainClock.advanceTimeBy(10_000L)
+        compose.settleFrames(2)
+        compose.onNodeWithTag("tv-recovery-primary").assertIsFocused()
+        compose.runOnIdle { origin.value = null }
+        compose.settleFrames(4)
+        compose.onNodeWithTag("tv-recovery-primary").assertIsFocused()
+        assertEquals(0, waits())
+    }
+
     private fun screen(
         initial: SessionObservation = SessionObservation.create(
             sessionState = SessionState.Connecting,
@@ -533,6 +569,7 @@ class LivePlayerServerWaitTest {
         // The profile the observation is data of, with saved logos and channel one's icon.
         profile: ServerProfile? = null,
         opener: SubscriptionOpener = SubscriptionOpener { _, _, _ -> awaitCancellation() },
+        startupOrigin: androidx.compose.runtime.State<Long?>? = null,
     ) {
         // A pending first frame needs a held stream, not the fake's immediate end-of-input failure.
         session = FakeTvheadendSession(initial).apply {
@@ -557,16 +594,7 @@ class LivePlayerServerWaitTest {
         assertMainSettled("the fake channel catalog is collected") { channels.scope.value.scope.visibleChannels.size == 3 }
         player = ExoPlayer.Builder(context).build()
         val coordinator = createTvheadendPlaybackCoordinator(player).also { it.launchIn(scope) }
-        val controlled = object : ExoPlayer by player {
-            override fun addListener(listener: androidx.media3.common.Player.Listener) {
-                playerListeners += listener
-                player.addListener(listener)
-            }
-            override fun removeListener(listener: androidx.media3.common.Player.Listener) {
-                playerListeners -= listener
-                player.removeListener(listener)
-            }
-        }
+        val controlled = at.bernhardberger.tvhplayer.testutil.observePlayerListeners(player, playerListeners)
         runtime = AppPlaybackRuntime(controlled, session, coordinator, settings, profiles, scope,
             TvheadendAudioOutputProvider(context), PlaybackAudioFocus.None, PlaybackRuntimePolicy.fromPlayerSettings(),
             noticeCenter = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) { at.bernhardberger.tvhplayer.notices.NoticeContext(0, null) })
@@ -585,7 +613,8 @@ class LivePlayerServerWaitTest {
                             VideoPlayerScreen(video, ChannelSelectionStore(), LastPlayedChannelStore(context), TargetAspect(AspectRatioMode.FIT) {},
                                 channels, session, ChannelId(1), "Name 1", {},
                                 { closes++ }, runtime, notices = notices, uiSettingsStore = UiSettingsStore(data),
-                                connectionUiState = connection.value, statsStore = statsStore)
+                                connectionUiState = connection.value, statsStore = statsStore,
+                                startupChannelStartAtMillis = startupOrigin?.value)
                         }
                     }
                 } }

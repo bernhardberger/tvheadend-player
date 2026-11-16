@@ -66,18 +66,14 @@ internal class LivePlayerServerWaitState(
     /** The observation the wait shows its channel logo for: its profile names the saved copy. */
     val artworkObservation: SessionObservation get() = observation.value
     private var failures by mutableStateOf(WaitingConnectionFailure())
-    private var dismissed by mutableStateOf(false)
-    var viewerInteracted by mutableStateOf(false)
-        private set
 
     /** Passive while connecting, Actionable once it failed (its buttons are [failure]'s); null when not waiting. */
     val presentation: MainStartupPresentation?
-        get() = if (channelStartAtMillis == null || startingDismissed || playerRecovery.value) null else {
+        get() = if (channelStartAtMillis == null || playerRecovery.value) null else {
             if (hasSession.value) MainStartupPresentation.Passive(MainStartupMessageKind.STARTING_TELEVISION)
             else failureState?.let(::waitingConnectionFailurePresentation)
                 ?: MainStartupPresentation.Passive(MainStartupMessageKind.CONNECTING)
         }
-    private val startingDismissed: Boolean get() = hasSession.value && dismissed
 
     /**
      * The catalog error of the failure [presentation] shows, with the buttons the SDK's guidance
@@ -93,7 +89,6 @@ internal class LivePlayerServerWaitState(
 
     /** Applied after each composition. */
     fun observed() {
-        if (!hasSession.value) dismissed = false
         failures = if (hasSession.value) WaitingConnectionFailure() else failures.observe(connection.value)
     }
 
@@ -109,35 +104,17 @@ internal class LivePlayerServerWaitState(
     }
 
     /**
-     * While connecting, every key but Back is consumed, down, repeats and up. A down opens a key
+     * Every non-system key but Back is consumed, down, repeats and up. A down opens a key
      * cycle, so the up of a key still held when the session arrives cannot activate the chrome.
      */
     fun consumesKey(event: KeyEvent, layerState: LivePlayerLayerState): Boolean {
         if (presentation !is MainStartupPresentation.Passive) return false
         val native = event.nativeKeyEvent
-        if (native.keyCode == AndroidKeyEvent.KEYCODE_BACK) return false
-        if (hasSession.value) return consumesStartingKey(native, layerState)
+        if (native.keyCode == AndroidKeyEvent.KEYCODE_BACK ||
+            at.bernhardberger.tvhplayer.ui.startup.startupSystemKey(native.keyCode)
+        ) return false
         trackOpeningKeyCycle(native, layerState)
         return true
-    }
-
-    private fun consumesStartingKey(native: AndroidKeyEvent, layerState: LivePlayerLayerState): Boolean {
-        val zap = channelStartupZapKey(native.keyCode)
-        if (!zap && !channelStartupRevealKey(native.keyCode)) return false
-        val deliberate = native.action == AndroidKeyEvent.ACTION_DOWN && native.repeatCount == 0
-        if (deliberate) viewerInteracted = true
-        return when {
-            zap -> false
-            native.action == AndroidKeyEvent.ACTION_DOWN && native.repeatCount > 0 -> true
-            else -> {
-                if (deliberate) {
-                    layerState.core.chrome.hideControls()
-                    dismissed = true
-                }
-                trackOpeningKeyCycle(native, layerState)
-                true
-            }
-        }
     }
 
     private fun trackOpeningKeyCycle(native: AndroidKeyEvent, layerState: LivePlayerLayerState) {
@@ -147,23 +124,6 @@ internal class LivePlayerServerWaitState(
         }
     }
 
-}
-
-internal fun channelStartupZapKey(keyCode: Int): Boolean = when (keyCode) {
-        AndroidKeyEvent.KEYCODE_DPAD_UP, AndroidKeyEvent.KEYCODE_DPAD_DOWN,
-        AndroidKeyEvent.KEYCODE_CHANNEL_UP, AndroidKeyEvent.KEYCODE_CHANNEL_DOWN,
-        in AndroidKeyEvent.KEYCODE_0..AndroidKeyEvent.KEYCODE_9 -> true
-        else -> false
-}
-
-internal fun channelStartupRevealKey(keyCode: Int): Boolean = when (keyCode) {
-    AndroidKeyEvent.KEYCODE_DPAD_LEFT, AndroidKeyEvent.KEYCODE_DPAD_RIGHT,
-    AndroidKeyEvent.KEYCODE_DPAD_CENTER, AndroidKeyEvent.KEYCODE_ENTER, AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
-    AndroidKeyEvent.KEYCODE_INFO, AndroidKeyEvent.KEYCODE_MENU, AndroidKeyEvent.KEYCODE_TV_MEDIA_CONTEXT_MENU,
-    AndroidKeyEvent.KEYCODE_MEDIA_AUDIO_TRACK, AndroidKeyEvent.KEYCODE_CAPTIONS,
-    AndroidKeyEvent.KEYCODE_TV_CONTENTS_MENU, AndroidKeyEvent.KEYCODE_TV_NUMBER_ENTRY,
-    AndroidKeyEvent.KEYCODE_BOOKMARK -> true
-    else -> false
 }
 
 @Composable
@@ -222,7 +182,7 @@ internal fun LivePlayerServerWait(
             if (motionEnabled) PlayerMotion.MediumMs else 0, easing = PlayerMotion.StandardAccelerate,
         )),
     ) {
-        ProvideArtworkSession(null, state.artworkObservation) {
+        ProvideArtworkSession(state.artworkObservation.currentSession, state.artworkObservation) {
             ChannelStartupSurface(
                 channel = channel,
                 channelName = channelName,

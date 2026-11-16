@@ -365,8 +365,8 @@ fun VideoPlayerScreen(
     onClose: () -> Unit,
     playbackRuntime: at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime = koinInject(),
     contentAllowed: Boolean = true,
-    onStartupInputReadyChanged: (Boolean) -> Unit = {},
     startupTarget: at.bernhardberger.tvhplayer.core.ApplianceLaunchTarget? = null,
+    startupChannelStartAtMillis: Long? = null,
     onStartupOutcome: (at.bernhardberger.tvhplayer.core.ApplianceLaunchTarget, at.bernhardberger.tvhplayer.core.MainStartupPlaybackOutcome) -> Boolean = { _, _ -> false },
     notices: NoticeCenter = koinInject(),
     uiSettingsStore: at.bernhardberger.tvhplayer.settings.UiSettingsStore = koinInject(),
@@ -656,7 +656,7 @@ fun VideoPlayerScreen(
 
     /** Starts [requestToken]'s selection; a newer request supersedes its outcome. */
     val runLiveStart: suspend (LivePlaybackSelection, Long, Long?) -> Unit = { playbackSelection, requestToken, requestIntent ->
-        val startupOwner = startupTarget.takeUnless { startupOutcomeDelivered }
+        val startupOwner = startupTarget
         initialPlayback.failedSelection = null
         if (startupOwner != null) {
             initialPlayback.selection = playbackSelection
@@ -704,10 +704,7 @@ fun VideoPlayerScreen(
             )
         } finally {
             // A commit can precede cancellation before onResolved obtains its receipt.
-            // Dropping an accepted visual owner cancels this effect, not its adopted install.
-            val handedBack = initialPlaybackAdopted && startupOutcomeDelivered &&
-                initialStartupTarget == startupOwner && initialPlayback.intent == requestIntent
-            if (startupOwner != null && requestIntent != null && !handedBack) {
+            if (startupOwner != null && requestIntent != null) {
                 if (!kotlinx.coroutines.currentCoroutineContext().isActive) {
                     retireCancelledStartup(playbackSelection, requestIntent)
                 }
@@ -741,10 +738,11 @@ fun VideoPlayerScreen(
 
         // A warm surface can still own the ended session's target. Reuse its fenced recovery
         // before the entry guards adopt it; it is a no-op for this session's current target.
-        if (startupTarget == null && playbackRuntime.videoPresentation.value.channelStartAtMillis != null) {
+        if (startupTarget == null) {
             val result = playbackRuntime.retuneAfterReconnect()
             if (result != null) {
                 initialPlayback.failedSelection = authorizedLiveSelection.takeUnless { result.isStarted }
+                requestedChannelFailed = !result.isStarted
                 return@LaunchedEffect
             }
         }
@@ -764,12 +762,9 @@ fun VideoPlayerScreen(
         val adoptionPresentation = if (startupTarget != null) {
             authorizedLiveSelection?.let(playbackRuntime::liveTargetPresentation)
         } else null
-        // Accepted handoff can precede collection of the just-committed target's UI state.
-        val warmChannelInstalled = playingLiveChannelId == currentChannelId ||
-            startupOutcomeDelivered && playbackRuntime.activeTarget.value == AppPlaybackTarget.Live(currentChannelId)
         if (
             if (startupTarget != null) adoptionPresentation != null else
-                warmChannelInstalled &&
+                playingLiveChannelId == currentChannelId &&
                     playbackRuntime.state.value !is AppPlaybackState.Idle &&
                     playbackRuntime.state.value !is AppPlaybackState.Failed
         ) {
@@ -1223,9 +1218,12 @@ fun VideoPlayerScreen(
         channelCondition = channelCondition,
     )
     val channelUnavailable = statusPresentation == PlaybackStatusPresentation.CHANNEL_UNAVAILABLE
+    val channelStartOrigin = remember(videoPresentation.channelStartAtMillis) {
+        videoPresentation.channelStartAtMillis?.let { startupChannelStartAtMillis ?: it }
+    }
     val serverWait = rememberLivePlayerServerWait(
         observation, connectionUiState, playerClose, onReconnect, onOpenConnectionSettings,
-        videoPresentation.channelStartAtMillis,
+        channelStartOrigin,
         playerRecovery = currentSession != null && (channelCondition != null || channelUnavailable ||
             statusPresentation == PlaybackStatusPresentation.FULL_RECOVERY || connState is ConnectionState.Error),
     )
@@ -1299,8 +1297,7 @@ fun VideoPlayerScreen(
             initialPlayback.token == liveRequestToken && initialStartupTarget == startupTarget
         },
         presentation = initialPresentation,
-        // A deliberate remote action hands startup ownership back to the interactive player.
-        recovery = serverWait.viewerInteracted || requestedChannelFailed || currentSubscriptionFailure != null ||
+        recovery = requestedChannelFailed || currentSubscriptionFailure != null ||
             (initialPlayback.selection != null && currentSession !== initialPlayback.selection?.currentSession) ||
             currentLiveInterrupted || genuineRecovery || channelUnavailable ||
             playbackState is AppPlaybackState.Recovering || playbackState is AppPlaybackState.Failed,
@@ -1464,8 +1461,6 @@ fun VideoPlayerScreen(
     // Playback/recovery effects above stay mounted. No chrome exists under startup until its first
     // picture is delivered; the passive Banner then shows while the startup screen fades, as on an
     // ordinary entry. Focus and Back wait for the reveal to end; startup consumes its keys.
-    val startupInputOnly = !contentAllowed && startupTarget != null && currentSession != null &&
-        serverWait.presentation is MainStartupPresentation.Passive
     if (contentAllowed) PlayerRootFocusEffect(foregroundLayer, rootFocus)
 
     val handlePlaybackBack: () -> Unit = handle@{
@@ -1499,38 +1494,14 @@ fun VideoPlayerScreen(
     val activityKeyCycleOwner = at.bernhardberger.tvhplayer.ui.startup.LocalMainStartupKeyCycleOwner.current
     val playerModals = remember { mutableStateListOf<PlayerModalBackOwner>() }
     val backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
-    var startupKeyCycle by remember { mutableStateOf(false) }
 
     @Composable
     fun playerRootModifier(): Modifier = Modifier
             .fillMaxSize()
             .onPreviewKeyEvent { event ->
-                if (startupKeyCycle && layerState.core.consumesRevealingKey(event)) {
-                    if (event.nativeKeyEvent.action == AndroidKeyEvent.ACTION_UP) startupKeyCycle = false
-                    return@onPreviewKeyEvent true
-                }
-                val startupInputPending = startupInputOnly && !startupOutcomeDelivered
-                val startupPending = startupInputPending ||
-                    (currentSession != null && serverWait.presentation is MainStartupPresentation.Passive)
-                val zap = channelStartupZapKey(event.nativeKeyEvent.keyCode)
-                if (startupPending && event.nativeKeyEvent.keyCode != AndroidKeyEvent.KEYCODE_BACK) {
-                    if (!zap && !channelStartupRevealKey(event.nativeKeyEvent.keyCode)) return@onPreviewKeyEvent false
-                }
-                if (startupInputPending && event.nativeKeyEvent.action == AndroidKeyEvent.ACTION_DOWN &&
-                    event.nativeKeyEvent.repeatCount == 0
-                ) {
-                    if (event.nativeKeyEvent.keyCode != AndroidKeyEvent.KEYCODE_BACK) {
-                        if (!zap) serverWait.consumesKey(event, layerState)
-                        // Retire the current visual owner before a zap replaces its target identity.
-                        startupOutcomeDelivered = onStartupOutcome(startupTarget!!, MainStartupPlaybackOutcome.RECOVERY)
-                        if (startupOutcomeDelivered) initialPlaybackAdopted = true
-                        if (!zap) {
-                            layerState.core.chrome.hideControls()
-                            startupKeyCycle = true
-                            return@onPreviewKeyEvent true
-                        }
-                    }
-                }
+                if (serverWait.presentation is MainStartupPresentation.Passive &&
+                    at.bernhardberger.tvhplayer.ui.startup.startupSystemKey(event.nativeKeyEvent.keyCode)
+                ) return@onPreviewKeyEvent false
                 if (event.nativeKeyEvent.action == AndroidKeyEvent.ACTION_DOWN) layerState.core.onKeyDown()
                 if (backCycle.intercept(event,
                         holdAllowed = contentAllowed &&
@@ -1800,19 +1771,10 @@ fun VideoPlayerScreen(
                 }
                 false
             }
-            .onFocusChanged { if (startupInputOnly) onStartupInputReadyChanged(it.hasFocus) }
             .focusRequester(rootFocus)
-            .livePlayerRoot(stringResource(R.string.player_live_tv_surface), contentAllowed || startupInputOnly)
+            .livePlayerRoot(stringResource(R.string.player_live_tv_surface), contentAllowed)
     if (!contentAllowed &&
         !(startupOutcomeDelivered && startupTarget != null && initialStartupTarget == startupTarget)) {
-        // Keep only the focused input root under the opaque startup surface, never its actions.
-        if (startupInputOnly) {
-            Box(playerRootModifier())
-            PlayerRootFocusEffect(foregroundLayer, rootFocus)
-            DisposableEffect(Unit) {
-                onDispose { onStartupInputReadyChanged(false) }
-            }
-        }
         return
     }
     @Composable

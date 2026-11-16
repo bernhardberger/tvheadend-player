@@ -503,6 +503,7 @@
     <string name="appliance_back_for_menu">Pulsa Back para ver los canales y los ajustes.</string>
     <string name="main_startup_message_preparing">Preparando la aplicación</string>
     <string name="main_startup_message_connecting">Conectando</string>
+    <string name="main_startup_message_starting">Iniciando</string>
     <string name="main_startup_message_syncing_metadata">Sincronizando canales y guía</string>
     <string name="main_startup_message_waiting_for_current_channel_metadata">Preparando canales</string>
     <string name="main_startup_message_reconnecting">Reconectando</string>

@@ -8,6 +8,17 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class ColdStartPresentationTest {
+    @Test fun pendingLiveUsesOneGraceWithOrWithoutSavedChannels() {
+        for (readiness in listOf(CurrentChannelReadiness.Waiting,
+            CurrentChannelReadiness.Browsable(listOf(Channel.create(ChannelId(1)))))) {
+            val launch = ApplianceLaunchState.Pending(ApplianceLaunchRequest(1))
+            val startup = MainStartupState.Ready(at.bernhardberger.tvhplayer.settings.ServerSettings(), true)
+            fun shown(elapsed: Long) = mainStartupPresentation(startup, launch, unreachable, readiness,
+                channelStartAtMillis = 100L, nowMillis = 100L + elapsed)
+            assertEquals(MainStartupPresentation.Passive(MainStartupMessageKind.RECONNECTING), shown(14_999L))
+            assertEquals(actionable(AppErrorCondition.RECONNECTING, AppErrorAction.CONNECTION_SETTINGS), shown(15_000L))
+        }
+    }
     @Test fun channelStartGraceOnlyDefersAutomaticRecoveryUntilItsDeadline() {
         val started = 700L
         val automatic = ConnectionUiState.Error(ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.AUTOMATIC_BACKOFF)
@@ -101,17 +112,6 @@ class ColdStartPresentationTest {
         assertEquals(failed, observe(unreachable))
         assertEquals(MainStartupPresentation.Passive(MainStartupMessageKind.SYNCING_METADATA), observe(ConnectionUiState.SyncingChannels))
         assertEquals(connecting, observe(ConnectionUiState.Connecting))
-    }
-
-    @Test fun autoplayStartupShowsItsAutomaticBackoffAsTheReconnectingAlert() {
-        val requests = ApplianceLaunchRequests()
-        requests.request()
-        val startup = MainStartupState.Ready(at.bernhardberger.tvhplayer.settings.ServerSettings(host = "offline.invalid"), autoStartPlayback = true)
-        assertEquals(actionable(AppErrorCondition.RECONNECTING, AppErrorAction.CONNECTION_SETTINGS),
-            mainStartupPresentation(startup, requests.state.value, unreachable, CurrentChannelReadiness.Waiting))
-        // Saved channels never block: autoplay then waits as reconnecting.
-        assertEquals(MainStartupPresentation.Passive(MainStartupMessageKind.RECONNECTING),
-            mainStartupPresentation(startup, requests.state.value, unreachable, CurrentChannelReadiness.Browsable(channels)))
     }
 
     @Test fun aFailureStaysThroughAutomaticAttemptsUntilTheServerAnswersAndRetryClearsIt() {

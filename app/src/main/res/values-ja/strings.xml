@@ -465,6 +465,7 @@
     <string name="appliance_back_for_menu">Backを押すとチャンネルと設定が表示されます。</string>
     <string name="main_startup_message_preparing">アプリを準備中</string>
     <string name="main_startup_message_connecting">接続中</string>
+    <string name="main_startup_message_starting">開始中</string>
     <string name="main_startup_message_syncing_metadata">チャンネルと番組表を同期中</string>
     <string name="main_startup_message_waiting_for_current_channel_metadata">チャンネルを準備中</string>
     <string name="main_startup_message_reconnecting">再接続中</string>

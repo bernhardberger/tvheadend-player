@@ -503,6 +503,7 @@
     <string name="appliance_back_for_menu">Appuie sur Back pour accéder aux chaînes et aux paramètres.</string>
     <string name="main_startup_message_preparing">Préparation de l’application</string>
     <string name="main_startup_message_connecting">Connexion</string>
+    <string name="main_startup_message_starting">Démarrage</string>
     <string name="main_startup_message_syncing_metadata">Synchronisation des chaînes et du guide</string>
     <string name="main_startup_message_waiting_for_current_channel_metadata">Préparation des chaînes</string>
     <string name="main_startup_message_reconnecting">Reconnexion</string>

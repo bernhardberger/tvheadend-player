@@ -465,6 +465,7 @@
     <string name="appliance_back_for_menu">채널과 설정을 보려면 Back을 눌러 주세요.</string>
     <string name="main_startup_message_preparing">앱 준비 중</string>
     <string name="main_startup_message_connecting">연결 중</string>
+    <string name="main_startup_message_starting">시작 중</string>
     <string name="main_startup_message_syncing_metadata">채널 및 편성표 동기화 중</string>
     <string name="main_startup_message_waiting_for_current_channel_metadata">채널 준비 중</string>
     <string name="main_startup_message_reconnecting">다시 연결 중</string>

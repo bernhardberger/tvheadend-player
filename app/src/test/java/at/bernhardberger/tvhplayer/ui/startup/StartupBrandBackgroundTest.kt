@@ -90,6 +90,12 @@ class StartupBrandBackgroundTest {
         compose.runOnIdle { status = "Starting" }
         compose.settleFrames(4)
         capture(view, "channel-starting")
+        compose.runOnIdle {
+            channel = Channel.create(ChannelId(1), number = 1, icon = ridge.icon,
+                name = "Ridge Earth — Discovering the extraordinary landscapes and wildlife of our planet")
+        }
+        compose.settleFrames(4)
+        capture(view, "channel-long-name")
         compose.runOnIdle { channel = Channel.create(ChannelId(8), name = "Little Orbit", number = 8) }
         compose.settleFrames(4)
         capture(view, "channel-without-logo")
@@ -120,7 +126,10 @@ class StartupBrandBackgroundTest {
     @Test fun logosWaitForReadinessThenReplaceSequentiallyWithoutAnInterveningMark() {
         with(StartupLogoFixture()) {
         compose.runOnIdle { channel = second }
-        compose.settleFrames(1)
+        // The replacement's image worker is still held: neither half of its identity may appear.
+        compose.settleFrames(4)
+        compose.onNodeWithText("Ridge Earth", useUnmergedTree = true).assertExists()
+        compose.onNodeWithText("Harbor Sport", useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithTag("startup-logo-Ridge Earth", useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("main-startup-mark", useUnmergedTree = true).assertDoesNotExist()
         dispatcher.scheduler.runCurrent()

@@ -503,6 +503,7 @@
     <string name="appliance_back_for_menu">Prime Back para aceder aos canais e às definições.</string>
     <string name="main_startup_message_preparing">A preparar a aplicação</string>
     <string name="main_startup_message_connecting">A ligar</string>
+    <string name="main_startup_message_starting">A iniciar</string>
     <string name="main_startup_message_syncing_metadata">A sincronizar canais e guia</string>
     <string name="main_startup_message_waiting_for_current_channel_metadata">A preparar canais</string>
     <string name="main_startup_message_reconnecting">A restabelecer ligação</string>

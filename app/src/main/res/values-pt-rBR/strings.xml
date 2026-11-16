@@ -503,6 +503,7 @@
     <string name="appliance_back_for_menu">Pressione Back para acessar canais e configurações.</string>
     <string name="main_startup_message_preparing">Preparando app</string>
     <string name="main_startup_message_connecting">Conectando</string>
+    <string name="main_startup_message_starting">Iniciando</string>
     <string name="main_startup_message_syncing_metadata">Sincronizando canais e guia</string>
     <string name="main_startup_message_waiting_for_current_channel_metadata">Preparando canais</string>
     <string name="main_startup_message_reconnecting">Reconectando</string>

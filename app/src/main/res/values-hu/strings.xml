@@ -484,6 +484,7 @@
     <string name="appliance_back_for_menu">A Vissza gombbal eléred a csatornákat és a beállításokat.</string>
     <string name="main_startup_message_preparing">Alkalmazás előkészítése</string>
     <string name="main_startup_message_connecting">Csatlakozás</string>
+    <string name="main_startup_message_starting">Indítás</string>
     <string name="main_startup_message_syncing_metadata">Csatornák és műsorújság szinkronizálása</string>
     <string name="main_startup_message_waiting_for_current_channel_metadata">Csatornák előkészítése</string>
     <string name="main_startup_message_reconnecting">Újracsatlakozás</string>

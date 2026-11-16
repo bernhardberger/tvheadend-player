@@ -176,7 +176,9 @@ internal fun ChannelStartupSurface(
     channelName: String? = channel?.name,
     announceStatus: Boolean = true,
 ) {
-    val title = channelName?.let { channelTitleText(channel?.visibleChannelNumber, it) }
+    var loaded by remember { mutableStateOf<StartupLogoContent?>(null) }
+    val displayedChannel = if (loaded?.channel?.id == channel?.id) channel else loaded?.channel
+    val title = startupIdentityTitle(displayedChannel, channel, channelName)
     val brandTitle = stringResource(R.string.app_name)
     val contentAlpha by animateFloatAsState(
         if (feedbackVisible) 1f else 0f,
@@ -210,11 +212,11 @@ internal fun ChannelStartupSurface(
             ).widthIn(max = 680.dp).fillMaxWidth()
             Box(Modifier.align(Alignment.TopCenter).padding(top = maxHeight * (172f / 540f) - 30.dp)
                 .size(136.dp, 60.dp).graphicsLayer { alpha = contentAlpha }) {
-                StartupLogo(channel, motionEnabled)
+                StartupLogo(channel, loaded, motionEnabled) { loaded = it }
             }
             Box(safeWidth.align(Alignment.TopCenter).padding(top = maxHeight * (250f / 540f) - nameHeight / 2)
                 .height(nameHeight).graphicsLayer { alpha = contentAlpha }, contentAlignment = Alignment.Center) {
-                StartupIdentity(title, channel?.id, motionEnabled)
+                StartupIdentity(title, displayedChannel?.id, motionEnabled)
             }
             Box(Modifier.align(Alignment.TopCenter).padding(top = maxHeight * (328f / 540f) - 22.dp)
                 .size(44.dp).graphicsLayer { alpha = contentAlpha }, contentAlignment = Alignment.Center) {
@@ -228,6 +230,11 @@ internal fun ChannelStartupSurface(
             }
         }
     }
+}
+
+private fun startupIdentityTitle(displayed: Channel?, requested: Channel?, requestedName: String?): String? {
+    val name = if (displayed?.id == requested?.id) requestedName else displayed?.name
+    return name?.let { channelTitleText(displayed?.visibleChannelNumber, it) }
 }
 
 @Composable
@@ -291,14 +298,18 @@ private data class StartupLogoContent(
 )
 
 @Composable
-private fun StartupLogo(channel: Channel?, motionEnabled: Boolean) {
+private fun StartupLogo(
+    channel: Channel?,
+    loaded: StartupLogoContent?,
+    motionEnabled: Boolean,
+    onLoaded: (StartupLogoContent?) -> Unit,
+) {
     val artwork = LocalArtworkContext.current
-    var loaded by remember { mutableStateOf<StartupLogoContent?>(null) }
     fun ready(channel: Channel) {
-        loaded = StartupLogoContent(channel, artwork.currentSession, artwork.latest.value)
+        onLoaded(StartupLogoContent(channel, artwork.currentSession, artwork.latest.value))
     }
     LaunchedEffect(channel?.id, channel?.icon) {
-        if (channel == null) loaded = null else if (channel.icon == null) ready(channel)
+        if (channel == null) onLoaded(null) else if (channel.icon == null) ready(channel)
     }
     val logoChanged = channel?.id != loaded?.channel?.id || channel?.icon != loaded?.channel?.icon
     if (channel != null && logoChanged && channel.icon != null) {

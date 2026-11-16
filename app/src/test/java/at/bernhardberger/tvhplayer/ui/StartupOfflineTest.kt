@@ -3,6 +3,8 @@
 
 package at.bernhardberger.tvhplayer.ui
 
+import androidx.compose.ui.input.key.nativeKeyCode
+import org.junit.Assert.assertFalse
 import at.bernhardberger.tvhplayer.testutil.pressKey
 import android.app.Application
 import android.os.Looper
@@ -73,6 +75,7 @@ import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.stores.GuidePositionStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.testutil.awaitScheduledWork
+import at.bernhardberger.tvhplayer.testutil.settleFrames
 import at.bernhardberger.tvhplayer.ui.player.LivePlayerServerWaitTag
 import at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
@@ -120,6 +123,10 @@ import java.io.IOException
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi")
 class StartupOfflineTest {
     @get:Rule val compose = createComposeRule()
+    private val startupKeys = MainStartupActivityKeyDispatcher(
+        at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyCycleOwner())
+    private var startupKeyContract = MainStartupActivityKeyContract(
+        at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyMode.Inactive)
     private val context = ApplicationProvider.getApplicationContext<Application>()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val profileDispatcher = StandardTestDispatcher()
@@ -380,41 +387,6 @@ class StartupOfflineTest {
         advance(500)
         assertEquals("passive Starting is not a recovery outcome", 1, startupScreens())
         compose.awaitScheduledWork(profileDispatcher) { SubscriptionChannelId(1) in activeSubscriptions }
-        compose.pressKey(Key.ChannelUp)
-        settle()
-        assertEquals("cold Starting accepts a direct zap", AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
-        compose.awaitScheduledWork(profileDispatcher) { activeSubscriptions == setOf(SubscriptionChannelId(2)) }
-        assertEquals("only the zapped channel holds its subscription", setOf(SubscriptionChannelId(2)), activeSubscriptions)
-        assertEquals("the deliberate zap hands startup back", 0, startupScreens())
-        compose.pressKey(Key.DirectionCenter)
-        settle()
-        compose.onNodeWithTag("player-actions").assertDoesNotExist()
-        compose.pressKey(Key.Back)
-        compose.pressKey(Key.Back)
-        settle()
-        compose.onNodeWithTag("home-header").assertExists()
-        compose.runOnIdle { launchRequests.requestStartup(true) }
-        settle()
-        assertEquals("a new startup owns the pending picture", 1, startupScreens())
-        compose.pressKey(Key.Back)
-        settle()
-        assertEquals("startup Back cancels only startup", 0, startupScreens())
-        compose.onNodeWithTag("home-header").assertExists()
-        compose.runOnIdle { launchRequests.requestStartup(true) }
-        settle()
-        assertEquals(1, startupScreens())
-        compose.onRoot().performKeyInput { keyDown(Key.DirectionCenter) }
-        settle()
-        assertEquals("Confirm hands back the visual owner", 0, startupScreens())
-        compose.onRoot().performKeyInput { advanceEventTime(800); keyUp(Key.DirectionCenter) }
-        settle()
-        compose.onNodeWithTag("player-actions").assertDoesNotExist()
-        compose.pressKey(Key.Back)
-        compose.pressKey(Key.Back)
-        settle()
-        compose.runOnIdle { launchRequests.requestStartup(true) }
-        settle()
-        assertEquals("without input the owner still waits for its picture", 1, startupScreens())
         compose.runOnIdle {
             player.pause()
             playerListeners.toList().forEach { it.onPlaybackStateChanged(androidx.media3.common.Player.STATE_READY) }
@@ -540,8 +512,16 @@ class StartupOfflineTest {
         app(awaitRows = false, bootstrapHandle = androidx.lifecycle.SavedStateHandle(),
             bootstrapReadGate = gate, earlyBootstrapLive = true, bootstrapAutoplay = true)
         settle()
+        assertEquals("the read gate keeps bootstrap unfinished when LIVE arrives",
+            MainStartupState.ResolvingLocal, bootstrapOwner.state.value)
+        val earlyRequest = bootstrapOwner.applianceLaunchRequests.state.value
+        assertTrue("LIVE is pending before bootstrap finishes",
+            earlyRequest is at.bernhardberger.tvhplayer.core.ApplianceLaunchState.Pending)
         gate.complete(Unit)
         settle()
+        assertTrue(bootstrapOwner.state.value is MainStartupState.Ready)
+        assertEquals("bootstrap autoplay coalesces with the earlier LIVE request",
+            earlyRequest, bootstrapOwner.applianceLaunchRequests.state.value)
         advance(500)
         assertTrue("a cold initial LIVE intent keeps glow after bootstrap", startupBackgroundCount() > 0)
         assertEquals(0, binds())
@@ -601,6 +581,48 @@ class StartupOfflineTest {
         compose.onAllNodes(hasTestTag("startup-background-pending") or hasTestTag("startup-background-prepared"),
             useUnmergedTree = true).fetchSemanticsNodes().size
 
+    @Test fun savedPendingLiveUsesTheChannelStartGrace() = pendingLiveGrace(connecting(catalog))
+
+    @Test fun unsavedPendingLiveUsesTheSameChannelStartGrace() =
+        pendingLiveGrace(SessionObservation.create(sessionState = SessionState.Connecting))
+
+    @Test fun sessionLostBeforeThePictureKeepsTheOriginalGraceThroughRecoveryHandoff() {
+        app(connecting(catalog), awaitRows = false, holdLive = true, autoplay = true)
+        settle()
+        advance(5_000)
+        session.publish(ready(catalog))
+        settle()
+        compose.awaitScheduledWork(profileDispatcher) { runtime.activeTarget.value != null }
+        session.publish(SessionObservation.create(
+            sessionState = SessionState.Unavailable(SessionFailure.TRANSPORT_UNAVAILABLE),
+            channelState = ChannelRepositoryState.Stale(catalog),
+        ))
+        // This crosses T0 + 15 s, but not the later runtime start's own deadline.
+        advance(10_000)
+        compose.onNodeWithTag("tv-recovery-primary").assertIsFocused()
+        assertEquals("RECOVERY releases the startup owner", at.bernhardberger.tvhplayer.core.ApplianceLaunchState.Idle,
+            launchRequests.state.value)
+        compose.settleFrames(4)
+        compose.onNodeWithTag("tv-recovery-primary").assertIsFocused()
+        compose.onNodeWithText("Connecting", useUnmergedTree = true).assertDoesNotExist()
+    }
+
+    private fun pendingLiveGrace(initial: SessionObservation) {
+        app(initial, awaitRows = false, holdLive = true, autoplay = true)
+        settle()
+        session.publish(SessionObservation.create(
+            sessionState = SessionState.Unavailable(SessionFailure.TRANSPORT_UNAVAILABLE),
+            channelState = initial.channelState,
+        ))
+        advance(1_000)
+        compose.onNodeWithTag("tv-recovery-primary").assertDoesNotExist()
+        assertEquals(0, binds())
+        advance(15_000)
+        compose.onNodeWithTag("tv-recovery-primary").assertExists()
+        compose.onNodeWithTag("tv-recovery-secondary").assertDoesNotExist()
+        assertEquals(0, binds())
+    }
+
     private fun startAutoplay(
         initial: SessionObservation, persisted: ChannelId?, title: String?, gate: CompletableDeferred<Unit>? = null,
     ) {
@@ -612,37 +634,33 @@ class StartupOfflineTest {
         else compose.onNodeWithText(title, useUnmergedTree = true).assertExists()
     }
 
-    @Test fun startupLayerKeysOnlyHandBackTheSurface() {
+    @Test fun startupKeysLeaveTheOwnerAndItsTargetUntilBack() {
         app(ready(catalog), awaitRows = false, holdLive = true, autoplay = true)
-        for ((index, entry) in listOf("Confirm" to Key.DirectionCenter, "Info" to Key.Info, "Menu" to Key.Menu).withIndex()) {
-            val (label, key) = entry
-            if (index > 0) compose.runOnIdle { launchRequests.requestStartup(true) }
-            settle()
-            compose.awaitScheduledWork(profileDispatcher) { runtime.activeTarget.value != null }
-            assertEquals("$label starts under the visual startup owner", 1, startupScreens())
-            val playing = player.playWhenReady
-            compose.pressKey(Key.VolumeUp)
-            settle()
-            assertEquals("$label: an unrelated key must leave startup untouched", 1, startupScreens())
-            assertEquals("$label: unrelated input preserves playback", playing, player.playWhenReady)
-            val installedTarget = runtime.activeTarget.value
-            val installedEpoch = runtime.videoPresentation.value.epoch
-            val installedBinds = binds()
-            compose.onRoot().performKeyInput {
-                keyDown(key)
-                keyUp(key)
-                keyDown(Key.Menu)
-                keyUp(Key.Menu)
+        settle()
+        compose.awaitScheduledWork(profileDispatcher) { runtime.activeTarget.value != null }
+        val target = runtime.activeTarget.value
+        val count = binds()
+        val playing = player.playWhenReady
+        for (key in listOf(Key.DirectionCenter, Key.Info, Key.Menu, Key.ChannelUp, Key.Two, Key.MediaPlayPause)) {
+            for ((action, repeat) in listOf(0 to 0, 0 to 1, 1 to 0)) {
+                assertTrue("$key is consumed by the Activity contract",
+                    startupKeys.dispatch(startupKeyContract, key.nativeKeyCode, action, repeat))
             }
-            settle()
-            assertEquals("$label: a revealing key ends startup", 0, startupScreens())
-            assertEquals("$label: the revealing key must not toggle playback", playing, player.playWhenReady)
-            assertEquals("$label: the following Menu opens options without another frame", 1,
-                compose.onAllNodes(hasTestTag("playback-options-title")).fetchSemanticsNodes().size)
-            assertEquals("$label: handoff adopts the installed target", installedTarget, runtime.activeTarget.value)
-            assertEquals("$label: handoff retains its installed epoch", installedEpoch, runtime.videoPresentation.value.epoch)
-            assertEquals("$label: handoff must not start the installed target twice", installedBinds, binds())
+            assertEquals("$key keeps startup", 1, startupScreens())
+            assertEquals("$key retains the target", target, runtime.activeTarget.value)
+            assertEquals("$key starts no subscription", count, binds())
+            assertEquals("$key does not control playback", playing, player.playWhenReady)
+            compose.onNodeWithTag("playback-options-title").assertDoesNotExist()
+            compose.onNodeWithTag("player-actions").assertDoesNotExist()
         }
+        assertFalse(startupKeys.dispatch(startupKeyContract, android.view.KeyEvent.KEYCODE_BACK, 0))
+        // Android dispatches unclaimed Back to this owner, not to an invisible player root.
+        @Suppress("UNCHECKED_CAST")
+        val activityRule = compose as androidx.compose.ui.test.junit4.AndroidComposeTestRule<*, androidx.activity.ComponentActivity>
+        compose.runOnIdle { activityRule.activity.onBackPressedDispatcher.onBackPressed() }
+        settle()
+        assertEquals(0, startupScreens())
+        compose.onNodeWithTag("home-header").assertExists()
     }
 
     @Test fun aServerRestartWhileBrowsingRetunesTheWarmChannelOnce() {
@@ -842,16 +860,7 @@ class StartupOfflineTest {
         data.readGate = initialReadGate
         player = ExoPlayer.Builder(context).build()
         val coordinator = createTvheadendPlaybackCoordinator(player).also { it.launchIn(scope) }
-        val controlled = object : ExoPlayer by player {
-            override fun addListener(listener: androidx.media3.common.Player.Listener) {
-                playerListeners += listener
-                player.addListener(listener)
-            }
-            override fun removeListener(listener: androidx.media3.common.Player.Listener) {
-                playerListeners -= listener
-                player.removeListener(listener)
-            }
-        }
+        val controlled = at.bernhardberger.tvhplayer.testutil.observePlayerListeners(player, playerListeners)
         runtime = AppPlaybackRuntime(controlled, session, coordinator, settings, profiles, scope,
             TvheadendAudioOutputProvider(context), PlaybackAudioFocus.None,
             PlaybackRuntimePolicy.fromPlayerSettings(),
@@ -902,7 +911,7 @@ class StartupOfflineTest {
                         org.koin.androidx.compose.koinViewModel<at.bernhardberger.tvhplayer.viewmodels.MainStartupViewModel>(
                             key = "bootstrap-$bootstrapGeneration")
                         else null
-                    androidx.compose.runtime.remember(bootstrap) {
+                    androidx.compose.runtime.LaunchedEffect(bootstrap) {
                         if (bootstrap != null) {
                             bootstrapOwner = bootstrap
                             if (earlyBootstrapLive) bootstrap.applianceLaunchRequests.requestEntry(
@@ -910,6 +919,11 @@ class StartupOfflineTest {
                         }
                     }
                     AppRoot(
+                        registerActivityKeyContract = { registered ->
+                            startupKeyContract = registered
+                            { startupKeyContract = MainStartupActivityKeyContract(
+                                at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyMode.Inactive) }
+                        },
                         startupState = bootstrap?.state?.collectAsStateWithLifecycle()?.value
                             ?: MainStartupState.Ready(server, autoStartPlayback = autoplay),
                         runtimeServerSettings = server,

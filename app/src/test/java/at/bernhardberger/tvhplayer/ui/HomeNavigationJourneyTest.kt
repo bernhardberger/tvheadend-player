@@ -154,7 +154,7 @@ class HomeNavigationJourneyTest {
             val entering = fixture.launchRequests.state.value as ApplianceLaunchState.Entering
             fixture.launchRequests.completePlayerVisibility(entering.target, entering.target.channelId, entering.target.channelName)
         }
-        fixture.settle()
+        fixture.presentFirstFrame()
         fixture.key(Key.Menu)
         compose.onNodeWithTag("playback-options-title").assertExists()
         compose.runOnIdle {

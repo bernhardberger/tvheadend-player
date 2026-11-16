@@ -484,6 +484,7 @@
     <string name="appliance_back_for_menu">Πάτησε Back για κανάλια και ρυθμίσεις.</string>
     <string name="main_startup_message_preparing">Προετοιμασία εφαρμογής</string>
     <string name="main_startup_message_connecting">Σύνδεση</string>
+    <string name="main_startup_message_starting">Έναρξη</string>
     <string name="main_startup_message_syncing_metadata">Συγχρονισμός καναλιών και οδηγού</string>
     <string name="main_startup_message_waiting_for_current_channel_metadata">Προετοιμασία καναλιών</string>
     <string name="main_startup_message_reconnecting">Επανασύνδεση</string>

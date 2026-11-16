@@ -38,6 +38,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.delay
+import at.bernhardberger.tvhplayer.core.CHANNEL_START_CONNECTION_GRACE_MILLIS
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
@@ -266,7 +268,6 @@ internal fun MainStartupComposition(
     onRevealed: () -> Unit = {},
     startupChannel: Channel? = null,
     startupConnected: Boolean = false,
-    startupInputReady: Boolean = false,
 ) {
     val livePresentation = when (state.presentation) {
         is MainStartupPresentation.Enter -> MainStartupPresentation.Passive(
@@ -308,23 +309,12 @@ internal fun MainStartupComposition(
     }
     val keyMode = when (renderedPresentation) {
         MainStartupPresentation.Inactive -> MainStartupKeyMode.Inactive
-        is MainStartupPresentation.Passive ->
-            if (startupInputReady) MainStartupKeyMode.Inactive else MainStartupKeyMode.Passive
+        is MainStartupPresentation.Passive -> MainStartupKeyMode.Passive
         is MainStartupPresentation.Actionable -> MainStartupKeyMode.Actionable
         is MainStartupPresentation.Enter -> error("Enter is rendered as passive startup")
     }
-    val revealScope = rememberCoroutineScope()
-    val keyContract = remember(keyMode, revealRequestId) {
-        MainStartupActivityKeyContract(
-            mode = keyMode,
-            // A key during the reveal ends it at once; the next key reaches the revealed content.
-            onConsumedKeyDown = revealRequestId?.let {
-                {
-                    revealScope.launch { revealAlpha.snapTo(0f) }
-                    latestOnRevealed()
-                }
-            },
-        )
+    val keyContract = remember(keyMode) {
+        MainStartupActivityKeyContract(mode = keyMode)
     }
 
     DisposableEffect(registerActivityKeyContract, keyContract) {
@@ -355,7 +345,7 @@ internal fun MainStartupComposition(
                 },
                 loadingFeedback = retained?.feedback ?: loadingFeedback,
                 // Pending cold art has zero-alpha tracks, but keeps its final layout.
-                // Only the existing-playback classification removes branding.
+                // The startup owner permanently ends branding's fresh-process lifetime.
                 brandingVisible = retained?.brandingVisible ?: !state.hideBranding,
                 motionEnabled = motionEnabled,
                 channel = startupChannel,
@@ -684,14 +674,31 @@ fun AppRoot(
     }
     val landingCatalogAvailable = currentChannelReadiness.channelsAvailable() || currentChannelReadiness is CurrentChannelReadiness.Ready
     var startupReveal by remember { mutableStateOf<MainStartupReveal?>(null) }
-    var startupInputReady by remember { mutableStateOf(false) }
     val revealingTarget = startupReveal?.targetFor(profileGeneration)
+    val liveStartupRequest = when (val launch = applianceLaunchState) {
+        is ApplianceLaunchState.Pending -> launch.request
+        is ApplianceLaunchState.Entering -> launch.target.request
+        ApplianceLaunchState.Idle -> null
+    }?.takeIf { it.destination == ApplianceEntryDestination.LIVE }
+    val channelStartAtMillis = remember(profileGeneration, liveStartupRequest?.id) {
+        liveStartupRequest?.let { SystemClock.elapsedRealtime() }
+    }
+    var startupNow by remember(channelStartAtMillis) { mutableStateOf(SystemClock.elapsedRealtime()) }
+    LaunchedEffect(channelStartAtMillis) {
+        channelStartAtMillis?.let { started ->
+            delay((started + CHANNEL_START_CONNECTION_GRACE_MILLIS -
+                SystemClock.elapsedRealtime()).coerceAtLeast(0L))
+            startupNow = started + CHANNEL_START_CONNECTION_GRACE_MILLIS
+        }
+    }
     val startupPresentation = mainStartupPresentation(
         startupState = startupState,
         // A warm Guide entry does not obscure or steal focus from the current screen.
         launchState = if (guideRequest != null && backStack.isNotEmpty()) ApplianceLaunchState.Idle else applianceLaunchState,
         connectionState = connectionUiState,
         currentChannelReadiness = currentChannelReadiness,
+        channelStartAtMillis = channelStartAtMillis,
+        nowMillis = startupNow,
     )
 
     val currentDestination = backStack.lastOrNull()
@@ -1368,7 +1375,7 @@ fun AppRoot(
                                     navigateTopLevel(SettingsKey(SettingsSection.CONNECTION))
                                 },
                                 connectionUiState = connectionUiState,
-                                onStartupInputReadyChanged = { startupInputReady = it },
+                                startupChannelStartAtMillis = channelStartAtMillis,
                                 startupTarget = (enteringLaunchTarget ?: revealingTarget)
                                     ?.takeIf { it.matchesPlayerKey(destination) },
                                 onStartupOutcome = { target, outcome ->
@@ -1553,7 +1560,6 @@ fun AppRoot(
                 ApplianceEntryDestination.LIVE && priorLiveChannelId == null && startupChannelIdRead
             ) provisionalStartupChannel else null,
         startupConnected = playbackObservation.currentSession != null,
-        startupInputReady = startupInputReady,
         onBack = if (coldStartVisible) onRequestExit else startupBack,
         onAction = if (coldStartVisible) { action ->
             performMainStartupAction(
