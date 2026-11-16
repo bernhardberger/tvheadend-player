@@ -148,6 +148,21 @@ class StartupBrandBackgroundTest {
         }
         compose.onNodeWithTag("startup-logo-Ridge Earth", useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("main-startup-mark", useUnmergedTree = true).assertDoesNotExist()
+        compose.runOnIdle { motion = true; channel = null }
+        compose.settleFrames(4)
+        compose.onNodeWithTag("main-startup-mark", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("main-startup-wordmark", useUnmergedTree = true).assertExists()
+        compose.runOnIdle { channel = first }
+        compose.settleFrames(2, frameMillis = 16)
+        // An existing brand fades out before the first channel takes over its slots.
+        compose.onNodeWithTag("main-startup-mark", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("main-startup-wordmark", useUnmergedTree = true).assertExists()
+        dispatcher.scheduler.runCurrent()
+        compose.settleFrames(4)
+        compose.onNodeWithText("Ridge Earth", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("startup-logo-Ridge Earth", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("main-startup-mark", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithTag("main-startup-wordmark", useUnmergedTree = true).assertDoesNotExist()
         }
     }
 
@@ -180,7 +195,7 @@ class StartupBrandBackgroundTest {
         val first = Channel.create(ChannelId(1), name = "Ridge Earth", icon = ChannelIcon.ImageCache(ArtworkId(1)))
         val second = Channel.create(ChannelId(2), name = "Harbor Sport", icon = ChannelIcon.ImageCache(ArtworkId(2)))
         var logoRequests = 0
-        var channel by mutableStateOf(first)
+        var channel by mutableStateOf<Channel?>(first)
         var motion by mutableStateOf(true)
         val profile = at.bernhardberger.tvheadend.sdk.core.ServerProfile("offline.invalid")
         val session = at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession().apply {
@@ -202,7 +217,11 @@ class StartupBrandBackgroundTest {
             }
         }
         compose.settleFrames(1)
-        compose.onNodeWithTag("main-startup-mark", useUnmergedTree = true).assertExists()
+        // A known first channel identifies itself before its held image request completes.
+        compose.onNodeWithText("Ridge Earth", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("main-startup-mark", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithTag("main-startup-wordmark", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithTag("startup-logo-Ridge Earth", useUnmergedTree = true).assertDoesNotExist()
         dispatcher.scheduler.runCurrent()
         compose.settleFrames(4)
         compose.onNodeWithTag("startup-logo-Ridge Earth", useUnmergedTree = true).assertExists()

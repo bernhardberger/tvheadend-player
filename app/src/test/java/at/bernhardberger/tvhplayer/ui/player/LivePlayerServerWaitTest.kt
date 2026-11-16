@@ -4,6 +4,8 @@
 
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.testutil.awaitScheduledWork
+
 import kotlinx.coroutines.flow.onStart
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionOpener
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionConfirmation
@@ -245,8 +247,7 @@ class LivePlayerServerWaitTest {
             session.publish(ready())
             compose.settleFrames(10)
             assertMainSettled("the target is installed") { runtime.activeTarget.value != null }
-            compose.mainClock.advanceTimeUntil {
-                dispatcher.scheduler.runCurrent()
+            compose.awaitScheduledWork(dispatcher) {
                 connection.subscribeCount > 0
             }
             runTest(dispatcher) {

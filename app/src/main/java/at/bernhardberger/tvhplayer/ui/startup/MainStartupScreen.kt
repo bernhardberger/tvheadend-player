@@ -177,7 +177,8 @@ internal fun ChannelStartupSurface(
     announceStatus: Boolean = true,
 ) {
     var loaded by remember { mutableStateOf<StartupLogoContent?>(null) }
-    val displayedChannel = if (loaded?.channel?.id == channel?.id) channel else loaded?.channel
+    // Only a replacement waits for its artwork: the first known channel names itself immediately.
+    val displayedChannel = loaded?.channel?.takeUnless { it.id == channel?.id } ?: channel
     val title = startupIdentityTitle(displayedChannel, channel, channelName)
     val brandTitle = stringResource(R.string.app_name)
     val contentAlpha by animateFloatAsState(
@@ -321,12 +322,15 @@ private fun StartupLogo(
     val display = remember(loaded, channel, logoChanged) {
         if (channel != null && !logoChanged) loaded?.copy(channel = channel) else loaded
     }
-    StartupSlot(display, motionEnabled, identity = display?.channel?.id) { shown, _ ->
-        if (shown != null) ProvideArtworkSession(shown.session, shown.observation) {
-            PiconBox(shown.channel.icon, Modifier.fillMaxSize().testTag("startup-logo-${shown.channel.name}"))
-        }
-        else Image(painterResource(R.drawable.startup_brand_symbol), null,
+    // Brand, pending channel (empty), and loaded artwork are distinct slot values.
+    // Read only the shown value below so a new request cannot cut off the outgoing mark.
+    val slot = (channel == null) to display
+    StartupSlot(slot, motionEnabled, identity = slot.first to display?.channel?.id) { (brand, logo), _ ->
+        if (brand) Image(painterResource(R.drawable.startup_brand_symbol), null,
             Modifier.fillMaxSize().testTag(MainStartupMarkTag))
+        else if (logo != null) ProvideArtworkSession(logo.session, logo.observation) {
+            PiconBox(logo.channel.icon, Modifier.fillMaxSize().testTag("startup-logo-${logo.channel.name}"))
+        }
     }
 }
 
