@@ -523,6 +523,7 @@
     <string name="main_startup_message_preparing">Подготовка приложения</string>
     <string name="main_startup_message_connecting">Подключение</string>
     <string name="main_startup_message_starting">Запуск</string>
+    <string name="main_startup_message_channel_starting">%1$s запускается…</string>
     <string name="main_startup_message_syncing_metadata">Синхронизация каналов и телепрограммы</string>
     <string name="main_startup_message_waiting_for_current_channel_metadata">Подготовка каналов</string>
     <string name="main_startup_message_reconnecting">Повторное подключение</string>

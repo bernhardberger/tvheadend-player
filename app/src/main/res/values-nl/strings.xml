@@ -485,6 +485,7 @@
     <string name="main_startup_message_preparing">App voorbereiden</string>
     <string name="main_startup_message_connecting">Verbinden</string>
     <string name="main_startup_message_starting">Starten</string>
+    <string name="main_startup_message_channel_starting">%1$s wordt gestart…</string>
     <string name="main_startup_message_syncing_metadata">Zenders en tv-gids synchroniseren</string>
     <string name="main_startup_message_waiting_for_current_channel_metadata">Zenders voorbereiden</string>
     <string name="main_startup_message_reconnecting">Opnieuw verbinden</string>

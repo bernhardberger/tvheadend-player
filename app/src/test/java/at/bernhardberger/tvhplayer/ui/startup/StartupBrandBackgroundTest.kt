@@ -103,16 +103,16 @@ class StartupBrandBackgroundTest {
         compose.runOnIdle { channel = null; fresh = true; status = "Syncing channels and guide" }
         compose.settleFrames(4)
         capture(view, "brand-only")
-        capture(view, "trial-brand-syncing")
+        capture(view, "brand-syncing")
         compose.runOnIdle { channel = ridge; tuning = ridge }
         compose.settleFrames(5)
-        capture(view, "trial-brand-tuning-logo")
+        capture(view, "brand-tuning-logo")
         compose.runOnIdle {
             channel = Channel.create(ChannelId(8), name = "Little Orbit", number = 8)
             tuning = channel
         }
         compose.settleFrames(4)
-        capture(view, "trial-brand-tuning-without-logo")
+        capture(view, "brand-tuning-without-logo")
         compose.runOnIdle {
             channel = Channel.create(ridge.id, name = "Ridge Earth — Exploring Our Extraordinary Planet and Beyond" +
                 " — Stories from Every Continent and Ocean in Spectacular Detail",
@@ -120,7 +120,7 @@ class StartupBrandBackgroundTest {
             tuning = channel
         }
         compose.settleFrames(4)
-        capture(view, "trial-brand-tuning-long-name")
+        capture(view, "brand-tuning-long-name")
     }
 
     @Test fun freshTuningKeepsBrandAndAnnouncesTheChannel() {
@@ -134,7 +134,7 @@ class StartupBrandBackgroundTest {
         compose.onNodeWithTag("main-startup-wordmark", useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("main-startup-mark", useUnmergedTree = true).assertExists()
         val status = compose.onNodeWithTag("main-startup-tuning", useUnmergedTree = true).fetchSemanticsNode().config
-        assertEquals(listOf("Tuning 8 Little Orbit"), status[SemanticsProperties.ContentDescription])
+        assertEquals(listOf("8 Little Orbit is starting…"), status[SemanticsProperties.ContentDescription])
         assertEquals(androidx.compose.ui.semantics.LiveRegionMode.Polite, status[SemanticsProperties.LiveRegion])
         compose.onNodeWithTag("startup-logo-Little Orbit", useUnmergedTree = true).assertDoesNotExist()
     }

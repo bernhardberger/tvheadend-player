@@ -504,6 +504,7 @@
     <string name="main_startup_message_preparing">האפליקציה בהכנה</string>
     <string name="main_startup_message_connecting">מתבצע חיבור</string>
     <string name="main_startup_message_starting">מתבצעת הפעלה</string>
+    <string name="main_startup_message_channel_starting">%1$s מתחיל…</string>
     <string name="main_startup_message_syncing_metadata">הערוצים והמדריך מסתנכרנים</string>
     <string name="main_startup_message_waiting_for_current_channel_metadata">הערוץ בהכנה</string>
     <string name="main_startup_message_reconnecting">מתבצע חיבור מחדש</string>

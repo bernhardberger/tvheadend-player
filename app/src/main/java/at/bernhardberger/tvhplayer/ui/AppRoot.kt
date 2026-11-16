@@ -1,7 +1,6 @@
 package at.bernhardberger.tvhplayer.ui
 
 import at.bernhardberger.tvheadend.sdk.core.Channel
-import at.bernhardberger.tvhplayer.core.mainStartupDisplayChannel
 import kotlinx.coroutines.flow.catch
 
 import at.bernhardberger.tvhplayer.ui.components.ProvideWatchingProgress
@@ -654,24 +653,6 @@ fun AppRoot(
     val browseConnectionFailure = browseFailure.failure
     val retryBrowseConnection = browseFailure.retry
     val currentChannelReadiness = connectionPresentation.currentChannelReadiness
-    var persistedStartupChannelId by remember(profileGeneration) { mutableStateOf<ChannelId?>(null) }
-    var startupChannelIdRead by remember(profileGeneration) { mutableStateOf(false) }
-    var startupChannelReadFailed by remember(profileGeneration) { mutableStateOf(false) }
-    LaunchedEffect(lastPlayedChannelStore, profileGeneration) {
-        lastPlayedChannelStore.channelId.catch {
-            startupChannelReadFailed = true
-            emit(null)
-        }.collect {
-            persistedStartupChannelId = it
-            startupChannelIdRead = true
-        }
-    }
-    val provisionalStartupChannel = remember(currentChannelReadiness, persistedStartupChannelId,
-        startupChannelIdRead, startupChannelReadFailed) {
-        if (startupChannelIdRead && !startupChannelReadFailed) {
-            mainStartupDisplayChannel(currentChannelReadiness, persistedStartupChannelId)
-        } else null
-    }
     val landingCatalogAvailable = currentChannelReadiness.channelsAvailable() || currentChannelReadiness is CurrentChannelReadiness.Ready
     var startupReveal by remember { mutableStateOf<MainStartupReveal?>(null) }
     val revealingTarget = startupReveal?.targetFor(profileGeneration)
@@ -1556,10 +1537,7 @@ fun AppRoot(
             hideBranding = !freshStart,
         ),
         loadingTiming = startupLoadingTiming,
-        startupChannel = (enteringLaunchTarget ?: revealingTarget)?.let { playbackObservation.channel(it.channelId) }
-            ?: if ((applianceLaunchState as? ApplianceLaunchState.Pending)?.request?.destination ==
-                ApplianceEntryDestination.LIVE && priorLiveChannelId == null && startupChannelIdRead
-            ) provisionalStartupChannel else null,
+        startupChannel = (enteringLaunchTarget ?: revealingTarget)?.let { playbackObservation.channel(it.channelId) },
         startupConnected = playbackObservation.currentSession != null,
         onBack = if (coldStartVisible) onRequestExit else startupBack,
         onAction = if (coldStartVisible) { action ->

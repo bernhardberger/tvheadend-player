@@ -35,11 +35,11 @@ import at.bernhardberger.tvhplayer.ui.components.InlineLogo
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
 import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
 
-/** Trial-only status composition; artwork joins the line only once its trimmed size is known. */
+/** Artwork joins the startup status line only once its trimmed size is known. */
 @Composable
 internal fun TuningStatus(channel: Channel, motionEnabled: Boolean, announce: Boolean) {
     val title = channelTitleText(channel.visibleChannelNumber, channel.name.orEmpty())
-    val phrase = stringResource(R.string.main_startup_message_tuning, title)
+    val phrase = stringResource(R.string.main_startup_message_channel_starting, title)
     var ready by remember(channel.id, channel.icon) { mutableStateOf(channel.icon == null) }
     val alpha by animateFloatAsState(if (ready) 1f else 0f,
         tween(if (motionEnabled) PlayerMotion.ShortMs else 0), label = "tuning-picon")
@@ -48,15 +48,12 @@ internal fun TuningStatus(channel: Channel, motionEnabled: Boolean, announce: Bo
         if (announce) liveRegion = LiveRegionMode.Polite
     }, horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically) {
-        Text(stringResource(R.string.main_startup_message_tuning, "").trim(),
-            style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.width(4.dp))
         val icon = channel.icon
         if (icon == null) PiconBox(null, Modifier.size(20.dp))
         else InlineLogo(icon, Modifier.graphicsLayer { this.alpha = alpha },
             collapseUntilLoaded = true, onLogoReady = { ready = true })
-        if (ready) Spacer(Modifier.width(4.dp))
-        Text(title, Modifier.weight(1f, fill = false), style = MaterialTheme.typography.titleMedium,
+        if (ready) Spacer(Modifier.width(8.dp))
+        Text(phrase, Modifier.weight(1f, fill = false), style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }

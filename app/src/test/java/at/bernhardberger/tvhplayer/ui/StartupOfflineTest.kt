@@ -396,14 +396,10 @@ class StartupOfflineTest {
         assertEquals("the presented target completes startup", 0, startupScreens())
     }
 
-    @Test fun savedAutoplayChannelIsPresentationOnlyUntilReady() {
-        val gate = CompletableDeferred<Unit>()
-        startAutoplay(connecting(catalog), ChannelId(2), null, gate)
-        compose.onNodeWithText("1 Name 1", useUnmergedTree = true).assertDoesNotExist()
-        compose.onNodeWithText("2 Name 2", useUnmergedTree = true).assertDoesNotExist()
-        playerData.readGate = null
-        gate.complete(Unit)
-        settle()
+    @Test fun freshAutoplayKeepsBrandUntilItsSavedChannelCanTune() {
+        startAutoplay(connecting(catalog), ChannelId(2))
+        compose.onNodeWithText("1 Name 1", substring = true, useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithText("2 Name 2", substring = true, useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithTag("main-startup-wordmark", useUnmergedTree = true).assertExists()
         assertEquals("Connecting", compose.onNodeWithTag("main-startup-status", useUnmergedTree = true)
             .fetchSemanticsNode().config[SemanticsProperties.Text].single().text)
@@ -416,63 +412,43 @@ class StartupOfflineTest {
         assertEquals("Connecting consumes a zap without tuning", 0, binds())
         session.publish(ready(catalog))
         settle()
-        compose.onNodeWithText("2 Name 2", useUnmergedTree = true).assertExists()
+        compose.onNodeWithText("2 Name 2", substring = true, useUnmergedTree = true).assertExists()
         assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
     }
 
-    @Test fun readyAutoplayReplacesAMissingSavedChannelWithThePolicyChoice() {
-        startAutoplay(connecting(catalog), ChannelId(2), null)
+    @Test fun autoplayFallsBackWhenTheSavedChannelIsMissing() {
+        startAutoplay(connecting(catalog), ChannelId(2))
         assertEquals(0, binds())
         val replacement = Channel.create(ChannelId(3), name = "Replacement", number = 3)
         session.publish(ready(ChannelCatalog.create(listOf(replacement))))
         settle()
-        compose.onNodeWithText("3 Replacement", useUnmergedTree = true).assertExists()
+        compose.onNodeWithText("3 Replacement", substring = true, useUnmergedTree = true).assertExists()
         assertEquals(AppPlaybackTarget.Live(replacement.id), runtime.activeTarget.value)
         assertEquals(1, binds())
     }
 
     @Test fun autoplayWithoutSavedDataKeepsBrandUntilReady() {
-        startAutoplay(SessionObservation.create(sessionState = SessionState.Connecting), null, null)
+        startAutoplay(SessionObservation.create(sessionState = SessionState.Connecting), null)
         assertEquals(0, binds())
         session.publish(ready(catalog))
         settle()
-        compose.onNodeWithText("1 Name 1", useUnmergedTree = true).assertExists()
+        compose.onNodeWithText("1 Name 1", substring = true, useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("main-startup-wordmark", useUnmergedTree = true).assertExists()
         assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
     }
 
     @Test fun readyWaitsForTheInitialSavedChoice() {
         val gate = CompletableDeferred<Unit>()
-        startAutoplay(connecting(catalog), ChannelId(2), null, gate)
+        startAutoplay(connecting(catalog), ChannelId(2), gate)
         session.publish(ready(catalog))
         settle()
         compose.onNodeWithTag("main-startup-wordmark", useUnmergedTree = true).assertExists()
-        compose.onNodeWithText("1 Name 1", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithText("1 Name 1", substring = true, useUnmergedTree = true).assertDoesNotExist()
         assertEquals(0, binds())
         playerData.readGate = null
         gate.complete(Unit)
         settle()
-        compose.onNodeWithText("2 Name 2", useUnmergedTree = true).assertExists()
-        assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
-    }
-
-    @Test fun nonAutoplayLiveEntryAlsoShowsTheSavedChoice() {
-        app(connecting(catalog), awaitRows = false, holdLive = true, persistedChannel = ChannelId(2))
-        settle()
-        advance(1_000)
-        compose.runOnIdle {
-            launchRequests.requestEntry(at.bernhardberger.tvhplayer.core.ApplianceEntryDestination.LIVE, false)
-        }
-        settle()
-        advance(500)
-        compose.onNodeWithText("2 Name 2", useUnmergedTree = true).assertExists()
-        assertEquals(0, binds())
-        assertTrue("a later HOME entry stays dark even without prior live playback",
-            compose.onAllNodes(hasTestTag("startup-background-pending") or hasTestTag("startup-background-prepared"),
-                useUnmergedTree = true).fetchSemanticsNodes().isEmpty())
-        session.publish(ready(catalog))
-        settle()
-        compose.onNodeWithText("2 Name 2", useUnmergedTree = true).assertExists()
+        compose.onNodeWithText("2 Name 2", substring = true, useUnmergedTree = true).assertExists()
         assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
     }
 
@@ -561,7 +537,7 @@ class StartupOfflineTest {
         gate.complete(Unit)
         settle()
         advance(500)
-        compose.onNodeWithText("1 Name 1", useUnmergedTree = true).assertExists()
+        compose.onNodeWithText("Connecting", useUnmergedTree = true).assertExists()
         assertTrue("restored Ready remains dark", startupBackgroundCount() == 0)
         assertEquals(0, binds())
     }
@@ -624,14 +600,13 @@ class StartupOfflineTest {
     }
 
     private fun startAutoplay(
-        initial: SessionObservation, persisted: ChannelId?, title: String?, gate: CompletableDeferred<Unit>? = null,
+        initial: SessionObservation, persisted: ChannelId?, gate: CompletableDeferred<Unit>? = null,
     ) {
         app(initial, awaitRows = false, holdLive = true, autoplay = true,
             persistedChannel = persisted, initialReadGate = gate)
         settle()
         advance(500)
-        if (title == null) compose.onNodeWithTag("main-startup-wordmark", useUnmergedTree = true).assertExists()
-        else compose.onNodeWithText(title, useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("main-startup-wordmark", useUnmergedTree = true).assertExists()
     }
 
     @Test fun startupKeysLeaveTheOwnerAndItsTargetUntilBack() {

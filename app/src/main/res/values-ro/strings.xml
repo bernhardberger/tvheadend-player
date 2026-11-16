@@ -504,6 +504,7 @@
     <string name="main_startup_message_preparing">Se pregătește aplicația</string>
     <string name="main_startup_message_connecting">Conectare</string>
     <string name="main_startup_message_starting">Pornire</string>
+    <string name="main_startup_message_channel_starting">%1$s pornește…</string>
     <string name="main_startup_message_syncing_metadata">Se sincronizează canalele și ghidul TV</string>
     <string name="main_startup_message_waiting_for_current_channel_metadata">Se pregătesc canalele</string>
     <string name="main_startup_message_reconnecting">Reconectare</string>

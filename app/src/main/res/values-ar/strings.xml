@@ -561,6 +561,7 @@
     <string name="main_startup_message_preparing">جارٍ تجهيز التطبيق</string>
     <string name="main_startup_message_connecting">جارٍ الاتصال</string>
     <string name="main_startup_message_starting">جارٍ البدء</string>
+    <string name="main_startup_message_channel_starting">جارٍ بدء %1$s…</string>
     <string name="main_startup_message_syncing_metadata">جارٍ مزامنة القنوات ودليل البرامج</string>
     <string name="main_startup_message_waiting_for_current_channel_metadata">جارٍ تجهيز القناة</string>
     <string name="main_startup_message_reconnecting">جارٍ إعادة الاتصال</string>

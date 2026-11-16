@@ -523,6 +523,7 @@
     <string name="main_startup_message_preparing">Przygotowywanie aplikacji</string>
     <string name="main_startup_message_connecting">Łączenie</string>
     <string name="main_startup_message_starting">Uruchamianie</string>
+    <string name="main_startup_message_channel_starting">%1$s uruchamia się…</string>
     <string name="main_startup_message_syncing_metadata">Synchronizacja kanałów i programu TV</string>
     <string name="main_startup_message_waiting_for_current_channel_metadata">Przygotowywanie kanałów</string>
     <string name="main_startup_message_reconnecting">Ponowne łączenie</string>

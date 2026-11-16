@@ -466,6 +466,7 @@
     <string name="main_startup_message_preparing">正在準備應用程式</string>
     <string name="main_startup_message_connecting">正在連線</string>
     <string name="main_startup_message_starting">正在啟動</string>
+    <string name="main_startup_message_channel_starting">正在啟動 %1$s…</string>
     <string name="main_startup_message_syncing_metadata">正在同步頻道與節目表</string>
     <string name="main_startup_message_waiting_for_current_channel_metadata">正在準備頻道</string>
     <string name="main_startup_message_reconnecting">正在重新連線</string>

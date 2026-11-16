@@ -492,6 +492,7 @@
     <string name="main_startup_message_preparing">App wird vorbereitet</string>
     <string name="main_startup_message_connecting">Verbindung wird hergestellt</string>
     <string name="main_startup_message_starting">Wird gestartet</string>
+    <string name="main_startup_message_channel_starting">%1$s wird gestartet…</string>
     <string name="main_startup_message_syncing_metadata">Sender und Programm werden synchronisiert</string>
     <string name="main_startup_message_waiting_for_current_channel_metadata">Sender werden vorbereitet</string>
     <string name="main_startup_message_reconnecting">Verbindung wird wiederhergestellt</string>

@@ -485,6 +485,7 @@
     <string name="main_startup_message_preparing">Forbereder appen</string>
     <string name="main_startup_message_connecting">Kobler til</string>
     <string name="main_startup_message_starting">Starter</string>
+    <string name="main_startup_message_channel_starting">%1$s starter…</string>
     <string name="main_startup_message_syncing_metadata">Synkroniserer kanaler og TV-guide</string>
     <string name="main_startup_message_waiting_for_current_channel_metadata">Forbereder kanaler</string>
     <string name="main_startup_message_reconnecting">Kobler til på nytt</string>

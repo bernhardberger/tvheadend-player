@@ -523,6 +523,7 @@
     <string name="main_startup_message_preparing">Příprava aplikace</string>
     <string name="main_startup_message_connecting">Připojování</string>
     <string name="main_startup_message_starting">Spouštění</string>
+    <string name="main_startup_message_channel_starting">%1$s se spouští…</string>
     <string name="main_startup_message_syncing_metadata">Synchronizace kanálů a programu</string>
     <string name="main_startup_message_waiting_for_current_channel_metadata">Příprava kanálů</string>
     <string name="main_startup_message_reconnecting">Obnovování připojení</string>

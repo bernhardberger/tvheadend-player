@@ -9,17 +9,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MainStartupPlaybackTest {
-    @Test fun displayChoiceUsesTheSavedPolicyWithoutAdmittingPlayback() {
-        val first = at.bernhardberger.tvheadend.sdk.core.Channel.create(ChannelId(1), name = "One")
-        val saved = at.bernhardberger.tvheadend.sdk.core.Channel.create(ChannelId(2), name = "Two")
-        val channels = listOf(first, saved)
-        assertEquals(saved, mainStartupDisplayChannel(CurrentChannelReadiness.Browsable(channels), saved.id))
-        assertEquals(first, mainStartupDisplayChannel(CurrentChannelReadiness.Browsable(channels), ChannelId(9)))
-        assertEquals(first, mainStartupDisplayChannel(CurrentChannelReadiness.Browsable(channels), null))
-        assertEquals(null, mainStartupDisplayChannel(CurrentChannelReadiness.Waiting, saved.id))
-        assertEquals(null, mainStartupDisplayChannel(CurrentChannelReadiness.Browsable(emptyList()), saved.id))
-        assertEquals(first, mainStartupDisplayChannel(CurrentChannelReadiness.Ready(listOf(first)), saved.id))
-    }
     @Test fun resumeCopyRequiresTheCapturedPriorLiveChannelToMatchResolvedTarget() {
         val target = ApplianceLaunchTarget(ApplianceLaunchRequest(1L), ChannelId(1L), "One")
         assertTrue(mainStartupReturningToPlayback(ChannelId(1L), target))

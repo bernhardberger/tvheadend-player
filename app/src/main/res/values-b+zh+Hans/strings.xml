@@ -466,6 +466,7 @@
     <string name="main_startup_message_preparing">正在准备应用</string>
     <string name="main_startup_message_connecting">正在连接</string>
     <string name="main_startup_message_starting">正在启动</string>
+    <string name="main_startup_message_channel_starting">正在启动 %1$s…</string>
     <string name="main_startup_message_syncing_metadata">正在同步频道和节目指南</string>
     <string name="main_startup_message_waiting_for_current_channel_metadata">正在准备频道</string>
     <string name="main_startup_message_reconnecting">正在重新连接</string>

@@ -504,6 +504,7 @@
     <string name="main_startup_message_preparing">Priprema aplikacije</string>
     <string name="main_startup_message_connecting">Povezivanje</string>
     <string name="main_startup_message_starting">Pokretanje</string>
+    <string name="main_startup_message_channel_starting">%1$s se pokreće…</string>
     <string name="main_startup_message_syncing_metadata">Sinkronizacija kanala i TV vodiča</string>
     <string name="main_startup_message_waiting_for_current_channel_metadata">Priprema kanala</string>
     <string name="main_startup_message_reconnecting">Ponovno povezivanje</string>
