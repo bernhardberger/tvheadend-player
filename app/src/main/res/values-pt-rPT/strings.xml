@@ -857,7 +857,7 @@
     <string name="channel_settings_save_failed">As definições dos canais estão ativas, mas não foi possível guardá-las.</string>
     <string name="keep_channel_setting">Manter a TV em pausa sintonizada</string>
     <string name="keep_channel_off">Desativado</string>
-    <string name="keep_channel_description">Se saíres da aplicação com a TV em direto em pausa, o canal mantém-se sintonizado durante este tempo para poderes continuar. Entretanto, um sintonizador continua ocupado.</string>
+    <string name="keep_channel_description">Útil para espreitar outra aplicação: quando voltares, a TV em direto continua de onde a puseste em pausa. Entretanto, um sintonizador continua ocupado. O canal é libertado mais cedo se o buffer de timeshift ficar cheio.</string>
     <string name="keep_channel_needs_timeshift">Disponível quando «%1$s» está ativado.</string>
     <string name="startup_buffer_setting">Buffer de arranque</string>
     <string name="startup_buffer_automatic">Automático • %1$s</string>

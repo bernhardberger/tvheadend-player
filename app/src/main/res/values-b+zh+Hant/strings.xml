@@ -815,7 +815,7 @@
     <string name="channel_settings_save_failed">頻道設定已生效，但無法儲存。</string>
     <string name="keep_channel_setting">暫停時維持頻道調諧</string>
     <string name="keep_channel_off">關閉</string>
-    <string name="keep_channel_description">暫停電視直播後離開應用程式，頻道會在此期間維持調諧，以便繼續觀看。期間會持續占用一個調諧器。</string>
+    <string name="keep_channel_description">適合暫時切換到其他應用程式：回來後，電視直播會從暫停處繼續播放。期間會持續占用一個調諧器。時移緩衝區存滿後會提早結束。</string>
     <string name="keep_channel_needs_timeshift">開啟「%1$s」後即可使用。</string>
     <string name="startup_buffer_setting">啟動緩衝</string>
     <string name="startup_buffer_automatic">自動 • %1$s</string>

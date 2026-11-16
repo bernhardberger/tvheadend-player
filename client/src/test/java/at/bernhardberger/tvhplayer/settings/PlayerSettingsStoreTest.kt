@@ -76,7 +76,7 @@ class PlayerSettingsStoreTest {
         val dataStore = InMemoryPreferencesDataStore()
         val store = PlayerSettingsStore(dataStore)
         assertEquals(20, store.playerSettings.first().keepChannelMinutes)
-        for (minutes in listOf(0, 10, 20, 30)) {
+        for (minutes in listOf(0, 10, 20, 30, 60)) {
             store.setKeepChannelMinutes(minutes)
             assertEquals(minutes, PlayerSettingsStore(dataStore).playerSettings.first().keepChannelMinutes)
         }

@@ -948,7 +948,7 @@
     <string name="channel_settings_save_failed">Ваши настройки каналов действуют, но сохранить их не удалось.</string>
     <string name="keep_channel_setting">Держать канал настроенным при паузе</string>
     <string name="keep_channel_off">Выкл.</string>
-    <string name="keep_channel_description">Если вы выйдете из приложения, поставив прямой эфир на паузу, канал останется настроенным на это время, чтобы вы могли продолжить. Тюнер всё это время будет занят.</string>
+    <string name="keep_channel_description">Удобно, если нужно ненадолго заглянуть в другое приложение: по возвращении прямой эфир продолжится с места паузы. Тюнер всё это время будет занят. Удержание канала завершится раньше, если буфер таймшифта заполнится.</string>
     <string name="keep_channel_needs_timeshift">Доступно, когда включена настройка «%1$s».</string>
     <string name="startup_buffer_setting">Стартовый буфер</string>
     <string name="startup_buffer_automatic">Автоматически • %1$s</string>

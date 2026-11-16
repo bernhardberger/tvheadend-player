@@ -1051,7 +1051,7 @@
     <string name="channel_settings_save_failed">Your channel settings are active but couldn’t be saved.</string>
     <string name="keep_channel_setting">Keep paused TV tuned</string>
     <string name="keep_channel_off">Off</string>
-    <string name="keep_channel_description">If you leave the app while live TV is paused, the channel stays tuned this long so you can continue. It keeps a tuner busy meanwhile.</string>
+    <string name="keep_channel_description">Handy for a quick look at another app: when you come back, live TV continues where you paused. Meanwhile it keeps a tuner busy. Ends early once the timeshift buffer is full.</string>
     <string name="keep_channel_needs_timeshift">Available when “%1$s” is on.</string>
     <string name="startup_buffer_setting">Start-up buffer</string>
     <string name="startup_buffer_automatic">Automatic • %1$s</string>

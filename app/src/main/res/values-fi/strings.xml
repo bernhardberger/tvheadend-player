@@ -878,7 +878,7 @@
     <string name="channel_settings_save_failed">Kanava-asetuksesi ovat käytössä, mutta niitä ei voitu tallentaa.</string>
     <string name="keep_channel_setting">Pidä tauolla oleva kanava viritettynä</string>
     <string name="keep_channel_off">Pois</string>
-    <string name="keep_channel_description">Jos poistut sovelluksesta suoran TV-lähetyksen ollessa tauolla, kanava pysyy viritettynä näin pitkään, jotta voit jatkaa katselua. Viritin pysyy sillä välin varattuna.</string>
+    <string name="keep_channel_description">Kätevä, kun haluat vilkaista toista sovellusta: palatessasi suora TV-lähetys jatkuu taukokohdasta. Viritin pysyy sillä välin varattuna. Kanavan ylläpito päättyy aiemmin, jos ajansiirron puskuri täyttyy.</string>
     <string name="keep_channel_needs_timeshift">Käytettävissä, kun ”%1$s” on käytössä.</string>
     <string name="startup_buffer_setting">Aloituspuskuri</string>
     <string name="startup_buffer_automatic">Automaattinen • %1$s</string>

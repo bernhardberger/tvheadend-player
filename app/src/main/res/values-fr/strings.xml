@@ -913,7 +913,7 @@
     <string name="channel_settings_save_failed">Tes paramètres de chaînes sont actifs, mais n’ont pas pu être enregistrés.</string>
     <string name="keep_channel_setting">Garder la chaîne réglée pendant la pause</string>
     <string name="keep_channel_off">Désactivé</string>
-    <string name="keep_channel_description">Si tu quittes l’application pendant une pause de la TV en direct, la chaîne reste réglée pendant cette durée pour te permettre de reprendre. Un tuner reste occupé entre-temps.</string>
+    <string name="keep_channel_description">Pratique pour jeter un œil à une autre application : à ton retour, la TV en direct reprend là où tu l’as mise en pause. Un tuner reste occupé entre-temps. Le maintien de la chaîne se termine plus tôt si le tampon du différé est plein.</string>
     <string name="keep_channel_needs_timeshift">Disponible quand « %1$s » est activée.</string>
     <string name="startup_buffer_setting">Tampon de démarrage</string>
     <string name="startup_buffer_automatic">Automatique • %1$s</string>

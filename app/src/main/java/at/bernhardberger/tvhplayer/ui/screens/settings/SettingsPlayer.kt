@@ -63,7 +63,7 @@ internal fun settingsKeepChannelLevel(navigation: DepthNavigationState, vm: Sett
 
 @Composable
 internal fun settingsKeepChannelLevel(minutes: Int, onSelect: (Int) -> Unit): DepthLevel =
-    settingsLevel(KEEP_CHANNEL_LEVEL, stringResource(R.string.keep_channel_setting), listOf(0, 10, 20, 30).map { value ->
+    settingsLevel(KEEP_CHANNEL_LEVEL, stringResource(R.string.keep_channel_setting), listOf(0, 10, 20, 30, 60).map { value ->
         settingsRow("keep-$value", keepChannelLabel(value), selected = minutes == value, onClick = { onSelect(value) })
     }, initialItemId = "keep-$minutes",
         description = stringResource(R.string.keep_channel_description))

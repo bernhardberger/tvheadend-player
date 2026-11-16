@@ -878,7 +878,7 @@
     <string name="channel_settings_save_failed">Dina kanalinställningar är aktiva men kunde inte sparas.</string>
     <string name="keep_channel_setting">Behåll kanalen när tv är pausad</string>
     <string name="keep_channel_off">Av</string>
-    <string name="keep_channel_description">Om du lämnar appen när direktsänd tv är pausad förblir kanalen inställd så här länge, så att du kan fortsätta. En mottagare hålls upptagen under tiden.</string>
+    <string name="keep_channel_description">Praktiskt för en snabb titt i en annan app: när du kommer tillbaka fortsätter direktsänd tv där du pausade. En mottagare hålls upptagen under tiden. Avslutas tidigare om bufferten för tidsförskjutning blir full.</string>
     <string name="keep_channel_needs_timeshift">Tillgängligt när ”%1$s” är på.</string>
     <string name="startup_buffer_setting">Startbuffert</string>
     <string name="startup_buffer_automatic">Automatiskt • %1$s</string>

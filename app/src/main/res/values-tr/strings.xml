@@ -878,7 +878,7 @@
     <string name="channel_settings_save_failed">Kanal ayarlarınız etkin ancak kaydedilemedi.</string>
     <string name="keep_channel_setting">Duraklatılan TV kanalını açık tut</string>
     <string name="keep_channel_off">Kapalı</string>
-    <string name="keep_channel_description">Canlı TV duraklatılmışken uygulamadan çıkarsanız devam edebilmeniz için kanal bu süre boyunca açık kalır. Bu sırada bir ayarlayıcı meşgul kalır.</string>
+    <string name="keep_channel_description">Başka bir uygulamaya kısaca göz atmak için kullanışlıdır: geri döndüğünüzde canlı TV duraklattığınız yerden devam eder. Bu sırada bir ayarlayıcı meşgul kalır. Zaman kaydırma arabelleği dolarsa kanal daha erken bırakılır.</string>
     <string name="keep_channel_needs_timeshift">“%1$s” açıkken kullanılabilir.</string>
     <string name="startup_buffer_setting">Başlangıç arabelleği</string>
     <string name="startup_buffer_automatic">Otomatik • %1$s</string>

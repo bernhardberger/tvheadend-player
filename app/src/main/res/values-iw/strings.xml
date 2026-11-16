@@ -913,7 +913,7 @@
     <string name="channel_settings_save_failed">הגדרות הערוצים שונו, אך לא ניתן לשמור אותן.</string>
     <string name="keep_channel_setting">שמירת הכוונון בשידור מושהה</string>
     <string name="keep_channel_off">כבוי</string>
-    <string name="keep_channel_description">ביציאה מהאפליקציה בזמן ששידור חי מושהה, הערוץ יישאר מכוון למשך הזמן הזה כדי לאפשר המשך צפייה. המקלט יישאר תפוס בינתיים.</string>
+    <string name="keep_channel_description">שימושי למעבר קצר לאפליקציה אחרת: בחזרה, השידור החי ממשיך מנקודת ההשהיה. המקלט נשאר תפוס בינתיים. שמירת הערוץ מסתיימת מוקדם אם מאגר ההשהיה מתמלא.</string>
     <string name="keep_channel_needs_timeshift">זמין כאשר ״%1$s״ מופעלת.</string>
     <string name="startup_buffer_setting">מאגר התחלתי</string>
     <string name="startup_buffer_automatic">אוטומטי • %1$s</string>

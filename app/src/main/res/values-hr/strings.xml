@@ -913,7 +913,7 @@
     <string name="channel_settings_save_failed">Tvoje su postavke kanala aktivne, ali ih nije moguće spremiti.</string>
     <string name="keep_channel_setting">Zadrži pauzirani kanal podešenim</string>
     <string name="keep_channel_off">Isključeno</string>
-    <string name="keep_channel_description">Ako napustiš aplikaciju dok je TV uživo pauziran, kanal ostaje podešen ovoliko dugo kako bi se gledanje moglo nastaviti. Tuner je za to vrijeme zauzet.</string>
+    <string name="keep_channel_description">Praktično za brz pogled u drugu aplikaciju: kad se vratiš, TV uživo nastavlja od mjesta pauze. Tuner je za to vrijeme zauzet. Zadržavanje kanala završava ranije čim se napuni međuspremnik vremenskog pomaka.</string>
     <string name="keep_channel_needs_timeshift">Dostupno kada je uključena opcija „%1$s”.</string>
     <string name="startup_buffer_setting">Početni međuspremnik</string>
     <string name="startup_buffer_automatic">Automatski • %1$s</string>

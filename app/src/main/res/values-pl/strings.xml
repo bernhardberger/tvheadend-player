@@ -948,7 +948,7 @@
     <string name="channel_settings_save_failed">Twoje ustawienia kanałów są aktywne, ale nie udało się ich zapisać.</string>
     <string name="keep_channel_setting">Zachowaj dostrojenie wstrzymanego kanału</string>
     <string name="keep_channel_off">Wyłączone</string>
-    <string name="keep_channel_description">Jeśli opuścisz aplikację przy wstrzymanej telewizji na żywo, kanał pozostanie dostrojony przez ten czas, aby można było kontynuować. W tym czasie tuner pozostaje zajęty.</string>
+    <string name="keep_channel_description">Przydatne, gdy chcesz zajrzeć do innej aplikacji: po powrocie telewizja na żywo będzie kontynuowana od miejsca wstrzymania. W tym czasie tuner pozostaje zajęty. Utrzymywanie kanału kończy się wcześniej, gdy bufor przesunięcia czasowego się zapełni.</string>
     <string name="keep_channel_needs_timeshift">Dostępne, gdy opcja „%1$s” jest włączona.</string>
     <string name="startup_buffer_setting">Bufor początkowy</string>
     <string name="startup_buffer_automatic">Automatycznie • %1$s</string>

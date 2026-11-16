@@ -843,7 +843,7 @@
     <string name="channel_settings_save_failed">チャンネルの設定は有効ですが、保存できませんでした。</string>
     <string name="keep_channel_setting">一時停止中もチャンネルの受信を維持</string>
     <string name="keep_channel_off">オフ</string>
-    <string name="keep_channel_description">ライブ放送を一時停止してアプリを離れた場合、この時間だけチャンネルの受信を維持して視聴を再開できるようにします。その間、チューナーを使用し続けます。</string>
+    <string name="keep_channel_description">別のアプリをちょっと確認したいときに便利です。戻ると、一時停止したところからライブ放送を再開できます。その間、チューナーを使用し続けます。タイムシフトのバッファがいっぱいになると、設定時間より前に受信を終了します。</string>
     <string name="keep_channel_needs_timeshift">「%1$s」がオンの場合に利用できます。</string>
     <string name="startup_buffer_setting">起動時のバッファ</string>
     <string name="startup_buffer_automatic">自動 • %1$s</string>

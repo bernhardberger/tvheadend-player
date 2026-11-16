@@ -948,7 +948,7 @@
     <string name="channel_settings_save_failed">Ваші налаштування каналів діють, але зберегти їх не вдалося.</string>
     <string name="keep_channel_setting">Тримати канал налаштованим під час паузи</string>
     <string name="keep_channel_off">Вимк.</string>
-    <string name="keep_channel_description">Якщо ви вийдете із застосунку, поставивши прямий ефір на паузу, канал залишиться налаштованим на цей час, щоб ви могли продовжити. Тюнер увесь цей час буде зайнятий.</string>
+    <string name="keep_channel_description">Зручно, якщо треба ненадовго зазирнути в інший застосунок: після повернення прямий ефір продовжиться з місця паузи. Тюнер увесь цей час буде зайнятий. Утримання каналу завершиться раніше, якщо буфер таймшифту заповниться.</string>
     <string name="keep_channel_needs_timeshift">Доступно, коли ввімкнено параметр «%1$s».</string>
     <string name="startup_buffer_setting">Початковий буфер</string>
     <string name="startup_buffer_automatic">Автоматично • %1$s</string>

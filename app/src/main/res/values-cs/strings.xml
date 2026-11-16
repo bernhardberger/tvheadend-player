@@ -948,7 +948,7 @@
     <string name="channel_settings_save_failed">Tvé nastavení kanálů je aktivní, ale nepodařilo se ho uložit.</string>
     <string name="keep_channel_setting">Ponechat pozastavený kanál naladěný</string>
     <string name="keep_channel_off">Vypnuto</string>
-    <string name="keep_channel_description">Když opustíš aplikaci při pozastaveném živém vysílání, kanál zůstane po tuto dobu naladěný, aby bylo možné pokračovat. Tuner zůstává po tuto dobu obsazený.</string>
+    <string name="keep_channel_description">Hodí se pro rychlé nahlédnutí do jiné aplikace: po návratu živé vysílání pokračuje od místa pozastavení. Tuner mezitím zůstává obsazený. Jakmile se zaplní vyrovnávací paměť časového posunu, udržování kanálu skončí předčasně.</string>
     <string name="keep_channel_needs_timeshift">Dostupné při zapnuté volbě „%1$s“.</string>
     <string name="startup_buffer_setting">Počáteční vyrovnávací paměť</string>
     <string name="startup_buffer_automatic">Automaticky • %1$s</string>

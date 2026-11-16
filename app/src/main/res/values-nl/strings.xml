@@ -878,7 +878,7 @@
     <string name="channel_settings_save_failed">Je zenderinstellingen zijn actief, maar konden niet worden opgeslagen.</string>
     <string name="keep_channel_setting">Gepauzeerde tv afgestemd houden</string>
     <string name="keep_channel_off">Uit</string>
-    <string name="keep_channel_description">Als je de app verlaat terwijl live-tv gepauzeerd is, blijft de zender zo lang afgestemd zodat je verder kunt kijken. Ondertussen blijft een tuner bezet.</string>
+    <string name="keep_channel_description">Handig om even in een andere app te kijken: als je terugkomt, gaat live-tv verder waar je hebt gepauzeerd. Ondertussen blijft een tuner bezet. Het vasthouden van de zender stopt eerder zodra de timeshiftbuffer vol is.</string>
     <string name="keep_channel_needs_timeshift">Beschikbaar wanneer “%1$s” aan staat.</string>
     <string name="startup_buffer_setting">Startbuffer</string>
     <string name="startup_buffer_automatic">Automatisch • %1$s</string>

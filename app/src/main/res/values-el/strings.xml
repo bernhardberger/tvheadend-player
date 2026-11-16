@@ -878,7 +878,7 @@
     <string name="channel_settings_save_failed">Οι ρυθμίσεις καναλιών σου είναι ενεργές, αλλά δεν ήταν δυνατή η αποθήκευσή τους.</string>
     <string name="keep_channel_setting">Διατήρηση συντονισμού σε παύση</string>
     <string name="keep_channel_off">Ανενεργή</string>
-    <string name="keep_channel_description">Αν φύγεις από την εφαρμογή ενώ η ζωντανή TV είναι σε παύση, το κανάλι μένει συντονισμένο για αυτό το διάστημα ώστε να συνεχίσεις. Στο μεταξύ δεσμεύει έναν δέκτη.</string>
+    <string name="keep_channel_description">Χρήσιμο για μια γρήγορη ματιά σε άλλη εφαρμογή: όταν επιστρέψεις, η ζωντανή TV συνεχίζει από εκεί που την έβαλες σε παύση. Στο μεταξύ δεσμεύει έναν δέκτη. Τερματίζεται νωρίτερα μόλις γεμίσει η προσωρινή μνήμη χρονικής μετατόπισης.</string>
     <string name="keep_channel_needs_timeshift">Διαθέσιμο όταν είναι ενεργή η «%1$s».</string>
     <string name="startup_buffer_setting">Μνήμη εκκίνησης</string>
     <string name="startup_buffer_automatic">Αυτόματα • %1$s</string>

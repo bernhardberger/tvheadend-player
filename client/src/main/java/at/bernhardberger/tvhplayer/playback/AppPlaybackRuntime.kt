@@ -452,7 +452,7 @@ class AppPlaybackRuntime(
     }
 
     /**
-     * Records a stop or issue as it shows. The reactions below wait behind a running command, so a
+     * Records a stop, issue or full buffer as it shows. Reactions wait behind a running command, so a
      * stop the server restarts meanwhile would never reach them.
      */
     private val liveLossJob = scope.launch {
@@ -2982,13 +2982,17 @@ class AppPlaybackRuntime(
     }
 
     /**
-     * The loss that ends the kept target [epoch]: the current observation's stop or issue, or a
+     * The loss that ends the kept target [epoch]: the current observation's stop, issue or limit, or a
      * stop observed for [epoch] since the keep began. The latter holds even if the server has
      * restarted the stream meanwhile, because the restart discards the kept timeshift.
      */
     private fun keptLiveLoss(epoch: Long?): BackgroundPlaybackNotice? =
         livePlaybackObservation.value.keptLiveLossNotice()
             ?: observedLiveLoss?.takeIf { it.epoch == epoch }?.notice
+            ?: BackgroundPlaybackNotice.TUNER_LOST.takeIf {
+                (livePlaybackObservation.value as? LivePlaybackObservation.Active)
+                    ?.timeshiftState == LiveTimeshiftState.Unavailable
+            }
 
     /** The current live target's stop or issue; null without a live target. */
     private fun currentLiveLossNotice(): BackgroundPlaybackNotice? =
@@ -3045,7 +3049,7 @@ class AppPlaybackRuntime(
         val paused = coordinator.pauseTimeshift() == TimeshiftCommandResult.ACCEPTED
         val yielded = paused && coordinator.setLivePriority(LiveSubscriptionPriority.YIELD) == TimeshiftCommandResult.ACCEPTED
         if (targetCommands.isOpen() && activeTargetEpoch == keep.epoch) {
-            // A stop or issue that arrived before the keep was admitted releases it now.
+            // A stop, issue or full buffer that arrived before admission releases the keep now.
             val lossNotice = if (livePlaybackObservation.value is LivePlaybackObservation.Active) keptLiveLoss(keep.epoch) else null
             if (!yielded) {
                 applyForegroundPlaybackAction(foregroundPlaybackLifecycle.releaseKept(keep.epoch))
@@ -3312,12 +3316,13 @@ internal data class RecordingRecoveryPosition(
 )
 
 /**
- * Why a kept live target no longer receives the stream, or null while it does. A server stop
+ * Why a kept live target should be released, or null while it can stay kept. A server stop
  * without an issue is only an interruption; one with an issue, or no target, lost the tuner.
  */
 private fun LivePlaybackObservation.keptLiveLossNotice(): BackgroundPlaybackNotice? = when {
     this !is LivePlaybackObservation.Active || subscriptionIssue != null -> BackgroundPlaybackNotice.TUNER_LOST
     serverStopped -> BackgroundPlaybackNotice.INTERRUPTED
+    (timeshiftState as? LiveTimeshiftState.Available)?.bufferFull == true -> BackgroundPlaybackNotice.LIMIT_EXPIRED
     else -> null
 }
 

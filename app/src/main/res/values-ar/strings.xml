@@ -1018,7 +1018,7 @@
     <string name="channel_settings_save_failed">تغيّرت إعدادات القنوات، لكن تعذّر حفظها.</string>
     <string name="keep_channel_setting">إبقاء قناة البث المتوقف مؤقتًا موالفة</string>
     <string name="keep_channel_off">إيقاف</string>
-    <string name="keep_channel_description">عند مغادرة التطبيق أثناء إيقاف البث المباشر مؤقتًا، تبقى القناة موالفة لهذه المدة لإتاحة المتابعة. ويظل الموالف مشغولًا خلال ذلك.</string>
+    <string name="keep_channel_description">مفيد لإلقاء نظرة سريعة على تطبيق آخر: عند العودة، يستأنف البث المباشر من حيث أوقفته مؤقتًا. ويظل الموالف مشغولًا خلال ذلك. تنتهي المهلة مبكرًا عند امتلاء المخزن المؤقت للإزاحة الزمنية.</string>
     <string name="keep_channel_needs_timeshift">متاح عند تفعيل «%1$s».</string>
     <string name="startup_buffer_setting">مخزن بدء التشغيل</string>
     <string name="startup_buffer_automatic">تلقائي • %1$s</string>

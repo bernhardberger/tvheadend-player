@@ -878,7 +878,7 @@
     <string name="channel_settings_save_failed">Dine kanalindstillinger er aktive, men kunne ikke gemmes.</string>
     <string name="keep_channel_setting">Behold kanal ved pause i live-tv</string>
     <string name="keep_channel_off">Fra</string>
-    <string name="keep_channel_description">Hvis du forlader appen, mens live-tv er på pause, forbliver kanalen indstillet så længe, så du kan fortsætte. Det optager en tuner i mellemtiden.</string>
+    <string name="keep_channel_description">Praktisk, hvis du lige vil kigge i en anden app: Når du vender tilbage, fortsætter live-tv, hvor du satte på pause. Det optager en tuner i mellemtiden. Afsluttes tidligere, hvis tidsforskydningsbufferen bliver fuld.</string>
     <string name="keep_channel_needs_timeshift">Tilgængelig, når ”%1$s” er slået til.</string>
     <string name="startup_buffer_setting">Startbuffer</string>
     <string name="startup_buffer_automatic">Automatisk • %1$s</string>

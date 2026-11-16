@@ -862,7 +862,7 @@
     <string name="recording_marker_next">Nächste Marke</string>
     <string name="keep_channel_setting">Pausierten Sender beibehalten</string>
     <string name="keep_channel_off">Aus</string>
-    <string name="keep_channel_description">Wenn du die App verlässt, während Live-TV pausiert ist, bleibt der Sender so lange eingestellt, damit du weiterschauen kannst. Solange ist ein Tuner belegt.</string>
+    <string name="keep_channel_description">Praktisch für einen kurzen Blick in eine andere App: Wenn du zurückkommst, läuft Live-TV an der pausierten Stelle weiter. Solange ist ein Tuner belegt. Endet vorzeitig, sobald der Timeshift-Puffer voll ist.</string>
     <string name="keep_channel_needs_timeshift">Verfügbar, wenn „%1$s“ eingeschaltet ist.</string>
     <string name="startup_buffer_setting">Startpuffer</string>
     <string name="startup_buffer_automatic">Automatisch • %1$s</string>

@@ -913,7 +913,7 @@
     <string name="channel_settings_save_failed">Tus ajustes de canales están activos, pero no se pudieron guardar.</string>
     <string name="keep_channel_setting">Mantener sintonizada la TV en pausa</string>
     <string name="keep_channel_off">Desactivado</string>
-    <string name="keep_channel_description">Si sales de la aplicación con la TV en directo en pausa, el canal seguirá sintonizado durante este tiempo para que puedas continuar. Mientras tanto, un sintonizador seguirá ocupado.</string>
+    <string name="keep_channel_description">Útil para echar un vistazo a otra aplicación: al volver, la TV en directo continúa donde la pausaste. Mientras tanto, mantiene ocupado un sintonizador. Termina antes si se llena el búfer de reproducción diferida.</string>
     <string name="keep_channel_needs_timeshift">Disponible cuando «%1$s» está activada.</string>
     <string name="startup_buffer_setting">Búfer de inicio</string>
     <string name="startup_buffer_automatic">Automático • %1$s</string>

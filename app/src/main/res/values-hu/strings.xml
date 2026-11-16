@@ -878,7 +878,7 @@
     <string name="channel_settings_save_failed">A csatornabeállításaid aktívak, de nem sikerült menteni őket.</string>
     <string name="keep_channel_setting">Szüneteltetett csatorna megtartása</string>
     <string name="keep_channel_off">Ki</string>
-    <string name="keep_channel_description">Ha szüneteltetett élő TV-adás közben kilépsz az alkalmazásból, a csatorna ennyi ideig behangolva marad, hogy folytathasd a nézést. Ezalatt lefoglal egy tunert.</string>
+    <string name="keep_channel_description">Hasznos, ha gyorsan megnéznél egy másik alkalmazást: visszatéréskor az élő TV a szüneteltetés helyétől folytatódik. Ezalatt lefoglal egy tunert. A csatorna megtartása hamarabb véget ér, ha az időeltolás puffere megtelik.</string>
     <string name="keep_channel_needs_timeshift">Akkor érhető el, ha a(z) „%1$s” be van kapcsolva.</string>
     <string name="startup_buffer_setting">Indulási puffer</string>
     <string name="startup_buffer_automatic">Automatikus • %1$s</string>

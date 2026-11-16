@@ -857,7 +857,7 @@
     <string name="channel_settings_save_failed">As configurações de canais estão ativas, mas não foi possível salvá-las.</string>
     <string name="keep_channel_setting">Manter a TV em pausa sintonizada</string>
     <string name="keep_channel_off">Desativado</string>
-    <string name="keep_channel_description">Se você sair do app enquanto a TV ao vivo estiver em pausa, o canal ficará sintonizado por esse tempo para que você possa continuar. Um sintonizador ficará ocupado enquanto isso.</string>
+    <string name="keep_channel_description">Útil para dar uma olhada rápida em outro app: ao voltar, a TV ao vivo continua de onde você pausou. Um sintonizador fica ocupado enquanto isso. O canal é liberado antes se o buffer de timeshift ficar cheio.</string>
     <string name="keep_channel_needs_timeshift">Disponível quando “%1$s” está ativado.</string>
     <string name="startup_buffer_setting">Buffer inicial</string>
     <string name="startup_buffer_automatic">Automático • %1$s</string>

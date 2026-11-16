@@ -815,7 +815,7 @@
     <string name="channel_settings_save_failed">频道设置已生效，但无法保存。</string>
     <string name="keep_channel_setting">暂停时保持频道调谐</string>
     <string name="keep_channel_off">关闭</string>
-    <string name="keep_channel_description">暂停电视直播后离开应用，频道会在此时长内保持调谐，以便继续观看。期间会持续占用一个调谐器。</string>
+    <string name="keep_channel_description">适合临时切换到其他应用：回来后，电视直播会从暂停处继续播放。期间会持续占用一个调谐器。时移缓冲区存满后会提前结束。</string>
     <string name="keep_channel_needs_timeshift">开启“%1$s”后可用。</string>
     <string name="startup_buffer_setting">启动缓冲</string>
     <string name="startup_buffer_automatic">自动 • %1$s</string>
