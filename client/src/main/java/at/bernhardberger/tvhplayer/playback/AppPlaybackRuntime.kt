@@ -1301,7 +1301,7 @@ class AppPlaybackRuntime(
                     _recordingSelection.value = selection
                     _recordingAdmission.value = admission
                     recordingMarkers.applySettings(markSettings)
-                    recordingMarkers.observeRecordingMarkersLocked(requireNotNull(installedBinding), continuesTarget = preservesMarkerHistory)
+                    recordingMarkers.observeRecordingMarkersLocked(requireNotNull(installedBinding), selection.recordingId, continuesTarget = preservesMarkerHistory)
                     presentation.publishStarting()
                     presentation.beginTargetPresentationLocked(epoch)
                     presentation.publishInstalledPlayerStateLocked()

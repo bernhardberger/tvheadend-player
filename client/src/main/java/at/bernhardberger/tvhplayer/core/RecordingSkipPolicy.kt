@@ -16,6 +16,11 @@ fun recordingSkipLanding(mark: RecordingMark, landing: SkipLanding): Long =
 private fun RecordingMark.skippableAt(positionMs: Long, landing: SkipLanding): Boolean =
     kind == RecordingMarkKind.AD_BREAK && contains(positionMs) && positionMs < recordingSkipLanding(this, landing)
 
+private val RecordingMark.entryStartMs: Long get() = if (kind == RecordingMarkKind.PROGRAM_START) 0 else startMs
+private val RecordingMark.entryEndMs: Long get() = if (kind == RecordingMarkKind.PROGRAM_START) startMs else endMs
+private fun RecordingMark.containsEntry(positionMs: Long): Boolean =
+    positionMs >= entryStartMs && positionMs < entryEndMs
+
 fun recordingMuted(cutpoints: List<DvrCutpoint>, positionMs: Long): Boolean = cutpoints.any {
     it.action == DvrCutpointAction.MUTE && positionMs >= it.start.inWholeMilliseconds && positionMs < it.end.inWholeMilliseconds
 }
@@ -26,34 +31,36 @@ class RecordingSkipPolicy {
     private var deliberateMinimum: Long? = null
     private var deliberateMaximum: Long? = null
     private val skippedAds = mutableListOf<RecordingMark>()
-    var offeredAdBreak: RecordingMark? = null
+    var offeredPrompt: RecordingMark? = null
         private set
     var currentAdBreak: RecordingMark? = null
         private set
 
-    fun dismissPrompt() { offeredAdBreak = null }
+    fun dismissPrompt() { offeredPrompt = null }
 
     fun deliberateSeek(marks: List<RecordingMark>, positionMs: Long, landing: SkipLanding = SkipLanding.END) {
         deliberateMinimum = positionMs
         deliberateMaximum = positionMs
-        occupied = marks.filter { it.contains(positionMs) }.toSet()
+        occupied = marks.filter { it.containsEntry(positionMs) }.toSet()
         currentAdBreak = occupied.firstOrNull { it.skippableAt(positionMs, landing) }
-        offeredAdBreak = null
+        offeredPrompt = null
     }
 
     fun evaluate(marks: List<RecordingMark>, positionMs: Long, playing: Boolean, settings: PlayerSettings): RecordingSkipDecision {
         deliberateMinimum = deliberateMinimum?.coerceAtMost(positionMs)
         deliberateMaximum = deliberateMaximum?.coerceAtLeast(positionMs)
-        val inside = marks.filter { it.contains(positionMs) }.toSet()
+        val inside = marks.filter { it.containsEntry(positionMs) }.toSet()
         currentAdBreak = inside.firstOrNull { it.skippableAt(positionMs, settings.skipLanding) }
-        if (offeredAdBreak?.skippableAt(positionMs, settings.skipLanding) != true ||
-            settings.adBreakMode != AdBreakMode.ASK) offeredAdBreak = null
+        offeredPrompt = offeredPrompt?.takeIf {
+            if (it.kind == RecordingMarkKind.PROGRAM_START) it in inside
+            else it.skippableAt(positionMs, settings.skipLanding) && settings.adBreakMode == AdBreakMode.ASK
+        }
         // Pausing does not forget entry history; a first resume inside a span still enters it.
         occupied = inside.filter { mark ->
-            (deliberateMinimum?.let { mark.contains(it) } == true &&
-                deliberateMaximum?.let { mark.contains(it) } == true) ||
+            (deliberateMinimum?.let { mark.containsEntry(it) } == true &&
+                deliberateMaximum?.let { mark.containsEntry(it) } == true) ||
                 occupied.any { previous -> previous.kind == mark.kind &&
-                    previous.startMs < mark.endMs && mark.startMs < previous.endMs }
+                    previous.entryStartMs < mark.entryEndMs && mark.entryStartMs < previous.entryEndMs }
         }.toSet()
         if (!playing) return RecordingSkipDecision()
         val entered = inside - occupied
@@ -62,11 +69,18 @@ class RecordingSkipPolicy {
             occupied = occupied + cut
             return RecordingSkipDecision(recordingSkipLanding(cut, settings.skipLanding))
         }
-        occupied = inside
+        entered.firstOrNull { it.kind == RecordingMarkKind.PROGRAM_START }?.let { offeredPrompt = it }
+        // A suppressed Ask entry remains eligible when the programme offer is dismissed.
+        occupied = inside.filterNot {
+            it.kind == RecordingMarkKind.AD_BREAK && settings.adBreakMode == AdBreakMode.ASK &&
+                offeredPrompt?.kind == RecordingMarkKind.PROGRAM_START && it in entered
+        }.toSet()
         val ad = entered.firstOrNull { it.kind == RecordingMarkKind.AD_BREAK } ?: return RecordingSkipDecision()
         return when (settings.adBreakMode) {
             AdBreakMode.ASK -> {
-                offeredAdBreak = ad.takeIf { it.skippableAt(positionMs, settings.skipLanding) }
+                if (offeredPrompt?.kind != RecordingMarkKind.PROGRAM_START) {
+                    offeredPrompt = ad.takeIf { it.skippableAt(positionMs, settings.skipLanding) }
+                }
                 RecordingSkipDecision()
             }
             AdBreakMode.AUTOMATIC -> {
@@ -83,9 +97,16 @@ class RecordingSkipPolicy {
         }
     }
 
+    fun acceptPrompt(expected: RecordingMark, settings: PlayerSettings): Long? {
+        if (expected.kind != RecordingMarkKind.PROGRAM_START) return skipAdBreak(expected, settings)
+        if (expected != offeredPrompt) return null
+        offeredPrompt = null
+        return expected.startMs
+    }
+
     fun skipAdBreak(expected: RecordingMark, settings: PlayerSettings): Long? {
         if (expected != currentAdBreak || settings.adBreakMode == AdBreakMode.OFF) return null
-        offeredAdBreak = null
+        offeredPrompt = null
         // The landing point ends the break as current, before the seek's position arrives.
         currentAdBreak = null
         return recordingSkipLanding(expected, settings.skipLanding)

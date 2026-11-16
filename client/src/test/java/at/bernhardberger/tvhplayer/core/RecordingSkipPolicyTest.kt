@@ -15,6 +15,78 @@ class RecordingSkipPolicyTest {
     private val marks = listOf(ad, cut)
     private val automatic = PlayerSettings(adBreakMode = AdBreakMode.AUTOMATIC)
 
+    @Test fun paddingOffersOnOpenInEveryAdModeAndNeverJumpsAutomatically() {
+        val start = RecordingMark(RecordingMarkKind.PROGRAM_START, 60_000)
+        for (mode in AdBreakMode.entries) {
+            val policy = RecordingSkipPolicy()
+            val settings = PlayerSettings(adBreakMode = mode)
+            assertNull(policy.evaluate(listOf(start), 0, false, settings).seekToMs)
+            assertNull(policy.offeredPrompt)
+            assertNull(policy.evaluate(listOf(start), 1, true, settings).seekToMs)
+            assertEquals(start, policy.offeredPrompt)
+            policy.dismissPrompt()
+            policy.evaluate(listOf(start), 2, true, settings)
+            assertNull(policy.offeredPrompt)
+            policy.evaluate(listOf(start), 60_000, true, settings)
+            policy.evaluate(listOf(start), 0, true, settings)
+            assertEquals(start, policy.offeredPrompt)
+        }
+    }
+
+    @Test fun paddingDeliberateEntryIsSuppressedEvenBeforeMetadataArrives() {
+        val start = RecordingMark(RecordingMarkKind.PROGRAM_START, 60_000)
+        for (known in listOf(emptyList(), listOf(start))) {
+            val policy = RecordingSkipPolicy()
+            policy.deliberateSeek(known, 1_000)
+            policy.evaluate(listOf(start), 1_001, true, PlayerSettings())
+            assertNull(policy.offeredPrompt)
+            policy.evaluate(listOf(start), start.startMs, true, PlayerSettings())
+            policy.evaluate(listOf(start), 0, true, PlayerSettings())
+            assertEquals(start, policy.offeredPrompt)
+        }
+    }
+
+    @Test fun paddingOfferWithdrawsAtStartAndAcceptsOnlyItsExactTarget() {
+        val start = RecordingMark(RecordingMarkKind.PROGRAM_START, 60_000)
+        val settings = automatic.copy(skipLanding = SkipLanding.FIVE_SECONDS_BEFORE)
+        val policy = RecordingSkipPolicy()
+        policy.evaluate(listOf(start), 1, true, settings)
+        assertNull(policy.acceptPrompt(start.copy(startMs = 59_000), settings))
+        assertEquals(start.startMs, policy.acceptPrompt(start, settings))
+        assertNull(policy.acceptPrompt(start, settings))
+        val passing = RecordingSkipPolicy()
+        passing.evaluate(listOf(start), 59_999, true, settings)
+        assertEquals(start, passing.offeredPrompt)
+        passing.evaluate(listOf(start), 60_000, true, settings)
+        assertNull(passing.offeredPrompt)
+        assertNull(passing.acceptPrompt(start, settings))
+    }
+
+    @Test fun paddingOfferSuppressesAdOffersUntilDismissedButDoesNotChangeAutoSkip() {
+        val start = RecordingMark(RecordingMarkKind.PROGRAM_START, 60_000)
+        val both = marks + start
+        val policy = RecordingSkipPolicy()
+        policy.evaluate(both, 0, true, PlayerSettings())
+        policy.evaluate(both, ad.startMs, true, PlayerSettings())
+        assertEquals(start, policy.offeredPrompt)
+        policy.dismissPrompt()
+        policy.evaluate(both, ad.startMs + 1, true, PlayerSettings())
+        assertEquals(ad, policy.offeredPrompt)
+        val auto = RecordingSkipPolicy()
+        auto.evaluate(both, 0, true, automatic)
+        assertEquals(RecordingSkipDecision(ad.endMs, ad), auto.evaluate(both, ad.startMs, true, automatic))
+        assertEquals(start, auto.offeredPrompt)
+    }
+
+    @Test fun paddingOfferSurvivesAdModeChanges() {
+        val start = RecordingMark(RecordingMarkKind.PROGRAM_START, 60_000)
+        val policy = RecordingSkipPolicy()
+        for ((index, mode) in AdBreakMode.entries.withIndex()) {
+            policy.evaluate(listOf(start), index.toLong(), true, PlayerSettings(adBreakMode = mode))
+            assertEquals(start, policy.offeredPrompt)
+        }
+    }
+
     @Test fun naturalEntrySkipsCutsSilentlyAndAutomaticAdsOnce() {
         val policy = RecordingSkipPolicy()
         assertNull(policy.evaluate(marks, 9_999, true, automatic).seekToMs)
@@ -31,7 +103,7 @@ class RecordingSkipPolicyTest {
         assertEquals(40_000L, policy.evaluate(marks, 30_000, true, automatic).seekToMs)
         policy.deliberateSeek(marks, 15_000)
         assertNull(policy.evaluate(marks, 15_001, true, automatic).seekToMs)
-        assertNull(policy.offeredAdBreak)
+        assertNull(policy.offeredPrompt)
     }
 
     @Test fun resumeInsideAndLateMetadataCountAsEntry() {
@@ -50,11 +122,11 @@ class RecordingSkipPolicyTest {
                 policy.deliberateSeek(emptyList(), mark.startMs + 1)
                 policy.evaluate(emptyList(), mark.startMs + 2, true, settings)
                 assertNull(policy.evaluate(listOf(mark), mark.startMs + 3, true, settings).seekToMs)
-                assertNull(policy.offeredAdBreak)
+                assertNull(policy.offeredPrompt)
                 policy.evaluate(listOf(mark), mark.endMs, true, settings)
                 val reentry = policy.evaluate(listOf(mark), mark.startMs, true, settings)
                 if (mark.kind == RecordingMarkKind.AD_BREAK && settings.adBreakMode == AdBreakMode.ASK) {
-                    assertEquals(mark, policy.offeredAdBreak)
+                    assertEquals(mark, policy.offeredPrompt)
                 } else assertEquals(mark.endMs, reentry.seekToMs)
             }
         }
@@ -71,17 +143,17 @@ class RecordingSkipPolicyTest {
         val policy = RecordingSkipPolicy()
         val settings = PlayerSettings(skipLanding = SkipLanding.TWO_SECONDS_BEFORE)
         assertNull(policy.evaluate(marks, 10_000, true, settings).seekToMs)
-        assertEquals(ad, policy.offeredAdBreak)
+        assertEquals(ad, policy.offeredPrompt)
         assertEquals(ad, policy.currentAdBreak)
         policy.dismissPrompt()
         policy.evaluate(marks, 11_000, true, settings)
-        assertNull(policy.offeredAdBreak)
+        assertNull(policy.offeredPrompt)
         assertEquals(18_000L, policy.skipAdBreak(ad, settings))
         policy.evaluate(marks, 20_000, true, settings)
         assertNull(policy.currentAdBreak)
         assertNull(policy.skipAdBreak(ad, settings))
         policy.evaluate(marks, 10_000, true, settings)
-        assertEquals(ad, policy.offeredAdBreak)
+        assertEquals(ad, policy.offeredPrompt)
     }
 
     @Test fun anEarlyLandingEndsTheBreakAsCurrentSoSkipCannotSeekBackwards() {
@@ -92,7 +164,7 @@ class RecordingSkipPolicyTest {
         assertNull(manual.currentAdBreak)
         manual.evaluate(marks, 15_000, true, settings)
         assertNull(manual.currentAdBreak)
-        assertNull(manual.offeredAdBreak)
+        assertNull(manual.offeredPrompt)
         assertNull(manual.skipAdBreak(ad, settings))
         manual.evaluate(marks, 19_000, true, settings)
         assertNull(manual.skipAdBreak(ad, settings))
@@ -110,16 +182,16 @@ class RecordingSkipPolicyTest {
         val settings = PlayerSettings(skipLanding = SkipLanding.FIVE_SECONDS_BEFORE)
         val policy = RecordingSkipPolicy()
         policy.evaluate(marks, 10_000, true, settings)
-        assertEquals(ad, policy.offeredAdBreak)
+        assertEquals(ad, policy.offeredPrompt)
         policy.evaluate(marks, 14_999, true, settings)
-        assertEquals(ad, policy.offeredAdBreak)
+        assertEquals(ad, policy.offeredPrompt)
         policy.evaluate(marks, 15_000, true, settings)
-        assertNull(policy.offeredAdBreak)
+        assertNull(policy.offeredPrompt)
         assertNull(policy.currentAdBreak)
         // Resuming inside the break past its landing point offers nothing.
         val late = RecordingSkipPolicy()
         late.evaluate(marks, 16_000, true, settings)
-        assertNull(late.offeredAdBreak)
+        assertNull(late.offeredPrompt)
         assertNull(late.currentAdBreak)
         late.deliberateSeek(marks, 17_000, settings.skipLanding)
         assertNull(late.currentAdBreak)
@@ -131,7 +203,7 @@ class RecordingSkipPolicyTest {
         val policy = RecordingSkipPolicy()
         val settings = PlayerSettings(adBreakMode = AdBreakMode.OFF, skipCuts = false)
         assertNull(policy.evaluate(marks, 10_000, true, settings).seekToMs)
-        assertNull(policy.offeredAdBreak)
+        assertNull(policy.offeredPrompt)
         assertNull(policy.skipAdBreak(ad, settings))
         assertNull(policy.evaluate(marks, 30_000, true, settings).seekToMs)
     }

@@ -960,6 +960,7 @@
     <!-- The short badge marking an ad break on the recording's timeline. -->
     <string name="recording_mark_ad_badge">Ad</string>
     <string name="skip_ad_break">Skip ad break</string>
+    <string name="skip_to_program_start">Skip to program start</string>
     <string name="settings_section_recording_marks">Recording marks</string>
     <string name="ad_breaks_setting">Ad breaks</string>
     <string name="recording_mark_program_starts">Program starts</string>

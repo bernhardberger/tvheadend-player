@@ -38,6 +38,9 @@ import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import at.bernhardberger.tvhplayer.core.RecordingMark
 import at.bernhardberger.tvhplayer.core.RecordingMarkKind
+import at.bernhardberger.tvhplayer.R
+import androidx.test.core.app.ApplicationProvider
+import androidx.compose.ui.test.assertTextEquals
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import androidx.tv.material3.MaterialTheme
 import org.junit.Assert.assertEquals
@@ -81,6 +84,16 @@ class RecordingSkipFocusTest {
         prompt.offer(ad)
         compose.pressKey(Key.DirectionCenter, settleFrames = 20)
         assertEquals(listOf(ad), prompt.skips)
+    }
+
+    @Test fun programStartUsesItsLabelAndOkPassesItsTarget() {
+        val start = RecordingMark(RecordingMarkKind.PROGRAM_START, 180_000L)
+        val prompt = prompt()
+        prompt.offer(start)
+        val label = ApplicationProvider.getApplicationContext<Application>().getString(R.string.skip_to_program_start)
+        compose.onNodeWithTag("recording-skip-prompt").assertTextEquals(label)
+        compose.pressKey(Key.DirectionCenter, settleFrames = 20)
+        assertEquals(listOf(start), prompt.skips)
     }
 
     @Test fun theFocusedPromptUsesTheStandardFocusedThemeAndTheRingDrainsClockwise() {

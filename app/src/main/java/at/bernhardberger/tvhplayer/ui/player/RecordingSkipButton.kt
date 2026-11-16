@@ -57,6 +57,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.layout.layout
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.RecordingMark
+import at.bernhardberger.tvhplayer.core.RecordingMarkKind
 import kotlin.math.roundToInt
 
 /** How long the Skip prompt stays over the hidden chrome, counted from the break's offer. */
@@ -85,6 +86,7 @@ internal fun recordingSkipRemainingSweep(elapsedFraction: Float): Float =
 @Composable
 private fun RecordingSkipButton(
     onSkip: () -> Unit,
+    kind: RecordingMarkKind?,
     elapsed: () -> Float,
     modifier: Modifier = Modifier,
 ) {
@@ -107,7 +109,8 @@ private fun RecordingSkipButton(
     ) {
         SkipCountdown(LocalContentColor.current, elapsed)
         Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-        Text(stringResource(R.string.skip_ad_break), maxLines = 1, softWrap = false)
+        Text(stringResource(if (kind == RecordingMarkKind.PROGRAM_START) R.string.skip_to_program_start else R.string.skip_ad_break),
+            maxLines = 1, softWrap = false)
     }
 }
 
@@ -223,6 +226,7 @@ internal fun RecordingSkipPrompt(
         ) {
             RecordingSkipButton(
                 onSkip = { prompt?.let(onSkip) },
+                kind = presentation?.kind,
                 elapsed = { elapsedMs / SKIP_PROMPT_MS.toFloat() },
                 modifier = Modifier.testTag("recording-skip-prompt").focusRequester(focus)
                     .focusProperties { canFocus = visible }
