@@ -6,6 +6,7 @@ import at.bernhardberger.tvhplayer.ui.components.railNowPlaying
 import at.bernhardberger.tvhplayer.profiling.profileRouteDraw
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalActivity
 import android.animation.ValueAnimator
 import android.content.pm.PackageManager
 import android.os.Build
@@ -107,6 +108,7 @@ import at.bernhardberger.tvhplayer.ui.components.ProvideAppArtwork
 import at.bernhardberger.tvhplayer.ui.components.SideRail
 import androidx.navigationevent.compose.LocalNavigationEventDispatcherOwner
 import androidx.navigationevent.compose.rememberNavigationEventDispatcherOwner
+import at.bernhardberger.tvhplayer.ui.player.AppDisplayMode
 import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
 import at.bernhardberger.tvhplayer.ui.player.ChannelZapPacer
 import at.bernhardberger.tvhplayer.ui.player.LocalSessionChannelStepAllowed
@@ -629,6 +631,10 @@ fun AppRoot(
     val uiSettingsStore: UiSettingsStore = koinInject()
     val context = LocalContext.current
     val uiSettings by uiSettingsStore.settings.collectAsStateWithLifecycle(initialValue = UiSettings())
+    val appWindow = LocalActivity.current?.window
+    LaunchedEffect(appWindow, uiSettings.displayRefreshRate) {
+        appWindow?.let { AppDisplayMode.of(it).useAppRate(uiSettings.displayRefreshRate) }
+    }
     val settingsScope = rememberCoroutineScope()
     var lastUpdateTime by remember { mutableStateOf<Long?>(null) }
     LaunchedEffect(uiSettingsStore) {
