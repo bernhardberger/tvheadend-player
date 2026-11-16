@@ -286,6 +286,7 @@ internal fun LivePlayerRouteContent(
     connectionUiState: ConnectionUiState? = null,
     startupTarget: ApplianceLaunchTarget? = null,
     onStartupOutcome: (ApplianceLaunchTarget, MainStartupPlaybackOutcome) -> Boolean = { _, _ -> false },
+    onStartupInputReadyChanged: (Boolean) -> Unit = {},
     guideEntryRequestId: Long? = null,
     consumeGuideEntry: () -> Boolean = { false },
 ) {
@@ -305,6 +306,7 @@ internal fun LivePlayerRouteContent(
             contentAllowed = contentAllowed,
             startupTarget = startupTarget,
             onStartupOutcome = onStartupOutcome,
+            onStartupInputReadyChanged = onStartupInputReadyChanged,
             onShowGuide = onShowGuide,
             onPlayRecording = onPlayRecording,
             guideEntryRequestId = guideEntryRequestId,

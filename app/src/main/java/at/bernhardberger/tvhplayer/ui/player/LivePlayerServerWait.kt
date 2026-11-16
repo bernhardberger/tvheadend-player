@@ -1,17 +1,11 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import android.animation.ValueAnimator
 import android.os.SystemClock
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -22,7 +16,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.input.key.KeyEvent
@@ -30,24 +23,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.Text
 import android.view.KeyEvent as AndroidKeyEvent
-import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.AppError
 import at.bernhardberger.tvhplayer.core.AppErrorAction
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
-import at.bernhardberger.tvhplayer.core.visibleChannelNumber
 import at.bernhardberger.tvhplayer.core.MainStartupMessageKind
 import at.bernhardberger.tvhplayer.core.MainStartupPresentation
 import at.bernhardberger.tvhplayer.core.WaitingConnectionFailure
@@ -57,11 +39,10 @@ import at.bernhardberger.tvhplayer.core.toAppError
 import at.bernhardberger.tvhplayer.core.toConnectionUiState
 import at.bernhardberger.tvhplayer.core.waitingConnectionFailurePresentation
 import at.bernhardberger.tvhplayer.ui.common.AppErrorText
-import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 import at.bernhardberger.tvhplayer.ui.components.TvRecoveryAction
 import at.bernhardberger.tvhplayer.ui.components.TvRecoveryOverlay
-import at.bernhardberger.tvhplayer.ui.components.channelTitleText
+import at.bernhardberger.tvhplayer.ui.startup.ChannelStartupSurface
 import kotlinx.coroutines.delay
 
 /**
@@ -80,17 +61,23 @@ internal class LivePlayerServerWaitState(
     private val onOpenConnectionSettings: State<() -> Unit>,
     private val channelStartAtMillis: Long?,
     private val nowMillis: State<Long>,
+    private val playerRecovery: State<Boolean>,
 ) {
     /** The observation the wait shows its channel logo for: its profile names the saved copy. */
     val artworkObservation: SessionObservation get() = observation.value
     private var failures by mutableStateOf(WaitingConnectionFailure())
+    private var dismissed by mutableStateOf(false)
+    var viewerInteracted by mutableStateOf(false)
+        private set
 
     /** Passive while connecting, Actionable once it failed (its buttons are [failure]'s); null when not waiting. */
     val presentation: MainStartupPresentation?
-        get() = if (channelStartAtMillis == null || hasSession.value) null else {
-            failureState?.let(::waitingConnectionFailurePresentation)
+        get() = if (channelStartAtMillis == null || startingDismissed || playerRecovery.value) null else {
+            if (hasSession.value) MainStartupPresentation.Passive(MainStartupMessageKind.STARTING_TELEVISION)
+            else failureState?.let(::waitingConnectionFailurePresentation)
                 ?: MainStartupPresentation.Passive(MainStartupMessageKind.CONNECTING)
         }
+    private val startingDismissed: Boolean get() = hasSession.value && dismissed
 
     /**
      * The catalog error of the failure [presentation] shows, with the buttons the SDK's guidance
@@ -106,6 +93,7 @@ internal class LivePlayerServerWaitState(
 
     /** Applied after each composition. */
     fun observed() {
+        if (!hasSession.value) dismissed = false
         failures = if (hasSession.value) WaitingConnectionFailure() else failures.observe(connection.value)
     }
 
@@ -128,12 +116,54 @@ internal class LivePlayerServerWaitState(
         if (presentation !is MainStartupPresentation.Passive) return false
         val native = event.nativeKeyEvent
         if (native.keyCode == AndroidKeyEvent.KEYCODE_BACK) return false
+        if (hasSession.value) return consumesStartingKey(native, layerState)
+        trackOpeningKeyCycle(native, layerState)
+        return true
+    }
+
+    private fun consumesStartingKey(native: AndroidKeyEvent, layerState: LivePlayerLayerState): Boolean {
+        val zap = channelStartupZapKey(native.keyCode)
+        if (!zap && !channelStartupRevealKey(native.keyCode)) return false
+        val deliberate = native.action == AndroidKeyEvent.ACTION_DOWN && native.repeatCount == 0
+        if (deliberate) viewerInteracted = true
+        return when {
+            zap -> false
+            native.action == AndroidKeyEvent.ACTION_DOWN && native.repeatCount > 0 -> true
+            else -> {
+                if (deliberate) {
+                    layerState.core.chrome.hideControls()
+                    dismissed = true
+                }
+                trackOpeningKeyCycle(native, layerState)
+                true
+            }
+        }
+    }
+
+    private fun trackOpeningKeyCycle(native: AndroidKeyEvent, layerState: LivePlayerLayerState) {
         when (native.action) {
             AndroidKeyEvent.ACTION_DOWN -> if (native.repeatCount == 0) layerState.core.beginOpeningKeyCycle(native.keyCode)
             AndroidKeyEvent.ACTION_UP -> layerState.core.endOpeningKeyCycle(native.keyCode)
         }
-        return true
     }
+
+}
+
+internal fun channelStartupZapKey(keyCode: Int): Boolean = when (keyCode) {
+        AndroidKeyEvent.KEYCODE_DPAD_UP, AndroidKeyEvent.KEYCODE_DPAD_DOWN,
+        AndroidKeyEvent.KEYCODE_CHANNEL_UP, AndroidKeyEvent.KEYCODE_CHANNEL_DOWN,
+        in AndroidKeyEvent.KEYCODE_0..AndroidKeyEvent.KEYCODE_9 -> true
+        else -> false
+}
+
+internal fun channelStartupRevealKey(keyCode: Int): Boolean = when (keyCode) {
+    AndroidKeyEvent.KEYCODE_DPAD_LEFT, AndroidKeyEvent.KEYCODE_DPAD_RIGHT,
+    AndroidKeyEvent.KEYCODE_DPAD_CENTER, AndroidKeyEvent.KEYCODE_ENTER, AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
+    AndroidKeyEvent.KEYCODE_INFO, AndroidKeyEvent.KEYCODE_MENU, AndroidKeyEvent.KEYCODE_TV_MEDIA_CONTEXT_MENU,
+    AndroidKeyEvent.KEYCODE_MEDIA_AUDIO_TRACK, AndroidKeyEvent.KEYCODE_CAPTIONS,
+    AndroidKeyEvent.KEYCODE_TV_CONTENTS_MENU, AndroidKeyEvent.KEYCODE_TV_NUMBER_ENTRY,
+    AndroidKeyEvent.KEYCODE_BOOKMARK -> true
+    else -> false
 }
 
 @Composable
@@ -144,6 +174,7 @@ internal fun rememberLivePlayerServerWait(
     onReconnect: () -> Unit,
     onOpenConnectionSettings: () -> Unit,
     channelStartAtMillis: Long?,
+    playerRecovery: Boolean = false,
 ): LivePlayerServerWaitState {
     val hasSession = rememberUpdatedState(observation.currentSession != null)
     val latest = rememberUpdatedState(observation)
@@ -151,6 +182,7 @@ internal fun rememberLivePlayerServerWait(
     val reconnect = rememberUpdatedState(onReconnect)
     val connectionSettings = rememberUpdatedState(onOpenConnectionSettings)
     val now = remember(channelStartAtMillis) { mutableStateOf(SystemClock.elapsedRealtime()) }
+    val recovery = rememberUpdatedState(playerRecovery)
     LaunchedEffect(channelStartAtMillis) {
         if (channelStartAtMillis != null) {
             delay((channelStartAtMillis + CHANNEL_START_CONNECTION_GRACE_MILLIS - now.value).coerceAtLeast(0L))
@@ -159,7 +191,7 @@ internal fun rememberLivePlayerServerWait(
     }
     val state = remember(close, channelStartAtMillis) {
         LivePlayerServerWaitState(
-            hasSession, latest, connection, close, reconnect, connectionSettings, channelStartAtMillis, now,
+            hasSession, latest, connection, close, reconnect, connectionSettings, channelStartAtMillis, now, recovery,
         )
     }
     SideEffect { state.observed() }
@@ -176,50 +208,30 @@ internal fun LivePlayerServerWait(
     channel: Channel?,
     channelName: String,
     rootFocus: FocusRequester,
+    motionEnabled: Boolean = ValueAnimator.areAnimatorsEnabled(),
+    announceStatus: Boolean = true,
 ) {
     val presentation = state.presentation
-    val channelNumber = channel?.visibleChannelNumber
-    val picon = channel?.icon
     val connecting = presentation is MainStartupPresentation.Passive
     // Nothing here takes focus; the screen keeps it, so a key reaches no action behind the wait.
     LaunchedEffect(connecting) { if (connecting) runCatching { rootFocus.requestFocus() } }
     AnimatedVisibility(
         visible = connecting,
-        enter = fadeIn(tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard)),
-        exit = fadeOut(tween(PlayerMotion.ShortMs, easing = PlayerMotion.StandardAccelerate)),
+        enter = fadeIn(tween(if (motionEnabled) PlayerMotion.MediumMs else 0, easing = PlayerMotion.Standard)),
+        exit = fadeOut(tween(
+            if (motionEnabled) PlayerMotion.MediumMs else 0, easing = PlayerMotion.StandardAccelerate,
+        )),
     ) {
-        val title = channelTitleText(channelNumber, channelName)
-        val connectingText = stringResource(R.string.connection_connecting)
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
-                .padding(48.dp)
-                .testTag(LivePlayerServerWaitTag)
-                .clearAndSetSemantics {
-                    contentDescription = "$title. $connectingText"
-                    liveRegion = LiveRegionMode.Polite
-                },
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-        ) {
-            WaitPicon(state, picon)
-            Text(
-                text = title,
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-                textAlign = TextAlign.Center,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 16.dp).widthIn(max = 680.dp),
-            )
-            PlayerBusyRing(Modifier.padding(top = 24.dp))
-            Text(
-                text = connectingText,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(top = 24.dp).widthIn(max = 680.dp),
+        ProvideArtworkSession(null, state.artworkObservation) {
+            ChannelStartupSurface(
+                channel = channel,
+                channelName = channelName,
+                status = stringResource(if ((presentation as? MainStartupPresentation.Passive)?.messageKind ==
+                    MainStartupMessageKind.STARTING_TELEVISION) R.string.main_startup_message_starting
+                    else R.string.main_startup_message_connecting),
+                modifier = Modifier.testTag(LivePlayerServerWaitTag),
+                motionEnabled = motionEnabled,
+                announceStatus = announceStatus,
             )
         }
     }
@@ -245,9 +257,3 @@ internal fun LivePlayerServerWait(
 }
 
 internal const val LivePlayerServerWaitTag = "player-server-wait"
-
-/** Only the saved logo of the observation's profile, as before a session; its own scope reads each emission. */
-@Composable
-private fun WaitPicon(state: LivePlayerServerWaitState, picon: ChannelIcon?) {
-    ProvideArtworkSession(null, state.artworkObservation) { PiconBox(picon, Modifier.size(136.dp, 60.dp)) }
-}

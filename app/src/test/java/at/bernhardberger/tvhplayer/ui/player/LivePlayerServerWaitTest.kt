@@ -1,9 +1,24 @@
 @file:androidx.media3.common.util.UnstableApi
-@file:OptIn(at.bernhardberger.tvheadend.sdk.testing.FakePlaybackApi::class)
+@file:OptIn(at.bernhardberger.tvheadend.sdk.testing.FakePlaybackApi::class,
+    at.bernhardberger.tvheadend.sdk.playback.SubscriptionInfrastructureApi::class)
 
 package at.bernhardberger.tvhplayer.ui.player
 
 import kotlinx.coroutines.flow.onStart
+import at.bernhardberger.tvheadend.sdk.playback.SubscriptionOpener
+import at.bernhardberger.tvheadend.sdk.playback.SubscriptionConfirmation
+import at.bernhardberger.tvheadend.sdk.playback.SubscriptionOperationResult
+import at.bernhardberger.tvheadend.sdk.playback.SubscriptionEvent
+import at.bernhardberger.tvheadend.sdk.playback.SubscriptionCondition
+import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssue
+import at.bernhardberger.tvheadend.sdk.playback.SubscriptionStream
+import at.bernhardberger.tvheadend.sdk.playback.SubscriptionStreamType
+import at.bernhardberger.tvheadend.sdk.playback.StreamIndex
+import at.bernhardberger.tvheadend.sdk.playback.createSubscriptionManager
+import at.bernhardberger.tvheadend.sdk.testing.ScriptedSubscriptionConnection
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.awaitCancellation
 
 import at.bernhardberger.tvhplayer.testutil.settleFrames
 import at.bernhardberger.tvhplayer.testutil.pressKey
@@ -166,10 +181,93 @@ class LivePlayerServerWaitTest {
         session.publish(ready())
         compose.settleFrames(10)
         assertMainSettled("the waiting start installs when the session arrives") { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(1)) }
+        compose.onRoot().performKeyInput { advanceEventTime(800) }
+        compose.settleFrames(2)
+        assertEquals("held Confirm repeats must not dismiss Starting", 1, waits())
+        compose.runOnIdle { playerListeners.toList().forEach { it.onRenderedFirstFrame() } }
+        compose.settleFrames(4)
+        assertEquals(0, waits())
         compose.onRoot().performKeyInput { keyUp(Key.DirectionCenter) }
         compose.settleFrames(10)
         assertEquals(0, unconsumed)
         assertEquals(0, compose.onAllNodes(hasTestTag("player-actions"), useUnmergedTree = true).fetchSemanticsNodes().size)
+    }
+
+    @Test fun startingAllowsDirectChannelZap() {
+        screen()
+        session.publish(ready())
+        compose.settleFrames(10)
+        assertMainSettled("the first target is installed") { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(1)) }
+        compose.settleFrames(4)
+        compose.pressKey(Key.VolumeUp)
+        assertEquals("unrelated keys do not dismiss Starting", 1, waits())
+        compose.pressKey(Key.ChannelUp)
+        compose.settleFrames(10)
+        assertEquals("Starting must not trap channel keys", AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
+        assertEquals(1, waits())
+        compose.pressKey(Key.DirectionCenter)
+        compose.settleFrames(3)
+        assertEquals("a revealing key first releases Starting", 0, waits())
+        compose.onNodeWithTag("player-actions").assertDoesNotExist()
+        compose.pressKey(Key.Menu)
+        compose.settleFrames(3)
+        compose.onNodeWithTag("playback-options-title").assertExists()
+    }
+
+    @Test fun aSubscriptionIssueReleasesStartingToTheChannelMessage() {
+        val dispatcher = StandardTestDispatcher()
+        val connection = ScriptedSubscriptionConnection().apply {
+            scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, null)))
+        }
+        val manager = createSubscriptionManager(connection, dispatcher).apply { startAdmission() }
+        try {
+            screen(opener = manager)
+            session.publish(ready())
+            compose.settleFrames(10)
+            assertMainSettled("the target is installed") { runtime.activeTarget.value != null }
+            compose.mainClock.advanceTimeUntil {
+                dispatcher.scheduler.runCurrent()
+                connection.subscribeCount > 0
+            }
+            runTest(dispatcher) {
+                connection.awaitCollectionRegistered()
+                connection.emit(SubscriptionEvent.Started(listOf(
+                    SubscriptionStream(index = StreamIndex(1), type = SubscriptionStreamType.H264,
+                        language = null, compositionId = null, ancillaryId = null, width = 320, height = 240,
+                        frameDuration = null, aspectNumerator = null, aspectDenominator = null, audioType = null,
+                        audioVersion = null, channelCount = null, rate = null, rdsUecp = null),
+                ), null))
+            }
+            compose.settleFrames(4)
+            runTest(dispatcher) {
+                connection.emit(SubscriptionEvent.Status(SubscriptionCondition.STATUS_REPORTED, SubscriptionIssue.NO_FREE_ADAPTER))
+            }
+            compose.settleFrames(10)
+            dispatcher.scheduler.runCurrent()
+            compose.settleFrames(4)
+            assertEquals("the SDK published the issue", SubscriptionIssue.NO_FREE_ADAPTER,
+                (runtime.livePlaybackObservation.value as? at.bernhardberger.tvheadend.sdk.media3.LivePlaybackObservation.Active)
+                    ?.subscriptionIssue)
+            assertEquals("a server issue is not masked by Starting", 0, waits())
+            compose.onNodeWithTag("player-channel-unavailable", useUnmergedTree = true).assertExists()
+            runTest(dispatcher) {
+                connection.emit(SubscriptionEvent.Status(SubscriptionCondition.NO_DETAIL, null))
+            }
+            compose.settleFrames(4)
+            assertEquals("a cleared issue returns to the pending picture", 1, waits())
+            session.publish(SessionObservation.create(
+                sessionState = SessionState.Unavailable(at.bernhardberger.tvheadend.sdk.core.SessionFailure.AUTHENTICATION_REJECTED),
+                channelState = ChannelRepositoryState.Stale(catalog),
+            ))
+            compose.runOnIdle {
+                this@LivePlayerServerWaitTest.connection.value = ConnectionUiState.Error(
+                    ConnectionFailureKind.AUTHENTICATION, SessionRecoveryDisposition.PROFILE_CHANGE_REQUIRED)
+            }
+            compose.settleFrames(4)
+            compose.onNodeWithTag("tv-recovery-primary").assertExists()
+        } finally {
+            runTest(dispatcher) { manager.closeAndJoin() }
+        }
     }
 
     // Opened before Ready, after a connection save to this profile: its saved logo shows at once.
@@ -311,11 +409,20 @@ class LivePlayerServerWaitTest {
 
     @Test fun aWaitWhoseConnectionRetriesByItselfOffersNoRetry() {
         screen()
+        session.publish(ready())
+        compose.settleFrames(10)
+        compose.pressKey(Key.DirectionCenter)
+        compose.settleFrames(3)
+        assertEquals("the viewer can dismiss Starting", 0, waits())
         compose.runOnIdle {
+            session.publish(SessionObservation.create(sessionState = SessionState.Connecting,
+                channelState = ChannelRepositoryState.Stale(catalog)))
             connection.value = ConnectionUiState.Error(ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.AUTOMATIC_BACKOFF)
         }
         compose.settleFrames(10)
         assertEquals("an automatic retry starts with the channel wait, not error 110", 1, waits())
+        compose.pressKey(Key.ChannelUp)
+        assertEquals("Connecting consumes channel keys", AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
         compose.onNode(hasText(string(R.string.error_110_title))).assertDoesNotExist()
         compose.mainClock.advanceTimeBy(15_000L)
         compose.settleFrames(2)
@@ -365,6 +472,8 @@ class LivePlayerServerWaitTest {
         compose.runOnIdle { connection.value = null }
         compose.settleFrames(10)
         assertEquals("the resumed channel is retuned exactly once when its session arrives", beforeReconnect + 1, binds())
+        assertEquals("session readiness must not uncover a channel before its first frame", 1, waits())
+        compose.onNode(hasText("Starting"), useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("player-footer").assertDoesNotExist()
         compose.runOnIdle { playerListeners.toList().forEach { it.onRenderedFirstFrame() } }
         compose.settleFrames(2)
@@ -423,8 +532,12 @@ class LivePlayerServerWaitTest {
         ),
         // The profile the observation is data of, with saved logos and channel one's icon.
         profile: ServerProfile? = null,
+        opener: SubscriptionOpener = SubscriptionOpener { _, _, _ -> awaitCancellation() },
     ) {
-        session = FakeTvheadendSession(initial).apply { scriptLivePlaybackSuccess() }
+        // A pending first frame needs a held stream, not the fake's immediate end-of-input failure.
+        session = FakeTvheadendSession(initial).apply {
+            scriptLivePlaybackSuccess(opener)
+        }
         if (profile != null) {
             session.artwork.scriptCached(profile)
             session.publish(SessionObservation.create(sessionState = SessionState.Connecting,

@@ -1,4 +1,5 @@
 <resources xmlns:tools="http://schemas.android.com/tools" tools:locale="en">
+    <string name="main_startup_message_starting">Starting</string>
     <string name="automatic_recording_new_overline">Automatic recordings</string>
     <string name="automatic_recording_new_title">New automatic recording</string>
     <string name="automatic_recording_new_choose">Choose how it decides what to record.</string>

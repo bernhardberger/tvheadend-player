@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui
 
+import at.bernhardberger.tvheadend.sdk.core.Channel
+
 import at.bernhardberger.tvhplayer.ui.components.ProvideWatchingProgress
 import at.bernhardberger.tvhplayer.ui.components.railNowPlaying
 
@@ -260,6 +262,9 @@ internal fun MainStartupComposition(
     notices: @Composable BoxScope.() -> Unit = {},
     motionEnabled: Boolean = ValueAnimator.areAnimatorsEnabled(),
     onRevealed: () -> Unit = {},
+    startupChannel: Channel? = null,
+    startupConnected: Boolean = false,
+    startupInputReady: Boolean = false,
 ) {
     val livePresentation = when (state.presentation) {
         is MainStartupPresentation.Enter -> MainStartupPresentation.Passive(
@@ -301,7 +306,8 @@ internal fun MainStartupComposition(
     }
     val keyMode = when (renderedPresentation) {
         MainStartupPresentation.Inactive -> MainStartupKeyMode.Inactive
-        is MainStartupPresentation.Passive -> MainStartupKeyMode.Passive
+        is MainStartupPresentation.Passive ->
+            if (startupInputReady) MainStartupKeyMode.Inactive else MainStartupKeyMode.Passive
         is MainStartupPresentation.Actionable -> MainStartupKeyMode.Actionable
         is MainStartupPresentation.Enter -> error("Enter is rendered as passive startup")
     }
@@ -350,6 +356,8 @@ internal fun MainStartupComposition(
                 // Only the existing-playback classification removes branding.
                 brandingVisible = retained?.brandingVisible ?: !state.hideBranding,
                 motionEnabled = motionEnabled,
+                channel = startupChannel,
+                connected = startupConnected,
             )
         }
         notices()
@@ -653,6 +661,7 @@ fun AppRoot(
     val currentChannelReadiness = connectionPresentation.currentChannelReadiness
     val landingCatalogAvailable = currentChannelReadiness.channelsAvailable() || currentChannelReadiness is CurrentChannelReadiness.Ready
     var startupReveal by remember { mutableStateOf<MainStartupReveal?>(null) }
+    var startupInputReady by remember { mutableStateOf(false) }
     val revealingTarget = startupReveal?.targetFor(profileGeneration)
     val startupPresentation = mainStartupPresentation(
         startupState = startupState,
@@ -1333,6 +1342,7 @@ fun AppRoot(
                                     navigateTopLevel(SettingsKey(SettingsSection.CONNECTION))
                                 },
                                 connectionUiState = connectionUiState,
+                                onStartupInputReadyChanged = { startupInputReady = it },
                                 startupTarget = (enteringLaunchTarget ?: revealingTarget)
                                     ?.takeIf { it.matchesPlayerKey(destination) },
                                 onStartupOutcome = { target, outcome ->
@@ -1510,6 +1520,9 @@ fun AppRoot(
             hideBranding = priorLiveChannelId != null,
         ),
         loadingTiming = startupLoadingTiming,
+        startupChannel = (enteringLaunchTarget ?: revealingTarget)?.let { playbackObservation.channel(it.channelId) },
+        startupConnected = playbackObservation.currentSession != null,
+        startupInputReady = startupInputReady,
         onBack = if (coldStartVisible) onRequestExit else startupBack,
         onAction = if (coldStartVisible) { action ->
             performMainStartupAction(
