@@ -8,6 +8,7 @@
 - A subtitle track, or *Off*, picked on a channel comes back the next time you watch that channel, the same way its audio track does. *Default* at the top of the list follows the Subtitles setting again (#38).
 - Turning subtitles off on one channel no longer turns them off on every channel and recording that follows.
 - On a channel with two audio tracks of the same language and format, the one you pick stays selected instead of switching back.
+- With *Tunneled playback* on, a device that can't open its audio output that way no longer stops with audio error 5001. The player turns tunneling off until the app restarts and starts the channel or recording again; on live TV, what you paused or could rewind to is gone. The setting stays on and says that it isn't in use, and *Stats for nerds* with debug details shows the tunneling state (#43).
 
 ### Recordings
 

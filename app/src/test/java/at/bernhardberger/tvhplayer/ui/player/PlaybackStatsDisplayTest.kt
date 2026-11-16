@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.playback.AppTunnelingState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -7,6 +8,14 @@ import kotlin.time.Duration.Companion.microseconds
 import kotlin.time.Duration.Companion.milliseconds
 
 class PlaybackStatsDisplayTest {
+    @Test
+    fun tunnelingDistinguishesRequestedActiveAndRefusedOutput() {
+        assertEquals("off", tunnelingText(AppTunnelingState.OFF))
+        assertEquals("on", tunnelingText(AppTunnelingState.ON))
+        assertEquals("requested, not active", tunnelingText(AppTunnelingState.REQUESTED_NOT_ACTIVE))
+        assertEquals("off after audio output error", tunnelingText(AppTunnelingState.OFF_AFTER_AUDIO_ERROR))
+    }
+
     @Test
     fun refreshRatesPrintBareWhenWholeAndTwoDecimalsWhenFractional() {
         assertEquals("60", formatRefreshRate(60f))

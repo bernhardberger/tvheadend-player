@@ -49,6 +49,7 @@ internal class PlaybackPresentationPublisher(
     private val elapsedRealtime: () -> Long,
     private val stallRecoveries: () -> Int,
     private val freshDecoderPerZap: () -> Boolean,
+    private val tunneling: () -> AppTunnelingState,
 ) {
     private val _state = MutableStateFlow<AppPlaybackState>(AppPlaybackState.Idle)
     val state = _state.asStateFlow()
@@ -611,6 +612,7 @@ internal class PlaybackPresentationPublisher(
             startupBuffer = startupBuffer?.inEffect?.value?.takeIf { activeTarget is AppPlaybackTarget.Live },
             stallRecoveries = stallRecoveries(),
             freshDecoderPerZap = freshDecoderPerZap(),
+            tunneling = tunneling(),
         )
     }
 

@@ -183,6 +183,8 @@ data class AppVideoDecoderCounters(
     val skippedOutputBufferCount: Int,
 )
 
+enum class AppTunnelingState { OFF, ON, REQUESTED_NOT_ACTIVE, OFF_AFTER_AUDIO_ERROR }
+
 data class AppPlaybackDiagnostics(
     val source: AppPlaybackSource = AppPlaybackSource.NONE,
     val state: AppPlaybackState = AppPlaybackState.Idle,
@@ -200,6 +202,7 @@ data class AppPlaybackDiagnostics(
     val stallRecoveries: Int = 0,
     /** A live stall recovery showed this device needs fresh decoders: every live zap stops the old target first. */
     val freshDecoderPerZap: Boolean = false,
+    val tunneling: AppTunnelingState = AppTunnelingState.OFF,
 )
 
 /**

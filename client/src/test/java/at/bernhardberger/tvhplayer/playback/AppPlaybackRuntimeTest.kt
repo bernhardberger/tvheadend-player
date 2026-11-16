@@ -365,7 +365,7 @@ class AppPlaybackRuntimeTest {
             targetEpoch = 25L,
         )
         val recovering = AppPlaybackState.Recovering(
-            reason = fence.reason,
+            reason = PlaybackRecoveryReason.LIVE_ENDED,
             retryDelayMillis = 0L,
         )
         var state: AppPlaybackState = recovering

@@ -16,6 +16,7 @@ import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.Player
+import androidx.media3.common.PlaybackException
 import androidx.media3.datasource.BaseDataSource
 import androidx.media3.datasource.ByteArrayDataSource
 import androidx.media3.datasource.DataSource
@@ -55,6 +56,7 @@ import java.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -78,6 +80,111 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class)
 class RecordingRecoveryPositionTest {
+    // The growing source is unseekable; the seekable fixture below proves the eventual landing.
+    @Test fun refusedTunneledAudioClaimsTheRealRecordingFailureAndOwesItsPosition() = exerciseGrowing {
+        settings.setTunnelingEnabled(true)
+        playGrowing()
+        appendGrowing()
+        driver.advanceLive(player, clock, 2_000)
+        val position = player.currentPosition
+        assertTrue("the real source must have played before failing", position >= 1_000)
+        assertTrue("tunneling must be requested before the output failure", player.trackSelectionParameters.tunnelingRequested)
+        val previous = player.currentMediaItem
+        val states = mutableListOf<AppPlaybackState>()
+        val failures = mutableListOf<Boolean>()
+        val sdkFailures = mutableListOf<Pair<Long, Boolean>>()
+        val observing = scope.launch(UnconfinedTestDispatcher(scheduler)) {
+            launch { runtime.state.collect { states += it } }
+            launch { runtime.recordingPlaybackFailure.collect { failures += it != null } }
+            launch { coordinator.recordingPlaybackFailure.collect { sdkFailures += scheduler.currentTime to (it != null) } }
+        }
+        player.failAudioTrackInitialization()
+        driver.advanceLive(player, clock, 100)
+        driver.await("recording fallback or failure") {
+            player.currentMediaItem !== previous || runtime.state.value is AppPlaybackState.Failed
+        }
+        assertNotSame("refused tunneled audio must reinstall the recording", previous, player.currentMediaItem)
+        driver.await("real recovered recording loaded") { requireNotNull(realRecording).waitingReads.value > 0 }
+        driver.advanceLive(player, clock, 100)
+        TestPlayerRunHelper.advance(player).untilState(Player.STATE_READY)
+        driver.settleLive(player)
+        assertTrue("recovered recording must play", player.isPlaying)
+        assertTrue("the SDK must see the prepared source failure: $sdkFailures", sdkFailures.any { it.second })
+        assertNull("reinstall clears the SDK failure: $sdkFailures", coordinator.recordingPlaybackFailure.value)
+        assertFalse("claimed failure must not reach the recording screen: $sdkFailures", failures.any { it })
+        assertFalse(player.trackSelectionParameters.tunnelingRequested)
+        assertTrue(settings.playerSettings.first().tunnelingEnabled)
+        assertFalse("automatic fallback must not expose Failed", states.any { it is AppPlaybackState.Failed })
+        assertFalse(player.isCurrentMediaItemSeekable)
+        assertNear(position, requireNotNull(coordinator.pendingRecordingRecoveryPosition.value).inWholeMilliseconds)
+        observing.cancelAndJoin()
+        val recovered = player.currentMediaItem
+        player.failAudioTrackInitialization()
+        driver.advanceLive(player, clock, 100)
+        driver.awaitCurrent("untunneled recording failure") { runtime.state.value is AppPlaybackState.Failed }
+        assertNotNull(runtime.recordingPlaybackFailure.value)
+        assertEquals(PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED,
+            (runtime.state.value as AppPlaybackState.Failed).playerErrorNumber)
+        driver.settleLive(player)
+        assertSame("an untunneled failure must not reinstall the recording", recovered, player.currentMediaItem)
+    }
+
+    // This fixture swaps the SDK source; the real-source case above proves failure ownership.
+    @Test fun refusedTunneledAudioRecoversTheRecordingWhereItStood() = exercise(bookmark = 5.minutes) {
+        settings.setTunnelingEnabled(true)
+        play(FIRST, RecordingPlaybackStart.RESUME)
+        seekToTwentyMinutes()
+        assertEventuallyNear(TWENTY_MINUTES)
+        val states = mutableListOf<AppPlaybackState>()
+        val observing = scope.launch(UnconfinedTestDispatcher(scheduler)) {
+            runtime.state.collect { states += it }
+        }
+        val previous = player.currentMediaItem
+        player.failAudioTrackInitialization()
+        driver.advanceLive(player, clock, 100)
+        driver.await("recording fallback or failure") {
+            player.currentMediaItem !== previous || runtime.state.value is AppPlaybackState.Failed
+        }
+        assertNotSame("refused tunneled audio must reinstall the recording", previous, player.currentMediaItem)
+        assertEventuallyNear(TWENTY_MINUTES)
+        assertTrue(player.isPlaying)
+        assertFalse("automatic fallback must not expose Failed", states.any { it is AppPlaybackState.Failed })
+        observing.cancelAndJoin()
+    }
+
+    @Test fun aDeclinedTunneledRecordingFallbackReleasesItsFailure() {
+        for (invalidation in listOf("new intent", "session change", "pause", "detach")) exerciseGrowing {
+            settings.setTunnelingEnabled(true)
+            playGrowing()
+            val previous = player.currentMediaItem
+            var detaching: Deferred<Unit>? = null
+            player.addListener(object : Player.Listener {
+                override fun onPlayerError(error: PlaybackException) {
+                    when (invalidation) {
+                        "new intent" -> runtime.notePlaybackIntent()
+                        "session change" -> session.replaceGeneration(growingObservation())
+                        "pause" -> player.pause()
+                        "detach" -> detaching = scope.async(start = CoroutineStart.UNDISPATCHED) { runtime.detach() }
+                    }
+                }
+            })
+            player.failAudioTrackInitialization()
+            driver.advanceLive(player, clock, 100)
+            detaching?.await()
+            driver.awaitCurrent("$invalidation exposes the declined failure") {
+                runtime.recordingPlaybackFailure.value != null &&
+                    (invalidation == "detach" || runtime.state.value is AppPlaybackState.Failed)
+            }
+            if (invalidation != "detach") {
+                assertEquals(PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED,
+                    (runtime.state.value as AppPlaybackState.Failed).playerErrorNumber)
+                assertFalse(player.trackSelectionParameters.tunnelingRequested)
+            }
+            driver.settleLive(player)
+            assertSame("$invalidation must prevent the automatic restart", previous, player.currentMediaItem)
+        }
+    }
+
     @Test fun aGrowingRecordingContinuesPastTheOldEndWhenMoreBytesArrive() = exerciseGrowing {
         playGrowing()
         val oldEnd = player.duration

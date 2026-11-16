@@ -35,6 +35,7 @@ data class SettingsPlayerUiState(
     val timeshiftEnabled: Boolean = true,
     val frameRateSwitching: FrameRateSwitching = FrameRateSwitching.ALWAYS,
     val tunnelingEnabled: Boolean = false,
+    val tunnelingFallbackActive: Boolean = false,
     val audioPassthroughEnabled: Boolean = true,
     val audioPassthroughChangeFailed: Boolean = false,
     val keepChannelMinutes: Int = 20,
@@ -89,6 +90,8 @@ class SettingsPlayerViewModel(
         state.copy(startupBufferLearnedMillis = learnedMillis)
     }.combine(uiSettingsStore.settings) { state, settings ->
         state.copy(autoStartPlayback = settings.autoStartPlayback)
+    }.combine(playbackRuntime.tunnelingFallbackActive) { state, fallback ->
+        state.copy(tunnelingFallbackActive = fallback)
     }.stateIn(viewModelScope, SharingStarted.Eagerly, SettingsPlayerUiState())
 
     fun onAutoStartPlaybackChanged(enabled: Boolean) {

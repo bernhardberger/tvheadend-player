@@ -423,6 +423,7 @@ private fun playbackDebugRows(
         measured?.framesPerSecond?.let { "${formatRefreshRate(it)} measured" },
         measured?.sameTimePercent?.let { "$it% same-time" }).ifEmpty { null }),
     d.videoDecoderCounters?.let { statsLine("Video buffers", formatVideoDecoderCounters(it, bufferTemplate)) },
+    statsLine("Tunneling", tunnelingText(d.tunneling)),
 )
 
 private fun displayDebugRows(

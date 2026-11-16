@@ -45,6 +45,9 @@ internal class PlaybackAudioTracks(
     private val _audioPassthroughChangeFailed = MutableStateFlow(false)
     val audioPassthroughChangeFailed = _audioPassthroughChangeFailed.asStateFlow()
     private var audioWriteJob: Job? = null
+    private var storedTunneling: Boolean? = null
+    private val _tunnelingFallbackActive = MutableStateFlow(false)
+    val tunnelingFallbackActive = _tunnelingFallbackActive.asStateFlow()
     private val _audioAutomatic = MutableStateFlow(player.trackSelectionParameters.overrides.values.none { it.type == C.TRACK_TYPE_AUDIO })
     val audioAutomatic = _audioAutomatic.asStateFlow()
 
@@ -197,12 +200,37 @@ internal class PlaybackAudioTracks(
         }
     }
 
+    /** Observe switches even while a serialized installation or settings application is suspended. */
+    fun observeTunnelingSetting(enabled: Boolean) {
+        targetCommands.runIfOpen {
+            if (storedTunneling != enabled) _tunnelingFallbackActive.value = false
+            storedTunneling = enabled
+        }
+    }
+
+    fun tunnelingState(): AppTunnelingState = when {
+        _tunnelingFallbackActive.value -> AppTunnelingState.OFF_AFTER_AUDIO_ERROR
+        storedTunneling != true -> AppTunnelingState.OFF
+        player.isTunnelingEnabled -> AppTunnelingState.ON
+        else -> AppTunnelingState.REQUESTED_NOT_ACTIVE
+    }
+
     fun applyPlayerSettingsLocked(value: PlayerSettings) {
         targetCommands.runIfOpen {
             player.trackSelectionParameters = trackPreferences(
-                player.trackSelectionParameters, value,
+                player.trackSelectionParameters,
+                value.copy(tunnelingEnabled = value.tunnelingEnabled && !_tunnelingFallbackActive.value),
             )
             frameRate.setSwitching(value.frameRateSwitching)
         }
+    }
+
+    /** Device output rejection is run-local; only changing the stored switch opts back in. */
+    fun noteTunnelingRefused() {
+        _tunnelingFallbackActive.value = true
+    }
+
+    fun applyTunnelingFallbackLocked() {
+        player.trackSelectionParameters = player.trackSelectionParameters.withTunneling(false)
     }
 }
