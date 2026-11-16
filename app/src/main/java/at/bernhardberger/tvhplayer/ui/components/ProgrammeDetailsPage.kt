@@ -1489,13 +1489,14 @@ internal fun InlineLogo(
     picon: ChannelIcon, modifier: Modifier,
     collapseUntilLoaded: Boolean = false,
     onLogoReady: () -> Unit = {},
+    onLogoError: () -> Unit = {},
 ) {
     val density = LocalDensity.current
-    var drawnWidth by remember(picon) { mutableStateOf<Dp?>(null) }
+    var drawnWidth by remember(picon.takeUnless { collapseUntilLoaded }) { mutableStateOf<Dp?>(null) }
     Box(Modifier.size(drawnWidth ?: if (collapseUntilLoaded) 0.dp else InlineLogoWidth, InlineLogoHeight)) {
         PiconBox(picon, modifier.wrapContentWidth(Alignment.Start, unbounded = true).size(InlineLogoWidth, InlineLogoHeight),
             contentScale = InlineLogoScale, alignment = Alignment.CenterStart, trim = true,
-            onLogoSize = { logo ->
+            onError = { onLogoError() }, onLogoSize = { logo ->
                 drawnWidth = with(density) { inlineLogoDrawnWidth(logo, Size(InlineLogoWidth.toPx(), InlineLogoHeight.toPx())).toDp() }
                 onLogoReady()
             })

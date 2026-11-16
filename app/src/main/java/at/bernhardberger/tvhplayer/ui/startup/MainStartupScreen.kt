@@ -20,6 +20,9 @@ import androidx.compose.foundation.layout.paddingFromBaseline
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.first
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -194,9 +197,14 @@ internal fun ChannelStartupSurface(
     val glowPresent by remember(glow) { derivedStateOf { glow.value > 0f } }
     val contentVisible by remember { derivedStateOf { contentAlpha > 0f } }
     val fadeGlow = listOfNotNull(tuningChannel, channel.takeUnless { freshStart }).isNotEmpty()
-    LaunchedEffect(fadeGlow, motionEnabled, freshStart) {
-        if (!fadeGlow) glow.snapTo(1f)
-        else glow.animateTo(0f, tween(if (motionEnabled) 2_000 else 0, easing = PlayerMotion.Standard))
+    var glowStarted by remember(freshStart) { mutableStateOf(false) }
+    val fadeRequested by rememberUpdatedState(fadeGlow)
+    LaunchedEffect(freshStart) {
+        snapshotFlow { fadeRequested }.first { it }
+        glowStarted = true
+    }
+    LaunchedEffect(glowStarted, motionEnabled, freshStart) {
+        if (glowStarted) glow.animateTo(0f, tween(if (motionEnabled) 2_000 else 0, easing = PlayerMotion.Standard))
     }
     Box(modifier.fillMaxSize().background(MainStartupBackground).testTag(MainStartupRootTag)
         .semantics {
@@ -231,7 +239,7 @@ internal fun ChannelStartupSurface(
             Box(safeWidth.align(Alignment.TopCenter).padding(top = maxHeight * (359f / 540f))
                 .height(104.dp).graphicsLayer { alpha = contentAlpha }) {
                 if (feedbackVisible) {
-                    StartupStatus(status, motionEnabled, contentVisible && announceStatus, tuningChannel)
+                    StartupStatus(status, motionEnabled, contentVisible && announceStatus, tuningChannel, channelName)
                 }
             }
         }
@@ -259,9 +267,13 @@ private fun StartupIdentity(title: String?, channelId: ChannelId?, motionEnabled
 }
 
 @Composable
-private fun StartupStatus(status: String, motionEnabled: Boolean, announce: Boolean, tuningChannel: Channel? = null) {
-    StartupSlot(status to tuningChannel, motionEnabled) { (message, channel), visible ->
-        if (channel != null) TuningStatus(channel, motionEnabled, visible && announce)
+private fun StartupStatus(
+    status: String, motionEnabled: Boolean, announce: Boolean,
+    tuningChannel: Channel? = null, channelName: String? = null,
+) {
+    StartupSlot(Triple(status, tuningChannel, channelName), motionEnabled, identity = tuningChannel?.id ?: status) {
+        (message, channel, name), visible ->
+        if (channel != null) TuningStatus(channel, name ?: channel.name.orEmpty(), motionEnabled, visible && announce)
         else
         Text(message, style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center,

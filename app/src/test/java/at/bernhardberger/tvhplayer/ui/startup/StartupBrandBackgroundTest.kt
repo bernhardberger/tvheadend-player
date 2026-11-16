@@ -102,7 +102,6 @@ class StartupBrandBackgroundTest {
         capture(view, "channel-without-logo")
         compose.runOnIdle { channel = null; fresh = true; status = "Syncing channels and guide" }
         compose.settleFrames(4)
-        capture(view, "brand-only")
         capture(view, "brand-syncing")
         compose.runOnIdle { channel = ridge; tuning = ridge }
         compose.settleFrames(5)
@@ -121,35 +120,79 @@ class StartupBrandBackgroundTest {
         }
         compose.settleFrames(4)
         capture(view, "brand-tuning-long-name")
+        compose.runOnIdle {
+            channel = Channel.create(ChannelId(9), name = "Missing Art", number = 9,
+                icon = ChannelIcon.ImageCache(ArtworkId(999)))
+            tuning = channel
+        }
+        compose.settleFrames(5)
+        capture(view, "brand-tuning-failed-logo")
     }
 
-    @Test fun freshTuningKeepsBrandAndAnnouncesTheChannel() {
-        val channel = Channel.create(ChannelId(8), name = "Little Orbit", number = 8)
+    @Test
+    @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun freshTuningKeepsBrandAndAnnouncesTheChannel() {
+        var channel by mutableStateOf(Channel.create(ChannelId(8), name = "Little Orbit", number = 8))
+        var announce by mutableStateOf(true)
+        val observation = artworkSession()
+        images.install(FixtureArt.imageLoader(ApplicationProvider.getApplicationContext(), emptyMap()))
+        compose.mainClock.autoAdvance = false
         compose.setContent {
-            TVHeadendPlayerTheme {
+            TVHeadendPlayerTheme { ProvideArtworkSession(observation) {
                 ChannelStartupSurface(channel, "Starting", freshStart = true, tuningChannel = channel,
-                    motionEnabled = false)
-            }
+                    channelName = channel.name ?: "Fallback Channel", announceStatus = announce)
+            } }
         }
         compose.onNodeWithTag("main-startup-wordmark", useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("main-startup-mark", useUnmergedTree = true).assertExists()
         val status = compose.onNodeWithTag("main-startup-tuning", useUnmergedTree = true).fetchSemanticsNode().config
         assertEquals(listOf("8 Little Orbit is starting…"), status[SemanticsProperties.ContentDescription])
         assertEquals(androidx.compose.ui.semantics.LiveRegionMode.Polite, status[SemanticsProperties.LiveRegion])
+        compose.onNodeWithText("8 Little Orbit is starting…", useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("startup-logo-Little Orbit", useUnmergedTree = true).assertDoesNotExist()
+        val longName = "Little Orbit adventures across the extraordinary universe ".repeat(8)
+        compose.runOnIdle {
+            channel = Channel.create(channel.id, name = longName, number = 8,
+                icon = ChannelIcon.ImageCache(ArtworkId(999)))
+        }
+        compose.settleFrames(3, 16)
+        compose.onNodeWithText(longName, substring = true, useUnmergedTree = true)
+            .performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult) { action ->
+                val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+                action(layouts)
+                assertEquals(1, layouts.single().lineCount)
+                assertTrue(layouts.single().isLineEllipsized(0))
+            }
+        compose.settleFrames(4)
+        compose.onNodeWithTag("main-startup-tuning-placeholder", useUnmergedTree = true).assertExists()
+        compose.runOnIdle { announce = false }
+        compose.settleFrames(2, 16)
+        assertTrue(compose.onNodeWithTag("main-startup-tuning", useUnmergedTree = true)
+            .fetchSemanticsNode().config.contains(SemanticsProperties.HideFromAccessibility))
+        compose.runOnIdle { channel = Channel.create(channel.id, number = 8) }
+        compose.settleFrames(3, 16)
+        compose.onNodeWithText("8 Fallback Channel is starting…", useUnmergedTree = true).assertExists()
     }
 
     @Test fun reducedMotionKeepsTheStatusWithoutARingOrGlow() {
         var motion by mutableStateOf(true)
+        var tuning by mutableStateOf<Channel?>(null)
         compose.setContent {
             TVHeadendPlayerTheme {
-                ChannelStartupSurface(null, "Connecting", freshStart = true, motionEnabled = motion)
+                ChannelStartupSurface(null, "Connecting", freshStart = true, motionEnabled = motion, tuningChannel = tuning)
             }
         }
         assertTrue(compose.onAllNodes(
             androidx.compose.ui.test.hasTestTag("startup-background-pending") or
                 androidx.compose.ui.test.hasTestTag("startup-background-prepared"), useUnmergedTree = true,
         ).fetchSemanticsNodes().isNotEmpty())
+        compose.runOnIdle { tuning = Channel.create(ChannelId(8), name = "Little Orbit") }
+        compose.settleFrames(2)
+        compose.runOnIdle { tuning = null }
+        compose.settleFrames(21)
+        compose.onNodeWithTag("startup-background-pending", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithTag("startup-background-prepared", useUnmergedTree = true).assertDoesNotExist()
         compose.runOnIdle { motion = false }
         compose.onNodeWithTag("main-startup-loader", useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithTag("startup-background-pending", useUnmergedTree = true).assertDoesNotExist()

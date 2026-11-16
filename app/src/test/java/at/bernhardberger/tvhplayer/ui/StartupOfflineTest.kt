@@ -539,6 +539,7 @@ class StartupOfflineTest {
         advance(500)
         compose.onNodeWithText("Connecting", useUnmergedTree = true).assertExists()
         assertTrue("restored Ready remains dark", startupBackgroundCount() == 0)
+        compose.onNodeWithTag("main-startup-wordmark", useUnmergedTree = true).assertExists()
         assertEquals(0, binds())
     }
 

@@ -196,7 +196,7 @@ class LivePlayerServerWaitTest {
     }
 
     @Test fun channelStartupConsumesKeysExceptSystemAndBack() {
-        screen()
+        screen(freshStart = true)
         for (connected in listOf(false, true)) {
             if (connected) {
                 session.publish(ready())
@@ -204,6 +204,8 @@ class LivePlayerServerWaitTest {
                 assertMainSettled("the first target is installed") {
                     runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(1))
                 }
+                compose.onNodeWithTag("main-startup-wordmark", useUnmergedTree = true).assertExists()
+                compose.onNodeWithTag("main-startup-tuning", useUnmergedTree = true).assertExists()
             }
             val target = runtime.activeTarget.value
             val count = binds()
@@ -605,6 +607,7 @@ class LivePlayerServerWaitTest {
         opener: SubscriptionOpener = SubscriptionOpener { _, _, _ -> awaitCancellation() },
         startupOrigin: androidx.compose.runtime.State<Long?>? = null,
         appInitiated: Boolean = true,
+        freshStart: Boolean = false,
     ) {
         // A pending first frame needs a held stream, not the fake's immediate end-of-input failure.
         session = FakeTvheadendSession(initial).apply {
@@ -651,7 +654,7 @@ class LivePlayerServerWaitTest {
                                 connectionUiState = connection.value, statsStore = statsStore,
                                 startupTarget = if (appInitiated) at.bernhardberger.tvhplayer.core.ApplianceLaunchTarget(
                                     at.bernhardberger.tvhplayer.core.ApplianceLaunchRequest(1), ChannelId(1), "Name 1") else null,
-                                startupChannelStartAtMillis = startupOrigin?.value)
+                                startupChannelStartAtMillis = startupOrigin?.value, freshStart = freshStart)
                         }
                     }
                 } }

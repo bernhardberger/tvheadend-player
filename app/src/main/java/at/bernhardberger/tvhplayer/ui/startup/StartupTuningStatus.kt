@@ -22,6 +22,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -37,21 +38,22 @@ import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
 
 /** Artwork joins the startup status line only once its trimmed size is known. */
 @Composable
-internal fun TuningStatus(channel: Channel, motionEnabled: Boolean, announce: Boolean) {
-    val title = channelTitleText(channel.visibleChannelNumber, channel.name.orEmpty())
+internal fun TuningStatus(channel: Channel, channelName: String, motionEnabled: Boolean, announce: Boolean) {
+    val title = channelTitleText(channel.visibleChannelNumber, channelName)
     val phrase = stringResource(R.string.main_startup_message_channel_starting, title)
-    var ready by remember(channel.id, channel.icon) { mutableStateOf(channel.icon == null) }
+    var ready by remember(channel.id) { mutableStateOf(channel.icon == null) }
+    var failed by remember(channel.id, channel.icon) { mutableStateOf(false) }
     val alpha by animateFloatAsState(if (ready) 1f else 0f,
         tween(if (motionEnabled) PlayerMotion.ShortMs else 0), label = "tuning-picon")
     Row(Modifier.fillMaxWidth().paddingFromBaseline(top = 32.dp).testTag("main-startup-tuning").clearAndSetSemantics {
         contentDescription = phrase
-        if (announce) liveRegion = LiveRegionMode.Polite
+        if (announce) liveRegion = LiveRegionMode.Polite else hideFromAccessibility()
     }, horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically) {
         val icon = channel.icon
-        if (icon == null) PiconBox(null, Modifier.size(20.dp))
+        if (icon == null || failed) PiconBox(null, Modifier.size(20.dp).testTag("main-startup-tuning-placeholder"))
         else InlineLogo(icon, Modifier.graphicsLayer { this.alpha = alpha },
-            collapseUntilLoaded = true, onLogoReady = { ready = true })
+            collapseUntilLoaded = true, onLogoReady = { ready = true }, onLogoError = { failed = true; ready = true })
         if (ready) Spacer(Modifier.width(8.dp))
         Text(phrase, Modifier.weight(1f, fill = false), style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
