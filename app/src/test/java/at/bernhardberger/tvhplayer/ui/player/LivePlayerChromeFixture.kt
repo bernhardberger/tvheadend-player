@@ -942,6 +942,7 @@ abstract class LivePlayerChromeFixture {
                 val application = remember { koinApplication { modules(module {
                     single { profiles }
                     single { statsStore }
+                    single { settings }
                 }) } }
                 DisposableEffect(application) { onDispose { application.close() } }
                 KoinIsolatedContext(application) {

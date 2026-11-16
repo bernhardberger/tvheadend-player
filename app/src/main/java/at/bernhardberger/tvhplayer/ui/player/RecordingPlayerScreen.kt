@@ -87,6 +87,8 @@ import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import at.bernhardberger.tvhplayer.playback.currentRecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.data.ConnectionState
+import at.bernhardberger.tvhplayer.settings.PlayerSettings
+import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.ui.components.TvRecoveryOverlay
 import at.bernhardberger.tvhplayer.ui.components.rememberPlaybackIntent
@@ -113,7 +115,9 @@ fun RecordingPlayerScreen(
     onOpenConnectionSettings: () -> Unit = {},
     onShowGuide: (at.bernhardberger.tvheadend.sdk.core.ChannelId, at.bernhardberger.tvheadend.sdk.core.EpgEvent?) -> Unit = { _, _ -> },
     statsStore: at.bernhardberger.tvhplayer.di.PlayerStatsStore = koinInject(),
+    playerSettingsStore: PlayerSettingsStore = koinInject(),
 ) {
+    val playerSettings by playerSettingsStore.playerSettings.collectAsStateWithLifecycle(PlayerSettings())
     val playerClose = rememberPlayerClose(onClose)
     // First, before the route restore: a user stop since the last intent closes the screen.
     val screenEntry = rememberPlayerEntry(session::enterPlayerScreen, playerClose)
@@ -845,11 +849,16 @@ fun RecordingPlayerScreen(
             closesAtOnce = { (_, quick) -> quick },
         ) { (page, _) ->
             val audioAutomatic by session.audioAutomatic.collectAsStateWithLifecycle()
+            val subtitlesDefault by session.subtitlesDefault.collectAsStateWithLifecycle()
             PlaybackOptionsSheet(
                 page = page,
                 player = player,
                 audioAutomatic = audioAutomatic,
                 onAutomaticAudio = { session.useAutomaticAudio() },
+                subtitlesDefault = subtitlesDefault,
+                onDefaultSubtitles = { session.useDefaultSubtitles() },
+                onSubtitleSelection = { override, off, epoch -> session.selectSubtitles(override, off, epoch) },
+                subtitleLanguage = playerSettings.subtitleLanguage,
                 tracksResolving =
                     playbackState is AppPlaybackState.Starting ||
                         playbackState is AppPlaybackState.Recovering,

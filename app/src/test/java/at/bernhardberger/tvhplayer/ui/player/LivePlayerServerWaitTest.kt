@@ -350,7 +350,7 @@ class LivePlayerServerWaitTest {
                             VideoPlayerScreen(video, ChannelSelectionStore(), LastPlayedChannelStore(context), TargetAspect(AspectRatioMode.FIT) {},
                                 channels, session, ChannelId(1), "Name 1", {},
                                 { closes++ }, runtime, notices = notices, uiSettingsStore = UiSettingsStore(data),
-                                connectionUiState = connection.value, statsStore = statsStore)
+                                connectionUiState = connection.value, statsStore = statsStore, playerSettingsStore = settings)
                         }
                     }
                 } }

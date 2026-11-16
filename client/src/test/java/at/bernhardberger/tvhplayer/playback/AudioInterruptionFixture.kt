@@ -207,9 +207,16 @@ internal open class AudioInterruptionFixture {
             scriptRecordingPlaybackSuccess()
         }
         var beforeSettingsRead: suspend () -> Unit = {}
+        var beforeSettingsWrite: suspend () -> Unit = {}
         private val settingsData = InMemoryPreferencesDataStore()
         val settings = PlayerSettingsStore(settingsData.let { store ->
             object : androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences> by store {
+                override suspend fun updateData(
+                    transform: suspend (androidx.datastore.preferences.core.Preferences) -> androidx.datastore.preferences.core.Preferences,
+                ): androidx.datastore.preferences.core.Preferences {
+                    beforeSettingsWrite()
+                    return store.updateData(transform)
+                }
                 override val data = kotlinx.coroutines.flow.flow {
                     beforeSettingsRead()
                     emitAll(store.data)
@@ -328,6 +335,35 @@ internal open class AudioInterruptionFixture {
             return TrackSelectionOverride(group, listOf(0)).also {
                 player.trackSelectionParameters = player.trackSelectionParameters.buildUpon().addOverride(it).build()
             }
+        }
+        suspend fun useChoiceProfile() {
+            AppProfileOwner::class.java.getDeclaredField("audioProfileId").apply {
+                isAccessible = true; set(profiles, "test-profile")
+            }
+            settingsData.updateData { current -> current.toMutablePreferences().apply {
+                this[androidx.datastore.preferences.core.stringPreferencesKey("activeServerProfileId")] = "test-profile"
+            } }
+        }
+
+        private var subtitleGeneration = 0
+        fun installSubtitleTracks(
+            vararg languages: String,
+            mimeType: String = MimeTypes.APPLICATION_DVBSUBS,
+            roleFlags: Int = 0,
+            supported: Boolean = true,
+        ): List<TrackGroup> {
+            val generation = subtitleGeneration++
+            val groups = languages.mapIndexed { index, language ->
+                TrackGroup("text-$generation-$index", Format.Builder().setLanguage(language)
+                    .setSampleMimeType(mimeType).setRoleFlags(roleFlags).build())
+            }
+            audioTracks = Tracks(groups.map { group ->
+                Tracks.Group(group, false,
+                    intArrayOf(if (supported) C.FORMAT_HANDLED else C.FORMAT_UNSUPPORTED_SUBTYPE),
+                    booleanArrayOf(false))
+            })
+            playerListeners.toList().forEach { it.onTracksChanged(requireNotNull(audioTracks)) }
+            return groups
         }
         private fun recover(reason: PlaybackRecoveryReason) { runtime.onRecoveryRequired(reason) }
 

@@ -164,9 +164,11 @@ class PlaybackOptionsRemoteKeyTest {
 
         press(Key.Captions)
         press(Key.Captions)
+        compose.onNodeWithTag(OFF_ROW).assertIsFocused()
+        press(Key.Captions)
         compose.onNodeWithTag(SUBTITLE_ROW).assertIsFocused()
         press(Key.Captions)
-        compose.onNodeWithTag(OFF_ROW).assertIsFocused()
+        compose.onNodeWithTag(DEFAULT_SUBTITLES_ROW).assertIsFocused()
     }
 
     @Test
@@ -271,16 +273,18 @@ class PlaybackOptionsRemoteKeyTest {
     }
 
     @Test
-    fun captionsKeyPreviewsSubtitlesAndBackRestoresTheAutomaticOffState() {
+    fun captionsKeyPreviewsSubtitlesAndBackRestoresDefault() {
         show()
         val start = player.parameters
         keyDown(Key.Captions)
         assertEquals(PlaybackOptionsPage.SUBTITLES, layerState.core.optionsPage)
-        compose.onNodeWithTag(OFF_ROW).assertIsFocused()
+        compose.onNodeWithTag(DEFAULT_SUBTITLES_ROW).assertIsFocused()
         keyUp(Key.Captions)
         advance(PLAYBACK_QUICK_LIST_SETTLE_MS + 50)
         assertEquals(0, player.selectionChanges)
 
+        press(Key.DirectionDown)
+        compose.onNodeWithTag(OFF_ROW).assertIsFocused()
         press(Key.DirectionDown)
         compose.onNodeWithTag(SUBTITLE_ROW).assertIsFocused()
         advance(PLAYBACK_QUICK_LIST_SETTLE_MS + 50)
@@ -288,7 +292,7 @@ class PlaybackOptionsRemoteKeyTest {
 
         press(Key.Back)
         assertNull(layerState.core.optionsPage)
-        // Off without a disabled text type, exactly as before; not a forced Off.
+        // Default restores the setting, rather than forcing Off.
         assertEquals(start, player.parameters)
     }
 
@@ -314,6 +318,7 @@ class PlaybackOptionsRemoteKeyTest {
         press(Key.Captions)
         assertEquals(PlaybackOptionsPage.SUBTITLES, layerState.core.optionsPage)
         compose.onNodeWithTag(OFF_ROW).assertIsFocused()
+        compose.onNodeWithTag(DEFAULT_SUBTITLES_ROW).assertDoesNotExist()
         compose.onNodeWithTag(OFF_SUPPORT, useUnmergedTree = true).assertTextEquals("No subtitles on this channel")
         // The row says why once; the header names only the state.
         compose.onNodeWithText("No subtitles available.", substring = true, useUnmergedTree = true).assertDoesNotExist()
@@ -332,6 +337,7 @@ class PlaybackOptionsRemoteKeyTest {
         advance(PLAYBACK_QUICK_LIST_SETTLE_MS + 50)
         press(Key.Captions)
         assertEquals(PlaybackOptionsPage.SUBTITLES, layerState.core.optionsPage)
+        press(Key.DirectionDown)
         press(Key.DirectionDown)
         advance(PLAYBACK_QUICK_LIST_SETTLE_MS + 50)
         assertEquals(listOf("dvb"), player.textOverrides())
@@ -600,7 +606,8 @@ class PlaybackOptionsRemoteKeyTest {
 
         press(Key.Captions)
         assertEquals(PlaybackOptionsPage.SUBTITLES, layerState.core.optionsPage)
-        compose.onNodeWithTag(OFF_ROW).assertIsFocused()
+        compose.onNodeWithTag(DEFAULT_SUBTITLES_ROW).assertIsFocused()
+        press(Key.DirectionDown)
         press(Key.DirectionDown)
         compose.onNodeWithTag(SUBTITLE_ROW).assertIsFocused()
         advance(PLAYBACK_QUICK_LIST_SETTLE_MS + 50)
@@ -690,6 +697,8 @@ class PlaybackOptionsRemoteKeyTest {
                                 automaticAudioRequests++
                                 fake.clearAudioOverrides()
                             },
+                            subtitlesDefault = fake.subtitlesDefault,
+                            onDefaultSubtitles = fake::clearSubtitleChoice,
                             quickList = state.core.quickList.takeIf { state.core.optionsQuickList },
                             onQuickListClose = state.core::closeQuickList,
                             quickListTargetEpoch = targetEpoch,
@@ -878,11 +887,15 @@ class PlaybackOptionsRemoteKeyTest {
         var selectionChanges = 0
         var audioAutomatic by mutableStateOf(true)
             private set
+        var subtitlesDefault by mutableStateOf(true)
+            private set
         var parameters: TrackSelectionParameters = TrackSelectionParameters.DEFAULT
             set(value) {
                 field = value
                 selectionChanges++
                 audioAutomatic = value.overrides.values.none { it.type == C.TRACK_TYPE_AUDIO }
+                subtitlesDefault = value.overrides.values.none { it.type == C.TRACK_TYPE_TEXT } &&
+                    C.TRACK_TYPE_TEXT !in value.disabledTrackTypes
                 val tracks = tracks()
                 listeners.toList().forEach {
                     it.onTrackSelectionParametersChanged(value)
@@ -928,6 +941,11 @@ class PlaybackOptionsRemoteKeyTest {
             parameters = parameters.buildUpon().clearOverridesOfType(C.TRACK_TYPE_AUDIO).build()
         }
 
+        fun clearSubtitleChoice() {
+            parameters = parameters.buildUpon().clearOverridesOfType(C.TRACK_TYPE_TEXT)
+                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false).build()
+        }
+
         fun audioOverrides(): List<String> = overrides(C.TRACK_TYPE_AUDIO)
 
         fun textOverrides(): List<String> = overrides(C.TRACK_TYPE_TEXT)
@@ -960,6 +978,7 @@ class PlaybackOptionsRemoteKeyTest {
         const val THIRD_ROW = "playback-options-track-1:third:third"
         const val SUBTITLE_ROW = "playback-options-track-3:dvb:dvb"
         const val OFF_ROW = "playback-options-subtitles-off"
+        const val DEFAULT_SUBTITLES_ROW = "playback-options-subtitles-default"
         const val OFF_SUPPORT = "playback-options-subtitles-off-support"
         const val MAIN_SUMMARY = "German • Stereo"
 

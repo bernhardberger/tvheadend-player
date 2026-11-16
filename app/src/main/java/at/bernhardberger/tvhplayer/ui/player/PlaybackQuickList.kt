@@ -90,6 +90,7 @@ internal fun restoreQuickListStart(
     page: PlaybackOptionsPage,
     start: TrackSelectionParameters,
     onAutomaticAudio: () -> Unit,
+    onDefaultSubtitles: () -> Unit = {},
 ) {
     val trackType = when (page) {
         PlaybackOptionsPage.AUDIO -> C.TRACK_TYPE_AUDIO
@@ -97,6 +98,15 @@ internal fun restoreQuickListStart(
         else -> return
     }
     val current = player.trackSelectionParameters
+    if (trackType == C.TRACK_TYPE_TEXT &&
+        C.TRACK_TYPE_TEXT !in start.disabledTrackTypes &&
+        start.overrides.values.none { it.type == C.TRACK_TYPE_TEXT }
+    ) {
+        if (C.TRACK_TYPE_TEXT in current.disabledTrackTypes ||
+            current.overrides.values.any { it.type == C.TRACK_TYPE_TEXT }
+        ) onDefaultSubtitles()
+        return
+    }
     if (
         trackType == C.TRACK_TYPE_AUDIO &&
         start.overrides.values.none { it.type == C.TRACK_TYPE_AUDIO }

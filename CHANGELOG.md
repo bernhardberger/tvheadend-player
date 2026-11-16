@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Playback
+
+- A subtitle track, or *Off*, picked on a channel comes back the next time you watch that channel, the same way its audio track does. *Default* at the top of the list follows the Subtitles setting again (#38).
+- Turning subtitles off on one channel no longer turns them off on every channel and recording that follows.
+
 ### Recordings
 
 - The playback options of a recording have an *Ad breaks* entry: *Ask*, *Skip automatically* or *Off* for this recording only, remembered the next time you play it. *Default* follows the setting under Settings → Playback again. The entry is dimmed while the recording has no marked ad breaks (#38).

@@ -27,6 +27,9 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.isSelected
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasText
@@ -128,6 +131,97 @@ class PlaybackOptionsTrackListTest {
             compose.changeState { subtitles = choices("x", "y", selected = selected) }
             assertFocused("y")
         }
+    }
+
+    @Test fun subtitleDefaultOffAndTracksHaveOneCheckedRowAndStayInDpadOrder() {
+        var default by mutableStateOf(true)
+        var off by mutableStateOf(false)
+        var selected by mutableStateOf<String?>("x")
+        var defaults = 0
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                PlaybackOptionsSheetContent(
+                    PlaybackOptionsPage.SUBTITLES, emptyList(), choices("x", "y", selected = selected),
+                    false, AspectRatioMode.FIT, PlayerStatsLevel.OFF,
+                    onPageChange = {}, onAudioTrackSelected = {},
+                    onSubtitleTrackSelected = { default = false; off = it == null; selected = it },
+                    onAspectRatioChange = {}, onStatsLevelChange = {},
+                    subtitlesDefault = default, subtitlesOff = off,
+                    onDefaultSubtitles = { defaults++; default = true; off = false },
+                    subtitleLanguage = "de",
+                )
+            }
+        }
+        val defaultRow = compose.onNodeWithTag("playback-options-subtitles-default")
+        defaultRow.assertIsFocused().assertIsSelected().assert(hasText("Default (German)"))
+        compose.onNodeWithTag("playback-options-track-x").assertIsNotSelected()
+        compose.onAllNodes(isSelected()).assertCountEquals(1)
+        compose.pressKey(Key.DirectionDown)
+        compose.onNodeWithTag("playback-options-subtitles-off").assertIsFocused()
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("playback-options-subtitles-off").assertIsSelected()
+        compose.onAllNodes(isSelected()).assertCountEquals(1)
+        compose.pressKey(Key.DirectionDown)
+        assertFocused("x")
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("playback-options-track-x").assertIsSelected()
+        compose.onAllNodes(isSelected()).assertCountEquals(1)
+        compose.pressKey(Key.DirectionDown)
+        assertFocused("y")
+        repeat(3) { compose.pressKey(Key.DirectionUp) }
+        defaultRow.assertIsFocused()
+        compose.pressKey(Key.DirectionCenter)
+        assertEquals(1, defaults)
+        defaultRow.assertIsSelected().assertIsFocused()
+        compose.onAllNodes(isSelected()).assertCountEquals(1)
+    }
+
+    @Test fun subtitleDefaultLabelsSystemCaptionsAndHeaderStillNamesThePlayingTrack() {
+        var defaults = 0
+        val tracks = Tracks(listOf(Tracks.Group(
+            TrackGroup("text", Format.Builder().setId("subtitles")
+                .setSampleMimeType(MimeTypes.APPLICATION_DVBSUBS).setLanguage("de").build()),
+            false, intArrayOf(C.FORMAT_HANDLED), booleanArrayOf(true),
+        )))
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                PlaybackOptionsSheet(
+                    PlaybackOptionsPage.SUBTITLES, player(tracks), false, AspectRatioMode.FIT, PlayerStatsLevel.OFF,
+                    {}, {}, {}, audioAutomatic = true, onAutomaticAudio = {}, subtitlesDefault = true,
+                    onDefaultSubtitles = { defaults++ },
+                )
+            }
+        }
+        compose.onNodeWithTag("playback-options-subtitles-default")
+            .assertIsFocused().assertIsSelected().assert(hasText("Default (System captions)"))
+        compose.onAllNodes(hasText("German")).assertCountEquals(2) // header and track row
+        compose.onAllNodes(isSelected()).assertCountEquals(1)
+        compose.pressKey(Key.DirectionCenter)
+        assertEquals(1, defaults)
+    }
+
+    @Test fun subtitleQuickListBackQueuesDefaultEvenBeforeThePreviewReachesThePlayer() {
+        val quickList = PlaybackQuickListSignals()
+        val requests = mutableListOf<Pair<Boolean, Long?>>()
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                PlaybackOptionsSheet(
+                    PlaybackOptionsPage.SUBTITLES,
+                    player(Tracks(listOf(audio("text", "en", MimeTypes.TEXT_VTT, 0, 0)))),
+                    false, AspectRatioMode.FIT, PlayerStatsLevel.OFF, {}, {}, {},
+                    audioAutomatic = true, onAutomaticAudio = {}, subtitlesDefault = true,
+                    quickList = quickList, quickListTargetEpoch = 7L,
+                    onSubtitleSelection = { _, off, epoch -> requests += off to epoch },
+                )
+            }
+        }
+        compose.onNodeWithTag("playback-options-subtitles-default").assertIsFocused()
+        compose.pressKey(Key.DirectionDown)
+        compose.mainClock.advanceTimeBy(PLAYBACK_QUICK_LIST_SETTLE_MS + 32)
+        compose.waitForIdle()
+        assertEquals(listOf(true to 7L), requests)
+        compose.runOnIdle { quickList.restoreStart() }
+        assertEquals(listOf(true to 7L, false to 7L), requests)
     }
 
     /**

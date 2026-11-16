@@ -263,7 +263,7 @@ class LiveZapStartOwnershipTest {
                     VideoPlayerScreen(video, ChannelSelectionStore(), LastPlayedChannelStore(context), TargetAspect(AspectRatioMode.FIT) {},
                         channels, session, ChannelId(1), "Name 1", {}, {}, runtime,
                         notices = notices, uiSettingsStore = at.bernhardberger.tvhplayer.settings.UiSettingsStore(settingsData),
-                        statsStore = statsStore)
+                        statsStore = statsStore, playerSettingsStore = settings)
                 }
             }
         }

@@ -238,6 +238,11 @@ class AppPlaybackRuntime(
     )
     val audioPassthroughChangeFailed = audioTracks.audioPassthroughChangeFailed
     val audioAutomatic = audioTracks.audioAutomatic
+    private val subtitleTracks = PlaybackSubtitleTracks(
+        player, settings, profileOwner, scope, targetCommands, _activeTarget,
+        targetInstallationInProgress = { targetInstallationInProgress },
+    )
+    val subtitlesDefault = subtitleTracks.subtitlesDefault
     private val _recordingSelection = MutableStateFlow<RecordingPlaybackSelection?>(null)
     private val _recordingAdmission = MutableStateFlow<RecordingPlaybackAdmission?>(null)
     @OptIn(ExperimentalTvheadendApi::class)
@@ -495,11 +500,17 @@ class AppPlaybackRuntime(
         }
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-            if (livePlaybackObservation.value != LivePlaybackObservation.Departed) audioTracks.onMediaItemTransition()
+            if (livePlaybackObservation.value != LivePlaybackObservation.Departed) {
+                audioTracks.onMediaItemTransition()
+                subtitleTracks.onMediaItemTransition()
+            }
         }
 
         override fun onTrackSelectionParametersChanged(parameters: TrackSelectionParameters) {
-            if (livePlaybackObservation.value != LivePlaybackObservation.Departed) audioTracks.onTrackSelectionParametersChanged(parameters)
+            if (livePlaybackObservation.value != LivePlaybackObservation.Departed) {
+                audioTracks.onTrackSelectionParametersChanged(parameters)
+                subtitleTracks.onTrackSelectionParametersChanged(parameters)
+            }
         }
 
         override fun onTracksChanged(tracks: Tracks) {
@@ -511,7 +522,10 @@ class AppPlaybackRuntime(
                 // Video again after a reset: the declaration may be unchanged, so the flow says nothing.
                 frameRate.onDeclared(declaredVideoFrameDuration.value)
             }
-            if (livePlaybackObservation.value != LivePlaybackObservation.Departed) audioTracks.onTracksChanged()
+            if (livePlaybackObservation.value != LivePlaybackObservation.Departed) {
+                audioTracks.onTracksChanged()
+                subtitleTracks.onTracksChanged()
+            }
             stallWatch.reset()
         }
 
@@ -756,6 +770,11 @@ class AppPlaybackRuntime(
         }
         if (recoveryFence != null && !canContinueRecoveryLocked(recoveryFence)) return null
         audioResult?.let { return it }
+        val subtitleResult = subtitleTracks.loadStoredSubtitlesLocked(channelId) {
+            recoveryFence == null || canContinueRecoveryLocked(recoveryFence)
+        }
+        if (recoveryFence != null && !canContinueRecoveryLocked(recoveryFence)) return null
+        subtitleResult?.let { return it }
         val selection = currentLivePlaybackSelection(session.observation.value, channelId)
         if (selection == null) {
             return completeUnavailableTarget(
@@ -2541,8 +2560,10 @@ class AppPlaybackRuntime(
             frameRate.close()
             presentation.seekDiagnosticsListener?.let(player::removeAnalyticsListener)
             audioTracks.clearSessionAudioLocked()
+            subtitleTracks.clearSessionLocked()
         }
         audioTracks.joinAudioWrites()
+        subtitleTracks.joinWrites()
     }
 
     private suspend fun installTargetForPresentation(
@@ -2608,6 +2629,7 @@ class AppPlaybackRuntime(
             }
             if (_activeTarget.value != null && livePlaybackObservation.value != LivePlaybackObservation.Departed) {
                 audioTracks.activateAudioAfterInstallLocked()
+                subtitleTracks.activateAfterInstallLocked()
             }
         }
     }
@@ -2861,6 +2883,25 @@ class AppPlaybackRuntime(
     fun useAutomaticAudio() = scope.launch {
         targetCommands.serialize(onClosed = {}) {
             audioTracks.applyAutomaticAudioLocked()
+        }
+    }
+
+    fun useDefaultSubtitles() = selectSubtitles(null, off = false)
+
+    /** Subtitle choices stay ordered with Default and belong to the target on which they were made. */
+    fun selectSubtitles(
+        override: androidx.media3.common.TrackSelectionOverride?,
+        off: Boolean,
+        quickListEpoch: Long? = null,
+    ): Job {
+        // Full-panel choices outlive their sheet too, but must not follow a queued channel switch.
+        val epoch = quickListEpoch ?: activeTargetEpoch
+        return scope.launch {
+            targetCommands.serialize(onClosed = {}) {
+                if (epoch == null || epoch != activeTargetEpoch || targetInstallationInProgress) return@serialize
+                if (quickListEpoch != null && !isQuickListTargetCurrent(quickListEpoch)) return@serialize
+                subtitleTracks.selectLocked(override, off)
+            }
         }
     }
 

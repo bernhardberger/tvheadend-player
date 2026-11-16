@@ -32,7 +32,15 @@ class ItemChoiceStoreTest {
             scope = CoroutineScope(firstJob + StandardTestDispatcher(testScheduler)), produceFile = { file },
         )
         val profile = try {
-            selectProfile(first).also { store(first).set(it, 5, AdBreakMode.OFF) }
+            selectProfile(first).also {
+                store(first).set(it, 5, AdBreakMode.OFF)
+                PlayerSettingsStore(first).subtitleChoices.set(it, 1, SubtitleChoice.Off)
+                PlayerSettingsStore(first).subtitleChoices.set(it, 2, SubtitleChoice.Track("en", "application/dvbsubs", 0))
+                val stored = requireNotNull(first.data.first()[stringPreferencesKey("channel_subtitle_choices_v1")])
+                assertTrue(stored.contains("\"type\":\"off\""))
+                assertTrue(stored.contains("\"type\":\"track\""))
+                assertFalse(stored.contains("at.bernhardberger"))
+            }
         } finally {
             firstJob.cancelAndJoin()
         }
@@ -42,6 +50,9 @@ class ItemChoiceStoreTest {
         )
         try {
             assertEquals(AdBreakMode.OFF, store(second).read(profile, 5))
+            val subtitles = PlayerSettingsStore(second).subtitleChoices
+            assertEquals(SubtitleChoice.Off, subtitles.read(profile, 1))
+            assertEquals(SubtitleChoice.Track("en", "application/dvbsubs", 0), subtitles.read(profile, 2))
         } finally {
             secondJob.cancelAndJoin()
         }
@@ -126,13 +137,17 @@ class ItemChoiceStoreTest {
         // The settings store drops a removed server's recording choices and keeps the others'.
         val settings = PlayerSettingsStore(data)
         settings.recordingAdBreaks.set(original, 7, AdBreakMode.OFF)
+        settings.subtitleChoices.set(original, 1, SubtitleChoice.Off)
         settings.useProfile(replacementId)
         settings.recordingAdBreaks.set(replacement, 7, AdBreakMode.AUTOMATIC)
+        settings.subtitleChoices.set(replacement, 1, SubtitleChoice.Track("en", "text/vtt", 0))
         assertEquals(AdBreakMode.AUTOMATIC, settings.recordingAdBreaks.choices.first()[7])
         settings.removeProfile(replacementId)
         assertNull("removed with its server", settings.recordingAdBreaks.choices.first()[7])
+        assertNull("subtitles removed with their server", settings.subtitleChoices.read(replacement, 1))
         data.edit { it[activeProfileKey] = original }
         assertEquals(AdBreakMode.OFF, settings.recordingAdBreaks.choices.first()[7])
+        assertEquals(SubtitleChoice.Off, settings.subtitleChoices.read(original, 1))
     }
 
     @Test

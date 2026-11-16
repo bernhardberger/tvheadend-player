@@ -133,6 +133,9 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
     internal val audioChoices = ItemChoiceStore(
         dataStore, "explicit_audio_choices_v1", "channel", "choice", AudioTrackChoice.serializer(), maxEntries = 64,
     )
+    internal val subtitleChoices = ItemChoiceStore(
+        dataStore, "channel_subtitle_choices_v1", "channel", "choice", SubtitleChoice.serializer(), maxEntries = 64,
+    )
     val channelAspects = ItemChoiceStore(
         dataStore, "channel_aspect_modes_v1", "channel", "mode", AspectRatioMode.serializer(), maxEntries = 256,
     )
@@ -148,6 +151,7 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
 
     internal suspend fun removeProfile(id: ServerProfileId) {
         audioChoices.removeProfile(id.value)
+        subtitleChoices.removeProfile(id.value)
         channelAspects.removeProfile(id.value)
         recordingAdBreaks.removeProfile(id.value)
         dataStore.edit { p ->

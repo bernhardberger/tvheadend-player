@@ -170,6 +170,8 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
+import at.bernhardberger.tvhplayer.settings.PlayerSettings
+import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import org.koin.compose.koinInject
 
 // An outgoing player can remain composed during the root's route transition.
@@ -372,8 +374,10 @@ fun VideoPlayerScreen(
     guideEntryRequestId: Long? = null,
     consumeGuideEntry: () -> Boolean = { false },
     statsStore: at.bernhardberger.tvhplayer.di.PlayerStatsStore = koinInject(),
+    playerSettingsStore: PlayerSettingsStore = koinInject(),
 ) {
     val scope = rememberCoroutineScope()
+    val playerSettings by playerSettingsStore.playerSettings.collectAsStateWithLifecycle(PlayerSettings())
     val statsLevel by statsStore.level.collectAsStateWithLifecycle()
     val layerState = rememberLivePlayerLayerState()
     val playerClose = rememberPlayerClose(onClose)
@@ -2008,11 +2012,16 @@ fun VideoPlayerScreen(
             closesAtOnce = { (_, quick) -> quick },
         ) { (page, _) ->
             val audioAutomatic by playbackRuntime.audioAutomatic.collectAsStateWithLifecycle()
+            val subtitlesDefault by playbackRuntime.subtitlesDefault.collectAsStateWithLifecycle()
             PlaybackOptionsSheet(
                 page = page,
                 player = player,
                 audioAutomatic = audioAutomatic,
                 onAutomaticAudio = { playbackRuntime.useAutomaticAudio() },
+                subtitlesDefault = subtitlesDefault,
+                onDefaultSubtitles = { playbackRuntime.useDefaultSubtitles() },
+                onSubtitleSelection = { override, off, epoch -> playbackRuntime.selectSubtitles(override, off, epoch) },
+                subtitleLanguage = playerSettings.subtitleLanguage,
                 tracksResolving =
                     playbackState is AppPlaybackState.Starting ||
                         playbackState is AppPlaybackState.Recovering,

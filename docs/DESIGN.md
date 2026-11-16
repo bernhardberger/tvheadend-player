@@ -1279,6 +1279,13 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
   per recording and per connection. The row stays in the list for a recording
   without marked ad breaks, dimmed and out of the focus order, reading
   `None marked`; it opens once marks arrive.
+- The Subtitles list of an item with subtitle tracks reads `Default (<the
+  Subtitles setting>)`, Off, then the tracks, and checks exactly one row:
+  Default until the viewer picks Off or a track, even when the setting itself
+  shows a track; the header names what is shown. A pick on a live channel is
+  remembered for that channel and connection, like its audio track, and comes
+  back when exactly one track matches it. It never carries to the next
+  channel or recording; a recording keeps a pick only while it plays.
 
 ### Context menus and dialogs (accepted 2026-10-15)
 

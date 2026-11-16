@@ -65,6 +65,20 @@ class PlaybackOptionsPolicyTest {
     @Test
     fun subtitleFocusUsesSelectionThenFallsBackToOff() {
         assertEquals(
+            PlaybackTrackFocusTarget.SubtitlesDefault,
+            playbackTrackFocusTarget(
+                trackKeys = listOf("sub-en"), selectedTrackKey = "sub-en", subtitles = true,
+                subtitleDefaultOffered = true, subtitlesDefault = true,
+            ),
+        )
+        assertEquals(
+            PlaybackTrackFocusTarget.track(key = "sub-de", lazyIndex = 3),
+            playbackTrackFocusTarget(
+                trackKeys = listOf("sub-en", "sub-de"), selectedTrackKey = "sub-de", subtitles = true,
+                subtitleDefaultOffered = true,
+            ),
+        )
+        assertEquals(
             PlaybackTrackFocusTarget.track(key = "sub-de", lazyIndex = 2),
             playbackTrackFocusTarget(
                 trackKeys = listOf("sub-en", "sub-de"),
