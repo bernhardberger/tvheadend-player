@@ -38,6 +38,7 @@ import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssue
 import at.bernhardberger.tvhplayer.core.RecordingFailureDetail
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.FrameRateSwitching
+import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.time.Duration
@@ -378,11 +379,21 @@ class AppPlaybackRuntime(
             settings.playerSettings.distinctUntilChanged().collect {
                 targetCommands.serialize(onClosed = {}) {
                     val latest = settings.playerSettings.first()
-                    recordingMarkers.applySettings(latest)
+                    recordingMarkers.applySettings(recordingMarkSettings(latest, playingRecording()))
                     audioTracks.applyPlayerSettingsLocked(latest)
                     audioTracks.applyAudioPassthroughLocked(effectiveAudioPassthrough(
                         latest.audioPassthroughEnabled, audioOutputs.personalOutputConnected.value,
                     ))
+                }
+            }
+        }
+        launch {
+            settings.recordingAdBreaks.choices.collect {
+                targetCommands.serialize(onClosed = {}) {
+                    // Only the marks follow this choice: track preferences are not reapplied.
+                    recordingMarkers.applySettings(
+                        recordingMarkSettings(settings.playerSettings.first(), playingRecording()),
+                    )
                 }
             }
         }
@@ -1144,6 +1155,15 @@ class AppPlaybackRuntime(
         } ?: recordingRecovery
     }
 
+    private fun playingRecording(): DvrEntryId? =
+        (_activeTarget.value as? AppPlaybackTarget.Recording)?.recordingId
+
+    /** The settings [recording]'s marks follow: its own ad-break choice replaces the setting. */
+    private suspend fun recordingMarkSettings(base: PlayerSettings, recording: DvrEntryId?): PlayerSettings {
+        val choice = settings.recordingAdBreaks.choices.first()[recording?.value] ?: return base
+        return base.copy(adBreakMode = choice)
+    }
+
     /** A new play, live, or Stop: nothing from an earlier recording target carries over. */
     private fun forgetRecordingRecoveryLocked() {
         recordingRecovery = null
@@ -1160,6 +1180,7 @@ class AppPlaybackRuntime(
     ): PlaybackTargetResult? {
         if (!targetCommands.isOpen()) return PlaybackTargetResult.SHUT_DOWN
         val playerSettings = settings.playerSettings.first()
+        val markSettings = recordingMarkSettings(playerSettings, recordingId)
         if (!targetCommands.isOpen()) return PlaybackTargetResult.SHUT_DOWN
         audioTracks.configureAudioOutputBeforeFirstTargetLocked(effectiveAudioPassthrough(
             playerSettings.audioPassthroughEnabled, audioOutputs.personalOutputConnected.value,
@@ -1251,7 +1272,7 @@ class AppPlaybackRuntime(
                     _liveStartUndisturbed.value = false
                     _recordingSelection.value = selection
                     _recordingAdmission.value = admission
-                    recordingMarkers.applySettings(playerSettings)
+                    recordingMarkers.applySettings(markSettings)
                     recordingMarkers.observeRecordingMarkersLocked(requireNotNull(installedBinding), continuesTarget = preservesMarkerHistory)
                     presentation.publishStarting()
                     presentation.beginTargetPresentationLocked(epoch)

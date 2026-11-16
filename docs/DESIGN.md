@@ -1272,6 +1272,13 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
 - The Audio and Subtitle short lists: focus switches the track after 300 ms,
   OK keeps it and closes, Back reverts, and the list closes 5 s after the last
   key and keeps the track. Menu opens the full panel.
+- A choice the player remembers for one channel or one recording lists
+  `Default (<the setting's current value>)` first; choosing it forgets the
+  choice, and the item follows the setting again. The recording player's
+  options carry Ad breaks this way (Ask, Skip automatically, Off), remembered
+  per recording and per connection. The row stays in the list for a recording
+  without marked ad breaks, dimmed and out of the focus order, reading
+  `None marked`; it opens once marks arrive.
 
 ### Context menus and dialogs (accepted 2026-10-15)
 

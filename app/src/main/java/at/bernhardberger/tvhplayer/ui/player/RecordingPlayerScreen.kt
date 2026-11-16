@@ -130,6 +130,7 @@ fun RecordingPlayerScreen(
     val recordingAdmission by session.recordingAdmission.collectAsStateWithLifecycle()
     val recordingFailure by session.recordingPlaybackFailure.collectAsStateWithLifecycle()
     val recordingMarks by session.recordingMarks.collectAsStateWithLifecycle()
+    val adBreakOption = rememberRecordingAdBreakOption(recordingId, recordingMarks, koinInject())
     val markerRevision by session.recordingMarkerRevision.collectAsStateWithLifecycle()
     val skipPrompt by session.recordingSkipPrompt.collectAsStateWithLifecycle()
     val observation by tvheadendSession.observation.collectAsStateWithLifecycle()
@@ -862,6 +863,7 @@ fun RecordingPlayerScreen(
                 isQuickListTargetCurrent = session::isQuickListTargetCurrent,
                 onQuickAudioSelection = { epoch, override -> session.selectQuickListAudio(epoch, override) },
                 recording = true,
+                adBreaks = adBreakOption,
                 onAspectRatioChange = targetAspect.select,
                 onStatsLevelChange = statsStore::setLevel,
             )

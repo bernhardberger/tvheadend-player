@@ -10,6 +10,12 @@ class PlaybackOptionsPolicyTest {
             listOf(PlaybackOptionsPage.AUDIO, PlaybackOptionsPage.SUBTITLES, PlaybackOptionsPage.DISPLAY, PlaybackOptionsPage.STATS),
             playbackOptionsCategories(),
         )
+        assertEquals(
+            "a recording's ad breaks sit between the picture and the stats",
+            listOf(PlaybackOptionsPage.AUDIO, PlaybackOptionsPage.SUBTITLES, PlaybackOptionsPage.DISPLAY,
+                PlaybackOptionsPage.AD_BREAKS, PlaybackOptionsPage.STATS),
+            playbackOptionsCategories(adBreaks = true),
+        )
     }
 
     @Test

@@ -91,6 +91,7 @@ import at.bernhardberger.tvhplayer.core.playbackOptionsCategories
 import at.bernhardberger.tvhplayer.core.playbackQuickListOffered
 import at.bernhardberger.tvhplayer.core.playbackTrackContentState
 import at.bernhardberger.tvhplayer.core.playbackTrackFocusTarget
+import at.bernhardberger.tvhplayer.settings.AdBreakMode
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.ui.TvScrimModalAlpha
 import at.bernhardberger.tvhplayer.ui.TvSpacing12
@@ -98,6 +99,7 @@ import at.bernhardberger.tvhplayer.ui.TvSpacing16
 import at.bernhardberger.tvhplayer.ui.TvSpacing24
 import at.bernhardberger.tvhplayer.ui.TvSpacing4
 import at.bernhardberger.tvhplayer.ui.TvSpacing48
+import at.bernhardberger.tvhplayer.ui.screens.settings.adBreakModeLabel
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.TvTextSecondaryAlpha
 import at.bernhardberger.tvhplayer.ui.TvTextTertiaryAlpha
@@ -131,6 +133,7 @@ internal fun PlaybackOptionsSheet(
     quickList: PlaybackQuickListSignals? = null,
     onQuickListClose: () -> Unit = {},
     recording: Boolean = false,
+    adBreaks: RecordingAdBreakOption? = null,
     quickListTargetEpoch: Long = 0L,
     quickListAvailable: Boolean = true,
     isQuickListTargetCurrent: (Long) -> Boolean = { true },
@@ -207,6 +210,7 @@ internal fun PlaybackOptionsSheet(
             }
         },
         recording = recording,
+        adBreaks = adBreaks,
     )
 }
 
@@ -318,9 +322,10 @@ internal fun PlaybackOptionsSheetContent(
     onQuickListClose: () -> Unit = {},
     onQuickListRestore: () -> Unit = {},
     recording: Boolean = false,
+    adBreaks: RecordingAdBreakOption? = null,
 ) {
     var lastRootPage by remember { mutableStateOf(PlaybackOptionsPage.AUDIO) }
-    val availableRootPages = playbackOptionsCategories()
+    val availableRootPages = playbackOptionsCategories(adBreaks = adBreaks != null)
     val rootRestorePage = lastRootPage.takeIf(availableRootPages::contains)
         ?: availableRootPages.first()
     val loadingLabel = stringResource(R.string.playback_tracks_loading)
@@ -354,6 +359,12 @@ internal fun PlaybackOptionsSheetContent(
         }
     )
     val statsValue = statsLevel.label()
+    val adBreaksValue = when {
+        adBreaks == null -> null
+        !adBreaks.marked -> stringResource(R.string.ad_breaks_none_marked)
+        adBreaks.choice != null -> adBreakModeLabel(adBreaks.choice)
+        else -> stringResource(R.string.playback_option_default, adBreakModeLabel(adBreaks.setting))
+    }
     val playingAudio = audioTracks.firstOrNull(PlaybackOptionTrack::selected)?.label
     val automaticAudioSupport = if (audioAutomatic && playingAudio != null) {
         stringResource(R.string.audio_automatic_playing, playingAudio)
@@ -367,6 +378,7 @@ internal fun PlaybackOptionsSheetContent(
                 if (quickList != null) R.string.audio_quick_list else R.string.audio_track
             PlaybackOptionsPage.SUBTITLES -> R.string.subtitles
             PlaybackOptionsPage.DISPLAY -> R.string.display_mode
+            PlaybackOptionsPage.AD_BREAKS -> R.string.ad_breaks_setting
             PlaybackOptionsPage.STATS -> R.string.stats_for_nerds
         }
     )
@@ -402,6 +414,8 @@ internal fun PlaybackOptionsSheetContent(
                     statsLevel = statsLevel,
                     audioAvailable = true,
                     subtitlesAvailable = subtitleTracks.isNotEmpty(),
+                    adBreaksValue = adBreaksValue,
+                    adBreaksAvailable = adBreaks?.marked == true,
                     initialPage = rootRestorePage,
                     onPageChange = ::openPage,
                 )
@@ -445,6 +459,11 @@ internal fun PlaybackOptionsSheetContent(
                     currentValue = displayValue,
                     onBack = { onPageChange(PlaybackOptionsPage.ROOT) },
                     onSelect = onAspectRatioChange,
+                )
+                PlaybackOptionsPage.AD_BREAKS -> if (adBreaks != null) AdBreakOptionsPage(
+                    option = adBreaks,
+                    currentValue = adBreaksValue.orEmpty(),
+                    onBack = { onPageChange(PlaybackOptionsPage.ROOT) },
                 )
                 PlaybackOptionsPage.STATS -> StatsOptionsPage(
                     selected = statsLevel,
@@ -521,17 +540,22 @@ private fun PlaybackOptionsRoot(
     statsLevel: PlayerStatsLevel,
     audioAvailable: Boolean,
     subtitlesAvailable: Boolean,
+    // Null leaves the row out (live TV); unavailable keeps it visible but dimmed.
+    adBreaksValue: String?,
+    adBreaksAvailable: Boolean,
     initialPage: PlaybackOptionsPage,
     onPageChange: (PlaybackOptionsPage) -> Unit,
 ) {
     val audioFocus = remember { FocusRequester() }
     val subtitlesFocus = remember { FocusRequester() }
     val displayFocus = remember { FocusRequester() }
+    val adBreaksFocus = remember { FocusRequester() }
     val statsFocus = remember { FocusRequester() }
     val requesters = buildList {
         if (audioAvailable) add(PlaybackOptionsPage.AUDIO to audioFocus)
         if (subtitlesAvailable) add(PlaybackOptionsPage.SUBTITLES to subtitlesFocus)
         add(PlaybackOptionsPage.DISPLAY to displayFocus)
+        if (adBreaksValue != null && adBreaksAvailable) add(PlaybackOptionsPage.AD_BREAKS to adBreaksFocus)
         add(PlaybackOptionsPage.STATS to statsFocus)
     }
     val orderedFocus = requesters.map(Pair<PlaybackOptionsPage, FocusRequester>::second)
@@ -584,6 +608,17 @@ private fun PlaybackOptionsRoot(
                     .onFocusChanged { if (it.isFocused) focusedPage = PlaybackOptionsPage.DISPLAY }
                     .containedFocus(displayFocus, orderedFocus, index = orderedFocus.indexOf(displayFocus))
                     .testTag("playback-options-display"),
+            )
+            if (adBreaksValue != null) PlaybackOptionRow(
+                label = stringResource(R.string.ad_breaks_setting),
+                supportingLabel = adBreaksValue,
+                onClick = { onPageChange(PlaybackOptionsPage.AD_BREAKS) },
+                enabled = adBreaksAvailable,
+                showChevron = adBreaksAvailable,
+                modifier = Modifier
+                    .onFocusChanged { if (it.isFocused) focusedPage = PlaybackOptionsPage.AD_BREAKS }
+                    .containedFocus(adBreaksFocus, orderedFocus, index = orderedFocus.indexOf(adBreaksFocus))
+                    .testTag("playback-options-ad-breaks"),
             )
             PlaybackOptionRow(
                 label = stringResource(R.string.stats_for_nerds),
@@ -933,6 +968,47 @@ private fun DisplayOptionsPage(
             onClick = { onSelect(AspectRatioMode.FORCE_4_3) },
             modifier = Modifier.containedFocus(standardFocus, requesters, 2, headerBackFocus),
         )
+    }
+}
+
+/** The recording's own ad-break handling: the first row follows the setting again. */
+@Composable
+private fun AdBreakOptionsPage(
+    option: RecordingAdBreakOption,
+    currentValue: String,
+    onBack: () -> Unit,
+) {
+    val headerBackFocus = remember { FocusRequester() }
+    val modes = listOf<AdBreakMode?>(null) + AdBreakMode.entries
+    val requesters = remember { modes.map { FocusRequester() } }
+    val initialFocus = requesters[modes.indexOf(option.choice)]
+    LaunchedEffect(Unit) {
+        // Wait one frame so the row is ready to draw its focused state.
+        withFrameNanos { }
+        runCatching { initialFocus.requestFocus() }
+    }
+    OptionsHeader(
+        title = stringResource(R.string.ad_breaks_setting),
+        currentValue = currentValue,
+        onBack = onBack,
+        backFocusRequester = headerBackFocus,
+        downFocusRequester = initialFocus,
+    )
+    Column(
+        modifier = Modifier.padding(PanelRowsPadding),
+        verticalArrangement = Arrangement.spacedBy(TvSpacing8),
+    ) {
+        modes.forEachIndexed { index, mode ->
+            PlaybackOptionRow(
+                label = if (mode == null) {
+                    stringResource(R.string.playback_option_default, adBreakModeLabel(option.setting))
+                } else adBreakModeLabel(mode),
+                selected = option.choice == mode,
+                onClick = { option.select(mode) },
+                modifier = Modifier.containedFocus(requesters[index], requesters, index, headerBackFocus)
+                    .testTag("playback-options-ad-breaks-${mode?.name ?: "DEFAULT"}"),
+            )
+        }
     }
 }
 

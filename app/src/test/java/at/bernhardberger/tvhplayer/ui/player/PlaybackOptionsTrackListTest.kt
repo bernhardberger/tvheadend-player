@@ -24,7 +24,10 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -40,6 +43,7 @@ import androidx.media3.common.TrackGroup
 import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.Tracks
 import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
+import at.bernhardberger.tvhplayer.settings.AdBreakMode
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
@@ -124,6 +128,47 @@ class PlaybackOptionsTrackListTest {
             compose.changeState { subtitles = choices("x", "y", selected = selected) }
             assertFocused("y")
         }
+    }
+
+    /**
+     * A recording without marked ad breaks shows the row dimmed and focus passes it by; once
+     * breaks are marked it opens on the recording's own choice, and its first row goes back
+     * to the setting.
+     */
+    @Test fun adBreaksRowOpensOnlyWithMarkedBreaksAndItsFirstRowFollowsTheSettingAgain() {
+        var page by mutableStateOf(PlaybackOptionsPage.ROOT)
+        val selections = mutableListOf<AdBreakMode?>()
+        fun option(marked: Boolean) =
+            RecordingAdBreakOption(marked, AdBreakMode.ASK, AdBreakMode.AUTOMATIC, select = { selections += it })
+        var adBreaks by mutableStateOf(option(marked = false))
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                PlaybackOptionsSheetContent(
+                    page, emptyList(), emptyList(), false, AspectRatioMode.FIT, PlayerStatsLevel.OFF,
+                    onPageChange = { page = it }, onAudioTrackSelected = {}, onSubtitleTrackSelected = {},
+                    onAspectRatioChange = {}, onStatsLevelChange = {}, recording = true, adBreaks = adBreaks,
+                )
+            }
+        }
+        val row = "playback-options-ad-breaks"
+        compose.onNodeWithTag(row).assertIsNotEnabled().assert(hasText("None marked"))
+        compose.onNodeWithTag("playback-options-audio").assertIsFocused()
+        compose.pressKey(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
+        compose.onNodeWithTag("playback-options-stats").assertIsFocused()
+
+        compose.changeState { adBreaks = option(marked = true) }
+        compose.onNodeWithTag(row).assertIsEnabled().assert(hasText("Skip automatically"))
+        compose.pressKey(Key.DirectionUp)
+        compose.onNodeWithTag(row).assertIsFocused()
+        compose.pressKey(Key.DirectionCenter)
+        assertEquals(PlaybackOptionsPage.AD_BREAKS, page)
+        compose.onNodeWithTag("$row-AUTOMATIC").assertIsFocused()
+        compose.pressKey(Key.DirectionUp)
+        compose.pressKey(Key.DirectionUp)
+        compose.onNodeWithTag("$row-DEFAULT").assertIsFocused().assert(hasText("Default (Ask)"))
+        compose.pressKey(Key.DirectionCenter)
+        assertEquals(listOf<AdBreakMode?>(null), selections)
     }
 
     private var chosen: String? = null

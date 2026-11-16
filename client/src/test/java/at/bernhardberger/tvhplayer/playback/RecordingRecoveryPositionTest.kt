@@ -259,6 +259,29 @@ class RecordingRecoveryPositionTest {
         }
     }
 
+    @Test fun aRecordingsOwnAdBreakChoiceReplacesTheSettingForThatRecordingOnly() {
+        val points = listOf(DvrCutpoint(20.minutes, 25.minutes, DvrCutpointAction.COMMERCIAL_BREAK))
+        exercise(bookmark = 20.minutes, cutpoints = { DvrCutpointsResult.Available.create(points) }) {
+            play(SECOND, RecordingPlaybackStart.RESUME)
+            awaitMain { runtime.recordingSkipPrompt.value != null }
+            assertTrue("the setting asks: ${player.currentPosition}", player.currentPosition < 25 * ONE_MINUTE)
+            // The fixture's profile owner has settled without a server identity by now.
+            val profile = at.bernhardberger.tvheadend.sdk.core.ServerProfileId.generate()
+            settings.useProfile(profile)
+            val automatic = at.bernhardberger.tvhplayer.settings.AdBreakMode.AUTOMATIC
+            assertTrue(settings.recordingAdBreaks.set(profile.value, FIRST.value, automatic))
+            awaitCurrent { runtime.recordingSkipPrompt.value != null }
+            play(FIRST, RecordingPlaybackStart.RESUME)
+            awaitMain { runtime.recordingCutpoints.value == points && player.currentPosition >= 25 * ONE_MINUTE }
+            assertNull(runtime.recordingSkipPrompt.value)
+            // A choice made while a recording plays applies to it at once.
+            play(SECOND, RecordingPlaybackStart.RESUME)
+            awaitMain { runtime.recordingSkipPrompt.value != null }
+            assertTrue(settings.recordingAdBreaks.set(profile.value, SECOND.value, automatic))
+            awaitCurrent { runtime.recordingSkipPrompt.value == null }
+        }
+    }
+
     @Test fun retryAfterAReadErrorContinuesWhereTheRecordingStood() = exercise {
         play(FIRST)
         val installed = player.currentMediaItem
