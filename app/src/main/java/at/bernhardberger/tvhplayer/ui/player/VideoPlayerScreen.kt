@@ -387,7 +387,9 @@ fun VideoPlayerScreen(
         onClose()
     }
     // First, before any playback effect: a user stop since the last intent closes the screen.
-    val screenEntry = rememberPlayerEntry({ playbackRuntime.enterPlayerScreen(livePlayerOwner) }, playerClose)
+    val screenEntry = rememberPlayerEntry({
+        playbackRuntime.enterPlayerScreen(livePlayerOwner, appInitiated = startupTarget != null)
+    }, playerClose)
     DisposableEffect(playbackRuntime) {
         onDispose { playbackRuntime.onLivePlayerClosed(livePlayerOwner) }
     }
@@ -1409,12 +1411,13 @@ fun VideoPlayerScreen(
         }
     }
 
-    LaunchedEffect(connState, screenActive, videoPresentation.channelStartAtMillis) {
+    LaunchedEffect(connState, screenActive, videoPresentation.channelStartAtMillis, serverWait.waitingForFirstSession) {
         // Entry/resume recovery belongs to its start, not the mid-picture loss path.
         if (videoPresentation.channelStartAtMillis != null) {
             connectionLost = false
             return@LaunchedEffect
         }
+        if (serverWait.waitingForFirstSession && playbackRuntime.activeTarget.value == null) return@LaunchedEffect
         if (!screenActive ||
             screenEntry == null) return@LaunchedEffect
 

@@ -266,7 +266,8 @@ class SessionStopCloseTest {
             assertEquals(name, 1, source.split("CloseOnSessionStop($runtime.sessionStops,playerClose)").size - 1)
             assertEquals(name, 1, source.split("closePlayer=playerClose::close").size - 1)
             assertEquals(name, 1, source.split("handlePlayerStopKeyWithoutTarget(").size - 1)
-            val entry = if (live) "valscreenEntry=rememberPlayerEntry({playbackRuntime.enterPlayerScreen(livePlayerOwner)},playerClose)"
+            val entry = if (live)
+                "valscreenEntry=rememberPlayerEntry({playbackRuntime.enterPlayerScreen(livePlayerOwner,appInitiated=startupTarget!=null)},playerClose)"
                 else "valscreenEntry=rememberPlayerEntry($runtime::enterPlayerScreen,playerClose)"
             assertEquals(name, 1, source.split(entry).size - 1)
             // The entry comes first: before every effect and every playback command of the screen.

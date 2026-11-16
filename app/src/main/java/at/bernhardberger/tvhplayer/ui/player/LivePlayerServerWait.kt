@@ -62,16 +62,21 @@ internal class LivePlayerServerWaitState(
     private val channelStartAtMillis: Long?,
     private val nowMillis: State<Long>,
     private val playerRecovery: State<Boolean>,
+    private val sessionSeen: State<Boolean>,
 ) {
     /** The observation the wait shows its channel logo for: its profile names the saved copy. */
     val artworkObservation: SessionObservation get() = observation.value
     private var failures by mutableStateOf(WaitingConnectionFailure())
+    val waitingForFirstSession: Boolean get() = !sessionSeen.value
 
     /** Passive while connecting, Actionable once it failed (its buttons are [failure]'s); null when not waiting. */
     val presentation: MainStartupPresentation?
-        get() = if (channelStartAtMillis == null || playerRecovery.value) null else {
-            if (hasSession.value) MainStartupPresentation.Passive(MainStartupMessageKind.STARTING_TELEVISION)
-            else failureState?.let(::waitingConnectionFailurePresentation)
+        get() = when {
+            playerRecovery.value -> null
+            channelStartAtMillis != null && hasSession.value ->
+                MainStartupPresentation.Passive(MainStartupMessageKind.STARTING_TELEVISION)
+            hasSession.value || channelStartAtMillis == null && sessionSeen.value -> null
+            else -> failureState?.let(::waitingConnectionFailurePresentation)
                 ?: MainStartupPresentation.Passive(MainStartupMessageKind.CONNECTING)
         }
 
@@ -80,11 +85,14 @@ internal class LivePlayerServerWaitState(
      * offers: no Retry while the connection retries by itself. Null while connecting or not waiting.
      */
     val failure: AppError?
-        get() = if (channelStartAtMillis == null || hasSession.value) null else failureState?.toAppError()
+        get() = if (hasSession.value || channelStartAtMillis == null && sessionSeen.value) null
+            else failureState?.toAppError()
 
     private val failureState: ConnectionUiState?
-        get() = channelStartAtMillis?.let {
-            channelStartConnectionFailure(failures.shown(connection.value), it, nowMillis.value)
+        get() {
+            val failure = failures.shown(connection.value)
+            return if (channelStartAtMillis == null) failure
+            else channelStartConnectionFailure(failure, channelStartAtMillis, nowMillis.value)
         }
 
     /** Applied after each composition. */
@@ -137,6 +145,8 @@ internal fun rememberLivePlayerServerWait(
     playerRecovery: Boolean = false,
 ): LivePlayerServerWaitState {
     val hasSession = rememberUpdatedState(observation.currentSession != null)
+    // Ordinary entries wait only for their first session, never again for a later loss.
+    val sessionSeen = remember(close) { mutableStateOf(observation.currentSession != null) }
     val latest = rememberUpdatedState(observation)
     val connection = rememberUpdatedState(connectionUiState ?: observation.sessionState.toConnectionUiState())
     val reconnect = rememberUpdatedState(onReconnect)
@@ -151,10 +161,14 @@ internal fun rememberLivePlayerServerWait(
     }
     val state = remember(close, channelStartAtMillis) {
         LivePlayerServerWaitState(
-            hasSession, latest, connection, close, reconnect, connectionSettings, channelStartAtMillis, now, recovery,
+            hasSession, latest, connection, close, reconnect, connectionSettings,
+            channelStartAtMillis, now, recovery, sessionSeen,
         )
     }
-    SideEffect { state.observed() }
+    SideEffect {
+        if (hasSession.value) sessionSeen.value = true
+        state.observed()
+    }
     return state
 }
 

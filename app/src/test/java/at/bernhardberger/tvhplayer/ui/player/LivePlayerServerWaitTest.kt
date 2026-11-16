@@ -313,7 +313,7 @@ class LivePlayerServerWaitTest {
     }
 
     @Test fun aRecreatedScreenWithAnActiveTargetStillHandlesTheLossAndRetunesOnReconnect() {
-        screen(initial = ready())
+        screen(initial = ready(), appInitiated = false)
         compose.runOnIdle {
             scope.launch { runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(1)))) }
         }
@@ -327,6 +327,9 @@ class LivePlayerServerWaitTest {
         compose.runOnIdle { visible.value = true }
         compose.settleFrames(10)
         assertEquals(1, waits())
+        assertMainSettled("the recreated in-app screen clears the lost target before reconnect") {
+            runtime.activeTarget.value == null
+        }
         session.publish(ready())
         compose.settleFrames(10)
         assertMainSettled("the reconnect binds a new stream") { binds() > before }
@@ -545,6 +548,36 @@ class LivePlayerServerWaitTest {
 
     private var beforeSettingsRead: suspend () -> Unit = {}
 
+    @Test fun aConnectedViewerSelectionUsesThePlayersOwnOpeningState() {
+        screen(initial = ready(), appInitiated = false)
+        assertMainSettled("the viewer's channel is installed") { runtime.activeTarget.value != null }
+        compose.settleFrames(4)
+        assertEquals("a connected viewer selection must not show channel startup", 0, waits())
+        assertNull(runtime.videoPresentation.value.channelStartAtMillis)
+        assertEquals("the target still awaits its first frame", false, runtime.videoPresentation.value.visible)
+    }
+
+    @Test fun aDisconnectedViewerSelectionWaitsForItsFirstSessionAndBindsOnce() {
+        screen(appInitiated = false)
+        assertEquals("an in-app selection waits for its first session", 1, waits())
+        assertNull(runtime.videoPresentation.value.channelStartAtMillis)
+        assertEquals(0, binds())
+        compose.onNode(hasText(string(R.string.error_110_title))).assertDoesNotExist()
+        session.publish(ready())
+        compose.settleFrames(10)
+        assertMainSettled("the viewer selection installs once") { runtime.activeTarget.value != null }
+        assertEquals(1, binds())
+        assertEquals("a viewer selection has no Starting phase", 0, waits())
+        compose.runOnIdle {
+            session.publish(SessionObservation.create(sessionState = SessionState.Connecting,
+                channelState = ChannelRepositoryState.Stale(catalog)))
+            connection.value = ConnectionUiState.Error(ConnectionFailureKind.UNREACHABLE,
+                SessionRecoveryDisposition.AUTOMATIC_BACKOFF)
+        }
+        compose.settleFrames(4)
+        compose.onNode(hasText(string(R.string.error_110_title))).assertExists()
+    }
+
     @Test fun aRecoveryHandoffKeepsTheDeadlineAndItsFocusedAction() {
         val origin = mutableStateOf<Long?>(android.os.SystemClock.elapsedRealtime() - 5_000L)
         screen(startupOrigin = origin)
@@ -570,6 +603,7 @@ class LivePlayerServerWaitTest {
         profile: ServerProfile? = null,
         opener: SubscriptionOpener = SubscriptionOpener { _, _, _ -> awaitCancellation() },
         startupOrigin: androidx.compose.runtime.State<Long?>? = null,
+        appInitiated: Boolean = true,
     ) {
         // A pending first frame needs a held stream, not the fake's immediate end-of-input failure.
         session = FakeTvheadendSession(initial).apply {
@@ -614,6 +648,8 @@ class LivePlayerServerWaitTest {
                                 channels, session, ChannelId(1), "Name 1", {},
                                 { closes++ }, runtime, notices = notices, uiSettingsStore = UiSettingsStore(data),
                                 connectionUiState = connection.value, statsStore = statsStore,
+                                startupTarget = if (appInitiated) at.bernhardberger.tvhplayer.core.ApplianceLaunchTarget(
+                                    at.bernhardberger.tvhplayer.core.ApplianceLaunchRequest(1), ChannelId(1), "Name 1") else null,
                                 startupChannelStartAtMillis = startupOrigin?.value)
                         }
                     }
@@ -621,7 +657,7 @@ class LivePlayerServerWaitTest {
             }
         }
         compose.settleFrames(10)
-        if (initial.currentSession == null) compose.waitUntil(10_000) { waits() == 1 }
+        if (initial.currentSession == null && appInitiated) compose.waitUntil(10_000) { waits() == 1 }
     }
 
     private fun string(id: Int): String = ApplicationProvider.getApplicationContext<Application>().getString(id)

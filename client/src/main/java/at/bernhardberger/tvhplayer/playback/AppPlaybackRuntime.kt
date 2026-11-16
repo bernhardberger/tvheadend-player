@@ -1106,7 +1106,8 @@ class AppPlaybackRuntime(
      * active), the entry plays. Otherwise notes opening the screen as intent and returns
      * its generation.
      */
-    fun enterPlayerScreen(livePlayerOwner: Any? = null): Long? {
+    // Only automatic entry owns channel-start identity; an in-app selection waits for its first session in the UI.
+    fun enterPlayerScreen(livePlayerOwner: Any? = null, appInitiated: Boolean = false): Long? {
         val entry = playerEntries.incrementAndGet()
         val intent = synchronized(intentLock) {
             val current = playbackRequests.get()
@@ -1116,7 +1117,9 @@ class AppPlaybackRuntime(
                 else -> playbackRequests.incrementAndGet()
             }
         }
-        if (intent != null && livePlayerOwner != null) presentation.registerLivePlayer(livePlayerOwner, entry)
+        if (intent != null && livePlayerOwner != null) {
+            presentation.registerLivePlayer(livePlayerOwner, entry, appInitiated)
+        }
         return intent
     }
 

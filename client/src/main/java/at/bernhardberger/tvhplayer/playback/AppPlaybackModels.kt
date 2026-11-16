@@ -211,7 +211,7 @@ data class AppVideoPresentation(
     val epoch: Long = 0L,
     val visible: Boolean = false,
     val soundSinceMillis: Long? = null,
-    /** A live entry/resume without its picture yet; the runtime's monotonic clock. */
+    /** An app-initiated live entry/resume without its picture yet; the runtime's monotonic clock. */
     val channelStartAtMillis: Long? = null,
 )
 

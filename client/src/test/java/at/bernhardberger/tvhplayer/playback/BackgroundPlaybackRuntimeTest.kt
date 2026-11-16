@@ -124,7 +124,7 @@ class BackgroundPlaybackRuntimeTest {
     }
 
     @Test fun standbyReleasesWithoutNoticeAndNoninteractiveBackgroundNeverYields() = exercise {
-        runtime.enterPlayerScreen(livePlayerOwner = this)
+        runtime.enterPlayerScreen(livePlayerOwner = this, appInitiated = true)
         live()
         val start = runtime.videoPresentation.value.channelStartAtMillis
         val guardedLoss = scope.async { runtime.stopAfterLoss(unlessChannelStarting = true) }
@@ -172,15 +172,15 @@ class BackgroundPlaybackRuntimeTest {
     @Test fun closingAnOlderSurfaceCannotWithdrawItsReplacementAndStopEndsTheStart() = exercise {
         val older = Any()
         val current = Any()
-        runtime.enterPlayerScreen(older)
-        runtime.enterPlayerScreen(current)
+        runtime.enterPlayerScreen(older, appInitiated = true)
+        runtime.enterPlayerScreen(current, appInitiated = true)
         val start = runtime.videoPresentation.value.channelStartAtMillis
         assertNotNull(start)
         runtime.onLivePlayerClosed(older)
         assertEquals(start, runtime.videoPresentation.value.channelStartAtMillis)
         runtime.onLivePlayerClosed(current)
         assertNull(runtime.videoPresentation.value.channelStartAtMillis)
-        runtime.enterPlayerScreen(current)
+        runtime.enterPlayerScreen(current, appInitiated = true)
         val stop = scope.async { runtime.stop() }
         await { stop.isCompleted }
         assertNull(runtime.videoPresentation.value.channelStartAtMillis)
@@ -189,7 +189,7 @@ class BackgroundPlaybackRuntimeTest {
     @Test fun cancelledStartsKeepTheirSurfaceWaitUntilItCloses() {
         for (queueAnother in listOf(false, true)) exercise {
             val owner = Any()
-            runtime.enterPlayerScreen(owner)
+            runtime.enterPlayerScreen(owner, appInitiated = true)
             val entered = CompletableDeferred<Unit>()
             val release = CompletableDeferred<Unit>()
             beforeSettingsRead = { entered.complete(Unit); release.await() }

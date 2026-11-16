@@ -131,14 +131,16 @@ internal class PlaybackPresentationPublisher(
     fun livePlayerOwner(): Any? = targetCommands.readIfOpen { livePlayerOwner }
 
     /** Surface identity fences an old disposal or a queued foreground return. */
-    fun registerLivePlayer(owner: Any, generation: Long) {
+    fun registerLivePlayer(owner: Any, generation: Long, appInitiated: Boolean) {
         targetCommands.runIfOpen {
             if (generation < livePlayerGeneration) return@runIfOpen
             livePlayerGeneration = generation
             livePlayerOwner = owner
             channelStartAudioEpoch = null
             _videoPresentation.value = _videoPresentation.value.copy(
-                channelStartAtMillis = if (_videoPresentation.value.visible) null else elapsedRealtime(),
+                channelStartAtMillis = if (appInitiated && !_videoPresentation.value.visible) {
+                    elapsedRealtime()
+                } else null,
             )
         }
     }

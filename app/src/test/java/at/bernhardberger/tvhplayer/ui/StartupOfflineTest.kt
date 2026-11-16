@@ -143,24 +143,26 @@ class StartupOfflineTest {
         if (::player.isInitialized) player.release()
     }
 
-    @Test fun okBeforeReadyOpensTheWaitingPlayerAndTunesThatChannelOnReady() {
+    @Test fun okBeforeReadyTunesThatChannelWithoutAnAppStartupSurface() {
         app(holdLive = true)
         confirmRow(1)
-        val wait = compose.onNodeWithTag(LivePlayerServerWaitTag, useUnmergedTree = true)
-        val description = wait.fetchSemanticsNode().config[SemanticsProperties.ContentDescription].joinToString()
-        assertTrue(description, description.contains("1 Name 1"))
-        compose.onNode(hasText("Connecting"), useUnmergedTree = true).assertExists()
-        // The opening OK activated nothing: no action exists or holds focus in the wait.
-        assertEquals(0, compose.onAllNodes(hasClickAction() and isFocused()).fetchSemanticsNodes().size)
+        // The saved row opens its channel wait, not the app's startup screen.
+        compose.onNodeWithTag(LivePlayerServerWaitTag, useUnmergedTree = true).assertExists()
+        assertEquals(listOf("1 Name 1"), compose.onNodeWithTag(LivePlayerServerWaitTag, useUnmergedTree = true)
+            .fetchSemanticsNode().config[SemanticsProperties.ContentDescription])
+        assertEquals(0, compose.onAllNodes(hasClickAction() and isFocused(), useUnmergedTree = false).fetchSemanticsNodes().size)
+        // Confirm is consumed by the wait rather than reaching an action behind it.
         compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag(LivePlayerServerWaitTag, useUnmergedTree = true).assertExists()
         assertEquals(0, binds())
 
+        // The first session installs the requested channel once; in-app entry has no Starting phase.
         session.publish(ready(catalog))
         settle()
         compose.awaitScheduledWork(profileDispatcher) { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(1)) }
         settle()
         assertEquals(1, binds())
-        compose.onNode(hasText("Starting"), useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag(LivePlayerServerWaitTag, useUnmergedTree = true).assertDoesNotExist()
     }
 
     @Test fun failedConnectingThatRetriesByItselfOffersConnectionSettingsFocusedAndNoRetry() {
@@ -173,10 +175,8 @@ class StartupOfflineTest {
         compose.waitUntil(10_000) {
             compose.onAllNodes(hasTestTag("tv-recovery-primary") and isFocused()).fetchSemanticsNodes().isNotEmpty()
         }
-        compose.onNode(hasTestTag("tv-recovery-primary") and hasText("Connection settings", substring = true), useUnmergedTree = false)
-            .assertIsFocused()
+        compose.onNode(hasTestTag("tv-recovery-primary") and hasText("Connection settings", substring = true)).assertIsFocused()
         assertEquals(0, compose.onAllNodes(hasText("Retry", substring = true), useUnmergedTree = true).fetchSemanticsNodes().size)
-        // Automatic attempts keep the recovery and its focus in place.
         session.publish(connecting(catalog))
         settle()
         compose.onNodeWithTag("tv-recovery-primary").assertIsFocused()
@@ -186,7 +186,6 @@ class StartupOfflineTest {
     @Test fun connectionSettingsFromTheFailedWaitLeavesThePlayerForConnectionSettings() {
         app()
         confirmRow(1)
-        // A failure that waits for the viewer: Retry first, Connection settings beside it.
         session.publish(SessionObservation.create(
             sessionState = SessionState.Unavailable(SessionFailure.synchronizationFailed(TvheadendFailure.MALFORMED_RESPONSE)),
             channelState = ChannelRepositoryState.Stale(catalog),
@@ -198,7 +197,6 @@ class StartupOfflineTest {
         compose.onNode(hasTestTag("tv-recovery-secondary") and hasText("Connection settings", substring = true)).assertIsFocused()
         compose.pressKey(Key.DirectionCenter)
         settle()
-        // Connection settings show the server list.
         compose.waitUntil(10_000) { compose.onAllNodes(hasText("Add connection"), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
         assertEquals(0, compose.onAllNodes(hasTestTag("tv-recovery-overlay")).fetchSemanticsNodes().size)
         assertEquals(0, compose.onAllNodes(hasTestTag(LivePlayerServerWaitTag), useUnmergedTree = true).fetchSemanticsNodes().size)
@@ -269,7 +267,7 @@ class StartupOfflineTest {
             tag.startsWith("home-") || tag.startsWith("nav-")
         }
         // clearAndSetSemantics hides the landing tree from accessibility's merged view.
-        assertEquals(0, compose.onAllNodes(landingOrRail).fetchSemanticsNodes().size)
+        assertEquals(0, compose.onAllNodes(landingOrRail, useUnmergedTree = false).fetchSemanticsNodes().size)
         assertEquals(0, compose.onAllNodes(isFocused(), useUnmergedTree = true).fetchSemanticsNodes().size)
 
         gate.complete(Unit)
@@ -370,8 +368,10 @@ class StartupOfflineTest {
         compose.awaitScheduledWork(profileDispatcher) { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(2)) }
         settle()
         assertEquals(1, binds())
-        assertEquals("the ready session still waits for picture", 1,
+        assertEquals("a viewer selection uses the player's opening state", 0,
             compose.onAllNodes(hasTestTag(LivePlayerServerWaitTag), useUnmergedTree = true).fetchSemanticsNodes().size)
+        compose.pressKey(Key.Back) // Ordinary player chrome handles the first Back.
+        settle()
         compose.pressKey(Key.Back)
         advance(300)
         compose.awaitScheduledWork(profileDispatcher) {
@@ -729,15 +729,17 @@ class StartupOfflineTest {
         }
         compose.runOnUiThread { confirms.forEach { it() } }
         settle()
-        val wait = compose.onNodeWithTag(LivePlayerServerWaitTag, useUnmergedTree = true)
-        val description = wait.fetchSemanticsNode().config[SemanticsProperties.ContentDescription].joinToString()
-        assertTrue(description, description.contains("2 Name 2"))
+        compose.onNodeWithTag(LivePlayerServerWaitTag, useUnmergedTree = true).assertExists()
+        assertEquals(listOf("2 Name 2"), compose.onNodeWithTag(LivePlayerServerWaitTag, useUnmergedTree = true)
+            .fetchSemanticsNode().config[SemanticsProperties.ContentDescription])
         session.publish(ready(catalog))
         settle()
         compose.awaitScheduledWork(profileDispatcher) { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(2)) }
         settle()
         assertEquals(1, binds())
-        // One Back leaves the one player.
+        // Ordinary player chrome handles the first Back; the second leaves the one player.
+        compose.pressKey(Key.Back)
+        settle()
         compose.pressKey(Key.Back)
         settle()
         compose.waitUntil(10_000) {
@@ -792,9 +794,7 @@ class StartupOfflineTest {
         compose.pressKey(Key.DirectionCenter)
         settle()
         if (!awaitWait) return
-        compose.waitUntil(10_000) {
-            compose.onAllNodes(hasTestTag(LivePlayerServerWaitTag), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
-        }
+        compose.onNodeWithTag(LivePlayerServerWaitTag, useUnmergedTree = true).assertExists()
         settle()
     }
 
