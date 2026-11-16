@@ -1,6 +1,8 @@
 package at.bernhardberger.tvhplayer.ui
 
 import at.bernhardberger.tvheadend.sdk.core.Channel
+import at.bernhardberger.tvhplayer.core.mainStartupDisplayChannel
+import kotlinx.coroutines.flow.catch
 
 import at.bernhardberger.tvhplayer.ui.components.ProvideWatchingProgress
 import at.bernhardberger.tvhplayer.ui.components.railNowPlaying
@@ -478,6 +480,8 @@ fun AppRoot(
      * not the active profile, so removing the server in use never passes through first run.
      */
     serversStored: Boolean = false,
+    freshStart: Boolean = true,
+    onStartupFinished: () -> Unit = {},
 ) {
     val applianceLaunchState by applianceLaunchRequests.state.collectAsStateWithLifecycle()
     val guideRequest = (applianceLaunchState as? ApplianceLaunchState.Pending)
@@ -504,6 +508,7 @@ fun AppRoot(
                     navigationStartDestination = null,
                     navigationAllowed = false,
                     loadingFeedbackEnabled = !cancelBootstrapLaunchWhenReady,
+                    hideBranding = !freshStart,
                 ),
                 loadingTiming = startupLoadingTiming,
                 onBack = resolvingBack,
@@ -659,6 +664,24 @@ fun AppRoot(
     val browseConnectionFailure = browseFailure.failure
     val retryBrowseConnection = browseFailure.retry
     val currentChannelReadiness = connectionPresentation.currentChannelReadiness
+    var persistedStartupChannelId by remember(profileGeneration) { mutableStateOf<ChannelId?>(null) }
+    var startupChannelIdRead by remember(profileGeneration) { mutableStateOf(false) }
+    var startupChannelReadFailed by remember(profileGeneration) { mutableStateOf(false) }
+    LaunchedEffect(lastPlayedChannelStore, profileGeneration) {
+        lastPlayedChannelStore.channelId.catch {
+            startupChannelReadFailed = true
+            emit(null)
+        }.collect {
+            persistedStartupChannelId = it
+            startupChannelIdRead = true
+        }
+    }
+    val provisionalStartupChannel = remember(currentChannelReadiness, persistedStartupChannelId,
+        startupChannelIdRead, startupChannelReadFailed) {
+        if (startupChannelIdRead && !startupChannelReadFailed) {
+            mainStartupDisplayChannel(currentChannelReadiness, persistedStartupChannelId)
+        } else null
+    }
     val landingCatalogAvailable = currentChannelReadiness.channelsAvailable() || currentChannelReadiness is CurrentChannelReadiness.Ready
     var startupReveal by remember { mutableStateOf<MainStartupReveal?>(null) }
     var startupInputReady by remember { mutableStateOf(false) }
@@ -834,6 +857,9 @@ fun AppRoot(
             )
         }
     }
+    LaunchedEffect(applianceLaunchActive, navigationAllowed) {
+        if (!applianceLaunchActive && navigationAllowed) onStartupFinished()
+    }
     val selectRoot = remember(backStack) {
         { destination: AppNavKey ->
             navigationStartDestination = destination
@@ -922,7 +948,7 @@ fun AppRoot(
         val directive = enterDirective ?: return@LaunchedEffect
         val readiness = currentChannelReadiness as? CurrentChannelReadiness.Ready
             ?: return@LaunchedEffect
-        val persistedId = lastPlayedChannelStore.channelId.first()
+        val persistedId = lastPlayedChannelStore.channelId.catch { emit(null) }.first()
         val target = applianceLaunchRequests.resolve(
             request = directive.request,
             readiness = readiness,
@@ -1354,6 +1380,7 @@ fun AppRoot(
                                         val accepted = applianceLaunchRequests.cancel(ApplianceLaunchState.Entering(target)) ||
                                             startupReveal?.target == target
                                         if (startupReveal?.target == target) startupReveal = null
+                                        if (accepted) onStartupFinished()
                                         accepted
                                     } else {
                                         val completed = completeEnteringPlayerVisibility(
@@ -1364,6 +1391,7 @@ fun AppRoot(
                                             outcome = outcome,
                                         )
                                         if (completed) {
+                                            onStartupFinished()
                                             startupReveal = if (outcome == MainStartupPlaybackOutcome.PRESENTED) {
                                                 MainStartupReveal(target, enteringProfileGeneration)
                                             } else null
@@ -1517,10 +1545,13 @@ fun AppRoot(
             requestId = startupRequestId,
             revealRequestId = revealingTarget?.request?.id,
             returningToPlayback = returningToPlayback,
-            hideBranding = priorLiveChannelId != null,
+            hideBranding = !freshStart,
         ),
         loadingTiming = startupLoadingTiming,
-        startupChannel = (enteringLaunchTarget ?: revealingTarget)?.let { playbackObservation.channel(it.channelId) },
+        startupChannel = (enteringLaunchTarget ?: revealingTarget)?.let { playbackObservation.channel(it.channelId) }
+            ?: if ((applianceLaunchState as? ApplianceLaunchState.Pending)?.request?.destination ==
+                ApplianceEntryDestination.LIVE && priorLiveChannelId == null && startupChannelIdRead
+            ) provisionalStartupChannel else null,
         startupConnected = playbackObservation.currentSession != null,
         startupInputReady = startupInputReady,
         onBack = if (coldStartVisible) onRequestExit else startupBack,

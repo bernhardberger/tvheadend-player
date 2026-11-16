@@ -81,6 +81,9 @@ class StartupBrandBackgroundTest {
         }
         compose.settleFrames(5)
         capture(view, "brand-waiting-fresh")
+        compose.runOnIdle { channel = ridge }
+        compose.settleFrames(5)
+        capture(view, "channel-connecting-saved-fresh")
         compose.runOnIdle { fresh = false; channel = ridge }
         compose.settleFrames(5)
         capture(view, "channel-connecting-wake")
@@ -113,32 +116,9 @@ class StartupBrandBackgroundTest {
         compose.onNodeWithText("Connecting", useUnmergedTree = true).assertExists()
     }
 
-    @OptIn(ExperimentalCoroutinesApi::class)
+    @OptIn(ExperimentalCoroutinesApi::class, at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)
     @Test fun logosWaitForReadinessThenReplaceSequentiallyWithoutAnInterveningMark() {
-        val dispatcher = StandardTestDispatcher()
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        val first = Channel.create(ChannelId(1), name = "Ridge Earth", icon = ChannelIcon.ImageCache(ArtworkId(1)))
-        val second = Channel.create(ChannelId(2), name = "Harbor Sport", icon = ChannelIcon.ImageCache(ArtworkId(2)))
-        images.install(FixtureArt.imageLoader(context, mapOf(
-            ArtworkId(1) to FixtureArt.picon("ridge-earth"),
-            ArtworkId(2) to FixtureArt.picon("harbor-sport"),
-        )).newBuilder().coroutineContext(dispatcher).build())
-        var channel by mutableStateOf(first)
-        var motion by mutableStateOf(true)
-        val observation = artworkSession()
-        compose.mainClock.autoAdvance = false
-        compose.setContent {
-            TVHeadendPlayerTheme {
-                ProvideArtworkSession(observation) {
-                    ChannelStartupSurface(channel, "Starting", motionEnabled = motion)
-                }
-            }
-        }
-        compose.settleFrames(1)
-        compose.onNodeWithTag("main-startup-mark", useUnmergedTree = true).assertExists()
-        dispatcher.scheduler.runCurrent()
-        compose.settleFrames(4)
-        compose.onNodeWithTag("startup-logo-Ridge Earth", useUnmergedTree = true).assertExists()
+        with(StartupLogoFixture()) {
         compose.runOnIdle { channel = second }
         compose.settleFrames(1)
         compose.onNodeWithTag("startup-logo-Ridge Earth", useUnmergedTree = true).assertExists()
@@ -159,20 +139,83 @@ class StartupBrandBackgroundTest {
         }
         compose.onNodeWithTag("startup-logo-Ridge Earth", useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("main-startup-mark", useUnmergedTree = true).assertDoesNotExist()
+        }
     }
 
-    private fun artworkSession() = FakeSessionObservation(SessionObservation.create(
-        sessionState = SessionState.Ready(ServerCapabilities.create(
+    @OptIn(ExperimentalCoroutinesApi::class, at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)
+    @Test fun confirmationKeepsTheLogoAndUpdatesMetadataInPlace() {
+        with(StartupLogoFixture()) {
+        val requestsBeforeConfirmation = logoRequests
+        val statusBefore = compose.onNodeWithTag("main-startup-status", useUnmergedTree = true).fetchSemanticsNode().config
+        compose.runOnIdle {
+            channel = Channel.create(first.id, name = first.name, icon = first.icon)
+            session.publish(artworkObservation(), profile)
+        }
+        compose.settleFrames(3, frameMillis = 16)
+        dispatcher.scheduler.runCurrent()
+        compose.mainClock.advanceTimeByFrame()
+        assertEquals("confirming the same logo does not request it again", requestsBeforeConfirmation, logoRequests)
+        val statusAfter = compose.onNodeWithTag("main-startup-status", useUnmergedTree = true).fetchSemanticsNode().config
+        assertEquals(statusBefore[SemanticsProperties.Text], statusAfter[SemanticsProperties.Text])
+        assertEquals(androidx.compose.ui.semantics.LiveRegionMode.Polite, statusAfter[SemanticsProperties.LiveRegion])
+        compose.runOnIdle { channel = Channel.create(first.id, name = "Ridge Earth HD", icon = first.icon) }
+        compose.settleFrames(3, frameMillis = 16)
+        compose.onNodeWithText("Ridge Earth HD", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("startup-logo-Ridge Earth HD", useUnmergedTree = true).assertExists()
+        }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class, at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)
+    private inner class StartupLogoFixture {
+        val dispatcher = StandardTestDispatcher()
+        val first = Channel.create(ChannelId(1), name = "Ridge Earth", icon = ChannelIcon.ImageCache(ArtworkId(1)))
+        val second = Channel.create(ChannelId(2), name = "Harbor Sport", icon = ChannelIcon.ImageCache(ArtworkId(2)))
+        var logoRequests = 0
+        var channel by mutableStateOf(first)
+        var motion by mutableStateOf(true)
+        val profile = at.bernhardberger.tvheadend.sdk.core.ServerProfile("offline.invalid")
+        val session = at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession().apply {
+            artwork.scriptCached(profile)
+            publish(artworkObservation(SessionState.Synchronizing), profile)
+        }
+        init {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        images.install(FixtureArt.imageLoader(context, mapOf(
+            ArtworkId(1) to FixtureArt.picon("ridge-earth"),
+            ArtworkId(2) to FixtureArt.picon("harbor-sport"),
+        ), onRequest = { logoRequests++ }).newBuilder().coroutineContext(dispatcher).build())
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                at.bernhardberger.tvhplayer.ui.components.ProvideAppArtwork(session) {
+                    ChannelStartupSurface(channel, "Starting", motionEnabled = motion)
+                }
+            }
+        }
+        compose.settleFrames(1)
+        compose.onNodeWithTag("main-startup-mark", useUnmergedTree = true).assertExists()
+        dispatcher.scheduler.runCurrent()
+        compose.settleFrames(4)
+        compose.onNodeWithTag("startup-logo-Ridge Earth", useUnmergedTree = true).assertExists()
+        dispatcher.scheduler.runCurrent()
+        compose.mainClock.advanceTimeByFrame()
+        }
+    }
+
+    private fun artworkSession() = FakeSessionObservation(artworkObservation()).captureCurrentSession()
+
+    private fun artworkObservation(state: SessionState = SessionState.Ready(ServerCapabilities.create(
             streaming = at.bernhardberger.tvheadend.sdk.core.CapabilityAccess.ALLOWED,
             dvrWrite = at.bernhardberger.tvheadend.sdk.core.CapabilityAccess.ALLOWED,
-        )),
+        ))) = SessionObservation.create(
+        sessionState = state,
         channelState = at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState.Current(
             at.bernhardberger.tvheadend.sdk.core.ChannelCatalog.create(emptyList())),
         epgState = at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState.Current(
             at.bernhardberger.tvheadend.sdk.core.EpgSnapshot.create()),
         dvrState = at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState.Current(
             at.bernhardberger.tvheadend.sdk.core.DvrSnapshot.create()),
-    )).captureCurrentSession()
+    )
 
     @Test
     @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")

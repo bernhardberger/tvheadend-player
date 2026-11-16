@@ -2,6 +2,21 @@ package at.bernhardberger.tvhplayer.core
 
 import at.bernhardberger.tvhplayer.playback.AppLiveTargetPresentation
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.Channel
+
+/** Display only, including the brief Ready-to-resolved handoff; never admits a playback target. */
+internal fun mainStartupDisplayChannel(
+    readiness: CurrentChannelReadiness,
+    persistedId: ChannelId?,
+): Channel? {
+    val channels = when (readiness) {
+        is CurrentChannelReadiness.Browsable -> readiness.channels
+        is CurrentChannelReadiness.Ready -> readiness.channels
+        else -> return null
+    }
+    val id = LastPlayedChannelPolicy.resolve(channels.map { it.id }, persistedId)
+    return channels.firstOrNull { it.id == id }
+}
 
 enum class MainStartupPlaybackOutcome { PRESENTED, ALREADY_PLAYING, RECOVERY }
 

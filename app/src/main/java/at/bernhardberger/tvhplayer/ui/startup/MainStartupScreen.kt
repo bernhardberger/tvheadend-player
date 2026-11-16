@@ -58,6 +58,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.hideFromAccessibility
 import at.bernhardberger.tvheadend.sdk.core.Channel
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
+import at.bernhardberger.tvheadend.sdk.core.SessionObservation
+import at.bernhardberger.tvhplayer.ui.components.LocalArtworkContext
+import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
 import at.bernhardberger.tvhplayer.core.visibleChannelNumber
@@ -209,7 +214,7 @@ internal fun ChannelStartupSurface(
             }
             Box(safeWidth.align(Alignment.TopCenter).padding(top = maxHeight * (250f / 540f) - nameHeight / 2)
                 .height(nameHeight).graphicsLayer { alpha = contentAlpha }, contentAlignment = Alignment.Center) {
-                StartupIdentity(title, motionEnabled)
+                StartupIdentity(title, channel?.id, motionEnabled)
             }
             Box(Modifier.align(Alignment.TopCenter).padding(top = maxHeight * (328f / 540f) - 22.dp)
                 .size(44.dp).graphicsLayer { alpha = contentAlpha }, contentAlignment = Alignment.Center) {
@@ -226,8 +231,8 @@ internal fun ChannelStartupSurface(
 }
 
 @Composable
-private fun StartupIdentity(title: String?, motionEnabled: Boolean) {
-    StartupSlot(title, motionEnabled) { name, _ ->
+private fun StartupIdentity(title: String?, channelId: ChannelId?, motionEnabled: Boolean) {
+    StartupSlot(title, motionEnabled, identity = channelId) { name, _ ->
         if (name == null) BrandWordmark(28.sp, 36.sp,
             Modifier.testTag("main-startup-wordmark").semantics { hideFromAccessibility() })
         else Text(name, style = MaterialTheme.typography.headlineSmall,
@@ -250,41 +255,65 @@ private fun StartupStatus(status: String, motionEnabled: Boolean, announce: Bool
     }
 }
 
-/** Delayed enter avoids the unreadable midpoint of a simultaneous content crossfade. */
+/** Replace by identity only; metadata updates within that identity stay in place. */
 @Composable
-private fun <T> StartupSlot(value: T, motionEnabled: Boolean, content: @Composable (T, Boolean) -> Unit) {
+private fun <T> StartupSlot(
+    value: T,
+    motionEnabled: Boolean,
+    identity: Any? = value,
+    content: @Composable (T, Boolean) -> Unit,
+) {
     var shown by remember { mutableStateOf(value) }
+    var shownIdentity by remember { mutableStateOf(identity) }
     val alpha = remember { Animatable(1f) }
-    LaunchedEffect(value, motionEnabled) {
+    LaunchedEffect(value, identity, motionEnabled) {
         val duration = if (motionEnabled) PlayerMotion.ShortMs else 0
-        if (shown != value) {
+        if (shownIdentity != identity) {
             alpha.animateTo(0f, tween(duration, easing = PlayerMotion.StandardAccelerate))
-            shown = value
         }
+        shown = value
+        shownIdentity = identity
         alpha.animateTo(1f, tween(duration, easing = PlayerMotion.Standard))
     }
     Box(Modifier.graphicsLayer { this.alpha = alpha.value }, contentAlignment = Alignment.Center) {
-        key(shown) { content(shown, alpha.value > 0f) }
+        key(shownIdentity) { content(shown, alpha.value > 0f) }
     }
 }
 
-/** Keep the mark until the real picon is decoded, then swap sequentially in the same slot. */
+/**
+ * Composition-scoped until the startup surface leaves at first frame. Do not retain across
+ * session/profile replacement: the same id/icon would otherwise keep drawing under its old session.
+ */
+private data class StartupLogoContent(
+    val channel: Channel,
+    val session: CurrentSessionObservation?,
+    val observation: SessionObservation?,
+)
+
 @Composable
 private fun StartupLogo(channel: Channel?, motionEnabled: Boolean) {
-    var loaded by remember { mutableStateOf<Channel?>(null) }
-    LaunchedEffect(channel?.id, channel?.icon) {
-        if (channel == null || channel.icon == null) loaded = channel
+    val artwork = LocalArtworkContext.current
+    var loaded by remember { mutableStateOf<StartupLogoContent?>(null) }
+    fun ready(channel: Channel) {
+        loaded = StartupLogoContent(channel, artwork.currentSession, artwork.latest.value)
     }
-    val logoChanged = channel?.id != loaded?.id || channel?.icon != loaded?.icon
+    LaunchedEffect(channel?.id, channel?.icon) {
+        if (channel == null) loaded = null else if (channel.icon == null) ready(channel)
+    }
+    val logoChanged = channel?.id != loaded?.channel?.id || channel?.icon != loaded?.channel?.icon
     if (channel != null && logoChanged && channel.icon != null) {
         key(channel.id, channel.icon) {
             PiconBox(channel.icon, Modifier.fillMaxSize().alpha(0f),
-                onLogoSize = { loaded = channel }, onError = { loaded = channel })
+                onLogoSize = { ready(channel) }, onError = { ready(channel) })
         }
     }
-    StartupSlot(loaded, motionEnabled) { shown, _ ->
-        if (shown != null) PiconBox(shown.icon,
-            Modifier.fillMaxSize().testTag("startup-logo-${shown.name}"))
+    val display = remember(loaded, channel, logoChanged) {
+        if (channel != null && !logoChanged) loaded?.copy(channel = channel) else loaded
+    }
+    StartupSlot(display, motionEnabled, identity = display?.channel?.id) { shown, _ ->
+        if (shown != null) ProvideArtworkSession(shown.session, shown.observation) {
+            PiconBox(shown.channel.icon, Modifier.fillMaxSize().testTag("startup-logo-${shown.channel.name}"))
+        }
         else Image(painterResource(R.drawable.startup_brand_symbol), null,
             Modifier.fillMaxSize().testTag(MainStartupMarkTag))
     }
