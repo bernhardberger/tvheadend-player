@@ -162,7 +162,9 @@ internal fun settingsStreamProfileLevel(
     val direct = stringResource(R.string.profile_direct_streaming)
     val profiles = ui.profiles as? StreamProfilesResult.Available
     val rows = if (profiles == null) {
-        listOf(settingsRow("profiles-status", streamProfilesStatus(ui.profiles, ui.connected).orEmpty(), enabled = false))
+        listOf(settingsRow(
+            "profiles-status", streamProfilesStatus(ui.profiles, ui.connected).orEmpty(), enabled = false,
+        ))
     } else buildList {
         add(settingsRow(STREAM_PROFILE_DEFAULT, stringResource(R.string.profile_server_default),
             selected = ui.selectedProfileId == null, onClick = { onSelect(null) }))
@@ -235,7 +237,8 @@ internal fun settingsPlayerLevel(
                 else stringResource(R.string.keep_channel_needs_timeshift, stringResource(R.string.timeshift_setting)),
             child = KEEP_CHANNEL_LEVEL.takeIf { ui.timeshiftEnabled }, enabled = ui.timeshiftEnabled),
     ) + settingsRecordingMarksRows(ui, onSkipCutsChanged) + listOf(
-        settingsRow(STREAM_PROFILE_LEVEL, stringResource(R.string.profile), profilesStatus ?: streamProfileLabel(ui.profiles, ui.selectedProfileId),
+        settingsRow(STREAM_PROFILE_LEVEL, stringResource(R.string.profile),
+            profilesStatus ?: streamProfileLabel(ui.profiles, ui.selectedProfileId),
             child = STREAM_PROFILE_LEVEL.takeIf { profilesStatus == null }, enabled = profilesStatus == null,
             section = stringResource(R.string.settings_section_streaming)),
         settingsRow(STARTUP_BUFFER_LEVEL, stringResource(R.string.startup_buffer_setting),

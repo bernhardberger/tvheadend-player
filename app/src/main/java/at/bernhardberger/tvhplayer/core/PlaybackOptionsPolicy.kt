@@ -79,7 +79,10 @@ fun playbackQuickListOffered(page: PlaybackOptionsPage, trackCount: Int): Boolea
 }
 
 /** The root's pages in row order; [adBreaks] adds the recording player's ad-break page. */
-fun playbackOptionsCategories(adBreaks: Boolean = false, streamProfiles: Boolean = false): List<PlaybackOptionsPage> = buildList {
+fun playbackOptionsCategories(
+    adBreaks: Boolean = false,
+    streamProfiles: Boolean = false,
+): List<PlaybackOptionsPage> = buildList {
     add(PlaybackOptionsPage.AUDIO)
     add(PlaybackOptionsPage.SUBTITLES)
     add(PlaybackOptionsPage.DISPLAY)

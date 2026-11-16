@@ -46,9 +46,10 @@ internal class PlaybackSubtitleTracks(
         if (!targetCommands.isOpen()) return
         _subtitlesDefault.value = isDefault(parameters)
         selection.useProfile(profileOwner.serverProfile.value, player)
-        val profileId = profileOwner.audioProfileId ?: return
-        val (channel, choice) = selection.rememberExplicitChoice(player) ?: return
-        write(profileId, channel, choice)
+        val profileId = profileOwner.audioProfileId
+        if (profileId != null) {
+            selection.rememberExplicitChoice(player)?.let { (channel, choice) -> write(profileId, channel, choice) }
+        }
     }
 
     fun onTracksChanged() {
@@ -66,13 +67,16 @@ internal class PlaybackSubtitleTracks(
         } catch (_: IOException) {
             null
         }
-        if (!targetCommands.isOpen()) return PlaybackTargetResult.SHUT_DOWN
-        if (profileOwner.serverProfile.value !== profile || profileOwner.audioProfileId != profileId || !canApply()) {
-            return PlaybackTargetResult.NOT_READY
+        return when {
+            !targetCommands.isOpen() -> PlaybackTargetResult.SHUT_DOWN
+            profileOwner.serverProfile.value !== profile || profileOwner.audioProfileId != profileId || !canApply() ->
+                PlaybackTargetResult.NOT_READY
+            else -> {
+                selection.useProfile(profile, player)
+                selection.load(channelId, stored)
+                null
+            }
         }
-        selection.useProfile(profile, player)
-        selection.load(channelId, stored)
-        return null
     }
 
     fun activateAfterInstallLocked() {

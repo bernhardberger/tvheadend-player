@@ -77,13 +77,15 @@ class SessionAudioSelection {
                 candidate.roleFlags == choice.roleFlags
         }.singleOrNull()
         if (match == null) {
-            val current = player.trackSelectionParameters.overrides.values.singleOrNull { it.type == C.TRACK_TYPE_AUDIO }
+            val current = player.trackSelectionParameters.overrides.values.singleOrNull {
+                it.type == C.TRACK_TYPE_AUDIO
+            }
             val selected = current?.trackIndices?.singleOrNull()
-            if (selected != null && candidates.any { (group, index) ->
+            val currentMatches = selected != null && candidates.any { (group, index) ->
                     group.mediaTrackGroup === current?.mediaTrackGroup && index == selected &&
                         choice(group.getTrackFormat(index)) == choice
                 }
-            ) return
+            if (currentMatches) return
             clearOverride(player)
             return
         }

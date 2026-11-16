@@ -15,7 +15,8 @@ private val audioLanguageCodes = listOf("de", "en", "fr", "it", "es", "pt", "nl"
     "sl", "hr", "sr", "ro", "bg", "el", "tr", "ru", "uk", "sv", "da", "nb", "fi", "ar", "zh", "ja", "ko")
 
 @Composable
-internal fun languageName(code: String): String = Locale.forLanguageTag(code).getDisplayLanguage(LocalConfiguration.current.locales[0])
+internal fun languageName(code: String): String =
+    Locale.forLanguageTag(code).getDisplayLanguage(LocalConfiguration.current.locales[0])
 
 @Composable
 private fun audioLanguageTitle(slot: Int): String = stringResource(when (slot) {

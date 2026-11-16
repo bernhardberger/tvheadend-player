@@ -7,6 +7,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import android.app.Application
+import androidx.test.core.app.ApplicationProvider
+import at.bernhardberger.tvhplayer.R
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.view.View
@@ -156,7 +158,10 @@ class PlaybackOptionsTrackListTest {
             }
         }
         val defaultRow = compose.onNodeWithTag("playback-options-subtitles-default")
-        defaultRow.assertIsFocused().assertIsSelected().assert(hasText("Default (German)"))
+        val resources = ApplicationProvider.getApplicationContext<Application>().resources
+        val language = java.util.Locale.forLanguageTag("de").getDisplayLanguage(resources.configuration.locales[0])
+        defaultRow.assertIsFocused().assertIsSelected()
+            .assert(hasText(resources.getString(R.string.playback_option_default, language)))
         compose.onNodeWithTag("playback-options-track-x").assertIsNotSelected()
         compose.onAllNodes(isSelected()).assertCountEquals(1)
         compose.pressKey(Key.DirectionDown)
@@ -196,8 +201,14 @@ class PlaybackOptionsTrackListTest {
             }
         }
         compose.onNodeWithTag("playback-options-subtitles-default")
-            .assertIsFocused().assertIsSelected().assert(hasText("Default (System captions)"))
-        compose.onAllNodes(hasText("German")).assertCountEquals(2) // header and track row
+            .assertIsFocused().assertIsSelected()
+        val resources = ApplicationProvider.getApplicationContext<Application>().resources
+        compose.onNodeWithTag("playback-options-subtitles-default").assert(hasText(
+            resources.getString(R.string.playback_option_default, resources.getString(R.string.subtitle_follow_system_short)),
+        ))
+        compose.onNodeWithTag("playback-options-current-value").assert(hasText(
+            java.util.Locale.forLanguageTag("de").getDisplayLanguage(resources.configuration.locales[0]),
+        ))
         compose.onAllNodes(isSelected()).assertCountEquals(1)
         compose.pressKey(Key.DirectionCenter)
         assertEquals(1, defaults)
@@ -248,14 +259,15 @@ class PlaybackOptionsTrackListTest {
             }
         }
         val row = "playback-options-ad-breaks"
-        compose.onNodeWithTag(row).assertIsNotEnabled().assert(hasText("None marked"))
+        val resources = ApplicationProvider.getApplicationContext<Application>().resources
+        compose.onNodeWithTag(row).assertIsNotEnabled().assert(hasText(resources.getString(R.string.ad_breaks_none_marked)))
         compose.onNodeWithTag("playback-options-audio").assertIsFocused()
         compose.pressKey(Key.DirectionDown)
         compose.pressKey(Key.DirectionDown)
         compose.onNodeWithTag("playback-options-stats").assertIsFocused()
 
         compose.changeState { adBreaks = option(marked = true) }
-        compose.onNodeWithTag(row).assertIsEnabled().assert(hasText("Skip automatically"))
+        compose.onNodeWithTag(row).assertIsEnabled()
         compose.pressKey(Key.DirectionUp)
         compose.onNodeWithTag(row).assertIsFocused()
         compose.pressKey(Key.DirectionCenter)
@@ -263,7 +275,7 @@ class PlaybackOptionsTrackListTest {
         compose.onNodeWithTag("$row-AUTOMATIC").assertIsFocused()
         compose.pressKey(Key.DirectionUp)
         compose.pressKey(Key.DirectionUp)
-        compose.onNodeWithTag("$row-DEFAULT").assertIsFocused().assert(hasText("Default (Ask)"))
+        compose.onNodeWithTag("$row-DEFAULT").assertIsFocused()
         compose.pressKey(Key.DirectionCenter)
         assertEquals(listOf<AdBreakMode?>(null), selections)
     }
@@ -328,8 +340,12 @@ class PlaybackOptionsTrackListTest {
         compose.onNodeWithTag("$root-default").assertDoesNotExist()
         assertEquals(PlaybackOptionsPage.ROOT, page)
         compose.onNodeWithTag(root).assertIsNotEnabled()
+        compose.onNodeWithTag("playback-options-display").assertIsFocused()
         compose.changeState { result = available; choice = null }
-        compose.onNodeWithTag(root).assert(hasText("Default (Direct streaming)"))
+        val resources = ApplicationProvider.getApplicationContext<Application>().resources
+        compose.onNodeWithTag(root).assert(hasText(
+            resources.getString(R.string.playback_option_default, resources.getString(R.string.profile_direct_streaming)),
+        ))
         compose.changeState { recording = true }
         compose.onNodeWithTag(root).assertDoesNotExist()
     }

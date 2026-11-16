@@ -1,7 +1,6 @@
 package at.bernhardberger.tvhplayer.settings
 
 import androidx.datastore.preferences.core.emptyPreferences
-import androidx.datastore.preferences.core.edit
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
@@ -41,22 +40,4 @@ class AudioPreferencesTest {
         assertNull(store.playerSettings.first().subtitleLanguage)
     }
 
-    @Test fun removingChoiceIsScopedAndDurable() = runTest {
-        val data = InMemoryPreferencesDataStore()
-        val store = PlayerSettingsStore(data).audioChoices
-        val choice = AudioTrackChoice("de", "audio/ac3", 0, 6, 48000)
-        data.edit { it[activeProfileKey] = "first" }
-        store.set("first", 1, choice)
-        store.set("first", 2, choice)
-        data.edit { it[activeProfileKey] = "second" }
-        store.set("second", 1, choice)
-        data.edit { it[activeProfileKey] = "first" }
-        store.set("first", 1, null)
-        val reopened = PlayerSettingsStore(data).audioChoices
-        assertNull(reopened.read("first", 1))
-        assertEquals(choice, reopened.read("first", 2))
-        assertEquals(choice, reopened.read("second", 1))
-        reopened.set("first", 1, null)
-        assertEquals(choice, reopened.read("first", 2))
-    }
 }

@@ -85,9 +85,13 @@ internal fun rememberTargetAspect(
         { mode: AspectRatioMode ->
             if (target != null) {
                 scope.launch {
-                    val stored = channel != null && store.channelAspects.set(
-                        profile, channel.value, mode.takeUnless { it == AspectRatioMode.FIT },
-                    )
+                    val stored = try {
+                        channel != null && store.channelAspects.set(
+                            profile, channel.value, mode.takeUnless { it == AspectRatioMode.FIT },
+                        )
+                    } catch (_: java.io.IOException) {
+                        false
+                    }
                     unsaved = if (stored) null else mode
                 }
             }

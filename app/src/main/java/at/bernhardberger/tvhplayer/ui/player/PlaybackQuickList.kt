@@ -105,15 +105,13 @@ internal fun restoreQuickListStart(
         if (C.TRACK_TYPE_TEXT in current.disabledTrackTypes ||
             current.overrides.values.any { it.type == C.TRACK_TYPE_TEXT }
         ) onDefaultSubtitles()
-        return
-    }
-    if (
+    } else if (
         trackType == C.TRACK_TYPE_AUDIO &&
         start.overrides.values.none { it.type == C.TRACK_TYPE_AUDIO }
     ) {
         if (current.overrides.values.any { it.type == C.TRACK_TYPE_AUDIO }) onAutomaticAudio()
-        return
+    } else {
+        val restored = restoredTrackSelection(current, start, trackType)
+        if (restored != current) player.trackSelectionParameters = restored
     }
-    val restored = restoredTrackSelection(current, start, trackType)
-    if (restored != current) player.trackSelectionParameters = restored
 }

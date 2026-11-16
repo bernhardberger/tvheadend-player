@@ -13,6 +13,7 @@ import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.DecoderCounters
 import androidx.media3.exoplayer.ExoPlayer
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.StreamProfileId
 import at.bernhardberger.tvheadend.sdk.core.StreamProfilesResult
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
@@ -892,7 +893,6 @@ class AppPlaybackRuntime(
                 }
             },
             onFailed = { targetResult ->
-                if (healthyActiveTarget() == null) installedLiveStreamProfileId = streamProfileId
                 publishTargetFailure(
                     expectedPresentationEpoch = expectedPresentationEpoch,
                     reason = AppPlaybackFailureReason.OTHER,
@@ -1609,15 +1609,11 @@ class AppPlaybackRuntime(
         val request = playbackRequests.get()
         return scope.launch {
             val result = targetCommands.serialize(onClosed = { null }) {
-                fun current() = lastLiveChannelId == channelId && request == playbackRequests.get() &&
-                    currentSession != null &&
-                    currentSession === session.observation.value.currentSession &&
-                    profile == profileOwner.audioProfileId && targetEpoch == activeTargetEpoch &&
-                    presentation == presentationEpoch.snapshot() && !targetInstallationInProgress
+                fun current() = channelStreamProfileRequestCurrent(
+                    channelId, request, currentSession, profile, targetEpoch, presentation,
+                )
                 if (!current()) return@serialize null
-                if (id != null && (profileOwner.streamProfiles.value as? StreamProfilesResult.Available)
-                        ?.profiles?.none { it.id == id } != false
-                ) return@serialize null
+                if (!channelStreamProfileAvailable(id)) return@serialize null
                 try {
                     if (!settings.channelStreamProfiles.set(profile, channelId.value, id?.value)) return@serialize null
                 } catch (_: java.io.IOException) {
@@ -1625,18 +1621,39 @@ class AppPlaybackRuntime(
                 }
                 val effective = profileOwner.selectedStreamProfileIdFor(currentSession!!, channelId)
                 if (!current()) return@serialize null
-                val live = livePlaybackObservation.value as? LivePlaybackObservation.Active
                 // A rejected zap can keep a healthy predecessor, including its Playing state.
                 // lastLiveChannelId still names the viewer's requested channel, not that target.
-                val unavailable = _activeTarget.value != AppPlaybackTarget.Live(channelId) ||
-                    state.value is AppPlaybackState.Failed || healthyActiveTarget() == null ||
-                    live?.serverStopped == true || live?.subscriptionIssue != null
-                if (!unavailable && effective == installedLiveStreamProfileId) return@serialize null
+                if (!channelStreamProfileUnavailable(channelId) && effective == installedLiveStreamProfileId) {
+                    return@serialize null
+                }
                 // A viewer choice is a fresh live start, including recovery from a bad profile.
                 retryLiveCommandLocked(playbackRequests.incrementAndGet(), viewerRetry = true)
             }
             onResult(result)
         }
+    }
+
+    private fun channelStreamProfileRequestCurrent(
+        channelId: ChannelId,
+        request: Long,
+        currentSession: CurrentSessionObservation?,
+        profile: String?,
+        targetEpoch: Long?,
+        presentation: Long,
+    ): Boolean = lastLiveChannelId == channelId && request == playbackRequests.get() &&
+        currentSession != null && currentSession === session.observation.value.currentSession &&
+        profile == profileOwner.audioProfileId && targetEpoch == activeTargetEpoch &&
+        presentation == presentationEpoch.snapshot() && !targetInstallationInProgress
+
+    private fun channelStreamProfileAvailable(id: StreamProfileId?): Boolean =
+        id == null || (profileOwner.streamProfiles.value as? StreamProfilesResult.Available)
+            ?.profiles?.none { it.id == id } == false
+
+    private fun channelStreamProfileUnavailable(channelId: ChannelId): Boolean {
+        val live = livePlaybackObservation.value as? LivePlaybackObservation.Active
+        return _activeTarget.value != AppPlaybackTarget.Live(channelId) ||
+            state.value is AppPlaybackState.Failed || healthyActiveTarget() == null ||
+            live?.serverStopped == true || live?.subscriptionIssue != null
     }
 
     val streamProfiles = profileOwner.streamProfiles

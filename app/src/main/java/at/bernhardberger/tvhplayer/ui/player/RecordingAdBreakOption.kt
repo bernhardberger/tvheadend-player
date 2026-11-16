@@ -39,7 +39,13 @@ internal fun rememberRecordingAdBreakOption(
     val profile = choices?.profile
     val select = remember(store, scope, profile, recording) {
         { mode: AdBreakMode? ->
-            scope.launch { store.recordingAdBreaks.set(profile, recording.value, mode) }
+            scope.launch {
+                try {
+                    store.recordingAdBreaks.set(profile, recording.value, mode)
+                } catch (_: java.io.IOException) {
+                    // Keep the previous choice when persistence is unavailable.
+                }
+            }
             Unit
         }
     }

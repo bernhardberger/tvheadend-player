@@ -7,11 +7,13 @@ import androidx.media3.common.TrackSelectionOverride
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.settings.SubtitleChoice
 
+private const val MAX_SUBTITLE_CHOICES = 64
+
+private fun choice(format: Format) =
+    SubtitleChoice.Track(format.language, format.sampleMimeType, format.roleFlags)
+
 /** Explicit live-channel choices; recordings keep only their current player parameters. */
 internal class SessionSubtitleSelection {
-    private fun choice(format: Format) =
-        SubtitleChoice.Track(format.language, format.sampleMimeType, format.roleFlags)
-
     private var profile: Any? = null
     private var channel: ChannelId? = null
     private val choices = LinkedHashMap<ChannelId, SubtitleChoice>()
@@ -20,7 +22,7 @@ internal class SessionSubtitleSelection {
     fun load(channelId: ChannelId, choice: SubtitleChoice?) {
         choices.remove(channelId)
         if (choice != null) choices[channelId] = choice
-        if (choices.size > 64) choices.remove(choices.keys.first())
+        if (choices.size > MAX_SUBTITLE_CHOICES) choices.remove(choices.keys.first())
     }
 
     fun useProfile(currentProfile: Any?, player: Player) {
@@ -42,60 +44,44 @@ internal class SessionSubtitleSelection {
     }
 
     fun rememberExplicitChoice(player: Player): Pair<ChannelId, SubtitleChoice>? {
-        val currentChannel = channel ?: return null
-        if (profile == null || restoring) return null
+        val currentChannel = channel
+        if (currentChannel == null || profile == null || restoring) return null
+        val selected = explicitChoice(player)
+        return if (selected != null && choices[currentChannel] != selected) {
+            load(currentChannel, selected)
+            currentChannel to selected
+        } else null
+    }
+
+    private fun explicitChoice(player: Player): SubtitleChoice? {
         val parameters = player.trackSelectionParameters
-        val selected = if (C.TRACK_TYPE_TEXT in parameters.disabledTrackTypes) {
-            SubtitleChoice.Off
-        } else {
-            val override = parameters.overrides.values.singleOrNull {
-                it.type == C.TRACK_TYPE_TEXT && it.trackIndices.size == 1
-            } ?: return null
-            val group = player.currentTracks.groups.singleOrNull {
+        if (C.TRACK_TYPE_TEXT in parameters.disabledTrackTypes) return SubtitleChoice.Off
+        return parameters.overrides.values.singleOrNull {
+            it.type == C.TRACK_TYPE_TEXT && it.trackIndices.size == 1
+        }?.let { override ->
+            player.currentTracks.groups.singleOrNull {
                 it.mediaTrackGroup === override.mediaTrackGroup
-            } ?: return null
-            val index = override.trackIndices.single()
-            if (index !in 0 until group.length || !group.isTrackSupported(index)) return null
-            choice(group.getTrackFormat(index))
+            }?.let { group ->
+                val index = override.trackIndices.single()
+                if (index in 0 until group.length && group.isTrackSupported(index)) {
+                    choice(group.getTrackFormat(index))
+                } else null
+            }
         }
-        if (choices[currentChannel] == selected) return null
-        load(currentChannel, selected)
-        return currentChannel to selected
     }
 
     fun restore(player: Player) {
         val saved = choices[channel] ?: return
         val parameters = player.trackSelectionParameters
-        val override = when (saved) {
-            SubtitleChoice.Off -> {
-                if (C.TRACK_TYPE_TEXT in parameters.disabledTrackTypes) return
-                null
-            }
-            is SubtitleChoice.Track -> {
-                val current = parameters.overrides.values.singleOrNull { it.type == C.TRACK_TYPE_TEXT }
-                val selected = current?.trackIndices?.singleOrNull()
-                if (C.TRACK_TYPE_TEXT !in parameters.disabledTrackTypes && selected != null &&
-                    player.currentTracks.groups.any { group ->
-                        group.type == C.TRACK_TYPE_TEXT && group.mediaTrackGroup === current?.mediaTrackGroup &&
-                            selected in 0 until group.length && group.isTrackSupported(selected) &&
-                            choice(group.getTrackFormat(selected)) == saved
-                    }
-                ) return
-                val matches = player.currentTracks.groups.flatMap { group ->
-                    if (group.type != C.TRACK_TYPE_TEXT) return@flatMap emptyList()
-                    (0 until group.length).mapNotNull { index ->
-                        if (group.isTrackSupported(index) && choice(group.getTrackFormat(index)) == saved) {
-                            group to index
-                        } else null
-                    }
-                }
-                val (group, index) = matches.singleOrNull() ?: run {
-                    reset(player)
-                    return
-                }
-                TrackSelectionOverride(group.mediaTrackGroup, listOf(index))
-            }
+        if (saved == SubtitleChoice.Off) {
+            if (C.TRACK_TYPE_TEXT !in parameters.disabledTrackTypes) applySaved(player, saved, null)
+        } else if (saved is SubtitleChoice.Track && !currentMatches(player, saved)) {
+            val override = matchingOverride(player, saved)
+            if (override == null) reset(player) else applySaved(player, saved, override)
         }
+    }
+
+    private fun applySaved(player: Player, saved: SubtitleChoice, override: TrackSelectionOverride?) {
         restoring = true
         try {
             player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
@@ -133,5 +119,31 @@ internal class SessionSubtitleSelection {
         } finally {
             restoring = false
         }
+    }
+}
+
+private fun currentMatches(player: Player, saved: SubtitleChoice.Track): Boolean {
+    val parameters = player.trackSelectionParameters
+    val current = parameters.overrides.values.singleOrNull { it.type == C.TRACK_TYPE_TEXT }
+    val selected = current?.trackIndices?.singleOrNull()
+    if (C.TRACK_TYPE_TEXT in parameters.disabledTrackTypes || selected == null) return false
+    return player.currentTracks.groups.any { group ->
+        val supported = selected in 0 until group.length && group.isTrackSupported(selected)
+        val sameGroup = group.type == C.TRACK_TYPE_TEXT && group.mediaTrackGroup === current.mediaTrackGroup
+        sameGroup && supported && choice(group.getTrackFormat(selected)) == saved
+    }
+}
+
+private fun matchingOverride(player: Player, saved: SubtitleChoice.Track): TrackSelectionOverride? {
+    val matches = player.currentTracks.groups.flatMap { group ->
+        if (group.type != C.TRACK_TYPE_TEXT) return@flatMap emptyList()
+        (0 until group.length).mapNotNull { index ->
+            if (group.isTrackSupported(index) && choice(group.getTrackFormat(index)) == saved) {
+                group to index
+            } else null
+        }
+    }
+    return matches.singleOrNull()?.let { (group, index) ->
+        TrackSelectionOverride(group.mediaTrackGroup, listOf(index))
     }
 }

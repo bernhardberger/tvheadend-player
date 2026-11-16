@@ -396,7 +396,9 @@ internal fun PlaybackOptionsSheetContent(
 ) {
     var lastRootPage by remember { mutableStateOf(PlaybackOptionsPage.AUDIO) }
     val liveStreamProfile = streamProfile.takeUnless { recording }
-    val availableRootPages = playbackOptionsCategories(adBreaks = adBreaks != null, streamProfiles = liveStreamProfile != null)
+    val availableRootPages = playbackOptionsCategories(
+        adBreaks = adBreaks != null, streamProfiles = liveStreamProfile != null,
+    )
     val profileStatus = liveStreamProfile?.let { streamProfilesStatus(it.profiles, it.connected) }
     val profileDefault = liveStreamProfile?.let {
         stringResource(R.string.playback_option_default, streamProfileLabel(it.profiles, it.setting))
@@ -407,7 +409,9 @@ internal fun PlaybackOptionsSheetContent(
         streamProfilePresentation(it.name, stringResource(R.string.profile_direct_streaming)).primaryLabel
     } ?: profileDefault
     LaunchedEffect(page, liveStreamProfile?.profiles) {
-        if (page == PlaybackOptionsPage.STREAM_PROFILE && liveStreamProfile?.profiles !is StreamProfilesResult.Available) {
+        if (page == PlaybackOptionsPage.STREAM_PROFILE &&
+            liveStreamProfile?.profiles !is StreamProfilesResult.Available
+        ) {
             onPageChange(PlaybackOptionsPage.ROOT)
         }
     }
@@ -563,7 +567,9 @@ internal fun PlaybackOptionsSheetContent(
                     currentValue = adBreaksValue.orEmpty(),
                     onBack = { onPageChange(PlaybackOptionsPage.ROOT) },
                 )
-                PlaybackOptionsPage.STREAM_PROFILE -> if (liveStreamProfile?.profiles is StreamProfilesResult.Available) StreamProfileOptionsPage(
+                PlaybackOptionsPage.STREAM_PROFILE -> if (
+                    liveStreamProfile?.profiles is StreamProfilesResult.Available
+                ) StreamProfileOptionsPage(
                     option = liveStreamProfile,
                     defaultLabel = profileDefault.orEmpty(),
                     currentValue = profileValue.orEmpty(),
@@ -662,7 +668,9 @@ private fun PlaybackOptionsRoot(
         if (audioAvailable) add(PlaybackOptionsPage.AUDIO to audioFocus)
         if (subtitlesAvailable) add(PlaybackOptionsPage.SUBTITLES to subtitlesFocus)
         add(PlaybackOptionsPage.DISPLAY to displayFocus)
-        if (streamProfileValue != null && streamProfileAvailable) add(PlaybackOptionsPage.STREAM_PROFILE to streamProfileFocus)
+        if (streamProfileValue != null && streamProfileAvailable) {
+            add(PlaybackOptionsPage.STREAM_PROFILE to streamProfileFocus)
+        }
         if (adBreaksValue != null && adBreaksAvailable) add(PlaybackOptionsPage.AD_BREAKS to adBreaksFocus)
         add(PlaybackOptionsPage.STATS to statsFocus)
     }
@@ -670,7 +678,7 @@ private fun PlaybackOptionsRoot(
     var focusedPage by remember { mutableStateOf<PlaybackOptionsPage?>(null) }
     LaunchedEffect(requesters.map { it.first }) {
         if (focusedPage == null || requesters.none { it.first == focusedPage }) {
-            val target = requesters.firstOrNull { it.first == initialPage } ?: requesters.first()
+            val target = requesters.lastOrNull { it.first.ordinal <= initialPage.ordinal } ?: requesters.first()
             androidx.compose.runtime.withFrameNanos { }
             target.second.requestFocus()
         }
@@ -717,28 +725,28 @@ private fun PlaybackOptionsRoot(
                     .containedFocus(displayFocus, orderedFocus, index = orderedFocus.indexOf(displayFocus))
                     .testTag("playback-options-display"),
             )
-            if (streamProfileValue != null) PlaybackOptionRow(
+            OptionalPlaybackOptionsRow(
+                page = PlaybackOptionsPage.STREAM_PROFILE,
                 label = stringResource(R.string.profile),
-                supportingLabel = streamProfileValue,
-                onClick = { onPageChange(PlaybackOptionsPage.STREAM_PROFILE) },
-                enabled = streamProfileAvailable,
-                showChevron = streamProfileAvailable,
+                value = streamProfileValue,
+                available = streamProfileAvailable,
+                focus = streamProfileFocus,
+                orderedFocus = orderedFocus,
+                onPageChange = onPageChange,
+                onFocused = { focusedPage = PlaybackOptionsPage.STREAM_PROFILE },
                 maxLines = 1,
-                modifier = Modifier
-                    .onFocusChanged { if (it.isFocused) focusedPage = PlaybackOptionsPage.STREAM_PROFILE }
-                    .containedFocus(streamProfileFocus, orderedFocus, orderedFocus.indexOf(streamProfileFocus))
-                    .testTag("playback-options-stream-profile"),
+                tag = "playback-options-stream-profile",
             )
-            if (adBreaksValue != null) PlaybackOptionRow(
+            OptionalPlaybackOptionsRow(
+                page = PlaybackOptionsPage.AD_BREAKS,
                 label = stringResource(R.string.ad_breaks_setting),
-                supportingLabel = adBreaksValue,
-                onClick = { onPageChange(PlaybackOptionsPage.AD_BREAKS) },
-                enabled = adBreaksAvailable,
-                showChevron = adBreaksAvailable,
-                modifier = Modifier
-                    .onFocusChanged { if (it.isFocused) focusedPage = PlaybackOptionsPage.AD_BREAKS }
-                    .containedFocus(adBreaksFocus, orderedFocus, index = orderedFocus.indexOf(adBreaksFocus))
-                    .testTag("playback-options-ad-breaks"),
+                value = adBreaksValue,
+                available = adBreaksAvailable,
+                focus = adBreaksFocus,
+                orderedFocus = orderedFocus,
+                onPageChange = onPageChange,
+                onFocused = { focusedPage = PlaybackOptionsPage.AD_BREAKS },
+                tag = "playback-options-ad-breaks",
             )
             PlaybackOptionRow(
                 label = stringResource(R.string.stats_for_nerds),
@@ -751,6 +759,33 @@ private fun PlaybackOptionsRoot(
                     .testTag("playback-options-stats"),
             )
     }
+}
+
+@Composable
+private fun OptionalPlaybackOptionsRow(
+    page: PlaybackOptionsPage,
+    label: String,
+    value: String?,
+    available: Boolean,
+    focus: FocusRequester,
+    orderedFocus: List<FocusRequester>,
+    onPageChange: (PlaybackOptionsPage) -> Unit,
+    onFocused: () -> Unit,
+    tag: String,
+    maxLines: Int = 2,
+) {
+    if (value != null) PlaybackOptionRow(
+        label = label,
+        supportingLabel = value,
+        onClick = { onPageChange(page) },
+        enabled = available,
+        showChevron = available,
+        maxLines = maxLines,
+        modifier = Modifier
+            .onFocusChanged { if (it.isFocused) onFocused() }
+            .containedFocus(focus, orderedFocus, index = orderedFocus.indexOf(focus))
+            .testTag(tag),
+    )
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -1312,6 +1347,7 @@ internal fun OptionsHeader(
             currentValue?.let {
                 Text(
                     text = it,
+                    modifier = Modifier.testTag("playback-options-current-value"),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = TvTextTertiaryAlpha),
                     // The narrow panel wraps a long German value at large text.

@@ -127,6 +127,24 @@ class TargetAspectTest {
         assertEquals(AspectRatioMode.FIT, mode())
     }
 
+    @Test fun aFailedWriteKeepsTheChoiceForOnlyTheCurrentPlayback() {
+        val data = InMemoryPreferencesDataStore(
+            preferencesOf(stringPreferencesKey("activeServerProfileId") to "server"),
+        )
+        val failing = object : DataStore<Preferences> by data {
+            override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences {
+                throw java.io.IOException("storage unavailable")
+            }
+        }
+        val store = PlayerSettingsStore(failing)
+        show(store)
+        choose(AspectRatioMode.FORCE_4_3)
+        assertEquals(AspectRatioMode.FORCE_4_3, mode())
+        assertEquals(AspectRatioMode.FIT, stored(store, one))
+        switchTo(AppPlaybackTarget.Live(two))
+        assertEquals(AspectRatioMode.FIT, mode())
+    }
+
     @Test fun aDelayedChoiceCannotWriteIntoAReplacementProfileOrChangeItsDisplayedMode() {
         val profileKey = stringPreferencesKey("activeServerProfileId")
         val data = InMemoryPreferencesDataStore(preferencesOf(profileKey to "original"))
