@@ -936,6 +936,7 @@
     <string name="refresh_rate_matching_setting_description">Pozwól Androidowi dopasować częstotliwość odświeżania ekranu do wideo, jeśli jest to obsługiwane.</string>
     <string name="tunneling_setting">Odtwarzanie tunelowane</string>
     <string name="tunneling_setting_description">Przesyła wideo bezpośrednio do telewizora, jeśli dekoder to obsługuje. Może na krótko przerwać obraz.</string>
+    <string name="tunneling_setting_fallback">Nieużywane do ponownego uruchomienia aplikacji. To urządzenie nie mogło odtworzyć dźwięku w tym trybie.</string>
     <string name="play">Odtwórz</string>
     <string name="play_recording">Odtwórz nagranie</string>
     <string name="status_disconnected_reconnecting">Rozłączono. Ponowne łączenie\u2026</string>

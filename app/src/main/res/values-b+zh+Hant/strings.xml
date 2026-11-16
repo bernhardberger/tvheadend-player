@@ -803,6 +803,7 @@
     <string name="refresh_rate_matching_setting_description">支援時，讓Android配合影片調整螢幕更新率。</string>
     <string name="tunneling_setting">通道式播放</string>
     <string name="tunneling_setting_description">解碼器支援時，將視訊直接傳送至電視。可能短暫中斷畫面。</string>
+    <string name="tunneling_setting_fallback">重新啟動應用程式前暫不使用。此裝置無法在此模式下播放音訊。</string>
     <string name="play">播放</string>
     <string name="play_recording">播放錄影</string>
     <string name="status_disconnected_reconnecting">連線中斷。正在重新連線\u2026</string>

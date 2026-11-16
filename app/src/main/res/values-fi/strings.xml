@@ -866,6 +866,7 @@
     <string name="refresh_rate_matching_setting_description">Anna Androidin sovittaa näytön virkistystaajuus videoon, kun sitä tuetaan.</string>
     <string name="tunneling_setting">Tunneloitu toisto</string>
     <string name="tunneling_setting_description">Lähettää videon suoraan televisioon, kun dekooderi tukee sitä. Saattaa katkaista kuvan hetkeksi.</string>
+    <string name="tunneling_setting_fallback">Ei käytössä ennen sovelluksen uudelleenkäynnistystä. Tämä laite ei pystynyt toistamaan ääntä tässä tilassa.</string>
     <string name="play">Toista</string>
     <string name="play_recording">Toista tallenne</string>
     <string name="status_disconnected_reconnecting">Yhteys katkesi. Yhdistetään uudelleen\u2026</string>

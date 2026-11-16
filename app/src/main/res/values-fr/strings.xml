@@ -901,6 +901,7 @@
     <string name="refresh_rate_matching_setting_description">Laisser Android adapter la fréquence de rafraîchissement de l’écran à la vidéo si cette fonction est prise en charge.</string>
     <string name="tunneling_setting">Lecture en tunnel</string>
     <string name="tunneling_setting_description">Envoie la vidéo directement au téléviseur si le décodeur le permet. Peut interrompre brièvement l’image.</string>
+    <string name="tunneling_setting_fallback">Non utilisée jusqu’au redémarrage de l’application. Cet appareil n’a pas pu lire le son dans ce mode.</string>
     <string name="play">Lire</string>
     <string name="play_recording">Lire l’enregistrement</string>
     <string name="status_disconnected_reconnecting">Déconnecté. Reconnexion\u2026</string>

@@ -6,6 +6,7 @@ import android.os.Handler
 import android.os.SystemClock
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
 import androidx.media3.common.TrackSelectionParameters
@@ -64,6 +65,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -209,6 +211,7 @@ class AppPlaybackRuntime(
         elapsedRealtime = elapsedRealtime,
         stallRecoveries = { stallRecoveries },
         freshDecoderPerZap = { freshDecoderPerZap },
+        tunneling = { audioTracks.tunnelingState() },
     )
     private val livePauseController = LivePauseController(
         player = player,
@@ -246,6 +249,7 @@ class AppPlaybackRuntime(
     )
     val audioPassthroughChangeFailed = audioTracks.audioPassthroughChangeFailed
     val audioAutomatic = audioTracks.audioAutomatic
+    val tunnelingFallbackActive = audioTracks.tunnelingFallbackActive
     private val subtitleTracks = PlaybackSubtitleTracks(
         player, settings, profileOwner, scope, targetCommands, _activeTarget,
         targetInstallationInProgress = { targetInstallationInProgress },
@@ -296,6 +300,7 @@ class AppPlaybackRuntime(
     /** Exact installed item, never a media-id match against an application replacement. */
     @Volatile
     private var ownedMediaItem: MediaItem? = null
+    private val tunnelingRecoveryError = MutableStateFlow<PlaybackException?>(null)
     private var departedEpoch: Long? = null
     private var bufferRecovery: LiveRecoveryFence? = null
     @Volatile
@@ -381,14 +386,21 @@ class AppPlaybackRuntime(
     val recordingSelection = _recordingSelection.asStateFlow()
     val recordingAdmission = _recordingAdmission.asStateFlow()
     @OptIn(ExperimentalTvheadendApi::class)
-    val recordingPlaybackFailure = coordinator.recordingPlaybackFailure.map { failure ->
-        failure?.let { RecordingFailureDetail(it.category, it.detail) }
+    val recordingPlaybackFailure = coordinator.recordingPlaybackFailure.combine(tunnelingRecoveryError) { _, _ ->
+        // Read both current values: a retired SDK failure must not pair with a released claim.
+        coordinator.recordingPlaybackFailure.value?.takeIf { tunnelingRecoveryError.value == null }
+            ?.let { RecordingFailureDetail(it.category, it.detail) }
     }.stateIn(scope, SharingStarted.Eagerly, null)
     val livePlaybackObservation = coordinator.livePlaybackObservation
     val diagnostics = presentation.diagnostics
     val videoPresentation = presentation.videoPresentation
 
     private val settingsJob = scope.launch {
+        launch {
+            settings.playerSettings.map { it.tunnelingEnabled }.distinctUntilChanged().collect {
+                audioTracks.observeTunnelingSetting(it)
+            }
+        }
         launch {
             settings.playerSettings.distinctUntilChanged().collect {
                 targetCommands.serialize(onClosed = {}) {
@@ -398,6 +410,7 @@ class AppPlaybackRuntime(
                     audioTracks.applyAudioPassthroughLocked(effectiveAudioPassthrough(
                         latest.audioPassthroughEnabled, audioOutputs.personalOutputConnected.value,
                     ))
+                    presentation.publishDiagnostics()
                 }
             }
         }
@@ -572,6 +585,10 @@ class AppPlaybackRuntime(
             ) {
                 publishPlayerError()
             }
+        }
+
+        override fun onPlayerError(error: PlaybackException) {
+            targetCommands.runIfOpen { recoverRefusedTunneling(error) }
         }
     }
 
@@ -1216,11 +1233,13 @@ class AppPlaybackRuntime(
         // A stall recovery replaces the very target it validated: Pause and Play still address it.
         continuesTarget: Boolean = false,
         requestedSelection: RecordingPlaybackSelection? = null,
+        canInstall: () -> Boolean = { true },
     ): PlaybackTargetResult? {
         if (!targetCommands.isOpen()) return PlaybackTargetResult.SHUT_DOWN
         val playerSettings = settings.playerSettings.first()
         val markSettings = recordingMarkSettings(playerSettings, recordingId)
         if (!targetCommands.isOpen()) return PlaybackTargetResult.SHUT_DOWN
+        if (!canInstall()) return PlaybackTargetResult.NOT_READY
         audioTracks.configureAudioOutputBeforeFirstTargetLocked(effectiveAudioPassthrough(
             playerSettings.audioPassthroughEnabled, audioOutputs.personalOutputConnected.value,
         ))
@@ -1256,6 +1275,7 @@ class AppPlaybackRuntime(
         startupBuffer?.targetInstalling(live = false)
         val result = installTargetForPresentation(
             expectedPresentationEpoch = expectedPresentationEpoch,
+            canInstall = canInstall,
             installTarget = {
                 if (!targetCommands.isOpen()) return@installTargetForPresentation PlaybackTargetResult.SHUT_DOWN
                 when (
@@ -2206,10 +2226,14 @@ class AppPlaybackRuntime(
      */
     @OptIn(ExperimentalTvheadendApi::class)
     private fun dispatchLiveRecovery(
-        reason: PlaybackRecoveryReason,
+        reason: PlaybackRecoveryReason?,
         origin: LiveRecoveryFence?,
         install: LiveInstallAttribution? = null,
     ) {
+        if (reason == null) {
+            publishPlayerError()
+            return
+        }
         val reportedEpoch = activeTargetEpoch
         liveRecovery.dispatch(
             reason = reason,
@@ -2235,13 +2259,13 @@ class AppPlaybackRuntime(
                 }
                 val attempt = liveRecovery.nextAttemptLocked()
                 if (attempt == null) {
-                    publishRecoveryExhausted(fence.reason)
+                    publishRecoveryExhausted(reason)
                     return@admit null
                 }
                 liveRecovery.admitLocked(fence)
                 presentationEpoch.publishIfCurrent(fence.targetEpoch) {
                     presentation.publishRecovering(
-                        reason = fence.reason,
+                        reason = reason,
                         retryDelayMillis = attempt.delay.inWholeMilliseconds,
                     )
                     presentation.publishDiagnostics()
@@ -2414,7 +2438,9 @@ class AppPlaybackRuntime(
         if (liveRecovery.interruptedRecovery != null) {
             liveRecovery.resumeInterruptedLocked(::retryResumedLiveRecoveryLocked) { fence ->
                 presentationEpoch.publishIfCurrent(fence.targetEpoch) {
-                    presentation.publishRecovering(reason = fence.reason, retryDelayMillis = 0L)
+                    val reason = fence.reason
+                    if (reason == null) presentation.publishStarting()
+                    else presentation.publishRecovering(reason = reason, retryDelayMillis = 0L)
                     presentation.publishDiagnostics()
                 }
             }
@@ -3068,6 +3094,7 @@ class AppPlaybackRuntime(
 
     private fun publishPlayerErrorFromPlayer() {
         val error = player.playerError ?: return
+        if (error === tunnelingRecoveryError.value || holdInterruptedTunnelingError(error)) return
         // A failed target never completes a pause pressed before its grant. A paused kept-channel
         // retune still has to fail closed, so its pending pause resolves (and stops) serialized.
         val failClosedPauseEpoch = livePauseController.onPlayerErrorUnderAccessLock()
@@ -3098,6 +3125,84 @@ class AppPlaybackRuntime(
         livePauseController.publishLivePause()
         presentation.publishDiagnosticsUnderAccessLock()
         if (failClosedPauseEpoch != null) livePauseController.launchPendingLivePauseResolution(failClosedPauseEpoch)
+    }
+
+    private fun holdInterruptedTunnelingError(error: PlaybackException): Boolean {
+        val interrupted = liveRecovery.interruptedRecovery
+        val held = interrupted != null && interrupted.reason == null && interrupted.targetEpoch == activeTargetEpoch
+        if (held) presentation.publishPlayerState(recoveryResolved = true, heldRecoveryError = error)
+        return held
+    }
+
+    private fun canFallbackFrom(error: PlaybackException): Boolean =
+        error.errorCode == PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED &&
+            player.trackSelectionParameters.tunnelingRequested && tunnelingRecoveryError.value == null &&
+            _activeTarget.value != null && activeTargetEpoch != null &&
+            session.observation.value.currentSession != null && ownedMediaItem != null &&
+            !targetInstallationInProgress && !coordinator.playerCleanupPending.value
+
+    private fun tunnelingRecoveryMatches(
+        target: AppPlaybackTarget, epoch: Long, currentSession: CurrentSessionObservation,
+        item: MediaItem, intent: Long,
+    ): Boolean = targetCommands.isOpen() && !targetInstallationInProgress &&
+        !coordinator.playerCleanupPending.value && _activeTarget.value == target &&
+        activeTargetEpoch == epoch && departedEpoch != epoch &&
+        session.observation.value.currentSession === currentSession &&
+        playbackRequests.get() == intent && !isPlaybackIntentStopped(intent) &&
+        player.currentMediaItem === item
+
+    private fun recoverRefusedTunneling(error: PlaybackException) {
+        if (!canFallbackFrom(error)) return
+        val target = checkNotNull(_activeTarget.value)
+        val epoch = checkNotNull(activeTargetEpoch)
+        val currentSession = checkNotNull(session.observation.value.currentSession)
+        val item = checkNotNull(ownedMediaItem)
+        val intent = if (target is AppPlaybackTarget.Live) servedIntent.get() else playbackRequests.get()
+        fun canRecover() = tunnelingRecoveryMatches(target, epoch, currentSession, item, intent) &&
+            !recoveryPlaybackBlocked(epoch)
+        val selection = activeLiveSelection
+        tunnelingRecoveryError.value = error
+        audioTracks.noteTunnelingRefused()
+        presentation.publishDiagnostics()
+        if (target is AppPlaybackTarget.Recording) noteRecordingInterruptionLocked()
+        if (!recoveryPlaybackBlocked(epoch)) presentation.publishStarting()
+        scope.launch {
+            try {
+                targetCommands.serialize(onClosed = {}) {
+                    if (tunnelingFallbackActive.value && canRecover()) {
+                        retryWithoutTunnelingLocked(target, epoch, intent, selection, ::canRecover)
+                    }
+                }
+            } finally {
+                tunnelingRecoveryError.value = null
+                targetCommands.runIfOpen {
+                    if (player.playerError === error && _activeTarget.value == target && activeTargetEpoch == epoch) {
+                        publishPlayerErrorFromPlayer()
+                    }
+                }
+            }
+        }
+    }
+
+    private suspend fun retryWithoutTunnelingLocked(
+        target: AppPlaybackTarget, epoch: Long, intent: Long,
+        selection: LivePlaybackSelection?, canInstall: () -> Boolean,
+    ) {
+        when (target) {
+            is AppPlaybackTarget.Live -> {
+                val liveSelection = selection ?: return
+                retryLiveRecoveryLocked(LiveRecoveryFence(
+                    null, liveSelection, epoch, intent,
+                ))
+            }
+            is AppPlaybackTarget.Recording -> {
+                val request = lastRecordingRequest?.takeIf { it.first == target.recordingId } ?: return
+                playRecordingLocked(
+                    target.recordingId, request.second, recoverAt = recordingRecovery,
+                    continuesTarget = true, canInstall = canInstall,
+                )
+            }
+        }
     }
 
     /** Reports a server skip to the start-up buffer; a cancelled or failed request counts as not accepted. */

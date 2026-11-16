@@ -866,6 +866,7 @@
     <string name="refresh_rate_matching_setting_description">La Android tilpasse skjermens oppdateringsfrekvens til videoen når det støttes.</string>
     <string name="tunneling_setting">Tunnelert avspilling</string>
     <string name="tunneling_setting_description">Sender video direkte til TV-en når dekoderen støtter det. Kan avbryte bildet et øyeblikk.</string>
+    <string name="tunneling_setting_fallback">Brukes ikke før appen startes på nytt. Denne enheten kunne ikke spille av lyd i denne modusen.</string>
     <string name="play">Spill av</string>
     <string name="play_recording">Spill av opptak</string>
     <string name="status_disconnected_reconnecting">Tilkoblingen er brutt. Kobler til på nytt\u2026</string>

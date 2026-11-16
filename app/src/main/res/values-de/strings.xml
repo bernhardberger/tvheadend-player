@@ -844,6 +844,7 @@
     <string name="refresh_rate_matching_setting_description">Android darf die Bildwiederholrate des Displays an das Video anpassen, wenn dies unterstützt wird.</string>
     <string name="tunneling_setting">Tunnel-Wiedergabe</string>
     <string name="tunneling_setting_description">Leitet das Video direkt an den Fernseher, wenn der Decoder das unterstützt. Kann das Bild kurz unterbrechen.</string>
+    <string name="tunneling_setting_fallback">Wird bis zum Neustart der App nicht verwendet. Dieses Gerät konnte damit keinen Ton wiedergeben.</string>
     <string name="play">Abspielen</string>
     <string name="play_recording">Aufnahme abspielen</string>
 

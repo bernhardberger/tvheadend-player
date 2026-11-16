@@ -803,6 +803,7 @@
     <string name="refresh_rate_matching_setting_description">在支持时，让Android将显示刷新率与视频匹配。</string>
     <string name="tunneling_setting">隧道播放</string>
     <string name="tunneling_setting_description">在解码器支持时，将视频直接发送到电视。可能短暂中断画面。</string>
+    <string name="tunneling_setting_fallback">重启应用前暂不使用。此设备无法在该模式下播放音频。</string>
     <string name="play">播放</string>
     <string name="play_recording">播放录制内容</string>
     <string name="status_disconnected_reconnecting">连接已断开。正在重新连接\u2026</string>

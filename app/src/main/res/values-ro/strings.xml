@@ -901,6 +901,7 @@
     <string name="refresh_rate_matching_setting_description">Permite Android să potrivească rata de reîmprospătare a ecranului cu cea a videoclipului, când este acceptat.</string>
     <string name="tunneling_setting">Redare tunelizată</string>
     <string name="tunneling_setting_description">Trimite imaginea video direct la televizor dacă decodorul acceptă acest lucru. Poate întrerupe imaginea pentru scurt timp.</string>
+    <string name="tunneling_setting_fallback">Nu se folosește până la repornirea aplicației. Acest dispozitiv nu a putut reda sunetul în acest mod.</string>
     <string name="play">Redă</string>
     <string name="play_recording">Redă înregistrarea</string>
     <string name="status_disconnected_reconnecting">Deconectat. Reconectare\u2026</string>

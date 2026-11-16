@@ -1006,6 +1006,7 @@
     <string name="refresh_rate_matching_setting_description">يتيح لـ Android مطابقة معدل تحديث الشاشة مع الفيديو عند الدعم.</string>
     <string name="tunneling_setting">تشغيل نفقي</string>
     <string name="tunneling_setting_description">يرسل الفيديو مباشرةً إلى التلفزيون عندما يدعم مفكك الترميز ذلك. قد تنقطع الصورة للحظة.</string>
+    <string name="tunneling_setting_fallback">لا يُستخدم حتى إعادة تشغيل التطبيق. تعذّر على هذا الجهاز تشغيل الصوت بهذا الوضع.</string>
     <string name="play">تشغيل</string>
     <string name="play_recording">تشغيل التسجيل</string>
     <string name="status_disconnected_reconnecting">فُقد الاتصال. جارٍ إعادة الاتصال\u2026</string>

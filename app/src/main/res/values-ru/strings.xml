@@ -936,6 +936,7 @@
     <string name="refresh_rate_matching_setting_description">Разрешить Android подстраивать частоту обновления экрана под видео, если это поддерживается.</string>
     <string name="tunneling_setting">Туннельное воспроизведение</string>
     <string name="tunneling_setting_description">Передаёт видео прямо на телевизор, если декодер это поддерживает. Возможен краткий перерыв изображения.</string>
+    <string name="tunneling_setting_fallback">Не используется до перезапуска приложения. Это устройство не смогло воспроизвести звук в этом режиме.</string>
     <string name="play">Воспроизвести</string>
     <string name="play_recording">Воспроизвести запись</string>
     <string name="status_disconnected_reconnecting">Соединение разорвано. Повторное подключение\u2026</string>

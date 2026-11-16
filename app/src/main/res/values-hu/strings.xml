@@ -866,6 +866,7 @@
     <string name="refresh_rate_matching_setting_description">Engedélyezd, hogy az Android a videóhoz igazítsa a kijelző képfrissítési frekvenciáját, ha támogatott.</string>
     <string name="tunneling_setting">Alagutas lejátszás</string>
     <string name="tunneling_setting_description">Közvetlenül a TV-nek küldi a videót, ha a dekóder támogatja. Rövid időre megszakíthatja a képet.</string>
+    <string name="tunneling_setting_fallback">Az alkalmazás újraindításáig nincs használatban. Az eszköz ebben a módban nem tudott hangot lejátszani.</string>
     <string name="play">Lejátszás</string>
     <string name="play_recording">Felvétel lejátszása</string>
     <string name="status_disconnected_reconnecting">Kapcsolat bontva. Újracsatlakozás\u2026</string>

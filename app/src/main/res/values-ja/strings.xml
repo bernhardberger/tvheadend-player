@@ -831,6 +831,7 @@
     <string name="refresh_rate_matching_setting_description">対応している場合に、Androidがディスプレイのリフレッシュレートを映像に合わせます。</string>
     <string name="tunneling_setting">トンネル再生</string>
     <string name="tunneling_setting_description">デコーダーが対応している場合に、映像をテレビに直接送ります。映像が一時的に途切れることがあります。</string>
+    <string name="tunneling_setting_fallback">アプリを再起動するまで使用しません。この端末では、このモードで音声を再生できませんでした。</string>
     <string name="play">再生</string>
     <string name="play_recording">録画を再生</string>
     <string name="status_disconnected_reconnecting">接続が切れました。再接続中\u2026</string>

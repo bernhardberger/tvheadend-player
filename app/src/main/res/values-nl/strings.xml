@@ -866,6 +866,7 @@
     <string name="refresh_rate_matching_setting_description">Laat Android de verversingssnelheid van het scherm aanpassen aan de video als dit wordt ondersteund.</string>
     <string name="tunneling_setting">Getunneld afspelen</string>
     <string name="tunneling_setting_description">Stuurt video rechtstreeks naar de tv als de decoder dit ondersteunt. Kan het beeld kort onderbreken.</string>
+    <string name="tunneling_setting_fallback">Niet in gebruik tot de app opnieuw start. Dit apparaat kon in deze modus geen geluid afspelen.</string>
     <string name="play">Afspelen</string>
     <string name="play_recording">Opname afspelen</string>
     <string name="status_disconnected_reconnecting">Verbinding verbroken. Opnieuw verbinden\u2026</string>

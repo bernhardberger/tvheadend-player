@@ -6,6 +6,7 @@ import android.os.Handler
 import androidx.media3.common.C
 import androidx.media3.common.Format
 import androidx.media3.common.Player
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.exoplayer.DecoderCounters
 import androidx.media3.exoplayer.ExoPlayer
@@ -49,6 +50,7 @@ internal class PlaybackPresentationPublisher(
     private val elapsedRealtime: () -> Long,
     private val stallRecoveries: () -> Int,
     private val freshDecoderPerZap: () -> Boolean,
+    private val tunneling: () -> AppTunnelingState,
 ) {
     private val _state = MutableStateFlow<AppPlaybackState>(AppPlaybackState.Idle)
     val state = _state.asStateFlow()
@@ -582,9 +584,10 @@ internal class PlaybackPresentationPublisher(
         _state.value = failure
     }
 
-    fun publishPlayerState(recoveryResolved: Boolean = false) {
+    fun publishPlayerState(recoveryResolved: Boolean = false, heldRecoveryError: PlaybackException? = null) {
         targetCommands.runIfOpen {
-            if (player.playerError == null) {
+            val error = player.playerError
+            if (error == null || error === heldRecoveryError) {
                 _state.value = if (recoveryResolved) {
                     playerStateAfterRecoveryResolution(
                         currentState = _state.value,
@@ -683,6 +686,7 @@ internal class PlaybackPresentationPublisher(
             startupBuffer = startupBuffer?.inEffect?.value?.takeIf { activeTarget is AppPlaybackTarget.Live },
             stallRecoveries = stallRecoveries(),
             freshDecoderPerZap = freshDecoderPerZap(),
+            tunneling = tunneling(),
         )
     }
 
