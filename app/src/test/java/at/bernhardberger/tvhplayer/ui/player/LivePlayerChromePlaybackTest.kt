@@ -1,5 +1,6 @@
 @file:androidx.media3.common.util.UnstableApi
-@file:OptIn(at.bernhardberger.tvheadend.sdk.playback.SubscriptionInfrastructureApi::class)
+@file:OptIn(at.bernhardberger.tvheadend.sdk.playback.SubscriptionInfrastructureApi::class,
+    at.bernhardberger.tvheadend.sdk.testing.FakePlaybackApi::class)
 
 
 package at.bernhardberger.tvhplayer.ui.player
@@ -14,6 +15,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import android.app.Application
 import androidx.compose.runtime.mutableStateOf
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.compose.ui.input.key.Key
 import at.bernhardberger.tvhplayer.testutil.assertMainSettled
 import org.robolectric.annotation.GraphicsMode
@@ -807,7 +810,16 @@ class LivePlayerChromePlaybackTest : LivePlayerChromeFixture() {
     }
 
     @Test fun playerUnavailableClaimsNeitherPlayingNorLiveInTheControlsNorTheChip() {
-        screen(failing = true)
+        val settingsData = InMemoryPreferencesDataStore()
+        screen(failing = true, streamProfiles = listOf(at.bernhardberger.tvheadend.sdk.core.StreamProfile(
+            at.bernhardberger.tvheadend.sdk.core.StreamProfileId("11111111111111111111111111111111"), "htsp", "")),
+            settingsData = settingsData)
+        val profile = "33333333-3333-3333-3333-333333333333"
+        runTest { settingsData.edit { it[stringPreferencesKey("activeServerProfileId")] = profile } }
+        compose.runOnIdle {
+            at.bernhardberger.tvhplayer.settings.AppProfileOwner::class.java.getDeclaredField("audioProfileId")
+                .apply { isAccessible = true; set(profiles, profile) }
+        }
         compose.runOnIdle { statsStore.setLevel(PlayerStatsLevel.STREAM_PATH) }
         // The undecodable stream fails on the player's next timed work.
         awaitLiveSignal("centre message") { exists("player-channel-unavailable") }
@@ -825,6 +837,54 @@ class LivePlayerChromePlaybackTest : LivePlayerChromeFixture() {
         key(Key.Back)
         assertFalse(exists("player-hidden-slot"))
         assertFalse(exists("player-state"))
+        key(Key.Menu)
+        compose.onNodeWithTag("playback-options-stream-profile").performSemanticsAction(SemanticsActions.RequestFocus)
+        key(Key.DirectionCenter)
+        compose.onNodeWithTag("playback-options-stream-profile-default").assertIsFocused()
+        key(Key.DirectionCenter)
+        compose.onNodeWithTag("playback-options-stream-profile-default").assertIsFocused()
+        key(Key.Back)
+        assertTrue("Back returns to options without leaving the failed channel", exists("playback-options-stream-profile"))
+        key(Key.Back)
+
+        // A rejected zap also leaves a screen-owned failed-request presentation.
+        session.scriptLivePlaybackFailure(at.bernhardberger.tvheadend.sdk.core.PlaybackBindingResult.TargetUnavailable)
+        key(Key.ChannelUp)
+        awaitLiveSignal("the rejected channel is shown as unavailable") {
+            runtime.activeTarget.value == null && exists("player-channel-unavailable")
+        }
+        key(Key.Menu)
+        compose.onNodeWithTag("playback-options-stream-profile").performSemanticsAction(SemanticsActions.RequestFocus)
+        key(Key.DirectionCenter)
+        key(Key.DirectionCenter)
+        key(Key.Back)
+        key(Key.Back)
+        assertTrue("a failed profile retry restores the unavailable presentation", exists("player-channel-unavailable"))
+        val connection = ScriptedSubscriptionConnection().apply {
+            scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, null)))
+        }
+        val manager = createSubscriptionManager(connection, subscriptionDispatcher).apply { startAdmission() }
+        try {
+            session.scriptLivePlaybackSuccess(manager)
+            key(Key.Menu)
+            compose.onNodeWithTag("playback-options-stream-profile").performSemanticsAction(SemanticsActions.RequestFocus)
+            key(Key.DirectionCenter)
+            key(Key.DirectionCenter)
+            awaitLiveSignal("the profile retry installs the requested channel") {
+                runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(2))
+            }
+            compose.runOnIdle { forcedReady = true; playerListeners.toList().forEach {
+                it.onPlaybackStateChanged(Player.STATE_READY)
+                it.onIsPlayingChanged(true)
+            } }
+            settleFrames()
+            key(Key.Back)
+            key(Key.Back)
+            assertFalse("a successful profile retry ends the screen's failed request", exists("player-channel-unavailable"))
+            assertEquals(AppPlaybackState.Playing, runtime.state.value)
+        } finally {
+            runTest(subscriptionDispatcher) { manager.closeAndJoin() }
+        }
     }
 
     /** A server-reported issue is not a failure: the message borrows the card's live rows instead. */

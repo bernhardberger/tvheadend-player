@@ -1286,6 +1286,17 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
   remembered for that channel and connection, like its audio track, and comes
   back when exactly one track matches it. It never carries to the next
   channel or recording; a recording keeps a pick only while it plays.
+- The live player's options carry Stream profile after Display mode:
+  `Default (<the connection's profile>)`, then the server's profiles in the
+  server's order, labelled as in Settings. A pick is remembered for that
+  channel and connection and tunes the channel again at once when the profile
+  it would send changes, which drops that channel's timeshift buffer. A
+  remembered profile the server no longer lists is not sent; the channel
+  follows the connection's. While the server's profiles aren't available the
+  row is dimmed and out of the focus order and reads why, as in Settings. The
+  options, and with them this row, stay reachable on a channel that failed to
+  play, and a pick there always tunes it again, so a profile that broke a
+  channel can be taken back. The recording player has no such row.
 
 ### Context menus and dialogs (accepted 2026-10-15)
 

@@ -16,6 +16,11 @@ class PlaybackOptionsPolicyTest {
                 PlaybackOptionsPage.AD_BREAKS, PlaybackOptionsPage.STATS),
             playbackOptionsCategories(adBreaks = true),
         )
+        assertEquals(
+            listOf(PlaybackOptionsPage.AUDIO, PlaybackOptionsPage.SUBTITLES, PlaybackOptionsPage.DISPLAY,
+                PlaybackOptionsPage.STREAM_PROFILE, PlaybackOptionsPage.STATS),
+            playbackOptionsCategories(streamProfiles = true),
+        )
     }
 
     @Test

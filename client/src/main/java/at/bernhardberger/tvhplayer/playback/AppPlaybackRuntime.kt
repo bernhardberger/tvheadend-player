@@ -13,6 +13,8 @@ import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.DecoderCounters
 import androidx.media3.exoplayer.ExoPlayer
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.StreamProfileId
+import at.bernhardberger.tvheadend.sdk.core.StreamProfilesResult
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.PlaybackBinding
 import at.bernhardberger.tvheadend.sdk.core.PlaybackBindingResult
@@ -312,6 +314,7 @@ class AppPlaybackRuntime(
         var committedEpoch: Long? = null
     }
     private var lastLiveChannelId: ChannelId? = null
+    private var installedLiveStreamProfileId: StreamProfileId? = null
     private var lastRecordingRequest: Pair<DvrEntryId, RecordingPlaybackStart>? = null
     // Where the failed or lost recording target last stood; only Retry and route restoration read it.
     private var recordingRecovery: RecordingRecoveryPosition? = null
@@ -764,7 +767,7 @@ class AppPlaybackRuntime(
                 keptTarget = keptTarget,
             )
         }
-        val streamProfileId = profileOwner.selectedStreamProfileIdFor(profileSelection.currentSession)
+        val streamProfileId = profileOwner.selectedStreamProfileIdFor(profileSelection.currentSession, channelId)
         val audioResult = audioTracks.loadStoredAudioLocked(channelId) {
             recoveryFence == null || canContinueRecoveryLocked(recoveryFence)
         }
@@ -865,6 +868,7 @@ class AppPlaybackRuntime(
                         _activeTarget.value == AppPlaybackTarget.Live(selection.channelId)
                     activeTargetEpoch = epoch
                     activeLiveSelection = selection
+                    installedLiveStreamProfileId = streamProfileId
                     activeLiveProfileGeneration = profileGeneration
                     // Whichever target this is, its epoch is new: no reconnect retry owns it.
                     reconnectRecoveryEpoch = null
@@ -888,6 +892,7 @@ class AppPlaybackRuntime(
                 }
             },
             onFailed = { targetResult ->
+                if (healthyActiveTarget() == null) installedLiveStreamProfileId = streamProfileId
                 publishTargetFailure(
                     expectedPresentationEpoch = expectedPresentationEpoch,
                     reason = AppPlaybackFailureReason.OTHER,
@@ -1591,6 +1596,52 @@ class AppPlaybackRuntime(
         }
     }
 
+    /** A committed channel choice outlives its sheet, but never its target or connection. */
+    fun selectChannelStreamProfile(
+        channelId: ChannelId,
+        id: StreamProfileId?,
+        onResult: (PlaybackTargetResult?) -> Unit = {},
+    ): Job {
+        val targetEpoch = activeTargetEpoch
+        val presentation = presentationEpoch.snapshot()
+        val currentSession = session.observation.value.currentSession
+        val profile = profileOwner.audioProfileId
+        val request = playbackRequests.get()
+        return scope.launch {
+            val result = targetCommands.serialize(onClosed = { null }) {
+                fun current() = lastLiveChannelId == channelId && request == playbackRequests.get() &&
+                    currentSession != null &&
+                    currentSession === session.observation.value.currentSession &&
+                    profile == profileOwner.audioProfileId && targetEpoch == activeTargetEpoch &&
+                    presentation == presentationEpoch.snapshot() && !targetInstallationInProgress
+                if (!current()) return@serialize null
+                if (id != null && (profileOwner.streamProfiles.value as? StreamProfilesResult.Available)
+                        ?.profiles?.none { it.id == id } != false
+                ) return@serialize null
+                try {
+                    if (!settings.channelStreamProfiles.set(profile, channelId.value, id?.value)) return@serialize null
+                } catch (_: java.io.IOException) {
+                    return@serialize null
+                }
+                val effective = profileOwner.selectedStreamProfileIdFor(currentSession!!, channelId)
+                if (!current()) return@serialize null
+                val live = livePlaybackObservation.value as? LivePlaybackObservation.Active
+                // A rejected zap can keep a healthy predecessor, including its Playing state.
+                // lastLiveChannelId still names the viewer's requested channel, not that target.
+                val unavailable = _activeTarget.value != AppPlaybackTarget.Live(channelId) ||
+                    state.value is AppPlaybackState.Failed || healthyActiveTarget() == null ||
+                    live?.serverStopped == true || live?.subscriptionIssue != null
+                if (!unavailable && effective == installedLiveStreamProfileId) return@serialize null
+                // A viewer choice is a fresh live start, including recovery from a bad profile.
+                retryLiveCommandLocked(playbackRequests.incrementAndGet(), viewerRetry = true)
+            }
+            onResult(result)
+        }
+    }
+
+    val streamProfiles = profileOwner.streamProfiles
+    val selectedStreamProfileId = profileOwner.selectedStreamProfileId
+
     /**
      * Retunes the last live channel. [viewerRetry]: the viewer pressed Retry, which is a fresh
      * start: without a playable target it shows Starting at once, and once the new target
@@ -1608,9 +1659,13 @@ class AppPlaybackRuntime(
     ): PlaybackTargetResult? = targetCommands.serialize(
         onClosed = { PlaybackTargetResult.SHUT_DOWN },
     ) {
+        retryLiveCommandLocked(generation, viewerRetry)
+    }
+
+    private suspend fun retryLiveCommandLocked(generation: Long, viewerRetry: Boolean): PlaybackTargetResult? {
         // An explicit retry is a user decision, so it refills the budget an exhausted target used.
         liveRecovery.resetBackoffLocked()
-        lastLiveChannelId?.let { channelId ->
+        return lastLiveChannelId?.let { channelId ->
             val startEpoch = presentationEpoch.snapshot()
             try {
                 playLive(

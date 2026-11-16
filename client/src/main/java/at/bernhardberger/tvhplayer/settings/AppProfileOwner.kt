@@ -6,6 +6,7 @@ import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult
 import at.bernhardberger.tvheadend.sdk.android.TvheadendServerProfileStore
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileAuthenticationMode
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileReadResult
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileStore
@@ -486,15 +487,23 @@ class AppProfileOwner(
 
     suspend fun selectedStreamProfileIdFor(
         observation: CurrentSessionObservation,
+        channelId: ChannelId? = null,
     ): StreamProfileId? {
         combine(mutableSettledStreamProfilesFor, session.observation) { settledFor, current ->
             settledFor === observation || current.currentSession !== observation
         }.first { it }
+        val profile = audioProfileId
+        val channelChoice = try {
+            if (profile != null && channelId != null) playerSettings.channelStreamProfiles.read(profile, channelId.value) else null
+        } catch (_: java.io.IOException) {
+            null
+        }
         return streamMutex.withLock {
-            mutableSelectedStreamProfileId.value.takeIf {
-                availableForObservation === observation &&
-                    session.observation.value.currentSession === observation
-            }
+            if (availableForObservation !== observation ||
+                session.observation.value.currentSession !== observation || audioProfileId != profile
+            ) return@withLock null
+            (mutableStreamProfiles.value as? StreamProfilesResult.Available)?.profiles
+                ?.firstOrNull { it.id.value == channelChoice }?.id ?: mutableSelectedStreamProfileId.value
         }
     }
 

@@ -31,6 +31,7 @@ import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.isSelected
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -46,6 +47,8 @@ import androidx.media3.common.TrackGroup
 import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.Tracks
 import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
+import at.bernhardberger.tvheadend.sdk.core.*
+import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import at.bernhardberger.tvhplayer.settings.AdBreakMode
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.testutil.CaptureOutput
@@ -263,6 +266,72 @@ class PlaybackOptionsTrackListTest {
         compose.onNodeWithTag("$row-DEFAULT").assertIsFocused().assert(hasText("Default (Ask)"))
         compose.pressKey(Key.DirectionCenter)
         assertEquals(listOf<AdBreakMode?>(null), selections)
+    }
+
+    @Test fun liveStreamProfilesFollowServerOrderAndDefaultAndDisappearFromRecordings() {
+        val observation = SessionObservation.create(
+            SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
+            ChannelRepositoryState.Current(ChannelCatalog.create()),
+            EpgRepositoryState.Current(EpgSnapshot.create()),
+            DvrRepositoryState.Current(DvrSnapshot.create()),
+        )
+        val profiles = (listOf("htsp", "A long server profile name") + (3..18).map { "Profile $it" }).mapIndexed { index, name ->
+            StreamProfile(StreamProfileId((index + 1).toString().padStart(32, '0')), name, "")
+        }
+        val available = StreamProfilesResult.Available.create(profiles, requireNotNull(observation.currentSession))
+        var result by mutableStateOf<StreamProfilesResult>(StreamProfilesResult.Failed(TvheadendFailure.NOT_READY))
+        var choice by mutableStateOf<String?>(profiles[1].id.value)
+        var recording by mutableStateOf(false)
+        var page by mutableStateOf(PlaybackOptionsPage.ROOT)
+        val picks = mutableListOf<StreamProfileId?>()
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                PlaybackOptionsSheetContent(
+                    page, emptyList(), emptyList(), false, AspectRatioMode.FIT, PlayerStatsLevel.OFF,
+                    { page = it }, {}, {}, {}, {}, recording = recording,
+                    streamProfile = LiveStreamProfileOption(result, true, profiles[0].id, choice) {
+                        picks += it; choice = it?.value
+                    },
+                )
+            }
+        }
+        val root = "playback-options-stream-profile"
+        compose.onNodeWithTag(root).assertIsNotEnabled()
+        compose.pressKey(Key.DirectionDown)
+        compose.onNodeWithTag("playback-options-display").assertIsFocused()
+        compose.pressKey(Key.DirectionDown)
+        compose.onNodeWithTag("playback-options-stats").assertIsFocused()
+        compose.changeState { result = available }
+        compose.onNodeWithTag(root).assertIsEnabled().assert(hasText(profiles[1].name))
+        compose.pressKey(Key.DirectionUp)
+        compose.onNodeWithTag(root).assertIsFocused()
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("$root-${profiles[1].id.value}").assertIsFocused().assertIsSelected()
+        compose.onAllNodes(isSelected()).assertCountEquals(1)
+        compose.pressKey(Key.DirectionUp)
+        compose.onNodeWithTag("$root-${profiles[0].id.value}").assertIsFocused().assert(hasText("htsp"))
+        compose.pressKey(Key.DirectionUp)
+        compose.onNodeWithTag("$root-default").assertIsFocused()
+        compose.pressKey(Key.DirectionCenter)
+        assertEquals(listOf<StreamProfileId?>(null), picks)
+        compose.onNodeWithTag("$root-default").assertIsFocused().assertIsSelected()
+        compose.onAllNodes(isSelected()).assertCountEquals(1)
+        compose.changeState { choice = profiles.last().id.value; page = PlaybackOptionsPage.ROOT }
+        compose.onNodeWithTag(root).performSemanticsAction(SemanticsActions.RequestFocus)
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("$root-${profiles.last().id.value}").assertIsFocused().assertIsSelected()
+        compose.pressKey(Key.DirectionDown)
+        compose.onNodeWithTag("$root-${profiles.last().id.value}").assertIsFocused()
+        compose.pressKey(Key.DirectionUp)
+        compose.onNodeWithTag("$root-${profiles[profiles.lastIndex - 1].id.value}").assertIsFocused()
+        compose.changeState { result = StreamProfilesResult.Failed(TvheadendFailure.NOT_READY) }
+        compose.onNodeWithTag("$root-default").assertDoesNotExist()
+        assertEquals(PlaybackOptionsPage.ROOT, page)
+        compose.onNodeWithTag(root).assertIsNotEnabled()
+        compose.changeState { result = available; choice = null }
+        compose.onNodeWithTag(root).assert(hasText("Default (Direct streaming)"))
+        compose.changeState { recording = true }
+        compose.onNodeWithTag(root).assertDoesNotExist()
     }
 
     private var chosen: String? = null

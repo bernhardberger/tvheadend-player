@@ -8,6 +8,7 @@ enum class PlaybackOptionsPage {
     AUDIO,
     SUBTITLES,
     DISPLAY,
+    STREAM_PROFILE,
 
     /** A recording's own ad-break handling; the live player has no such page. */
     AD_BREAKS,
@@ -78,10 +79,11 @@ fun playbackQuickListOffered(page: PlaybackOptionsPage, trackCount: Int): Boolea
 }
 
 /** The root's pages in row order; [adBreaks] adds the recording player's ad-break page. */
-fun playbackOptionsCategories(adBreaks: Boolean = false): List<PlaybackOptionsPage> = buildList {
+fun playbackOptionsCategories(adBreaks: Boolean = false, streamProfiles: Boolean = false): List<PlaybackOptionsPage> = buildList {
     add(PlaybackOptionsPage.AUDIO)
     add(PlaybackOptionsPage.SUBTITLES)
     add(PlaybackOptionsPage.DISPLAY)
+    if (streamProfiles) add(PlaybackOptionsPage.STREAM_PROFILE)
     if (adBreaks) add(PlaybackOptionsPage.AD_BREAKS)
     add(PlaybackOptionsPage.STATS)
 }

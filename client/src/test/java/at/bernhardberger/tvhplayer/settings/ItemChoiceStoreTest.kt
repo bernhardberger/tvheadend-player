@@ -35,6 +35,11 @@ class ItemChoiceStoreTest {
             selectProfile(first).also {
                 store(first).set(it, 5, AdBreakMode.OFF)
                 PlayerSettingsStore(first).subtitleChoices.set(it, 1, SubtitleChoice.Off)
+                PlayerSettingsStore(first).channelStreamProfiles.set(it, 1, "11111111111111111111111111111111")
+                val streamProfiles = requireNotNull(first.data.first()[stringPreferencesKey("channel_stream_profiles_v1")])
+                assertTrue("the standard profile field holds the connection identity", streamProfiles.contains("\"profile\":\"$it\""))
+                assertTrue(streamProfiles.contains("\"streamProfile\":\"11111111111111111111111111111111\""))
+                assertFalse(streamProfiles.contains("\"connection\":"))
                 PlayerSettingsStore(first).subtitleChoices.set(it, 2, SubtitleChoice.Track("en", "application/dvbsubs", 0))
                 val stored = requireNotNull(first.data.first()[stringPreferencesKey("channel_subtitle_choices_v1")])
                 assertTrue(stored.contains("\"type\":\"off\""))
@@ -50,6 +55,7 @@ class ItemChoiceStoreTest {
         )
         try {
             assertEquals(AdBreakMode.OFF, store(second).read(profile, 5))
+            assertEquals("11111111111111111111111111111111", PlayerSettingsStore(second).channelStreamProfiles.read(profile, 1))
             val subtitles = PlayerSettingsStore(second).subtitleChoices
             assertEquals(SubtitleChoice.Off, subtitles.read(profile, 1))
             assertEquals(SubtitleChoice.Track("en", "application/dvbsubs", 0), subtitles.read(profile, 2))
@@ -138,16 +144,20 @@ class ItemChoiceStoreTest {
         val settings = PlayerSettingsStore(data)
         settings.recordingAdBreaks.set(original, 7, AdBreakMode.OFF)
         settings.subtitleChoices.set(original, 1, SubtitleChoice.Off)
+        settings.channelStreamProfiles.set(original, 1, "original")
         settings.useProfile(replacementId)
         settings.recordingAdBreaks.set(replacement, 7, AdBreakMode.AUTOMATIC)
         settings.subtitleChoices.set(replacement, 1, SubtitleChoice.Track("en", "text/vtt", 0))
+        settings.channelStreamProfiles.set(replacement, 1, "replacement")
         assertEquals(AdBreakMode.AUTOMATIC, settings.recordingAdBreaks.choices.first()[7])
         settings.removeProfile(replacementId)
         assertNull("removed with its server", settings.recordingAdBreaks.choices.first()[7])
         assertNull("subtitles removed with their server", settings.subtitleChoices.read(replacement, 1))
+        assertNull(settings.channelStreamProfiles.read(replacement, 1))
         data.edit { it[activeProfileKey] = original }
         assertEquals(AdBreakMode.OFF, settings.recordingAdBreaks.choices.first()[7])
         assertEquals(SubtitleChoice.Off, settings.subtitleChoices.read(original, 1))
+        assertEquals("original", settings.channelStreamProfiles.read(original, 1))
     }
 
     @Test

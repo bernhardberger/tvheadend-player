@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.serializer
 
 @Serializable enum class AspectRatioMode { FIT, FORCE_16_9, FORCE_4_3 }
 enum class AudioFormatPreference { AUTOMATIC, PREFER_DOLBY, PREFER_STEREO }
@@ -139,6 +140,9 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
     val channelAspects = ItemChoiceStore(
         dataStore, "channel_aspect_modes_v1", "channel", "mode", AspectRatioMode.serializer(), maxEntries = 256,
     )
+    val channelStreamProfiles = ItemChoiceStore(
+        dataStore, "channel_stream_profiles_v1", "channel", "streamProfile", String.serializer(), maxEntries = 256,
+    )
 
     /** A recording's own ad-break handling; a recording without an entry follows the setting. */
     val recordingAdBreaks = ItemChoiceStore(
@@ -153,6 +157,7 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
         audioChoices.removeProfile(id.value)
         subtitleChoices.removeProfile(id.value)
         channelAspects.removeProfile(id.value)
+        channelStreamProfiles.removeProfile(id.value)
         recordingAdBreaks.removeProfile(id.value)
         dataStore.edit { p ->
             p.asMap().keys.filter { it.name.startsWith(profilePreferencePrefix(id)) }.forEach { p.remove(it) }

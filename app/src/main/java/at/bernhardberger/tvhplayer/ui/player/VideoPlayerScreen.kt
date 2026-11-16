@@ -163,6 +163,7 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.ensureActive
@@ -378,6 +379,11 @@ fun VideoPlayerScreen(
 ) {
     val scope = rememberCoroutineScope()
     val playerSettings by playerSettingsStore.playerSettings.collectAsStateWithLifecycle(PlayerSettings())
+    val channelStreamProfiles = remember(playerSettingsStore) {
+        playerSettingsStore.channelStreamProfiles.choices.catch { if (it !is java.io.IOException) throw it }
+    }.collectAsStateWithLifecycle(null).value
+    val streamProfiles by playbackRuntime.streamProfiles.collectAsStateWithLifecycle()
+    val selectedStreamProfile by playbackRuntime.selectedStreamProfileId.collectAsStateWithLifecycle()
     val statsLevel by statsStore.level.collectAsStateWithLifecycle()
     val layerState = rememberLivePlayerLayerState()
     val playerClose = rememberPlayerClose(onClose)
@@ -1349,12 +1355,17 @@ fun VideoPlayerScreen(
      * session lacks keeps it. A retune that does not start gives the request its failure back
      * while that request is still the current one.
      */
-    fun retryLive(viewerRetry: Boolean) {
+    fun retryLive(
+        viewerRetry: Boolean,
+        start: ((PlaybackTargetResult?) -> Unit) -> Unit = { onResult ->
+            videoPlayerViewModel.retryLiveNow(viewerRetry, onResult)
+        },
+    ) {
         val retunesRequest = authorizedLiveSelection != null
         val cleared = requestedChannelFailed && retunesRequest
         if (cleared) requestedChannelFailed = false
         val request = liveRequestToken
-        videoPlayerViewModel.retryLiveNow(viewerRetry) { result ->
+        start { result ->
             liveRetryRequestFailure(retunesRequest, cleared, result, request == liveRequestToken)
                 ?.let { requestedChannelFailed = it }
         }
@@ -2022,6 +2033,17 @@ fun VideoPlayerScreen(
                 onDefaultSubtitles = { playbackRuntime.useDefaultSubtitles() },
                 onSubtitleSelection = { override, off, epoch -> playbackRuntime.selectSubtitles(override, off, epoch) },
                 subtitleLanguage = playerSettings.subtitleLanguage,
+                streamProfile = LiveStreamProfileOption(
+                    profiles = streamProfiles,
+                    connected = observation.currentSession != null,
+                    setting = selectedStreamProfile,
+                    choice = channelStreamProfiles?.get(currentChannelId?.value),
+                    select = { id ->
+                        retryLive(viewerRetry = true) { onResult ->
+                            playbackRuntime.selectChannelStreamProfile(currentChannelId, id, onResult)
+                        }
+                    },
+                ),
                 tracksResolving =
                     playbackState is AppPlaybackState.Starting ||
                         playbackState is AppPlaybackState.Recovering,

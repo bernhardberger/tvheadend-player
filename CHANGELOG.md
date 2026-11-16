@@ -4,8 +4,10 @@
 
 ### Playback
 
+- A channel can have its own stream profile: *Stream profile* in the live player's options lists the server's profiles, and the one you pick is used every time you tune that channel. *Default* follows the profile under Settings → Playback again. Picking a profile tunes the channel again, so what you paused or could rewind to is gone (#38).
 - A subtitle track, or *Off*, picked on a channel comes back the next time you watch that channel, the same way its audio track does. *Default* at the top of the list follows the Subtitles setting again (#38).
 - Turning subtitles off on one channel no longer turns them off on every channel and recording that follows.
+- On a channel with two audio tracks of the same language and format, the one you pick stays selected instead of switching back.
 
 ### Recordings
 

@@ -11,6 +11,7 @@ import kotlin.coroutines.ContinuationInterceptor
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.test.*
 import org.junit.Assert.*
 import org.junit.Test
@@ -51,29 +52,46 @@ class AppProfileDiscoveryTest {
     }
 
     @Test fun selectedProfileReadWaitsForCurrentDiscoveryToSettle() = runTest {
+        val channelProfile = StreamProfileId("22222222222222222222222222222222")
         val started = CompletableDeferred<Unit>()
         val release = CompletableDeferred<Unit>()
         val observations = FakeSessionObservation(currentObservation("server"))
         val session = discoverySession(observations) { currentSession ->
             started.complete(Unit)
             release.await()
-            available(streamId, currentSession)
+            StreamProfilesResult.Available.create(
+                listOf(StreamProfile(streamId, "Connection", ""), StreamProfile(channelProfile, "Channel", "")),
+                currentSession,
+            )
         }
         val stored = FakeServerProfileStore()
         val id = (stored.addAnonymous("first.invalid", activate = true) as ServerProfileWriteResult.Applied).id
-        val settings = PlayerSettingsStore(InMemoryPreferencesDataStore())
+        var readsFail = false
+        val backingData = InMemoryPreferencesDataStore()
+        val settings = PlayerSettingsStore(object : DataStore<Preferences> by backingData {
+            override val data = flow {
+                if (readsFail) throw java.io.IOException("choice read unavailable")
+                emitAll(backingData.data)
+            }
+        })
         settings.useProfile(id)
         settings.setStreamProfile(streamId)
+        settings.channelStreamProfiles.set(id.value, 1, channelProfile.value)
         val owner = AppProfileOwner(session, stored, settings, StandardTestDispatcher(testScheduler), { ServerProfileEditReadResult.Missing })
         backgroundScope.launch { owner.run() }
         runCurrent()
         started.await()
-        val selected = async { owner.selectedStreamProfileIdFor(checkNotNull(observations.observation.value.currentSession)) }
+        val selected = async { owner.selectedStreamProfileIdFor(checkNotNull(observations.observation.value.currentSession), ChannelId(1)) }
         runCurrent()
         assertFalse(selected.isCompleted)
         release.complete(Unit)
         runCurrent()
-        assertEquals(streamId, selected.await())
+        assertEquals(channelProfile, selected.await())
+        assertEquals(streamId, owner.selectedStreamProfileId.value)
+        readsFail = true
+        assertEquals(streamId, owner.selectedStreamProfileIdFor(checkNotNull(observations.observation.value.currentSession), ChannelId(1)))
+        readsFail = false
+        assertEquals(channelProfile.value, settings.channelStreamProfiles.read(id.value, 1))
     }
 
     @Test fun selectedProfileReadSettlesWhenPersistedSelectionReadFails() = runTest {
@@ -95,7 +113,7 @@ class AppProfileDiscoveryTest {
         backgroundScope.launch { owner.run() }
         runCurrent()
         started.await()
-        val selected = async { owner.selectedStreamProfileIdFor(current) }
+        val selected = async { owner.selectedStreamProfileIdFor(current, ChannelId(1)) }
         runCurrent()
         assertFalse(selected.isCompleted)
         release.complete(Unit)
@@ -121,7 +139,7 @@ class AppProfileDiscoveryTest {
         backgroundScope.launch { owner.run() }
         runCurrent()
         started.await()
-        val selected = async { owner.selectedStreamProfileIdFor(current) }
+        val selected = async { owner.selectedStreamProfileIdFor(current, ChannelId(1)) }
         runCurrent()
         assertFalse(selected.isCompleted)
         observations.retire(SessionObservation.create(sessionState = SessionState.Disconnected))

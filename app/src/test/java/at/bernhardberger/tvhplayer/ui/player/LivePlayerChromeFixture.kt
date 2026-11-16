@@ -201,6 +201,8 @@ abstract class LivePlayerChromeFixture {
     /** The player reports READY and playing, as when the tune's stream has started. */
     protected var forcedReady = false
 
+    protected lateinit var profiles: AppProfileOwner
+
     /** Tracks the player reports, for services the fake stream never describes. */
     protected var forcedTracks: Tracks? = null
 
@@ -861,6 +863,7 @@ abstract class LivePlayerChromeFixture {
         onStartupOutcome: (MainStartupPlaybackOutcome) -> Unit = {},
         scheduleCompletion: CompletableDeferred<Unit>? = null,
         workDispatcher: CoroutineDispatcher = subscriptionDispatcher,
+        streamProfiles: List<at.bernhardberger.tvheadend.sdk.core.StreamProfile>? = null,
     ) {
         val now = System.currentTimeMillis() / 1_000L
         session = FakeTvheadendSession(observation(now, if (!epg) emptyList() else listOf(
@@ -877,6 +880,7 @@ abstract class LivePlayerChromeFixture {
             if (opener != null) scriptLivePlaybackSuccess(opener)
             else if (failing) scriptLivePlaybackSuccess()
             else scriptLivePlaybackSuccess(SubscriptionOpener { _, _, _ -> awaitCancellation() })
+            streamProfiles?.let { scriptStreamProfiles(it) }
         }
         val settings = PlayerSettingsStore(settingsData)
         val uiSettings = at.bernhardberger.tvhplayer.settings.UiSettingsStore(InMemoryPreferencesDataStore())
@@ -891,7 +895,7 @@ abstract class LivePlayerChromeFixture {
                 }
             }
         }
-        val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.Main.immediate,
+        profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.Main.immediate,
             readProfileForEditing = { ServerProfileEditReadResult.Missing })
         scope.launch { profiles.run() }
         val channels = ChannelsViewModel(session, ChannelTagSettingsStore(InMemoryPreferencesDataStore()), profiles.liveProfile)

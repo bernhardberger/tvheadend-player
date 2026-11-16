@@ -104,6 +104,11 @@ import at.bernhardberger.tvhplayer.ui.TvTextSecondaryAlpha
 import at.bernhardberger.tvhplayer.ui.TvTextTertiaryAlpha
 import at.bernhardberger.tvhplayer.ui.screens.settings.adBreakModeLabel
 import at.bernhardberger.tvhplayer.ui.screens.settings.languageName
+import at.bernhardberger.tvhplayer.ui.screens.settings.streamProfileLabel
+import at.bernhardberger.tvhplayer.ui.screens.settings.streamProfilesStatus
+import at.bernhardberger.tvhplayer.core.streamProfilePresentation
+import at.bernhardberger.tvheadend.sdk.core.StreamProfileId
+import at.bernhardberger.tvheadend.sdk.core.StreamProfilesResult
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 
@@ -114,6 +119,14 @@ internal data class PlaybackOptionTrack(
     val selected: Boolean = false,
     val headline: String = label,
     val overline: String? = null,
+)
+
+internal data class LiveStreamProfileOption(
+    val profiles: StreamProfilesResult,
+    val connected: Boolean,
+    val setting: StreamProfileId?,
+    val choice: String?,
+    val select: (StreamProfileId?) -> Unit,
 )
 
 /**
@@ -143,6 +156,7 @@ internal fun PlaybackOptionsSheet(
     onDefaultSubtitles: () -> Unit = {},
     subtitleLanguage: String? = null,
     onSubtitleSelection: ((androidx.media3.common.TrackSelectionOverride?, Boolean, Long?) -> Unit)? = null,
+    streamProfile: LiveStreamProfileOption? = null,
 ) {
     // What the quick list of this page restores on Back: the selection it opened with.
     val quickListStart = remember(page, quickList != null) { player.trackSelectionParameters }
@@ -260,6 +274,7 @@ internal fun PlaybackOptionsSheet(
         },
         recording = recording,
         adBreaks = adBreaks,
+        streamProfile = streamProfile,
     )
 }
 
@@ -377,9 +392,25 @@ internal fun PlaybackOptionsSheetContent(
     onDefaultSubtitles: () -> Unit = {},
     subtitleLanguage: String? = null,
     subtitleSelectedKey: String? = subtitleTracks.firstOrNull(PlaybackOptionTrack::selected)?.key,
+    streamProfile: LiveStreamProfileOption? = null,
 ) {
     var lastRootPage by remember { mutableStateOf(PlaybackOptionsPage.AUDIO) }
-    val availableRootPages = playbackOptionsCategories(adBreaks = adBreaks != null)
+    val liveStreamProfile = streamProfile.takeUnless { recording }
+    val availableRootPages = playbackOptionsCategories(adBreaks = adBreaks != null, streamProfiles = liveStreamProfile != null)
+    val profileStatus = liveStreamProfile?.let { streamProfilesStatus(it.profiles, it.connected) }
+    val profileDefault = liveStreamProfile?.let {
+        stringResource(R.string.playback_option_default, streamProfileLabel(it.profiles, it.setting))
+    }
+    val profileChoice = (liveStreamProfile?.profiles as? StreamProfilesResult.Available)?.profiles
+        ?.firstOrNull { it.id.value == liveStreamProfile.choice }
+    val profileValue = profileStatus ?: profileChoice?.let {
+        streamProfilePresentation(it.name, stringResource(R.string.profile_direct_streaming)).primaryLabel
+    } ?: profileDefault
+    LaunchedEffect(page, liveStreamProfile?.profiles) {
+        if (page == PlaybackOptionsPage.STREAM_PROFILE && liveStreamProfile?.profiles !is StreamProfilesResult.Available) {
+            onPageChange(PlaybackOptionsPage.ROOT)
+        }
+    }
     val rootRestorePage = lastRootPage.takeIf(availableRootPages::contains)
         ?: availableRootPages.first()
     val loadingLabel = stringResource(R.string.playback_tracks_loading)
@@ -432,6 +463,7 @@ internal fun PlaybackOptionsSheetContent(
                 if (quickList != null) R.string.audio_quick_list else R.string.audio_track
             PlaybackOptionsPage.SUBTITLES -> R.string.subtitles
             PlaybackOptionsPage.DISPLAY -> R.string.display_mode
+            PlaybackOptionsPage.STREAM_PROFILE -> R.string.profile
             PlaybackOptionsPage.AD_BREAKS -> R.string.ad_breaks_setting
             PlaybackOptionsPage.STATS -> R.string.stats_for_nerds
         }
@@ -465,6 +497,8 @@ internal fun PlaybackOptionsSheetContent(
                     audioValue = audioValue,
                     subtitlesValue = subtitlesValue,
                     displayValue = displayValue,
+                    streamProfileValue = profileValue,
+                    streamProfileAvailable = profileStatus == null,
                     statsLevel = statsLevel,
                     audioAvailable = true,
                     subtitlesAvailable = subtitleTracks.isNotEmpty(),
@@ -527,6 +561,12 @@ internal fun PlaybackOptionsSheetContent(
                 PlaybackOptionsPage.AD_BREAKS -> if (adBreaks != null) AdBreakOptionsPage(
                     option = adBreaks,
                     currentValue = adBreaksValue.orEmpty(),
+                    onBack = { onPageChange(PlaybackOptionsPage.ROOT) },
+                )
+                PlaybackOptionsPage.STREAM_PROFILE -> if (liveStreamProfile?.profiles is StreamProfilesResult.Available) StreamProfileOptionsPage(
+                    option = liveStreamProfile,
+                    defaultLabel = profileDefault.orEmpty(),
+                    currentValue = profileValue.orEmpty(),
                     onBack = { onPageChange(PlaybackOptionsPage.ROOT) },
                 )
                 PlaybackOptionsPage.STATS -> StatsOptionsPage(
@@ -601,6 +641,8 @@ private fun PlaybackOptionsRoot(
     audioValue: String,
     subtitlesValue: String,
     displayValue: String,
+    streamProfileValue: String?,
+    streamProfileAvailable: Boolean,
     statsLevel: PlayerStatsLevel,
     audioAvailable: Boolean,
     subtitlesAvailable: Boolean,
@@ -613,12 +655,14 @@ private fun PlaybackOptionsRoot(
     val audioFocus = remember { FocusRequester() }
     val subtitlesFocus = remember { FocusRequester() }
     val displayFocus = remember { FocusRequester() }
+    val streamProfileFocus = remember { FocusRequester() }
     val adBreaksFocus = remember { FocusRequester() }
     val statsFocus = remember { FocusRequester() }
     val requesters = buildList {
         if (audioAvailable) add(PlaybackOptionsPage.AUDIO to audioFocus)
         if (subtitlesAvailable) add(PlaybackOptionsPage.SUBTITLES to subtitlesFocus)
         add(PlaybackOptionsPage.DISPLAY to displayFocus)
+        if (streamProfileValue != null && streamProfileAvailable) add(PlaybackOptionsPage.STREAM_PROFILE to streamProfileFocus)
         if (adBreaksValue != null && adBreaksAvailable) add(PlaybackOptionsPage.AD_BREAKS to adBreaksFocus)
         add(PlaybackOptionsPage.STATS to statsFocus)
     }
@@ -672,6 +716,18 @@ private fun PlaybackOptionsRoot(
                     .onFocusChanged { if (it.isFocused) focusedPage = PlaybackOptionsPage.DISPLAY }
                     .containedFocus(displayFocus, orderedFocus, index = orderedFocus.indexOf(displayFocus))
                     .testTag("playback-options-display"),
+            )
+            if (streamProfileValue != null) PlaybackOptionRow(
+                label = stringResource(R.string.profile),
+                supportingLabel = streamProfileValue,
+                onClick = { onPageChange(PlaybackOptionsPage.STREAM_PROFILE) },
+                enabled = streamProfileAvailable,
+                showChevron = streamProfileAvailable,
+                maxLines = 1,
+                modifier = Modifier
+                    .onFocusChanged { if (it.isFocused) focusedPage = PlaybackOptionsPage.STREAM_PROFILE }
+                    .containedFocus(streamProfileFocus, orderedFocus, orderedFocus.indexOf(streamProfileFocus))
+                    .testTag("playback-options-stream-profile"),
             )
             if (adBreaksValue != null) PlaybackOptionRow(
                 label = stringResource(R.string.ad_breaks_setting),
@@ -1071,6 +1127,53 @@ private fun DisplayOptionsPage(
     }
 }
 
+/** A channel choice follows the connection again when the viewer selects Default. */
+@Composable
+private fun ColumnScope.StreamProfileOptionsPage(
+    option: LiveStreamProfileOption,
+    defaultLabel: String,
+    currentValue: String,
+    onBack: () -> Unit,
+) {
+    val profiles = (option.profiles as? StreamProfilesResult.Available)?.profiles ?: return
+    val ids = listOf<StreamProfileId?>(null) + profiles.map { it.id }
+    val selected = profiles.firstOrNull { it.id.value == option.choice }?.id
+    val headerFocus = remember { FocusRequester() }
+    val requesters = remember(ids) { ids.map { FocusRequester() } }
+    val initialIndex = remember(ids) { ids.indexOf(selected) }
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialIndex)
+    LaunchedEffect(ids) {
+        listState.scrollToItem(initialIndex)
+        snapshotFlow { listState.layoutInfo.visibleItemsInfo.any { it.index == initialIndex } }.first { it }
+        requesters[initialIndex].requestFocus()
+    }
+    OptionsHeader(
+        title = stringResource(R.string.profile), currentValue = currentValue,
+        onBack = onBack, backFocusRequester = headerFocus,
+        downFocusRequester = requesters.first(),
+    )
+    LazyColumn(
+        state = listState,
+        modifier = Modifier.fillMaxWidth().weight(1f, fill = false).focusGroup(),
+        contentPadding = PanelRowsPadding,
+        verticalArrangement = Arrangement.spacedBy(TvSpacing8),
+    ) {
+        itemsIndexed(ids, key = { _, id -> id?.value ?: "default" }) { index, id ->
+            val presentation = profiles.firstOrNull { it.id == id }?.let {
+                streamProfilePresentation(it.name, stringResource(R.string.profile_direct_streaming))
+            }
+            PlaybackOptionRow(
+                label = presentation?.primaryLabel ?: defaultLabel,
+                supportingLabel = presentation?.secondaryLabel,
+                selected = selected == id, radio = true, maxLines = 1,
+                onClick = { option.select(id) },
+                modifier = Modifier.containedFocus(requesters[index], requesters, index, headerFocus, lazy = true)
+                    .testTag("playback-options-stream-profile-${id?.value ?: "default"}"),
+            )
+        }
+    }
+}
+
 /** The recording's own ad-break handling: the first row follows the setting again. */
 @Composable
 private fun AdBreakOptionsPage(
@@ -1237,6 +1340,7 @@ internal fun PlaybackOptionRow(
     leadingDot: Color? = null,
     leadingLabel: String? = null,
     trailingLabel: String? = null,
+    maxLines: Int = 2,
 ) {
     val endKey = optionsPageEndKey()
     ListItem(
@@ -1265,7 +1369,7 @@ internal fun PlaybackOptionRow(
                     Text(text = label, maxLines = 1, overflow = TextOverflow.Ellipsis,
                         color = color.copy(alpha = color.alpha * TvTextSecondaryAlpha))
                 }
-                else -> Text(text = label, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                else -> Text(text = label, maxLines = maxLines, overflow = TextOverflow.Ellipsis)
             }
         },
         leadingContent = leadingIcon?.let { icon ->
@@ -1278,7 +1382,7 @@ internal fun PlaybackOptionRow(
             {
                 Text(
                     text = text,
-                    maxLines = 2,
+                    maxLines = maxLines,
                     overflow = TextOverflow.Ellipsis,
                     modifier = supportingTestTag?.let(Modifier::testTag) ?: Modifier,
                 )
