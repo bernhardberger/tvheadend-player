@@ -175,14 +175,16 @@ internal fun PlaybackOptionsSheet(
         LaunchedEffect(quickList) { onQuickListClose() }
         return
     }
-    val choices = rememberPlaybackTrackChoices(player)
-    val audioChoices = choices.audio
-    val subtitleChoices = choices.subtitles
-    val audioTracks = choices.audioTracks
-    val subtitleTracks = choices.subtitleTracks
+    var tracks by remember(player) { mutableStateOf(player.currentTracks) }
     var parameters by remember(player) { mutableStateOf(player.trackSelectionParameters) }
     DisposableEffect(player) {
+        tracks = player.currentTracks
+        parameters = player.trackSelectionParameters
         val listener = object : Player.Listener {
+            override fun onTracksChanged(updatedTracks: Tracks) {
+                tracks = updatedTracks
+            }
+
             override fun onTrackSelectionParametersChanged(updated: androidx.media3.common.TrackSelectionParameters) {
                 parameters = updated
             }
@@ -190,6 +192,11 @@ internal fun PlaybackOptionsSheet(
         player.addListener(listener)
         onDispose { player.removeListener(listener) }
     }
+    val choices = rememberPlaybackTrackChoices(tracks)
+    val audioChoices = choices.audio
+    val subtitleChoices = choices.subtitles
+    val audioTracks = choices.audioTracks
+    val subtitleTracks = choices.subtitleTracks
     val textOverride = parameters.overrides.values.singleOrNull { it.type == C.TRACK_TYPE_TEXT }
 
     PlaybackOptionsSheetContent(
@@ -286,6 +293,11 @@ internal class PlaybackTrackChoices(val audio: List<UiTrack>, val subtitles: Lis
 
 @Composable
 internal fun rememberPlaybackTrackChoices(player: Player): PlaybackTrackChoices {
+    return rememberPlaybackTrackChoices(rememberPlayerTracks(player))
+}
+
+@Composable
+private fun rememberPlaybackTrackChoices(currentTracks: Tracks): PlaybackTrackChoices {
     val unknownLanguage = stringResource(R.string.track_unknown_language)
     val multipleLanguages = stringResource(R.string.track_multiple_languages)
     val mono = stringResource(R.string.track_mono)
@@ -296,7 +308,6 @@ internal fun rememberPlaybackTrackChoices(player: Player): PlaybackTrackChoices 
     val locale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
     val audioDescription = stringResource(R.string.audio_description)
     val clearDialogue = stringResource(R.string.track_clear_dialogue)
-    val currentTracks = rememberPlayerTracks(player)
     return remember(
         currentTracks,
         unknownLanguage,
