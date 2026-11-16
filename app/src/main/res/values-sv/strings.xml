@@ -865,6 +865,7 @@
     <string name="refresh_rate_matching_setting_description">Låt Android anpassa skärmens uppdateringsfrekvens till videon när det stöds.</string>
     <string name="tunneling_setting">Tunnlad uppspelning</string>
     <string name="tunneling_setting_description">Skickar video direkt till tv:n när avkodaren stöder det. Kan avbryta bilden en kort stund.</string>
+    <string name="tunneling_setting_fallback">Används inte förrän appen startas om. Den här enheten kunde inte spela upp ljud i det här läget.</string>
     <string name="play">Spela</string>
     <string name="play_recording">Spela inspelning</string>
     <string name="status_disconnected_reconnecting">Frånkopplad. Återansluter\u2026</string>

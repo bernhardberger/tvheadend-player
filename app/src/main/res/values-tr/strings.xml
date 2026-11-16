@@ -865,6 +865,7 @@
     <string name="refresh_rate_matching_setting_description">Desteklendiğinde Android, ekranın yenileme hızını videoyla eşleştirsin.</string>
     <string name="tunneling_setting">Tünelli oynatma</string>
     <string name="tunneling_setting_description">Kod çözücü desteklediğinde videoyu doğrudan TV ekranına gönderir. Görüntüyü kısa süreliğine kesebilir.</string>
+    <string name="tunneling_setting_fallback">Uygulama yeniden başlatılana kadar kullanılmaz. Bu cihaz, bu modda ses oynatamadı.</string>
     <string name="play">Oynat</string>
     <string name="play_recording">Kaydı oynat</string>
     <string name="status_disconnected_reconnecting">Bağlantı kesildi. Yeniden bağlanılıyor\u2026</string>

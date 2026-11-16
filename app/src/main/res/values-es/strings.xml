@@ -900,6 +900,7 @@
     <string name="refresh_rate_matching_setting_description">Permitir que Android ajuste la frecuencia de actualización de la pantalla al vídeo cuando sea compatible.</string>
     <string name="tunneling_setting">Reproducción por túnel</string>
     <string name="tunneling_setting_description">Envía el vídeo directamente al televisor si el decodificador lo admite. Puede interrumpir brevemente la imagen.</string>
+    <string name="tunneling_setting_fallback">No se usa hasta reiniciar la app. Este dispositivo no pudo reproducir audio en este modo.</string>
     <string name="play">Reproducir</string>
     <string name="play_recording">Reproducir grabación</string>
     <string name="status_disconnected_reconnecting">Desconectado. Reconectando\u2026</string>

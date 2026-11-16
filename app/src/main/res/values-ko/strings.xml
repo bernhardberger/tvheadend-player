@@ -830,6 +830,7 @@
     <string name="refresh_rate_matching_setting_description">지원되는 경우 Android가 화면 주사율을 동영상에 맞추도록 합니다.</string>
     <string name="tunneling_setting">터널링 재생</string>
     <string name="tunneling_setting_description">디코더가 지원하면 동영상을 TV로 직접 보냅니다. 화면이 잠시 끊길 수 있습니다.</string>
+    <string name="tunneling_setting_fallback">앱을 다시 시작할 때까지 사용하지 않습니다. 이 기기에서 이 모드로 오디오를 재생하지 못했습니다.</string>
     <string name="play">재생</string>
     <string name="play_recording">녹화 재생</string>
     <string name="status_disconnected_reconnecting">연결이 끊겼습니다. 다시 연결 중\u2026</string>

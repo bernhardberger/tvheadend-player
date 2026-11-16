@@ -865,6 +865,7 @@
     <string name="refresh_rate_matching_setting_description">Επίτρεψε στο Android να προσαρμόζει τον ρυθμό ανανέωσης της οθόνης στο βίντεο, όταν υποστηρίζεται.</string>
     <string name="tunneling_setting">Αναπαραγωγή μέσω σήραγγας</string>
     <string name="tunneling_setting_description">Στέλνει το βίντεο απευθείας στην τηλεόραση όταν το υποστηρίζει ο αποκωδικοποιητής. Μπορεί να διακόψει στιγμιαία την εικόνα.</string>
+    <string name="tunneling_setting_fallback">Δεν χρησιμοποιείται μέχρι την επανεκκίνηση της εφαρμογής. Αυτή η συσκευή δεν μπόρεσε να αναπαραγάγει ήχο σε αυτή τη λειτουργία.</string>
     <string name="play">Αναπαραγωγή</string>
     <string name="play_recording">Αναπαραγωγή εγγραφής</string>
     <string name="status_disconnected_reconnecting">Αποσυνδέθηκε. Επανασύνδεση\u2026</string>
