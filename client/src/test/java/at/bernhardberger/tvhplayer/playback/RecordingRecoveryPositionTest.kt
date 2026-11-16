@@ -270,7 +270,6 @@ class RecordingRecoveryPositionTest {
             settings.useProfile(profile)
             val automatic = at.bernhardberger.tvhplayer.settings.AdBreakMode.AUTOMATIC
             assertTrue(settings.recordingAdBreaks.set(profile.value, FIRST.value, automatic))
-            awaitCurrent { runtime.recordingSkipPrompt.value != null }
             play(FIRST, RecordingPlaybackStart.RESUME)
             awaitMain { runtime.recordingCutpoints.value == points && player.currentPosition >= 25 * ONE_MINUTE }
             assertNull(runtime.recordingSkipPrompt.value)

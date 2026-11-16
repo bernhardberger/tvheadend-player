@@ -99,10 +99,10 @@ import at.bernhardberger.tvhplayer.ui.TvSpacing16
 import at.bernhardberger.tvhplayer.ui.TvSpacing24
 import at.bernhardberger.tvhplayer.ui.TvSpacing4
 import at.bernhardberger.tvhplayer.ui.TvSpacing48
-import at.bernhardberger.tvhplayer.ui.screens.settings.adBreakModeLabel
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.TvTextSecondaryAlpha
 import at.bernhardberger.tvhplayer.ui.TvTextTertiaryAlpha
+import at.bernhardberger.tvhplayer.ui.screens.settings.adBreakModeLabel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 

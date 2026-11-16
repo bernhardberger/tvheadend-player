@@ -64,9 +64,16 @@ class ItemChoiceStoreTest {
         data.edit { it[activeProfileKey] = original }
         assertEquals(AdBreakMode.AUTOMATIC, store.choices.first()[1])
 
-        PlayerSettingsStore(data).removeProfile(replacementId)
-        data.edit { it[activeProfileKey] = replacement }
-        assertNull("removed with its server", PlayerSettingsStore(data).recordingAdBreaks.choices.first()[1])
+        // The settings store drops a removed server's recording choices and keeps the others'.
+        val settings = PlayerSettingsStore(data)
+        settings.recordingAdBreaks.set(original, 7, AdBreakMode.OFF)
+        settings.useProfile(replacementId)
+        settings.recordingAdBreaks.set(replacement, 7, AdBreakMode.AUTOMATIC)
+        assertEquals(AdBreakMode.AUTOMATIC, settings.recordingAdBreaks.choices.first()[7])
+        settings.removeProfile(replacementId)
+        assertNull("removed with its server", settings.recordingAdBreaks.choices.first()[7])
+        data.edit { it[activeProfileKey] = original }
+        assertEquals(AdBreakMode.OFF, settings.recordingAdBreaks.choices.first()[7])
     }
 
     @Test
@@ -80,6 +87,16 @@ class ItemChoiceStoreTest {
             store.set(profile, 1, AdBreakMode.OFF)
             assertEquals(unreadable, AdBreakMode.OFF, store.choices.first()[1])
         }
+        // One unreadable entry does not take the readable ones with it.
+        val data = InMemoryPreferencesDataStore()
+        val profile = selectProfile(data)
+        data.edit {
+            it[stringPreferencesKey("choices")] =
+                """[{"profile":"$profile","item":1,"value":"SOMETIMES"},{"profile":"$profile","item":2,"value":"OFF"}]"""
+        }
+        val choices = store(data).choices.first()
+        assertNull(choices[1])
+        assertEquals(AdBreakMode.OFF, choices[2])
     }
 
     @Test

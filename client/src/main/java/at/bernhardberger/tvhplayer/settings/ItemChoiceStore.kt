@@ -11,7 +11,6 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.long
@@ -88,22 +87,26 @@ class ItemChoiceStore<T : Any>(
         },
     ).toString()
 
-    /** A value this version cannot read counts as no choices; the next choice replaces it. */
+    /** An entry this version cannot read counts as no choice; the readable ones stay. */
     private fun decode(value: String?): List<Entry<T>> {
-        if (value == null) return emptyList()
-        return try {
-            Json.parseToJsonElement(value).jsonArray.map { element ->
+        val elements = try {
+            value?.let { Json.parseToJsonElement(it) as? JsonArray }
+        } catch (_: IllegalArgumentException) {
+            null
+        }
+        return elements.orEmpty().mapNotNull { element ->
+            try {
                 val fields = element.jsonObject
                 Entry(
                     fields.getValue("profile").jsonPrimitive.content,
                     fields.getValue(itemField).jsonPrimitive.long,
                     Json.decodeFromJsonElement(serializer, fields.getValue(valueField)),
                 )
+            } catch (_: IllegalArgumentException) {
+                null
+            } catch (_: NoSuchElementException) {
+                null
             }
-        } catch (_: IllegalArgumentException) {
-            emptyList()
-        } catch (_: NoSuchElementException) {
-            emptyList()
         }
     }
 }
