@@ -3,6 +3,8 @@
     at.bernhardberger.tvheadend.sdk.testing.FakePlaybackApi::class,
     at.bernhardberger.tvheadend.sdk.playback.SubscriptionInfrastructureApi::class,
     kotlinx.coroutines.ExperimentalCoroutinesApi::class,
+    at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class,
+    at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi::class,
 )
 
 package at.bernhardberger.tvhplayer.playback
@@ -43,11 +45,13 @@ class BackgroundPlaybackRuntimeTest {
         runtime.onAppBackgrounded()
         await { connection.priorityChanges == listOf(LiveSubscriptionPriority.YIELD) }
         assertFalse(player.playWhenReady)
+        assertTrue(androidx.media3.common.C.TRACK_TYPE_AUDIO in player.trackSelectionParameters.disabledTrackTypes)
         assertTrue(focus.abandons > 0)
         assertEquals(listOf(ScriptedSubscriptionCall.SPEED, ScriptedSubscriptionCall.PRIORITY), controlCalls(commands))
         scheduler.advanceTimeBy(60_000)
         runtime.onAppForegrounded()
         await { player.playWhenReady && connection.speeds == listOf(0, 100) }
+        assertFalse(androidx.media3.common.C.TRACK_TYPE_AUDIO in player.trackSelectionParameters.disabledTrackTypes)
         assertEquals(listOf(LiveSubscriptionPriority.YIELD, LiveSubscriptionPriority.NORMAL), connection.priorityChanges)
         assertEquals(listOf(ScriptedSubscriptionCall.SPEED, ScriptedSubscriptionCall.PRIORITY,
             ScriptedSubscriptionCall.PRIORITY, ScriptedSubscriptionCall.SPEED), controlCalls(commands))
@@ -69,6 +73,56 @@ class BackgroundPlaybackRuntimeTest {
         assertNotNull(runtime.activeTarget.value)
         scheduler.advanceTimeBy(60_000)
         await { runtime.activeTarget.value == null }
+    }
+
+    @Test fun recordingsReleaseTheirSourceInBackground() = exercise {
+        val install = scope.async {
+            runtime.playRecording(requireNotNull(currentRecordingPlaybackSelection(session.observation.value, RECORDING)),
+                RecordingPlaybackStart.START_OVER)
+        }
+        await { install.isCompleted }
+        runtime.onAppBackgrounded()
+        settle()
+        assertNull("background recording must release its source", player.currentMediaItem)
+        assertEquals(Player.STATE_IDLE, player.playbackState)
+    }
+
+    @Test fun keepingDoesNotEnableAnotherOwnersAudioDisable() = exercise {
+        live()
+        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+            .setTrackTypeDisabled(androidx.media3.common.C.TRACK_TYPE_AUDIO, true).build()
+        runtime.onAppBackgrounded()
+        await { connection.priorityChanges.size == 1 }
+        runtime.onAppForegrounded()
+        await { connection.priorityChanges.size == 2 }
+        assertTrue(androidx.media3.common.C.TRACK_TYPE_AUDIO in player.trackSelectionParameters.disabledTrackTypes)
+        val stop = scope.async { runtime.stop() }
+        await { stop.isCompleted }
+        assertTrue(androidx.media3.common.C.TRACK_TYPE_AUDIO in player.trackSelectionParameters.disabledTrackTypes)
+    }
+
+    @Test fun stoppedOrReplacedBackgroundRecordingNeverReopens() {
+        for ((replace, discardContinuation) in listOf(false to false, true to false, false to true)) exercise {
+            val install = scope.async {
+                runtime.playRecording(requireNotNull(currentRecordingPlaybackSelection(session.observation.value, RECORDING)),
+                    RecordingPlaybackStart.START_OVER)
+            }
+            await { install.isCompleted }
+            runtime.onAppBackgrounded()
+            settle()
+            if (replace) {
+                live(timeshift = false)
+                returnAndRetune()
+                assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+            } else {
+                val stopped = scope.async { if (discardContinuation) coordinator.stop() else runtime.stop() }
+                await { stopped.isCompleted }
+                runtime.onAppForegrounded()
+                settle()
+                assertNull("A stopped or discarded continuation must not reopen its source", player.currentMediaItem)
+                assertNull(runtime.activeTarget.value)
+            }
+        }
     }
 
     @Test fun serverPausedChannelRemainsPausedOnReturn() = exercise {
@@ -96,6 +150,7 @@ class BackgroundPlaybackRuntimeTest {
         scheduler.advanceTimeBy(1)
         await { runtime.activeTarget.value == null }
         assertEquals(1, connection.subscribeCount)
+        assertFalse(androidx.media3.common.C.TRACK_TYPE_AUDIO in player.trackSelectionParameters.disabledTrackTypes)
         await("exactly one subscription unsubscribed") { connection.unsubscribeCount == 1 }
         assertNull(runtime.backgroundNotice.value)
         returnAndRetune()
@@ -132,6 +187,7 @@ class BackgroundPlaybackRuntimeTest {
             runtime.onAppBackgrounded()
             await { runtime.activeTarget.value == null }
             assertEquals(priorities + if (rejectPause) 0 else 1, connection.priorityChanges.size)
+            assertFalse(androidx.media3.common.C.TRACK_TYPE_AUDIO in player.trackSelectionParameters.disabledTrackTypes)
             returnAndRetune()
             assertNull(runtime.backgroundNotice.value)
         }
@@ -155,6 +211,7 @@ class BackgroundPlaybackRuntimeTest {
         await { connection.priorityChanges.size == 1 }
         connection.emit(SubscriptionEvent.Stopped(SubscriptionCondition.STATUS_REPORTED, SubscriptionIssue.SUBSCRIPTION_OVERRIDDEN))
         await { runtime.activeTarget.value == null }
+        assertFalse(androidx.media3.common.C.TRACK_TYPE_AUDIO in player.trackSelectionParameters.disabledTrackTypes)
         scheduler.advanceTimeBy(120_000)
         settle()
         assertEquals(1, connection.subscribeCount)
@@ -475,6 +532,23 @@ class BackgroundPlaybackRuntimeTest {
         assertEquals(1, connection.subscribeCount)
     }
 
+    @Test fun interruptionMuteOnReturnOutlivesTheKeptAudioDisable() = exercise {
+        live()
+        runtime.onAppBackgrounded()
+        await { connection.priorityChanges.size == 1 }
+        focus.granted = false
+        // Focus denial cannot establish its server hold: video consumes muted instead.
+        connection.scriptSpeed(SubscriptionOperationResult.Failed(TvheadendFailure.SERVER_REJECTED))
+        runtime.onAppForegrounded()
+        await { focus.requestCount == 2 && player.playWhenReady }
+        assertTrue(androidx.media3.common.C.TRACK_TYPE_AUDIO in player.trackSelectionParameters.disabledTrackTypes)
+        focus.granted = true
+        val resume = scope.async { runtime.resumeTimeshift() }
+        await { resume.isCompleted }
+        assertFalse(androidx.media3.common.C.TRACK_TYPE_AUDIO in player.trackSelectionParameters.disabledTrackTypes)
+        assertEquals(1, connection.subscribeCount)
+    }
+
     @Test fun rejectedNormalPriorityRetunesOnceRatherThanResumingYieldedTarget() = exercise {
         live()
         runtime.onAppBackgrounded()
@@ -740,6 +814,7 @@ class BackgroundPlaybackRuntimeTest {
             val subscriptions = connection.subscribeCount
             val stopped = scope.async { runtime.stop() }
             await { stopped.isCompleted }
+            assertFalse(androidx.media3.common.C.TRACK_TYPE_AUDIO in player.trackSelectionParameters.disabledTrackTypes)
             assertNull(runtime.backgroundNotice.value)
             scheduler.advanceTimeBy(1_200_000)
             runtime.onAppForegrounded()
@@ -756,6 +831,7 @@ class BackgroundPlaybackRuntimeTest {
         await { connection.priorityChanges.size == 1 }
         live(channel = 2, timeshift = false)
         assertNull(runtime.activeTarget.value) // New background target uses the legacy release path.
+        assertFalse(androidx.media3.common.C.TRACK_TYPE_AUDIO in player.trackSelectionParameters.disabledTrackTypes)
         scheduler.advanceTimeBy(1_200_000)
         returnAndRetune()
         assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)

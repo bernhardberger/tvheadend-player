@@ -291,21 +291,48 @@ class RecordingRecoveryPositionTest {
         assertNear(TWENTY_MINUTES, player.currentPosition) // no late bookmark seek follows
     }
 
-    @Test fun routeRestorationAfterANewServerSessionContinuesWhereTheRecordingStood() = exercise {
-        play(FIRST)
-        failAtTwentyMinutes()
-        session.replaceGeneration(observation())
-        settleMain()
-        // The server session's loss leaves the failed target's position in the player.
-        assertNear(TWENTY_MINUTES, player.currentPosition)
-        media.seekable = false
+    @Test fun routeRestorationAfterANewServerSessionContinuesWhereTheRecordingStood() {
+        for ((background, returnBeforeReconnect) in listOf(false to false, true to false, true to true)) exercise {
+            play(FIRST)
+            if (background) {
+                seekToTwentyMinutes()
+                runtime.onAppBackgrounded()
+                awaitCurrent { player.currentMediaItem == null }
+            } else failAtTwentyMinutes()
+            if (returnBeforeReconnect) {
+                // Lose the session after binding, while focus is acquired for continuation.
+                focus.beforeRequest = { session.publish(SessionObservation.create()) }
+                val abandons = focus.abandons
+                runtime.onAppForegrounded()
+                awaitCurrent { runtime.state.value is AppPlaybackState.Failed }
+                assertEquals(PlaybackTargetResult.NOT_READY,
+                    (runtime.state.value as AppPlaybackState.Failed).targetResult)
+                assertNull(player.currentMediaItem)
+                assertFalse("A failed continuation must leave the empty player paused", player.playWhenReady)
+                assertTrue("A failed continuation must release audio focus", focus.abandons > abandons)
+                focus.beforeRequest = {}
+                runtime.onAppBackgrounded()
+                settleMain()
+                runtime.onAppForegrounded()
+                awaitCurrent { runtime.state.value is AppPlaybackState.Failed }
+            }
+            session.replaceGeneration(observation())
+            settleMain()
+            media.seekable = false
 
-        assertTrue(restore(FIRST)?.isStarted == true)
+            if (background && !returnBeforeReconnect) {
+                restore(FIRST)
+                assertNull("route restoration must wait for foreground", player.currentMediaItem)
+                runtime.onAppForegrounded()
+            } else assertTrue(restore(FIRST)?.isStarted == true)
 
-        awaitUnseekablePlayback()
-        media.openSeeking()
-        assertEventuallyNear(TWENTY_MINUTES)
-        assertEquals(AppPlaybackTarget.Recording(FIRST), runtime.activeTarget.value)
+            awaitUnseekablePlayback()
+            media.openSeeking()
+            assertEventuallyNear(TWENTY_MINUTES)
+            assertTrue("A pending continuation must retain the original playing intent", player.playWhenReady)
+            assertEquals(selection(FIRST), runtime.recordingSelection.value)
+            assertEquals(AppPlaybackTarget.Recording(FIRST), runtime.activeTarget.value)
+        }
     }
 
     @Test fun routeRestorationAfterAnAutomaticStopContinuesWhereTheRecordingStood() = exercise {
@@ -354,12 +381,10 @@ class RecordingRecoveryPositionTest {
         assertEventuallyNear(TWENTY_MINUTES)
     }
 
-    @Test fun repeatedRetryKeepsTheOriginalDurationWhenTheReplacementIsShorter() = exercise {
-        retryWithChangedPendingDuration(unknown = false)
-    }
-
-    @Test fun repeatedRetryKeepsTheOriginalDurationWhenTheReplacementDurationIsUnknown() = exercise {
-        retryWithChangedPendingDuration(unknown = true)
+    @Test fun repeatedRetryKeepsTheOwedPositionWhenTheReplacementDurationChanges() {
+        for (unknown in listOf(false, true)) exercise {
+            retryWithChangedPendingDuration(unknown)
+        }
     }
 
     @Test fun aNewPlayWhileTheRecoverySeekWaitsStartsPerTheViewersChoice() = exercise {
@@ -412,14 +437,55 @@ class RecordingRecoveryPositionTest {
         assertTrue("first restored: ${player.currentPosition}", player.currentPosition < ONE_MINUTE)
     }
 
-    @Test fun recoveryNearTheEndStartsPerTheViewersChoice() = exercise {
+    @Test fun recoveryNearTheEndContinuesAtTheSpot() = exercise {
         play(FIRST)
         failAt(TWENTY_NINE_MINUTES) // past the orderly-completion fraction of 30 minutes
 
         assertTrue(runtime.retryRecording()?.isStarted == true)
 
-        awaitPlayback { player.isPlaying && coordinator.pendingRecordingRecoveryPosition.value == null }
-        assertTrue("near the end: ${player.currentPosition}", player.currentPosition < ONE_MINUTE)
+        assertEventuallyNear(TWENTY_NINE_MINUTES)
+    }
+
+    @Test fun backgroundReturnNearTheEndContinuesPlayingOrPaused() {
+        for ((playing, granted) in listOf(true to true, false to true, true to false)) exercise {
+            play(FIRST)
+            runtime.seekTo(TWENTY_NINE_MINUTES)
+            awaitPlayback { near(TWENTY_NINE_MINUTES, player.currentPosition) }
+            if (!playing) player.pause()
+            val position = player.currentPosition
+            runtime.onAppBackgrounded()
+            awaitCurrent { player.currentMediaItem == null }
+            // Retry must not replace the released position or reopen behind another app.
+            runtime.retryRecording()
+            assertNull("background Retry must leave the source released", player.currentMediaItem)
+            focus.granted = granted
+            focus.beforeRequest = {
+                if (focus.requests.size == 1) {
+                    assertNull("Continuation must request focus before installing its source", player.currentMediaItem)
+                }
+            }
+            runtime.onAppForegrounded()
+            awaitPlayback {
+                near(position, player.currentPosition) && player.playbackState == Player.STATE_READY
+            }
+            assertEquals(playing && granted, player.playWhenReady)
+            assertEquals(AppPlaybackTarget.Recording(FIRST), runtime.activeTarget.value)
+            if (playing && granted) assertEventuallyNear(position) else assertFalse(player.isPlaying)
+            if (!granted) assertTrue(runtime.hasAudioInterruption)
+        }
+    }
+
+    @Test fun backgroundGrowingRecordingWaitsForSeekabilityThenContinuesAtTheSpot() = exercise(growing = true) {
+        play(FIRST)
+        seekToTwentyMinutes()
+        runtime.onAppBackgrounded()
+        awaitCurrent { player.currentMediaItem == null }
+        media.seekable = false
+        runtime.onAppForegrounded()
+        awaitUnseekablePlayback()
+        media.openSeeking()
+        assertEventuallyNear(TWENTY_MINUTES)
+        assertGrowingTarget()
     }
 
     @Test fun retryOfAGrowingRecordingWaitsForSeekabilityThenContinuesWhereItStood() = exercise(growing = true) {
@@ -469,38 +535,21 @@ class RecordingRecoveryPositionTest {
         assertTrue("after the settle bound: ${player.currentPosition}", player.currentPosition < ONE_MINUTE)
     }
 
-    @Test fun aGrowingRecordingThatCompletedBeforeTheRetryIsJudgedByItsMediaNotItsFileTimes() =
-        exercise(growing = true) {
+    @Test fun aGrowingRecordingThatCompletedBeforeTheRetryIsJudgedByItsMediaNotItsFileTimes() {
+        for ((position, span) in listOf(FORTY_NINE_MINUTES to 50, FIFTY_EIGHT_MINUTES to 70)) exercise(growing = true) {
             media.lengthMs = SIXTY_MINUTES
             play(FIRST)
             assertGrowingTarget()
-            failAt(FORTY_NINE_MINUTES)
-            // The files' wall-clock span (50 minutes) says less than the 60-minute media.
-            session.publish(completedObservation(spanMinutes = 50))
+            failAt(position)
+            // File wall-clock spans both below and above the 60-minute media are irrelevant.
+            session.publish(completedObservation(spanMinutes = span))
 
             assertTrue(runtime.retryRecording()?.isStarted == true)
             assertTrue(runtime.recordingAdmission.value is RecordingPlaybackAdmission.Completed)
 
-            assertEventuallyNear(FORTY_NINE_MINUTES)
+            assertEventuallyNear(position)
         }
-
-    @Test fun aGrowingRecordingThatCompletedBeforeTheRetryStartsPerTheViewersChoiceNearItsMediaEnd() =
-        exercise(growing = true) {
-            media.lengthMs = SIXTY_MINUTES
-            play(FIRST)
-            assertGrowingTarget()
-            failAt(FIFTY_EIGHT_MINUTES) // past the orderly-completion fraction of the 60-minute media
-            // The files' wall-clock span (70 minutes) says more than the media.
-            session.publish(completedObservation(spanMinutes = 70))
-
-            assertTrue(runtime.retryRecording()?.isStarted == true)
-            assertTrue(runtime.recordingAdmission.value is RecordingPlaybackAdmission.Completed)
-
-            awaitMain { player.isCurrentMediaItemSeekable }
-            awaitPlayback { player.isPlaying }
-            settleMain()
-            assertTrue("near the media end: ${player.currentPosition}", player.currentPosition < ONE_MINUTE)
-        }
+    }
 
     @Test fun aGrowingRecordingThatCompletesWhileItsRecoveryWaitsKeepsTheGrowingClamp() =
         exercise(growing = true) {
@@ -569,10 +618,7 @@ class RecordingRecoveryPositionTest {
         val realRecording: FakeGrowingRecording? = null,
     ) {
         private val context = ApplicationProvider.getApplicationContext<Application>()
-        private val focus = object : PlaybackAudioFocus {
-            override fun request(onInterruption: (AudioInterruption) -> Unit): Boolean = true
-            override fun abandon() = Unit
-        }
+        val focus = AudioInterruptionFixture.FakeFocus(granted = true)
         private val connection = ScriptedSubscriptionConnection()
         private val work = StandardTestDispatcher(scheduler)
         private val manager = createSubscriptionManager(connection, work).apply { startAdmission() }
@@ -746,8 +792,7 @@ class RecordingRecoveryPositionTest {
             media.unknownDuration = false
             assertTrue(runtime.retryRecording()?.isStarted == true)
             awaitUnseekablePlayback()
-            // 20/21 exceeds the completion cutoff; only the original 30-minute duration
-            // keeps this owed position eligible, even when the new timeline becomes seekable.
+            // The owed position survives changed timelines, even near their reported end.
             assertNotNull(coordinator.pendingRecordingRecoveryPosition.value)
             media.openSeeking()
             assertEventuallyNear(TWENTY_MINUTES)

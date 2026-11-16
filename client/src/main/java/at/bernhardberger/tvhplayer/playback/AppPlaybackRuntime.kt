@@ -28,6 +28,7 @@ import at.bernhardberger.tvheadend.sdk.media3.PlaybackStopOutcome
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackStopResult
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult
 import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
+import at.bernhardberger.tvheadend.sdk.media3.RecordingReleaseResult
 import at.bernhardberger.tvheadend.sdk.media3.TimeshiftCommandDisposition
 import at.bernhardberger.tvheadend.sdk.media3.TimeshiftCommandResult
 import at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider
@@ -307,6 +308,10 @@ class AppPlaybackRuntime(
     }
     private var lastLiveChannelId: ChannelId? = null
     private var lastRecordingRequest: Pair<DvrEntryId, RecordingPlaybackStart>? = null
+    /** A released source, not a stopped viewing target; only foreground may reopen it. */
+    private var backgroundRecordingEpoch: Long? = null
+    private var backgroundRecordingPlayWhenReady = false
+    private var ownsKeptAudioDisable = false
     // Where the failed or lost recording target last stood; only Retry and route restoration read it.
     private var recordingRecovery: RecordingRecoveryPosition? = null
     /** Written under the command serializer, read at arrival by the transport commands. */
@@ -506,7 +511,7 @@ class AppPlaybackRuntime(
 
         override fun onPlaybackStateChanged(playbackState: Int) {
             watchForStall()
-            if (!targetInstallationInProgress && !coordinator.playerCleanupPending.value && targetCommands.isOpen()) {
+            if (!holdsPlayerStateCallbacks() && !coordinator.playerCleanupPending.value && targetCommands.isOpen()) {
                 if (policy.trace.enabled && playbackState == Player.STATE_READY) {
                     policy.trace.ready(activeTargetEpoch)
                 }
@@ -525,7 +530,7 @@ class AppPlaybackRuntime(
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             recordingMarkers.onPlaybackChanged()
             watchForStall()
-            if (!targetInstallationInProgress && !coordinator.playerCleanupPending.value && targetCommands.isOpen()) {
+            if (!holdsPlayerStateCallbacks() && !coordinator.playerCleanupPending.value && targetCommands.isOpen()) {
                 presentation.publishPlayerState()
             }
         }
@@ -539,6 +544,9 @@ class AppPlaybackRuntime(
             }
         }
     }
+
+    private fun holdsPlayerStateCallbacks(): Boolean =
+        backgroundRecordingEpoch != null || targetInstallationInProgress
 
     /** Samples while Media3 has a target to play; player events start it again after a pause. */
     private val stallPoll = object : Runnable {
@@ -778,6 +786,7 @@ class AppPlaybackRuntime(
         var heldPause = false
         // The load control must know the target kind before the source is prepared.
         startupBuffer?.targetInstalling(live = true)
+        backgroundRecordingEpoch = null
         // Read before the SDK can replace the player's source for this install.
         val install = LiveInstallAttribution(sourceGeneration = playerSources, selection = selection)
         liveInstall = install
@@ -1092,7 +1101,7 @@ class AppPlaybackRuntime(
     ): PlaybackTargetResult? = targetCommands.restoreRecordingIfNeeded(
         onClosed = { PlaybackTargetResult.SHUT_DOWN },
         targetMatches = {
-            currentRecordingPlaybackSelection(
+            if (backgroundRecordingEpoch != null) !foreground else currentRecordingPlaybackSelection(
                 observation = session.observation.value,
                 recordingId = selection.recordingId,
             )?.let { currentSelection ->
@@ -1106,6 +1115,13 @@ class AppPlaybackRuntime(
         restore = {
             if (userStopIsLatest()) {
                 null
+            } else if (backgroundRecordingEpoch != null) {
+                if (foreground && backgroundRecordingEpoch == activeTargetEpoch &&
+                    _activeTarget.value == AppPlaybackTarget.Recording(selection.recordingId)
+                ) playRecordingLocked(selection.recordingId, start, continuesTarget = true,
+                    requestedSelection = selection, playWhenReady = backgroundRecordingPlayWhenReady,
+                    continueReleased = true)
+                else null
             } else {
                 noteRecordingInterruptionLocked()
                 playRecordingLocked(selection.recordingId, start,
@@ -1122,24 +1138,14 @@ class AppPlaybackRuntime(
      */
     @OptIn(ExperimentalTvheadendApi::class)
     private fun noteRecordingInterruptionLocked() {
+        if (backgroundRecordingEpoch != null) return
         val target = _activeTarget.value as? AppPlaybackTarget.Recording ?: return
         recordingRecovery = targetCommands.readIfOpen {
             val pendingPosition = coordinator.pendingRecordingRecoveryPosition.value
-            val previous = recordingRecovery?.takeIf { it.recordingId == target.recordingId }
             RecordingRecoveryPosition(
                 recordingId = target.recordingId,
                 positionMs = pendingPosition?.inWholeMilliseconds
                     ?: player.currentPosition.coerceAtLeast(0L),
-                // A growing recording's extent is no final duration to judge a finish by.
-                // An owed seek keeps the original duration, including an unknown one.
-                durationMs = if (pendingPosition != null && previous != null) {
-                    previous.durationMs
-                } else {
-                    player.duration.takeIf {
-                        _recordingAdmission.value is RecordingPlaybackAdmission.Completed &&
-                            it != C.TIME_UNSET && it > 0
-                    }
-                },
             )
         } ?: recordingRecovery
     }
@@ -1157,6 +1163,8 @@ class AppPlaybackRuntime(
         // A stall recovery replaces the very target it validated: Pause and Play still address it.
         continuesTarget: Boolean = false,
         requestedSelection: RecordingPlaybackSelection? = null,
+        playWhenReady: Boolean = true,
+        continueReleased: Boolean = false,
     ): PlaybackTargetResult? {
         if (!targetCommands.isOpen()) return PlaybackTargetResult.SHUT_DOWN
         val playerSettings = settings.playerSettings.first()
@@ -1171,6 +1179,14 @@ class AppPlaybackRuntime(
         }
         val selection = currentRecordingPlaybackSelection(session.observation.value, recordingId)
         if (selection == null) {
+            if (continueReleased && session.observation.value.currentSession == null) {
+                presentation.publishFailed(AppPlaybackState.Failed(
+                    AppPlaybackFailureReason.RECORDING_READ_FAILED, PlaybackTargetResult.NOT_READY,
+                    target = AppPlaybackTarget.Recording(recordingId),
+                ))
+                return PlaybackTargetResult.NOT_READY
+            }
+            backgroundRecordingEpoch = null
             val observation = session.observation.value
             return completeUnavailableRecordingTarget(
                 expectedPresentationEpoch = expectedPresentationEpoch,
@@ -1193,7 +1209,9 @@ class AppPlaybackRuntime(
         var admission: RecordingPlaybackAdmission? = null
         var installedBinding: PlaybackBinding.Recording? = null
         var committed = false
+        var continuingPlayWhenReady = playWhenReady
         startupBuffer?.targetInstalling(live = false)
+        if (!continueReleased) backgroundRecordingEpoch = null
         val result = installTargetForPresentation(
             expectedPresentationEpoch = expectedPresentationEpoch,
             installTarget = {
@@ -1209,14 +1227,33 @@ class AppPlaybackRuntime(
                         installedBinding = binding.binding
                         val recovery = recoverAt?.takeIf { it.recordingId == recordingId }
                         if (targetCommands.isOpen()) stopOtherKindBeforeInstall(live = false, expectedPresentationEpoch)
-                        if (targetCommands.isOpen()) stopForFreshDecoder(recovery)
+                        if (targetCommands.isOpen() && !continueReleased) stopForFreshDecoder(recovery)
                         if (!targetCommands.isOpen()) {
                             PlaybackTargetResult.SHUT_DOWN
+                        } else if (continueReleased) {
+                            if (playWhenReady) {
+                                continuingPlayWhenReady =
+                                    audioInterruptions.playWithAudioFocusLocked() == TimeshiftCommandResult.ACCEPTED
+                            }
+                            player.playWhenReady = continuingPlayWhenReady
+                            val continued = coordinator.continueRecordingTarget(binding.binding)
+                            if (playWhenReady && !continued.isStarted) {
+                                audioInterruptions.clearAudioInterruptionLocked()
+                                player.playWhenReady = false
+                            }
+                            when {
+                                continued.isStarted || continued == PlaybackTargetResult.NOT_READY ||
+                                    continued == PlaybackTargetResult.GROWING_RECORDING_DEFERRED ||
+                                    continued == PlaybackTargetResult.PLAYER_UNAVAILABLE -> continued
+                                else -> {
+                                    backgroundRecordingEpoch = null
+                                    continued
+                                }
+                            }
                         } else if (recovery != null) {
                             coordinator.recoverRecordingTarget(
                                 binding = binding.binding,
                                 position = recovery.positionMs.milliseconds,
-                                previousDuration = recovery.durationMs?.milliseconds,
                                 fallbackStart = start,
                             )
                         } else {
@@ -1228,6 +1265,7 @@ class AppPlaybackRuntime(
                         PlaybackTargetResult.NOT_READY
                     }
                     PlaybackBindingResult.TargetUnavailable -> {
+                        backgroundRecordingEpoch = null
                         admission = RecordingPlaybackAdmission.TargetUnavailable
                         PlaybackTargetResult.TARGET_UNAVAILABLE
                     }
@@ -1238,7 +1276,8 @@ class AppPlaybackRuntime(
                     ?: return@started
                 presentationEpoch.publishIfCurrent(epoch) {
                     committed = true
-                    audioInterruptions.clearAudioInterruptionLocked()
+                    backgroundRecordingEpoch = null
+                    if (!continueReleased) audioInterruptions.clearAudioInterruptionLocked()
                     val continues = continuesTarget && activeTargetEpoch == expectedPresentationEpoch &&
                         _activeTarget.value == AppPlaybackTarget.Recording(selection.recordingId)
                     val preservesMarkerHistory = (continuesTarget || recoverAt?.recordingId == selection.recordingId) &&
@@ -1260,7 +1299,12 @@ class AppPlaybackRuntime(
                 }
             },
             onFailed = { targetResult ->
-                publishTargetFailure(
+                if (continueReleased && backgroundRecordingEpoch == activeTargetEpoch) {
+                    presentation.publishFailed(AppPlaybackState.Failed(
+                        AppPlaybackFailureReason.RECORDING_READ_FAILED, targetResult,
+                        target = AppPlaybackTarget.Recording(recordingId),
+                    ))
+                } else publishTargetFailure(
                     expectedPresentationEpoch = expectedPresentationEpoch,
                     reason = AppPlaybackFailureReason.RECORDING_READ_FAILED,
                     targetResult = targetResult,
@@ -1276,7 +1320,7 @@ class AppPlaybackRuntime(
             val epoch = activeTargetEpoch
             var applied = false
             try {
-                applyPlayIntentToStartedTarget(result)
+                applyPlayIntentToStartedTarget(result, continuingPlayWhenReady)
                 applied = true
             } finally {
                 presentation.presentStartedTargetLocked(epoch, playStillPending = foreground && !applied)
@@ -1349,8 +1393,13 @@ class AppPlaybackRuntime(
                 recordingMarkers.setForeground(false)
                 val currentJob = currentCoroutineContext().job
                 val recoveryPending = liveRecovery.cancelOnBackgroundLocked(currentJob, activeTargetEpoch)
-                val recordingPlayWhenReady = targetCommands.readIfOpen { player.playWhenReady }
-                    ?: return@serialize
+                val recordingPlayWhenReady =
+                    if (backgroundRecordingEpoch != null && backgroundRecordingEpoch == activeTargetEpoch) {
+                        backgroundRecordingPlayWhenReady
+                    } else targetCommands.readIfOpen { player.playWhenReady } ?: return@serialize
+                if (_activeTarget.value is AppPlaybackTarget.Recording) {
+                    backgroundRecordingPlayWhenReady = recordingPlayWhenReady
+                }
                 player.pause()
                 // A pending pause is already a local pause: the paused intent below carries it.
                 livePauseController.dropPendingLivePauseLocked()
@@ -1481,6 +1530,8 @@ class AppPlaybackRuntime(
 
     private suspend fun stopPlayback(): PlaybackStopResult {
         if (!targetCommands.isOpen()) return PlaybackStopResult.SHUT_DOWN
+        if (livePlaybackObservation.value != LivePlaybackObservation.Departed) restoreKeptAudioLocked()
+        backgroundRecordingEpoch = null
         _liveStartUndisturbed.value = false
         // A timer executing this stop must not cancel its own serialized cleanup.
         val timer = keepTimer
@@ -1493,7 +1544,8 @@ class AppPlaybackRuntime(
         ) player.pause()
         livePauseController.dropPendingLivePauseLocked()
         if (livePlaybackObservation.value == LivePlaybackObservation.Departed) {
-            audioInterruptions.withdrawAudioInterruptionLocked()
+            audioInterruptions.withdrawAudioInterruptionLocked(additionalOwnedAudioDisable = ownsKeptAudioDisable)
+            ownsKeptAudioDisable = false
         } else audioInterruptions.clearAudioInterruptionLocked()
         recordingMarkers.clearRecordingMarkers()
         val epoch = presentationEpoch.begin()
@@ -1594,8 +1646,16 @@ class AppPlaybackRuntime(
         onClosed = { PlaybackTargetResult.SHUT_DOWN },
         currentRequest = { lastRecordingRequest },
     ) { (recordingId, start) ->
-        noteRecordingInterruptionLocked()
-        playRecordingLocked(recordingId, start, recoverAt = recordingRecovery)
+        if (backgroundRecordingEpoch != null) {
+            if (foreground && backgroundRecordingEpoch == activeTargetEpoch &&
+                _activeTarget.value == AppPlaybackTarget.Recording(recordingId)
+            ) playRecordingLocked(recordingId, start, continuesTarget = true,
+                playWhenReady = backgroundRecordingPlayWhenReady, continueReleased = true)
+            else null
+        } else {
+            noteRecordingInterruptionLocked()
+            playRecordingLocked(recordingId, start, recoverAt = recordingRecovery)
+        }
     }
     suspend fun pauseTimeshift(): TimeshiftCommandResult = targetCommands.serialize(
         onClosed = { TimeshiftCommandResult.SHUT_DOWN },
@@ -2246,7 +2306,9 @@ class AppPlaybackRuntime(
         _recordingSelection.value = null
         _recordingAdmission.value = null
         livePauseController.dropPendingLivePauseLocked()
-        audioInterruptions.withdrawAudioInterruptionLocked()
+        audioInterruptions.withdrawAudioInterruptionLocked(additionalOwnedAudioDisable = ownsKeptAudioDisable)
+        ownsKeptAudioDisable = false
+        backgroundRecordingEpoch = null
         recordingMarkers.clearRecordingMarkers()
         presentation.publishIdle()
         presentation.publishDiagnostics()
@@ -2509,6 +2571,8 @@ class AppPlaybackRuntime(
         declaredFrameDurationJob.join()
         targetCommands.awaitIdle {
             _liveStartUndisturbed.value = false
+            restoreKeptAudioLocked()
+            backgroundRecordingEpoch = null
             recordingRecovery = null
             livePauseController.dropPendingLivePauseLocked()
             dropHeldLiveSelectionPause()
@@ -2554,6 +2618,7 @@ class AppPlaybackRuntime(
                 activeTarget = keptTarget,
                 onStarted = {
                     ownedMediaItem = player.currentMediaItem
+                    restoreKeptAudioLocked()
                     audioInterruptions.restoreWithdrawnMuteOnCommitLocked()
                     departedEpoch = null
                     bufferRecovery = null
@@ -2735,6 +2800,7 @@ class AppPlaybackRuntime(
             } else if (playWhenReady) audioInterruptions.playWithAudioFocusLocked()
             else {
                 player.pause()
+                if (target is AppPlaybackTarget.Recording) return
                 // A player that failed during installation never reaches READY to resolve a pause.
                 if (state.value is AppPlaybackState.Failed) {
                     stopPausedRetune()
@@ -2776,62 +2842,111 @@ class AppPlaybackRuntime(
     private fun currentLiveLossNotice(): BackgroundPlaybackNotice? =
         (livePlaybackObservation.value as? LivePlaybackObservation.Active)?.keptLiveLossNotice()
 
+    private fun restoreKeptAudioLocked() {
+        if (!ownsKeptAudioDisable) return
+        ownsKeptAudioDisable = false
+        when {
+            livePlaybackObservation.value == LivePlaybackObservation.Departed ||
+                player.currentMediaItem?.let { it !== ownedMediaItem } == true ->
+                audioInterruptions.withdrawAudioInterruptionLocked(additionalOwnedAudioDisable = true)
+            audioInterruptions.interruptionMuted ->
+                audioInterruptions.preserveInterruptionMute(additionalOwnedAudioDisable = true)
+            else -> {
+                player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+                    .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, false).build()
+                audioTracks.restoreAudioAfterInterruptionLocked()
+            }
+        }
+    }
+
+    @OptIn(ExperimentalTvheadendApi::class)
+    private suspend fun releaseBackgroundRecordingLocked() {
+        if (backgroundRecordingEpoch == null || backgroundRecordingEpoch != activeTargetEpoch) {
+            backgroundRecordingEpoch = activeTargetEpoch
+            // Suppress source-retirement callbacks, not the SDK's retained position.
+            val released = coordinator.releaseRecordingTarget()
+            if (released != RecordingReleaseResult.RELEASED &&
+                released != RecordingReleaseResult.PLAYER_UNAVAILABLE
+            ) backgroundRecordingEpoch = null
+        }
+    }
+
+    private suspend fun resumeBackgroundRecordingLocked(play: Boolean) {
+        val target = _activeTarget.value as? AppPlaybackTarget.Recording
+        val request = lastRecordingRequest?.takeIf { it.first == target?.recordingId }
+        if (foreground && request != null && backgroundRecordingEpoch == activeTargetEpoch) {
+            backgroundRecordingPlayWhenReady = play
+            playRecordingLocked(request.first, request.second,
+                continuesTarget = true, playWhenReady = play, continueReleased = true)
+        }
+    }
+
+    private suspend fun keepLiveLocked(keep: ForegroundPlaybackAction.KeepLive) {
+        // Evidence from before this keep is superseded by the current observation below.
+        observedLiveLoss = null
+        player.pause()
+        ownsKeptAudioDisable = C.TRACK_TYPE_AUDIO !in player.trackSelectionParameters.disabledTrackTypes
+        if (ownsKeptAudioDisable) {
+            player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+                .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, true).build()
+        }
+        val paused = coordinator.pauseTimeshift() == TimeshiftCommandResult.ACCEPTED
+        val yielded = paused && coordinator.setLivePriority(LiveSubscriptionPriority.YIELD) == TimeshiftCommandResult.ACCEPTED
+        if (targetCommands.isOpen() && activeTargetEpoch == keep.epoch) {
+            // A stop or issue that arrived before the keep was admitted releases it now.
+            val lossNotice = if (livePlaybackObservation.value is LivePlaybackObservation.Active) keptLiveLoss(keep.epoch) else null
+            if (!yielded) {
+                applyForegroundPlaybackAction(foregroundPlaybackLifecycle.releaseKept(keep.epoch))
+            } else if (lossNotice != null) {
+                applyForegroundPlaybackAction(foregroundPlaybackLifecycle.releaseKept(keep.epoch, lossNotice))
+            } else {
+                keepTimer = scope.launch {
+                    delay((keep.deadlineMillis - elapsedRealtime()).coerceAtLeast(0))
+                    targetCommands.serialize(onClosed = {}) {
+                        applyForegroundPlaybackAction(foregroundPlaybackLifecycle.releaseKept(keep.epoch, BackgroundPlaybackNotice.LIMIT_EXPIRED))
+                    }
+                }
+            }
+        }
+    }
+
+    private suspend fun resumeKeptLiveLocked(kept: ForegroundPlaybackAction.ResumeKeptLive) {
+        restoreKeptAudioLocked()
+        if (activeTargetEpoch == kept.epoch) {
+            val restored = coordinator.setLivePriority(LiveSubscriptionPriority.NORMAL) == TimeshiftCommandResult.ACCEPTED
+            if (targetCommands.isOpen() && activeTargetEpoch == kept.epoch) {
+                val resumed = if (restored && kept.resume) audioInterruptions.playWithAudioFocusLocked(resumeTimeshift = true)
+                    else TimeshiftCommandResult.ACCEPTED
+                // Focus denial retains interruption ownership; it is not a server failure.
+                val resumeFailed = resumed != TimeshiftCommandResult.ACCEPTED &&
+                    resumed != TimeshiftCommandResult.SHUT_DOWN && audioInterruptions.interruption == null
+                if (!restored || resumeFailed) {
+                    val channel = (_activeTarget.value as? AppPlaybackTarget.Live)?.channelId
+                    // A stop the queued loss check has not handled yet is not a lost tuner.
+                    val notice = currentLiveLossNotice()
+                        ?: observedLiveLoss?.takeIf { it.epoch == kept.epoch }?.notice
+                        ?: BackgroundPlaybackNotice.TUNER_LOST
+                    stopPlayback()
+                    channel?.let { playLive(it, recovering = false, playWhenReady = kept.resume) }
+                    if (resumeFailed) _backgroundNotice.value = notice
+                }
+            }
+        }
+    }
+
     private suspend fun applyForegroundPlaybackAction(action: ForegroundPlaybackAction) {
         executeForegroundPlaybackAction(
             action = action,
             stopLive = { stopPlayback() },
-            pauseRecording = { targetCommands.runIfOpen(player::pause) },
+            releaseRecording = ::releaseBackgroundRecordingLocked,
             resumeLive = { channelId ->
                 if (_activeTarget.value != null) stopPlayback()
                 lastLiveChannelId = channelId
                 playLive(channelId = channelId, recovering = false)
             },
-            resumeRecording = { audioInterruptions.playWithAudioFocusLocked() },
-            keepLive = { keep ->
-                // Evidence from before this keep is superseded by the current observation below.
-                observedLiveLoss = null
-                player.pause()
-                val paused = coordinator.pauseTimeshift() == TimeshiftCommandResult.ACCEPTED
-                val yielded = paused && coordinator.setLivePriority(LiveSubscriptionPriority.YIELD) == TimeshiftCommandResult.ACCEPTED
-                if (targetCommands.isOpen() && activeTargetEpoch == keep.epoch) {
-                    // A stop or issue that arrived before the keep was admitted releases it now.
-                    val lossNotice = if (livePlaybackObservation.value is LivePlaybackObservation.Active) keptLiveLoss(keep.epoch) else null
-                    if (!yielded) {
-                        applyForegroundPlaybackAction(foregroundPlaybackLifecycle.releaseKept(keep.epoch))
-                    } else if (lossNotice != null) {
-                        applyForegroundPlaybackAction(foregroundPlaybackLifecycle.releaseKept(keep.epoch, lossNotice))
-                    } else {
-                        keepTimer = scope.launch {
-                            delay((keep.deadlineMillis - elapsedRealtime()).coerceAtLeast(0))
-                            targetCommands.serialize(onClosed = {}) {
-                                applyForegroundPlaybackAction(foregroundPlaybackLifecycle.releaseKept(keep.epoch, BackgroundPlaybackNotice.LIMIT_EXPIRED))
-                            }
-                        }
-                    }
-                }
-            },
-            resumeKeptLive = { kept ->
-                if (activeTargetEpoch == kept.epoch) {
-                    val restored = coordinator.setLivePriority(LiveSubscriptionPriority.NORMAL) == TimeshiftCommandResult.ACCEPTED
-                    if (targetCommands.isOpen() && activeTargetEpoch == kept.epoch) {
-                        val resumed = if (restored && kept.resume) audioInterruptions.playWithAudioFocusLocked(resumeTimeshift = true)
-                            else TimeshiftCommandResult.ACCEPTED
-                        // Focus denial retains interruption ownership; it is not a server failure.
-                        val resumeFailed = resumed != TimeshiftCommandResult.ACCEPTED &&
-                            resumed != TimeshiftCommandResult.SHUT_DOWN && audioInterruptions.interruption == null
-                        if (!restored || resumeFailed) {
-                            val channel = (_activeTarget.value as? AppPlaybackTarget.Live)?.channelId
-                            // A stop the queued loss check has not handled yet is not a lost tuner.
-                            val notice = currentLiveLossNotice()
-                                ?: observedLiveLoss?.takeIf { it.epoch == kept.epoch }?.notice
-                                ?: BackgroundPlaybackNotice.TUNER_LOST
-                            stopPlayback()
-                            channel?.let { playLive(it, recovering = false, playWhenReady = kept.resume) }
-                            if (resumeFailed) _backgroundNotice.value = notice
-                        }
-                    }
-                }
-            },
+            resumeRecording = ::resumeBackgroundRecordingLocked,
+            keepLive = ::keepLiveLocked,
+            resumeKeptLive = ::resumeKeptLiveLocked,
             notice = { _backgroundNotice.value = it },
         )
     }
@@ -2944,7 +3059,6 @@ class AppPlaybackRuntime(
 internal data class RecordingRecoveryPosition(
     val recordingId: DvrEntryId,
     val positionMs: Long,
-    val durationMs: Long?,
 )
 
 /**

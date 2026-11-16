@@ -79,10 +79,10 @@ internal class AudioInterruptionController(
         setInterruptionMuted(false)
     }
 
-    /** Departure relinquishes callbacks, not the replacement item's audio configuration. */
-    fun withdrawAudioInterruptionLocked() {
+    /** Departure relinquishes callbacks; app-owned disables wait for the next owned commit. */
+    fun withdrawAudioInterruptionLocked(additionalOwnedAudioDisable: Boolean = false) {
         resetAudioInterruptionLocked()
-        restoreAppAudioDisable = restoreAppAudioDisable || ownsAudioDisable
+        restoreAppAudioDisable = restoreAppAudioDisable || ownsAudioDisable || additionalOwnedAudioDisable
         ownsAudioDisable = false
         interruptionMuted = false
     }
@@ -120,7 +120,8 @@ internal class AudioInterruptionController(
         if (!muted) audioTracks.restoreAudioAfterInterruptionLocked()
     }
 
-    fun preserveInterruptionMute() {
+    fun preserveInterruptionMute(additionalOwnedAudioDisable: Boolean = false) {
+        if (interruptionMuted && additionalOwnedAudioDisable) ownsAudioDisable = true
         if (interruptionMuted && C.TRACK_TYPE_AUDIO !in player.trackSelectionParameters.disabledTrackTypes) {
             ownsAudioDisable = true
             player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
