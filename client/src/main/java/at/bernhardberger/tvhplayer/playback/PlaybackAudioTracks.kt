@@ -203,7 +203,7 @@ internal class PlaybackAudioTracks(
     /** Observe switches even while a serialized installation or settings application is suspended. */
     fun observeTunnelingSetting(enabled: Boolean) {
         targetCommands.runIfOpen {
-            if (storedTunneling != enabled) _tunnelingFallbackActive.value = false
+            if (storedTunneling != null && storedTunneling != enabled) _tunnelingFallbackActive.value = false
             storedTunneling = enabled
         }
     }
@@ -227,10 +227,7 @@ internal class PlaybackAudioTracks(
 
     /** Device output rejection is run-local; only changing the stored switch opts back in. */
     fun noteTunnelingRefused() {
-        _tunnelingFallbackActive.value = true
-    }
-
-    fun applyTunnelingFallbackLocked() {
         player.trackSelectionParameters = player.trackSelectionParameters.withTunneling(false)
+        _tunnelingFallbackActive.value = true
     }
 }

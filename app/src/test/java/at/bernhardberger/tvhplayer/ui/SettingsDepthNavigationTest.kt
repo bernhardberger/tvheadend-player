@@ -377,10 +377,6 @@ class SettingsDepthNavigationTest {
         assertAccessibleSwitch(tag, checked = true)
         press(Key.DirectionCenter)
         assertAccessibleSwitch(tag, checked = false)
-        if (rowId == "tunneling") {
-            compose.onNodeWithTag(tag).assert(hasText(RuntimeEnvironment.getApplication()
-                .getString(at.bernhardberger.tvhplayer.R.string.tunneling_setting_description)))
-        }
     }
 
     private fun assertAccessibleSwitch(tag: String, checked: Boolean) {

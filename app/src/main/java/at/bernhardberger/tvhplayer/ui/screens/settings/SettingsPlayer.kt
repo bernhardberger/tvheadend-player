@@ -247,7 +247,8 @@ internal fun settingsPlayerLevel(
             frameRateSwitchingLabel(ui.frameRateSwitching), child = FRAME_RATE_LEVEL,
             section = stringResource(R.string.settings_section_picture)),
         settingsRow("tunneling", stringResource(R.string.tunneling_setting),
-            supporting = stringResource(if (ui.tunnelingFallbackActive) R.string.tunneling_setting_fallback
+            supporting = stringResource(
+                if (ui.tunnelingEnabled && ui.tunnelingFallbackActive) R.string.tunneling_setting_fallback
                 else R.string.tunneling_setting_description), checked = ui.tunnelingEnabled,
             section = stringResource(R.string.settings_section_experimental),
             onClick = { onTunnelingEnabledChanged(!ui.tunnelingEnabled) }),

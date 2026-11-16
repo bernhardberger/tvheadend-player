@@ -2212,7 +2212,10 @@ class AppPlaybackRuntime(
         origin: LiveRecoveryFence?,
         install: LiveInstallAttribution? = null,
     ) {
-        if (reason == null) return
+        if (reason == null) {
+            publishPlayerError()
+            return
+        }
         val reportedEpoch = activeTargetEpoch
         liveRecovery.dispatch(
             reason = reason,
@@ -3064,7 +3067,7 @@ class AppPlaybackRuntime(
 
     private fun publishPlayerErrorFromPlayer() {
         val error = player.playerError ?: return
-        if (error === tunnelingRecoveryError.value) return
+        if (error === tunnelingRecoveryError.value || holdInterruptedTunnelingError(error)) return
         // A failed target never completes a pause pressed before its grant. A paused kept-channel
         // retune still has to fail closed, so its pending pause resolves (and stops) serialized.
         val failClosedPauseEpoch = livePauseController.onPlayerErrorUnderAccessLock()
@@ -3097,6 +3100,13 @@ class AppPlaybackRuntime(
         if (failClosedPauseEpoch != null) livePauseController.launchPendingLivePauseResolution(failClosedPauseEpoch)
     }
 
+    private fun holdInterruptedTunnelingError(error: PlaybackException): Boolean {
+        val interrupted = liveRecovery.interruptedRecovery
+        val held = interrupted != null && interrupted.reason == null && interrupted.targetEpoch == activeTargetEpoch
+        if (held) presentation.publishPlayerState(recoveryResolved = true, heldRecoveryError = error)
+        return held
+    }
+
     private fun canFallbackFrom(error: PlaybackException): Boolean =
         error.errorCode == PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED &&
             player.trackSelectionParameters.tunnelingRequested && tunnelingRecoveryError.value == null &&
@@ -3126,21 +3136,23 @@ class AppPlaybackRuntime(
         val selection = activeLiveSelection
         tunnelingRecoveryError.value = error
         audioTracks.noteTunnelingRefused()
+        presentation.publishDiagnostics()
         if (target is AppPlaybackTarget.Recording) noteRecordingInterruptionLocked()
         if (!recoveryPlaybackBlocked(epoch)) presentation.publishStarting()
         scope.launch {
             try {
                 targetCommands.serialize(onClosed = {}) {
-                    if (tunnelingFallbackActive.value && !targetInstallationInProgress &&
-                        !coordinator.playerCleanupPending.value) {
-                        audioTracks.applyTunnelingFallbackLocked()
-                        presentation.publishDiagnostics()
-                        if (canRecover()) retryWithoutTunnelingLocked(target, epoch, intent, selection, ::canRecover)
+                    if (tunnelingFallbackActive.value && canRecover()) {
+                        retryWithoutTunnelingLocked(target, epoch, intent, selection, ::canRecover)
                     }
                 }
             } finally {
                 tunnelingRecoveryError.value = null
-                publishPlayerError()
+                targetCommands.runIfOpen {
+                    if (player.playerError === error && _activeTarget.value == target && activeTargetEpoch == epoch) {
+                        publishPlayerErrorFromPlayer()
+                    }
+                }
             }
         }
     }

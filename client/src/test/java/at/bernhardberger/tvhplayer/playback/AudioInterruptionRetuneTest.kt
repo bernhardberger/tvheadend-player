@@ -37,12 +37,19 @@ internal class AudioInterruptionRetuneTest : AudioInterruptionFixture() {
         val choice = installManualAudio()
         await { player.trackSelectionParameters.tunnelingRequested }
         val states = mutableListOf<AppPlaybackState>()
+        var requestedDuringError: Boolean? = null
+        player.addListener(object : Player.Listener {
+            override fun onPlayerError(error: PlaybackException) {
+                requestedDuringError = player.trackSelectionParameters.tunnelingRequested
+            }
+        })
         val observing = scope.launch(kotlinx.coroutines.test.UnconfinedTestDispatcher(scheduler)) {
             runtime.state.collect { states += it }
         }
         player.failAudioTrackInitialization()
         await("fallback or failure") { connection.subscribeCount == 2 || runtime.state.value is AppPlaybackState.Failed }
         assertEquals("refused tunneled audio must retune", 2, connection.subscribeCount)
+        assertEquals("the error dispatch must already disable tunneling", false, requestedDuringError)
         startSubscription(connection.awaitCollectionRegistered())
         await { player.playerError == null }
         settle()
@@ -80,10 +87,22 @@ internal class AudioInterruptionRetuneTest : AudioInterruptionFixture() {
             (runtime.state.value as AppPlaybackState.Failed).playerErrorNumber)
         settle()
         assertEquals(2, connection.subscribeCount)
+        settings.setTunnelingEnabled(false)
+        settle()
+        settings.setTunnelingEnabled(true)
+        live(timeshift = false)
+        session.scriptLivePlaybackFailure(PlaybackBindingResult.TargetUnavailable)
+        player.failAudioTrackInitialization()
+        await("fallback target rejected") { runtime.activeTarget.value == null }
+        val rejected = runtime.state.value as AppPlaybackState.Failed
+        assertEquals("the restart failure must survive release of the old error",
+            PlaybackTargetResult.TARGET_UNAVAILABLE, rejected.targetResult)
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), rejected.target)
+        assertNull(rejected.playerErrorNumber)
     }
 
     @Test fun staleOrPausedTunneledAudioFallbackDoesNotRestartPlayback() {
-        for (invalidation in listOf("new intent", "session change", "pause", "detach")) exercise {
+        for (invalidation in listOf("new intent", "session change", "pause", "stop", "detach")) exercise {
             settings.setTunnelingEnabled(true)
             live(timeshift = false)
             val release = CompletableDeferred<Unit>()
@@ -92,6 +111,9 @@ internal class AudioInterruptionRetuneTest : AudioInterruptionFixture() {
                 commands.serialize(onClosed = {}) { entered.complete(Unit); release.await() }
             }
             await { entered.isCompleted }
+            val stopping = if (invalidation == "stop") scope.async(start = CoroutineStart.UNDISPATCHED) {
+                runtime.stop()
+            } else null
             player.failAudioTrackInitialization()
             await { player.playerError != null }
             val detaching = when (invalidation) {
@@ -108,7 +130,11 @@ internal class AudioInterruptionRetuneTest : AudioInterruptionFixture() {
             settle()
             detaching?.await()
             assertEquals("$invalidation must prevent the automatic restart", 1, connection.subscribeCount)
-            if (invalidation == "detach") {
+            if (stopping != null) {
+                await("stop finished") { stopping.isCompleted }
+                assertEquals(AppPlaybackState.Idle, runtime.state.value)
+                assertNull(runtime.activeTarget.value)
+            } else if (invalidation == "detach") {
                 assertFalse(commands.isOpen())
                 assertEquals(PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED, player.playerError?.errorCode)
             } else {
@@ -119,7 +145,7 @@ internal class AudioInterruptionRetuneTest : AudioInterruptionFixture() {
                     (runtime.state.value as AppPlaybackState.Failed).playerErrorNumber)
             }
         }
-        exercise {
+        for (failsOnResume in listOf(false, true)) exercise {
             settings.setTunnelingEnabled(true)
             live(timeshift = true)
             val entered = CompletableDeferred<Unit>()
@@ -132,16 +158,41 @@ internal class AudioInterruptionRetuneTest : AudioInterruptionFixture() {
             settle()
             beforeSettingsRead = {}
             assertEquals(1, connection.subscribeCount)
+            // As for an interrupted SDK retune, resolve to the player's paused state; this error stopped it.
+            assertEquals("an interrupted retune keeps the paused target presented",
+                AppPlaybackState.Idle, runtime.state.value)
+            assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+            assertFalse(player.playWhenReady)
             val states = mutableListOf<AppPlaybackState>()
             val observing = scope.launch(kotlinx.coroutines.test.UnconfinedTestDispatcher(scheduler)) {
                 runtime.state.collect { states += it }
             }
+            var resumedBinding = false
+            beforeLiveBinding = { resumedBinding = true }
+            if (failsOnResume) {
+                // Isolate the resolver's retained-reconnect mode without replacing this fence's session.
+                AppPlaybackRuntime::class.java.getDeclaredField("reconnectRecoveryEpoch").apply {
+                    isAccessible = true
+                    set(runtime, runtime.videoPresentation.value.epoch)
+                }
+                session.scriptLivePlaybackFailure(PlaybackBindingResult.TargetUnavailable)
+            }
             player.play()
-            await("resumed fallback") { connection.subscribeCount == 2 }
+            await("resumed fallback binding") { resumedBinding }
+            settle()
             observing.cancelAndJoin()
             assertTrue("resumed fallback presents as Starting", states.contains(AppPlaybackState.Starting))
             assertFalse("app fallback is not an SDK buffer exhaustion", states.any { it is AppPlaybackState.Recovering })
             assertFalse(player.trackSelectionParameters.tunnelingRequested)
+            if (failsOnResume) {
+                assertTrue("a failed app-only retune must expose the player error: ${runtime.state.value}",
+                    runtime.state.value is AppPlaybackState.Failed)
+                assertEquals(PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED,
+                    (runtime.state.value as AppPlaybackState.Failed).playerErrorNumber)
+                assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+            } else {
+                assertEquals(2, connection.subscribeCount)
+            }
         }
     }
 
