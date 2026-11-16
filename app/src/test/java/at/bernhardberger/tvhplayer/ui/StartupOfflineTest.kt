@@ -404,7 +404,7 @@ class StartupOfflineTest {
         playerData.readGate = null
         gate.complete(Unit)
         settle()
-        compose.onNodeWithText("2 Name 2", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("main-startup-wordmark", useUnmergedTree = true).assertExists()
         assertEquals("Connecting", compose.onNodeWithTag("main-startup-status", useUnmergedTree = true)
             .fetchSemanticsNode().config[SemanticsProperties.Text].single().text)
         assertEquals("the saved choice must not tune", 0, binds())
@@ -421,7 +421,7 @@ class StartupOfflineTest {
     }
 
     @Test fun readyAutoplayReplacesAMissingSavedChannelWithThePolicyChoice() {
-        startAutoplay(connecting(catalog), ChannelId(2), "2 Name 2")
+        startAutoplay(connecting(catalog), ChannelId(2), null)
         assertEquals(0, binds())
         val replacement = Channel.create(ChannelId(3), name = "Replacement", number = 3)
         session.publish(ready(ChannelCatalog.create(listOf(replacement))))
@@ -437,7 +437,7 @@ class StartupOfflineTest {
         session.publish(ready(catalog))
         settle()
         compose.onNodeWithText("1 Name 1", useUnmergedTree = true).assertExists()
-        compose.onNodeWithTag("main-startup-wordmark", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithTag("main-startup-wordmark", useUnmergedTree = true).assertExists()
         assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
     }
 

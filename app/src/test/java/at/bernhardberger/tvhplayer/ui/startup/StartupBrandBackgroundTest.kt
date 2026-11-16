@@ -67,6 +67,7 @@ class StartupBrandBackgroundTest {
         var channel by mutableStateOf<Channel?>(null)
         var status by mutableStateOf("Connecting")
         var fresh by mutableStateOf(true)
+        var tuning by mutableStateOf<Channel?>(null)
         lateinit var view: View
         compose.mainClock.autoAdvance = false
         compose.setContent {
@@ -74,7 +75,7 @@ class StartupBrandBackgroundTest {
             TVHeadendPlayerTheme {
                 CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, 1f)) {
                     ProvideArtworkSession(observation) {
-                        key(fresh) { ChannelStartupSurface(channel, status, freshStart = fresh) }
+                        key(fresh) { ChannelStartupSurface(channel, status, freshStart = fresh, tuningChannel = tuning) }
                     }
                 }
             }
@@ -102,6 +103,40 @@ class StartupBrandBackgroundTest {
         compose.runOnIdle { channel = null; fresh = true; status = "Syncing channels and guide" }
         compose.settleFrames(4)
         capture(view, "brand-only")
+        capture(view, "trial-brand-syncing")
+        compose.runOnIdle { channel = ridge; tuning = ridge }
+        compose.settleFrames(5)
+        capture(view, "trial-brand-tuning-logo")
+        compose.runOnIdle {
+            channel = Channel.create(ChannelId(8), name = "Little Orbit", number = 8)
+            tuning = channel
+        }
+        compose.settleFrames(4)
+        capture(view, "trial-brand-tuning-without-logo")
+        compose.runOnIdle {
+            channel = Channel.create(ridge.id, name = "Ridge Earth — Exploring Our Extraordinary Planet and Beyond" +
+                " — Stories from Every Continent and Ocean in Spectacular Detail",
+                number = 1, icon = ridge.icon)
+            tuning = channel
+        }
+        compose.settleFrames(4)
+        capture(view, "trial-brand-tuning-long-name")
+    }
+
+    @Test fun freshTuningKeepsBrandAndAnnouncesTheChannel() {
+        val channel = Channel.create(ChannelId(8), name = "Little Orbit", number = 8)
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                ChannelStartupSurface(channel, "Starting", freshStart = true, tuningChannel = channel,
+                    motionEnabled = false)
+            }
+        }
+        compose.onNodeWithTag("main-startup-wordmark", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("main-startup-mark", useUnmergedTree = true).assertExists()
+        val status = compose.onNodeWithTag("main-startup-tuning", useUnmergedTree = true).fetchSemanticsNode().config
+        assertEquals(listOf("Tuning 8 Little Orbit"), status[SemanticsProperties.ContentDescription])
+        assertEquals(androidx.compose.ui.semantics.LiveRegionMode.Polite, status[SemanticsProperties.LiveRegion])
+        compose.onNodeWithTag("startup-logo-Little Orbit", useUnmergedTree = true).assertDoesNotExist()
     }
 
     @Test fun reducedMotionKeepsTheStatusWithoutARingOrGlow() {

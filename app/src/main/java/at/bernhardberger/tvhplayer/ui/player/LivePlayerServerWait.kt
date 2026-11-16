@@ -184,6 +184,7 @@ internal fun LivePlayerServerWait(
     rootFocus: FocusRequester,
     motionEnabled: Boolean = ValueAnimator.areAnimatorsEnabled(),
     announceStatus: Boolean = true,
+    freshStart: Boolean = false,
 ) {
     val presentation = state.presentation
     val connecting = presentation is MainStartupPresentation.Passive
@@ -206,6 +207,10 @@ internal fun LivePlayerServerWait(
                 modifier = Modifier.testTag(LivePlayerServerWaitTag),
                 motionEnabled = motionEnabled,
                 announceStatus = announceStatus,
+                freshStart = freshStart,
+                tuningChannel = channel?.takeIf { freshStart &&
+                    (presentation as? MainStartupPresentation.Passive)?.messageKind ==
+                    MainStartupMessageKind.STARTING_TELEVISION },
             )
         }
     }

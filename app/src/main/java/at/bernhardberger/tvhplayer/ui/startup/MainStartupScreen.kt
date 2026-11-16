@@ -149,7 +149,7 @@ private fun MainStartupPassiveContent(
     // A channel start intentionally masks Syncing/Reconnecting as Connecting, then Starting.
     ChannelStartupSurface(
         channel = channel,
-        status = if (channel != null) stringResource(
+        status = if (channel != null && !brandingVisible) stringResource(
             if (connected) R.string.main_startup_message_starting else R.string.main_startup_message_connecting,
         ) else stringResource(mainStartupMessageResource(presentation.messageKind)),
         modifier = modifier,
@@ -157,6 +157,7 @@ private fun MainStartupPassiveContent(
         motionEnabled = motionEnabled,
         feedbackVisible = loadingFeedback == MainStartupLoadingFeedback.WAITING,
         contentPadding = contentPadding,
+        tuningChannel = channel?.takeIf { brandingVisible && connected },
     )
 }
 
@@ -175,11 +176,12 @@ internal fun ChannelStartupSurface(
     contentPadding: PaddingValues = PaddingValues(horizontal = 48.dp, vertical = 32.dp),
     channelName: String? = channel?.name,
     announceStatus: Boolean = true,
+    tuningChannel: Channel? = null,
 ) {
     var loaded by remember { mutableStateOf<StartupLogoContent?>(null) }
     // Only a replacement waits for its artwork: the first known channel names itself immediately.
     val displayedChannel = loaded?.channel?.takeUnless { it.id == channel?.id } ?: channel
-    val title = startupIdentityTitle(displayedChannel, channel, channelName)
+    val title = startupIdentityTitle(displayedChannel, channel, channelName, freshStart)
     val brandTitle = stringResource(R.string.app_name)
     val contentAlpha by animateFloatAsState(
         if (feedbackVisible) 1f else 0f,
@@ -191,8 +193,9 @@ internal fun ChannelStartupSurface(
     val glow = remember(freshStart) { Animatable(1f) }
     val glowPresent by remember(glow) { derivedStateOf { glow.value > 0f } }
     val contentVisible by remember { derivedStateOf { contentAlpha > 0f } }
-    LaunchedEffect(channel != null, motionEnabled, freshStart) {
-        if (channel == null) glow.snapTo(1f)
+    val fadeGlow = listOfNotNull(tuningChannel, channel.takeUnless { freshStart }).isNotEmpty()
+    LaunchedEffect(fadeGlow, motionEnabled, freshStart) {
+        if (!fadeGlow) glow.snapTo(1f)
         else glow.animateTo(0f, tween(if (motionEnabled) 2_000 else 0, easing = PlayerMotion.Standard))
     }
     Box(modifier.fillMaxSize().background(MainStartupBackground).testTag(MainStartupRootTag)
@@ -213,11 +216,11 @@ internal fun ChannelStartupSurface(
             ).widthIn(max = 680.dp).fillMaxWidth()
             Box(Modifier.align(Alignment.TopCenter).padding(top = maxHeight * (172f / 540f) - 30.dp)
                 .size(136.dp, 60.dp).graphicsLayer { alpha = contentAlpha }) {
-                StartupLogo(channel, loaded, motionEnabled) { loaded = it }
+                StartupLogo(channel.takeUnless { freshStart }, loaded, motionEnabled) { loaded = it }
             }
             Box(safeWidth.align(Alignment.TopCenter).padding(top = maxHeight * (250f / 540f) - nameHeight / 2)
                 .height(nameHeight).graphicsLayer { alpha = contentAlpha }, contentAlignment = Alignment.Center) {
-                StartupIdentity(title, displayedChannel?.id, motionEnabled)
+                StartupIdentity(title, displayedChannel?.id.takeUnless { freshStart }, motionEnabled)
             }
             Box(Modifier.align(Alignment.TopCenter).padding(top = maxHeight * (328f / 540f) - 22.dp)
                 .size(44.dp).graphicsLayer { alpha = contentAlpha }, contentAlignment = Alignment.Center) {
@@ -227,13 +230,18 @@ internal fun ChannelStartupSurface(
             // grows with font scale, well below the ring and inside the TV safe bounds.
             Box(safeWidth.align(Alignment.TopCenter).padding(top = maxHeight * (359f / 540f))
                 .height(104.dp).graphicsLayer { alpha = contentAlpha }) {
-                if (feedbackVisible) StartupStatus(status, motionEnabled, contentVisible && announceStatus)
+                if (feedbackVisible) {
+                    StartupStatus(status, motionEnabled, contentVisible && announceStatus, tuningChannel)
+                }
             }
         }
     }
 }
 
-private fun startupIdentityTitle(displayed: Channel?, requested: Channel?, requestedName: String?): String? {
+private fun startupIdentityTitle(
+    displayed: Channel?, requested: Channel?, requestedName: String?, brand: Boolean,
+): String? {
+    if (brand) return null
     val name = if (displayed?.id == requested?.id) requestedName else displayed?.name
     return name?.let { channelTitleText(displayed?.visibleChannelNumber, it) }
 }
@@ -251,8 +259,10 @@ private fun StartupIdentity(title: String?, channelId: ChannelId?, motionEnabled
 }
 
 @Composable
-private fun StartupStatus(status: String, motionEnabled: Boolean, announce: Boolean) {
-    StartupSlot(status, motionEnabled) { message, visible ->
+private fun StartupStatus(status: String, motionEnabled: Boolean, announce: Boolean, tuningChannel: Channel? = null) {
+    StartupSlot(status to tuningChannel, motionEnabled) { (message, channel), visible ->
+        if (channel != null) TuningStatus(channel, motionEnabled, visible && announce)
+        else
         Text(message, style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center,
             maxLines = 2, overflow = TextOverflow.Ellipsis,

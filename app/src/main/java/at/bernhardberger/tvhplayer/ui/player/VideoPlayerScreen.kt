@@ -366,6 +366,7 @@ fun VideoPlayerScreen(
     playbackRuntime: at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime = koinInject(),
     contentAllowed: Boolean = true,
     startupTarget: at.bernhardberger.tvhplayer.core.ApplianceLaunchTarget? = null,
+    freshStart: Boolean = false,
     startupChannelStartAtMillis: Long? = null,
     onStartupOutcome: (at.bernhardberger.tvhplayer.core.ApplianceLaunchTarget, at.bernhardberger.tvhplayer.core.MainStartupPlaybackOutcome) -> Boolean = { _, _ -> false },
     notices: NoticeCenter = koinInject(),
@@ -2141,6 +2142,7 @@ fun VideoPlayerScreen(
         )
         LivePlayerServerWait(
             serverWait, currentChannel, currentChannelName, rootFocus, announceStatus = startupTarget == null,
+            freshStart = freshStart,
         )
         LivePlayerAlertOverlay(
             visible = foregroundLayer == PlayerForegroundLayer.RECOVERY && serverWait.presentation == null,

@@ -1376,6 +1376,7 @@ fun AppRoot(
                                 },
                                 connectionUiState = connectionUiState,
                                 startupChannelStartAtMillis = channelStartAtMillis,
+                                freshStart = freshStart,
                                 startupTarget = (enteringLaunchTarget ?: revealingTarget)
                                     ?.takeIf { it.matchesPlayerKey(destination) },
                                 onStartupOutcome = { target, outcome ->
