@@ -58,6 +58,8 @@ is retained. No human reviewer; remains labeled machine-drafted.
 
 0.5 player options strings `playback_option_default`, `ad_breaks_none_marked` and `subtitle_follow_system_short` drafted against `350475f8` by GPT-6.1 Sol (medium) and reviewed by Sonnet 5.5 (medium); still machine-drafted, no human reviewer.
 
+0.5 settings string `tunneling_setting_fallback` drafted against `b9b18bf8` by GPT-6.1 Sol (medium) and reviewed by Sonnet 5.5 (medium); still machine-drafted, no human reviewer.
+
 ## Open questions
 
 - Check TTS pronunciation of `player_scrub_*` speed multipliers.

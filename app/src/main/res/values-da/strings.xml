@@ -865,6 +865,7 @@
     <string name="refresh_rate_matching_setting_description">Lad Android tilpasse skærmens opdateringsfrekvens til videoen, når det understøttes.</string>
     <string name="tunneling_setting">Tunneleret afspilning</string>
     <string name="tunneling_setting_description">Sender video direkte til tv’et, når dekoderen understøtter det. Kan afbryde billedet kortvarigt.</string>
+    <string name="tunneling_setting_fallback">Bruges ikke, før appen genstartes. Denne enhed kunne ikke afspille lyd i denne tilstand.</string>
     <string name="play">Afspil</string>
     <string name="play_recording">Afspil optagelse</string>
     <string name="status_disconnected_reconnecting">Forbindelsen er afbrudt. Genopretter forbindelse\u2026</string>

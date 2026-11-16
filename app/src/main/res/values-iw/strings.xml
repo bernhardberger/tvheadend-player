@@ -900,6 +900,7 @@
     <string name="refresh_rate_matching_setting_description">מאפשר ל-Android להתאים את קצב רענון המסך לסרטון, כאשר יש תמיכה.</string>
     <string name="tunneling_setting">ניגון במנהור</string>
     <string name="tunneling_setting_description">שולח וידאו ישירות לטלוויזיה כאשר המפענח תומך בכך. ייתכן ניתוק קצר בתמונה.</string>
+    <string name="tunneling_setting_fallback">אינו בשימוש עד להפעלה מחדש של האפליקציה. המכשיר לא הצליח לנגן שמע במצב זה.</string>
     <string name="play">ניגון</string>
     <string name="play_recording">ניגון ההקלטה</string>
     <string name="status_disconnected_reconnecting">החיבור אבד. מתבצע חיבור מחדש\u2026</string>

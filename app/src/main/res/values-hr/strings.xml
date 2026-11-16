@@ -900,6 +900,7 @@
     <string name="refresh_rate_matching_setting_description">Dopusti Androidu da uskladi frekvenciju osvježavanja zaslona s videom kad je podržano.</string>
     <string name="tunneling_setting">Tunelirana reprodukcija</string>
     <string name="tunneling_setting_description">Šalje video izravno TV-u ako dekoder to podržava. Može nakratko prekinuti sliku.</string>
+    <string name="tunneling_setting_fallback">Ne koristi se do ponovnog pokretanja aplikacije. Ovaj uređaj nije mogao reproducirati zvuk u tom načinu.</string>
     <string name="play">Reproduciraj</string>
     <string name="play_recording">Reproduciraj snimku</string>
     <string name="status_disconnected_reconnecting">Veza prekinuta. Ponovno povezivanje\u2026</string>

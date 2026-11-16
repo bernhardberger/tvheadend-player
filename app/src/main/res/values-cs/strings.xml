@@ -935,6 +935,7 @@
     <string name="refresh_rate_matching_setting_description">Povolit Androidu přizpůsobit obnovovací frekvenci obrazovky videu, pokud je to podporováno.</string>
     <string name="tunneling_setting">Tunelové přehrávání</string>
     <string name="tunneling_setting_description">Posílá video přímo do TV, pokud to dekodér podporuje. Může krátce přerušit obraz.</string>
+    <string name="tunneling_setting_fallback">Do restartu aplikace se nepoužívá. Toto zařízení v tomto režimu nedokázalo přehrát zvuk.</string>
     <string name="play">Přehrát</string>
     <string name="play_recording">Přehrát nahrávku</string>
     <string name="status_disconnected_reconnecting">Odpojeno. Obnovování připojení\u2026</string>
