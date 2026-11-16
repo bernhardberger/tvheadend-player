@@ -459,7 +459,16 @@ class AppPlaybackRuntime(
         livePlaybackObservation.collect { observation ->
             val observedEpoch = activeTargetEpoch
             if (observation is LivePlaybackObservation.Active && observedEpoch != null) {
-                observation.keptLiveLossNotice()?.let { observedLiveLoss = ObservedLiveLoss(observedEpoch, it) }
+                val notice = observation.keptLiveLossNotice() ?: BackgroundPlaybackNotice.TUNER_LOST.takeIf {
+                    foregroundPlaybackLifecycle.isKeeping(observedEpoch) &&
+                        observation.timeshiftState == LiveTimeshiftState.Unavailable &&
+                        observedLiveLoss?.epoch != observedEpoch
+                }
+                if (notice != null &&
+                    (notice != BackgroundPlaybackNotice.LIMIT_EXPIRED || observedLiveLoss?.epoch != observedEpoch)
+                ) {
+                    observedLiveLoss = ObservedLiveLoss(observedEpoch, notice)
+                }
             }
         }
     }
@@ -1499,6 +1508,12 @@ class AppPlaybackRuntime(
     fun onAppForegrounded() {
         scope.launch {
             targetCommands.serialize(onClosed = {}) {
+                val keptEpoch = activeTargetEpoch
+                if (foregroundPlaybackLifecycle.isKeeping(keptEpoch)) {
+                    keptLiveLoss(keptEpoch)?.let { notice ->
+                        applyForegroundPlaybackAction(foregroundPlaybackLifecycle.releaseKept(keptEpoch, notice))
+                    }
+                }
                 foreground = true
                 recordingMarkers.setForeground(true)
                 cancelKeepTimer()
@@ -2979,8 +2994,8 @@ class AppPlaybackRuntime(
     }
 
     /**
-     * A paused kept channel never plays without its server pause: stop with the tuner-loss notice,
-     * or the neutral one while the server has stopped the stream without an issue.
+     * A paused kept channel never plays without its server pause: stop with the tuner-loss,
+     * interruption or buffer-limit notice, according to the observed reason.
      */
     private suspend fun stopPausedRetune() {
         val notice = currentLiveLossNotice() ?: BackgroundPlaybackNotice.TUNER_LOST
@@ -2993,15 +3008,17 @@ class AppPlaybackRuntime(
      * stop observed for [epoch] since the keep began. The latter holds even if the server has
      * restarted the stream meanwhile, because the restart discards the kept timeshift.
      */
-    private fun keptLiveLoss(epoch: Long?): BackgroundPlaybackNotice? =
-        livePlaybackObservation.value.keptLiveLossNotice()
-            ?: observedLiveLoss?.takeIf { it.epoch == epoch }?.notice
+    private fun keptLiveLoss(epoch: Long?): BackgroundPlaybackNotice? {
+        val current = livePlaybackObservation.value.keptLiveLossNotice()
+        val observed = observedLiveLoss?.takeIf { it.epoch == epoch }?.notice
+        return (if (current == BackgroundPlaybackNotice.LIMIT_EXPIRED) observed ?: current else current ?: observed)
             ?: BackgroundPlaybackNotice.TUNER_LOST.takeIf {
                 (livePlaybackObservation.value as? LivePlaybackObservation.Active)
                     ?.timeshiftState == LiveTimeshiftState.Unavailable
             }
+    }
 
-    /** The current live target's stop or issue; null without a live target. */
+    /** The current live target's stop, issue or buffer-limit notice; null without a live target. */
     private fun currentLiveLossNotice(): BackgroundPlaybackNotice? =
         (livePlaybackObservation.value as? LivePlaybackObservation.Active)?.keptLiveLossNotice()
 
@@ -3059,7 +3076,8 @@ class AppPlaybackRuntime(
             // A stop, issue or full buffer that arrived before admission releases the keep now.
             val lossNotice = if (livePlaybackObservation.value is LivePlaybackObservation.Active) keptLiveLoss(keep.epoch) else null
             if (!yielded) {
-                applyForegroundPlaybackAction(foregroundPlaybackLifecycle.releaseKept(keep.epoch))
+                val notice = observedLiveLoss?.takeIf { it.epoch == keep.epoch }?.notice
+                applyForegroundPlaybackAction(foregroundPlaybackLifecycle.releaseKept(keep.epoch, notice))
             } else if (lossNotice != null) {
                 applyForegroundPlaybackAction(foregroundPlaybackLifecycle.releaseKept(keep.epoch, lossNotice))
             } else {

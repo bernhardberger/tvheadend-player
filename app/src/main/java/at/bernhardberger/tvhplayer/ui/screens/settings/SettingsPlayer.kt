@@ -12,6 +12,7 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.common.formatDurationSeconds
 import at.bernhardberger.tvhplayer.core.streamProfilePresentation
 import at.bernhardberger.tvhplayer.settings.FrameRateSwitching
+import at.bernhardberger.tvhplayer.settings.keepChannelMinuteChoices
 import at.bernhardberger.tvhplayer.settings.WarmPlaybackMode
 import at.bernhardberger.tvhplayer.settings.STARTUP_BUFFER_AUTOMATIC
 import at.bernhardberger.tvhplayer.settings.STARTUP_BUFFER_FIXED_MILLIS
@@ -63,7 +64,7 @@ internal fun settingsKeepChannelLevel(navigation: DepthNavigationState, vm: Sett
 
 @Composable
 internal fun settingsKeepChannelLevel(minutes: Int, onSelect: (Int) -> Unit): DepthLevel =
-    settingsLevel(KEEP_CHANNEL_LEVEL, stringResource(R.string.keep_channel_setting), listOf(0, 10, 20, 30, 60).map { value ->
+    settingsLevel(KEEP_CHANNEL_LEVEL, stringResource(R.string.keep_channel_setting), keepChannelMinuteChoices.map { value ->
         settingsRow("keep-$value", keepChannelLabel(value), selected = minutes == value, onClick = { onSelect(value) })
     }, initialItemId = "keep-$minutes",
         description = stringResource(R.string.keep_channel_description))

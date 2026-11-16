@@ -171,32 +171,27 @@ class BackgroundPlaybackRuntimeTest {
         assertFalse(player.trackSelectionParameters.tunnelingRequested)
     }
 
-    @Test fun expiryUsesVirtualTimeReleasesThenRetunesExactlyOnceWithNotice() {
-        for (statusArrived in listOf(false, true)) exercise {
-            live(timeshiftStatus = statusArrived)
-            assertEquals(
-                if (statusArrived) false else null,
-                (liveObservation()?.timeshiftState as? LiveTimeshiftState.Available)?.bufferFull,
-            )
-            runtime.onAppBackgrounded()
-            await { connection.priorityChanges.size == 1 }
-            scheduler.advanceTimeBy(1_199_999)
-            settle()
-            assertNotNull(runtime.activeTarget.value)
-            scheduler.advanceTimeBy(1)
-            await { runtime.activeTarget.value == null }
-            assertEquals(1, connection.subscribeCount)
-            assertFalse(androidx.media3.common.C.TRACK_TYPE_AUDIO in player.trackSelectionParameters.disabledTrackTypes)
-            await("exactly one subscription unsubscribed") { connection.unsubscribeCount == 1 }
-            assertNull(runtime.backgroundNotice.value)
-            returnAndRetune()
-            assertEquals(BackgroundPlaybackNotice.LIMIT_EXPIRED, runtime.backgroundNotice.value)
-            runtime.consumeBackgroundNotice(BackgroundPlaybackNotice.LIMIT_EXPIRED)
-            runtime.onAppForegrounded()
-            settle()
-            assertEquals(2, connection.subscribeCount)
-            assertNull(runtime.backgroundNotice.value)
-        }
+    @Test fun expiryUsesVirtualTimeReleasesThenRetunesExactlyOnceWithNotice() = exercise {
+        live(timeshiftStatus = false)
+        assertNull((liveObservation()?.timeshiftState as? LiveTimeshiftState.Available)?.bufferFull)
+        runtime.onAppBackgrounded()
+        await { connection.priorityChanges.size == 1 }
+        scheduler.advanceTimeBy(1_199_999)
+        settle()
+        assertNotNull(runtime.activeTarget.value)
+        scheduler.advanceTimeBy(1)
+        await { runtime.activeTarget.value == null }
+        assertEquals(1, connection.subscribeCount)
+        assertFalse(androidx.media3.common.C.TRACK_TYPE_AUDIO in player.trackSelectionParameters.disabledTrackTypes)
+        await("exactly one subscription unsubscribed") { connection.unsubscribeCount == 1 }
+        assertNull(runtime.backgroundNotice.value)
+        returnAndRetune()
+        assertEquals(BackgroundPlaybackNotice.LIMIT_EXPIRED, runtime.backgroundNotice.value)
+        runtime.consumeBackgroundNotice(BackgroundPlaybackNotice.LIMIT_EXPIRED)
+        runtime.onAppForegrounded()
+        settle()
+        assertEquals(2, connection.subscribeCount)
+        assertNull(runtime.backgroundNotice.value)
     }
 
     @Test fun fullBufferReleasesBeforeTheKeepLimitAndReturnsLikeExpiry() = exercise {
@@ -222,6 +217,8 @@ class BackgroundPlaybackRuntimeTest {
         connection.emit(SubscriptionEvent.Timeshift(1, 0, 0, 120_000_000, 100))
         await { (liveObservation()?.timeshiftState as? LiveTimeshiftState.Available)?.bufferFull == true }
         assertNotNull(runtime.activeTarget.value) // Full status alone does not stop foreground TV.
+        assertTrue(player.playWhenReady)
+        assertTrue(connection.priorityChanges.isEmpty())
         runtime.onAppBackgrounded()
         await { connection.priorityChanges.size == 1 }
         settle()
@@ -230,15 +227,25 @@ class BackgroundPlaybackRuntimeTest {
         assertEquals(BackgroundPlaybackNotice.LIMIT_EXPIRED, runtime.backgroundNotice.value)
     }
 
-    @Test fun unavailableTimeshiftWhileKeptReleasesBeforeTheLimit() = exercise {
-        live()
-        runtime.onAppBackgrounded()
-        await { connection.priorityChanges.size == 1 }
-        connection.completeStreams()
-        settle()
-        assertNull("lost timeshift must release the kept channel", runtime.activeTarget.value)
-        returnAndRetune()
-        assertEquals(BackgroundPlaybackNotice.TUNER_LOST, runtime.backgroundNotice.value)
+    @Test fun unavailableTimeshiftWhileKeptReleasesBeforeTheLimit() {
+        for (duringAdmission in listOf(false, true)) exercise {
+            live()
+            if (duringAdmission) beforePriority = {
+                connection.completeStreams()
+                await { liveObservation()?.timeshiftState == LiveTimeshiftState.Unavailable }
+            }
+            runtime.onAppBackgrounded()
+            if (duringAdmission) await { runtime.activeTarget.value == null }
+            else {
+                await { connection.priorityChanges.size == 1 }
+                connection.completeStreams()
+            }
+            settle()
+            assertNull("lost timeshift must release the kept channel", runtime.activeTarget.value)
+            beforePriority = {}
+            returnAndRetune()
+            assertEquals(BackgroundPlaybackNotice.TUNER_LOST, runtime.backgroundNotice.value)
+        }
     }
 
     @Test fun standbyReleasesWithoutNoticeAndNoninteractiveBackgroundNeverYields() = exercise {
@@ -375,6 +382,9 @@ class BackgroundPlaybackRuntimeTest {
         settle() // The loss check is queued behind the held command.
         startSubscription()
         await { liveObservation()?.let { !it.serverStopped && it.timeshiftState is LiveTimeshiftState.Available } == true }
+        connection.emit(SubscriptionEvent.Timeshift(1, 0, 0, 120_000_000, 0))
+        await { (liveObservation()?.timeshiftState as? LiveTimeshiftState.Available)?.bufferFull == true }
+        settle() // A later full buffer must not replace the recorded interruption.
         release.complete(Unit)
         // The restart discarded the kept timeshift: the recorded stop still ends the keep.
         await { runtime.activeTarget.value == null }
@@ -474,26 +484,50 @@ class BackgroundPlaybackRuntimeTest {
         assertEquals(BackgroundPlaybackNotice.INTERRUPTED, runtime.backgroundNotice.value)
     }
 
-    @Test fun returnQueuedBeforeTheStopCheckRetunesWithInterruptedNotice() = exercise {
-        live()
-        runtime.onAppBackgrounded()
-        await { connection.priorityChanges.size == 1 }
-        settle()
-        val release = holdCommands()
-        runtime.onAppForegrounded()
-        settle() // The return queues before the stop's loss check.
-        connection.emit(SubscriptionEvent.Stopped(SubscriptionCondition.NO_DETAIL, null))
-        await { liveObservation()?.serverStopped == true }
-        settle()
-        release.complete(Unit)
-        await { connection.subscribeCount == 2 }
-        connection.awaitCollectionRegistered()
-        startSubscription()
-        await { runtime.activeTarget.value != null && player.playWhenReady }
-        settle()
-        assertEquals(listOf(LiveSubscriptionPriority.YIELD, LiveSubscriptionPriority.NORMAL), connection.priorityChanges)
-        await("exactly one subscription unsubscribed") { connection.unsubscribeCount == 1 }
-        assertEquals(BackgroundPlaybackNotice.INTERRUPTED, runtime.backgroundNotice.value)
+    @Test fun returnQueuedBeforeTheStopCheckRetunesWithInterruptedNotice() {
+        val cases = listOf(
+            BackgroundPlaybackNotice.INTERRUPTED to false,
+            BackgroundPlaybackNotice.LIMIT_EXPIRED to true,
+            BackgroundPlaybackNotice.LIMIT_EXPIRED to false,
+            BackgroundPlaybackNotice.TUNER_LOST to false,
+        )
+        for ((notice, paused) in cases) exercise {
+            live()
+            if (paused) {
+                player.pause()
+                settle()
+            }
+            runtime.onAppBackgrounded()
+            await { connection.priorityChanges.size == 1 }
+            settle()
+            val release = holdCommands()
+            runtime.onAppForegrounded()
+            settle() // The return queues before the loss check.
+            when (notice) {
+                BackgroundPlaybackNotice.LIMIT_EXPIRED -> {
+                    connection.emit(SubscriptionEvent.Timeshift(1, 0, 0, 120_000_000, 0))
+                    await { (liveObservation()?.timeshiftState as? LiveTimeshiftState.Available)?.bufferFull == true }
+                }
+                BackgroundPlaybackNotice.TUNER_LOST -> {
+                    connection.completeStreams()
+                    await { liveObservation()?.timeshiftState == LiveTimeshiftState.Unavailable }
+                }
+                else -> {
+                    connection.emit(SubscriptionEvent.Stopped(SubscriptionCondition.NO_DETAIL, null))
+                    await { liveObservation()?.serverStopped == true }
+                }
+            }
+            settle()
+            release.complete(Unit)
+            await { connection.subscribeCount == 2 }
+            connection.awaitCollectionRegistered()
+            startSubscription()
+            await { runtime.activeTarget.value != null && player.playWhenReady }
+            settle()
+            assertEquals(2, connection.subscribeCount)
+            await("exactly one subscription unsubscribed") { connection.unsubscribeCount == 1 }
+            assertEquals(notice, runtime.backgroundNotice.value)
+        }
     }
 
     @Test fun explicitStopQueuedBeforeTheStopCheckLeavesNoNotice() = exercise {

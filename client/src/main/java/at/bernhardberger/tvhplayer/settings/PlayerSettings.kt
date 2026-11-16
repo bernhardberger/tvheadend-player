@@ -28,7 +28,7 @@ enum class WarmPlaybackMode { ON, AUDIO_ONLY, OFF }
 /** Whether the TV switches to the video's frame rate: Always may blank the screen briefly. */
 enum class FrameRateSwitching { ALWAYS, SEAMLESS_ONLY, OFF }
 
-private val keepChannelMinuteChoices = listOf(0, 10, 20, 30, 60)
+val keepChannelMinuteChoices = listOf(0, 10, 20, 30, 60)
 
 fun resolveFrameRateSwitching(storedValue: String?): FrameRateSwitching =
     FrameRateSwitching.entries.firstOrNull { it.name == storedValue } ?: FrameRateSwitching.ALWAYS
