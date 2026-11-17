@@ -8,6 +8,32 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class ColdStartPresentationTest {
+    @Test fun pendingLiveUsesOneGraceWithOrWithoutSavedChannels() {
+        for (readiness in listOf(CurrentChannelReadiness.Waiting,
+            CurrentChannelReadiness.Browsable(listOf(Channel.create(ChannelId(1)))))) {
+            val launch = ApplianceLaunchState.Pending(ApplianceLaunchRequest(1))
+            val startup = MainStartupState.Ready(at.bernhardberger.tvhplayer.settings.ServerSettings(), true)
+            fun shown(elapsed: Long) = mainStartupPresentation(startup, launch, unreachable, readiness,
+                channelStartAtMillis = 100L, nowMillis = 100L + elapsed)
+            assertEquals(MainStartupPresentation.Passive(MainStartupMessageKind.RECONNECTING), shown(14_999L))
+            assertEquals(actionable(AppErrorCondition.RECONNECTING, AppErrorAction.CONNECTION_SETTINGS), shown(15_000L))
+        }
+    }
+    @Test fun channelStartGraceOnlyDefersAutomaticRecoveryUntilItsDeadline() {
+        val started = 700L
+        val automatic = ConnectionUiState.Error(ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.AUTOMATIC_BACKOFF)
+        assertEquals(null, channelStartConnectionFailure(automatic, started, started + CHANNEL_START_CONNECTION_GRACE_MILLIS - 1))
+        assertEquals(automatic, channelStartConnectionFailure(automatic, started, started + CHANNEL_START_CONNECTION_GRACE_MILLIS))
+        for (failure in listOf(
+            ConnectionUiState.NeedsConfiguration,
+            ConnectionUiState.CredentialUnavailable,
+            ConnectionUiState.Error(ConnectionFailureKind.AUTHENTICATION, SessionRecoveryDisposition.PROFILE_CHANGE_REQUIRED),
+            ConnectionUiState.Error(ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.EXPLICIT_RETRY),
+        )) {
+            assertEquals(failure, channelStartConnectionFailure(failure, started, started))
+        }
+    }
+
     private val channels = listOf(Channel.create(ChannelId(1)))
     private val unreachable = ConnectionUiState.Error(ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.AUTOMATIC_BACKOFF)
     private fun actionable(condition: AppErrorCondition, vararg actions: AppErrorAction) =
@@ -86,17 +112,6 @@ class ColdStartPresentationTest {
         assertEquals(failed, observe(unreachable))
         assertEquals(MainStartupPresentation.Passive(MainStartupMessageKind.SYNCING_METADATA), observe(ConnectionUiState.SyncingChannels))
         assertEquals(connecting, observe(ConnectionUiState.Connecting))
-    }
-
-    @Test fun autoplayStartupShowsItsAutomaticBackoffAsTheReconnectingAlert() {
-        val requests = ApplianceLaunchRequests()
-        requests.request()
-        val startup = MainStartupState.Ready(at.bernhardberger.tvhplayer.settings.ServerSettings(host = "offline.invalid"), autoStartPlayback = true)
-        assertEquals(actionable(AppErrorCondition.RECONNECTING, AppErrorAction.CONNECTION_SETTINGS),
-            mainStartupPresentation(startup, requests.state.value, unreachable, CurrentChannelReadiness.Waiting))
-        // Saved channels never block: autoplay then waits as reconnecting.
-        assertEquals(MainStartupPresentation.Passive(MainStartupMessageKind.RECONNECTING),
-            mainStartupPresentation(startup, requests.state.value, unreachable, CurrentChannelReadiness.Browsable(channels)))
     }
 
     @Test fun aFailureStaysThroughAutomaticAttemptsUntilTheServerAnswersAndRetryClearsIt() {

@@ -45,7 +45,7 @@ internal fun automaticRecordingWindowLabel(window: RecordingStartWindow): String
 @Composable
 internal fun automaticRecordingChannelTimeLabel(draft: AutorecDraft, channels: List<Channel>): String =
     listOf(automaticRecordingChannelLabel(draft, channels), automaticRecordingDaysLabel(draft.days),
-        automaticRecordingWindowLabel(draft.startWindow)).joinToString(" · ")
+        automaticRecordingWindowLabel(draft.startWindow)).joinToString(" • ")
 
 @Composable
 internal fun automaticRecordingKeepLabel(value: DvrRemoval?): String = when (value) {

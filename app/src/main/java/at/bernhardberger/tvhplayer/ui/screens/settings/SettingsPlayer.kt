@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens.settings
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
@@ -12,6 +13,11 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.common.formatDurationSeconds
 import at.bernhardberger.tvhplayer.core.streamProfilePresentation
 import at.bernhardberger.tvhplayer.settings.FrameRateSwitching
+import at.bernhardberger.tvhplayer.settings.keepChannelMinuteChoices
+import at.bernhardberger.tvhplayer.ui.player.displayRefreshRateChoices
+import at.bernhardberger.tvhplayer.ui.player.formatRefreshRate
+import at.bernhardberger.tvhplayer.ui.player.matchesVideoRate
+import at.bernhardberger.tvhplayer.ui.player.toSpec
 import at.bernhardberger.tvhplayer.settings.WarmPlaybackMode
 import at.bernhardberger.tvhplayer.settings.STARTUP_BUFFER_AUTOMATIC
 import at.bernhardberger.tvhplayer.settings.STARTUP_BUFFER_FIXED_MILLIS
@@ -63,7 +69,7 @@ internal fun settingsKeepChannelLevel(navigation: DepthNavigationState, vm: Sett
 
 @Composable
 internal fun settingsKeepChannelLevel(minutes: Int, onSelect: (Int) -> Unit): DepthLevel =
-    settingsLevel(KEEP_CHANNEL_LEVEL, stringResource(R.string.keep_channel_setting), listOf(0, 10, 20, 30).map { value ->
+    settingsLevel(KEEP_CHANNEL_LEVEL, stringResource(R.string.keep_channel_setting), keepChannelMinuteChoices.map { value ->
         settingsRow("keep-$value", keepChannelLabel(value), selected = minutes == value, onClick = { onSelect(value) })
     }, initialItemId = "keep-$minutes",
         description = stringResource(R.string.keep_channel_description))
@@ -73,6 +79,48 @@ internal fun settingsKeepChannelLevel(minutes: Int, onSelect: (Int) -> Unit): De
 private fun keepChannelLabel(minutes: Int): String = if (minutes == 0) stringResource(R.string.keep_channel_off)
     else at.bernhardberger.tvhplayer.ui.common.formatDurationMinutes(minutes.toLong(),
         androidx.compose.ui.platform.LocalResources.current, spoken = true)
+
+internal const val DISPLAY_RATE_LEVEL = "display-rate"
+
+/** The display's refresh rates at its current resolution; empty before the window has a display. */
+@Composable
+private fun rememberDisplayRefreshRates(): List<Float> {
+    val view = androidx.compose.ui.platform.LocalView.current
+    return remember(view) {
+        val display = view.display ?: return@remember emptyList()
+        displayRefreshRateChoices(display.mode.toSpec(), display.supportedModes.map { it.toSpec() })
+    }
+}
+
+@Composable
+internal fun settingsDisplayRateLevel(navigation: DepthNavigationState, vm: SettingsPlayerViewModel = koinViewModel()): DepthLevel {
+    val ui by vm.ui.collectAsStateWithLifecycle()
+    return settingsDisplayRateLevel(ui.displayRefreshRate, rememberDisplayRefreshRates()) { rate ->
+        vm.onDisplayRefreshRateChanged(rate)
+        navigation.pop()
+    }
+}
+
+@Composable
+internal fun settingsDisplayRateLevel(selected: Float?, rates: List<Float>, onSelect: (Float?) -> Unit): DepthLevel {
+    val selectedRate = selected?.let { stored -> rates.firstOrNull { matchesVideoRate(it, stored) } }
+    return settingsLevel(DISPLAY_RATE_LEVEL, stringResource(R.string.display_refresh_rate_setting), listOf(
+        settingsRow(DISPLAY_RATE_SYSTEM, stringResource(R.string.display_refresh_rate_system),
+            supporting = stringResource(R.string.display_refresh_rate_system_help),
+            selected = selected == null, onClick = { onSelect(null) }),
+    ) + rates.map { rate ->
+        settingsRow(rate.toString(), displayRefreshRateLabel(rate),
+            selected = rate == selectedRate, onClick = { onSelect(rate) })
+    }, initialItemId = selectedRate?.toString() ?: DISPLAY_RATE_SYSTEM,
+        description = stringResource(R.string.display_refresh_rate_description))
+}
+
+private const val DISPLAY_RATE_SYSTEM = "system"
+
+@Composable
+private fun displayRefreshRateLabel(rate: Float?): String =
+    if (rate == null) stringResource(R.string.display_refresh_rate_system)
+    else stringResource(R.string.display_refresh_rate_value, formatRefreshRate(rate))
 
 internal const val FRAME_RATE_LEVEL = "frame-rate"
 
@@ -243,11 +291,15 @@ internal fun settingsPlayerLevel(
             section = stringResource(R.string.settings_section_streaming)),
         settingsRow(STARTUP_BUFFER_LEVEL, stringResource(R.string.startup_buffer_setting),
             startupBufferLabel(ui.startupBufferMillis, ui.startupBufferLearnedMillis), child = STARTUP_BUFFER_LEVEL),
-        settingsRow(FRAME_RATE_LEVEL, stringResource(R.string.refresh_rate_matching_setting),
-            frameRateSwitchingLabel(ui.frameRateSwitching), child = FRAME_RATE_LEVEL,
+        settingsRow(DISPLAY_RATE_LEVEL, stringResource(R.string.display_refresh_rate_setting),
+            displayRefreshRateLabel(ui.displayRefreshRate), child = DISPLAY_RATE_LEVEL,
             section = stringResource(R.string.settings_section_picture)),
+        settingsRow(FRAME_RATE_LEVEL, stringResource(R.string.refresh_rate_matching_setting),
+            frameRateSwitchingLabel(ui.frameRateSwitching), child = FRAME_RATE_LEVEL),
         settingsRow("tunneling", stringResource(R.string.tunneling_setting),
-            supporting = stringResource(R.string.tunneling_setting_description), checked = ui.tunnelingEnabled,
+            supporting = stringResource(
+                if (ui.tunnelingEnabled && ui.tunnelingFallbackActive) R.string.tunneling_setting_fallback
+                else R.string.tunneling_setting_description), checked = ui.tunnelingEnabled,
             section = stringResource(R.string.settings_section_experimental),
             onClick = { onTunnelingEnabledChanged(!ui.tunnelingEnabled) }),
     ))

@@ -10,7 +10,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 internal data class LiveRecoveryFence(
-    val reason: PlaybackRecoveryReason,
+    val reason: PlaybackRecoveryReason?,
     val selection: LivePlaybackSelection,
     val targetEpoch: Long,
     val viewingIntent: Long? = null,

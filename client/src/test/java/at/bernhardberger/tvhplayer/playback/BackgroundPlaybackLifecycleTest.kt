@@ -74,9 +74,21 @@ class BackgroundPlaybackLifecycleTest {
         val lifecycle = kept()
         lifecycle.releaseKept(7, BackgroundPlaybackNotice.TUNER_LOST)
         val replacement = AppPlaybackTarget.Recording(DvrEntryId(4))
-        assertEquals(ForegroundPlaybackAction.PauseRecording, lifecycle.onTargetStarted(replacement, 8))
+        assertEquals(ForegroundPlaybackAction.ReleaseRecording, lifecycle.onTargetStarted(replacement, 8))
         assertEquals(ForegroundPlaybackAction.None, lifecycle.releaseKept(7))
-        assertEquals(ForegroundPlaybackAction.ResumeRecording, lifecycle.onForegrounded(replacement, 8))
+        assertEquals(ForegroundPlaybackAction.ResumeRecording(), lifecycle.onForegrounded(replacement, 8))
+    }
+
+    @Test fun standbyRecordingReturnReopensOnceWithoutChangingPlayingIntent() {
+        val recording = AppPlaybackTarget.Recording(DvrEntryId(4))
+        for (playing in listOf(false, true)) {
+            val lifecycle = ForegroundPlaybackLifecycle()
+            assertEquals(ForegroundPlaybackAction.ReleaseRecording,
+                lifecycle.onBackgrounded(recording, 8, playing, interactive = false))
+            assertEquals(ForegroundPlaybackAction.ResumeRecording(play = playing),
+                lifecycle.onForegrounded(recording, 8))
+            assertEquals(ForegroundPlaybackAction.None, lifecycle.onForegrounded(recording, 8))
+        }
     }
 
     @Test fun newerIntentThanTheBackgroundedChannelSkipsResumeAndReleasesKeptTuner() {

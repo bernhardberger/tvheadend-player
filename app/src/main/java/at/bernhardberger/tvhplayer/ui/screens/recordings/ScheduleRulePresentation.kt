@@ -160,7 +160,7 @@ internal fun ScheduleRulePane(item: AutomaticRecordingListItem, channels: List<C
         is AutomaticRecordingListItem.Timer -> {
             val draft = item.rule.toDraft(LocalDate.MIN)
             whenLabel = formatTimerRecordingDays(LocalContext.current, draft.days) +
-                " • ${formatClock(draft.start)} – ${formatClock(draft.end)}"
+                " • ${formatClock(draft.start)}–${formatClock(draft.end)}"
             keepLabel = automaticRecordingKeepLabel(draft.removal)
         }
     }

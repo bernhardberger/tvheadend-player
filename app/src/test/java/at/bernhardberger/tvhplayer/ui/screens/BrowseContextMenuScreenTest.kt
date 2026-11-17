@@ -835,7 +835,7 @@ class BrowseContextMenuScreenTest {
         compose.onNodeWithTag("recording-resume").assertIsFocused()
         compose.onNodeWithText("Resume from 1:02:00").assertIsFocused()
         compose.onNode(hasText("The winter ridge") and hasAnyAncestor(hasTestTag("centred-dialog-card"))).assertExists()
-        compose.onNode(hasText("101 Ridge Earth HD · ", substring = true) and hasAnyAncestor(hasTestTag("centred-dialog-card"))).assertExists()
+        compose.onNode(hasText("101 Ridge Earth HD • ", substring = true) and hasAnyAncestor(hasTestTag("centred-dialog-card"))).assertExists()
         compose.onNodeWithText("Watched", substring = true).assertDoesNotExist()
         assertResumePiconGeometry(picon = true)
         compose.onNodeWithTag("recording-resume").assert(

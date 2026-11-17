@@ -263,7 +263,7 @@ class SettingsDepthNavigationTest {
         switchAccessibilityCheckedStateTracksCenterAndReentry("timeshift", downCount = 2)
 
     @Test fun tunnelingAccessibilityCheckedStateTracksCenterAndReentry() =
-        switchAccessibilityCheckedStateTracksCenterAndReentry("tunneling", downCount = 10)
+        switchAccessibilityCheckedStateTracksCenterAndReentry("tunneling", downCount = 11)
 
     @Test fun passthroughAccessibilityCheckedStateTracksCenterAndReentry() =
         switchAccessibilityCheckedStateTracksCenterAndReentry("audio-passthrough", 2, SettingsSection.AUDIO)
@@ -339,7 +339,9 @@ class SettingsDepthNavigationTest {
                             settingsPlayerLevel(ui,
                                 onTimeshiftEnabledChanged = { ui = ui.copy(timeshiftEnabled = it) },
                                 onAutoStartPlaybackChanged = { ui = ui.copy(autoStartPlayback = it) },
-                                onTunnelingEnabledChanged = { ui = ui.copy(tunnelingEnabled = it) }),
+                                onTunnelingEnabledChanged = {
+                                    ui = ui.copy(tunnelingEnabled = it, tunnelingFallbackActive = false)
+                                }),
                             settingsAudioLevel(ui,
                                 onAudioPassthroughEnabledChanged = { ui = ui.copy(audioPassthroughEnabled = it) },
                                 onAudioDescriptionChanged = { ui = ui.copy(audioDescription = it) }),
@@ -363,6 +365,12 @@ class SettingsDepthNavigationTest {
         assertAccessibleSwitch(tag, checked = false)
         press(Key.DirectionCenter)
         assertAccessibleSwitch(tag, checked = true)
+        if (rowId == "tunneling") {
+            compose.runOnIdle { ui = ui.copy(tunnelingFallbackActive = true) }
+            compose.onNodeWithTag(tag).assert(hasText(RuntimeEnvironment.getApplication()
+                .getString(at.bernhardberger.tvhplayer.R.string.tunneling_setting_fallback)))
+            assertAccessibleSwitch(tag, checked = true)
+        }
         press(Key.Back)
         compose.onNodeWithTag("settings-row-${section.name}").assertIsFocused()
         press(Key.DirectionCenter)
@@ -928,7 +936,7 @@ class SettingsDepthNavigationTest {
         press(Key.DirectionDown)
         press(Key.DirectionDown)
         press(Key.DirectionDown)
-        compose.onNode(isFocused() and hasText(keep) and hasText("Available when “Timeshift” is on."))
+        compose.onNode(isFocused() and hasText(keep) and hasText("Available when “Timeshift” is on"))
             .assertIsNotEnabled()
         press(Key.DirectionCenter)
         press(Key.DirectionRight)
@@ -975,7 +983,7 @@ class SettingsDepthNavigationTest {
         press(Key.DirectionCenter)
         assertEquals(STREAM_PROFILE_LEVEL, navigation.stack.active.levelId)
         compose.onNode(isFocused() and hasText("pass")).assertIsSelected()
-        compose.onNodeWithText("How Tvheadend prepares the stream for this TV.").assertIsDisplayed()
+        compose.onNodeWithText("How Tvheadend prepares the stream for this TV").assertIsDisplayed()
         // A page left open across a disconnect shows only why, as a row that offers nothing.
         compose.runOnIdle { ui = ui.copy(profiles = StreamProfilesResult.Failed(TvheadendFailure.NOT_READY), connected = false) }
         compose.onNodeWithText("Not connected").assertIsNotEnabled()
@@ -996,7 +1004,7 @@ class SettingsDepthNavigationTest {
         // Without a server list the row says why and stays closed, even through Right.
         for ((profilesState, connected, why) in listOf(
             Triple(StreamProfilesResult.Failed(TvheadendFailure.NOT_READY), false, "Not connected"),
-            Triple(StreamProfilesResult.Failed(TvheadendFailure.ACCESS_DENIED), true, "Stream profiles aren’t available."),
+            Triple(StreamProfilesResult.Failed(TvheadendFailure.ACCESS_DENIED), true, "Stream profiles aren’t available"),
         )) {
             compose.runOnIdle { ui = ui.copy(profiles = profilesState, connected = connected) }
             compose.onNode(isFocused() and hasText(row) and hasText(why)).assertIsNotEnabled()

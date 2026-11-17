@@ -405,7 +405,7 @@ class BrowseCohesionEvidenceTest {
         showRecordings(1f, empty = true)
         // Library preparation runs off-main; a composed frame alone is not readiness.
         awaitFocus(hasTestTag("recordings-mode-archive"))
-        compose.onNodeWithText("No recordings are available.").assertIsDisplayed()
+        compose.onNodeWithText("No recordings are available").assertIsDisplayed()
         capture("recordings-empty", 1f, "Empty recording library; Browse tab", hasTestTag("recordings-mode-archive"))
     }
 

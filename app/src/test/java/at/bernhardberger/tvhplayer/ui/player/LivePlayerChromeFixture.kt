@@ -296,6 +296,10 @@ abstract class LivePlayerChromeFixture {
             assertMainSettled("the driven player reports Playing") { runtime.state.value is AppPlaybackState.Playing }
             playerListeners.toList().forEach { it.onRenderedFirstFrame() }
             assertMainSettled("the driven frame is presented") { runtime.videoPresentation.value.visible }
+            assertMainSettled("a presented frame ends the startup wait") {
+                runtime.videoPresentation.value.channelStartAtMillis == null
+            }
+            settleFrames()
             // Media3's ExoPlayer playback thread binds the grant after collection registration.
             awaitLiveSignal("the timeshift grant is bound") { runtime.livePause.value.availability == LivePauseAvailability.READY }
             if (mapPosition) {
@@ -449,6 +453,7 @@ abstract class LivePlayerChromeFixture {
             if (zap) {
                 startLiveSubscription(connection, 1080, 0, timeshift = true)
                 playerReady()
+                compose.runOnIdle { playerListeners.toList().forEach { it.onRenderedFirstFrame() } }
                 settle()
                 if (pauseBeforeZap) {
                     key(Key.MediaPause)
@@ -521,6 +526,7 @@ abstract class LivePlayerChromeFixture {
             startLiveSubscription(connection, 1080, 0, timeshift = true)
             playerReady()
             assertMainSettled("the driven player reports Playing") { runtime.state.value is AppPlaybackState.Playing }
+            compose.runOnIdle { playerListeners.toList().forEach { it.onRenderedFirstFrame() } }
             settle()
             if (pauseBeforeZap) {
                 // Media3's ExoPlayer playback thread binds the grant after collection registration.
@@ -853,6 +859,7 @@ abstract class LivePlayerChromeFixture {
         recordingProfile: DvrConfigId? = null,
         settingsData: DataStore<Preferences> = InMemoryPreferencesDataStore(),
         settleOnEntry: Boolean = true,
+        presentOnEntry: Boolean = true,
         contentAllowed: () -> Boolean = { true },
         startup: Boolean = false,
         startupEnabled: () -> Boolean = { startup },
@@ -974,6 +981,12 @@ abstract class LivePlayerChromeFixture {
             settle()
             compose.mainClock.autoAdvance = false
             settle()
+            if (presentOnEntry && opener == null && contentAllowed() && !startupEnabled() && !failing) {
+                // Chrome scenarios start with a picture; a bound target alone is now Starting.
+                playerReady()
+                compose.runOnIdle { playerListeners.toList().forEach { it.onRenderedFirstFrame() } }
+                settle()
+            }
         }
     }
 

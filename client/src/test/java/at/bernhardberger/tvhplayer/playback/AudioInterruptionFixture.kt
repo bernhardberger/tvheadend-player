@@ -516,3 +516,13 @@ internal open class AudioInterruptionFixture {
         fun advanceRecoveryTime(millis: Long = 2_500) = driver.advanceLive(player, clock, millis)
     }
 }
+
+/** A nonrecoverable renderer failure, dispatched by Media3 as on a refused tunneled output. */
+internal fun ExoPlayer.failAudioTrackInitialization() {
+    createMessage { _, _ ->
+        throw ExoPlaybackException.createForRenderer(
+            UnsupportedOperationException("Builder.build"), "audio", 0, null,
+            C.FORMAT_HANDLED, false, PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED,
+        )
+    }.send()
+}

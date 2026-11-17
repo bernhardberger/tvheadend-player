@@ -345,17 +345,37 @@ internal class AudioInterruptionCleanupTest : AudioInterruptionFixture() {
         assertFalse(coordinator.playerCleanupPending.value)
     }
 
-    @Test fun departureKeepsReplacementUntouchedButRestoresAppMuteOnNewLiveCommit() = exercise {
-        live(timeshift = false)
-        focus.send(AudioInterruption.NOISY)
-        await { audioDisabled() }
-        player.setMediaItem(androidx.media3.common.MediaItem.fromUri("file:///replacement"))
-        await { runtime.activeTarget.value == null }
-        assertTrue(audioDisabled())
-        assertFalse(runtime.hasAudioInterruption)
-        assertFalse(runtime.isInterruptionMuted)
-        live(timeshift = false, channel = 2)
-        assertFalse(audioDisabled())
+    @Test fun departureKeepsReplacementUntouchedButRestoresAppMuteOnNewLiveCommit() {
+        for ((kept, detachBeforeDeparture) in listOf(false to false, true to false, true to true)) exercise {
+            settings.setKeepChannelMinutes(30)
+            live(timeshift = kept)
+            if (kept) runtime.onAppBackgrounded() else focus.send(AudioInterruption.NOISY)
+            await { audioDisabled() }
+            player.setMediaItem(androidx.media3.common.MediaItem.fromUri("file:///replacement"))
+            if (detachBeforeDeparture) {
+                assertNotNull(runtime.activeTarget.value)
+                runtime.detach()
+                assertTrue("Detach must not enable audio on a replacement target", audioDisabled())
+                return@exercise
+            }
+            await { runtime.activeTarget.value == null }
+            assertTrue(audioDisabled())
+            assertFalse(runtime.hasAudioInterruption)
+            assertFalse(runtime.isInterruptionMuted)
+            if (kept) {
+                runtime.onAppForegrounded()
+                settle()
+                failNextPrepare = true
+                val failed = scope.async {
+                    runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(2))))
+                }
+                await { failed.isCompleted }
+                assertFalse(failed.await()?.isStarted == true)
+                assertTrue("A failed install must not restore the departed target's audio disable", audioDisabled())
+            }
+            live(timeshift = false, channel = 2)
+            assertFalse(audioDisabled())
+        }
     }
 
     @Test fun departureKeepsReplacementUntouchedButRestoresAppMuteOnRecordingCommit() = exercise {

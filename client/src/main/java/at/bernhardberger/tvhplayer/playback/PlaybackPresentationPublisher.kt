@@ -6,6 +6,7 @@ import android.os.Handler
 import androidx.media3.common.C
 import androidx.media3.common.Format
 import androidx.media3.common.Player
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.exoplayer.DecoderCounters
 import androidx.media3.exoplayer.ExoPlayer
@@ -49,6 +50,7 @@ internal class PlaybackPresentationPublisher(
     private val elapsedRealtime: () -> Long,
     private val stallRecoveries: () -> Int,
     private val freshDecoderPerZap: () -> Boolean,
+    private val tunneling: () -> AppTunnelingState,
 ) {
     private val _state = MutableStateFlow<AppPlaybackState>(AppPlaybackState.Idle)
     val state = _state.asStateFlow()
@@ -123,6 +125,70 @@ internal class PlaybackPresentationPublisher(
     }
     val diagnostics = _diagnostics.asStateFlow()
     val videoPresentation = _videoPresentation.asStateFlow()
+
+    private var livePlayerOwner: Any? = null
+    private var livePlayerGeneration = 0L
+    private var channelStartAudioEpoch: Long? = null
+
+    fun livePlayerOwner(): Any? = targetCommands.readIfOpen { livePlayerOwner }
+
+    /** Surface identity fences an old disposal or a queued foreground return. */
+    fun registerLivePlayer(owner: Any, generation: Long, appInitiated: Boolean) {
+        targetCommands.runIfOpen {
+            if (generation < livePlayerGeneration) return@runIfOpen
+            livePlayerGeneration = generation
+            livePlayerOwner = owner
+            channelStartAudioEpoch = null
+            _videoPresentation.value = _videoPresentation.value.copy(
+                channelStartAtMillis = if (appInitiated && !_videoPresentation.value.visible) {
+                    elapsedRealtime()
+                } else null,
+            )
+        }
+    }
+
+    fun unregisterLivePlayer(owner: Any) {
+        targetCommands.runIfOpen {
+            if (livePlayerOwner !== owner) return@runIfOpen
+            livePlayerOwner = null
+            endChannelStart()
+        }
+    }
+
+    fun beginChannelStart(owner: Any?) {
+        targetCommands.runIfOpen {
+            if (owner == null || livePlayerOwner !== owner) return@runIfOpen
+            channelStartAudioEpoch = activeTargetEpoch()
+            _videoPresentation.value = _videoPresentation.value.copy(channelStartAtMillis = elapsedRealtime())
+        }
+    }
+
+    fun endChannelStart() {
+        targetCommands.runIfOpen {
+            _videoPresentation.value = _videoPresentation.value.copy(channelStartAtMillis = null)
+        }
+    }
+
+    /** An entry may adopt its already installed target instead of installing a new one. */
+    fun adoptChannelStartTarget() {
+        targetCommands.runIfOpen {
+            channelStartAudioEpoch = activeTargetEpoch()
+            endChannelStartIfAudioPlaying()
+        }
+    }
+
+    fun endChannelStartIfAudioPlaying(tracks: androidx.media3.common.Tracks = player.currentTracks) {
+        targetCommands.runIfOpen {
+            if (channelStartAudioEpoch != activeTargetEpoch()) return@runIfOpen
+            if (_activeTarget.value !is AppPlaybackTarget.Live || _state.value !is AppPlaybackState.Playing ||
+                !player.isPlaying
+            ) return@runIfOpen
+            if (player.playerError != null) return@runIfOpen
+            if (tracks.groups.any { it.type == androidx.media3.common.C.TRACK_TYPE_AUDIO && it.isSelected } &&
+                tracks.groups.none { it.type == androidx.media3.common.C.TRACK_TYPE_VIDEO }
+            ) endChannelStart()
+        }
+    }
 
     private var diagnosticDecoderName = "unknown"
     private var diagnosticDecoderGeneration = 0
@@ -239,6 +305,7 @@ internal class PlaybackPresentationPublisher(
 
     fun beginTargetPresentationLocked(epoch: Long) {
         targetCommands.runIfOpen {
+            channelStartAudioEpoch = epoch
             targetFrameListener?.let(player::removeListener)
             targetSoundListener?.let(player::removeAnalyticsListener)
             pendingSoundMillis = null
@@ -375,6 +442,11 @@ internal class PlaybackPresentationPublisher(
     }
 
     private fun noteFirstFrame(epoch: Long, counters: DecoderCounters?) {
+        targetCommands.runIfOpen {
+            if (epoch == activeTargetEpoch() && epoch == _videoPresentation.value.epoch) {
+                _videoPresentation.value = _videoPresentation.value.copy(channelStartAtMillis = null)
+            }
+        }
         if (policy.trace.enabled && !targetFrameRendered && epoch == activeTargetEpoch()) {
             val live = livePlaybackObservation.value as? LivePlaybackObservation.Active
             policy.trace.firstVideoFrame(epoch, player.videoFormat, live?.diagnostics?.source?.adapterName)
@@ -512,9 +584,10 @@ internal class PlaybackPresentationPublisher(
         _state.value = failure
     }
 
-    fun publishPlayerState(recoveryResolved: Boolean = false) {
+    fun publishPlayerState(recoveryResolved: Boolean = false, heldRecoveryError: PlaybackException? = null) {
         targetCommands.runIfOpen {
-            if (player.playerError == null) {
+            val error = player.playerError
+            if (error == null || error === heldRecoveryError) {
                 _state.value = if (recoveryResolved) {
                     playerStateAfterRecoveryResolution(
                         currentState = _state.value,
@@ -535,6 +608,7 @@ internal class PlaybackPresentationPublisher(
                 }
             }
             publishDiagnosticsUnderAccessLock()
+            endChannelStartIfAudioPlaying()
         }
     }
 
@@ -551,6 +625,7 @@ internal class PlaybackPresentationPublisher(
                 isPlaying = player.isPlaying,
             )
             publishDiagnosticsUnderAccessLock()
+            endChannelStartIfAudioPlaying()
         }
     }
 
@@ -611,6 +686,7 @@ internal class PlaybackPresentationPublisher(
             startupBuffer = startupBuffer?.inEffect?.value?.takeIf { activeTarget is AppPlaybackTarget.Live },
             stallRecoveries = stallRecoveries(),
             freshDecoderPerZap = freshDecoderPerZap(),
+            tunneling = tunneling(),
         )
     }
 

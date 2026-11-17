@@ -123,7 +123,7 @@ class OnboardingLayoutEvidenceTest {
 
     @Test fun searchIsItsOwnScreenAndChoosingAServerGoesOnToAccount() {
         show()
-        compose.onNodeWithTag("setup-find-server").assertIsFocused().assertTextEquals("Find servers on my network")
+        compose.onNodeWithTag("setup-find-server").assertIsFocused().assertTextEquals("Find servers on this network")
         assertEquals(0, state.searchRequest)
         compose.pressKey(Key.DirectionCenter)
         assertEquals(SetupStep.FIND_SERVER, state.step)

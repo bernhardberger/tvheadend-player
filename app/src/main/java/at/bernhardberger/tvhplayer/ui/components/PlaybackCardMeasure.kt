@@ -93,6 +93,6 @@ private fun playbackHeadingHeight(
 }
 
 internal fun channelLine(channel: String, airTime: String?) = listOfNotNull(channel.takeIf(String::isNotBlank), airTime)
-    .joinToString(" · ")
+    .joinToString(" • ")
 
 internal fun TextStyle.balanced() = copy(lineBreak = lineBreak.copy(strategy = LineBreak.Strategy.Balanced))

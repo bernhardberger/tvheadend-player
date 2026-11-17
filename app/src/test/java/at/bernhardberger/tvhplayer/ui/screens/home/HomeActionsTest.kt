@@ -768,7 +768,7 @@ class HomeActionsTest {
             homeScreen(input, observation)
         } }
         compose.onNodeWithText("Start watching").assertExists()
-        compose.onNodeWithText("Channels you watch and recordings will appear here.").assertExists()
+        compose.onNodeWithText("Channels you watch and recordings will appear here").assertExists()
         compose.onNodeWithText("Connection settings").assertDoesNotExist()
         compose.onNodeWithText("Browse channels").assertIsFocused()
         compose.onNodeWithTag("home-view-button").assertExists()
@@ -997,7 +997,7 @@ class HomeActionsTest {
             listOf(DvrEntry.create(DvrEntryId(1), state = DvrEntryState.COMPLETED,
                 start = Instant.fromEpochSeconds(now - 8 * 24 * 3600))))
         compose.onNodeWithText("No recordings yet.").assertDoesNotExist()
-        compose.onNodeWithText("Channels you watch and recordings will appear here.").assertExists()
+        compose.onNodeWithText("Channels you watch and recordings will appear here").assertExists()
     }
 
     @Test fun hiddenExplainingSectionsStillShowTheViewOptionsFallback() {

@@ -9,19 +9,19 @@ import kotlin.time.Duration
 internal sealed interface ForegroundPlaybackAction {
     data object None : ForegroundPlaybackAction
     data object StopLive : ForegroundPlaybackAction
-    data object PauseRecording : ForegroundPlaybackAction
+    data object ReleaseRecording : ForegroundPlaybackAction
     data class ResumeLive(val channelId: ChannelId, val notice: BackgroundPlaybackNotice? = null) : ForegroundPlaybackAction
     data class KeepLive(val epoch: Long, val deadlineMillis: Long) : ForegroundPlaybackAction
     data class ResumeKeptLive(val epoch: Long, val resume: Boolean) : ForegroundPlaybackAction
-    data object ResumeRecording : ForegroundPlaybackAction
+    data class ResumeRecording(val play: Boolean = true) : ForegroundPlaybackAction
 }
 
 internal suspend fun executeForegroundPlaybackAction(
     action: ForegroundPlaybackAction,
     stopLive: suspend () -> Unit,
-    pauseRecording: () -> Unit,
+    releaseRecording: suspend () -> Unit,
     resumeLive: suspend (ChannelId) -> Unit,
-    resumeRecording: suspend () -> Unit,
+    resumeRecording: suspend (Boolean) -> Unit,
     keepLive: suspend (ForegroundPlaybackAction.KeepLive) -> Unit = {},
     resumeKeptLive: suspend (ForegroundPlaybackAction.ResumeKeptLive) -> Unit = {},
     notice: (BackgroundPlaybackNotice) -> Unit = {},
@@ -29,14 +29,14 @@ internal suspend fun executeForegroundPlaybackAction(
     when (action) {
         ForegroundPlaybackAction.None -> Unit
         ForegroundPlaybackAction.StopLive -> stopLive()
-        ForegroundPlaybackAction.PauseRecording -> pauseRecording()
+        ForegroundPlaybackAction.ReleaseRecording -> releaseRecording()
         is ForegroundPlaybackAction.ResumeLive -> {
             resumeLive(action.channelId)
             action.notice?.let(notice)
         }
         is ForegroundPlaybackAction.KeepLive -> keepLive(action)
         is ForegroundPlaybackAction.ResumeKeptLive -> resumeKeptLive(action)
-        ForegroundPlaybackAction.ResumeRecording -> resumeRecording()
+        is ForegroundPlaybackAction.ResumeRecording -> resumeRecording(action.play)
     }
 }
 
@@ -135,11 +135,10 @@ internal class ForegroundPlaybackLifecycle {
                 else -> ForegroundPlaybackAction.ResumeKeptLive(target.keptEpoch, target.resume)
             }
             is BackgroundedPlaybackTarget.Recording -> if (
-                target.resumeOnForeground &&
                 activeTarget == AppPlaybackTarget.Recording(target.recordingId) &&
                 activeTargetEpoch == target.targetEpoch
             ) {
-                ForegroundPlaybackAction.ResumeRecording
+                ForegroundPlaybackAction.ResumeRecording(target.resumeOnForeground)
             } else {
                 ForegroundPlaybackAction.None
             }
@@ -169,7 +168,7 @@ internal class ForegroundPlaybackLifecycle {
         backgroundedTarget = null
         return if (foreground) {
             if (activeTarget is AppPlaybackTarget.Recording) {
-                ForegroundPlaybackAction.ResumeRecording
+                ForegroundPlaybackAction.ResumeRecording()
             } else {
                 ForegroundPlaybackAction.None
             }
@@ -203,7 +202,7 @@ internal class ForegroundPlaybackLifecycle {
         }
         return when (backgroundedTarget) {
             is BackgroundedPlaybackTarget.Live -> ForegroundPlaybackAction.StopLive
-            is BackgroundedPlaybackTarget.Recording -> ForegroundPlaybackAction.PauseRecording
+            is BackgroundedPlaybackTarget.Recording -> ForegroundPlaybackAction.ReleaseRecording
             null -> ForegroundPlaybackAction.None
         }
     }

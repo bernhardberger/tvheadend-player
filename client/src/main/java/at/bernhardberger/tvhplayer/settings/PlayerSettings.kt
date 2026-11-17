@@ -28,6 +28,8 @@ enum class WarmPlaybackMode { ON, AUDIO_ONLY, OFF }
 /** Whether the TV switches to the video's frame rate: Always may blank the screen briefly. */
 enum class FrameRateSwitching { ALWAYS, SEAMLESS_ONLY, OFF }
 
+val keepChannelMinuteChoices = listOf(0, 10, 20, 30, 60)
+
 fun resolveFrameRateSwitching(storedValue: String?): FrameRateSwitching =
     FrameRateSwitching.entries.firstOrNull { it.name == storedValue } ?: FrameRateSwitching.ALWAYS
 
@@ -282,7 +284,7 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
     }
 
     suspend fun setKeepChannelMinutes(minutes: Int) {
-        require(minutes in listOf(0, 10, 20, 30))
+        require(minutes in keepChannelMinuteChoices)
         dataStore.edit { it[Keys.KEEP_CHANNEL_MINUTES] = minutes }
     }
 
@@ -366,7 +368,7 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
                 frameRateSwitching = resolveFrameRateSwitching(p[Keys.FRAME_RATE_SWITCHING]),
                 tunnelingEnabled = p[Keys.TUNNELING_ENABLED] ?: false,
                 audioPassthroughEnabled = p[Keys.AUDIO_PASSTHROUGH_ENABLED] ?: true,
-                keepChannelMinutes = p[Keys.KEEP_CHANNEL_MINUTES]?.takeIf { it in listOf(0, 10, 20, 30) } ?: 20,
+                keepChannelMinutes = p[Keys.KEEP_CHANNEL_MINUTES]?.takeIf { it in keepChannelMinuteChoices } ?: 20,
                 warmPlaybackMode = WarmPlaybackMode.entries.firstOrNull { it.name == p[Keys.WARM_PLAYBACK_MODE] }
                     ?: WarmPlaybackMode.ON,
                 startupBufferMillis = p[Keys.STARTUP_BUFFER_MILLIS]

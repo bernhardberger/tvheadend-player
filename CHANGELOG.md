@@ -2,12 +2,26 @@
 
 ## Unreleased
 
+### Guide
+
+- A square channel logo, such as PULS 4's, no longer runs into the channel name in the header of a programme's details. The logo sits at the start of the line with a gap before the name (#45).
+
+## 0.5.2
+
 ### Playback
 
+- Settings → Playback has a *Display refresh rate* option to keep the app's screens at a chosen rate. *Match content frame rate* still switches to the video's rate (#44).
 - A channel can have its own stream profile: *Stream profile* in the live player's options lists the server's profiles, and the one you pick is used every time you tune that channel. *Default* follows the profile under Settings → Playback again. Picking a profile tunes the channel again, so what you paused or could rewind to is gone (#38).
 - A subtitle track, or *Off*, picked on a channel comes back the next time you watch that channel, the same way its audio track does. *Default* at the top of the list follows the Subtitles setting again (#38).
 - Turning subtitles off on one channel no longer turns them off on every channel and recording that follows.
 - On a channel with two audio tracks of the same language and format, the one you pick stays selected instead of switching back.
+- With *Tunneled playback* on, a device that can't open its audio output that way no longer stops with audio error 5001. The player turns tunneling off until the app restarts and starts the channel or recording again; on live TV, what you paused or could rewind to is gone. The setting stays on and says that it isn't in use, and *Stats for nerds* with debug details shows the tunneling state (#43).
+- Leaving the player for another app no longer keeps the TV's audio output busy. On TVs with audio passthrough, such as a Sony Bravia, the other app had no sound until the player was closed. A channel kept tuned in the background lets go of the audio while you're away. A recording is closed and continues where you left it when you come back, paused if you had paused it; one you leave past the point where it counts as watched is marked watched, the same as when you stop it (#39).
+- *Keep paused TV tuned* lets go of the channel early when the server's timeshift buffer is full, because it can't keep more of what you're missing anyway. Coming back then starts the channel again, the same as when the time runs out. The setting has a 60-minute choice (#40).
+
+### Startup
+
+- When the app starts into a channel, with *Start playback when the app opens*, after the TV wakes from standby or when you come back from another app, it shows the startup screen until the picture appears instead of a connection error. On a fresh start the app's name stays up, and the line under it names the channel as it starts. The error shows only if the server is still unreachable after 15 seconds. Back leaves the startup screen for the app's screens (#41).
 
 ### Recordings
 
@@ -16,6 +30,10 @@
 ### Remote buttons
 
 - The GUIDE button opens the Guide from every screen, not only from the startup screen and the live player, where it still shows the channel's schedule. The TV button starts live TV on the last channel from every screen (#33).
+
+### Pictures
+
+- Pictures from your XMLTV guide whose web address has several parameters load instead of showing the image site's placeholder. Tvheadend passes these addresses on with `&amp;` in them, and the app now reads them correctly (#42).
 
 ## 0.5.1
 

@@ -1,7 +1,26 @@
 @file:androidx.media3.common.util.UnstableApi
-@file:OptIn(at.bernhardberger.tvheadend.sdk.testing.FakePlaybackApi::class)
+@file:OptIn(at.bernhardberger.tvheadend.sdk.testing.FakePlaybackApi::class,
+    at.bernhardberger.tvheadend.sdk.playback.SubscriptionInfrastructureApi::class)
 
 package at.bernhardberger.tvhplayer.ui.player
+
+import at.bernhardberger.tvhplayer.testutil.awaitScheduledWork
+
+import kotlinx.coroutines.flow.onStart
+import at.bernhardberger.tvheadend.sdk.playback.SubscriptionOpener
+import at.bernhardberger.tvheadend.sdk.playback.SubscriptionConfirmation
+import at.bernhardberger.tvheadend.sdk.playback.SubscriptionOperationResult
+import at.bernhardberger.tvheadend.sdk.playback.SubscriptionEvent
+import at.bernhardberger.tvheadend.sdk.playback.SubscriptionCondition
+import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssue
+import at.bernhardberger.tvheadend.sdk.playback.SubscriptionStream
+import at.bernhardberger.tvheadend.sdk.playback.SubscriptionStreamType
+import at.bernhardberger.tvheadend.sdk.playback.StreamIndex
+import at.bernhardberger.tvheadend.sdk.playback.createSubscriptionManager
+import at.bernhardberger.tvheadend.sdk.testing.ScriptedSubscriptionConnection
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.awaitCancellation
 
 import at.bernhardberger.tvhplayer.testutil.settleFrames
 import at.bernhardberger.tvhplayer.testutil.pressKey
@@ -117,6 +136,9 @@ class LivePlayerServerWaitTest {
     private lateinit var session: FakeTvheadendSession
     private lateinit var runtime: AppPlaybackRuntime
     private lateinit var profiles: AppProfileOwner
+    private val owner = object : LifecycleOwner {
+        override val lifecycle = LifecycleRegistry.createUnsafe(this)
+    }
     private var closes = 0
     /** Key events no player handler consumed. */
     private var unconsumed = 0
@@ -161,10 +183,114 @@ class LivePlayerServerWaitTest {
         session.publish(ready())
         compose.settleFrames(10)
         assertMainSettled("the waiting start installs when the session arrives") { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(1)) }
+        compose.onRoot().performKeyInput { advanceEventTime(800) }
+        compose.settleFrames(2)
+        assertEquals("held Confirm repeats must not dismiss Starting", 1, waits())
+        compose.runOnIdle { playerListeners.toList().forEach { it.onRenderedFirstFrame() } }
+        compose.settleFrames(4)
+        assertEquals(0, waits())
         compose.onRoot().performKeyInput { keyUp(Key.DirectionCenter) }
         compose.settleFrames(10)
         assertEquals(0, unconsumed)
         assertEquals(0, compose.onAllNodes(hasTestTag("player-actions"), useUnmergedTree = true).fetchSemanticsNodes().size)
+    }
+
+    @Test fun channelStartupConsumesKeysExceptSystemAndBack() {
+        screen(freshStart = true)
+        for (connected in listOf(false, true)) {
+            if (connected) {
+                session.publish(ready())
+                compose.settleFrames(10)
+                assertMainSettled("the first target is installed") {
+                    runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(1))
+                }
+                compose.onNodeWithTag("main-startup-wordmark", useUnmergedTree = true).assertExists()
+                compose.onNodeWithTag("main-startup-tuning", useUnmergedTree = true).assertExists()
+            }
+            val target = runtime.activeTarget.value
+            val count = binds()
+            val playing = player.playWhenReady
+            for ((key, passes) in listOf(
+                Key.VolumeUp to true, Key.VolumeDown to true, Key.VolumeMute to true,
+                Key.Power to true, Key.SystemHome to true, Key.MediaPlayPause to false, Key.MediaPlay to false,
+                Key.MediaPause to false, Key.MediaFastForward to false, Key.MediaRewind to false,
+                Key.MediaStop to false, Key.Guide to false, Key.ChannelUp to false, Key.ChannelDown to false,
+                Key.Two to false, Key.DirectionUp to false, Key.DirectionDown to false,
+                Key.DirectionLeft to false, Key.DirectionRight to false, Key.DirectionCenter to false,
+                Key.Info to false, Key.Menu to false, Key.Unknown to false,
+            )) {
+                val before = unconsumed
+                compose.onRoot().performKeyInput {
+                    keyDown(key)
+                    advanceEventTime(800)
+                    keyUp(key)
+                }
+                assertEquals("$key passes only system keys", passes, unconsumed > before)
+                assertEquals("$key keeps the channel startup surface", 1, waits())
+                assertEquals("$key issues no playback command", playing, player.playWhenReady)
+                assertEquals("$key starts no new subscription", count, binds())
+                assertEquals(target, runtime.activeTarget.value)
+                compose.onNodeWithTag("player-actions").assertDoesNotExist()
+                compose.onNodeWithTag("playback-options-title").assertDoesNotExist()
+            }
+        }
+        compose.pressKey(Key.Back)
+        assertEquals(1, closes)
+    }
+
+    @Test fun aSubscriptionIssueReleasesStartingToTheChannelMessage() {
+        val dispatcher = StandardTestDispatcher()
+        val connection = ScriptedSubscriptionConnection().apply {
+            scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, null)))
+        }
+        val manager = createSubscriptionManager(connection, dispatcher).apply { startAdmission() }
+        try {
+            screen(opener = manager)
+            session.publish(ready())
+            compose.settleFrames(10)
+            assertMainSettled("the target is installed") { runtime.activeTarget.value != null }
+            compose.awaitScheduledWork(dispatcher) {
+                connection.subscribeCount > 0
+            }
+            runTest(dispatcher) {
+                connection.awaitCollectionRegistered()
+                connection.emit(SubscriptionEvent.Started(listOf(
+                    SubscriptionStream(index = StreamIndex(1), type = SubscriptionStreamType.H264,
+                        language = null, compositionId = null, ancillaryId = null, width = 320, height = 240,
+                        frameDuration = null, aspectNumerator = null, aspectDenominator = null, audioType = null,
+                        audioVersion = null, channelCount = null, rate = null, rdsUecp = null),
+                ), null))
+            }
+            compose.settleFrames(4)
+            runTest(dispatcher) {
+                connection.emit(SubscriptionEvent.Status(SubscriptionCondition.STATUS_REPORTED, SubscriptionIssue.NO_FREE_ADAPTER))
+            }
+            compose.settleFrames(10)
+            dispatcher.scheduler.runCurrent()
+            compose.settleFrames(4)
+            assertEquals("the SDK published the issue", SubscriptionIssue.NO_FREE_ADAPTER,
+                (runtime.livePlaybackObservation.value as? at.bernhardberger.tvheadend.sdk.media3.LivePlaybackObservation.Active)
+                    ?.subscriptionIssue)
+            assertEquals("a server issue is not masked by Starting", 0, waits())
+            compose.onNodeWithTag("player-channel-unavailable", useUnmergedTree = true).assertExists()
+            runTest(dispatcher) {
+                connection.emit(SubscriptionEvent.Status(SubscriptionCondition.NO_DETAIL, null))
+            }
+            compose.settleFrames(4)
+            assertEquals("a cleared issue returns to the pending picture", 1, waits())
+            session.publish(SessionObservation.create(
+                sessionState = SessionState.Unavailable(at.bernhardberger.tvheadend.sdk.core.SessionFailure.AUTHENTICATION_REJECTED),
+                channelState = ChannelRepositoryState.Stale(catalog),
+            ))
+            compose.runOnIdle {
+                this@LivePlayerServerWaitTest.connection.value = ConnectionUiState.Error(
+                    ConnectionFailureKind.AUTHENTICATION, SessionRecoveryDisposition.PROFILE_CHANGE_REQUIRED)
+            }
+            compose.settleFrames(4)
+            compose.onNodeWithTag("tv-recovery-primary").assertExists()
+        } finally {
+            runTest(dispatcher) { manager.closeAndJoin() }
+        }
     }
 
     // Opened before Ready, after a connection save to this profile: its saved logo shows at once.
@@ -190,7 +316,7 @@ class LivePlayerServerWaitTest {
     }
 
     @Test fun aRecreatedScreenWithAnActiveTargetStillHandlesTheLossAndRetunesOnReconnect() {
-        screen(initial = ready())
+        screen(initial = ready(), appInitiated = false)
         compose.runOnIdle {
             scope.launch { runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(1)))) }
         }
@@ -204,9 +330,59 @@ class LivePlayerServerWaitTest {
         compose.runOnIdle { visible.value = true }
         compose.settleFrames(10)
         assertEquals(1, waits())
+        assertMainSettled("the recreated in-app screen clears the lost target before reconnect") {
+            runtime.activeTarget.value == null
+        }
         session.publish(ready())
         compose.settleFrames(10)
         assertMainSettled("the reconnect binds a new stream") { binds() > before }
+    }
+
+    @Test fun aFailedEntryWaitsForANewSessionInsteadOfRetryingCatalogUpdates() {
+        screen()
+        session.scriptLivePlaybackFailure(at.bernhardberger.tvheadend.sdk.core.PlaybackBindingResult.TargetUnavailable)
+        session.publish(ready())
+        compose.waitForIdle()
+        assertEquals("the failed entry is attempted once", 1, binds())
+        compose.runOnIdle { owner.lifecycle.currentState = Lifecycle.State.CREATED }
+        compose.waitForIdle()
+        compose.runOnIdle { owner.lifecycle.currentState = Lifecycle.State.RESUMED }
+        compose.waitForIdle()
+        assertEquals("re-keying the failed entry does not retry the same selection", 1, binds())
+        session.publish(ready())
+        compose.waitForIdle()
+        assertEquals("catalog updates do not retry a failed entry", 1, binds())
+        val retryEntered = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val finishRetry = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val retryCancelled = kotlinx.coroutines.CompletableDeferred<Unit>()
+        beforeSettingsRead = {
+            retryEntered.complete(Unit)
+            try {
+                finishRetry.await()
+            } finally {
+                retryCancelled.complete(Unit)
+            }
+        }
+        session.replaceGeneration(session.observation.value)
+        compose.waitForIdle()
+        assertMainSettled("the new-session start reaches settings before installation") { retryEntered.isCompleted }
+        compose.runOnIdle { owner.lifecycle.currentState = Lifecycle.State.CREATED }
+        compose.waitForIdle()
+        assertMainSettled("backgrounding cancels the pending start") { retryCancelled.isCompleted }
+        assertMainSettled("the cancelled start settles before the next foreground") {
+            runtime.state.value is at.bernhardberger.tvhplayer.playback.AppPlaybackState.Idle
+        }
+        assertNull(runtime.activeTarget.value)
+        assertNotNull(runtime.videoPresentation.value.channelStartAtMillis)
+        beforeSettingsRead = {}
+        session.scriptLivePlaybackSuccess()
+        finishRetry.complete(Unit)
+        compose.runOnIdle { owner.lifecycle.currentState = Lifecycle.State.RESUMED }
+        compose.waitForIdle()
+        assertMainSettled("foreground return restarts the same session's cancelled start") {
+            runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(1))
+        }
+        assertEquals("a new session retries the channel", 2, binds())
     }
 
     @Test fun aProfileSavedDuringTheOutageRetunesNothingAway() {
@@ -259,10 +435,23 @@ class LivePlayerServerWaitTest {
 
     @Test fun aWaitWhoseConnectionRetriesByItselfOffersNoRetry() {
         screen()
+        session.publish(ready())
+        compose.settleFrames(10)
+        compose.pressKey(Key.DirectionCenter)
+        compose.settleFrames(3)
+        assertEquals("Starting remains until a frame", 1, waits())
         compose.runOnIdle {
+            session.publish(SessionObservation.create(sessionState = SessionState.Connecting,
+                channelState = ChannelRepositoryState.Stale(catalog)))
             connection.value = ConnectionUiState.Error(ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.AUTOMATIC_BACKOFF)
         }
         compose.settleFrames(10)
+        assertEquals("an automatic retry starts with the channel wait, not error 110", 1, waits())
+        compose.pressKey(Key.ChannelUp)
+        assertEquals("Connecting consumes channel keys", AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        compose.onNode(hasText(string(R.string.error_110_title))).assertDoesNotExist()
+        compose.mainClock.advanceTimeBy(15_000L)
+        compose.settleFrames(2)
         compose.onNode(hasText(string(R.string.error_110_title))).assertExists()
         compose.onNodeWithTag("tv-recovery-primary").assert(hasText("Connection settings")).assertIsFocused()
         assertEquals(0, compose.onAllNodes(hasText("Retry"), useUnmergedTree = true).fetchSemanticsNodes().size)
@@ -283,7 +472,64 @@ class LivePlayerServerWaitTest {
         compose.onNodeWithTag("tv-recovery-secondary").assert(hasText("Connection settings"))
     }
 
+    @Test fun standbyReturnWithNoConnectionWaitsInsteadOfShowingTheLiveAlert() {
+        screen(initial = ready())
+        assertMainSettled("the initial channel is installed") { runtime.activeTarget.value != null }
+        compose.runOnIdle {
+            owner.lifecycle.currentState = Lifecycle.State.CREATED
+            runtime.onAppBackgrounded(interactive = false)
+        }
+        assertMainSettled("standby releases the channel") { runtime.activeTarget.value == null }
+        session.publish(SessionObservation.create(sessionState = SessionState.Connecting, channelState = ChannelRepositoryState.Stale(catalog)))
+        compose.settleFrames(2)
+        compose.runOnIdle {
+            runtime.onAppForegrounded()
+            connection.value = ConnectionUiState.Error(ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.AUTOMATIC_BACKOFF)
+            owner.lifecycle.currentState = Lifecycle.State.RESUMED
+        }
+        assertMainSettled("foreground begins a new channel start") { runtime.videoPresentation.value.channelStartAtMillis != null }
+        compose.settleFrames(2)
+        assertEquals(1, waits())
+        compose.onNode(hasText(string(R.string.error_110_title))).assertDoesNotExist()
+        compose.pressKey(Key.DirectionCenter)
+        assertEquals(1, waits())
+        val beforeReconnect = binds()
+        session.publish(ready())
+        compose.runOnIdle { connection.value = null }
+        compose.settleFrames(10)
+        assertEquals("the resumed channel is retuned exactly once when its session arrives", beforeReconnect + 1, binds())
+        assertEquals("session readiness must not uncover a channel before its first frame", 1, waits())
+        compose.onNode(hasText("Starting"), useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("player-footer").assertDoesNotExist()
+        compose.runOnIdle { playerListeners.toList().forEach { it.onRenderedFirstFrame() } }
+        compose.settleFrames(2)
+        assertNull(runtime.videoPresentation.value.channelStartAtMillis)
+        assertEquals(0, waits())
+        compose.pressKey(Key.Back)
+        assertEquals(1, closes)
+        assertNull(runtime.videoPresentation.value.channelStartAtMillis)
+    }
+
+    @Test fun aConnectionLostAfterTheChannelStartEndsKeepsTheExistingAlert() {
+        screen(initial = ready())
+        assertMainSettled("the live target is installed") { runtime.activeTarget.value != null }
+        compose.runOnIdle {
+            player.pause()
+            playerListeners.toList().forEach { it.onPlaybackStateChanged(androidx.media3.common.Player.STATE_READY) }
+            playerListeners.toList().forEach { it.onRenderedFirstFrame() }
+        }
+        assertNull(runtime.videoPresentation.value.channelStartAtMillis)
+        org.junit.Assert.assertTrue(runtime.videoPresentation.value.visible)
+        session.publish(SessionObservation.create(
+            sessionState = SessionState.Connecting, channelState = ChannelRepositoryState.Stale(catalog),
+        ))
+        compose.settleFrames(4)
+        assertEquals(0, waits())
+        compose.onNode(hasText(string(R.string.error_110_title))).assertExists()
+    }
+
     private val visible = MutableStateFlow(true)
+    private val playerListeners = mutableListOf<androidx.media3.common.Player.Listener>()
     /** AppRoot's connection state; null derives it from the observation. */
     private val connection = mutableStateOf<ConnectionUiState?>(null)
 
@@ -303,6 +549,54 @@ class LivePlayerServerWaitTest {
         dvrState = DvrRepositoryState.Current(DvrSnapshot.create()),
     )
 
+    private var beforeSettingsRead: suspend () -> Unit = {}
+
+    @Test fun aConnectedViewerSelectionUsesThePlayersOwnOpeningState() {
+        screen(initial = ready(), appInitiated = false)
+        assertMainSettled("the viewer's channel is installed") { runtime.activeTarget.value != null }
+        compose.settleFrames(4)
+        assertEquals("a connected viewer selection must not show channel startup", 0, waits())
+        assertNull(runtime.videoPresentation.value.channelStartAtMillis)
+        assertEquals("the target still awaits its first frame", false, runtime.videoPresentation.value.visible)
+    }
+
+    @Test fun aDisconnectedViewerSelectionWaitsForItsFirstSessionAndBindsOnce() {
+        screen(appInitiated = false)
+        assertEquals("an in-app selection waits for its first session", 1, waits())
+        assertNull(runtime.videoPresentation.value.channelStartAtMillis)
+        assertEquals(0, binds())
+        compose.onNode(hasText(string(R.string.error_110_title))).assertDoesNotExist()
+        session.publish(ready())
+        compose.settleFrames(10)
+        assertMainSettled("the viewer selection installs once") { runtime.activeTarget.value != null }
+        assertEquals(1, binds())
+        assertEquals("a viewer selection has no Starting phase", 0, waits())
+        compose.runOnIdle {
+            session.publish(SessionObservation.create(sessionState = SessionState.Connecting,
+                channelState = ChannelRepositoryState.Stale(catalog)))
+            connection.value = ConnectionUiState.Error(ConnectionFailureKind.UNREACHABLE,
+                SessionRecoveryDisposition.AUTOMATIC_BACKOFF)
+        }
+        compose.settleFrames(4)
+        compose.onNode(hasText(string(R.string.error_110_title))).assertExists()
+    }
+
+    @Test fun aRecoveryHandoffKeepsTheDeadlineAndItsFocusedAction() {
+        val origin = mutableStateOf<Long?>(android.os.SystemClock.elapsedRealtime() - 5_000L)
+        screen(startupOrigin = origin)
+        compose.runOnIdle {
+            connection.value = ConnectionUiState.Error(ConnectionFailureKind.UNREACHABLE,
+                SessionRecoveryDisposition.AUTOMATIC_BACKOFF)
+        }
+        compose.mainClock.advanceTimeBy(10_000L)
+        compose.settleFrames(2)
+        compose.onNodeWithTag("tv-recovery-primary").assertIsFocused()
+        compose.runOnIdle { origin.value = null }
+        compose.settleFrames(4)
+        compose.onNodeWithTag("tv-recovery-primary").assertIsFocused()
+        assertEquals(0, waits())
+    }
+
     private fun screen(
         initial: SessionObservation = SessionObservation.create(
             sessionState = SessionState.Connecting,
@@ -310,8 +604,15 @@ class LivePlayerServerWaitTest {
         ),
         // The profile the observation is data of, with saved logos and channel one's icon.
         profile: ServerProfile? = null,
+        opener: SubscriptionOpener = SubscriptionOpener { _, _, _ -> awaitCancellation() },
+        startupOrigin: androidx.compose.runtime.State<Long?>? = null,
+        appInitiated: Boolean = true,
+        freshStart: Boolean = false,
     ) {
-        session = FakeTvheadendSession(initial).apply { scriptLivePlaybackSuccess() }
+        // A pending first frame needs a held stream, not the fake's immediate end-of-input failure.
+        session = FakeTvheadendSession(initial).apply {
+            scriptLivePlaybackSuccess(opener)
+        }
         if (profile != null) {
             session.artwork.scriptCached(profile)
             session.publish(SessionObservation.create(sessionState = SessionState.Connecting,
@@ -320,7 +621,9 @@ class LivePlayerServerWaitTest {
                 }))), profile)
         }
         val data = InMemoryPreferencesDataStore()
-        val settings = PlayerSettingsStore(data)
+        val settings = PlayerSettingsStore(object : androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences> by data {
+            override val data = data.data.onStart { beforeSettingsRead() }
+        })
         profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.Main.immediate,
             readProfileForEditing = { ServerProfileEditReadResult.Missing })
         scope.launch { profiles.run() }
@@ -329,14 +632,12 @@ class LivePlayerServerWaitTest {
         assertMainSettled("the fake channel catalog is collected") { channels.scope.value.scope.visibleChannels.size == 3 }
         player = ExoPlayer.Builder(context).build()
         val coordinator = createTvheadendPlaybackCoordinator(player).also { it.launchIn(scope) }
-        runtime = AppPlaybackRuntime(player, session, coordinator, settings, profiles, scope,
+        val controlled = at.bernhardberger.tvhplayer.testutil.observePlayerListeners(player, playerListeners)
+        runtime = AppPlaybackRuntime(controlled, session, coordinator, settings, profiles, scope,
             TvheadendAudioOutputProvider(context), PlaybackAudioFocus.None, PlaybackRuntimePolicy.fromPlayerSettings(),
             noticeCenter = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) { at.bernhardberger.tvhplayer.notices.NoticeContext(0, null) })
         val video = VideoPlayerViewModel(runtime, session)
         models.put("video", video)
-        val owner = object : LifecycleOwner {
-            override val lifecycle = LifecycleRegistry.createUnsafe(this)
-        }
         owner.lifecycle.currentState = Lifecycle.State.RESUMED
         val notices = NoticeCenter(android.os.SystemClock::elapsedRealtime) {
             NoticeContext(profiles.configurationGeneration.value, session.observation.value.currentSession?.generationIdentity)
@@ -350,14 +651,17 @@ class LivePlayerServerWaitTest {
                             VideoPlayerScreen(video, ChannelSelectionStore(), LastPlayedChannelStore(context), TargetAspect(AspectRatioMode.FIT) {},
                                 channels, session, ChannelId(1), "Name 1", {},
                                 { closes++ }, runtime, notices = notices, uiSettingsStore = UiSettingsStore(data),
-                                connectionUiState = connection.value, statsStore = statsStore)
+                                connectionUiState = connection.value, statsStore = statsStore,
+                                startupTarget = if (appInitiated) at.bernhardberger.tvhplayer.core.ApplianceLaunchTarget(
+                                    at.bernhardberger.tvhplayer.core.ApplianceLaunchRequest(1), ChannelId(1), "Name 1") else null,
+                                startupChannelStartAtMillis = startupOrigin?.value, freshStart = freshStart)
                         }
                     }
                 } }
             }
         }
         compose.settleFrames(10)
-        if (initial.currentSession == null) compose.waitUntil(10_000) { waits() == 1 }
+        if (initial.currentSession == null && appInitiated) compose.waitUntil(10_000) { waits() == 1 }
     }
 
     private fun string(id: Int): String = ApplicationProvider.getApplicationContext<Application>().getString(id)

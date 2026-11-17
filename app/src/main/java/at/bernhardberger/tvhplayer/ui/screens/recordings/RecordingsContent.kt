@@ -676,7 +676,7 @@ internal fun RecordingProblems(
     val countsLine = listOfNotNull(
         counts.failed.takeIf { it > 0 }?.let { pluralStringResource(R.plurals.problems_count_failed, it, it) },
         counts.canceled.takeIf { it > 0 }?.let { pluralStringResource(R.plurals.problems_count_canceled, it, it) },
-    ).joinToString(" · ")
+    ).joinToString(" • ")
     var clearWidth by remember { mutableStateOf(0.dp) }
     val density = LocalDensity.current
     val owner = LocalTabOwner.current

@@ -891,9 +891,9 @@ class ProgrammeDetailsPageTest {
         val sparse = EpgEvent.create(event.id, event.channelId, event.start, event.stop,
             episode = EpgEpisode(null, null, null, null, null, null, null, null, "Pilot"), isNew = true,
             contentGenre = ContentGenre.fromContentType(0x90))
-        Assert.assertEquals(listOf("Genre" to "Education & Factual", "Episode" to "Pilot", "Broadcast" to "New"),
+        Assert.assertEquals(listOf("Genre" to "Education & factual", "Episode" to "Pilot", "Broadcast" to "New"),
             programmeAboutFacts(sparse, null, resources, Locale.US))
-        Assert.assertEquals(listOf("Education & Factual", "Pilot"),
+        Assert.assertEquals(listOf("Education & factual", "Pilot"),
             at.bernhardberger.tvhplayer.ui.components.programmeHeaderMetadata(programmeAboutFacts(sparse, null, resources, Locale.US), resources, sparse.episode))
         // XMLTV guides mostly send categories without a genre: the first two stand in for it.
         val categoriesOnly = EpgEvent.create(event.id, event.channelId, event.start, event.stop, copyrightYear = 2021,

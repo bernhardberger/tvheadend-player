@@ -49,9 +49,8 @@ class VideoPlayerViewModel(
     }
 
     /** Automatic stop (connection lost, rejected start); records no user stop. */
-    suspend fun stopAfterLoss() {
-        playbackRuntime.stopAfterLoss()
-    }
+    suspend fun stopAfterLoss(unlessChannelStarting: Boolean = false) =
+        playbackRuntime.stopAfterLoss(unlessChannelStarting)
 
     /**
      * [viewerRetry]: the viewer pressed Retry (a fresh start); otherwise automatic reconnect recovery.

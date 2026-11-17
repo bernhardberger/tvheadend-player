@@ -3,6 +3,8 @@
     at.bernhardberger.tvheadend.sdk.testing.FakePlaybackApi::class,
     at.bernhardberger.tvheadend.sdk.playback.SubscriptionInfrastructureApi::class,
     kotlinx.coroutines.ExperimentalCoroutinesApi::class,
+    at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class,
+    at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi::class,
 )
 
 package at.bernhardberger.tvhplayer.playback
@@ -38,16 +40,34 @@ import org.robolectric.annotation.Config
 @Config(sdk = [34], application = Application::class)
 class BackgroundPlaybackRuntimeTest {
     @Test fun keepAndReturnOrdersCommandsAndReacquiresFocusWithoutRetune() = exercise {
+        runtime.enterPlayerScreen(livePlayerOwner = this)
         live()
+        playerListeners.toList().forEach { it.onRenderedFirstFrame() }
+        assertTrue(runtime.videoPresentation.value.visible)
         val commands = connection.calls.size
         runtime.onAppBackgrounded()
         await { connection.priorityChanges == listOf(LiveSubscriptionPriority.YIELD) }
         assertFalse(player.playWhenReady)
+        assertTrue(androidx.media3.common.C.TRACK_TYPE_AUDIO in player.trackSelectionParameters.disabledTrackTypes)
         assertTrue(focus.abandons > 0)
         assertEquals(listOf(ScriptedSubscriptionCall.SPEED, ScriptedSubscriptionCall.PRIORITY), controlCalls(commands))
         scheduler.advanceTimeBy(60_000)
+        val resuming = CompletableDeferred<Unit>()
+        val finishResume = CompletableDeferred<Unit>()
+        beforePriority = { priority ->
+            if (priority == LiveSubscriptionPriority.NORMAL) {
+                resuming.complete(Unit)
+                finishResume.await()
+            }
+        }
         runtime.onAppForegrounded()
+        await { resuming.isCompleted }
+        assertNotNull(runtime.videoPresentation.value.channelStartAtMillis)
+        beforePriority = {}
+        finishResume.complete(Unit)
         await { player.playWhenReady && connection.speeds == listOf(0, 100) }
+        assertFalse(androidx.media3.common.C.TRACK_TYPE_AUDIO in player.trackSelectionParameters.disabledTrackTypes)
+        assertNull(runtime.videoPresentation.value.channelStartAtMillis)
         assertEquals(listOf(LiveSubscriptionPriority.YIELD, LiveSubscriptionPriority.NORMAL), connection.priorityChanges)
         assertEquals(listOf(ScriptedSubscriptionCall.SPEED, ScriptedSubscriptionCall.PRIORITY,
             ScriptedSubscriptionCall.PRIORITY, ScriptedSubscriptionCall.SPEED), controlCalls(commands))
@@ -71,7 +91,64 @@ class BackgroundPlaybackRuntimeTest {
         await { runtime.activeTarget.value == null }
     }
 
+    @Test fun recordingsReleaseTheirSourceInBackground() = exercise {
+        runtime.enterPlayerScreen(livePlayerOwner = this)
+        val install = scope.async {
+            runtime.playRecording(requireNotNull(currentRecordingPlaybackSelection(session.observation.value, RECORDING)),
+                RecordingPlaybackStart.START_OVER)
+        }
+        await { install.isCompleted }
+        runtime.onAppBackgrounded()
+        settle()
+        assertNull("background recording must release its source", player.currentMediaItem)
+        assertEquals(Player.STATE_IDLE, player.playbackState)
+        assertNull(runtime.videoPresentation.value.channelStartAtMillis)
+        runtime.onAppForegrounded()
+        await { player.currentMediaItem != null }
+        assertEquals(AppPlaybackTarget.Recording(RECORDING), runtime.activeTarget.value)
+        assertNull(runtime.videoPresentation.value.channelStartAtMillis)
+    }
+
+    @Test fun keepingDoesNotEnableAnotherOwnersAudioDisable() = exercise {
+        live()
+        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+            .setTrackTypeDisabled(androidx.media3.common.C.TRACK_TYPE_AUDIO, true).build()
+        runtime.onAppBackgrounded()
+        await { connection.priorityChanges.size == 1 }
+        runtime.onAppForegrounded()
+        await { connection.priorityChanges.size == 2 }
+        assertTrue(androidx.media3.common.C.TRACK_TYPE_AUDIO in player.trackSelectionParameters.disabledTrackTypes)
+        val stop = scope.async { runtime.stop() }
+        await { stop.isCompleted }
+        assertTrue(androidx.media3.common.C.TRACK_TYPE_AUDIO in player.trackSelectionParameters.disabledTrackTypes)
+    }
+
+    @Test fun stoppedOrReplacedBackgroundRecordingNeverReopens() {
+        for ((replace, discardContinuation) in listOf(false to false, true to false, false to true)) exercise {
+            val install = scope.async {
+                runtime.playRecording(requireNotNull(currentRecordingPlaybackSelection(session.observation.value, RECORDING)),
+                    RecordingPlaybackStart.START_OVER)
+            }
+            await { install.isCompleted }
+            runtime.onAppBackgrounded()
+            settle()
+            if (replace) {
+                live(timeshift = false)
+                returnAndRetune()
+                assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+            } else {
+                val stopped = scope.async { if (discardContinuation) coordinator.stop() else runtime.stop() }
+                await { stopped.isCompleted }
+                runtime.onAppForegrounded()
+                settle()
+                assertNull("A stopped or discarded continuation must not reopen its source", player.currentMediaItem)
+                assertNull(runtime.activeTarget.value)
+            }
+        }
+    }
+
     @Test fun serverPausedChannelRemainsPausedOnReturn() = exercise {
+        settings.setTunnelingEnabled(true)
         live()
         connection.emit(SubscriptionEvent.Speed(0))
         await { !player.playWhenReady }
@@ -84,10 +161,41 @@ class BackgroundPlaybackRuntimeTest {
         assertEquals(speeds, connection.speeds)
         assertFalse(player.playWhenReady)
         assertEquals(1, focus.requests.size)
+        val playTransitions = mutableListOf<Boolean>()
+        player.addListener(object : Player.Listener {
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                playTransitions += playWhenReady
+            }
+        })
+        val keptItem = player.currentMediaItem
+        afterPause = {
+            if (player.currentMediaItem !== keptItem && runtime.activeTarget.value != null) {
+                afterPause = {}
+                scope.launch {
+                    await { connection.subscribeCount == 2 }
+                    connection.awaitCollectionRegistered()
+                    startSubscription()
+                }
+            }
+        }
+        player.failAudioTrackInitialization()
+        await { !player.trackSelectionParameters.tunnelingRequested }
+        settle()
+        assertNotSame("paused kept-live refusal must retune without tunneling", keptItem, player.currentMediaItem)
+        await { runtime.livePause.value == LivePauseState(LivePauseAvailability.READY, pending = true) }
+        playerReady()
+        await { connection.speeds.size > speeds.size }
+        settle()
+        assertEquals(0, connection.speeds.last())
+        assertFalse(player.playWhenReady)
+        assertFalse(playTransitions.contains(true))
+        assertEquals(1, focus.requests.size)
+        assertFalse(player.trackSelectionParameters.tunnelingRequested)
     }
 
     @Test fun expiryUsesVirtualTimeReleasesThenRetunesExactlyOnceWithNotice() = exercise {
-        live()
+        live(timeshiftStatus = false)
+        assertNull((liveObservation()?.timeshiftState as? LiveTimeshiftState.Available)?.bufferFull)
         runtime.onAppBackgrounded()
         await { connection.priorityChanges.size == 1 }
         scheduler.advanceTimeBy(1_199_999)
@@ -96,6 +204,7 @@ class BackgroundPlaybackRuntimeTest {
         scheduler.advanceTimeBy(1)
         await { runtime.activeTarget.value == null }
         assertEquals(1, connection.subscribeCount)
+        assertFalse(androidx.media3.common.C.TRACK_TYPE_AUDIO in player.trackSelectionParameters.disabledTrackTypes)
         await("exactly one subscription unsubscribed") { connection.unsubscribeCount == 1 }
         assertNull(runtime.backgroundNotice.value)
         returnAndRetune()
@@ -107,17 +216,153 @@ class BackgroundPlaybackRuntimeTest {
         assertNull(runtime.backgroundNotice.value)
     }
 
-    @Test fun standbyReleasesWithoutNoticeAndNoninteractiveBackgroundNeverYields() = exercise {
+    @Test fun fullBufferReleasesBeforeTheKeepLimitAndReturnsLikeExpiry() = exercise {
+        runtime.enterPlayerScreen(livePlayerOwner = this)
         live()
+        runtime.onAppBackgrounded()
+        await { connection.priorityChanges.size == 1 }
+        scheduler.advanceTimeBy(1_000)
+        connection.emit(SubscriptionEvent.Timeshift(1, 0, 0, 120_000_000, 0))
+        settle()
+        assertNull("full buffer must release the kept channel before the limit", runtime.activeTarget.value)
+        await { connection.unsubscribeCount == 1 }
+        assertNull(runtime.backgroundNotice.value)
+        assertNull(runtime.videoPresentation.value.channelStartAtMillis)
+        returnAndRetune()
+        assertEquals(BackgroundPlaybackNotice.LIMIT_EXPIRED, runtime.backgroundNotice.value)
+        assertNotNull(runtime.videoPresentation.value.channelStartAtMillis)
+        playerListeners.toList().forEach { it.onRenderedFirstFrame() }
+        assertNull(runtime.videoPresentation.value.channelStartAtMillis)
+        scheduler.advanceTimeBy(1_200_000)
+        settle()
+        assertNotNull(runtime.activeTarget.value)
+        assertEquals(2, connection.subscribeCount)
+    }
+
+    @Test fun bufferAlreadyFullWhenLeavingReleasesImmediately() = exercise {
+        live()
+        connection.emit(SubscriptionEvent.Timeshift(1, 0, 0, 120_000_000, 100))
+        await { (liveObservation()?.timeshiftState as? LiveTimeshiftState.Available)?.bufferFull == true }
+        assertNotNull(runtime.activeTarget.value) // Full status alone does not stop foreground TV.
+        assertTrue(player.playWhenReady)
+        assertTrue(connection.priorityChanges.isEmpty())
+        runtime.onAppBackgrounded()
+        await { connection.priorityChanges.size == 1 }
+        settle()
+        assertNull("already full buffer must not keep the channel", runtime.activeTarget.value)
+        returnAndRetune()
+        assertEquals(BackgroundPlaybackNotice.LIMIT_EXPIRED, runtime.backgroundNotice.value)
+    }
+
+    @Test fun unavailableTimeshiftWhileKeptReleasesBeforeTheLimit() {
+        for (duringAdmission in listOf(false, true)) exercise {
+            live()
+            if (duringAdmission) beforePriority = {
+                connection.completeStreams()
+                await { liveObservation()?.timeshiftState == LiveTimeshiftState.Unavailable }
+            }
+            runtime.onAppBackgrounded()
+            if (duringAdmission) await { runtime.activeTarget.value == null }
+            else {
+                await { connection.priorityChanges.size == 1 }
+                connection.completeStreams()
+            }
+            settle()
+            assertNull("lost timeshift must release the kept channel", runtime.activeTarget.value)
+            beforePriority = {}
+            returnAndRetune()
+            assertEquals(BackgroundPlaybackNotice.TUNER_LOST, runtime.backgroundNotice.value)
+        }
+    }
+
+    @Test fun standbyReleasesWithoutNoticeAndNoninteractiveBackgroundNeverYields() = exercise {
+        runtime.enterPlayerScreen(livePlayerOwner = this, appInitiated = true)
+        live()
+        val start = runtime.videoPresentation.value.channelStartAtMillis
+        val guardedLoss = scope.async { runtime.stopAfterLoss(unlessChannelStarting = true) }
+        await { guardedLoss.isCompleted }
+        assertNull(guardedLoss.await())
+        assertNotNull(runtime.activeTarget.value)
+        assertEquals(start, runtime.videoPresentation.value.channelStartAtMillis)
         runtime.onAppBackgrounded()
         await { connection.priorityChanges.size == 1 }
         runtime.onDeviceStandby()
         await { runtime.activeTarget.value == null }
+        assertNull(runtime.videoPresentation.value.channelStartAtMillis)
         returnAndRetune()
+        assertNotNull(runtime.videoPresentation.value.channelStartAtMillis)
         assertNull(runtime.backgroundNotice.value)
         runtime.onAppBackgrounded(interactive = false)
         await { runtime.activeTarget.value == null }
+        assertNull(runtime.videoPresentation.value.channelStartAtMillis)
         assertEquals(listOf(LiveSubscriptionPriority.YIELD), connection.priorityChanges)
+    }
+
+    @Test fun aClosedLiveSurfaceCannotBeRestartedByAQueuedForegroundReturn() = exercise {
+        val owner = Any()
+        runtime.enterPlayerScreen(owner)
+        live()
+        runtime.onAppBackgrounded(interactive = false)
+        await { runtime.activeTarget.value == null }
+        val release = holdCommands()
+        runtime.onAppForegrounded()
+        runtime.onLivePlayerClosed(owner)
+        release.complete(Unit)
+        await { connection.subscribeCount == 2 }
+        settle()
+        assertNull(runtime.videoPresentation.value.channelStartAtMillis)
+    }
+
+    @Test fun foregroundPlaybackWithoutALiveSurfaceCreatesNoChannelStart() = exercise {
+        live()
+        runtime.onAppBackgrounded(interactive = false)
+        await { runtime.activeTarget.value == null }
+        returnAndRetune()
+        assertNull(runtime.videoPresentation.value.channelStartAtMillis)
+    }
+
+    @Test fun closingAnOlderSurfaceCannotWithdrawItsReplacementAndStopEndsTheStart() = exercise {
+        val older = Any()
+        val current = Any()
+        runtime.enterPlayerScreen(older, appInitiated = true)
+        runtime.enterPlayerScreen(current, appInitiated = true)
+        val start = runtime.videoPresentation.value.channelStartAtMillis
+        assertNotNull(start)
+        runtime.onLivePlayerClosed(older)
+        assertEquals(start, runtime.videoPresentation.value.channelStartAtMillis)
+        runtime.onLivePlayerClosed(current)
+        assertNull(runtime.videoPresentation.value.channelStartAtMillis)
+        runtime.enterPlayerScreen(current, appInitiated = true)
+        val stop = scope.async { runtime.stop() }
+        await { stop.isCompleted }
+        assertNull(runtime.videoPresentation.value.channelStartAtMillis)
+    }
+
+    @Test fun cancelledStartsKeepTheirSurfaceWaitUntilItCloses() {
+        for (queueAnother in listOf(false, true)) exercise {
+            val owner = Any()
+            runtime.enterPlayerScreen(owner, appInitiated = true)
+            val entered = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            beforeSettingsRead = { entered.complete(Unit); release.await() }
+            val start = scope.async {
+                runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(1))))
+            }
+            await { entered.isCompleted }
+            // The second start is cancelled before admission; its cleanup runs after the first's.
+            val queued = if (queueAnother) scope.async {
+                runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(1))))
+            } else null
+            scheduler.runCurrent()
+            queued?.cancel()
+            start.cancel()
+            await { start.isCompleted && queued?.isCompleted != false }
+            settle()
+            assertNull(runtime.activeTarget.value)
+            assertNotNull(runtime.videoPresentation.value.channelStartAtMillis)
+            runtime.onLivePlayerClosed(owner)
+            assertNull(runtime.videoPresentation.value.channelStartAtMillis)
+        }
     }
 
     @Test fun rejectedPauseAndUnsupportedYieldReleaseWithoutNotice() = exercise {
@@ -132,6 +377,7 @@ class BackgroundPlaybackRuntimeTest {
             runtime.onAppBackgrounded()
             await { runtime.activeTarget.value == null }
             assertEquals(priorities + if (rejectPause) 0 else 1, connection.priorityChanges.size)
+            assertFalse(androidx.media3.common.C.TRACK_TYPE_AUDIO in player.trackSelectionParameters.disabledTrackTypes)
             returnAndRetune()
             assertNull(runtime.backgroundNotice.value)
         }
@@ -155,6 +401,7 @@ class BackgroundPlaybackRuntimeTest {
         await { connection.priorityChanges.size == 1 }
         connection.emit(SubscriptionEvent.Stopped(SubscriptionCondition.STATUS_REPORTED, SubscriptionIssue.SUBSCRIPTION_OVERRIDDEN))
         await { runtime.activeTarget.value == null }
+        assertFalse(androidx.media3.common.C.TRACK_TYPE_AUDIO in player.trackSelectionParameters.disabledTrackTypes)
         scheduler.advanceTimeBy(120_000)
         settle()
         assertEquals(1, connection.subscribeCount)
@@ -239,6 +486,9 @@ class BackgroundPlaybackRuntimeTest {
         settle() // The loss check is queued behind the held command.
         startSubscription()
         await { liveObservation()?.let { !it.serverStopped && it.timeshiftState is LiveTimeshiftState.Available } == true }
+        connection.emit(SubscriptionEvent.Timeshift(1, 0, 0, 120_000_000, 0))
+        await { (liveObservation()?.timeshiftState as? LiveTimeshiftState.Available)?.bufferFull == true }
+        settle() // A later full buffer must not replace the recorded interruption.
         release.complete(Unit)
         // The restart discarded the kept timeshift: the recorded stop still ends the keep.
         await { runtime.activeTarget.value == null }
@@ -338,26 +588,50 @@ class BackgroundPlaybackRuntimeTest {
         assertEquals(BackgroundPlaybackNotice.INTERRUPTED, runtime.backgroundNotice.value)
     }
 
-    @Test fun returnQueuedBeforeTheStopCheckRetunesWithInterruptedNotice() = exercise {
-        live()
-        runtime.onAppBackgrounded()
-        await { connection.priorityChanges.size == 1 }
-        settle()
-        val release = holdCommands()
-        runtime.onAppForegrounded()
-        settle() // The return queues before the stop's loss check.
-        connection.emit(SubscriptionEvent.Stopped(SubscriptionCondition.NO_DETAIL, null))
-        await { liveObservation()?.serverStopped == true }
-        settle()
-        release.complete(Unit)
-        await { connection.subscribeCount == 2 }
-        connection.awaitCollectionRegistered()
-        startSubscription()
-        await { runtime.activeTarget.value != null && player.playWhenReady }
-        settle()
-        assertEquals(listOf(LiveSubscriptionPriority.YIELD, LiveSubscriptionPriority.NORMAL), connection.priorityChanges)
-        await("exactly one subscription unsubscribed") { connection.unsubscribeCount == 1 }
-        assertEquals(BackgroundPlaybackNotice.INTERRUPTED, runtime.backgroundNotice.value)
+    @Test fun returnQueuedBeforeTheStopCheckRetunesWithInterruptedNotice() {
+        val cases = listOf(
+            BackgroundPlaybackNotice.INTERRUPTED to false,
+            BackgroundPlaybackNotice.LIMIT_EXPIRED to true,
+            BackgroundPlaybackNotice.LIMIT_EXPIRED to false,
+            BackgroundPlaybackNotice.TUNER_LOST to false,
+        )
+        for ((notice, paused) in cases) exercise {
+            live()
+            if (paused) {
+                player.pause()
+                settle()
+            }
+            runtime.onAppBackgrounded()
+            await { connection.priorityChanges.size == 1 }
+            settle()
+            val release = holdCommands()
+            runtime.onAppForegrounded()
+            settle() // The return queues before the loss check.
+            when (notice) {
+                BackgroundPlaybackNotice.LIMIT_EXPIRED -> {
+                    connection.emit(SubscriptionEvent.Timeshift(1, 0, 0, 120_000_000, 0))
+                    await { (liveObservation()?.timeshiftState as? LiveTimeshiftState.Available)?.bufferFull == true }
+                }
+                BackgroundPlaybackNotice.TUNER_LOST -> {
+                    connection.completeStreams()
+                    await { liveObservation()?.timeshiftState == LiveTimeshiftState.Unavailable }
+                }
+                else -> {
+                    connection.emit(SubscriptionEvent.Stopped(SubscriptionCondition.NO_DETAIL, null))
+                    await { liveObservation()?.serverStopped == true }
+                }
+            }
+            settle()
+            release.complete(Unit)
+            await { connection.subscribeCount == 2 }
+            connection.awaitCollectionRegistered()
+            startSubscription()
+            await { runtime.activeTarget.value != null && player.playWhenReady }
+            settle()
+            assertEquals(2, connection.subscribeCount)
+            await("exactly one subscription unsubscribed") { connection.unsubscribeCount == 1 }
+            assertEquals(notice, runtime.backgroundNotice.value)
+        }
     }
 
     @Test fun explicitStopQueuedBeforeTheStopCheckLeavesNoNotice() = exercise {
@@ -381,32 +655,44 @@ class BackgroundPlaybackRuntimeTest {
         assertNull(runtime.backgroundNotice.value)
     }
 
-    @Test fun replacementQueuedBeforeTheStopCheckIsNotReleasedForTheOldTarget() = exercise {
-        live()
-        runtime.onAppBackgrounded()
-        await { connection.priorityChanges.size == 1 }
-        val release = holdCommands()
-        connection.scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 120)))
-        val replacement = scope.async {
-            runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(2))))
+    @Test fun replacementQueuedBeforeTheStopCheckIsNotReleasedForTheOldTarget() {
+        for (bufferFull in listOf(false, true)) exercise {
+            live()
+            runtime.onAppBackgrounded()
+            await { connection.priorityChanges.size == 1 }
+            val release = holdCommands()
+            connection.scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 120)))
+            val replacement = scope.async {
+                runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(2))))
+            }
+            settle() // The replacement queues first.
+            if (bufferFull) {
+                connection.emit(SubscriptionEvent.Timeshift(1, 0, 0, 120_000_000, 0))
+                await { (liveObservation()?.timeshiftState as? LiveTimeshiftState.Available)?.bufferFull == true }
+            } else {
+                connection.emit(SubscriptionEvent.Stopped(SubscriptionCondition.NO_DETAIL, null))
+                await { liveObservation()?.serverStopped == true }
+            }
+            settle()
+            release.complete(Unit)
+            // The replacement runs first: it tunes channel 2 and, being in the background, releases it
+            // without a keep. The old target's check then finds a new epoch and does nothing.
+            await { replacement.isCompleted }
+            settle()
+            // Whether the SDK opened channel 2's subscription before that release depends on the
+            // player's playback thread (4 of 40 probe runs did not); every opened one is closed.
+            await { runtime.activeTarget.value == null && connection.subscribeCount == connection.unsubscribeCount }
+            assertEquals(listOf(LiveSubscriptionPriority.YIELD), connection.priorityChanges)
+            assertNull(runtime.backgroundNotice.value)
+            returnAndRetune()
+            assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
+            assertNull(runtime.backgroundNotice.value)
+            runtime.onAppBackgrounded()
+            await { connection.priorityChanges.size == 2 }
+            scheduler.advanceTimeBy(1_000)
+            settle()
+            assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
         }
-        settle() // The replacement queues first.
-        connection.emit(SubscriptionEvent.Stopped(SubscriptionCondition.NO_DETAIL, null))
-        await { liveObservation()?.serverStopped == true }
-        settle()
-        release.complete(Unit)
-        // The replacement runs first: it tunes channel 2 and, being in the background, releases it
-        // without a keep. The old target's check then finds a new epoch and does nothing.
-        await { replacement.isCompleted }
-        settle()
-        // Whether the SDK opened channel 2's subscription before that release depends on the
-        // player's playback thread (4 of 40 probe runs did not); every opened one is closed.
-        await { runtime.activeTarget.value == null && connection.subscribeCount == connection.unsubscribeCount }
-        assertEquals(listOf(LiveSubscriptionPriority.YIELD), connection.priorityChanges)
-        assertNull(runtime.backgroundNotice.value)
-        returnAndRetune()
-        assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
-        assertNull(runtime.backgroundNotice.value)
     }
 
     @Test fun detachDuringTheStopCheckReleasesNothing() = exercise {
@@ -475,12 +761,37 @@ class BackgroundPlaybackRuntimeTest {
         assertEquals(1, connection.subscribeCount)
     }
 
-    @Test fun rejectedNormalPriorityRetunesOnceRatherThanResumingYieldedTarget() = exercise {
+    @Test fun interruptionMuteOnReturnOutlivesTheKeptAudioDisable() = exercise {
         live()
         runtime.onAppBackgrounded()
         await { connection.priorityChanges.size == 1 }
+        focus.granted = false
+        // Focus denial cannot establish its server hold: video consumes muted instead.
+        connection.scriptSpeed(SubscriptionOperationResult.Failed(TvheadendFailure.SERVER_REJECTED))
+        runtime.onAppForegrounded()
+        await { focus.requestCount == 2 && player.playWhenReady }
+        assertTrue(androidx.media3.common.C.TRACK_TYPE_AUDIO in player.trackSelectionParameters.disabledTrackTypes)
+        focus.granted = true
+        val resume = scope.async { runtime.resumeTimeshift() }
+        await { resume.isCompleted }
+        assertFalse(androidx.media3.common.C.TRACK_TYPE_AUDIO in player.trackSelectionParameters.disabledTrackTypes)
+        assertEquals(1, connection.subscribeCount)
+    }
+
+    @Test fun rejectedNormalPriorityRetunesOnceRatherThanResumingYieldedTarget() = exercise {
+        runtime.enterPlayerScreen(livePlayerOwner = this)
+        live()
+        runtime.onAppBackgrounded()
+        await { connection.priorityChanges.size == 1 }
+        var resumeStart: Long? = null
+        beforePriority = { priority ->
+            if (priority == LiveSubscriptionPriority.NORMAL) {
+                resumeStart = runtime.videoPresentation.value.channelStartAtMillis
+            }
+        }
         connection.scriptPriority(SubscriptionOperationResult.Failed(TvheadendFailure.NOT_SUPPORTED))
         returnAndRetune()
+        assertEquals(resumeStart, runtime.videoPresentation.value.channelStartAtMillis)
         runtime.onAppForegrounded()
         settle()
         assertEquals(2, connection.subscribeCount)
@@ -740,6 +1051,7 @@ class BackgroundPlaybackRuntimeTest {
             val subscriptions = connection.subscribeCount
             val stopped = scope.async { runtime.stop() }
             await { stopped.isCompleted }
+            assertFalse(androidx.media3.common.C.TRACK_TYPE_AUDIO in player.trackSelectionParameters.disabledTrackTypes)
             assertNull(runtime.backgroundNotice.value)
             scheduler.advanceTimeBy(1_200_000)
             runtime.onAppForegrounded()
@@ -756,6 +1068,7 @@ class BackgroundPlaybackRuntimeTest {
         await { connection.priorityChanges.size == 1 }
         live(channel = 2, timeshift = false)
         assertNull(runtime.activeTarget.value) // New background target uses the legacy release path.
+        assertFalse(androidx.media3.common.C.TRACK_TYPE_AUDIO in player.trackSelectionParameters.disabledTrackTypes)
         scheduler.advanceTimeBy(1_200_000)
         returnAndRetune()
         assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
@@ -1221,6 +1534,7 @@ class BackgroundPlaybackRuntimeTest {
             timeshift: Boolean = true,
             frameDurationUs: Long? = null,
             beforeStart: () -> Unit = {},
+            timeshiftStatus: Boolean = true,
         ) {
             settings.setTimeshiftEnabled(timeshift)
             connection.scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, if (timeshift) 120 else 0)))
@@ -1242,9 +1556,11 @@ class BackgroundPlaybackRuntimeTest {
                 await("initial live timeshift grant") {
                     (runtime.livePlaybackObservation.value as? LivePlaybackObservation.Active)?.timeshiftState is LiveTimeshiftState.Available
                 }
-                connection.emit(SubscriptionEvent.Timeshift(0, 0, 0, 120_000_000, 100))
-                await { ((runtime.livePlaybackObservation.value as? LivePlaybackObservation.Active)
-                    ?.timeshiftState as? LiveTimeshiftState.Available)?.playbackPaused != null }
+                if (timeshiftStatus) {
+                    connection.emit(SubscriptionEvent.Timeshift(0, 0, 0, 120_000_000, 100))
+                    await { ((runtime.livePlaybackObservation.value as? LivePlaybackObservation.Active)
+                        ?.timeshiftState as? LiveTimeshiftState.Available)?.playbackPaused != null }
+                }
             }
             playerReady()
         }

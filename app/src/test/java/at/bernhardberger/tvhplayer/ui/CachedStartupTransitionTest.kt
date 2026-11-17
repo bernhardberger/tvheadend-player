@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui
 
+import at.bernhardberger.tvhplayer.core.CHANNEL_START_CONNECTION_GRACE_MILLIS
+
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition
@@ -94,6 +96,8 @@ class CachedStartupTransitionTest {
                     launchState = pending,
                     connectionState = connection,
                     currentChannelReadiness = readiness,
+                    channelStartAtMillis = 0L,
+                    nowMillis = CHANNEL_START_CONNECTION_GRACE_MILLIS - 1L,
                 )
             assertTrue(presentation is MainStartupPresentation.Passive)
             var destination: AppNavKey? = null

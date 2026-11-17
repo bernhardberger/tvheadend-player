@@ -183,6 +183,8 @@ data class AppVideoDecoderCounters(
     val skippedOutputBufferCount: Int,
 )
 
+enum class AppTunnelingState { OFF, ON, REQUESTED_NOT_ACTIVE, OFF_AFTER_AUDIO_ERROR }
+
 data class AppPlaybackDiagnostics(
     val source: AppPlaybackSource = AppPlaybackSource.NONE,
     val state: AppPlaybackState = AppPlaybackState.Idle,
@@ -200,6 +202,7 @@ data class AppPlaybackDiagnostics(
     val stallRecoveries: Int = 0,
     /** A live stall recovery showed this device needs fresh decoders: every live zap stops the old target first. */
     val freshDecoderPerZap: Boolean = false,
+    val tunneling: AppTunnelingState = AppTunnelingState.OFF,
 )
 
 /**
@@ -211,6 +214,8 @@ data class AppVideoPresentation(
     val epoch: Long = 0L,
     val visible: Boolean = false,
     val soundSinceMillis: Long? = null,
+    /** An app-initiated live entry/resume without its picture yet; the runtime's monotonic clock. */
+    val channelStartAtMillis: Long? = null,
 )
 
 /** One installed live target's presentation evidence, read together under the target access lock. */
@@ -222,7 +227,7 @@ data class AppLiveTargetPresentation(
 )
 
 internal fun AppVideoPresentation.beginTarget(epoch: Long) =
-    AppVideoPresentation(epoch = epoch)
+    AppVideoPresentation(epoch = epoch, channelStartAtMillis = channelStartAtMillis)
 
 internal fun AppVideoPresentation.onFirstFrame(
     frameEpoch: Long,
@@ -230,7 +235,7 @@ internal fun AppVideoPresentation.onFirstFrame(
 ): AppVideoPresentation = if (
     epoch == frameEpoch && activeTargetEpoch == frameEpoch
 ) {
-    copy(visible = true)
+    copy(visible = true, channelStartAtMillis = null)
 } else {
     this
 }

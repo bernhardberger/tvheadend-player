@@ -26,6 +26,8 @@ data class UiSettings(
     val hiddenHomeSections: Set<HomeSectionKind> = emptySet(),
     val whatsNewSeenVersion: Int? = null,
     val recordingsView: DvrArchiveView = DvrArchiveView(),
+    /** The refresh rate the app asks the display for outside video; null leaves it to the system. */
+    val displayRefreshRate: Float? = null,
 )
 
 fun resolvePlaybackAutoStart(storedValue: Boolean?): Boolean = storedValue ?: false
@@ -36,6 +38,7 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
         val AUTO_START_PLAYBACK = booleanPreferencesKey("autoStartPlayback")
         val WHATS_NEW_SEEN_VERSION = intPreferencesKey("whatsNewSeenVersion")
         val CLOCK_FORMAT = stringPreferencesKey("clockFormat")
+        val DISPLAY_REFRESH_RATE = stringPreferencesKey("displayRefreshRate")
         val SHOW_CHANNEL_NUMBERS = booleanPreferencesKey("showChannelNumbers")
         val RECORDING_PROFILE = stringPreferencesKey("recordingProfile")
         val CHANNELS_LAYOUT = stringPreferencesKey("channelsLayout")
@@ -66,6 +69,8 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
             ),
             autoStartPlayback = resolvePlaybackAutoStart(preferences[Keys.AUTO_START_PLAYBACK]),
             clockFormat = resolveClockFormat(preferences[Keys.CLOCK_FORMAT]),
+            displayRefreshRate = preferences[Keys.DISPLAY_REFRESH_RATE]?.toFloatOrNull()
+                ?.takeIf { it.isFinite() && it > 0f },
             showChannelNumbers = preferences[Keys.SHOW_CHANNEL_NUMBERS] ?: true,
             hiddenHomeSections = HomeSectionKind.entries.filterTo(mutableSetOf()) {
                 preferences[Keys.homeSection(it)] == false
@@ -132,6 +137,12 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
             preferences[Keys.GUIDE_ROWS] = view.rows.name
             preferences[Keys.GUIDE_HEADLINE] = view.headline
             preferences[Keys.GUIDE_GENRE_COLORS] = view.genreColors
+        }
+    }
+
+    suspend fun setDisplayRefreshRate(rate: Float?) {
+        dataStore.edit {
+            if (rate == null) it.remove(Keys.DISPLAY_REFRESH_RATE) else it[Keys.DISPLAY_REFRESH_RATE] = rate.toString()
         }
     }
 

@@ -172,7 +172,8 @@ class LivePlayerChromeStartupTest : LivePlayerChromeFixture() {
     @Test fun startupWarmAdoptionWithoutAPresentedFrameWaitsButCancellationPreservesTheWarmTune() {
         val startup = mutableStateOf(false)
         val outcomes = mutableListOf<MainStartupPlaybackOutcome>()
-        screen(contentAllowed = { !startup.value }, startupEnabled = { startup.value }, onStartupOutcome = { outcomes += it })
+        screen(presentOnEntry = false, contentAllowed = { !startup.value },
+            startupEnabled = { startup.value }, onStartupOutcome = { outcomes += it })
         playerReady()
         settle()
         val epoch = runtime.videoPresentation.value.epoch
@@ -199,10 +200,9 @@ class LivePlayerChromeStartupTest : LivePlayerChromeFixture() {
         compose.runOnIdle { session.replaceGeneration(session.observation.value) }
         settle()
         val selection = requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(1)))
-        assertEquals(null, runtime.liveTargetPresentation(selection))
-        compose.runOnIdle { screenVisible.value = false }
-        settle()
-        compose.runOnIdle { screenVisible.value = true }
+        assertMainSettled("a visible ended session is retuned") { runtime.videoPresentation.value.epoch != epoch }
+        playerReady()
+        compose.runOnIdle { playerListeners.toList().forEach { it.onRenderedFirstFrame() } }
         settle()
         key(Key.DirectionDown)
         assertTrue(exists("player-actions"))

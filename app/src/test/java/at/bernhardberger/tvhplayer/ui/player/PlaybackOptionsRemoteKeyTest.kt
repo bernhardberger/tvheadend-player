@@ -321,7 +321,7 @@ class PlaybackOptionsRemoteKeyTest {
         compose.onNodeWithTag(DEFAULT_SUBTITLES_ROW).assertDoesNotExist()
         compose.onNodeWithTag(OFF_SUPPORT, useUnmergedTree = true).assertTextEquals("No subtitles on this channel")
         // The row says why once; the header names only the state.
-        compose.onNodeWithText("No subtitles available.", substring = true, useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithText("No subtitles available", substring = true, useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithTag("playback-options-track-empty").assertDoesNotExist()
         press(Key.DirectionDown)
         compose.onNodeWithTag(OFF_ROW).assertIsFocused()

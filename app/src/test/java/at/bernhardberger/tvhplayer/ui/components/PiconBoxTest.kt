@@ -27,6 +27,8 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -51,12 +53,14 @@ import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionObservation
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
+import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
 import coil3.ImageLoader
 import coil3.asImage
 import coil3.decode.DataSource
 import coil3.intercept.Interceptor
 import coil3.request.ErrorResult
 import coil3.request.SuccessResult
+import coil3.request.crossfade
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import org.junit.After
@@ -86,6 +90,7 @@ class PiconBoxTest {
     /** The library's leading-slot content color by focus, read from the plain item. */
     private val leadingTint = HashMap<Boolean, Color>()
     private var rowFocusFill = Color.Unspecified
+    private var failReload by mutableStateOf(false)
 
     @Test fun missingPiconTakesTheRowsContentColor() = assertRowFallback(ArtworkState.MISSING)
 
@@ -106,6 +111,35 @@ class PiconBoxTest {
     @Test fun passiveLoadingPiconKeepsExistingDefaultTint() = assertPassiveFallback(ArtworkState.LOADING)
 
     @Test fun passiveFailedPiconKeepsExistingDefaultTint() = assertPassiveFallback(ArtworkState.ERROR)
+
+    @Test fun squareEyebrowLogoKeepsTheGapBeforeTheChannelName() {
+        show(ArtworkState.SUCCESS, inRow = false, eyebrow = true)
+        val loadedLogo = compose.onNodeWithTag("inline-picon").getUnclippedBoundsInRoot()
+        assertTrue("The loaded square releases the unused width",
+            loadedLogo.right - loadedLogo.left < InlineLogoWidth)
+        assertEyebrowGap()
+        // A ground change re-inks the same logo. A failed reload must fit the width
+        // already measured for the square, rather than painting into the name.
+        compose.runOnIdle { failReload = true }
+        compose.waitForIdle()
+        assertEyebrowGap()
+    }
+
+    private fun assertEyebrowGap() {
+        val logo = compose.onNodeWithTag("inline-picon").getUnclippedBoundsInRoot()
+        val name = compose.onNodeWithText("Documentary").getUnclippedBoundsInRoot()
+        val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        compose.runOnIdle { view.draw(Canvas(bitmap)) }
+        val gapInk = (ceil(logo.right.value).toInt() until floor(name.left.value).toInt()).any { x ->
+            (logo.top.value.toInt() until logo.bottom.value.toInt()).any { y ->
+                bitmap.getPixel(x, y) != background.toArgb()
+            }
+        }
+        bitmap.recycle()
+        assertTrue("Logo must not paint in the gap: logo=$logo name=$name failedReload=$failReload", !gapInk)
+        assertTrue("Logo must end before the channel name with the 8dp gap: logo=$logo name=$name",
+            name.left - logo.right >= 8.dp)
+    }
 
     private fun assertRowFallback(state: ArtworkState) {
         show(state, inRow = true)
@@ -128,7 +162,7 @@ class PiconBoxTest {
         assertPiconColor(passiveTint.copy(alpha = alpha).compositeOver(background), "passive-picon")
     }
 
-    private fun show(state: ArtworkState, inRow: Boolean) {
+    private fun show(state: ArtworkState, inRow: Boolean, eyebrow: Boolean = false) {
         val session = FakeSessionObservation(SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(
                 streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED,
@@ -141,6 +175,7 @@ class PiconBoxTest {
             .components {
                 add(Interceptor { chain ->
                     assertTrue(chain.request.data is AppArtworkSource)
+                    if (failReload) return@Interceptor ErrorResult(null, chain.request, IllegalStateException("Synthetic reload failure"))
                     when (state) {
                         ArtworkState.MISSING -> error("Absent artwork must not be requested")
                         ArtworkState.LOADING -> {
@@ -149,7 +184,7 @@ class PiconBoxTest {
                         }
                         ArtworkState.ERROR -> ErrorResult(null, chain.request, IllegalStateException("Synthetic picon failure"))
                         ArtworkState.SUCCESS -> SuccessResult(
-                            Bitmap.createBitmap(60, 36, Bitmap.Config.ARGB_8888).apply {
+                            Bitmap.createBitmap(if (eyebrow) 36 else 60, 36, Bitmap.Config.ARGB_8888).apply {
                                 eraseColor(PICON_COLOR)
                             }.asImage(), chain.request, DataSource.MEMORY,
                         )
@@ -157,6 +192,7 @@ class PiconBoxTest {
                 })
             }
             .coroutineContext(Dispatchers.Main.immediate)
+            .crossfade(if (eyebrow) PlayerMotion.MediumMs else 0)
             .diskCache(null)
             .build()
         images.install(loader)
@@ -169,7 +205,16 @@ class PiconBoxTest {
                     rowFocusFill = ListItemDefaults.colors().focusedContainerColor
                     Column(Modifier.fillMaxSize().background(background).padding(40.dp)) {
                         val picon = if (state == ArtworkState.MISSING) null else ArtworkId(1)
-                        if (inRow) {
+                        if (eyebrow) {
+                            MaterialTheme(colorScheme = MaterialTheme.colorScheme.copy(
+                                background = if (failReload) Color.DarkGray else background,
+                            )) {
+                                ProvideArtworkSession(session) {
+                                    ProgrammeEyebrow(picon?.let { ChannelIcon.ImageCache(it) }, "Documentary",
+                                        piconModifier = Modifier.testTag("inline-picon"))
+                                }
+                            }
+                        } else if (inRow) {
                             ProvideArtworkSession(session) {
                                 ChannelRow(
                                     modifier = Modifier.width(396.dp).testTag("row"),

@@ -57,7 +57,7 @@ class SidebarGuideNavigationTest {
         enterInitialChannelScope()
         assertTabBodyMoves(
             compose.onNodeWithTag("channels-list"),
-            compose.onNodeWithText(compose.activity.getString(at.bernhardberger.tvhplayer.R.string.channel_list)),
+            compose.onNode(hasText("Channels") and !hasClickAction()),
             "Group A",
         )
         back()

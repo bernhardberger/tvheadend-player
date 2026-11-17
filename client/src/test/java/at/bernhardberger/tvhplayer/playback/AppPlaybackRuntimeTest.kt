@@ -365,7 +365,7 @@ class AppPlaybackRuntimeTest {
             targetEpoch = 25L,
         )
         val recovering = AppPlaybackState.Recovering(
-            reason = fence.reason,
+            reason = PlaybackRecoveryReason.LIVE_ENDED,
             retryDelayMillis = 0L,
         )
         var state: AppPlaybackState = recovering
@@ -490,17 +490,17 @@ class AppPlaybackRuntimeTest {
 
     @Test
     fun replacementConcealsThePreviousTargetsFrame() {
-        val previous = AppVideoPresentation(epoch = 1L, visible = true)
+        val previous = AppVideoPresentation(epoch = 1L, visible = true, channelStartAtMillis = 123L)
 
         assertEquals(
-            AppVideoPresentation(epoch = 2L, visible = false),
+            AppVideoPresentation(epoch = 2L, visible = false, channelStartAtMillis = 123L),
             previous.beginTarget(epoch = 2L),
         )
     }
 
     @Test
     fun staleFirstFrameCannotRevealTheCurrentTarget() {
-        val current = AppVideoPresentation(epoch = 2L, visible = false)
+        val current = AppVideoPresentation(epoch = 2L, visible = false, channelStartAtMillis = 123L)
 
         assertEquals(
             current,
@@ -510,7 +510,7 @@ class AppPlaybackRuntimeTest {
 
     @Test
     fun currentTargetsFirstFrameRevealsVideoOnlyAfterTargetActivation() {
-        val current = AppVideoPresentation(epoch = 2L, visible = false)
+        val current = AppVideoPresentation(epoch = 2L, visible = false, channelStartAtMillis = 123L)
 
         assertEquals(
             current,
@@ -834,7 +834,7 @@ class AppPlaybackRuntimeTest {
     fun newlyOpenedRecordingStartsPlayingInsteadOfInheritingPause() {
         val lifecycle = ForegroundPlaybackLifecycle()
         assertEquals(
-            ForegroundPlaybackAction.ResumeRecording,
+            ForegroundPlaybackAction.ResumeRecording(),
             lifecycle.onTargetStarted(
                 activeTarget = AppPlaybackTarget.Recording(DvrEntryId(19)),
                 activeTargetEpoch = 12L,
@@ -850,22 +850,22 @@ class AppPlaybackRuntimeTest {
         val target = AppPlaybackTarget.Recording(DvrEntryId(19))
         lifecycle.onBackgrounded(null, null, recordingPlayWhenReady = false)
         assertEquals(
-            ForegroundPlaybackAction.PauseRecording,
+            ForegroundPlaybackAction.ReleaseRecording,
             lifecycle.onTargetStarted(target, 12L),
         )
-        assertEquals(ForegroundPlaybackAction.ResumeRecording,
+        assertEquals(ForegroundPlaybackAction.ResumeRecording(),
             lifecycle.onForegrounded(target, 12L))
         assertEquals(ForegroundPlaybackAction.None,
             lifecycle.onForegrounded(target, 12L))
     }
 
     @Test
-    fun recordingBackgroundPausesAndResumesTheSameTargetInPlace() {
+    fun recordingBackgroundReleasesAndReopensTheSameTarget() {
         val lifecycle = ForegroundPlaybackLifecycle()
         val target = AppPlaybackTarget.Recording(DvrEntryId(19))
 
         assertEquals(
-            ForegroundPlaybackAction.PauseRecording,
+            ForegroundPlaybackAction.ReleaseRecording,
             lifecycle.onBackgrounded(
                 activeTarget = target,
                 activeTargetEpoch = 12L,
@@ -873,13 +873,13 @@ class AppPlaybackRuntimeTest {
             ),
         )
         assertEquals(
-            ForegroundPlaybackAction.ResumeRecording,
+            ForegroundPlaybackAction.ResumeRecording(),
             lifecycle.onForegrounded(activeTarget = target, activeTargetEpoch = 12L),
         )
     }
 
     @Test
-    fun foregroundDoesNotRestartARecordingThatWasAlreadyPaused() {
+    fun foregroundReopensAnAlreadyPausedRecordingWithoutPlaying() {
         val lifecycle = ForegroundPlaybackLifecycle()
         val target = AppPlaybackTarget.Recording(DvrEntryId(23))
 
@@ -890,7 +890,7 @@ class AppPlaybackRuntimeTest {
         )
 
         assertEquals(
-            ForegroundPlaybackAction.None,
+            ForegroundPlaybackAction.ResumeRecording(play = false),
             lifecycle.onForegrounded(activeTarget = target, activeTargetEpoch = 13L),
         )
     }
@@ -907,7 +907,7 @@ class AppPlaybackRuntimeTest {
             recordingPlayWhenReady = true,
         )
         assertEquals(
-            ForegroundPlaybackAction.PauseRecording,
+            ForegroundPlaybackAction.ReleaseRecording,
             lifecycle.onTargetStarted(
                 activeTarget = replacementTarget,
                 activeTargetEpoch = 15L,
@@ -915,7 +915,7 @@ class AppPlaybackRuntimeTest {
         )
 
         assertEquals(
-            ForegroundPlaybackAction.ResumeRecording,
+            ForegroundPlaybackAction.ResumeRecording(),
             lifecycle.onForegrounded(
                 activeTarget = replacementTarget,
                 activeTargetEpoch = 15L,
@@ -1230,9 +1230,10 @@ class AppPlaybackRuntimeTest {
         val cases = listOf(
             ForegroundPlaybackAction.None to emptyList(),
             ForegroundPlaybackAction.StopLive to listOf("stop-live"),
-            ForegroundPlaybackAction.PauseRecording to listOf("pause-recording"),
+            ForegroundPlaybackAction.ReleaseRecording to listOf("release-recording"),
             ForegroundPlaybackAction.ResumeLive(ChannelId(7)) to listOf("resume-live:7"),
-            ForegroundPlaybackAction.ResumeRecording to listOf("resume-recording"),
+            ForegroundPlaybackAction.ResumeRecording() to listOf("resume-recording"),
+            ForegroundPlaybackAction.ResumeRecording(play = false) to listOf("reopen-paused-recording"),
         )
 
         cases.forEach { (action, expected) ->
@@ -1240,9 +1241,9 @@ class AppPlaybackRuntimeTest {
             executeForegroundPlaybackAction(
                 action = action,
                 stopLive = { events += "stop-live" },
-                pauseRecording = { events += "pause-recording" },
+                releaseRecording = { events += "release-recording" },
                 resumeLive = { events += "resume-live:${it.value}" },
-                resumeRecording = { events += "resume-recording" },
+                resumeRecording = { play -> events += if (play) "resume-recording" else "reopen-paused-recording" },
             )
 
             assertEquals(action.toString(), expected, events)
