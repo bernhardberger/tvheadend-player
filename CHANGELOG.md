@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Guide
+
+- A square channel logo, such as PULS 4's, no longer runs into the channel name in the header of a programme's details. The logo sits at the start of the line with a gap before the name (#45).
+
 ## 0.5.2
 
 ### Playback

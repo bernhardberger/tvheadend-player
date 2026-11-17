@@ -1481,8 +1481,8 @@ internal fun ProgrammeEyebrow(
 
 /**
  * A trimmed logo at the start of a line. Once it has loaded the line keeps only the width it is
- * drawn in, so the text follows a square logo as closely as a wide one; until then, and for the
- * placeholder, the whole box stands.
+ * drawn in, so the text follows a square logo as closely as a wide one. Until then the whole
+ * box stands, unless the caller opts into a zero-width loading probe.
  */
 @Composable
 internal fun InlineLogo(
@@ -1494,7 +1494,11 @@ internal fun InlineLogo(
     val density = LocalDensity.current
     var drawnWidth by remember(picon.takeUnless { collapseUntilLoaded }) { mutableStateOf<Dp?>(null) }
     Box(Modifier.size(drawnWidth ?: if (collapseUntilLoaded) 0.dp else InlineLogoWidth, InlineLogoHeight)) {
-        PiconBox(picon, modifier.wrapContentWidth(Alignment.Start, unbounded = true).size(InlineLogoWidth, InlineLogoHeight),
+        // Only the hidden startup probe may exceed its reservation. After measurement, the
+        // painter (including Coil's internally centred crossfade) must use the reserved width.
+        PiconBox(picon, modifier
+            .wrapContentWidth(Alignment.Start, unbounded = collapseUntilLoaded && drawnWidth == null)
+            .size(InlineLogoWidth, InlineLogoHeight),
             contentScale = InlineLogoScale, alignment = Alignment.CenterStart, trim = true,
             onError = { onLogoError() }, onLogoSize = { logo ->
                 drawnWidth = with(density) { inlineLogoDrawnWidth(logo, Size(InlineLogoWidth.toPx(), InlineLogoHeight.toPx())).toDp() }
