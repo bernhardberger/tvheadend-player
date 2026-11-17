@@ -242,6 +242,7 @@ abstract class GuideScreenFixture {
         longProgrammeHours: Int = 5, longProgrammeSuccessor: Boolean = false, initialCoverage: Boolean = true,
         beforeCoverageBatch: (suspend (List<ChannelId>, Instant) -> Unit)? = null, headline: Boolean = false,
         rows: GuideRows = GuideRows.REGULAR,
+        layout: at.bernhardberger.tvhplayer.settings.GuideLayout = at.bernhardberger.tvhplayer.settings.GuideLayout.TIMELINE,
         groupWithoutFirst: Boolean = false, genres: Boolean = false, tags: Boolean = true,
         recordings: List<DvrEntry> = emptyList(), shortSecondMinutes: Int? = null, connecting: Boolean = false,
         entryCoverage: Boolean = true, tagName: String = "Favourites", activeTag: Boolean = false,
@@ -345,7 +346,9 @@ abstract class GuideScreenFixture {
         }
         uiSettings = UiSettingsStore(uiPreferences)
         // These tests pin the rows they measure; a test passing the default view writes nothing.
-        if (!headline || rows != GuideView().rows) runBlocking { uiSettings.setGuideView(GuideView(rows, headline = headline)) }
+        if (!headline || rows != GuideView().rows || layout != GuideView().layout) runBlocking {
+            uiSettings.setGuideView(GuideView(rows, headline = headline, layout = layout))
+        }
         val noticeModule = module {
             single { notices }
             single { uiSettings }
@@ -399,13 +402,16 @@ abstract class GuideScreenFixture {
                 compose.onNodeWithTag("guide-date-button").assertExists()
                 compose.onNodeWithTag("guide-date-button").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
             }
-            dateFocused()
+            if (layout == at.bernhardberger.tvhplayer.settings.GuideLayout.TIMELINE) dateFocused()
+            else compose.waitForIdle()
             assertNotNull("The fixture must exercise a current SDK capability, not cached-only rows", model.observation.value.currentSession)
             // Drive entry acquisition before counting later navigation requests.
             if (entryCoverage && beforeCoverageBatch == null) {
                 runAcquisition()
                 val entryCalls = session.calls.toList()
-                assertEquals("Entry asks for coverage once", 1, entryCalls.count { it == FakeSessionCall.EPG_ACQUIRE_COVERAGE_BATCH })
+                if (layout == at.bernhardberger.tvhplayer.settings.GuideLayout.TIMELINE) {
+                    assertEquals("Entry asks for coverage once", 1, entryCalls.count { it == FakeSessionCall.EPG_ACQUIRE_COVERAGE_BATCH })
+                }
                 callsAtEntry = entryCalls.size
                 return
             }

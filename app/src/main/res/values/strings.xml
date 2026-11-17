@@ -1,4 +1,7 @@
 <resources xmlns:tools="http://schemas.android.com/tools" tools:locale="en">
+    <string name="guide_layout">Layout</string>
+    <string name="guide_layout_timeline">Timeline</string>
+    <string name="guide_layout_magazine">Magazine</string>
     <string name="automatic_recording_new_overline">Automatic recordings</string>
     <string name="automatic_recording_new_title">New automatic recording</string>
     <string name="automatic_recording_new_choose">Choose how it decides what to record.</string>

@@ -159,6 +159,8 @@ import at.bernhardberger.tvhplayer.ui.screens.guide.GuideTimePanel
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideViewOptionsPanel
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideFilterPanel
 import at.bernhardberger.tvhplayer.settings.GuideView
+import at.bernhardberger.tvhplayer.settings.GuideLayout
+import at.bernhardberger.tvhplayer.ui.screens.guide.GuideMagazineBody
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.ui.TvBrowseLeadingInset
 import at.bernhardberger.tvhplayer.ui.TvBrowseTrailingInset
@@ -374,6 +376,13 @@ fun EpgGridScreen(
         channelCatalogCurrent = channelScopeState.channelCatalogCurrent,
         connectionFailure = connectionFailure,
     )
+    val tagNotice by channelViewModel.unavailableTagNotice.collectAsStateWithLifecycle()
+    val guideRecovering = connectionUiState == ConnectionUiState.Connecting ||
+        connectionUiState == ConnectionUiState.SyncingChannels ||
+        connectionUiState == ConnectionUiState.Reconnecting
+    val magazine = view.layout == GuideLayout.MAGAZINE && channels.isNotEmpty() &&
+        guideAlert == null && !guideRecovering && !tagNotice &&
+        !connectionUiState.awaitsGuide(observation.epgState)
 
     val guideZoneId = remember { ZoneId.systemDefault() }
     val openedAtSec = remember { System.currentTimeMillis() / 1000L }
@@ -1206,6 +1215,7 @@ fun EpgGridScreen(
         minReadableOverlapSec,
         earlierContent,
         laterContent,
+        magazine,
         channels,
         initialFocusEnabled,
         mayFocusProgramme,
@@ -1213,6 +1223,7 @@ fun EpgGridScreen(
         connectionUiState,
         indexCurrent,
     ) {
+        if (magazine) return@LaunchedEffect
         if (!indexCurrent) return@LaunchedEffect
         val target = selectedTarget
         if (target == null) {
@@ -1787,9 +1798,10 @@ fun EpgGridScreen(
         if (detailsEvent == null && restoreDetailsFocus) {
             withFrameNanos { }
             if (mayFocusProgramme) {
-                selectedTarget?.eventId?.let(eventFocusRequesters::get)?.let { requester ->
-                    runCatching { requester.requestFocus() }
-                }
+                val restored = selectedTarget?.eventId?.let(eventFocusRequesters::get)?.let { requester ->
+                    runCatching { requester.requestFocus() }.getOrDefault(false)
+                } == true
+                if (!restored && view.layout == GuideLayout.MAGAZINE) guideDateFocus.requestFocus()
             }
             restoreDetailsFocus = false
         }
@@ -1881,10 +1893,6 @@ fun EpgGridScreen(
         val channelNumbers = remember(channels) {
             channels.associate { it.id to it.visibleChannelNumber }
         }
-        val tagNotice by channelViewModel.unavailableTagNotice.collectAsStateWithLifecycle()
-        val guideRecovering = connectionUiState == ConnectionUiState.Connecting ||
-            connectionUiState == ConnectionUiState.SyncingChannels ||
-            connectionUiState == ConnectionUiState.Reconnecting
         val showGenre = genreCodes || genre != ProgrammeCategory.ALL
         // From the same snapshot as the rows' programmes, so a row is never proven empty before they arrive.
         val coverageByChannel = remember(epgState) {
@@ -1892,7 +1900,7 @@ fun EpgGridScreen(
         }
         val browseAlpha = { 1f - (detailsLayering?.detailsAlpha() ?: if (detailsEvent != null && !showContextMenu) 1f else 0f) }
         // Read by the headline and its picture alone, so neither focus steps nor a settle recompose the screen.
-        val settledHeadline = if (view.headline) {
+        val settledHeadline = if (view.headline && !magazine) {
             rememberSettledGuideHeadline(
                 programme = { guideHeadlineProgramme(selectedTarget, channels, focusRows) },
                 repositioning = {
@@ -1909,7 +1917,7 @@ fun EpgGridScreen(
             )
         } else null
         val headlineProgramme = { settledHeadline?.value }
-        if (view.headline) {
+        if (view.headline && !magazine) {
             GuideHeadlineBackground(
                 programme = headlineProgramme,
                 channels = channels,
@@ -2010,6 +2018,35 @@ fun EpgGridScreen(
                 },
                 onMoveToContent = { leaveGuideScope() },
             )
+            if (magazine) {
+                GuideMagazineBody(
+                    channels, timelineEventIndex, preparedIndex.input.windowStartSec, windowEndSec,
+                    observation, channelScopeState.observation, nowSecProvider(),
+                    Modifier.weight(1f).fillMaxWidth().padding(start = startPadding + TvBrowseLeadingInset),
+                    gridFocus, guideDateFocus, navigationFocus ?: FocusRequester.Default,
+                    eventFocusRequesters,
+                    initialFocusEnabled && guideActive && openPanel == null && !showTimePanel && detailsEvent == null,
+                    onFocused = { c, event ->
+                        selectedTarget = EpgFocusTarget(c, event.id)
+                        realizedTarget = selectedTarget
+                        programmeFocusOwned = true
+                        lastFocusedEvent = event
+                        selection.setSelected(channels[c].id)
+                    },
+                    onOpen = { c, event, contextMenu ->
+                        releaseProgrammeFocus()
+                        selectedTarget = EpgFocusTarget(c, event.id)
+                        detailsEvent = event
+                        detailsObservation = observation
+                        showContextMenu = contextMenu
+                        recordInitialAction = null
+                    },
+                    onVisible = { visible ->
+                        visible.map { it / CHANNEL_PAGE_SIZE * CHANNEL_PAGE_SIZE }.distinct()
+                            .forEach { requestVisibleWindow(windowStartSec, it) }
+                    },
+                )
+            } else {
             if (view.headline && channels.isNotEmpty()) {
                 GuideHeadline(
                     programme = headlineProgramme,
@@ -2138,6 +2175,7 @@ fun EpgGridScreen(
                     recordInitialAction = null
                 },
             )
+            }
         }
 
         }

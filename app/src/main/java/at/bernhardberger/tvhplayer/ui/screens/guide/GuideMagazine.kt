@@ -3,9 +3,9 @@ package at.bernhardberger.tvhplayer.ui.screens.guide
 import androidx.compose.foundation.background
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -30,6 +30,7 @@ import androidx.tv.material3.*
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
+import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.programmeArtwork
 import at.bernhardberger.tvhplayer.core.programmeArtworkModel
@@ -70,22 +71,36 @@ internal fun GuideMagazine(
     headerFocus: FocusRequester = FocusRequester.Default,
     initialFocus: FocusRequester? = null,
     columnCount: Int = 3,
+    eventFocusRequesters: MutableMap<EventId, FocusRequester> = remember { mutableMapOf() },
+    onProgramFocused: (Int, EpgEvent) -> Unit = { _, _ -> },
+    onContextMenu: ((Int, EpgEvent) -> Unit)? = null,
+    onColumnsVisible: (List<Int>) -> Unit = {},
+    autoFocus: Boolean = true,
 ) {
     require(columnCount in 3..4)
     val scope = rememberCoroutineScope()
-    val lists = columns.map { key(it.channel.id) { rememberLazyListState() } }
+    val horizontal = rememberLazyListState()
+    val lists = remember { mutableMapOf<Int, LazyListState>() }
+    val localRequests = remember { mutableMapOf<EventId, FocusRequester>() }
     val requests = remember(columns, initialFocus) {
         columns.mapIndexed { c, column ->
             column.entries.mapIndexed { e, _ ->
-                if (c == 0 && e == 0 && initialFocus != null) initialFocus else FocusRequester()
+                localRequests.getOrPut(column.entries[e].event.id) { FocusRequester() }
             }
         }
     }
     var focusedColumn by remember { mutableIntStateOf(-1) }
-    LaunchedEffect(requests) {
+    LaunchedEffect(columns.firstOrNull()?.entries?.firstOrNull()?.event?.id) {
         // Let the TV Surface's interaction collector attach before requesting initial focus.
         withFrameNanos { }
-        requests.firstOrNull()?.firstOrNull()?.requestFocus()
+        if (autoFocus) {
+            requests.firstOrNull()?.firstOrNull()?.requestFocus() ?: headerFocus.requestFocus()
+        }
+    }
+    val visibleCallback by rememberUpdatedState(onColumnsVisible)
+    LaunchedEffect(horizontal) {
+        snapshotFlow { horizontal.layoutInfo.visibleItemsInfo.map { it.index } }
+            .collect { visibleCallback(it) }
     }
     val line = MaterialTheme.colorScheme.onSurface.copy(alpha = TvTrackAlpha)
     val columnGap = if (columnCount == 3) TvGridGutter * 2 else TvSpacing32
@@ -96,12 +111,17 @@ internal fun GuideMagazine(
             else -> (maxWidth - ChannelRowEdgeInset * 2 - columnGap * 3) / 4
         }
         // Reserves belong to the existing gutter, rather than increasing the channel pitch.
-        Row(
-            Modifier.fillMaxSize().horizontalScroll(rememberScrollState()),
+        LazyRow(
+            Modifier.fillMaxSize().then(if (initialFocus != null) Modifier.focusRequester(initialFocus) else Modifier),
+            state = horizontal,
             horizontalArrangement = Arrangement.spacedBy(columnGap - ChannelRowEdgeInset * 2),
         ) {
-            columns.forEachIndexed { c, column ->
-                val list = lists[c]
+            itemsIndexed(columns, key = { _, column -> column.channel.id.value }) { c, column ->
+                val list = rememberLazyListState()
+                DisposableEffect(list, c) {
+                    lists[c] = list
+                    onDispose { if (lists[c] === list) lists.remove(c) }
+                }
                 val listScroll = rememberListEdgeBringIntoView(list, TvSpacing12)
                 Column(Modifier.width(width + ChannelRowEdgeInset * 2).fillMaxHeight()) {
                     Row(
@@ -135,7 +155,14 @@ internal fun GuideMagazine(
                                 // Picture-bearing rows grow more than the Channels list's short rows.
                                 verticalArrangement = Arrangement.spacedBy(TvSpacing4),
                             ) {
-                                itemsIndexed(column.entries, key = { _, entry -> entry.event.id.value }) { e, entry ->
+                                 itemsIndexed(column.entries, key = { _, entry -> entry.event.id.value }) { e, entry ->
+                                     DisposableEffect(entry.event.id, requests[c][e]) {
+                                         val requester = requests[c][e]
+                                         eventFocusRequesters[entry.event.id] = requester
+                                         onDispose {
+                                             if (eventFocusRequesters[entry.event.id] === requester) eventFocusRequesters.remove(entry.event.id)
+                                         }
+                                     }
                                     val start = entry.event.start.epochSeconds
                                     fun neighbor(index: Int): Int? =
                                         columns.getOrNull(index)?.entries?.indices
@@ -147,15 +174,19 @@ internal fun GuideMagazine(
                                             .focusRequester(requests[c][e])
                                             .onPreviewKeyEvent { event ->
                                                 val targetColumn = when (event.key) {
-                                                    Key.DirectionLeft -> c - 1
-                                                    Key.DirectionRight -> c + 1
+                                                    Key.DirectionLeft -> (c - 1 downTo 0).firstOrNull { columns[it].entries.isNotEmpty() } ?: -1
+                                                    Key.DirectionRight -> (c + 1 until columns.size).firstOrNull { columns[it].entries.isNotEmpty() } ?: columns.size
                                                     else -> return@onPreviewKeyEvent false
                                                 }
                                                 if (targetColumn < 0) return@onPreviewKeyEvent false
                                                 val target = neighbor(targetColumn)
                                                 if (event.type == KeyEventType.KeyDown && target != null) {
                                                     scope.launch {
-                                                        val targetList = lists[targetColumn]
+                                                        if (horizontal.layoutInfo.visibleItemsInfo.none { it.index == targetColumn }) {
+                                                            horizontal.scrollToItem(targetColumn)
+                                                            withFrameNanos { }
+                                                        }
+                                                        val targetList = lists[targetColumn] ?: return@launch
                                                         if (targetList.layoutInfo.visibleItemsInfo.none { it.index == target }) {
                                                             targetList.scrollToItem(target)
                                                         }
@@ -171,7 +202,13 @@ internal fun GuideMagazine(
                                                 left = if (c == 0) navigationFocus else FocusRequester.Cancel
                                                 right = FocusRequester.Cancel
                                             }
-                                            .onFocusChanged { if (it.isFocused) focusedColumn = c },
+                                             .onFocusChanged {
+                                                 if (it.isFocused) {
+                                                     focusedColumn = c
+                                                     onProgramFocused(c, entry.event)
+                                                 }
+                                             },
+                                        onContextMenu?.let { callback -> { callback(c, entry.event) } },
                                     )
                                 }
                             }
@@ -190,6 +227,7 @@ private fun MagazineProgram(
     verticalPadding: Dp,
     onOpen: () -> Unit,
     modifier: Modifier,
+    onContextMenu: (() -> Unit)? = null,
 ) {
     var focused by remember { mutableStateOf(false) }
     val event = entry.event
@@ -202,6 +240,7 @@ private fun MagazineProgram(
     val art = programmeArtwork(event)?.takeIf { magazineShowsPicture(event) }
     Surface(
         onClick = onOpen,
+        onLongClick = onContextMenu,
         modifier = modifier.onFocusChanged { focused = it.isFocused },
         shape = ClickableSurfaceDefaults.shape(
             shape = listShape.shape,

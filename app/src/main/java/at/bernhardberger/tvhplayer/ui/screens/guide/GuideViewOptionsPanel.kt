@@ -5,6 +5,7 @@ import androidx.compose.ui.res.stringResource
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.settings.GuideRows
 import at.bernhardberger.tvhplayer.settings.GuideView
+import at.bernhardberger.tvhplayer.settings.GuideLayout
 import at.bernhardberger.tvhplayer.ui.screens.BrowsePanelEntry
 import at.bernhardberger.tvhplayer.ui.screens.BrowseLevelsPanel
 
@@ -19,6 +20,16 @@ internal fun GuideViewOptionsPanel(
     onClose: () -> Unit,
 ) {
     val entries = buildList {
+        add(BrowsePanelEntry.Section(stringResource(R.string.guide_layout)))
+        GuideLayout.entries.forEach { layout ->
+            add(BrowsePanelEntry.Choice(
+                key = "guide-layout-${layout.name.lowercase()}",
+                label = stringResource(if (layout == GuideLayout.TIMELINE) R.string.guide_layout_timeline else R.string.guide_layout_magazine),
+                selected = layout == view.layout,
+                onClick = { onViewChange(view.copy(layout = layout)) },
+            ))
+        }
+        add(BrowsePanelEntry.Divider)
         add(BrowsePanelEntry.Section(stringResource(R.string.guide_view_rows)))
         GuideRows.entries.forEach { rows ->
             add(BrowsePanelEntry.Choice(
@@ -28,7 +39,6 @@ internal fun GuideViewOptionsPanel(
                 onClick = { onViewChange(view.copy(rows = rows)) },
             ))
         }
-        add(BrowsePanelEntry.Divider)
         add(BrowsePanelEntry.Choice(
             key = "guide-view-headline",
             label = stringResource(R.string.guide_view_headline),

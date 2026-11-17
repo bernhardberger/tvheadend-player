@@ -43,6 +43,7 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
         fun channelsChannelNames(layout: ChannelsLayout) = booleanPreferencesKey("channelsChannelNames${layout.name}")
         // "guideRows" stored the retired taller rows and named today's Regular rows DENSE.
         val GUIDE_ROWS = stringPreferencesKey("guideRowDensity")
+        val GUIDE_LAYOUT = stringPreferencesKey("guideLayout")
         val GUIDE_HEADLINE = booleanPreferencesKey("guideHeadline")
         val GUIDE_GENRE_COLORS = booleanPreferencesKey("guideGenreColors")
         val RECORDINGS_GROUPING = stringPreferencesKey("recordingsGrouping")
@@ -76,6 +77,7 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
             ) { preferences[Keys.channelsProgramArt(it)] },
             guideView = resolveGuideView(
                 preferences[Keys.GUIDE_ROWS], preferences[Keys.GUIDE_HEADLINE], preferences[Keys.GUIDE_GENRE_COLORS],
+                preferences[Keys.GUIDE_LAYOUT],
             ),
         )
     }
@@ -130,6 +132,7 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
     suspend fun setGuideView(view: GuideView) {
         dataStore.edit { preferences ->
             preferences[Keys.GUIDE_ROWS] = view.rows.name
+            preferences[Keys.GUIDE_LAYOUT] = view.layout.name
             preferences[Keys.GUIDE_HEADLINE] = view.headline
             preferences[Keys.GUIDE_GENRE_COLORS] = view.genreColors
         }

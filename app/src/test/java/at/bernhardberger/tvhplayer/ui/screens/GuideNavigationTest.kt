@@ -145,6 +145,14 @@ import kotlinx.coroutines.test.StandardTestDispatcher
     instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class GuideNavigationTest : GuideScreenFixture() {
+    @Test fun magazineOpensProgrammeDetails() {
+        show(layout = at.bernhardberger.tvhplayer.settings.GuideLayout.MAGAZINE)
+        compose.onNodeWithTag("epg-magazine-content").assertExists()
+        focused(title(1, 0))
+        key(Key.DirectionCenter)
+        compose.onNodeWithTag("details-title").assertTextEquals(title(1, 0))
+        assertNoPlayback()
+    }
     @Test fun recordKeyOnScheduledProgrammeOpensItsOwnActionWithoutConfirming() {
         show(recordings = listOf(DvrEntry.create(DvrEntryId(1), eventId = EventId(110),
             channelId = ChannelId(1), state = DvrEntryState.SCHEDULED, enabled = false,
@@ -1100,6 +1108,9 @@ class GuideNavigationTest : GuideScreenFixture() {
         key(Key.DirectionRight)
         tagFocused("channels-view-button")
         key(Key.Enter)
+        tagFocused("guide-layout-timeline")
+        key(Key.DirectionDown)
+        key(Key.DirectionDown)
         tagFocused("guide-view-rows-regular")
         key(Key.DirectionDown)
         tagFocused("guide-view-rows-dense")
@@ -1408,6 +1419,8 @@ class GuideNavigationTest : GuideScreenFixture() {
             key(Key.DirectionRight)
             tagFocused("channels-view-button")
             key(Key.Enter)
+            tagFocused("guide-layout-timeline")
+            repeat(3) { key(Key.DirectionDown) }
             tagFocused("guide-view-rows-dense")
             key(Key.DirectionDown)
             tagFocused("guide-view-headline")

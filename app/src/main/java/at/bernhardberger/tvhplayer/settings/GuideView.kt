@@ -9,6 +9,8 @@ enum class GuideRows {
     DENSE,
 }
 
+enum class GuideLayout { TIMELINE, MAGAZINE }
+
 /**
  * The Guide's view, remembered for the whole app; [headline] shows the focused programme above the grid
  * and [genreColors] tints programmes by their genre code.
@@ -17,11 +19,13 @@ data class GuideView(
     val rows: GuideRows = GuideRows.DENSE,
     val headline: Boolean = true,
     val genreColors: Boolean = true,
+    val layout: GuideLayout = GuideLayout.TIMELINE,
 )
 
 /** Stored values to a view; anything missing or unknown keeps its default. */
-fun resolveGuideView(rows: String?, headline: Boolean?, genreColors: Boolean?): GuideView = GuideView(
+fun resolveGuideView(rows: String?, headline: Boolean?, genreColors: Boolean?, layout: String? = null): GuideView = GuideView(
     rows = GuideRows.entries.firstOrNull { it.name == rows } ?: GuideView().rows,
     headline = headline ?: GuideView().headline,
     genreColors = genreColors ?: GuideView().genreColors,
+    layout = GuideLayout.entries.firstOrNull { it.name == layout } ?: GuideLayout.TIMELINE,
 )
