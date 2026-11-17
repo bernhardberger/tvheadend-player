@@ -1025,6 +1025,11 @@
     <string name="player_current_broadcast">Current broadcast</string>
     <string name="timeshift_setting">Timeshift</string>
     <string name="timeshift_setting_description">Pause and rewind live TV</string>
+    <string name="display_refresh_rate_setting">Display refresh rate</string>
+    <string name="display_refresh_rate_description">The refresh rate for the app’s screens. Match content frame rate can still switch for a video.</string>
+    <string name="display_refresh_rate_system">System default</string>
+    <string name="display_refresh_rate_system_help">Leaves the refresh rate to the TV.</string>
+    <string name="display_refresh_rate_value">%1$s Hz</string>
     <string name="refresh_rate_matching_setting">Match content frame rate</string>
     <string name="frame_rate_switching_always">Always</string>
     <string name="frame_rate_switching_seamless_only">Only if seamless</string>

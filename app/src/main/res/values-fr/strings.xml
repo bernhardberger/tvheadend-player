@@ -887,6 +887,11 @@
     <string name="player_current_broadcast">Diffusion en cours</string>
     <string name="timeshift_setting">Lecture différée</string>
     <string name="timeshift_setting_description">Mettre en pause et rembobiner la TV en direct</string>
+    <string name="display_refresh_rate_setting">Fréquence de rafraîchissement de l’écran</string>
+    <string name="display_refresh_rate_description">La fréquence de rafraîchissement des écrans de l’application. « Adapter à la fréquence du contenu » peut toujours la changer pour une vidéo.</string>
+    <string name="display_refresh_rate_system">Valeur par défaut du système</string>
+    <string name="display_refresh_rate_system_help">Laisse le téléviseur déterminer la fréquence de rafraîchissement.</string>
+    <string name="display_refresh_rate_value">%1$s Hz</string>
     <string name="refresh_rate_matching_setting">Adapter à la fréquence du contenu</string>
     <string name="frame_rate_switching_always">Toujours</string>
     <string name="frame_rate_switching_seamless_only">Uniquement sans coupure</string>

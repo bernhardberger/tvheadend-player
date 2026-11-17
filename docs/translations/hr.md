@@ -52,6 +52,8 @@ Reconciled to frozen source `6d80a8ff` for 0.3.0 by GPT-6.1 Sol (medium), retain
 
 0.5 settings string `tunneling_setting_fallback` drafted against `b9b18bf8` by GPT-6.1 Sol (medium) and reviewed by Sonnet 5.5 (medium); still machine-drafted, no human reviewer.
 
+0.5 settings strings `display_refresh_rate_*` drafted against `27523c0b` by GPT-6.1 Sol (medium) and reviewed by Sonnet 5.5 (medium); still machine-drafted, no human reviewer.
+
 ## Open questions
 
 - Check TTS pronunciation of the × speed multiplier in `player_scrub_*`.
