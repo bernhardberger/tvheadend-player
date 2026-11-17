@@ -220,6 +220,9 @@ fun RecordingPlayerScreen(
         if (!canSeekMarks) emptyList()
         else if (programMarks.isEmpty()) recordingMarks else recordingMarks + programMarks
     }
+    val controlsSkip = at.bernhardberger.tvhplayer.core.recordingSkipAction(
+        marks, positionMs, playerSettings.copy(adBreakMode = adBreakOption.choice ?: adBreakOption.setting),
+    )
     val markStops = remember(marks, durationMs) { at.bernhardberger.tvhplayer.core.recordingMarkStops(marks, durationMs) }
     val markers = remember(markStops) { markStops.map { it.positionMs } }
     val markerNavigation = remember { RecordingMarkerNavigation() }
@@ -766,6 +769,16 @@ fun RecordingPlayerScreen(
                         else -> null
                     },
                     tracks = trackButtons,
+                    skip = controlsSkip?.let { mark ->
+                        PlayerSkipAction(
+                            label = stringResource(if (mark.kind == at.bernhardberger.tvhplayer.core.RecordingMarkKind.PROGRAM_START)
+                                R.string.skip_to_program_start else R.string.skip_ad_break),
+                            onClick = {
+                                timelineState.cancelPendingSeek()
+                                session.skipRecordingAdBreak(mark, markerRevision, fromControls = true)
+                            },
+                        )
+                    },
                 ),
                 entry = chrome.controlsEntry,
                 panelOpen = chromePanelOpen,

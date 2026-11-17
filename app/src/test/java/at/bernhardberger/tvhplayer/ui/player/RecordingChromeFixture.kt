@@ -8,6 +8,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Alignment
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.core.recordingSkipAction
+import at.bernhardberger.tvhplayer.core.recordingSkipLanding
+import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
@@ -90,6 +95,8 @@ internal fun RecordingChromeFixture(
     onFocusRestored: () -> Unit = {},
     entry: PlayerControlsEntry = PlayerControlsEntry.TRAVEL,
 ) {
+    val settings = PlayerSettings()
+    val skip = recordingSkipAction(marks, positionMs, settings).takeIf { canSeek }
     Box(Modifier.fillMaxSize()) {
     PlayerChrome(
         mode = mode,
@@ -116,7 +123,16 @@ internal fun RecordingChromeFixture(
             markStops = durationMs?.let { recordingMarkStops(marks, it) }.orEmpty(),
             markerRevision = markerRevision,
         ),
-        actions = PlayerChromeActions(active = active, paused = paused, restoreFocus = restoreFocus),
+        actions = PlayerChromeActions(
+            active = active, paused = paused, restoreFocus = restoreFocus,
+            skip = skip?.let { mark ->
+                PlayerSkipAction(
+                    stringResource(if (mark.kind == RecordingMarkKind.PROGRAM_START) R.string.skip_to_program_start else R.string.skip_ad_break),
+                    { onSeekMarker(if (mark.kind == RecordingMarkKind.PROGRAM_START) mark.startMs
+                        else recordingSkipLanding(mark, settings.skipLanding)) },
+                )
+            },
+        ),
         onTogglePause = onTogglePause,
         onSeek = onSeek,
         onStop = onStop,

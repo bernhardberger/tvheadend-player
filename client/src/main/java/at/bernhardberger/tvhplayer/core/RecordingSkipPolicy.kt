@@ -21,6 +21,13 @@ private val RecordingMark.entryEndMs: Long get() = if (kind == RecordingMarkKind
 private fun RecordingMark.containsEntry(positionMs: Long): Boolean =
     positionMs >= entryStartMs && positionMs < entryEndMs
 
+/** A controls action is position-based, including deliberate entries and dismissed offers. */
+fun recordingSkipAction(marks: List<RecordingMark>, positionMs: Long, settings: PlayerSettings): RecordingMark? =
+    marks.firstOrNull { it.kind == RecordingMarkKind.PROGRAM_START && it.containsEntry(positionMs) }
+        ?: marks.firstOrNull {
+            settings.adBreakMode != AdBreakMode.OFF && it.skippableAt(positionMs, settings.skipLanding)
+        }
+
 fun recordingMuted(cutpoints: List<DvrCutpoint>, positionMs: Long): Boolean = cutpoints.any {
     it.action == DvrCutpointAction.MUTE && positionMs >= it.start.inWholeMilliseconds && positionMs < it.end.inWholeMilliseconds
 }
@@ -95,6 +102,13 @@ class RecordingSkipPolicy {
             }
             AdBreakMode.OFF -> RecordingSkipDecision()
         }
+    }
+
+    fun acceptAction(expected: RecordingMark, marks: List<RecordingMark>, positionMs: Long, settings: PlayerSettings): Long? {
+        if (expected != recordingSkipAction(marks, positionMs, settings)) return null
+        if (expected.kind != RecordingMarkKind.PROGRAM_START) return skipAdBreak(expected, settings)
+        offeredPrompt = null
+        return expected.startMs
     }
 
     fun acceptPrompt(expected: RecordingMark, settings: PlayerSettings): Long? {

@@ -243,13 +243,16 @@ internal class RecordingMarkers(
         }
     }
 
-    fun skipAdBreak(expected: RecordingMark, expectedRevision: Long) {
+    fun skipAdBreak(expected: RecordingMark, expectedRevision: Long, fromControls: Boolean = false) {
         targetCommands.runIfOpen {
             if (!isCurrent() || pendingRecordingRecoveryPosition.value != null ||
                 expectedRevision != recordingMarkerRevision.value || !canSeek()) return@runIfOpen
             skipPolicy.evaluate(policyMarks(), player.currentPosition, false, settings)
-            skipPolicy.acceptPrompt(expected, settings)?.let { target ->
-                seekPlayer(target)
+            val target = if (fromControls) {
+                skipPolicy.acceptAction(expected, policyMarks(), player.currentPosition, settings)
+            } else skipPolicy.acceptPrompt(expected, settings)
+            target?.let {
+                seekPlayer(it)
             }
             publishSkipState()
         }

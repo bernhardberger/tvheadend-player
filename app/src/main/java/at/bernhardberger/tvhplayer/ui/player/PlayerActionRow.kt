@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -19,6 +20,11 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
@@ -27,6 +33,9 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.IconButton
 import androidx.tv.material3.IconButtonDefaults
 import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.Button
+import androidx.tv.material3.ButtonDefaults
+import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.TvOverlayActionGap
 
@@ -36,7 +45,7 @@ internal const val PauseUnavailableIconAlpha = TvTextDisabledAlpha
 private data class PlayerAction(
     val tag: String,
     val label: String,
-    @DrawableRes val icon: Int,
+    @DrawableRes val icon: Int?,
     val onClick: (() -> Unit)?,
     val focus: FocusRequester?,
     /** The current choice a track button announces after its label. */
@@ -67,6 +76,8 @@ internal fun PlayerActionRow(
     tracks: PlayerTrackButtons = PlayerTrackButtons(),
     onAudioList: () -> Unit = {},
     audioFocus: FocusRequester? = null,
+    skip: PlayerSkipAction? = null,
+    skipFocus: FocusRequester? = null,
 ) {
     val playPause = stringResource(if (paused) R.string.play else R.string.pause)
     val settings = stringResource(R.string.nav_settings)
@@ -92,7 +103,10 @@ internal fun PlayerActionRow(
         horizontalArrangement = Arrangement.spacedBy(TvOverlayActionGap),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        actions.forEach { (tag, label, icon, action, focus, state) ->
+        val rowActions = if (skip == null) actions else actions.toMutableList().apply {
+            add(2, PlayerAction("recording-skip", skip.label, null, skip.onClick, skipFocus))
+        }
+        rowActions.forEach { (tag, label, icon, action, focus, state) ->
             key(tag) {
                 if (tag == endStart) Spacer(Modifier.weight(1f))
                 if (action != null) {
@@ -106,7 +120,26 @@ internal fun PlayerActionRow(
                             }
                         } else Modifier)
                         .then(if (state != null) Modifier.semantics { stateDescription = state } else Modifier)
-                    IconButton(
+                    if (icon == null) {
+                        val pressed = remember { mutableSetOf<Key>() }
+                        Button(
+                            onClick = { onInteraction(); action() },
+                            colors = ButtonDefaults.colors(
+                                containerColor = Color.Transparent,
+                                contentColor = MaterialTheme.colorScheme.onSurface,
+                            ),
+                            modifier = actionModifier.height(TvIconButtonSize).onPreviewKeyEvent { event ->
+                                if (event.key !in RecordingSkipActivationKeys) false else when (event.type) {
+                                    KeyEventType.KeyDown -> {
+                                        if (event.nativeKeyEvent.repeatCount == 0) pressed.add(event.key)
+                                        event.key !in pressed
+                                    }
+                                    KeyEventType.KeyUp -> !pressed.remove(event.key)
+                                    else -> false
+                                }
+                            },
+                        ) { Text(label, maxLines = 1, softWrap = false) }
+                    } else IconButton(
                         onClick = { onInteraction(); action() },
                         colors = IconButtonDefaults.colors(
                             containerColor = Color.Transparent,

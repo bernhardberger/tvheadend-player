@@ -142,7 +142,10 @@ internal data class PlayerChromeActions(
     /** Test tag of the control that takes focus back, such as after a panel closes. */
     val restoreFocus: String? = null,
     val tracks: PlayerTrackButtons = PlayerTrackButtons(),
+    val skip: PlayerSkipAction? = null,
 )
+
+internal data class PlayerSkipAction(val label: String, val onClick: () -> Unit)
 
 /** The action row's Audio button, the playing track of its list; null leaves it out. */
 internal data class PlayerTrackButtons(val audio: String? = null)

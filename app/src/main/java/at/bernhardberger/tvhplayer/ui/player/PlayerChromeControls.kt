@@ -123,6 +123,7 @@ internal fun PlayerChromeControls(
     val settingsFocus = remember { FocusRequester() }
     val timelineFocus = remember { FocusRequester() }
     val stopFocus = remember { FocusRequester() }
+    val skipFocus = remember { FocusRequester() }
     val seekable = when (timeline) {
         is PlayerChromeTimeline.Live -> timeline.timeshift.available && (timeline.timeshift.timingKnown || previewing)
         is PlayerChromeTimeline.Recording -> timeline.canSeek && recordingRange != null
@@ -181,11 +182,13 @@ internal fun PlayerChromeControls(
         "player-seekbar" -> if (timelineFocusable) timelineFocus else initialFocus
         // The Audio button goes with its choice (zap pending, failure, fewer tracks); its neighbour Info takes over.
         "player-audio" -> if (actions.tracks.audio != null) audioFocus else infoFocus
+        "recording-skip" -> if (actions.skip != null) skipFocus else initialFocus
         else -> null
     }
     val pageActive = LocalPlayerPageActive.current
     val audioShown = actions.tracks.audio != null
-    LaunchedEffect(actions.active, restoreFocus, seekable, pausable, pageActive, audioShown) {
+    val skipShown = actions.skip != null
+    LaunchedEffect(actions.active, restoreFocus, seekable, pausable, pageActive, audioShown, skipShown) {
         if (actions.active && pageActive) {
             val target = when (restoreFocus) {
                 null -> null
@@ -195,6 +198,7 @@ internal fun PlayerChromeControls(
                 "player-audio" -> if (actions.tracks.audio != null) audioFocus else infoFocus
                 "player-settings" -> settingsFocus
                 "player-stop" -> stopFocus
+                "recording-skip" -> if (skipShown) skipFocus else initialFocus
                 "player-seekbar" -> timelineFocus.takeIf { timelineFocusable }
                 else -> initialFocus
             } ?: when {
@@ -236,6 +240,7 @@ internal fun PlayerChromeControls(
         "player-info" -> infoFocus
         "player-schedule" -> scheduleFocus
         "player-audio" -> if (actions.tracks.audio != null) audioFocus else infoFocus
+        "recording-skip" -> if (skipShown) skipFocus else pauseFocus
         else -> pauseFocus
     }
     val belowIdentity = if (timelineFocusable) timelineFocus else actionFocus
@@ -443,6 +448,8 @@ internal fun PlayerChromeControls(
             onSettings = onOptions,
             onStop = onStop,
             stopFocus = stopFocus,
+            skip = actions.skip,
+            skipFocus = skipFocus,
             onInfo = onInfo,
             onSchedule = onSchedule,
             scheduleAvailable = scheduleAvailable,

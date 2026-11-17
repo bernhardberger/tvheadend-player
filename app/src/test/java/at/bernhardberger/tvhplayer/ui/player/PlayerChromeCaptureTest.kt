@@ -2,6 +2,8 @@ package at.bernhardberger.tvhplayer.ui.player
 
 import at.bernhardberger.tvhplayer.core.glanceBadges
 import at.bernhardberger.tvhplayer.core.VideoScan
+import at.bernhardberger.tvhplayer.core.RecordingMark
+import at.bernhardberger.tvhplayer.core.RecordingMarkKind
 
 import androidx.compose.ui.res.stringResource
 import at.bernhardberger.tvhplayer.R
@@ -187,6 +189,10 @@ class PlayerChromeCaptureTest {
     @Test fun english() = captures("en", 1f)
 
     @Category(VisualCapture::class)
+    @Test fun recordingControlsSkip() = captures("en", 1f,
+        scenes = setOf(Scene.RECORDING_AD_SKIP, Scene.RECORDING_PADDING_SKIP))
+
+    @Category(VisualCapture::class)
     @Test fun recordingStartup() = captures("en", 1f,
         scenes = setOf(Scene.RECORDING_STARTING, Scene.RECORDING_STARTING_CONTROLS))
 
@@ -330,6 +336,7 @@ class PlayerChromeCaptureTest {
         AUDIO_FOCUSED, RECORDING_STARTING, RECORDING_STARTING_CONTROLS, BANNER_LONG_EYEBROW,
         // The tray preview's Next line with a recording scheduled for it.
         TRAY_NEXT_SCHEDULED,
+        RECORDING_AD_SKIP, RECORDING_PADDING_SKIP,
     }
 
     /** [Scene.CONTROLS_REVEAL_MID] composes the Banner, then the controls take it over. */
@@ -499,6 +506,8 @@ class PlayerChromeCaptureTest {
             if (next == Scene.RECORDING_STARTING_CONTROLS) {
                 compose.onNodeWithTag("player-pause").assertIsFocused()
             }
+            if (next == Scene.RECORDING_AD_SKIP) compose.onNodeWithTag("recording-skip").assertIsFocused()
+            if (next == Scene.RECORDING_PADDING_SKIP) compose.onNodeWithTag("player-pause").assertIsFocused()
             // No status slot and no Go live: the state cell lives in the bar row.
             compose.onNodeWithTag("player-status-slot", useUnmergedTree = true).assertDoesNotExist()
             compose.onNodeWithTag("player-go-live", useUnmergedTree = true).assertDoesNotExist()
@@ -720,16 +729,22 @@ class PlayerChromeCaptureTest {
                 Modifier.align(Alignment.BottomStart).padding(playerHiddenChipPadding()))
             Scene.RECORDING_BANNER, Scene.RECORDING_STEP, Scene.RECORDING_CONTROLS, Scene.RECORDING_GROWING, Scene.RECORDING_CONTROLS_STEP, Scene.RECORDING_INFO_FOCUSED,
             Scene.RECORDING_STEP_FORWARD, Scene.RECORDING_CONTROLS_STEP_FORWARD,
-            Scene.RECORDING_STARTING, Scene.RECORDING_STARTING_CONTROLS -> {
+            Scene.RECORDING_STARTING, Scene.RECORDING_STARTING_CONTROLS,
+            Scene.RECORDING_AD_SKIP, Scene.RECORDING_PADDING_SKIP -> {
                 val growing = scene == Scene.RECORDING_GROWING
-                val position = if (scene == Scene.RECORDING_STARTING || scene == Scene.RECORDING_STARTING_CONTROLS) 0L else 1_045_000L
+                val position = when (scene) {
+                    Scene.RECORDING_STARTING, Scene.RECORDING_STARTING_CONTROLS -> 0L
+                    Scene.RECORDING_PADDING_SKIP -> 60_000L
+                    else -> 1_045_000L
+                }
                 val duration = 4_350_000L
                 ProvideArtworkSession(session) { RecordingChromeFixture(
                     mode = when (scene) {
                         Scene.RECORDING_STEP, Scene.RECORDING_STEP_FORWARD ->
                             PlayerChromeMode.BANNER_STEP
                         Scene.RECORDING_CONTROLS, Scene.RECORDING_CONTROLS_STEP, Scene.RECORDING_CONTROLS_STEP_FORWARD, Scene.RECORDING_INFO_FOCUSED,
-                        Scene.RECORDING_STARTING_CONTROLS -> PlayerChromeMode.CONTROLS
+                        Scene.RECORDING_STARTING_CONTROLS, Scene.RECORDING_AD_SKIP,
+                        Scene.RECORDING_PADDING_SKIP -> PlayerChromeMode.CONTROLS
                         else -> PlayerChromeMode.BANNER
                     },
                     // 0:17:25 of 1:12:30; a quick step back 30 s previews 0:16:55.
@@ -742,7 +757,13 @@ class PlayerChromeCaptureTest {
                     },
                     originMs = position.takeIf { scene.name.startsWith("RECORDING") && scene.name.contains("STEP") },
                     // Stepping in the full controls: the focused timeline.
-                    restoreFocus = if (scene == Scene.RECORDING_INFO_FOCUSED) "player-info" else "player-seekbar".takeIf { scene == Scene.RECORDING_CONTROLS_STEP || scene == Scene.RECORDING_CONTROLS_STEP_FORWARD },
+                    restoreFocus = when (scene) {
+                        Scene.RECORDING_AD_SKIP -> "recording-skip"
+                        Scene.RECORDING_PADDING_SKIP -> "player-pause"
+                        Scene.RECORDING_INFO_FOCUSED -> "player-info"
+                        Scene.RECORDING_CONTROLS_STEP, Scene.RECORDING_CONTROLS_STEP_FORWARD -> "player-seekbar"
+                        else -> null
+                    },
                     growing = growing,
                     badges = glanceBadges(1080, "audio/ac3", 6, scan = VideoScan.INTERLACED),
                     info = fixtureRecordingInfo(programme.title.orEmpty(), growing, subtitle = programme.subtitle,
@@ -750,7 +771,12 @@ class PlayerChromeCaptureTest {
                          .copy(channelName = "Ridge Earth HD", channelNumber = "101"),
                     picon = LOGO,
                     artwork = programme.image,
-                    marks = chapterMarks(900_000L, 2_700_000L).takeIf { scene == Scene.RECORDING_CONTROLS }.orEmpty(),
+                    marks = when (scene) {
+                        Scene.RECORDING_AD_SKIP -> listOf(RecordingMark(RecordingMarkKind.AD_BREAK, 900_000L, 1_200_000L))
+                        Scene.RECORDING_PADDING_SKIP -> listOf(RecordingMark(RecordingMarkKind.PROGRAM_START, 120_000L))
+                        Scene.RECORDING_CONTROLS -> chapterMarks(900_000L, 2_700_000L)
+                        else -> emptyList()
+                    },
                     modifier = Modifier.align(Alignment.BottomCenter),
                 ) }
             }

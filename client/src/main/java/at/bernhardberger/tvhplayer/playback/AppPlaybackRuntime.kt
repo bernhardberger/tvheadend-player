@@ -2212,8 +2212,8 @@ class AppPlaybackRuntime(
         recordingMarkers.deliberateSeek(positionMs)
         player.seekTo(positionMs)
     } }
-    fun skipRecordingAdBreak(mark: at.bernhardberger.tvhplayer.core.RecordingMark, expectedRevision: Long) {
-        recordingMarkers.skipAdBreak(mark, expectedRevision)
+    fun skipRecordingAdBreak(mark: at.bernhardberger.tvhplayer.core.RecordingMark, expectedRevision: Long, fromControls: Boolean = false) {
+        recordingMarkers.skipAdBreak(mark, expectedRevision, fromControls)
     }
     fun dismissRecordingSkipPrompt(mark: at.bernhardberger.tvhplayer.core.RecordingMark, expectedRevision: Long) {
         recordingMarkers.dismissSkipPrompt(mark, expectedRevision)

@@ -15,6 +15,38 @@ class RecordingSkipPolicyTest {
     private val marks = listOf(ad, cut)
     private val automatic = PlayerSettings(adBreakMode = AdBreakMode.AUTOMATIC)
 
+    @Test fun controlsActionUsesPositionAndLandingRatherThanOfferHistory() {
+        val start = RecordingMark(RecordingMarkKind.PROGRAM_START, 5_000)
+        val spans = marks + start
+        for (mode in AdBreakMode.entries) {
+            val settings = PlayerSettings(adBreakMode = mode, skipLanding = SkipLanding.TWO_SECONDS_BEFORE)
+            val policy = RecordingSkipPolicy()
+            policy.deliberateSeek(spans, 1_000)
+            policy.evaluate(spans, 1_000, true, settings)
+            policy.dismissPrompt()
+            assertEquals(start, recordingSkipAction(spans, 1_000, settings))
+            assertEquals(5_000L, policy.acceptAction(start, spans, 1_000, settings))
+            assertNull(recordingSkipAction(spans, 5_000, settings))
+            policy.deliberateSeek(spans, 12_000)
+            policy.evaluate(spans, 12_000, true, settings)
+            assertNull(policy.offeredPrompt)
+            if (mode == AdBreakMode.OFF) {
+                assertNull(recordingSkipAction(spans, 12_000, settings))
+                assertNull(policy.acceptAction(ad, spans, 12_000, settings))
+            } else {
+                assertEquals(ad, recordingSkipAction(spans, 12_000, settings))
+                assertEquals(18_000L, policy.acceptAction(ad, spans, 12_000, settings))
+                assertNull(recordingSkipAction(spans, 18_000, settings))
+                assertNull(recordingSkipAction(spans, 19_999, settings))
+                assertNull(policy.acceptAction(ad, spans, 18_000, settings))
+                policy.deliberateSeek(spans, 17_999)
+                policy.evaluate(spans, 17_999, false, settings)
+                assertEquals(ad, recordingSkipAction(spans, 17_999, settings))
+            }
+            assertNull(recordingSkipAction(spans, ad.endMs, settings))
+        }
+    }
+
     @Test fun paddingOffersOnOpenInEveryAdModeAndNeverJumpsAutomatically() {
         val start = RecordingMark(RecordingMarkKind.PROGRAM_START, 60_000)
         for (mode in AdBreakMode.entries) {

@@ -315,34 +315,43 @@ class RecordingSkipFocusTest {
         assertEquals(listOf(ad), prompt.timeouts)
     }
 
-    // Controls up: ad breaks are skipped through the marks, never a separate button.
-
-    @Test fun duringABreakNoSkipExistsAndTheTitleUsesTheFullInfoBarWidth() {
-        controls(breakPlaying = true, title = "A long recording title ".repeat(20))
+    @Test fun allActionsReachTheSeekbarAndReturnDuringABreakAndSkipReturnsToPause() {
+        val state = controls(breakPlaying = true)
         assertEquals(listOf("player-pause"), compose.focusedTags())
-        assertFalse(compose.tagExists("recording-skip"))
+        assertTrue(compose.tagExists("recording-skip"))
         assertFalse(compose.tagExists("recording-skip-prompt"))
-        val title = compose.onNodeWithTag("player-info-title", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        val info = compose.onNodeWithTag("player-info-bar", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        assertEquals("no end reservation for a removed Skip", info.right, title.right, .5f)
-    }
-
-    @Test fun allActionsReachTheSeekbarAndReturnWithoutASkipFocusTargetDuringABreak() {
-        controls(breakPlaying = true)
-        val visited = mutableSetOf<String>()
-        repeat(6) {
-            val action = compose.focusedTags().single()
-            visited += action
+        val actions = listOf("player-pause", "player-stop", "recording-skip", "player-info", "player-settings")
+        actions.forEachIndexed { index, action ->
+            assertEquals(listOf(action), compose.focusedTags())
             compose.pressKey(Key.DirectionUp, settleFrames = 20)
             assertEquals(listOf("player-seekbar"), compose.focusedTags())
-            assertFalse(compose.tagExists("recording-skip"))
             compose.pressKey(Key.DirectionDown, settleFrames = 20)
             assertEquals(listOf(action), compose.focusedTags())
-            compose.pressKey(Key.DirectionRight, settleFrames = 20)
+            if (index < actions.lastIndex) compose.pressKey(Key.DirectionRight, settleFrames = 20)
         }
-        assertTrue(visited.containsAll(listOf("player-pause", "player-stop", "player-info", "player-settings")))
         compose.pressKey(Key.DirectionLeft, settleFrames = 20)
-        assertTrue(compose.focusedTags().single() in visited)
+        compose.pressKey(Key.DirectionLeft, settleFrames = 20)
+        assertEquals(listOf("recording-skip"), compose.focusedTags())
+        compose.pressKey(Key.DirectionCenter, settleFrames = 20)
+        assertEquals(listOf(ad.endMs), state.seeks)
+        assertFalse(compose.tagExists("recording-skip"))
+        assertEquals(listOf("player-pause"), compose.focusedTags())
+        assertEquals("the accepting OK does not toggle Pause", 0, state.pauseToggles)
+    }
+
+    @Test fun paddingSkipIsReachableAndOutsideSpansNoSkipExists() {
+        val state = controls(breakPlaying = false, padding = true)
+        assertEquals(listOf("player-pause"), compose.focusedTags())
+        compose.pressKey(Key.DirectionRight, settleFrames = 20)
+        compose.pressKey(Key.DirectionRight, settleFrames = 20)
+        assertEquals(listOf("recording-skip"), compose.focusedTags())
+        compose.onNodeWithTag("recording-skip").assertTextEquals(
+            ApplicationProvider.getApplicationContext<Application>().getString(R.string.skip_to_program_start))
+        compose.pressKey(Key.DirectionCenter, settleFrames = 20)
+        assertEquals(listOf(1_000_000L), state.seeks)
+        assertFalse(compose.tagExists("recording-skip"))
+        assertEquals(listOf("player-pause"), compose.focusedTags())
+        assertEquals("the accepting OK does not toggle Pause", 0, state.pauseToggles)
     }
 
     @Test fun marksKeepNearestEntryAndBothVerticalExitsReturnToTheSeekbarDuringABreak() {
@@ -352,7 +361,7 @@ class RecordingSkipFocusTest {
             compose.pressKey(Key.DirectionUp, settleFrames = 20)
             assertEquals(listOf("recording-marker-target"), compose.focusedTags())
             assertEquals("nearest entry with earlier tie", ad.startMs, state.navigation.selectedMs)
-            assertFalse(compose.tagExists("recording-skip"))
+            assertFalse(compose.tagExists("recording-skip-prompt"))
             compose.pressKey(Key.DirectionRight, settleFrames = 20)
             assertEquals(ad.endMs, state.navigation.selectedMs)
             compose.pressKey(Key.DirectionLeft, settleFrames = 20)
@@ -449,20 +458,24 @@ class RecordingSkipFocusTest {
     private class ControlsState {
         val navigation = RecordingMarkerNavigation()
         val seeks = mutableListOf<Long>()
+        var pauseToggles = 0
+        var position by mutableStateOf(0L)
     }
 
-    private fun controls(breakPlaying: Boolean, title: String = "Zeit im Bild"): ControlsState {
+    private fun controls(breakPlaying: Boolean, title: String = "Zeit im Bild", padding: Boolean = false): ControlsState {
         val state = ControlsState()
-        val position = if (breakPlaying) 1_800_000L else 900_000L
+        state.position = if (breakPlaying) 1_800_000L else 900_000L
         compose.mainClock.autoAdvance = false
         compose.setContent {
             TVHeadendPlayerTheme {
                 RecordingChromeFixture(
-                    positionMs = position,
-                    info = fixtureRecordingInfo(title = title, positionMs = position),
-                    marks = listOf(ad) + chapterMarks(900_000L),
+                    positionMs = state.position,
+                    info = fixtureRecordingInfo(title = title, positionMs = state.position),
+                    marks = listOf(ad) + chapterMarks(900_000L) +
+                        if (padding) listOf(RecordingMark(RecordingMarkKind.PROGRAM_START, 1_000_000L)) else emptyList(),
                     markerNavigation = state.navigation,
-                    onSeekMarker = { state.seeks += it },
+                    onSeekMarker = { state.seeks += it; state.position = it },
+                    onTogglePause = { state.pauseToggles++ },
                 )
             }
         }
