@@ -389,7 +389,7 @@ class LivePlayerChromePlaybackTest : LivePlayerChromeFixture() {
     }
 
     @Test fun playerBannerStaysWhileTheChannelIsTuning() {
-        screen()
+        screen(presentOnEntry = false)
         // Well past the Banner's 5 s: no frame was presented, so it stays while tuning.
         repeat(8) { settle() }
         assertTrue(exists("player-banner"))
@@ -544,6 +544,8 @@ class LivePlayerChromePlaybackTest : LivePlayerChromeFixture() {
             screen(opener = manager)
             startLiveSubscription(connection, height = 1080L, signal = 53739L)
             playerReady()
+            compose.runOnIdle { playerListeners.toList().forEach { it.onRenderedFirstFrame() } }
+            settleFrames()
             // Media3's ExoPlayer playback thread binds the grant after collection registration.
             awaitLiveSignal("the timeshift refusal is bound") { runtime.livePause.value.availability == LivePauseAvailability.UNAVAILABLE }
             key(Key.DirectionDown)
@@ -561,7 +563,7 @@ class LivePlayerChromePlaybackTest : LivePlayerChromeFixture() {
 
     @Test fun playerBannerHidesFiveSecondsAfterThisTunesFirstFrame() {
         statsStore.setLevel(PlayerStatsLevel.DEBUG)
-        screen()
+        screen(presentOnEntry = false)
         playerReady()
         assertMainSettled("the driven player reports Playing") { runtime.state.value is AppPlaybackState.Playing }
         // Playing without a picture: no video diagnostics does not prove audio-only.
@@ -598,7 +600,7 @@ class LivePlayerChromePlaybackTest : LivePlayerChromeFixture() {
     private fun statsWidth() = compose.onNodeWithTag("playback-stats-overlay").fetchSemanticsNode().boundsInRoot.width
 
     @Test fun playerAudioOnlyServiceStartsTheBannerTimerWhenPlaying() {
-        screen()
+        screen(presentOnEntry = false)
         val audioOnly = Tracks(listOf(Tracks.Group(
             TrackGroup(Format.Builder().setSampleMimeType(MimeTypes.AUDIO_AAC).build()),
             false, intArrayOf(C.FORMAT_HANDLED), booleanArrayOf(true),
@@ -703,6 +705,8 @@ class LivePlayerChromePlaybackTest : LivePlayerChromeFixture() {
             playerReady()
             assertMainSettled("the driven player reports Playing") { runtime.state.value is AppPlaybackState.Playing }
             settle()
+            compose.runOnIdle { playerListeners.toList().forEach { it.onRenderedFirstFrame() } }
+            settleFrames()
             assertTrue(exists("player-banner"))
             assertTrue("warm adoption uses the existing decoded raster without another callback",
                 description("player-info-bar").contains("1080 lines"))
@@ -840,6 +844,10 @@ class LivePlayerChromePlaybackTest : LivePlayerChromeFixture() {
         key(Key.Menu)
         compose.onNodeWithTag("playback-options-stream-profile").performSemanticsAction(SemanticsActions.RequestFocus)
         key(Key.DirectionCenter)
+        // A successful profile retry starts a new channel; options cannot take keys until its picture.
+        playerReady()
+        compose.runOnIdle { playerListeners.toList().forEach { it.onRenderedFirstFrame() } }
+        settle()
         compose.onNodeWithTag("playback-options-stream-profile-default").assertIsFocused()
         key(Key.DirectionCenter)
         compose.onNodeWithTag("playback-options-stream-profile-default").assertIsFocused()

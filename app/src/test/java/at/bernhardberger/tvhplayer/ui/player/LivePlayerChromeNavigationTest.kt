@@ -370,6 +370,7 @@ class LivePlayerChromeNavigationTest : LivePlayerChromeFixture() {
                 Channel.create(ChannelId(3), name = "Channel 20", number = 20),
             ))),
             epgState = EpgRepositoryState.Current(EpgSnapshot.create(events = emptyList())),
+            dvrState = session.observation.value.dvrState,
         ))
         settleFrames()
         val target = runtime.activeTarget.value
@@ -396,8 +397,7 @@ class LivePlayerChromeNavigationTest : LivePlayerChromeFixture() {
             key(Key.DirectionDown)
             assertEquals("browser opens on the playing channel", listOf("player-channel-card-1"), focused())
             assertTrue("the now-playing strip stands above the rows", exists("player-now-playing"))
-            // This screen's channel never leaves tuning.
-            compose.onNode(hasTestTag("channel-tuning-indicator") and hasAnyAncestor(hasTestTag("player-now-playing")),
+            compose.onNode(hasTestTag("channel-playing-indicator") and hasAnyAncestor(hasTestTag("player-now-playing")),
                 useUnmergedTree = true).assertExists("the strip carries the playback marker")
             assertFalse("the programme info page does not open", exists("programme-details-page"))
             assertEquals("the opening key tunes nothing", AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)

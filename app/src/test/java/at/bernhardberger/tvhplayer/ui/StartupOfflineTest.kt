@@ -3,6 +3,8 @@
 
 package at.bernhardberger.tvhplayer.ui
 
+import androidx.compose.ui.input.key.nativeKeyCode
+import org.junit.Assert.assertFalse
 import at.bernhardberger.tvhplayer.testutil.pressKey
 import android.app.Application
 import android.os.Looper
@@ -17,8 +19,15 @@ import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.datastore.core.DataStore
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewModelScope
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.media3.exoplayer.ExoPlayer
@@ -66,6 +75,7 @@ import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.stores.GuidePositionStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.testutil.awaitScheduledWork
+import at.bernhardberger.tvhplayer.testutil.settleFrames
 import at.bernhardberger.tvhplayer.ui.player.LivePlayerServerWaitTag
 import at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
@@ -99,6 +109,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.time.Duration
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionOpener
+import at.bernhardberger.tvheadend.sdk.playback.SubscriptionChannelId
 import kotlinx.coroutines.awaitCancellation
 import java.io.IOException
 
@@ -112,6 +123,10 @@ import java.io.IOException
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi")
 class StartupOfflineTest {
     @get:Rule val compose = createComposeRule()
+    private val startupKeys = MainStartupActivityKeyDispatcher(
+        at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyCycleOwner())
+    private var startupKeyContract = MainStartupActivityKeyContract(
+        at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyMode.Inactive)
     private val context = ApplicationProvider.getApplicationContext<Application>()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val profileDispatcher = StandardTestDispatcher()
@@ -120,29 +135,34 @@ class StartupOfflineTest {
     private lateinit var session: FakeTvheadendSession
     private lateinit var runtime: AppPlaybackRuntime
     private lateinit var playerData: InMemoryData
+    private lateinit var launchRequests: ApplianceLaunchRequests
+    private val activeSubscriptions = java.util.concurrent.ConcurrentHashMap.newKeySet<SubscriptionChannelId>()
 
     @After fun after() {
         scope.cancel()
         if (::player.isInitialized) player.release()
     }
 
-    @Test fun okBeforeReadyOpensTheWaitingPlayerAndTunesThatChannelOnReady() {
-        app()
+    @Test fun okBeforeReadyTunesThatChannelWithoutAnAppStartupSurface() {
+        app(holdLive = true)
         confirmRow(1)
-        val wait = compose.onNodeWithTag(LivePlayerServerWaitTag, useUnmergedTree = true)
-        val description = wait.fetchSemanticsNode().config[SemanticsProperties.ContentDescription].joinToString()
-        assertTrue(description, description.contains("1 Name 1") && description.contains("Connecting to your Tvheadend server"))
-        // The opening OK activated nothing: no action exists or holds focus in the wait.
-        assertEquals(0, compose.onAllNodes(hasClickAction() and isFocused()).fetchSemanticsNodes().size)
+        // The saved row opens its channel wait, not the app's startup screen.
+        compose.onNodeWithTag(LivePlayerServerWaitTag, useUnmergedTree = true).assertExists()
+        assertEquals(listOf("1 Name 1"), compose.onNodeWithTag(LivePlayerServerWaitTag, useUnmergedTree = true)
+            .fetchSemanticsNode().config[SemanticsProperties.ContentDescription])
+        assertEquals(0, compose.onAllNodes(hasClickAction() and isFocused(), useUnmergedTree = false).fetchSemanticsNodes().size)
+        // Confirm is consumed by the wait rather than reaching an action behind it.
         compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag(LivePlayerServerWaitTag, useUnmergedTree = true).assertExists()
         assertEquals(0, binds())
 
+        // The first session installs the requested channel once; in-app entry has no Starting phase.
         session.publish(ready(catalog))
         settle()
         compose.awaitScheduledWork(profileDispatcher) { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(1)) }
         settle()
         assertEquals(1, binds())
-        assertEquals(0, compose.onAllNodes(hasTestTag(LivePlayerServerWaitTag), useUnmergedTree = true).fetchSemanticsNodes().size)
+        compose.onNodeWithTag(LivePlayerServerWaitTag, useUnmergedTree = true).assertDoesNotExist()
     }
 
     @Test fun failedConnectingThatRetriesByItselfOffersConnectionSettingsFocusedAndNoRetry() {
@@ -155,10 +175,8 @@ class StartupOfflineTest {
         compose.waitUntil(10_000) {
             compose.onAllNodes(hasTestTag("tv-recovery-primary") and isFocused()).fetchSemanticsNodes().isNotEmpty()
         }
-        compose.onNode(hasTestTag("tv-recovery-primary") and hasText("Connection settings", substring = true), useUnmergedTree = false)
-            .assertIsFocused()
+        compose.onNode(hasTestTag("tv-recovery-primary") and hasText("Connection settings", substring = true)).assertIsFocused()
         assertEquals(0, compose.onAllNodes(hasText("Retry", substring = true), useUnmergedTree = true).fetchSemanticsNodes().size)
-        // Automatic attempts keep the recovery and its focus in place.
         session.publish(connecting(catalog))
         settle()
         compose.onNodeWithTag("tv-recovery-primary").assertIsFocused()
@@ -168,7 +186,6 @@ class StartupOfflineTest {
     @Test fun connectionSettingsFromTheFailedWaitLeavesThePlayerForConnectionSettings() {
         app()
         confirmRow(1)
-        // A failure that waits for the viewer: Retry first, Connection settings beside it.
         session.publish(SessionObservation.create(
             sessionState = SessionState.Unavailable(SessionFailure.synchronizationFailed(TvheadendFailure.MALFORMED_RESPONSE)),
             channelState = ChannelRepositoryState.Stale(catalog),
@@ -180,7 +197,6 @@ class StartupOfflineTest {
         compose.onNode(hasTestTag("tv-recovery-secondary") and hasText("Connection settings", substring = true)).assertIsFocused()
         compose.pressKey(Key.DirectionCenter)
         settle()
-        // Connection settings show the server list.
         compose.waitUntil(10_000) { compose.onAllNodes(hasText("Add connection"), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
         assertEquals(0, compose.onAllNodes(hasTestTag("tv-recovery-overlay")).fetchSemanticsNodes().size)
         assertEquals(0, compose.onAllNodes(hasTestTag(LivePlayerServerWaitTag), useUnmergedTree = true).fetchSemanticsNodes().size)
@@ -251,7 +267,7 @@ class StartupOfflineTest {
             tag.startsWith("home-") || tag.startsWith("nav-")
         }
         // clearAndSetSemantics hides the landing tree from accessibility's merged view.
-        assertEquals(0, compose.onAllNodes(landingOrRail).fetchSemanticsNodes().size)
+        assertEquals(0, compose.onAllNodes(landingOrRail, useUnmergedTree = false).fetchSemanticsNodes().size)
         assertEquals(0, compose.onAllNodes(isFocused(), useUnmergedTree = true).fetchSemanticsNodes().size)
 
         gate.complete(Unit)
@@ -282,8 +298,8 @@ class StartupOfflineTest {
         // The one grace: the screen is laid out with its brand still transparent, no stage text yet.
         assertEquals(1, startupScreens())
         assertEquals(0, statusTexts())
-        compose.onNodeWithTag("main-startup-mark").fetchSemanticsNode()
-        compose.onNode(hasText("Tvheadend Player")).fetchSemanticsNode()
+        compose.onNodeWithTag("main-startup-mark", useUnmergedTree = true).fetchSemanticsNode()
+        compose.onNode(hasText("Tvheadend Player"), useUnmergedTree = true).fetchSemanticsNode()
         // From the stage text on, readiness keeps the shown screen readable before it leaves.
         // (Its 500ms minimum is checked in ColdStartPresentationTest: the glow's frames also
         // move Robolectric's Handler clock, so a fixed wait here would measure the harness.)
@@ -292,7 +308,8 @@ class StartupOfflineTest {
         session.publish(ready(catalog))
         advance(50)
         assertEquals("shown screens stay readable", 1, startupScreens())
-        assertEquals("the stage text follows the brand", 1, statusTexts())
+        compose.mainClock.advanceTimeBy(300)
+        assertEquals("the settled stage has one status", 1, statusTexts())
         advance(600)
         assertEquals(0, startupScreens())
         openChannels()
@@ -346,18 +363,280 @@ class StartupOfflineTest {
     }
 
     @Test fun okWithAReadySessionStartsThatChannelAndBackLeavesItPlaying() {
-        app(ready(catalog))
+        app(ready(catalog), holdLive = true)
         confirmRow(2, awaitWait = false)
         compose.awaitScheduledWork(profileDispatcher) { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(2)) }
         settle()
         assertEquals(1, binds())
-        assertEquals(0, compose.onAllNodes(hasTestTag(LivePlayerServerWaitTag), useUnmergedTree = true).fetchSemanticsNodes().size)
-        compose.pressKey(Key.Back)
+        assertEquals("a viewer selection uses the player's opening state", 0,
+            compose.onAllNodes(hasTestTag(LivePlayerServerWaitTag), useUnmergedTree = true).fetchSemanticsNodes().size)
+        compose.pressKey(Key.Back) // Ordinary player chrome handles the first Back.
         settle()
-        compose.waitUntil(10_000) {
+        compose.pressKey(Key.Back)
+        advance(300)
+        compose.awaitScheduledWork(profileDispatcher) {
             compose.onAllNodes(hasTestTag("channel-row-2") and isFocused()).fetchSemanticsNodes().isNotEmpty()
         }
         assertEquals("playback stays warm behind browse", AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
+    }
+
+    @Test fun autoplayKeepsStartupPendingUntilItsFirstFrame() {
+        app(ready(catalog), awaitRows = false, holdLive = true, autoplay = true)
+        settle()
+        compose.awaitScheduledWork(profileDispatcher) { runtime.activeTarget.value != null }
+        advance(500)
+        assertEquals("passive Starting is not a recovery outcome", 1, startupScreens())
+        compose.awaitScheduledWork(profileDispatcher) { SubscriptionChannelId(1) in activeSubscriptions }
+        compose.runOnIdle {
+            player.pause()
+            playerListeners.toList().forEach { it.onPlaybackStateChanged(androidx.media3.common.Player.STATE_READY) }
+            playerListeners.toList().forEach { it.onRenderedFirstFrame() }
+        }
+        advance(800)
+        assertEquals("the presented target completes startup", 0, startupScreens())
+    }
+
+    @Test fun freshAutoplayKeepsBrandUntilItsSavedChannelCanTune() {
+        startAutoplay(connecting(catalog), ChannelId(2))
+        compose.onNodeWithText("1 Name 1", substring = true, useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithText("2 Name 2", substring = true, useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithTag("main-startup-wordmark", useUnmergedTree = true).assertExists()
+        assertEquals("Connecting", compose.onNodeWithTag("main-startup-status", useUnmergedTree = true)
+            .fetchSemanticsNode().config[SemanticsProperties.Text].single().text)
+        assertEquals("the saved choice must not tune", 0, binds())
+        assertTrue("cold autoplay retains the branded background",
+            compose.onAllNodes(hasTestTag("startup-background-pending") or hasTestTag("startup-background-prepared"),
+                useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
+        compose.pressKey(Key.ChannelUp)
+        settle()
+        assertEquals("Connecting consumes a zap without tuning", 0, binds())
+        session.publish(ready(catalog))
+        settle()
+        compose.onNodeWithText("2 Name 2", substring = true, useUnmergedTree = true).assertExists()
+        assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
+    }
+
+    @Test fun autoplayFallsBackWhenTheSavedChannelIsMissing() {
+        startAutoplay(connecting(catalog), ChannelId(2))
+        assertEquals(0, binds())
+        val replacement = Channel.create(ChannelId(3), name = "Replacement", number = 3)
+        session.publish(ready(ChannelCatalog.create(listOf(replacement))))
+        settle()
+        compose.onNodeWithText("3 Replacement", substring = true, useUnmergedTree = true).assertExists()
+        assertEquals(AppPlaybackTarget.Live(replacement.id), runtime.activeTarget.value)
+        assertEquals(1, binds())
+    }
+
+    @Test fun autoplayWithoutSavedDataKeepsBrandUntilReady() {
+        startAutoplay(SessionObservation.create(sessionState = SessionState.Connecting), null)
+        assertEquals(0, binds())
+        session.publish(ready(catalog))
+        settle()
+        compose.onNodeWithText("1 Name 1", substring = true, useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("main-startup-wordmark", useUnmergedTree = true).assertExists()
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+    }
+
+    @Test fun readyWaitsForTheInitialSavedChoice() {
+        val gate = CompletableDeferred<Unit>()
+        startAutoplay(connecting(catalog), ChannelId(2), gate)
+        session.publish(ready(catalog))
+        settle()
+        compose.onNodeWithTag("main-startup-wordmark", useUnmergedTree = true).assertExists()
+        compose.onNodeWithText("1 Name 1", substring = true, useUnmergedTree = true).assertDoesNotExist()
+        assertEquals(0, binds())
+        playerData.readGate = null
+        gate.complete(Unit)
+        settle()
+        compose.onNodeWithText("2 Name 2", substring = true, useUnmergedTree = true).assertExists()
+        assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
+    }
+
+    private lateinit var bootstrapOwner: at.bernhardberger.tvhplayer.viewmodels.MainStartupViewModel
+    private var bootstrapGeneration by androidx.compose.runtime.mutableStateOf(0)
+
+    @Test fun stoppedBootstrapRestoresDarkWithoutWithdrawingAutoplay() {
+        val gate = CompletableDeferred<Unit>()
+        val saved = androidx.lifecycle.SavedStateHandle()
+        app(awaitRows = false, bootstrapHandle = saved, bootstrapReadGate = gate, bootstrapAutoplay = true)
+        settle()
+        compose.runOnIdle {
+            bootstrapOwner.finishFreshStart()
+            assertTrue(saved.get<Boolean>("startup.requestCreationHandled") != true)
+            assertEquals(at.bernhardberger.tvhplayer.core.ApplianceLaunchState.Idle,
+                bootstrapOwner.applianceLaunchRequests.state.value)
+            // Cancel the old owner's held bootstrap before creating its replacement from the same saved state.
+            bootstrapOwner.viewModelScope.cancel()
+            bootstrapGeneration++
+        }
+        settle()
+        advance(1_500)
+        assertEquals(MainStartupState.ResolvingLocal, bootstrapOwner.state.value)
+        assertTrue("recreated Preparing must remember the completed freshness", startupBackgroundCount() == 0)
+        gate.complete(Unit)
+        settle()
+        advance(500)
+        assertTrue(bootstrapOwner.state.value is MainStartupState.Ready)
+        assertTrue(bootstrapOwner.applianceLaunchRequests.state.value is
+            at.bernhardberger.tvhplayer.core.ApplianceLaunchState.Pending)
+        assertTrue("restored Ready remains dark while autoplay waits", startupBackgroundCount() == 0)
+        assertEquals(0, binds())
+    }
+
+    @Test fun coldInitialLiveIntentKeepsGlowWhenBootstrapCoalesces() {
+        val gate = CompletableDeferred<Unit>()
+        app(awaitRows = false, bootstrapHandle = androidx.lifecycle.SavedStateHandle(),
+            bootstrapReadGate = gate, earlyBootstrapLive = true, bootstrapAutoplay = true)
+        settle()
+        assertEquals("the read gate keeps bootstrap unfinished when LIVE arrives",
+            MainStartupState.ResolvingLocal, bootstrapOwner.state.value)
+        val earlyRequest = bootstrapOwner.applianceLaunchRequests.state.value
+        assertTrue("LIVE is pending before bootstrap finishes",
+            earlyRequest is at.bernhardberger.tvhplayer.core.ApplianceLaunchState.Pending)
+        gate.complete(Unit)
+        settle()
+        assertTrue(bootstrapOwner.state.value is MainStartupState.Ready)
+        assertEquals("bootstrap autoplay coalesces with the earlier LIVE request",
+            earlyRequest, bootstrapOwner.applianceLaunchRequests.state.value)
+        advance(500)
+        assertTrue("a cold initial LIVE intent keeps glow after bootstrap", startupBackgroundCount() > 0)
+        assertEquals(0, binds())
+    }
+
+    @Test fun leavingEndsGlowEvenWhileTheColdRequestRemainsPending() {
+        val gate = CompletableDeferred<Unit>()
+        app(initial = SessionObservation.create(sessionState = SessionState.Connecting), awaitRows = false,
+            bootstrapHandle = androidx.lifecycle.SavedStateHandle(), bootstrapReadGate = gate, bootstrapAutoplay = true)
+        settle()
+        gate.complete(Unit)
+        settle()
+        advance(500)
+        assertTrue(startupBackgroundCount() > 0)
+        val pending = bootstrapOwner.applianceLaunchRequests.state.value
+        compose.runOnIdle {
+            bootstrapOwner.finishFreshStart()
+            bootstrapOwner.applianceLaunchRequests.requestEntry(
+                at.bernhardberger.tvhplayer.core.ApplianceEntryDestination.LIVE, false)
+        }
+        settle()
+        assertTrue("a return to the same pending request is dark", startupBackgroundCount() == 0)
+        assertEquals(pending, bootstrapOwner.applianceLaunchRequests.state.value)
+        assertEquals(0, binds())
+    }
+
+    @Test fun restoredBootstrapStaysDarkBeforeAndAfterLocalSettingsArrive() {
+        val gate = CompletableDeferred<Unit>()
+        app(awaitRows = false, holdLive = true,
+            bootstrapHandle = androidx.lifecycle.SavedStateHandle(mapOf(
+                "startup.requestCreationHandled" to true, "startup.retainedRequestId" to 7L)),
+            bootstrapReadGate = gate)
+        settle()
+        advance(1_500)
+        compose.onNodeWithTag("main-startup-status", useUnmergedTree = true).assertExists()
+        assertTrue("restored Preparing must not flash the brand", startupBackgroundCount() == 0)
+        gate.complete(Unit)
+        settle()
+        advance(500)
+        compose.onNodeWithText("Connecting", useUnmergedTree = true).assertExists()
+        assertTrue("restored Ready remains dark", startupBackgroundCount() == 0)
+        compose.onNodeWithTag("main-startup-wordmark", useUnmergedTree = true).assertExists()
+        assertEquals(0, binds())
+    }
+
+    @Test fun coldBootstrapKeepsTheBrandedPreparingScreen() {
+        val gate = CompletableDeferred<Unit>()
+        app(awaitRows = false, bootstrapHandle = androidx.lifecycle.SavedStateHandle(), bootstrapReadGate = gate)
+        settle()
+        advance(1_500)
+        assertTrue("cold Preparing retains its brand", startupBackgroundCount() > 0)
+        gate.complete(Unit)
+        settle()
+        assertTrue("cold Ready retains its brand", startupBackgroundCount() > 0)
+    }
+
+    private fun startupBackgroundCount() =
+        compose.onAllNodes(hasTestTag("startup-background-pending") or hasTestTag("startup-background-prepared"),
+            useUnmergedTree = true).fetchSemanticsNodes().size
+
+    @Test fun savedPendingLiveUsesTheChannelStartGrace() = pendingLiveGrace(connecting(catalog))
+
+    @Test fun unsavedPendingLiveUsesTheSameChannelStartGrace() =
+        pendingLiveGrace(SessionObservation.create(sessionState = SessionState.Connecting))
+
+    @Test fun sessionLostBeforeThePictureKeepsTheOriginalGraceThroughRecoveryHandoff() {
+        app(connecting(catalog), awaitRows = false, holdLive = true, autoplay = true)
+        settle()
+        advance(5_000)
+        session.publish(ready(catalog))
+        settle()
+        compose.awaitScheduledWork(profileDispatcher) { runtime.activeTarget.value != null }
+        session.publish(SessionObservation.create(
+            sessionState = SessionState.Unavailable(SessionFailure.TRANSPORT_UNAVAILABLE),
+            channelState = ChannelRepositoryState.Stale(catalog),
+        ))
+        // This crosses T0 + 15 s, but not the later runtime start's own deadline.
+        advance(10_000)
+        compose.onNodeWithTag("tv-recovery-primary").assertIsFocused()
+        assertEquals("RECOVERY releases the startup owner", at.bernhardberger.tvhplayer.core.ApplianceLaunchState.Idle,
+            launchRequests.state.value)
+        compose.settleFrames(4)
+        compose.onNodeWithTag("tv-recovery-primary").assertIsFocused()
+        compose.onNodeWithText("Connecting", useUnmergedTree = true).assertDoesNotExist()
+    }
+
+    private fun pendingLiveGrace(initial: SessionObservation) {
+        app(initial, awaitRows = false, holdLive = true, autoplay = true)
+        settle()
+        session.publish(SessionObservation.create(
+            sessionState = SessionState.Unavailable(SessionFailure.TRANSPORT_UNAVAILABLE),
+            channelState = initial.channelState,
+        ))
+        advance(1_000)
+        compose.onNodeWithTag("tv-recovery-primary").assertDoesNotExist()
+        assertEquals(0, binds())
+        advance(15_000)
+        compose.onNodeWithTag("tv-recovery-primary").assertExists()
+        compose.onNodeWithTag("tv-recovery-secondary").assertDoesNotExist()
+        assertEquals(0, binds())
+    }
+
+    private fun startAutoplay(
+        initial: SessionObservation, persisted: ChannelId?, gate: CompletableDeferred<Unit>? = null,
+    ) {
+        app(initial, awaitRows = false, holdLive = true, autoplay = true,
+            persistedChannel = persisted, initialReadGate = gate)
+        settle()
+        advance(500)
+        compose.onNodeWithTag("main-startup-wordmark", useUnmergedTree = true).assertExists()
+    }
+
+    @Test fun startupKeysLeaveTheOwnerAndItsTargetUntilBack() {
+        app(ready(catalog), awaitRows = false, holdLive = true, autoplay = true)
+        settle()
+        compose.awaitScheduledWork(profileDispatcher) { runtime.activeTarget.value != null }
+        val target = runtime.activeTarget.value
+        val count = binds()
+        val playing = player.playWhenReady
+        for (key in listOf(Key.DirectionCenter, Key.Info, Key.Menu, Key.ChannelUp, Key.Two, Key.MediaPlayPause)) {
+            for ((action, repeat) in listOf(0 to 0, 0 to 1, 1 to 0)) {
+                assertTrue("$key is consumed by the Activity contract",
+                    startupKeys.dispatch(startupKeyContract, key.nativeKeyCode, action, repeat))
+            }
+            assertEquals("$key keeps startup", 1, startupScreens())
+            assertEquals("$key retains the target", target, runtime.activeTarget.value)
+            assertEquals("$key starts no subscription", count, binds())
+            assertEquals("$key does not control playback", playing, player.playWhenReady)
+            compose.onNodeWithTag("playback-options-title").assertDoesNotExist()
+            compose.onNodeWithTag("player-actions").assertDoesNotExist()
+        }
+        assertFalse(startupKeys.dispatch(startupKeyContract, android.view.KeyEvent.KEYCODE_BACK, 0))
+        // Android dispatches unclaimed Back to this owner, not to an invisible player root.
+        @Suppress("UNCHECKED_CAST")
+        val activityRule = compose as androidx.compose.ui.test.junit4.AndroidComposeTestRule<*, androidx.activity.ComponentActivity>
+        compose.runOnIdle { activityRule.activity.onBackPressedDispatcher.onBackPressed() }
+        settle()
+        assertEquals(0, startupScreens())
+        compose.onNodeWithTag("home-header").assertExists()
     }
 
     @Test fun aServerRestartWhileBrowsingRetunesTheWarmChannelOnce() {
@@ -426,15 +705,17 @@ class StartupOfflineTest {
         }
         compose.runOnUiThread { confirms.forEach { it() } }
         settle()
-        val wait = compose.onNodeWithTag(LivePlayerServerWaitTag, useUnmergedTree = true)
-        val description = wait.fetchSemanticsNode().config[SemanticsProperties.ContentDescription].joinToString()
-        assertTrue(description, description.contains("2 Name 2"))
+        compose.onNodeWithTag(LivePlayerServerWaitTag, useUnmergedTree = true).assertExists()
+        assertEquals(listOf("2 Name 2"), compose.onNodeWithTag(LivePlayerServerWaitTag, useUnmergedTree = true)
+            .fetchSemanticsNode().config[SemanticsProperties.ContentDescription])
         session.publish(ready(catalog))
         settle()
         compose.awaitScheduledWork(profileDispatcher) { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(2)) }
         settle()
         assertEquals(1, binds())
-        // One Back leaves the one player.
+        // Ordinary player chrome handles the first Back; the second leaves the one player.
+        compose.pressKey(Key.Back)
+        settle()
         compose.pressKey(Key.Back)
         settle()
         compose.waitUntil(10_000) {
@@ -489,9 +770,7 @@ class StartupOfflineTest {
         compose.pressKey(Key.DirectionCenter)
         settle()
         if (!awaitWait) return
-        compose.waitUntil(10_000) {
-            compose.onAllNodes(hasTestTag(LivePlayerServerWaitTag), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
-        }
+        compose.onNodeWithTag(LivePlayerServerWaitTag, useUnmergedTree = true).assertExists()
         settle()
     }
 
@@ -525,10 +804,24 @@ class StartupOfflineTest {
         profile: ServerProfileReadResult = ServerProfileReadResult.anonymous(at.bernhardberger.tvheadend.sdk.core.ServerProfileId.generate(), "offline.invalid", 9982),
         tagData: InMemoryData = InMemoryData(),
         holdLive: Boolean = false,
+        autoplay: Boolean = false,
+        persistedChannel: ChannelId? = null,
+        initialReadGate: CompletableDeferred<Unit>? = null,
+        bootstrapHandle: androidx.lifecycle.SavedStateHandle? = null,
+        bootstrapReadGate: CompletableDeferred<Unit>? = null,
+        earlyBootstrapLive: Boolean = false,
+        bootstrapAutoplay: Boolean = false,
     ) {
         session = FakeTvheadendSession(initial).apply {
             // The fake's stream otherwise fails at once, and a failed player is not a warm channel.
-            if (holdLive) scriptLivePlaybackSuccess(SubscriptionOpener { _, _, _ -> awaitCancellation() })
+            if (holdLive) scriptLivePlaybackSuccess(SubscriptionOpener { channel, _, _ ->
+                activeSubscriptions.add(channel)
+                try {
+                    awaitCancellation()
+                } finally {
+                    activeSubscriptions.remove(channel)
+                }
+            })
             else scriptLivePlaybackSuccess()
         }
         val data = InMemoryData().also { playerData = it }
@@ -536,15 +829,27 @@ class StartupOfflineTest {
         val profiles = AppProfileOwner(session, FakeServerProfileStore(profile),
             settings, profileDispatcher, readProfileForEditing = { ServerProfileEditReadResult.Missing })
         scope.launch { profiles.run() }
+        // Establish the active profile before setChannelId; without it the store does not write.
+        profileDispatcher.scheduler.runCurrent()
+        val lastPlayed = LastPlayedChannelStore(data)
+        if (persistedChannel != null) runBlocking { lastPlayed.setChannelId(persistedChannel) }
+        data.readGate = initialReadGate
         player = ExoPlayer.Builder(context).build()
         val coordinator = createTvheadendPlaybackCoordinator(player).also { it.launchIn(scope) }
-        runtime = AppPlaybackRuntime(player, session, coordinator, settings, profiles, scope,
+        val controlled = at.bernhardberger.tvhplayer.testutil.observePlayerListeners(player, playerListeners)
+        runtime = AppPlaybackRuntime(controlled, session, coordinator, settings, profiles, scope,
             TvheadendAudioOutputProvider(context), PlaybackAudioFocus.None,
             PlaybackRuntimePolicy.fromPlayerSettings(),
             noticeCenter = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) { at.bernhardberger.tvhplayer.notices.NoticeContext(0, null) })
         val notices = NoticeCenter(android.os.SystemClock::elapsedRealtime) {
             NoticeContext(profiles.configurationGeneration.value, session.observation.value.currentSession?.generationIdentity)
         }
+        val uiData = InMemoryData()
+        val uiStore = UiSettingsStore(uiData).apply {
+            runBlocking { setChannelsView(ChannelsView(ChannelsLayout.LIST)) }
+            runBlocking { setAutoStartPlayback(bootstrapAutoplay) }
+        }
+        uiData.readGate = bootstrapReadGate
         val dependencies = module {
             includes(at.bernhardberger.tvhplayer.testutil.playerStatsTestModule())
             single<CoroutineScope>(qualifier = org.koin.core.qualifier.named("application")) { scope }
@@ -554,8 +859,12 @@ class StartupOfflineTest {
             single { settings }
             single { ChannelTagSettingsStore(tagData) }
             // These journeys walk the list's rows.
-            single { UiSettingsStore(InMemoryData()).apply { runBlocking { setChannelsView(ChannelsView(ChannelsLayout.LIST)) } } }
-            single { LastPlayedChannelStore(context) }
+            single { uiStore }
+            viewModel {
+                at.bernhardberger.tvhplayer.viewmodels.MainStartupViewModel(
+                    get(), get(), bootstrapHandle ?: androidx.lifecycle.SavedStateHandle())
+            }
+            single { lastPlayed }
             single { ChannelSelectionStore() }
             single { GuidePositionStore() }
             single { notices }
@@ -567,15 +876,40 @@ class StartupOfflineTest {
             viewModel { SettingsPlayerViewModel(get(), get(), get(), get(), get()) }
         }
         val server = ServerSettings(host = "offline.invalid")
+        launchRequests = ApplianceLaunchRequests().apply { requestStartup(autoplay) }
+        val fixtureFreshStart = androidx.compose.runtime.mutableStateOf(true)
         // Startup timing is checked against the frame and Handler clocks.
         if (!awaitRows) compose.mainClock.autoAdvance = false
         compose.setContent {
             KoinIsolatedContext(koinApplication { modules(dependencies) }) {
                 TVHeadendPlayerTheme {
+                    val bootstrap = if (bootstrapHandle != null)
+                        org.koin.androidx.compose.koinViewModel<at.bernhardberger.tvhplayer.viewmodels.MainStartupViewModel>(
+                            key = "bootstrap-$bootstrapGeneration")
+                        else null
+                    androidx.compose.runtime.LaunchedEffect(bootstrap) {
+                        if (bootstrap != null) {
+                            bootstrapOwner = bootstrap
+                            if (earlyBootstrapLive) bootstrap.applianceLaunchRequests.requestEntry(
+                                at.bernhardberger.tvhplayer.core.ApplianceEntryDestination.LIVE, false)
+                        }
+                    }
                     AppRoot(
-                        startupState = MainStartupState.Ready(server, autoStartPlayback = false),
+                        registerActivityKeyContract = { registered ->
+                            startupKeyContract = registered
+                            { startupKeyContract = MainStartupActivityKeyContract(
+                                at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyMode.Inactive) }
+                        },
+                        startupState = bootstrap?.state?.collectAsStateWithLifecycle()?.value
+                            ?: MainStartupState.Ready(server, autoStartPlayback = autoplay),
                         runtimeServerSettings = server,
-                        applianceLaunchRequests = ApplianceLaunchRequests(),
+                        applianceLaunchRequests = bootstrap?.applianceLaunchRequests ?: launchRequests,
+                        freshStart = bootstrap?.freshStart?.collectAsStateWithLifecycle()?.value
+                            ?: fixtureFreshStart.value,
+                        onStartupFinished = {
+                            if (bootstrap != null) bootstrap.finishFreshStart()
+                            else fixtureFreshStart.value = false
+                        },
                         onPlayerVisibilityChanged = {},
                         onRequestExit = {},
                     )
@@ -596,6 +930,7 @@ class StartupOfflineTest {
             compose.pressKey(Key.DirectionRight)
         }
     }
+    private val playerListeners = mutableListOf<androidx.media3.common.Player.Listener>()
 
     private class InMemoryData : DataStore<Preferences> {
         val state = MutableStateFlow(emptyPreferences())

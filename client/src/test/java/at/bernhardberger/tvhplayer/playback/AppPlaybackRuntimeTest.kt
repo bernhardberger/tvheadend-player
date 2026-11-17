@@ -490,17 +490,17 @@ class AppPlaybackRuntimeTest {
 
     @Test
     fun replacementConcealsThePreviousTargetsFrame() {
-        val previous = AppVideoPresentation(epoch = 1L, visible = true)
+        val previous = AppVideoPresentation(epoch = 1L, visible = true, channelStartAtMillis = 123L)
 
         assertEquals(
-            AppVideoPresentation(epoch = 2L, visible = false),
+            AppVideoPresentation(epoch = 2L, visible = false, channelStartAtMillis = 123L),
             previous.beginTarget(epoch = 2L),
         )
     }
 
     @Test
     fun staleFirstFrameCannotRevealTheCurrentTarget() {
-        val current = AppVideoPresentation(epoch = 2L, visible = false)
+        val current = AppVideoPresentation(epoch = 2L, visible = false, channelStartAtMillis = 123L)
 
         assertEquals(
             current,
@@ -510,7 +510,7 @@ class AppPlaybackRuntimeTest {
 
     @Test
     fun currentTargetsFirstFrameRevealsVideoOnlyAfterTargetActivation() {
-        val current = AppVideoPresentation(epoch = 2L, visible = false)
+        val current = AppVideoPresentation(epoch = 2L, visible = false, channelStartAtMillis = 123L)
 
         assertEquals(
             current,

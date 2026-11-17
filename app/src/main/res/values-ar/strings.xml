@@ -560,6 +560,8 @@
     <string name="appliance_back_for_menu">يتيح زر Back الوصول إلى القنوات والإعدادات.</string>
     <string name="main_startup_message_preparing">جارٍ تجهيز التطبيق</string>
     <string name="main_startup_message_connecting">جارٍ الاتصال</string>
+    <string name="main_startup_message_starting">جارٍ البدء</string>
+    <string name="main_startup_message_channel_starting">جارٍ بدء %1$s…</string>
     <string name="main_startup_message_syncing_metadata">جارٍ مزامنة القنوات ودليل البرامج</string>
     <string name="main_startup_message_waiting_for_current_channel_metadata">جارٍ تجهيز القناة</string>
     <string name="main_startup_message_reconnecting">جارٍ إعادة الاتصال</string>
@@ -992,6 +994,11 @@
     <string name="player_current_broadcast">البث الحالي</string>
     <string name="timeshift_setting">الإزاحة الزمنية</string>
     <string name="timeshift_setting_description">إيقاف البث المباشر مؤقتًا وإرجاعه</string>
+    <string name="display_refresh_rate_setting">معدل تحديث الشاشة</string>
+    <string name="display_refresh_rate_description">معدل تحديث شاشات التطبيق. يظل بإمكان «مطابقة معدل إطارات المحتوى» تبديل المعدل للفيديو.</string>
+    <string name="display_refresh_rate_system">الإعداد الافتراضي للنظام</string>
+    <string name="display_refresh_rate_system_help">يترك تحديد معدل التحديث للتلفزيون.</string>
+    <string name="display_refresh_rate_value">%1$s هرتز</string>
     <string name="refresh_rate_matching_setting">مطابقة معدل إطارات المحتوى</string>
     <string name="frame_rate_switching_always">دائمًا</string>
     <string name="frame_rate_switching_seamless_only">دون انقطاع فقط</string>

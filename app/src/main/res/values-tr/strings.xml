@@ -484,6 +484,8 @@
     <string name="appliance_back_for_menu">Kanallar ve ayarlar için Back düğmesine basın.</string>
     <string name="main_startup_message_preparing">Uygulama hazırlanıyor</string>
     <string name="main_startup_message_connecting">Bağlanıyor</string>
+    <string name="main_startup_message_starting">Başlatılıyor</string>
+    <string name="main_startup_message_channel_starting">%1$s başlatılıyor…</string>
     <string name="main_startup_message_syncing_metadata">Kanallar ve rehber eşitleniyor</string>
     <string name="main_startup_message_waiting_for_current_channel_metadata">Kanallar hazırlanıyor</string>
     <string name="main_startup_message_reconnecting">Yeniden bağlanıyor</string>
@@ -852,6 +854,11 @@
     <string name="player_current_broadcast">Geçerli yayın</string>
     <string name="timeshift_setting">Zaman kaydırma</string>
     <string name="timeshift_setting_description">Canlı TV yayınına ara ver ve geri sar</string>
+    <string name="display_refresh_rate_setting">Ekran yenileme hızı</string>
+    <string name="display_refresh_rate_description">Uygulama ekranlarının yenileme hızı. “İçeriğin kare hızıyla eşleştir” ayarı, video için yenileme hızını yine de değiştirebilir.</string>
+    <string name="display_refresh_rate_system">Sistem varsayılanı</string>
+    <string name="display_refresh_rate_system_help">Yenileme hızını TV’ye bırakır.</string>
+    <string name="display_refresh_rate_value">%1$s Hz</string>
     <string name="refresh_rate_matching_setting">İçeriğin kare hızıyla eşleştir</string>
     <string name="frame_rate_switching_always">Her zaman</string>
     <string name="frame_rate_switching_seamless_only">Yalnızca kesintisiz</string>

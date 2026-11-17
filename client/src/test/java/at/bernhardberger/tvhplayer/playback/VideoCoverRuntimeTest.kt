@@ -46,10 +46,15 @@ import org.robolectric.annotation.Config
 class VideoCoverRuntimeTest {
     @Test fun installCoversTheOldPictureBeforeThePlayerPausesAndTheNewTargetStarts() =
         exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
+            runtime.enterPlayerScreen(livePlayerOwner = this, appInitiated = true)
+            assertNotEquals(null, runtime.videoPresentation.value.channelStartAtMillis)
             live()
             renderFirstFrame()
+            assertNull(runtime.videoPresentation.value.channelStartAtMillis)
             val oldEpoch = runtime.videoPresentation.value.epoch
             assertTrue(runtime.videoPresentation.value.visible)
+            runtime.enterPlayerScreen(livePlayerOwner = Any(), appInitiated = true)
+            assertNull(runtime.videoPresentation.value.channelStartAtMillis)
             var atPause: AppVideoPresentation? = null
             afterPause = { if (atPause == null) atPause = runtime.videoPresentation.value }
             live(channel = 2)
@@ -176,10 +181,13 @@ class VideoCoverRuntimeTest {
             assertTrue(runtime.videoPresentation.value.visible)
             live(channel = 2)
             val epoch = runtime.videoPresentation.value.epoch
+            runtime.enterPlayerScreen(livePlayerOwner = this, appInitiated = true)
+            val waiting = runtime.videoPresentation.value
+            assertNotEquals(null, waiting.channelStartAtMillis)
 
             // Still the old source's format: this frame was rendered before the source change.
             renderFirstFrame()
-            assertEquals(AppVideoPresentation(epoch = epoch, visible = false), runtime.videoPresentation.value)
+            assertEquals(waiting, runtime.videoPresentation.value)
 
             forcedVideoFormat = videoFormat("new")
             renderFirstFrame()
@@ -188,11 +196,14 @@ class VideoCoverRuntimeTest {
 
     @Test fun firstFrameWhileBufferingKeepsTheCoverUntilTheTargetIsReady() =
         exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
+            runtime.enterPlayerScreen(livePlayerOwner = this, appInitiated = true)
             live()
+            assertNotEquals(null, runtime.videoPresentation.value.channelStartAtMillis)
             val epoch = runtime.videoPresentation.value.epoch
             // Media3 renders the first frame while it still buffers: that picture would stand still.
             buffering()
             renderFirstFrame()
+            assertNull(runtime.videoPresentation.value.channelStartAtMillis)
             assertEquals(AppVideoPresentation(epoch = epoch, visible = false), runtime.videoPresentation.value)
             playerReady()
             assertEquals(AppVideoPresentation(epoch = epoch, visible = true), runtime.videoPresentation.value)
@@ -424,14 +435,30 @@ class VideoCoverRuntimeTest {
             live(timeshift = false)
             val radioIntent = runtime.notePlaybackIntent().also(runtime::notePlaybackIntentServed)
             val radioEpoch = requireNotNull(runtime.installedLiveTargetEpoch(selection, radioIntent))
+            val radioEntry = requireNotNull(runtime.enterPlayerScreen(livePlayerOwner = this, appInitiated = true))
+            runtime.notePlaybackIntentServed(radioEntry)
+            assertNotEquals(null, runtime.videoPresentation.value.channelStartAtMillis)
             forcedTracks = audioTracks()
             forcedPlaybackState = Player.STATE_READY
             forcedPlaying = true
             playerReady()
+            assertNull(runtime.videoPresentation.value.channelStartAtMillis)
             val radioCleanup = scope.async { runtime.stopAfterLoss(selection, radioEpoch, radioIntent) }
             await { radioCleanup.isCompleted }
             assertEquals(null, radioCleanup.await())
             assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+            runtime.onLivePlayerClosed(this)
+            runtime.enterPlayerScreen(livePlayerOwner = Any(), appInitiated = true)
+            assertNotEquals("the predecessor radio cannot present a new TV entry", null,
+                runtime.videoPresentation.value.channelStartAtMillis)
+            playerReady()
+            assertNotEquals(null, runtime.videoPresentation.value.channelStartAtMillis)
+            forcedTracks = Tracks.EMPTY
+            forcedPlaying = false
+            live(channel = 2, timeshift = false)
+            assertNotEquals(null, runtime.videoPresentation.value.channelStartAtMillis)
+            renderFirstFrame()
+            assertNull(runtime.videoPresentation.value.channelStartAtMillis)
         }
 
     @Test fun playingReadyFirstFrameStaysCoveredUntilTheDecoderRendersAnotherFrame() =

@@ -465,6 +465,8 @@
     <string name="appliance_back_for_menu">채널과 설정을 보려면 Back을 눌러 주세요.</string>
     <string name="main_startup_message_preparing">앱 준비 중</string>
     <string name="main_startup_message_connecting">연결 중</string>
+    <string name="main_startup_message_starting">시작 중</string>
+    <string name="main_startup_message_channel_starting">%1$s 시작 중…</string>
     <string name="main_startup_message_syncing_metadata">채널 및 편성표 동기화 중</string>
     <string name="main_startup_message_waiting_for_current_channel_metadata">채널 준비 중</string>
     <string name="main_startup_message_reconnecting">다시 연결 중</string>
@@ -817,6 +819,11 @@
     <string name="player_current_broadcast">현재 방송</string>
     <string name="timeshift_setting">타임시프트</string>
     <string name="timeshift_setting_description">실시간 TV 일시정지 및 되감기</string>
+    <string name="display_refresh_rate_setting">화면 주사율</string>
+    <string name="display_refresh_rate_description">앱 화면의 주사율입니다. “콘텐츠 프레임 속도에 맞추기” 설정은 동영상에 맞춰 주사율을 계속 전환할 수 있습니다.</string>
+    <string name="display_refresh_rate_system">시스템 기본값</string>
+    <string name="display_refresh_rate_system_help">TV가 주사율을 결정하도록 합니다.</string>
+    <string name="display_refresh_rate_value">%1$s Hz</string>
     <string name="refresh_rate_matching_setting">콘텐츠 프레임 속도에 맞추기</string>
     <string name="frame_rate_switching_always">항상</string>
     <string name="frame_rate_switching_seamless_only">끊김 없이 가능한 경우만</string>

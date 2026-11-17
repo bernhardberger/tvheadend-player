@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui
 
 import at.bernhardberger.tvhplayer.testutil.changeState
+import at.bernhardberger.tvhplayer.testutil.settleFrames
 import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -40,8 +41,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * The autoplay reveal: its hold and fade, and keys during it: the first ends it, and only the
- * next reaches the player.
+ * The autoplay reveal holds its key fence until its timed fade finishes.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi")
@@ -53,7 +53,7 @@ class StartupRevealKeysTest {
     private var contract = MainStartupActivityKeyContract(mode = MainStartupKeyMode.Inactive)
     private val playerKeys = mutableListOf<String>()
 
-    @Test fun aKeyDuringTheRevealEndsItAndOnlyTheNextKeyReachesThePlayer() {
+    @Test fun keysDuringTheRevealStayConsumedUntilTheTimedFadeFinishes() {
         var state by mutableStateOf(MainStartupCompositionState(
             MainStartupPresentation.Passive(MainStartupMessageKind.STARTING_TELEVISION), ChannelsKey,
             navigationAllowed = true, contentAllowed = false))
@@ -83,20 +83,23 @@ class StartupRevealKeysTest {
                 )
             }
         }
-        frames()
+        compose.settleFrames(4, 16)
         // Autoplay's handoff: the startup screen starts dissolving into the first video frames.
         compose.changeState { state = state.copy(presentation = MainStartupPresentation.Inactive, revealRequestId = 1) }
-        frames()
+        compose.settleFrames(4, 16)
         assertEquals(0, revealed)
         assertEquals(1, startupScreens())
 
-        assertTrue("the key that ends the reveal is consumed", key(KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.ACTION_DOWN))
-        assertEquals(1, revealed)
-        frames()
-        assertEquals(0, startupScreens())
+        assertTrue("keys during the reveal are consumed", key(KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.ACTION_DOWN))
+        assertEquals(0, revealed)
+        compose.settleFrames(4, 16)
+        assertEquals(1, startupScreens())
         assertTrue("its up stays consumed", key(KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.ACTION_UP))
         assertEquals(emptyList<String>(), playerKeys)
 
+        compose.mainClock.advanceTimeBy(800)
+        compose.settleFrames(4, 16)
+        assertEquals(0, startupScreens())
         key(KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.ACTION_DOWN)
         key(KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.ACTION_UP)
         assertEquals(listOf("KeyDown", "KeyUp"), playerKeys)
@@ -121,7 +124,7 @@ class StartupRevealKeysTest {
                 )
             }
         }
-        frames()
+        compose.settleFrames(4, 16)
         val covered = pixel(view)
         assertTrue("the startup screen covers the player", covered != android.graphics.Color.RED)
 
@@ -162,13 +165,6 @@ class StartupRevealKeysTest {
         compose.waitForIdle()
         return false
     }
-
-    private fun frames() = repeat(4) {
-        compose.mainClock.advanceTimeByFrame()
-        compose.waitForIdle()
-    }
-
-    /** Publish the handoff before advancing the paused clock, rather than racing snapshot delivery. */
 
     private fun startupScreens() = compose.onAllNodes(hasTestTag("main-startup-root")).fetchSemanticsNodes().size
 }

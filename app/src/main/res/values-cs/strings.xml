@@ -522,6 +522,8 @@
     <string name="appliance_back_for_menu">Tlačítkem Zpět otevřeš kanály a nastavení.</string>
     <string name="main_startup_message_preparing">Příprava aplikace</string>
     <string name="main_startup_message_connecting">Připojování</string>
+    <string name="main_startup_message_starting">Spouštění</string>
+    <string name="main_startup_message_channel_starting">%1$s se spouští…</string>
     <string name="main_startup_message_syncing_metadata">Synchronizace kanálů a programu</string>
     <string name="main_startup_message_waiting_for_current_channel_metadata">Příprava kanálů</string>
     <string name="main_startup_message_reconnecting">Obnovování připojení</string>
@@ -922,6 +924,11 @@
     <string name="player_current_broadcast">Aktuální vysílání</string>
     <string name="timeshift_setting">Časový posun</string>
     <string name="timeshift_setting_description">Pozastavit a přetáčet živé vysílání</string>
+    <string name="display_refresh_rate_setting">Obnovovací frekvence obrazovky</string>
+    <string name="display_refresh_rate_description">Obnovovací frekvence obrazovek aplikace. Nastavení „Přizpůsobit snímkové frekvenci obsahu“ ji může při přehrávání videa nadále měnit.</string>
+    <string name="display_refresh_rate_system">Výchozí nastavení systému</string>
+    <string name="display_refresh_rate_system_help">Ponechá obnovovací frekvenci na televizoru.</string>
+    <string name="display_refresh_rate_value">%1$s Hz</string>
     <string name="refresh_rate_matching_setting">Přizpůsobit snímkové frekvenci obsahu</string>
     <string name="frame_rate_switching_always">Vždy</string>
     <string name="frame_rate_switching_seamless_only">Jen plynule</string>

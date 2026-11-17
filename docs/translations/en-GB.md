@@ -26,6 +26,8 @@ No change from en-US; spelling only.
 
 Reconciled to frozen source `6d80a8ff` for 0.3.0 by GPT-6.1 Sol (medium), retaining applicable round-1 overrides from `daebdd86`. Sonnet 5.5 (medium) reviewed the six differing strings and regional fallback. No human reviewer; the override locale is labeled machine-drafted.
 
+0.5 settings strings `display_refresh_rate_*` drafted against `27523c0b` by GPT-6.1 Sol (medium) and reviewed by Sonnet 5.5 (medium); still machine-drafted, no human reviewer. All five keys inherit English unchanged; no British overrides.
+
 ## Open questions
 
 - The plan changes the English source spelling to US; once it does, en-GB needs an override for that string.

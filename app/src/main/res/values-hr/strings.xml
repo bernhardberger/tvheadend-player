@@ -503,6 +503,8 @@
     <string name="appliance_back_for_menu">Pritisni Natrag za kanale i postavke.</string>
     <string name="main_startup_message_preparing">Priprema aplikacije</string>
     <string name="main_startup_message_connecting">Povezivanje</string>
+    <string name="main_startup_message_starting">Pokretanje</string>
+    <string name="main_startup_message_channel_starting">%1$s se pokreće…</string>
     <string name="main_startup_message_syncing_metadata">Sinkronizacija kanala i TV vodiča</string>
     <string name="main_startup_message_waiting_for_current_channel_metadata">Priprema kanala</string>
     <string name="main_startup_message_reconnecting">Ponovno povezivanje</string>
@@ -887,6 +889,11 @@
     <string name="player_current_broadcast">Trenutačno emitiranje</string>
     <string name="timeshift_setting">Vremenski pomak</string>
     <string name="timeshift_setting_description">Pauziraj i premotavaj TV uživo</string>
+    <string name="display_refresh_rate_setting">Frekvencija osvježavanja zaslona</string>
+    <string name="display_refresh_rate_description">Frekvencija osvježavanja zaslona aplikacije. Postavka „Uskladi s frekvencijom sličica sadržaja” i dalje je može promijeniti za videozapis.</string>
+    <string name="display_refresh_rate_system">Zadano u sustavu</string>
+    <string name="display_refresh_rate_system_help">Prepušta frekvenciju osvježavanja televizoru.</string>
+    <string name="display_refresh_rate_value">%1$s Hz</string>
     <string name="refresh_rate_matching_setting">Uskladi s frekvencijom sličica sadržaja</string>
     <string name="frame_rate_switching_always">Uvijek</string>
     <string name="frame_rate_switching_seamless_only">Samo bez prekida</string>

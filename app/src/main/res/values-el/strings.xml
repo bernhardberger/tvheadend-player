@@ -484,6 +484,8 @@
     <string name="appliance_back_for_menu">Πάτησε Back για κανάλια και ρυθμίσεις.</string>
     <string name="main_startup_message_preparing">Προετοιμασία εφαρμογής</string>
     <string name="main_startup_message_connecting">Σύνδεση</string>
+    <string name="main_startup_message_starting">Έναρξη</string>
+    <string name="main_startup_message_channel_starting">%1$s ξεκινά…</string>
     <string name="main_startup_message_syncing_metadata">Συγχρονισμός καναλιών και οδηγού</string>
     <string name="main_startup_message_waiting_for_current_channel_metadata">Προετοιμασία καναλιών</string>
     <string name="main_startup_message_reconnecting">Επανασύνδεση</string>
@@ -852,6 +854,11 @@
     <string name="player_current_broadcast">Τρέχουσα μετάδοση</string>
     <string name="timeshift_setting">Χρονική μετατόπιση</string>
     <string name="timeshift_setting_description">Παύση και επανατύλιξη ζωντανής TV</string>
+    <string name="display_refresh_rate_setting">Ρυθμός ανανέωσης οθόνης</string>
+    <string name="display_refresh_rate_description">Ο ρυθμός ανανέωσης για τις οθόνες της εφαρμογής. Η ρύθμιση «Αντιστοίχιση ρυθμού καρέ» μπορεί ακόμα να τον αλλάζει για ένα βίντεο.</string>
+    <string name="display_refresh_rate_system">Προεπιλογή συστήματος</string>
+    <string name="display_refresh_rate_system_help">Αφήνει τον ρυθμό ανανέωσης στην τηλεόραση.</string>
+    <string name="display_refresh_rate_value">%1$s Hz</string>
     <string name="refresh_rate_matching_setting">Αντιστοίχιση ρυθμού καρέ</string>
     <string name="frame_rate_switching_always">Πάντα</string>
     <string name="frame_rate_switching_seamless_only">Μόνο χωρίς διακοπή</string>

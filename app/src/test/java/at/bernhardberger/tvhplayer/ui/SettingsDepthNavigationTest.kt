@@ -263,7 +263,7 @@ class SettingsDepthNavigationTest {
         switchAccessibilityCheckedStateTracksCenterAndReentry("timeshift", downCount = 2)
 
     @Test fun tunnelingAccessibilityCheckedStateTracksCenterAndReentry() =
-        switchAccessibilityCheckedStateTracksCenterAndReentry("tunneling", downCount = 10)
+        switchAccessibilityCheckedStateTracksCenterAndReentry("tunneling", downCount = 11)
 
     @Test fun passthroughAccessibilityCheckedStateTracksCenterAndReentry() =
         switchAccessibilityCheckedStateTracksCenterAndReentry("audio-passthrough", 2, SettingsSection.AUDIO)

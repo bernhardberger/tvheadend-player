@@ -60,7 +60,9 @@ class MainStartupKeyCycleOwner {
             }
         }
 
-        if (action != KeyEvent.ACTION_DOWN) return MainStartupKeyDecision.PASS_THROUGH
+        if (action != KeyEvent.ACTION_DOWN) return if (mode is MainStartupKeyMode.Passive) {
+            MainStartupKeyDecision.CONSUME
+        } else MainStartupKeyDecision.PASS_THROUGH
 
         return when (mode) {
             MainStartupKeyMode.Inactive -> MainStartupKeyDecision.PASS_THROUGH
@@ -72,10 +74,7 @@ class MainStartupKeyCycleOwner {
         }
     }
 
-    private fun passiveDecision(keyCode: Int): MainStartupKeyDecision = when {
-        isPassiveOwnedKey(keyCode) -> claimAndConsume(keyCode)
-        else -> MainStartupKeyDecision.PASS_THROUGH
-    }
+    private fun passiveDecision(keyCode: Int): MainStartupKeyDecision = claimAndConsume(keyCode)
 
     private fun actionableDecision(
         keyCode: Int,
@@ -95,30 +94,7 @@ class MainStartupKeyCycleOwner {
         return MainStartupKeyDecision.CONSUME
     }
 
-    private fun isAlwaysSystemKey(keyCode: Int): Boolean = when (keyCode) {
-        KeyEvent.KEYCODE_BACK,
-        KeyEvent.KEYCODE_HOME,
-        KeyEvent.KEYCODE_POWER,
-        KeyEvent.KEYCODE_TV_POWER,
-        KeyEvent.KEYCODE_STB_POWER,
-        KeyEvent.KEYCODE_AVR_POWER,
-        KeyEvent.KEYCODE_VOLUME_UP,
-        KeyEvent.KEYCODE_VOLUME_DOWN,
-        KeyEvent.KEYCODE_VOLUME_MUTE,
-        KeyEvent.KEYCODE_MUTE -> true
-        else -> false
-    }
-
-    private fun isPassiveOwnedKey(keyCode: Int): Boolean =
-        isDirectionalKey(keyCode) || isActivationKey(keyCode) || isActionableNonNavigationKey(keyCode)
-
-    private fun isDirectionalKey(keyCode: Int): Boolean = when (keyCode) {
-        KeyEvent.KEYCODE_DPAD_UP,
-        KeyEvent.KEYCODE_DPAD_DOWN,
-        KeyEvent.KEYCODE_DPAD_LEFT,
-        KeyEvent.KEYCODE_DPAD_RIGHT -> true
-        else -> false
-    }
+    private fun isAlwaysSystemKey(keyCode: Int): Boolean = keyCode == KeyEvent.KEYCODE_BACK || startupSystemKey(keyCode)
 
     private fun isActivationKey(keyCode: Int): Boolean = when (keyCode) {
         KeyEvent.KEYCODE_DPAD_CENTER,
@@ -157,4 +133,11 @@ class MainStartupKeyCycleOwner {
         in KeyEvent.KEYCODE_NUMPAD_0..KeyEvent.KEYCODE_NUMPAD_9 -> true
         else -> false
     }
+}
+
+internal fun startupSystemKey(keyCode: Int): Boolean = when (keyCode) {
+    KeyEvent.KEYCODE_HOME, KeyEvent.KEYCODE_POWER, KeyEvent.KEYCODE_TV_POWER,
+    KeyEvent.KEYCODE_STB_POWER, KeyEvent.KEYCODE_AVR_POWER, KeyEvent.KEYCODE_VOLUME_UP,
+    KeyEvent.KEYCODE_VOLUME_DOWN, KeyEvent.KEYCODE_VOLUME_MUTE, KeyEvent.KEYCODE_MUTE -> true
+    else -> false
 }

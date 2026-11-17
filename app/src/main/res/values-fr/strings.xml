@@ -503,6 +503,8 @@
     <string name="appliance_back_for_menu">Appuie sur Back pour accéder aux chaînes et aux paramètres.</string>
     <string name="main_startup_message_preparing">Préparation de l’application</string>
     <string name="main_startup_message_connecting">Connexion</string>
+    <string name="main_startup_message_starting">Démarrage</string>
+    <string name="main_startup_message_channel_starting">%1$s démarre…</string>
     <string name="main_startup_message_syncing_metadata">Synchronisation des chaînes et du guide</string>
     <string name="main_startup_message_waiting_for_current_channel_metadata">Préparation des chaînes</string>
     <string name="main_startup_message_reconnecting">Reconnexion</string>
@@ -887,6 +889,11 @@
     <string name="player_current_broadcast">Diffusion en cours</string>
     <string name="timeshift_setting">Lecture différée</string>
     <string name="timeshift_setting_description">Mettre en pause et rembobiner la TV en direct</string>
+    <string name="display_refresh_rate_setting">Fréquence de rafraîchissement de l’écran</string>
+    <string name="display_refresh_rate_description">La fréquence de rafraîchissement des écrans de l’application. « Adapter à la fréquence du contenu » peut toujours la changer pour une vidéo.</string>
+    <string name="display_refresh_rate_system">Valeur par défaut du système</string>
+    <string name="display_refresh_rate_system_help">Laisse le téléviseur déterminer la fréquence de rafraîchissement.</string>
+    <string name="display_refresh_rate_value">%1$s Hz</string>
     <string name="refresh_rate_matching_setting">Adapter à la fréquence du contenu</string>
     <string name="frame_rate_switching_always">Toujours</string>
     <string name="frame_rate_switching_seamless_only">Uniquement sans coupure</string>

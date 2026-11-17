@@ -484,6 +484,8 @@
     <string name="appliance_back_for_menu">Druk op Back voor zenders en instellingen.</string>
     <string name="main_startup_message_preparing">App voorbereiden</string>
     <string name="main_startup_message_connecting">Verbinden</string>
+    <string name="main_startup_message_starting">Starten</string>
+    <string name="main_startup_message_channel_starting">%1$s wordt gestart…</string>
     <string name="main_startup_message_syncing_metadata">Zenders en tv-gids synchroniseren</string>
     <string name="main_startup_message_waiting_for_current_channel_metadata">Zenders voorbereiden</string>
     <string name="main_startup_message_reconnecting">Opnieuw verbinden</string>
@@ -852,6 +854,11 @@
     <string name="player_current_broadcast">Huidige uitzending</string>
     <string name="timeshift_setting">Timeshift</string>
     <string name="timeshift_setting_description">Live-tv pauzeren en terugspoelen</string>
+    <string name="display_refresh_rate_setting">Verversingssnelheid van het scherm</string>
+    <string name="display_refresh_rate_description">De verversingssnelheid voor de schermen van de app. “Beeldsnelheid van inhoud volgen” kan deze nog steeds omschakelen voor een video.</string>
+    <string name="display_refresh_rate_system">Systeemstandaard</string>
+    <string name="display_refresh_rate_system_help">Laat de tv de verversingssnelheid bepalen.</string>
+    <string name="display_refresh_rate_value">%1$s Hz</string>
     <string name="refresh_rate_matching_setting">Beeldsnelheid van inhoud volgen</string>
     <string name="frame_rate_switching_always">Altijd</string>
     <string name="frame_rate_switching_seamless_only">Alleen zonder onderbreking</string>

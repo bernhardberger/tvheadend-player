@@ -484,6 +484,8 @@
     <string name="appliance_back_for_menu">Avaa kanavat ja asetukset painamalla Back.</string>
     <string name="main_startup_message_preparing">Valmistellaan sovellusta</string>
     <string name="main_startup_message_connecting">Yhdistetään</string>
+    <string name="main_startup_message_starting">Käynnistetään</string>
+    <string name="main_startup_message_channel_starting">Käynnistetään %1$s…</string>
     <string name="main_startup_message_syncing_metadata">Synkronoidaan kanavia ja ohjelmaopasta</string>
     <string name="main_startup_message_waiting_for_current_channel_metadata">Valmistellaan kanavia</string>
     <string name="main_startup_message_reconnecting">Yhdistetään uudelleen</string>
@@ -852,6 +854,11 @@
     <string name="player_current_broadcast">Nykyinen lähetys</string>
     <string name="timeshift_setting">Ajansiirto</string>
     <string name="timeshift_setting_description">Suoran TV-lähetyksen tauotus ja takaisinkelaus</string>
+    <string name="display_refresh_rate_setting">Näytön virkistystaajuus</string>
+    <string name="display_refresh_rate_description">Sovelluksen näkymien virkistystaajuus. Asetus ”Sovita sisällön kuvataajuuteen” voi silti vaihtaa taajuutta videota varten.</string>
+    <string name="display_refresh_rate_system">Järjestelmän oletus</string>
+    <string name="display_refresh_rate_system_help">Jättää virkistystaajuuden television päätettäväksi.</string>
+    <string name="display_refresh_rate_value">%1$s Hz</string>
     <string name="refresh_rate_matching_setting">Sovita sisällön kuvataajuuteen</string>
     <string name="frame_rate_switching_always">Aina</string>
     <string name="frame_rate_switching_seamless_only">Vain saumattomasti</string>

@@ -503,6 +503,8 @@
     <string name="appliance_back_for_menu">לחיצה על Back מציגה ערוצים והגדרות.</string>
     <string name="main_startup_message_preparing">האפליקציה בהכנה</string>
     <string name="main_startup_message_connecting">מתבצע חיבור</string>
+    <string name="main_startup_message_starting">מתבצעת הפעלה</string>
+    <string name="main_startup_message_channel_starting">%1$s מתחיל…</string>
     <string name="main_startup_message_syncing_metadata">הערוצים והמדריך מסתנכרנים</string>
     <string name="main_startup_message_waiting_for_current_channel_metadata">הערוץ בהכנה</string>
     <string name="main_startup_message_reconnecting">מתבצע חיבור מחדש</string>
@@ -887,6 +889,11 @@
     <string name="player_current_broadcast">השידור הנוכחי</string>
     <string name="timeshift_setting">השהיית שידור חי</string>
     <string name="timeshift_setting_description">השהיה והרצה לאחור של שידור חי</string>
+    <string name="display_refresh_rate_setting">קצב רענון המסך</string>
+    <string name="display_refresh_rate_description">קצב הרענון של מסכי האפליקציה. ההגדרה “התאמה לקצב התמונות של התוכן” עדיין יכולה לשנות אותו עבור סרטון.</string>
+    <string name="display_refresh_rate_system">ברירת המחדל של המערכת</string>
+    <string name="display_refresh_rate_system_help">משאיר את קביעת קצב הרענון לטלוויזיה.</string>
+    <string name="display_refresh_rate_value">%1$s Hz</string>
     <string name="refresh_rate_matching_setting">התאמה לקצב התמונות של התוכן</string>
     <string name="frame_rate_switching_always">תמיד</string>
     <string name="frame_rate_switching_seamless_only">רק ללא הפרעה</string>

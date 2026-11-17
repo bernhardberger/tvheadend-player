@@ -491,6 +491,8 @@
     <!-- Startup-Statusbildschirm -->
     <string name="main_startup_message_preparing">App wird vorbereitet</string>
     <string name="main_startup_message_connecting">Verbindung wird hergestellt</string>
+    <string name="main_startup_message_starting">Wird gestartet</string>
+    <string name="main_startup_message_channel_starting">%1$s wird gestartet…</string>
     <string name="main_startup_message_syncing_metadata">Sender und Programm werden synchronisiert</string>
     <string name="main_startup_message_waiting_for_current_channel_metadata">Sender werden vorbereitet</string>
     <string name="main_startup_message_reconnecting">Verbindung wird wiederhergestellt</string>
@@ -830,6 +832,11 @@
     <string name="player_current_broadcast">Aktuelle Sendung</string>
     <string name="timeshift_setting">Timeshift</string>
     <string name="timeshift_setting_description">Live-TV pausieren und zurückspulen</string>
+    <string name="display_refresh_rate_setting">Bildwiederholrate des Displays</string>
+    <string name="display_refresh_rate_description">Die Bildwiederholrate für die App-Oberfläche. „Bildwiederholrate anpassen“ kann sie für ein Video weiterhin umschalten.</string>
+    <string name="display_refresh_rate_system">Systemstandard</string>
+    <string name="display_refresh_rate_system_help">Überlässt die Bildwiederholrate dem Fernseher.</string>
+    <string name="display_refresh_rate_value">%1$s Hz</string>
     <string name="refresh_rate_matching_setting">Bildwiederholrate anpassen</string>
     <string name="frame_rate_switching_always">Immer</string>
     <string name="frame_rate_switching_seamless_only">Nur wenn nahtlos</string>

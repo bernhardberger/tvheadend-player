@@ -465,6 +465,8 @@
     <string name="appliance_back_for_menu">按Back键查看频道和设置。</string>
     <string name="main_startup_message_preparing">正在准备应用</string>
     <string name="main_startup_message_connecting">正在连接</string>
+    <string name="main_startup_message_starting">正在启动</string>
+    <string name="main_startup_message_channel_starting">正在启动 %1$s…</string>
     <string name="main_startup_message_syncing_metadata">正在同步频道和节目指南</string>
     <string name="main_startup_message_waiting_for_current_channel_metadata">正在准备频道</string>
     <string name="main_startup_message_reconnecting">正在重新连接</string>
@@ -789,6 +791,11 @@
     <string name="player_current_broadcast">当前播出</string>
     <string name="timeshift_setting">时移</string>
     <string name="timeshift_setting_description">暂停和回退电视直播</string>
+    <string name="display_refresh_rate_setting">显示刷新率</string>
+    <string name="display_refresh_rate_description">应用界面的刷新率。“匹配内容帧率”仍可在播放视频时切换刷新率。</string>
+    <string name="display_refresh_rate_system">系统默认</string>
+    <string name="display_refresh_rate_system_help">由电视决定刷新率。</string>
+    <string name="display_refresh_rate_value">%1$s Hz</string>
     <string name="refresh_rate_matching_setting">匹配内容帧率</string>
     <string name="frame_rate_switching_always">始终</string>
     <string name="frame_rate_switching_seamless_only">仅限无缝切换</string>

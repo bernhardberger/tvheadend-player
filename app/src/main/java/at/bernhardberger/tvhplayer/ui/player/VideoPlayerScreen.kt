@@ -58,10 +58,14 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.util.UnstableApi
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.focus.focusRequester
 import androidx.tv.material3.Button
 import androidx.tv.material3.OutlinedButton
 import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.core.MainStartupPresentation
+import at.bernhardberger.tvhplayer.core.MainStartupPlaybackOutcome
+import at.bernhardberger.tvhplayer.core.mainStartupPlaybackOutcome
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.core.ChannelNumberEntryReadiness
@@ -362,6 +366,8 @@ fun VideoPlayerScreen(
     playbackRuntime: at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime = koinInject(),
     contentAllowed: Boolean = true,
     startupTarget: at.bernhardberger.tvhplayer.core.ApplianceLaunchTarget? = null,
+    freshStart: Boolean = false,
+    startupChannelStartAtMillis: Long? = null,
     onStartupOutcome: (at.bernhardberger.tvhplayer.core.ApplianceLaunchTarget, at.bernhardberger.tvhplayer.core.MainStartupPlaybackOutcome) -> Boolean = { _, _ -> false },
     notices: NoticeCenter = koinInject(),
     uiSettingsStore: at.bernhardberger.tvhplayer.settings.UiSettingsStore = koinInject(),
@@ -376,9 +382,18 @@ fun VideoPlayerScreen(
     val scope = rememberCoroutineScope()
     val statsLevel by statsStore.level.collectAsStateWithLifecycle()
     val layerState = rememberLivePlayerLayerState()
-    val playerClose = rememberPlayerClose(onClose)
+    val livePlayerOwner = remember { Any() }
+    val playerClose = rememberPlayerClose {
+        playbackRuntime.onLivePlayerClosed(livePlayerOwner)
+        onClose()
+    }
     // First, before any playback effect: a user stop since the last intent closes the screen.
-    val screenEntry = rememberPlayerEntry(playbackRuntime::enterPlayerScreen, playerClose)
+    val screenEntry = rememberPlayerEntry({
+        playbackRuntime.enterPlayerScreen(livePlayerOwner, appInitiated = startupTarget != null)
+    }, playerClose)
+    DisposableEffect(playbackRuntime) {
+        onDispose { playbackRuntime.onLivePlayerClosed(livePlayerOwner) }
+    }
     val stopAndClose: () -> Unit = {
         scope.launch {
             stopPlaybackAndClose(
@@ -408,8 +423,6 @@ fun VideoPlayerScreen(
         ?.name?.takeIf { it.isNotBlank() } ?: stringResource(R.string.all_channels)
     val observation by videoPlayerViewModel.observation.collectAsStateWithLifecycle()
     val currentSession = observation.currentSession
-    // Opened before its session was playable: the entry start below tunes once one is current.
-    val serverWait = rememberLivePlayerServerWait(observation, connectionUiState, playerClose, onReconnect, onOpenConnectionSettings)
     val channelBrowser = remember(currentSession) { PlayerChannelBrowserState() }
     val canModifyRecordings = currentSession != null
     val orderedChannelIds = remember(channels) { channels.map { it.id } }
@@ -647,6 +660,7 @@ fun VideoPlayerScreen(
     /** Starts [requestToken]'s selection; a newer request supersedes its outcome. */
     val runLiveStart: suspend (LivePlaybackSelection, Long, Long?) -> Unit = { playbackSelection, requestToken, requestIntent ->
         val startupOwner = startupTarget
+        initialPlayback.failedSelection = null
         if (startupOwner != null) {
             initialPlayback.selection = playbackSelection
             initialPlayback.intent = requestIntent
@@ -670,6 +684,7 @@ fun VideoPlayerScreen(
                 },
                 onResolved = { result ->
                     initialPlayback.resolved = true
+                    initialPlayback.failedSelection = playbackSelection.takeUnless { result?.isStarted == true }
                     if (result?.isStarted == true) {
                         lastPlayedChannelId = currentChannelId
                         requestedChannelFailed = false
@@ -692,8 +707,10 @@ fun VideoPlayerScreen(
             )
         } finally {
             // A commit can precede cancellation before onResolved obtains its receipt.
-            if (startupOwner != null && !kotlinx.coroutines.currentCoroutineContext().isActive && requestIntent != null) {
-                retireCancelledStartup(playbackSelection, requestIntent)
+            if (startupOwner != null && requestIntent != null) {
+                if (!kotlinx.coroutines.currentCoroutineContext().isActive) {
+                    retireCancelledStartup(playbackSelection, requestIntent)
+                }
             }
         }
     }
@@ -719,11 +736,25 @@ fun VideoPlayerScreen(
             // A new launch can reuse this exact route; its adoption owns fresh viewing intent.
             liveIntent = playbackRuntime.notePlaybackIntent()
             admittedStartupTarget = startupTarget
+            startupOutcomeDelivered = false
         }
 
-        if (lastPlayedChannelId == currentChannelId &&
-            (startupTarget == null || initialStartupTarget == startupTarget)
-        ) return@LaunchedEffect
+        // A warm surface can still own the ended session's target. Reuse its fenced recovery
+        // before the entry guards adopt it; it is a no-op for this session's current target.
+        if (startupTarget == null) {
+            val result = playbackRuntime.retuneAfterReconnect()
+            if (result != null) {
+                initialPlayback.failedSelection = authorizedLiveSelection.takeUnless { result.isStarted }
+                requestedChannelFailed = !result.isStarted
+                return@LaunchedEffect
+            }
+        }
+        val restartingChannelStart = if (initialPlayback.failedSelection == authorizedLiveSelection) false else
+            playbackRuntime.videoPresentation.value.channelStartAtMillis != null &&
+                playbackRuntime.activeTarget.value == null && playbackRuntime.state.value !is AppPlaybackState.Starting
+        if (!restartingChannelStart && lastPlayedChannelId == currentChannelId) {
+            if (startupTarget == null || initialStartupTarget == startupTarget) return@LaunchedEffect
+        }
         if (directLiveToken == liveRequestToken) {
             if (pendingZap.value != null || directLiveSelection == authorizedLiveSelection) return@LaunchedEffect
             // The session changed under the key's start: this effect restarts it.
@@ -737,7 +768,8 @@ fun VideoPlayerScreen(
         if (
             if (startupTarget != null) adoptionPresentation != null else
                 playingLiveChannelId == currentChannelId &&
-                    playbackState !is AppPlaybackState.Idle && playbackState !is AppPlaybackState.Failed
+                    playbackRuntime.state.value !is AppPlaybackState.Idle &&
+                    playbackRuntime.state.value !is AppPlaybackState.Failed
         ) {
             lastPlayedChannelId = currentChannelId
             requestedLiveSelection = null
@@ -750,17 +782,17 @@ fun VideoPlayerScreen(
             initialPlayback.token = liveRequestToken
             initialStartupTarget = startupTarget
             initialPlaybackAdopted = true
-            startupOutcomeDelivered = false
+            if (startupTarget != null) startupOutcomeDelivered = false
             adoptedPlaying = adoptionPresentation?.let { it.playing && (it.visible || it.audioOnly) } == true
             // A reconnect the browse owner did not reach before this entry left the ended stream.
             if (startupTarget == null) withContext(NonCancellable) { playbackRuntime.retuneAfterReconnect() }
             return@LaunchedEffect
         }
 
-        if (playbackState is AppPlaybackState.Failed && requestedLiveSelection == null) {
+        if (!restartingChannelStart && playbackState is AppPlaybackState.Failed && requestedLiveSelection == null) {
             return@LaunchedEffect
         }
-        if (initialPlayback.resolved && requestedLiveSelection == null) return@LaunchedEffect
+        if (!restartingChannelStart && initialPlayback.resolved && requestedLiveSelection == null) return@LaunchedEffect
         val playbackSelection = authorizedLiveSelection ?: run {
             // A current session without the channel: it is gone after sync, or never existed.
             if (currentSession != null) requestedChannelFailed = true
@@ -1188,9 +1220,19 @@ fun VideoPlayerScreen(
         playbackPlaying = playbackState.presented,
         channelCondition = channelCondition,
     )
-    val recoveryVisible = screenActive &&
-        (serverWait.presentation != null || statusPresentation == PlaybackStatusPresentation.FULL_RECOVERY)
     val channelUnavailable = statusPresentation == PlaybackStatusPresentation.CHANNEL_UNAVAILABLE
+    val channelStartOrigin = remember(videoPresentation.channelStartAtMillis) {
+        videoPresentation.channelStartAtMillis?.let { startupChannelStartAtMillis ?: it }
+    }
+    val serverWait = rememberLivePlayerServerWait(
+        observation, connectionUiState, playerClose, onReconnect, onOpenConnectionSettings,
+        channelStartOrigin,
+        playerRecovery = currentSession != null && (channelCondition != null || channelUnavailable ||
+            statusPresentation == PlaybackStatusPresentation.FULL_RECOVERY || connState is ConnectionState.Error),
+    )
+    val genuineRecovery = serverWait.presentation is MainStartupPresentation.Actionable ||
+        statusPresentation == PlaybackStatusPresentation.FULL_RECOVERY
+    val recoveryVisible = screenActive && genuineRecovery
     // The box's states plus a connected live TV alert (208): either way the channel's source is gone.
     val channelFailed = channelCondition != null && connState is ConnectionState.Connected &&
         playbackState !is AppPlaybackState.Recovering
@@ -1253,14 +1295,14 @@ fun VideoPlayerScreen(
     val initialPresentation = if (startupTarget == null) null else initialPlayback.selection?.let {
         playbackRuntime.liveTargetPresentation(it, liveIntent)
     }
-    val startupOutcome = at.bernhardberger.tvhplayer.core.mainStartupPlaybackOutcome(
+    val startupOutcome = mainStartupPlaybackOutcome(
         expectedEpoch = initialPlayback.epoch.takeIf {
             initialPlayback.token == liveRequestToken && initialStartupTarget == startupTarget
         },
         presentation = initialPresentation,
         recovery = requestedChannelFailed || currentSubscriptionFailure != null ||
             (initialPlayback.selection != null && currentSession !== initialPlayback.selection?.currentSession) ||
-            currentLiveInterrupted || recoveryVisible || channelUnavailable ||
+            currentLiveInterrupted || genuineRecovery || channelUnavailable ||
             playbackState is AppPlaybackState.Recovering || playbackState is AppPlaybackState.Failed,
         adoptedPlaying = adoptedPlaying,
     )
@@ -1370,9 +1412,14 @@ fun VideoPlayerScreen(
         }
     }
 
-    LaunchedEffect(connState, screenActive) {
-        // Waiting for the first session with nothing playing is no loss; an active target still is.
-        if (!screenActive || serverWait.presentation != null && playbackRuntime.activeTarget.value == null ||
+    LaunchedEffect(connState, screenActive, videoPresentation.channelStartAtMillis, serverWait.waitingForFirstSession) {
+        // Entry/resume recovery belongs to its start, not the mid-picture loss path.
+        if (videoPresentation.channelStartAtMillis != null) {
+            connectionLost = false
+            return@LaunchedEffect
+        }
+        if (serverWait.waitingForFirstSession && playbackRuntime.activeTarget.value == null) return@LaunchedEffect
+        if (!screenActive ||
             screenEntry == null) return@LaunchedEffect
 
         when (connState) {
@@ -1393,15 +1440,23 @@ fun VideoPlayerScreen(
             is ConnectionState.Disconnected,
             is ConnectionState.Error -> {
                 if (!connectionLost) {
+                    val previousLastPlayedChannelId = lastPlayedChannelId
+                    val previousRestoreToLive = restoreToLiveAfterReconnect
                     connectionLost = true
                     restoreToLiveAfterReconnect =
                         effectiveTimeshiftState.available && effectiveTimeshiftState.timingKnown &&
                             !timeshiftPositionPresentation(
                                 effectiveTimeshiftState
                             ).atLiveEdge
-                    layerState.showControls()
-                    videoPlayerViewModel.stopAfterLoss()
                     lastPlayedChannelId = null
+                    // Publish loss before suspending, so a Connected re-key still recovers it.
+                    if (videoPlayerViewModel.stopAfterLoss(unlessChannelStarting = true) == null) {
+                        connectionLost = false
+                        restoreToLiveAfterReconnect = previousRestoreToLive
+                        lastPlayedChannelId = previousLastPlayedChannelId
+                        return@LaunchedEffect
+                    }
+                    layerState.showControls()
                 }
             }
         }
@@ -1410,11 +1465,13 @@ fun VideoPlayerScreen(
     // Playback/recovery effects above stay mounted. No chrome exists under startup until its first
     // picture is delivered; the passive Banner then shows while the startup screen fades, as on an
     // ordinary entry. Focus and Back wait for the reveal to end; startup consumes its keys.
-    if (!contentAllowed &&
-        !(startupOutcomeDelivered && startupTarget != null && initialStartupTarget == startupTarget)) return
     if (contentAllowed) PlayerRootFocusEffect(foregroundLayer, rootFocus)
 
     val handlePlaybackBack: () -> Unit = handle@{
+        if (serverWait.presentation is MainStartupPresentation.Passive) {
+            playerClose.close()
+            return@handle
+        }
         val action = playerBackAction(
             surface = PlayerSurface.LIVE,
             context = currentPlayerForegroundContext(),
@@ -1446,11 +1503,19 @@ fun VideoPlayerScreen(
     fun playerRootModifier(): Modifier = Modifier
             .fillMaxSize()
             .onPreviewKeyEvent { event ->
+                if (serverWait.presentation is MainStartupPresentation.Passive &&
+                    at.bernhardberger.tvhplayer.ui.startup.startupSystemKey(event.nativeKeyEvent.keyCode)
+                ) return@onPreviewKeyEvent false
                 if (event.nativeKeyEvent.action == AndroidKeyEvent.ACTION_DOWN) layerState.core.onKeyDown()
                 if (backCycle.intercept(event,
-                        holdAllowed = playerBackHoldAllowed(foregroundLayer) && playerModals.isEmpty(),
+                        holdAllowed = contentAllowed &&
+                            playerBackHoldAllowed(foregroundLayer) && playerModals.isEmpty(),
                         onBack = {
-                            if (playerModals.isNotEmpty() || layerState.core.infoOpen || layerState.scheduleOpen) backDispatcher?.onBackPressed()
+                            val modalBack = playerModals.isNotEmpty() ||
+                                layerState.core.infoOpen || layerState.scheduleOpen
+                            if (!contentAllowed || modalBack) {
+                                backDispatcher?.onBackPressed()
+                            }
                             else handlePlaybackBack()
                         }, stopAndClose = stopAndClose,
                         activityKeyCycleOwner = activityKeyCycleOwner,
@@ -1712,6 +1777,10 @@ fun VideoPlayerScreen(
             }
             .focusRequester(rootFocus)
             .livePlayerRoot(stringResource(R.string.player_live_tv_surface), contentAllowed)
+    if (!contentAllowed &&
+        !(startupOutcomeDelivered && startupTarget != null && initialStartupTarget == startupTarget)) {
+        return
+    }
     @Composable
     fun PlayerContent() {
     val rootModifier = playerRootModifier()
@@ -2071,7 +2140,10 @@ fun VideoPlayerScreen(
             statsFailure = (playbackState as? AppPlaybackState.Failed)?.takeIf { statsLevel.enabled },
             statsRows = { rememberLiveStatsRows(videoPlayerViewModel, statsLevel, currentChannelId) },
         )
-        LivePlayerServerWait(serverWait, currentChannel, currentChannelName, rootFocus)
+        LivePlayerServerWait(
+            serverWait, currentChannel, currentChannelName, rootFocus, announceStatus = startupTarget == null,
+            freshStart = freshStart,
+        )
         LivePlayerAlertOverlay(
             visible = foregroundLayer == PlayerForegroundLayer.RECOVERY && serverWait.presentation == null,
             alert = livePlayerAlert(connState, playbackState, channelCondition),
@@ -2100,6 +2172,7 @@ private class LivePlayerRemoteKeyState {
 }
 
 private class InitialLivePlaybackState {
+    var failedSelection by mutableStateOf<LivePlaybackSelection?>(null)
     var resolved by mutableStateOf(false)
     var selection by mutableStateOf<LivePlaybackSelection?>(null)
     var epoch by mutableStateOf<Long?>(null)

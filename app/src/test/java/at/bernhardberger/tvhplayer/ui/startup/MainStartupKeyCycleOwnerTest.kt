@@ -33,6 +33,8 @@ class MainStartupKeyCycleOwnerTest {
     @Test fun freshDownDoesNotReleaseAStartupClaim() {
         val owner = MainStartupKeyCycleOwner()
         assertDecision(MainStartupKeyDecision.CONSUME,
+            owner.keyEvent(MainStartupKeyMode.Passive, KeyEvent.KEYCODE_A, KeyEvent.ACTION_UP))
+        assertDecision(MainStartupKeyDecision.CONSUME,
             owner.keyEvent(MainStartupKeyMode.Passive, KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.ACTION_DOWN))
         assertDecision(MainStartupKeyDecision.CONSUME,
             owner.keyEvent(MainStartupKeyMode.Inactive, KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.ACTION_DOWN))
@@ -79,8 +81,8 @@ class MainStartupKeyCycleOwnerTest {
     }
 
     @Test
-    fun systemOwnedAndUnknownKeys_alwaysPassThrough() {
-        (systemOwnedKeys + listOf(KeyEvent.KEYCODE_A)).forEach { keyCode ->
+    fun systemOwnedKeys_alwaysPassThrough() {
+        systemOwnedKeys.forEach { keyCode ->
             val owner = MainStartupKeyCycleOwner()
 
             assertDecision(
@@ -94,6 +96,11 @@ class MainStartupKeyCycleOwnerTest {
                 keyCode,
             )
         }
+        val owner = MainStartupKeyCycleOwner()
+        assertDecision(MainStartupKeyDecision.CONSUME,
+            owner.keyEvent(MainStartupKeyMode.Passive, KeyEvent.KEYCODE_A, KeyEvent.ACTION_DOWN))
+        assertDecision(MainStartupKeyDecision.CONSUME,
+            owner.keyEvent(MainStartupKeyMode.Inactive, KeyEvent.KEYCODE_A, KeyEvent.ACTION_UP))
     }
 
     @Test

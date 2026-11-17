@@ -1,11 +1,15 @@
 package at.bernhardberger.tvhplayer.ui
 
+import at.bernhardberger.tvheadend.sdk.core.Channel
+import kotlinx.coroutines.flow.catch
+
 import at.bernhardberger.tvhplayer.ui.components.ProvideWatchingProgress
 import at.bernhardberger.tvhplayer.ui.components.railNowPlaying
 
 import at.bernhardberger.tvhplayer.profiling.profileRouteDraw
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalActivity
 import android.animation.ValueAnimator
 import android.content.pm.PackageManager
 import android.os.Build
@@ -34,6 +38,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.delay
+import at.bernhardberger.tvhplayer.core.CHANNEL_START_CONNECTION_GRACE_MILLIS
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
@@ -107,6 +113,7 @@ import at.bernhardberger.tvhplayer.ui.components.ProvideAppArtwork
 import at.bernhardberger.tvhplayer.ui.components.SideRail
 import androidx.navigationevent.compose.LocalNavigationEventDispatcherOwner
 import androidx.navigationevent.compose.rememberNavigationEventDispatcherOwner
+import at.bernhardberger.tvhplayer.ui.player.AppDisplayMode
 import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
 import at.bernhardberger.tvhplayer.ui.player.ChannelZapPacer
 import at.bernhardberger.tvhplayer.ui.player.LocalSessionChannelStepAllowed
@@ -260,6 +267,8 @@ internal fun MainStartupComposition(
     notices: @Composable BoxScope.() -> Unit = {},
     motionEnabled: Boolean = ValueAnimator.areAnimatorsEnabled(),
     onRevealed: () -> Unit = {},
+    startupChannel: Channel? = null,
+    startupConnected: Boolean = false,
 ) {
     val livePresentation = when (state.presentation) {
         is MainStartupPresentation.Enter -> MainStartupPresentation.Passive(
@@ -305,18 +314,8 @@ internal fun MainStartupComposition(
         is MainStartupPresentation.Actionable -> MainStartupKeyMode.Actionable
         is MainStartupPresentation.Enter -> error("Enter is rendered as passive startup")
     }
-    val revealScope = rememberCoroutineScope()
-    val keyContract = remember(keyMode, revealRequestId) {
-        MainStartupActivityKeyContract(
-            mode = keyMode,
-            // A key during the reveal ends it at once; the next key reaches the revealed content.
-            onConsumedKeyDown = revealRequestId?.let {
-                {
-                    revealScope.launch { revealAlpha.snapTo(0f) }
-                    latestOnRevealed()
-                }
-            },
-        )
+    val keyContract = remember(keyMode) {
+        MainStartupActivityKeyContract(mode = keyMode)
     }
 
     DisposableEffect(registerActivityKeyContract, keyContract) {
@@ -347,9 +346,11 @@ internal fun MainStartupComposition(
                 },
                 loadingFeedback = retained?.feedback ?: loadingFeedback,
                 // Pending cold art has zero-alpha tracks, but keeps its final layout.
-                // Only the existing-playback classification removes branding.
+                // The startup owner permanently ends branding's fresh-process lifetime.
                 brandingVisible = retained?.brandingVisible ?: !state.hideBranding,
                 motionEnabled = motionEnabled,
+                channel = startupChannel,
+                connected = startupConnected,
             )
         }
         notices()
@@ -470,6 +471,8 @@ fun AppRoot(
      * not the active profile, so removing the server in use never passes through first run.
      */
     serversStored: Boolean = false,
+    freshStart: Boolean = true,
+    onStartupFinished: () -> Unit = {},
 ) {
     val applianceLaunchState by applianceLaunchRequests.state.collectAsStateWithLifecycle()
     val guideRequest = (applianceLaunchState as? ApplianceLaunchState.Pending)
@@ -496,6 +499,7 @@ fun AppRoot(
                     navigationStartDestination = null,
                     navigationAllowed = false,
                     loadingFeedbackEnabled = !cancelBootstrapLaunchWhenReady,
+                    hideBranding = !freshStart,
                 ),
                 loadingTiming = startupLoadingTiming,
                 onBack = resolvingBack,
@@ -629,6 +633,10 @@ fun AppRoot(
     val uiSettingsStore: UiSettingsStore = koinInject()
     val context = LocalContext.current
     val uiSettings by uiSettingsStore.settings.collectAsStateWithLifecycle(initialValue = UiSettings())
+    val appWindow = LocalActivity.current?.window
+    LaunchedEffect(appWindow, uiSettings.displayRefreshRate) {
+        appWindow?.let { AppDisplayMode.of(it).useAppRate(uiSettings.displayRefreshRate) }
+    }
     val settingsScope = rememberCoroutineScope()
     var lastUpdateTime by remember { mutableStateOf<Long?>(null) }
     LaunchedEffect(uiSettingsStore) {
@@ -654,12 +662,30 @@ fun AppRoot(
     val landingCatalogAvailable = currentChannelReadiness.channelsAvailable() || currentChannelReadiness is CurrentChannelReadiness.Ready
     var startupReveal by remember { mutableStateOf<MainStartupReveal?>(null) }
     val revealingTarget = startupReveal?.targetFor(profileGeneration)
+    val liveStartupRequest = when (val launch = applianceLaunchState) {
+        is ApplianceLaunchState.Pending -> launch.request
+        is ApplianceLaunchState.Entering -> launch.target.request
+        ApplianceLaunchState.Idle -> null
+    }?.takeIf { it.destination == ApplianceEntryDestination.LIVE }
+    val channelStartAtMillis = remember(profileGeneration, liveStartupRequest?.id) {
+        liveStartupRequest?.let { SystemClock.elapsedRealtime() }
+    }
+    var startupNow by remember(channelStartAtMillis) { mutableStateOf(SystemClock.elapsedRealtime()) }
+    LaunchedEffect(channelStartAtMillis) {
+        channelStartAtMillis?.let { started ->
+            delay((started + CHANNEL_START_CONNECTION_GRACE_MILLIS -
+                SystemClock.elapsedRealtime()).coerceAtLeast(0L))
+            startupNow = started + CHANNEL_START_CONNECTION_GRACE_MILLIS
+        }
+    }
     val startupPresentation = mainStartupPresentation(
         startupState = startupState,
         // A warm Guide entry does not obscure or steal focus from the current screen.
         launchState = if (guideRequest != null && backStack.isNotEmpty()) ApplianceLaunchState.Idle else applianceLaunchState,
         connectionState = connectionUiState,
         currentChannelReadiness = currentChannelReadiness,
+        channelStartAtMillis = channelStartAtMillis,
+        nowMillis = startupNow,
     )
 
     val currentDestination = backStack.lastOrNull()
@@ -825,6 +851,9 @@ fun AppRoot(
             )
         }
     }
+    LaunchedEffect(applianceLaunchActive, navigationAllowed) {
+        if (!applianceLaunchActive && navigationAllowed) onStartupFinished()
+    }
     val selectRoot = remember(backStack) {
         { destination: AppNavKey ->
             navigationStartDestination = destination
@@ -913,7 +942,7 @@ fun AppRoot(
         val directive = enterDirective ?: return@LaunchedEffect
         val readiness = currentChannelReadiness as? CurrentChannelReadiness.Ready
             ?: return@LaunchedEffect
-        val persistedId = lastPlayedChannelStore.channelId.first()
+        val persistedId = lastPlayedChannelStore.channelId.catch { emit(null) }.first()
         val target = applianceLaunchRequests.resolve(
             request = directive.request,
             readiness = readiness,
@@ -1333,6 +1362,8 @@ fun AppRoot(
                                     navigateTopLevel(SettingsKey(SettingsSection.CONNECTION))
                                 },
                                 connectionUiState = connectionUiState,
+                                startupChannelStartAtMillis = channelStartAtMillis,
+                                freshStart = freshStart,
                                 startupTarget = (enteringLaunchTarget ?: revealingTarget)
                                     ?.takeIf { it.matchesPlayerKey(destination) },
                                 onStartupOutcome = { target, outcome ->
@@ -1344,6 +1375,7 @@ fun AppRoot(
                                         val accepted = applianceLaunchRequests.cancel(ApplianceLaunchState.Entering(target)) ||
                                             startupReveal?.target == target
                                         if (startupReveal?.target == target) startupReveal = null
+                                        if (accepted) onStartupFinished()
                                         accepted
                                     } else {
                                         val completed = completeEnteringPlayerVisibility(
@@ -1354,6 +1386,7 @@ fun AppRoot(
                                             outcome = outcome,
                                         )
                                         if (completed) {
+                                            onStartupFinished()
                                             startupReveal = if (outcome == MainStartupPlaybackOutcome.PRESENTED) {
                                                 MainStartupReveal(target, enteringProfileGeneration)
                                             } else null
@@ -1507,9 +1540,11 @@ fun AppRoot(
             requestId = startupRequestId,
             revealRequestId = revealingTarget?.request?.id,
             returningToPlayback = returningToPlayback,
-            hideBranding = priorLiveChannelId != null,
+            hideBranding = !freshStart,
         ),
         loadingTiming = startupLoadingTiming,
+        startupChannel = (enteringLaunchTarget ?: revealingTarget)?.let { playbackObservation.channel(it.channelId) },
+        startupConnected = playbackObservation.currentSession != null,
         onBack = if (coldStartVisible) onRequestExit else startupBack,
         onAction = if (coldStartVisible) { action ->
             performMainStartupAction(

@@ -20,10 +20,19 @@ import kotlinx.coroutines.launch
 class MainStartupViewModel(
     profileOwner: AppProfileOwner,
     uiSettingsStore: UiSettingsStore,
-    savedStateHandle: SavedStateHandle,
+    private val savedStateHandle: SavedStateHandle,
     noteViewingIntent: () -> Unit = {},
 ) : ViewModel() {
     private val createStartupRequest = shouldCreateStartupRequest(savedStateHandle)
+    // Retained requests belong to a return, even before local settings finish loading.
+    private val _freshStart = MutableStateFlow(createStartupRequest &&
+        savedStateHandle.get<Long>(RETAINED_REQUEST_ID_KEY) == null &&
+        savedStateHandle.get<Boolean>(FRESH_START_FINISHED_KEY) != true)
+    internal val freshStart = _freshStart.asStateFlow()
+    internal fun finishFreshStart() {
+        savedStateHandle[FRESH_START_FINISHED_KEY] = true
+        _freshStart.value = false
+    }
     private val initialActivityIntentPolicy = InitialActivityIntentPolicy(
         allowRestoredIntent = createStartupRequest,
     )
@@ -75,6 +84,7 @@ class MainStartupViewModel(
     }
 
     companion object {
+        private const val FRESH_START_FINISHED_KEY = "startup.freshStartFinished"
         private const val RETAINED_REQUEST_ID_KEY = "startup.retainedRequestId"
         private const val STARTUP_REQUEST_CREATION_HANDLED_KEY =
             "startup.requestCreationHandled"

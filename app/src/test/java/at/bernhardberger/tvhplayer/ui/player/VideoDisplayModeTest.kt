@@ -143,6 +143,12 @@ class VideoDisplayModeTest {
     }
 
     @Test
+    fun anAppBaselinePinsTheCurrentModeWithoutAnExistingPreference() {
+        val fifty = current.copy(refreshRate = 50f, modeId = 2)
+        assertEquals(fifty.modeId, displayModeIdToRequest(fifty, fifty, 0, pin = true))
+    }
+
+    @Test
     fun selectingAnotherModeRequestsItsId() {
         val fifty = current.copy(refreshRate = 50f, modeId = 2)
         assertEquals(fifty.modeId, displayModeIdToRequest(fifty, current, 0))
@@ -161,5 +167,39 @@ class VideoDisplayModeTest {
     fun noMatchingModeClearsAnExistingPreferenceOnly() {
         assertEquals(0, displayModeIdToRequest(null, current, current.modeId))
         assertNull(displayModeIdToRequest(null, current, 0))
+    }
+
+    @Test
+    fun refreshRateChoicesAreTheCurrentResolutionsDistinctRates() {
+        val supported = listOf(
+            current, current.copy(refreshRate = 59.94f, modeId = 2), current.copy(refreshRate = 50f, modeId = 3),
+            current.copy(refreshRate = 50.0001f, modeId = 4), current.copy(width = 3840, height = 2160, refreshRate = 24f, modeId = 5),
+        )
+        assertEquals(listOf(50f, 59.94f, 60f), displayRefreshRateChoices(current, supported))
+        assertEquals(listOf(60f), displayRefreshRateChoices(current, emptyList()))
+    }
+
+    @Test
+    fun theWindowFollowsAnAlwaysRequestOnlyWithAnAppRate() {
+        assertEquals(50f, windowVideoRate(SurfaceFrameRateChange.DISPLAY_MODE, 50f, null))
+        assertNull(windowVideoRate(SurfaceFrameRateChange.ALWAYS, 50f, null))
+        assertEquals(50f, windowVideoRate(SurfaceFrameRateChange.ALWAYS, 50f, 60f))
+        assertNull(windowVideoRate(SurfaceFrameRateChange.ALWAYS, null, 60f))
+        for (seamless in listOf(SurfaceFrameRateChange.ONLY_IF_SEAMLESS, SurfaceFrameRateChange.SEAMLESS_DEFAULT)) {
+            assertNull(windowVideoRate(seamless, 50f, 60f))
+        }
+    }
+
+    @Test
+    fun theWindowPrefersTheVideosModeAndFallsBackToTheAppRate() {
+        val fifty = current.copy(refreshRate = 50f, modeId = 2)
+        val film = current.copy(refreshRate = 24f, modeId = 3)
+        val modes = listOf(current, fifty, film)
+        assertEquals(film, windowDisplayMode(24f, 50f, current, modes))
+        assertEquals(fifty, windowDisplayMode(null, 50f, current, modes))
+        // A video rate the display lacks, and a stored rate another TV offered.
+        assertEquals(fifty, windowDisplayMode(25f, 50f, current, modes))
+        assertNull(windowDisplayMode(null, 120f, current, modes))
+        assertNull(windowDisplayMode(null, null, current, modes))
     }
 }

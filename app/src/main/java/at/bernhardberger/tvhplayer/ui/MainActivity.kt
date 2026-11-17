@@ -65,8 +65,6 @@ import org.koin.androidx.viewmodel.ext.android.viewModel
 
 data class MainStartupActivityKeyContract(
     val mode: MainStartupKeyMode,
-    /** Called for each fresh key down the contract consumes; that key's whole cycle stays consumed. */
-    val onConsumedKeyDown: (() -> Unit)? = null,
 )
 
 internal class MainStartupActivityKeyDispatcher(
@@ -94,10 +92,7 @@ internal class MainStartupActivityKeyDispatcher(
             repeatCount = repeatCount,
         )
         when (decision) {
-            MainStartupKeyDecision.CONSUME -> {
-                if (action == KeyEvent.ACTION_DOWN && repeatCount == 0) contract.onConsumedKeyDown?.invoke()
-                return true
-            }
+            MainStartupKeyDecision.CONSUME -> return true
             MainStartupKeyDecision.PASS_THROUGH -> Unit
         }
         if (action == KeyEvent.ACTION_UP && keyCode in forwardedActivationKeyCodes) {
@@ -194,6 +189,7 @@ class MainActivity : AppCompatActivity() {
         onBackPressedDispatcher.addCallback(this) { requestRootExit() }
         setContent {
             val startupState by startupViewModel.state.collectAsStateWithLifecycle()
+            val freshStart by startupViewModel.freshStart.collectAsStateWithLifecycle()
             val runtimeServerSettings by
                 startupViewModel.runtimeServerSettings.collectAsStateWithLifecycle()
             val serverProfiles by profileOwner.profiles.collectAsStateWithLifecycle()
@@ -206,6 +202,8 @@ class MainActivity : AppCompatActivity() {
                         startupState = startupState,
                         runtimeServerSettings = runtimeServerSettings,
                         applianceLaunchRequests = startupViewModel.applianceLaunchRequests,
+                        freshStart = freshStart,
+                        onStartupFinished = startupViewModel::finishFreshStart,
                         debugVideoBackdropVisible = debugVideoBackdropVisible,
                         onPlayerVisibilityChanged = { isPlayerVisible = it },
                         onRequestExit = ::requestRootExit,
@@ -254,6 +252,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onStop() {
+        startupViewModel.finishFreshStart()
         mediaSessionLifecycle.stop()
         if (debugVideoBackdropReceiverRegistered) {
             unregisterReceiver(debugVideoBackdropReceiver)

@@ -50,6 +50,17 @@ internal class NavigationJourneyFixture(
     private val context = ApplicationProvider.getApplicationContext<Application>()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private lateinit var player: ExoPlayer
+    private val playerListeners = mutableListOf<androidx.media3.common.Player.Listener>()
+    fun presentFirstFrame() {
+        compose.runOnIdle {
+            playerListeners.toList().forEach {
+                it.onPlaybackStateChanged(androidx.media3.common.Player.STATE_READY)
+                it.onIsPlayingChanged(true)
+                it.onRenderedFirstFrame()
+            }
+        }
+        settle()
+    }
     private lateinit var session: FakeTvheadendSession
     lateinit var back: androidx.activity.OnBackPressedDispatcher
         private set
@@ -122,7 +133,8 @@ internal class NavigationJourneyFixture(
         scope.launch { profiles.run() }
         player = ExoPlayer.Builder(context).build()
         val coordinator = createTvheadendPlaybackCoordinator(player).also { it.launchIn(scope) }
-        val runtime = AppPlaybackRuntime(player, session, coordinator, settings, profiles, scope,
+        val observedPlayer = at.bernhardberger.tvhplayer.testutil.observePlayerListeners(player, playerListeners)
+        val runtime = AppPlaybackRuntime(observedPlayer, session, coordinator, settings, profiles, scope,
             TvheadendAudioOutputProvider(context), PlaybackAudioFocus.None, PlaybackRuntimePolicy.fromPlayerSettings(),
             noticeCenter = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) { at.bernhardberger.tvhplayer.notices.NoticeContext(0, null) })
         val notices = NoticeCenter(android.os.SystemClock::elapsedRealtime) {

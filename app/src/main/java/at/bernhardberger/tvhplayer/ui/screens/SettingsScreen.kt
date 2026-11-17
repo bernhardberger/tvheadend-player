@@ -89,6 +89,7 @@ internal fun SettingsScreen(
         settingsKeepChannelLevel(navigation),
         settingsWarmPlaybackLevel(navigation),
         settingsStreamProfileLevel(navigation, connectionName = connectionName),
+        settingsDisplayRateLevel(navigation),
         settingsFrameRateLevel(navigation),
         settingsStartupBufferLevel(navigation),
         settingsChannelTagsLevel(channelsVm, connectionName),

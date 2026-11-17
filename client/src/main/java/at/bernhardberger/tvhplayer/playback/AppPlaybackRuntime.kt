@@ -114,6 +114,7 @@ class AppPlaybackRuntime(
      * recovery, [restoreRecordingRoute], and automatic stops ([stopAfterLoss]).
      */
     private val playbackRequests = AtomicLong()
+    private val playerEntries = AtomicLong()
 
     /**
      * The newest intent generation the installed live target serves: the one it was started
@@ -549,6 +550,7 @@ class AppPlaybackRuntime(
         }
 
         override fun onTracksChanged(tracks: Tracks) {
+            presentation.endChannelStartIfAudioPlaying(tracks)
             recordingMarkers.onTracksChanged()
             // Known tracks without video (radio): nothing to request. Empty tracks during a zap keep the rate.
             if (tracks.groups.isNotEmpty() && !tracks.containsType(androidx.media3.common.C.TRACK_TYPE_VIDEO)) {
@@ -991,7 +993,7 @@ class AppPlaybackRuntime(
         if (currentCoroutineContext().isActive || !targetCommands.isOpen() || _activeTarget.value != null) return
         withContext(NonCancellable) {
             if (presentationEpoch.isCurrent(startEpoch) && request == playbackRequests.get()) {
-                stopPlayback()
+                stopPlayback(preserveChannelStart = true)
             } else {
                 // As during an install, the retired source's IDLE is no state of the newer request.
                 targetInstallationInProgress = true
@@ -1023,7 +1025,7 @@ class AppPlaybackRuntime(
                 targetCommands.serialize(onClosed = {}) {
                     if (_activeTarget.value == null && state.value == AppPlaybackState.Starting &&
                         request == playbackRequests.get()
-                    ) stopPlayback()
+                    ) stopPlayback(preserveChannelStart = true)
                 }
             }
             throw cancelled
@@ -1120,6 +1122,7 @@ class AppPlaybackRuntime(
      */
     fun notePlaybackIntentServed(intent: Long) {
         servedIntent.accumulateAndGet(intent, ::maxOf)
+        if (intent == playbackRequests.get()) presentation.adoptChannelStartTarget()
         if (!endLiveSelection(intent)) return
         scope.launch {
             targetCommands.serialize(onClosed = {}) {
@@ -1139,13 +1142,21 @@ class AppPlaybackRuntime(
      * active), the entry plays. Otherwise notes opening the screen as intent and returns
      * its generation.
      */
-    fun enterPlayerScreen(): Long? = synchronized(intentLock) {
-        val current = playbackRequests.get()
-        when {
-            userStopIntent == current -> null
-            pendingStops > 0 && pendingStopIntent == current -> current
-            else -> playbackRequests.incrementAndGet()
+    // Only automatic entry owns channel-start identity; an in-app selection waits for its first session in the UI.
+    fun enterPlayerScreen(livePlayerOwner: Any? = null, appInitiated: Boolean = false): Long? {
+        val entry = playerEntries.incrementAndGet()
+        val intent = synchronized(intentLock) {
+            val current = playbackRequests.get()
+            when {
+                userStopIntent == current -> null
+                pendingStops > 0 && pendingStopIntent == current -> current
+                else -> playbackRequests.incrementAndGet()
+            }
         }
+        if (intent != null && livePlayerOwner != null) {
+            presentation.registerLivePlayer(livePlayerOwner, entry, appInitiated)
+        }
+        return intent
     }
 
     /** Whether a user stop was asked for under [intent] or a later generation. */
@@ -1428,11 +1439,12 @@ class AppPlaybackRuntime(
      * no user stop is recorded, so it neither blocks a later restore nor closes a player
      * screen entered afterwards.
      */
-    suspend fun stopAfterLoss(): PlaybackStopResult = targetCommands.serialize(
+    suspend fun stopAfterLoss(unlessChannelStarting: Boolean = false): PlaybackStopResult? = targetCommands.serialize(
         onClosed = { PlaybackStopResult.SHUT_DOWN },
     ) {
+        if (unlessChannelStarting && videoPresentation.value.channelStartAtMillis != null) return@serialize null
         noteRecordingInterruptionLocked()
-        explicitStopLocked()
+        explicitStopLocked(preserveChannelStart = true)
     }
 
     /** A cancelled startup can retire only its own still-unpresented install, never a replacement. */
@@ -1450,16 +1462,19 @@ class AppPlaybackRuntime(
             tracks.groups.none { it.type == androidx.media3.common.C.TRACK_TYPE_VIDEO }
         if (frame.epoch == epoch && frame.visible || audioOnlyPlaying) return@serialize null
         noteRecordingInterruptionLocked()
-        explicitStopLocked()
+        explicitStopLocked(preserveChannelStart = true)
     }
 
-    private suspend fun explicitStopLocked(): PlaybackStopResult {
+    private suspend fun explicitStopLocked(preserveChannelStart: Boolean = false): PlaybackStopResult {
         foregroundPlaybackLifecycle.onExplicitStop()
         cancelKeepTimer()
         _backgroundNotice.value = null
         liveRecovery.resetBackoffLocked()
-        return stopPlayback()
+        return stopPlayback(preserveChannelStart)
     }
+
+    /** Closing the live surface withdraws an entry still waiting for a connection. */
+    fun onLivePlayerClosed(owner: Any) = presentation.unregisterLivePlayer(owner)
 
     fun onAppBackgrounded(interactive: Boolean = true) {
         scope.launch {
@@ -1506,6 +1521,7 @@ class AppPlaybackRuntime(
     }
 
     fun onAppForegrounded() {
+        val livePlayerOwner = presentation.livePlayerOwner()
         scope.launch {
             targetCommands.serialize(onClosed = {}) {
                 val keptEpoch = activeTargetEpoch
@@ -1524,6 +1540,7 @@ class AppPlaybackRuntime(
                         nowMillis = elapsedRealtime(),
                         latestIntent = playbackRequests.get(),
                     ),
+                    livePlayerOwner,
                 )
                 resumeBufferRecoveryLocked()
             }
@@ -1613,10 +1630,11 @@ class AppPlaybackRuntime(
         keepTimer = null
     }
 
-    private suspend fun stopPlayback(): PlaybackStopResult {
+    private suspend fun stopPlayback(preserveChannelStart: Boolean = false): PlaybackStopResult {
         if (!targetCommands.isOpen()) return PlaybackStopResult.SHUT_DOWN
         if (livePlaybackObservation.value != LivePlaybackObservation.Departed) restoreKeptAudioLocked()
         backgroundRecordingEpoch = null
+        if (!preserveChannelStart) presentation.endChannelStart()
         _liveStartUndisturbed.value = false
         // A timer executing this stop must not cancel its own serialized cleanup.
         val timer = keepTimer
@@ -3091,9 +3109,10 @@ class AppPlaybackRuntime(
         }
     }
 
-    private suspend fun resumeKeptLiveLocked(kept: ForegroundPlaybackAction.ResumeKeptLive) {
+    private suspend fun resumeKeptLiveLocked(kept: ForegroundPlaybackAction.ResumeKeptLive, livePlayerOwner: Any?) {
         restoreKeptAudioLocked()
         if (activeTargetEpoch == kept.epoch) {
+            presentation.beginChannelStart(livePlayerOwner)
             val restored = coordinator.setLivePriority(LiveSubscriptionPriority.NORMAL) == TimeshiftCommandResult.ACCEPTED
             if (targetCommands.isOpen() && activeTargetEpoch == kept.epoch) {
                 val resumed = if (restored && kept.resume) audioInterruptions.playWithAudioFocusLocked(resumeTimeshift = true)
@@ -3104,30 +3123,37 @@ class AppPlaybackRuntime(
                 if (!restored || resumeFailed) {
                     val channel = (_activeTarget.value as? AppPlaybackTarget.Live)?.channelId
                     // A stop the queued loss check has not handled yet is not a lost tuner.
-                    val notice = currentLiveLossNotice()
-                        ?: observedLiveLoss?.takeIf { it.epoch == kept.epoch }?.notice
-                        ?: BackgroundPlaybackNotice.TUNER_LOST
-                    stopPlayback()
+                    val notice = keptLiveLoss(kept.epoch) ?: BackgroundPlaybackNotice.TUNER_LOST
+                    stopPlayback(preserveChannelStart = true)
                     channel?.let { playLive(it, recovering = false, playWhenReady = kept.resume) }
                     if (resumeFailed) _backgroundNotice.value = notice
+                } else if (videoPresentation.value.visible) {
+                    // A successful kept resume still has its picture; no new target is needed.
+                    presentation.endChannelStart()
+                } else {
+                    presentation.endChannelStartIfAudioPlaying()
                 }
             }
         }
     }
 
-    private suspend fun applyForegroundPlaybackAction(action: ForegroundPlaybackAction) {
+    private suspend fun applyForegroundPlaybackAction(
+        action: ForegroundPlaybackAction,
+        livePlayerOwner: Any? = presentation.livePlayerOwner(),
+    ) {
         executeForegroundPlaybackAction(
             action = action,
             stopLive = { stopPlayback() },
             releaseRecording = ::releaseBackgroundRecordingLocked,
             resumeLive = { channelId ->
                 if (_activeTarget.value != null) stopPlayback()
+                presentation.beginChannelStart(livePlayerOwner)
                 lastLiveChannelId = channelId
                 playLive(channelId = channelId, recovering = false)
             },
             resumeRecording = ::resumeBackgroundRecordingLocked,
             keepLive = ::keepLiveLocked,
-            resumeKeptLive = ::resumeKeptLiveLocked,
+            resumeKeptLive = { resumeKeptLiveLocked(it, livePlayerOwner) },
             notice = { _backgroundNotice.value = it },
         )
     }
