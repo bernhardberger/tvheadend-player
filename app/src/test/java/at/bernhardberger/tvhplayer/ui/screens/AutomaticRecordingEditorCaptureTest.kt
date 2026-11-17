@@ -189,7 +189,7 @@ class AutomaticRecordingEditorCaptureTest {
                         episode = programmeEpisodeLine(entry.episode, entry.subtitle,
                             ApplicationProvider.getApplicationContext<Application>().resources),
                         time = formatRecordingDate(requireNotNull(entry.start).epochSeconds, dateOnly = true,
-                            nowSec = automaticRecordingNow.epochSeconds) + " · " +
+                            nowSec = automaticRecordingNow.epochSeconds) + " • " +
                             formatClock(requireNotNull(entry.start).epochSeconds),
                         summary = automaticRecordingEvents.first().description.orEmpty(),
                         recordingState = entry.state, recordingRule = RecordingRule.SERIES,

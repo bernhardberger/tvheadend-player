@@ -936,7 +936,7 @@ class SettingsDepthNavigationTest {
         press(Key.DirectionDown)
         press(Key.DirectionDown)
         press(Key.DirectionDown)
-        compose.onNode(isFocused() and hasText(keep) and hasText("Available when “Timeshift” is on."))
+        compose.onNode(isFocused() and hasText(keep) and hasText("Available when “Timeshift” is on"))
             .assertIsNotEnabled()
         press(Key.DirectionCenter)
         press(Key.DirectionRight)
@@ -983,7 +983,7 @@ class SettingsDepthNavigationTest {
         press(Key.DirectionCenter)
         assertEquals(STREAM_PROFILE_LEVEL, navigation.stack.active.levelId)
         compose.onNode(isFocused() and hasText("pass")).assertIsSelected()
-        compose.onNodeWithText("How Tvheadend prepares the stream for this TV.").assertIsDisplayed()
+        compose.onNodeWithText("How Tvheadend prepares the stream for this TV").assertIsDisplayed()
         // A page left open across a disconnect shows only why, as a row that offers nothing.
         compose.runOnIdle { ui = ui.copy(profiles = StreamProfilesResult.Failed(TvheadendFailure.NOT_READY), connected = false) }
         compose.onNodeWithText("Not connected").assertIsNotEnabled()
@@ -1004,7 +1004,7 @@ class SettingsDepthNavigationTest {
         // Without a server list the row says why and stays closed, even through Right.
         for ((profilesState, connected, why) in listOf(
             Triple(StreamProfilesResult.Failed(TvheadendFailure.NOT_READY), false, "Not connected"),
-            Triple(StreamProfilesResult.Failed(TvheadendFailure.ACCESS_DENIED), true, "Stream profiles aren’t available."),
+            Triple(StreamProfilesResult.Failed(TvheadendFailure.ACCESS_DENIED), true, "Stream profiles aren’t available"),
         )) {
             compose.runOnIdle { ui = ui.copy(profiles = profilesState, connected = connected) }
             compose.onNode(isFocused() and hasText(row) and hasText(why)).assertIsNotEnabled()

@@ -3,7 +3,7 @@
     <string name="main_startup_message_channel_starting">%1$s is starting…</string>
     <string name="automatic_recording_new_overline">Automatic recordings</string>
     <string name="automatic_recording_new_title">New automatic recording</string>
-    <string name="automatic_recording_new_choose">Choose how it decides what to record.</string>
+    <string name="automatic_recording_new_choose">Choose how it decides what to record</string>
     <!-- Kind of automatic recording that matches words. -->
     <string name="automatic_recording_new_keyword">Keyword</string>
     <string name="automatic_recording_new_keyword_help">Programs that mention your words</string>
@@ -21,9 +21,9 @@
     <!-- Supporting line of the Automatic recordings row when there are none. -->
     <string name="schedule_automatic_empty_help">None yet</string>
     <!-- Empty state inside the Automatic recordings level. -->
-    <string name="schedule_automatic_empty">No automatic recordings yet.</string>
+    <string name="schedule_automatic_empty">No automatic recordings yet</string>
     <!-- Supporting line of the row that adds an automatic recording. -->
-    <string name="schedule_automatic_new_help">By title, keyword or set times</string>
+    <string name="schedule_automatic_new_help">By title, keyword, or set times</string>
     <!-- Menu action on one automatic recording. -->
     <string name="schedule_automatic_turn_off">Turn off</string>
     <!-- Menu action on one automatic recording. -->
@@ -86,8 +86,8 @@
     <string name="timer_editor_start">Starts at</string>
     <string name="timer_editor_end">Ends at</string>
     <string name="timer_editor_next_day">Next day</string>
-    <string name="timer_editor_next_day_time">%1$s · next day</string>
-    <string name="timer_editor_next_day_date">Next day · %1$s</string>
+    <string name="timer_editor_next_day_time">%1$s • next day</string>
+    <string name="timer_editor_next_day_date">Next day • %1$s</string>
     <!-- %1$s is a date; %2$s is a clock time. -->
     <string name="timer_editor_ends">Ends %1$s at %2$s</string>
     <string name="timer_editor_no_padding">No padding for repeating timers</string>
@@ -96,37 +96,37 @@
     <string name="timer_editor_channel_required">Choose a channel first</string>
     <string name="timer_editor_channel_not_chosen">Not chosen yet</string>
     <string name="timer_editor_name_default">Same as the channel</string>
-    <string name="timer_editor_no_channel_description">Records a channel at set times, whatever is on.</string>
+    <string name="timer_editor_no_channel_description">Records a channel at set times, whatever is on</string>
     <string name="timer_editor_empty_span">Start and end are the same</string>
     <string name="timer_editor_time_passed">That time has passed</string>
     <string name="timer_editor_repeat_required">Choose at least one day</string>
     <string name="timer_editor_starts_now">Starts recording as soon as you confirm</string>
     <!-- %1$s is the channel name; %2$s is the start time; %3$s is the end time. -->
-    <string name="timer_editor_description">Records %1$s from %2$s to %3$s, whatever is on.</string>
-    <string name="timer_editor_repeat_help">Tick the days it repeats on.</string>
-    <string name="timer_editor_clock_help">Pick the hour, then the minutes.</string>
-    <string name="timer_editor_minute_help">In 5-minute steps.</string>
-    <string name="timer_editor_name_help">Leave the name empty to use the channel’s name.</string>
-    <string name="timer_editor_keep_help">Choose how long to keep these recordings.</string>
-    <string name="timer_editor_more_help">These settings apply to recordings made by this timer.</string>
+    <string name="timer_editor_description">Records %1$s from %2$s to %3$s, whatever is on</string>
+    <string name="timer_editor_repeat_help">Select the days it repeats on</string>
+    <string name="timer_editor_clock_help">Pick the hour, then the minutes</string>
+    <string name="timer_editor_minute_help">In 5-minute steps</string>
+    <string name="timer_editor_name_help">Leave the name empty to use the channel’s name</string>
+    <string name="timer_editor_keep_help">Choose how long to keep these recordings</string>
+    <string name="timer_editor_more_help">These settings apply to recordings made by this timer</string>
     <string name="timer_editor_undo">Undo changes here</string>
     <string name="timer_editor_delete">Delete repeating timer?</string>
     <string name="timer_editor_deleting">Deleting repeating timer…</string>
     <string name="timer_editor_more_removed">and %1$d more</string>
     <plurals name="timer_editor_delete_scheduled">
-        <item quantity="one">Its %1$d scheduled recording will be removed.</item>
-        <item quantity="other">Its %1$d scheduled recordings will be removed.</item>
+        <item quantity="one">%1$d scheduled recording will be removed.</item>
+        <item quantity="other">%1$d scheduled recordings will be removed.</item>
     </plurals>
     <string name="autorec_editor_search_in">Search in</string>
     <string name="autorec_editor_titles_only">Titles only</string>
-    <string name="autorec_editor_full_text">Titles, subtitles and descriptions</string>
-    <string name="autorec_editor_raw_value">Expression from Tvheadend · %1$s</string>
-    <string name="autorec_editor_words_empty_summary">“%1$s” · None in the guide yet</string>
-    <string name="autorec_editor_raw_help">Uses this expression from Tvheadend exactly as shown.</string>
-    <string name="autorec_editor_title_description">Records every program whose title exactly matches “%1$s”.</string>
-    <string name="autorec_editor_title_full_description">Uses “%1$s” to find programs by title, subtitle and description.</string>
-    <string name="autorec_editor_keyword_description">Records every program whose title contains “%1$s”.</string>
-    <string name="autorec_editor_keyword_full_description">Records every program whose title, subtitle or description contains “%1$s”.</string>
+    <string name="autorec_editor_full_text">Titles, subtitles, and descriptions</string>
+    <string name="autorec_editor_raw_value">Expression from Tvheadend • %1$s</string>
+    <string name="autorec_editor_words_empty_summary">“%1$s” • None in the guide yet</string>
+    <string name="autorec_editor_raw_help">Uses this expression from Tvheadend exactly as shown</string>
+    <string name="autorec_editor_title_description">Records every program whose title exactly matches “%1$s”</string>
+    <string name="autorec_editor_title_full_description">Uses “%1$s” to find programs by title, subtitle, and description</string>
+    <string name="autorec_editor_keyword_description">Records every program whose title contains “%1$s”</string>
+    <string name="autorec_editor_keyword_full_description">Records every program whose title, subtitle, or description contains “%1$s”</string>
     <string name="autorec_editor_delete_series">Delete series recording?</string>
     <string name="automatic_recording_kind_series">Series recording</string>
     <string name="automatic_recording_kind_title">Title recording</string>
@@ -137,20 +137,20 @@
     <string name="autorec_editor_delete_unsaved">Your unsaved changes will be discarded.</string>
     <string name="autorec_editor_deleting">Deleting automatic recording…</string>
     <plurals name="autorec_editor_words_titles_summary">
-        <item quantity="one">“%1$s” in titles · %2$d program</item>
-        <item quantity="other">“%1$s” in titles · %2$d programs</item>
+        <item quantity="one">“%1$s” in titles • %2$d program</item>
+        <item quantity="other">“%1$s” in titles • %2$d programs</item>
     </plurals>
     <plurals name="autorec_editor_words_full_summary">
-        <item quantity="one">“%1$s” in all text · %2$d program</item>
-        <item quantity="other">“%1$s” in all text · %2$d programs</item>
+        <item quantity="one">“%1$s” in all text • %2$d program</item>
+        <item quantity="other">“%1$s” in all text • %2$d programs</item>
     </plurals>
     <plurals name="autorec_editor_delete_episodes">
-        <item quantity="one">Its %1$d scheduled episode will be removed.</item>
-        <item quantity="other">Its %1$d scheduled episodes will be removed.</item>
+        <item quantity="one">%1$d scheduled episode will be removed.</item>
+        <item quantity="other">%1$d scheduled episodes will be removed.</item>
     </plurals>
     <plurals name="autorec_editor_delete_programs">
-        <item quantity="one">Its %1$d scheduled program will be removed.</item>
-        <item quantity="other">Its %1$d scheduled programs will be removed.</item>
+        <item quantity="one">%1$d scheduled program will be removed.</item>
+        <item quantity="other">%1$d scheduled programs will be removed.</item>
     </plurals>
     <plurals name="autorec_editor_upcoming_episodes">
         <item quantity="one">Records %1$d upcoming episode</item>
@@ -180,10 +180,10 @@
     <string name="autorec_editor_new_title">New title recording</string>
     <string name="autorec_editor_new_keyword">New keyword recording</string>
     <string name="autorec_editor_save">Save changes</string>
-    <string name="autorec_editor_series_description">Records every episode the guide links to this series, whatever its title.</string>
-    <string name="autorec_editor_keep_help">Choose how long to keep the recordings this automatic recording makes.</string>
-    <string name="autorec_editor_channel_time_help">Limit the channels, days, or start times this automatic recording uses.</string>
-    <string name="autorec_editor_more_help">These settings apply to recordings made by this automatic recording.</string>
+    <string name="autorec_editor_series_description">Records every episode the guide links to this series, whatever its title</string>
+    <string name="autorec_editor_keep_help">Choose how long to keep the recordings this automatic recording makes</string>
+    <string name="autorec_editor_channel_time_help">Limit the channels, days, or start times this automatic recording uses</string>
+    <string name="autorec_editor_more_help">These settings apply to recordings made by this automatic recording</string>
     <string name="autorec_editor_upcoming">Upcoming episodes</string>
     <string name="autorec_editor_words">Words to find</string>
     <string name="autorec_editor_channel_time">Channel and time</string>
@@ -194,12 +194,12 @@
     <!-- Span of clock times in which a program must start to be recorded. -->
     <string name="autorec_editor_start_window">Start window</string>
     <string name="autorec_editor_any_time">Any time</string>
-    <string name="autorec_editor_after">Starts after…</string>
-    <string name="autorec_editor_before">Starts before…</string>
+    <string name="autorec_editor_after">Starts after</string>
+    <string name="autorec_editor_before">Starts before</string>
     <string name="autorec_editor_after_time">Starts after %1$s</string>
     <string name="autorec_editor_before_time">Starts before %1$s</string>
     <!-- A stored value outside the offered choices; %1$s is that value. -->
-    <string name="autorec_editor_current">Current · %1$s</string>
+    <string name="autorec_editor_current">Current • %1$s</string>
     <string name="autorec_editor_current_setting">Current setting from Tvheadend</string>
     <string name="autorec_editor_channel_unavailable">Channel unavailable</string>
     <string name="autorec_editor_keep_week">1 week after recording</string>
@@ -227,14 +227,14 @@
     <string name="autorec_editor_duplicate_description">Same description</string>
     <string name="autorec_editor_duplicate_day">Once a day</string>
     <string name="autorec_editor_duplicate_week">Once a week</string>
-    <string name="autorec_editor_duplicate_default_help">Uses the recording profile’s duplicate detection.</string>
-    <string name="autorec_editor_duplicate_all_help">Records every matching broadcast.</string>
-    <string name="autorec_editor_duplicate_episode_help">Leaves out episodes with a number already recorded.</string>
-    <string name="autorec_editor_duplicate_subtitle_help">Leaves out programs with a subtitle already recorded.</string>
-    <string name="autorec_editor_duplicate_description_help">Leaves out programs with a description already recorded.</string>
-    <string name="autorec_editor_duplicate_day_help">Records at most one matching program each day.</string>
-    <string name="autorec_editor_duplicate_week_help">Records at most one matching program each week.</string>
-    <string name="autorec_editor_current_help">Keeps this setting from Tvheadend unless you choose another.</string>
+    <string name="autorec_editor_duplicate_default_help">Uses the recording profile’s duplicate detection</string>
+    <string name="autorec_editor_duplicate_all_help">Records every matching broadcast</string>
+    <string name="autorec_editor_duplicate_episode_help">Leaves out episodes with a number already recorded</string>
+    <string name="autorec_editor_duplicate_subtitle_help">Leaves out programs with a subtitle already recorded</string>
+    <string name="autorec_editor_duplicate_description_help">Leaves out programs with a description already recorded</string>
+    <string name="autorec_editor_duplicate_day_help">Records at most one matching program each day</string>
+    <string name="autorec_editor_duplicate_week_help">Records at most one matching program each week</string>
+    <string name="autorec_editor_current_help">Keeps this setting from Tvheadend unless you choose another</string>
     <string name="autorec_editor_priority">Priority</string>
     <!-- Value of Priority meaning the server's default priority. -->
     <string name="autorec_editor_default">Default</string>
@@ -265,13 +265,13 @@
     </plurals>
     <string name="autorec_editor_no_limit">No limit</string>
     <plurals name="autorec_editor_maximum_help">
-        <item quantity="one">Keeps at most %1$d recording from this automatic recording.</item>
-        <item quantity="other">Keeps at most %1$d recordings from this automatic recording.</item>
+        <item quantity="one">Keeps at most %1$d recording from this automatic recording</item>
+        <item quantity="other">Keeps at most %1$d recordings from this automatic recording</item>
     </plurals>
     <!-- Label of the switch that turns an automatic recording or timer on or off. -->
     <string name="autorec_editor_turned_on">Enabled</string>
     <string name="autorec_editor_off_after_save">Off once you save</string>
-    <string name="autorec_editor_off_help">A running recording continues and finished recordings stay.</string>
+    <string name="autorec_editor_off_help">A running recording continues and finished recordings stay</string>
     <string name="autorec_editor_done">Done</string>
     <string name="autorec_editor_unchanged">Nothing changed yet</string>
     <string name="autorec_editor_enter_words">Enter words first</string>
@@ -280,9 +280,9 @@
     <string name="autorec_editor_no_matches">None in the guide yet</string>
     <string name="autorec_editor_empty_words">Enter words and the programs they find appear here</string>
     <!-- %1$d is how many more programs match; %2$s names their level (e.g. Upcoming episodes). -->
-    <string name="autorec_editor_more_preview">and %1$d more · all under %2$s</string>
-    <string name="autorec_editor_guide_horizon">The guide covers only the coming days.</string>
-    <string name="autorec_editor_broadcast_unavailable">May include programs this automatic recording leaves out.</string>
+    <string name="autorec_editor_more_preview">and %1$d more • all under %2$s</string>
+    <string name="autorec_editor_guide_horizon">The guide covers only the coming days</string>
+    <string name="autorec_editor_broadcast_unavailable">May include programs this automatic recording leaves out</string>
     <string name="autorec_editor_duplicate_state">Duplicate, not recorded</string>
     <!-- Badge and state of a scheduled recording the user chose not to record. -->
     <string name="autorec_editor_skipped">Skipped</string>
@@ -291,14 +291,14 @@
     <!-- State of a scheduled episode the edited settings no longer match. -->
     <string name="autorec_editor_removed">Removed</string>
     <string name="autorec_editor_leave_title">Leave without saving?</string>
-    <string name="autorec_editor_leave_body">Your changes have not been saved.</string>
+    <string name="autorec_editor_leave_body">Your changes haven’t been saved</string>
     <string name="autorec_editor_keep_editing">Keep editing</string>
     <!-- Last button of the "Leave without saving?" card; leaves the editor and drops the unsaved changes. -->
     <string name="autorec_editor_discard">Discard changes</string>
     <string name="record_unavailable">Can’t record this program</string>
-    <string name="record_unavailable_ended">It has already ended.</string>
-    <string name="record_unavailable_no_programme">There’s no program information for this channel.</string>
-    <string name="record_unavailable_permission">Your account isn’t allowed to record.</string>
+    <string name="record_unavailable_ended">This program has already ended</string>
+    <string name="record_unavailable_no_programme">There’s no program information for this channel</string>
+    <string name="record_unavailable_permission">Your account isn’t allowed to record</string>
     <string name="player_scrub_forward">Fast forward, %1$d times</string>
     <string name="player_scrub_backward">Rewind, %1$d times</string>
     <string name="server_connection_failed">Can’t connect to %1$s</string>
@@ -315,17 +315,17 @@
     <string name="connection_scope_line">For %1$s</string>
     <string name="server_profile_removed">Removed %1$s</string>
     <string name="server_profile_already_exists">This connection already exists</string>
-    <string name="server_profile_write_failed">The connection could not be selected. Try again.</string>
+    <string name="server_profile_write_failed">The connection couldn’t be selected. Try again.</string>
     <string name="server_list_title">Connections</string>
     <string name="server_add">Add connection</string>
     <string name="server_add_description">Another server or another user</string>
     <string name="server_in_use">In use</string>
     <string name="server_no_sign_in">No sign-in</string>
     <string name="server_password_needed">Password needed</string>
-    <!-- Joins the parts of a supporting line, e.g. "Living room · Connecting…". -->
-    <string name="server_detail_separator">%1$s · %2$s</string>
-    <!-- A server address with a port other than the default, e.g. "tvheadend.home.arpa · port 9983". -->
-    <string name="server_host_port">%1$s · port %2$d</string>
+    <!-- Joins the parts of a supporting line, e.g. "Living room • Connecting…". -->
+    <string name="server_detail_separator">%1$s • %2$s</string>
+    <!-- A server address with a port other than the default, e.g. "tvheadend.home.arpa • port 9983". -->
+    <string name="server_host_port">%1$s • port %2$d</string>
     <string name="server_use">Use this connection</string>
     <string name="server_use_sign_in">Sign in as %1$s</string>
     <string name="server_use_anonymous">Connect without sign-in</string>
@@ -336,15 +336,15 @@
     <string name="server_account">Account</string>
     <string name="server_enter_password">Enter password</string>
     <string name="server_switch_question">Switch to this server?</string>
-    <string name="server_switch_live_body">Live TV stops, and the app loads that server\'s channels and guide.</string>
-    <string name="server_switch_recording_body">Playback stops, and the app loads that server\'s channels and guide.</string>
-    <string name="server_confirmation_account_detail">%1$s · %2$s:%3$d</string>
-    <string name="server_confirmation_anonymous_detail">No sign-in · %1$s:%2$d</string>
+    <string name="server_switch_live_body">Live TV stops, and the app loads that server\'s channels and guide</string>
+    <string name="server_switch_recording_body">Playback stops, and the app loads that server\'s channels and guide</string>
+    <string name="server_confirmation_account_detail">%1$s • %2$s:%3$d</string>
+    <string name="server_confirmation_anonymous_detail">No sign-in • %1$s:%2$d</string>
     <string name="server_keep_watching">Keep watching</string>
     <string name="server_switch">Switch</string>
     <string name="server_remove_question">Remove this connection?</string>
-    <string name="server_remove_body">Its recent channels, audio choices and saved pictures are deleted from this TV. Recordings stay on the server.</string>
-    <string name="server_remove_body_active">Playback stops, and no connection is in use until you choose one. Its recent channels, audio choices and saved pictures are deleted from this TV. Recordings stay on the server.</string>
+    <string name="server_remove_body">This connection’s recent channels, audio choices, and saved pictures are deleted from this TV. Recordings stay on the server.</string>
+    <string name="server_remove_body_active">Playback stops, and no connection is in use until you choose one. This connection’s recent channels, audio choices, and saved pictures are deleted from this TV. Recordings stay on the server.</string>
     <string name="server_add_name">Add a name</string>
     <string name="server_name_title">Name this connection</string>
     <string name="server_name_body">Settings shows the name instead of the address. Leave it empty to show %1$s.</string>
@@ -354,7 +354,7 @@
     <string name="server_password_title">Enter the password again</string>
     <string name="server_password_body">The saved password for %1$s can’t be read anymore. Enter it to use %2$s again.</string>
     <string name="server_none_in_use">No connection in use</string>
-    <string name="server_list_unavailable">The saved connections can’t be read on this TV right now.</string>
+    <string name="server_list_unavailable">The saved connections can’t be read on this TV right now</string>
     <string name="server_none_in_use_description">No connection in use. Choose one to watch TV again.</string>
     <string name="recording_ad_break_skipped">Ad break skipped</string>
     <string name="settings_channel_numbers">Channel numbers</string>
@@ -365,9 +365,9 @@
     <string name="warm_playback_on">Show picture</string>
     <string name="warm_playback_audio">Sound only</string>
     <string name="warm_playback_off">Stop</string>
-    <string name="warm_playback_on_help">Keep playing with the picture behind menus.</string>
-    <string name="warm_playback_audio_help">Keep playing with sound but no picture behind menus.</string>
-    <string name="warm_playback_off_help">Stop playback when you leave the player.</string>
+    <string name="warm_playback_on_help">Keep playing with the picture behind menus</string>
+    <string name="warm_playback_audio_help">Keep playing with sound but no picture behind menus</string>
+    <string name="warm_playback_off_help">Stop playback when you leave the player</string>
     <!-- Notes above strings are for translators. "Max N" is a rough character budget for the
          TV layout, not a hard limit; docs/translations/README.md has the full workflow. -->
     <string name="player_continue_watching">Continue watching</string>
@@ -414,7 +414,7 @@
     <!-- Program details start fact. %1$s = time like "20:15". Max 18. -->
     <string name="details_tomorrow">Tomorrow %1$s</string>
     <string name="context_record">Record</string>
-    <string name="details_record_choice">Record…</string>
+    <string name="details_record_choice">Record</string>
     <string name="context_show_guide">Show in Guide</string>
     <string name="context_resume">Resume</string>
     <string name="context_start_over">Watch from beginning</string>
@@ -441,17 +441,17 @@
     <string name="audio_format">Audio format</string>
     <string name="audio_format_dolby">Prefer Dolby Digital</string>
     <string name="audio_format_stereo">Prefer stereo</string>
-    <string name="audio_format_automatic_help">Let the player choose the audio format.</string>
-    <string name="audio_format_dolby_help">Prefer E-AC-3 and AC-3 within your chosen language.</string>
-    <string name="audio_format_stereo_help">Prefer AAC and MPEG audio, without limiting channels.</string>
+    <string name="audio_format_automatic_help">Let the player choose the audio format</string>
+    <string name="audio_format_dolby_help">Prefer E-AC-3 and AC-3 within your chosen language</string>
+    <string name="audio_format_stereo_help">Prefer AAC and MPEG audio, without limiting channels</string>
     <string name="audio_description">Audio description</string>
-    <string name="audio_description_description">Prefers narrated tracks when available.</string>
+    <string name="audio_description_description">Prefers narrated tracks when available</string>
     <string name="subtitle_follow_system">Follow system caption settings</string>
     <!-- Short Subtitles setting value inside the player’s “Default (%1$s)” row. -->
     <string name="subtitle_follow_system_short">System captions</string>
     <string name="player_status_rec">REC</string>
     <string name="setup_connection">Edit connection</string>
-    <string name="setup_connection_description">Server address, port and account</string>
+    <string name="setup_connection_description">Server address, port, and account</string>
     <string name="connection_overview_server">Server</string>
     <string name="connection_overview_connected">Connected</string>
     <string name="connection_overview_connecting">Connecting…</string>
@@ -471,7 +471,6 @@
     <string name="app_name" translatable="false">Tvheadend Player</string>
     <string name="launcher_label" translatable="false">@string/app_name</string>
 
-    <string name="channel_list">Channel List</string>
     <string name="all_channels">All channels</string>
     <string name="choose_channel_tag">Choose a channel tag</string>
     <string name="previous_channel_tag">Previous channel tag</string>
@@ -494,27 +493,25 @@
     <string name="options">Options</string>
     <string name="no_epg">No program information</string>
     <string name="epg_next">Next %1$s</string>
-    <string name="select_channel_hint">Select a channel on the left to see details.</string>
 
     <!-- Settings screen -->
     <string name="settings_general">General</string>
     <string name="settings_channel_tags_nav">Channel groups</string>
-    <string name="settings_channel_tags_last_enabled">Required — at least one group must stay on.</string>
+    <string name="settings_channel_tags_last_enabled">At least one group must stay on</string>
     <string name="player_info">Info</string>
     <string name="player_channel_number_none">No channel</string>
     <string name="player_shelf_playing">Playing</string>
     <string name="player_shelf_recording">Recording now</string>
     <string name="port_htsp">HTSP port</string>
-    <string name="port_http">Http Port</string>
     <string name="username">Username</string>
     <string name="password">Password</string>
     <string name="clear_saved_password">Clear saved password</string>
     <string name="connection_save_failed">Couldn’t save the connection. Try again.</string>
-    <string name="onboarding_find_server">Find servers on my network</string>
+    <string name="onboarding_find_server">Find servers on this network</string>
     <string name="onboarding_find_title">Find your server</string>
-    <string name="onboarding_find_body">Tvheadend servers that announce themselves on this network show up here.</string>
+    <string name="onboarding_find_body">Tvheadend servers that announce themselves on this network show up here</string>
     <string name="onboarding_enter_address_manually">Enter address manually</string>
-    <string name="onboarding_welcome_body">Watch live TV and recordings from your own Tvheadend server.</string>
+    <string name="onboarding_welcome_body">Watch live TV and recordings from your own Tvheadend server</string>
     <string name="onboarding_find_searching">Searching…</string>
     <string name="onboarding_find_on_network">On this network</string>
     <string name="onboarding_found_server_detail">%1$s • port %2$d</string>
@@ -524,7 +521,7 @@
     <string name="onboarding_step_sign_in">Account</string>
     <string name="onboarding_connect">Connect</string>
     <string name="onboarding_address_title">Where’s your server?</string>
-    <string name="onboarding_address_body">The name or IP address you use for Tvheadend’s web interface.</string>
+    <string name="onboarding_address_body">The name or IP address you use for Tvheadend’s web interface</string>
     <string name="onboarding_server_address">Server address</string>
     <string name="onboarding_server_address_support">Name or IP address, without http://</string>
     <string name="onboarding_server_address_missing">Enter the server address</string>
@@ -539,7 +536,7 @@
     <string name="onboarding_connecting_body">Checking the server and signing in as %1$s. Press Back to cancel.</string>
     <string name="onboarding_connecting_body_anonymous">Checking the server. Press Back to cancel.</string>
     <string name="onboarding_change_address">Change address</string>
-    <string name="onboarding_change_address_detail">%1$s · port %2$s</string>
+    <string name="onboarding_change_address_detail">%1$s • port %2$s</string>
     <string name="onboarding_change_sign_in">Change account</string>
     <string name="onboarding_change_sign_in_detail">User: %1$s</string>
     <string name="onboarding_change_sign_in_anonymous">Without an account</string>
@@ -551,7 +548,7 @@
     <string name="onboarding_edit_failure_body">%1$s Your current connection stays in use.</string>
     <string name="onboarding_done_title">Connected to %1$s</string>
     <string name="onboarding_done_body">Signed in as %1$s. Your channels and guide load next.</string>
-    <string name="onboarding_done_body_anonymous">Your channels and guide load next.</string>
+    <string name="onboarding_done_body_anonymous">Your channels and guide load next</string>
     <string name="onboarding_start_watching">Start watching</string>
     <string name="guided_step_progress">Step %1$d of %2$d: %3$s</string>
     <string name="guided_step_all_done">All steps done</string>
@@ -582,24 +579,22 @@
     <string name="clock_format_12_hour">12-hour (8:15\u00A0PM)</string>
     <string name="clock_format_24_hour">24-hour (20:15)</string>
     <string name="profile">Stream profile</string>
-    <string name="stream_profile_description">How Tvheadend prepares the stream for this TV.</string>
+    <string name="stream_profile_description">How Tvheadend prepares the stream for this TV</string>
     <string name="settings_section_streaming">Streaming</string>
     <string name="settings_section_picture">Picture</string>
     <string name="settings_section_experimental">Experimental</string>
     <string name="profile_server_default">Server default</string>
     <string name="profile_direct_streaming">Direct streaming</string>
-    <string name="stream_profiles_unavailable">Stream profiles aren’t available.</string>
-    <string name="audio_language">Audio Language</string>
+    <string name="stream_profiles_unavailable">Stream profiles aren’t available</string>
     <string name="subtitle_language">Subtitle language</string>
 
     <string name="settings_appliance">Appliance</string>
     <string name="appliance_setup">Appliance setup</string>
     <string name="auto_start_playback">Start playback when the app opens</string>
-    <string name="auto_start_playback_description">Plays the last channel after a fresh app launch. This does not enable the accessibility service.</string>
+    <string name="auto_start_playback_description">Plays the last channel after a fresh app launch. This doesn’t enable the accessibility service.</string>
     <string name="appliance_service_enabled">Appliance entry service: enabled</string>
     <string name="appliance_service_disabled">Appliance entry service: disabled</string>
     <string name="appliance_starting_tv">Starting playback</string>
-    <string name="appliance_back_for_menu">Press Back for channels and settings.</string>
 
     <!-- Startup status screen -->
     <string name="main_startup_message_preparing">Preparing app</string>
@@ -617,7 +612,6 @@
     <string name="loading">Loading…</string>
     <string name="select_profile">Select profile</string>
 
-    <string name="error_prefix">Error:</string>
 
     <string name="back">Back</string>
 
@@ -627,12 +621,12 @@
     <!-- Audio -->
     <string name="audio_track">Audio track</string>
     <string name="audio_track_unselected">Choose audio track</string>
-    <string name="no_audio_tracks">No audio tracks available.</string>
+    <string name="no_audio_tracks">No audio tracks available</string>
 
     <!-- Subtitles -->
     <string name="subtitles">Subtitles</string>
     <string name="subtitles_off">Off</string>
-    <string name="no_subtitles">No subtitles available.</string>
+    <string name="no_subtitles">No subtitles available</string>
     <string name="no_subtitles_channel">No subtitles on this channel</string>
     <string name="no_subtitles_recording">No subtitles in this recording</string>
 
@@ -669,16 +663,16 @@
     <string name="epg_clear_filter">Clear filter</string>
     <string name="epg_search_unknown_channel">Unknown channel</string>
     <string name="programme_category_all">All genres</string>
-    <string name="programme_category_film_drama">Film &amp; Drama</string>
+    <string name="programme_category_film_drama">Film &amp; drama</string>
     <string name="programme_category_news">News</string>
     <string name="programme_category_entertainment">Entertainment</string>
     <string name="programme_category_sport">Sport</string>
     <string name="programme_category_children">Children</string>
     <string name="programme_category_music">Music</string>
-    <string name="programme_category_arts_culture">Arts &amp; Culture</string>
-    <string name="programme_category_society_politics">Society &amp; Politics</string>
-    <string name="programme_category_education_factual">Education &amp; Factual</string>
-    <string name="programme_category_lifestyle_leisure">Lifestyle &amp; Leisure</string>
+    <string name="programme_category_arts_culture">Arts &amp; culture</string>
+    <string name="programme_category_society_politics">Society &amp; politics</string>
+    <string name="programme_category_education_factual">Education &amp; factual</string>
+    <string name="programme_category_lifestyle_leisure">Lifestyle &amp; leisure</string>
     <string name="epg_schedule">Schedule</string>
     <string name="epg_loading">Loading guide…</string>
     <string name="epg_jump">Jump to time</string>
@@ -714,7 +708,6 @@
     <!-- TalkBack description of a dimmed Guide cell whose genre does not match the filter. %1$s = genre such as "News". -->
     <string name="epg_cell_not_genre">Not %1$s</string>
     <string name="epg_details_action_hint">Program actions are shown in this panel. Playback never starts directly from the guide.</string>
-    <string name="epg_no_actions">There are no available actions for this program.</string>
     <string name="epg_already_aired">This program has already aired. Details remain available for reference.</string>
     <string name="watch">Watch</string>
     <string name="watch_from_start">Watch from start</string>
@@ -727,9 +720,9 @@
     <!-- Sentence under the stopped recording's panel when it has a listed end still ahead. %1$s = duration recorded so far, %2$s = duration left until the listed end; narrow units with zero units omitted ("1h 5m", "45m", "30s"), joined with no-break spaces. -->
     <string name="stop_recording_confirm_body">The %1$s recorded so far is kept. The last %2$s won\'t be recorded.</string>
     <!-- Sentence under the stopped recording's panel when it is past its listed end or has none. %1$s = duration recorded so far: narrow units with zero units omitted ("2h 5m", "45m", "30s"), joined with no-break spaces. -->
-    <string name="stop_recording_confirm_body_open">The %1$s recorded so far is kept, and recording ends now.</string>
+    <string name="stop_recording_confirm_body_open">The %1$s recorded so far is kept, and recording ends now</string>
     <!-- Sentence under the panel of a scheduled recording about to be canceled. -->
-    <string name="cancel_recording_confirm_body">It\'s taken off the schedule and won\'t be recorded.</string>
+    <string name="cancel_recording_confirm_body">This recording is taken off the schedule and won’t be recorded</string>
     <string name="recording_status">Recording: %1$s</string>
     <string name="recording_state_scheduled">Scheduled</string>
     <string name="recording_state_recording">Recording now</string>
@@ -770,8 +763,8 @@
     <string name="automatic_recording_action_failed_change">Couldn’t change automatic recording</string>
     <string name="automatic_recording_action_not_confirmed">Automatic recording change not confirmed</string>
     <string name="automatic_recording_action_check_first">Check it before trying again.</string>
-    <string name="automatic_recording_episodes_not_applied_create">Automatic recording created, but some left-out episodes may still record.</string>
-    <string name="automatic_recording_episodes_not_applied_change">Automatic recording changed, but some episode choices could not be applied.</string>
+    <string name="automatic_recording_episodes_not_applied_create">Automatic recording created, but some left-out episodes may still record</string>
+    <string name="automatic_recording_episodes_not_applied_change">Automatic recording changed, but some episode choices couldn’t be applied</string>
     <string name="recording_action_not_confirmed">Recording change not confirmed</string>
     <plurals name="recording_folder_action_failed_change">
         <item quantity="one">Couldn’t change %1$d of %2$d recording</item>
@@ -840,7 +833,6 @@
     <string name="recording_action_not_supported">This Tvheadend server can’t do this.</string>
     <string name="recording_action_check_first">Check the recording before trying again.</string>
     <string name="recording_action_connection">Not connected to the server.</string>
-    <string name="recording_already_scheduled">This program is recording or scheduled.</string>
     <string name="recordings_title">Recordings</string>
     <!-- Recordings tab listing the recorded library. Verb used as a noun. Max 14. -->
     <string name="recordings_browse">Browse</string>
@@ -876,21 +868,21 @@
     <string name="recordings_show_partially_watched_detail">Started but not finished</string>
     <string name="recordings_show_watched_detail">Played to the end</string>
     <!-- Empty states when the Show filter hides everything, then the count of hidden recordings. -->
-    <string name="recordings_empty_not_watched_root">Everything here has been played.</string>
-    <string name="recordings_empty_started">Nothing started yet.</string>
-    <string name="recordings_empty_watched">Nothing has been watched to the end yet.</string>
+    <string name="recordings_empty_not_watched_root">Everything here has been played</string>
+    <string name="recordings_empty_started">Nothing started yet</string>
+    <string name="recordings_empty_watched">Nothing has been watched to the end yet</string>
     <plurals name="recordings_hidden_count">
-        <item quantity="one">%1$d recording is hidden.</item>
-        <item quantity="other">%1$d recordings are hidden.</item>
+        <item quantity="one">%1$d recording is hidden</item>
+        <item quantity="other">%1$d recordings are hidden</item>
     </plurals>
     <string name="recordings_group_no_channel">No channel</string>
     <string name="recordings_group_no_genre">No genre</string>
     <string name="recordings_date_today">Today</string>
     <string name="recordings_date_yesterday">Yesterday</string>
     <string name="recordings_date_unknown">Unknown date</string>
-    <string name="recordings_archive_empty">No playable recordings in this folder.</string>
-    <string name="recordings_schedule_empty">Nothing is recording or scheduled.</string>
-    <string name="recordings_problems_empty">No recording problems.</string>
+    <string name="recordings_archive_empty">No playable recordings in this folder</string>
+    <string name="recordings_schedule_empty">Nothing is recording or scheduled</string>
+    <string name="recordings_problems_empty">No recording problems</string>
     <plurals name="recordings_folder_recording_count">
         <item quantity="one">%1$d recording</item>
         <item quantity="other">%1$d recordings</item>
@@ -915,21 +907,21 @@
     <string name="recordings_upcoming_active">Upcoming and active</string>
     <string name="recordings_completed">Completed</string>
     <string name="recordings_failed_cancelled">Failed and canceled</string>
-    <string name="recordings_empty">No recordings are available.</string>
+    <string name="recordings_empty">No recordings are available</string>
     <string name="recordings_loading">Loading recordings…</string>
     <string name="recordings_reconnecting">Reconnecting. Saved recording information may be out of date…</string>
     <string name="delete_recording">Delete recording</string>
     <string name="delete_recording_confirm_title">Delete this recording?</string>
     <!-- Sentence under the panel of the recording about to be deleted. -->
-    <string name="delete_recording_confirm_body">The recording is deleted from the server.</string>
+    <string name="delete_recording_confirm_body">The recording is deleted from the server</string>
     <!-- Delete for a missed, invalid or failed entry that has no file: only its row in the server's list goes. -->
     <string name="remove_entry">Remove entry</string>
     <string name="remove_entry_confirm_title">Remove this entry?</string>
     <!-- Sentence under the panel of an entry without a file about to be removed. -->
-    <string name="remove_entry_confirm_body">It\'s removed from the server\'s list.</string>
+    <string name="remove_entry_confirm_body">This entry is removed from the server’s list</string>
     <string name="delete_folder_all_confirm_question">Delete all the recordings in this folder?</string>
     <string name="delete_folder_watched_confirm_question">Delete all watched recordings in this folder?</string>
-    <string name="delete_folder_confirm_body">They\'re deleted from the server.</string>
+    <string name="delete_folder_confirm_body">These recordings are deleted from the server.</string>
     <string name="delete_folder_running_kept">Recordings still running are kept.</string>
     <string name="recording_loading">Loading recording…</string>
     <string name="recording_resume_from">Resume from %1$s</string>
@@ -967,7 +959,7 @@
     <string name="recording_mark_program_starts">Program starts</string>
     <string name="recording_mark_program_ends">Program ends</string>
     <string name="ad_breaks_ask">Ask</string>
-    <string name="ad_breaks_ask_help">Shows a Skip button over the video when a break starts.</string>
+    <string name="ad_breaks_ask_help">Shows a Skip button over the video when a break starts</string>
     <string name="ad_breaks_automatic">Skip automatically</string>
     <string name="ad_breaks_automatic_help">Jumps over each break once. Seeking back into it plays it.</string>
     <string name="ad_breaks_off">Off</string>
@@ -977,9 +969,9 @@
     <!-- A player option that follows the setting; %1$s is the setting's current value, such as Ask. -->
     <string name="playback_option_default">Default (%1$s)</string>
     <string name="skip_cuts_setting">Skip cuts</string>
-    <string name="skip_cuts_setting_description">Skips parts marked as cuts. The recording itself is not shortened.</string>
+    <string name="skip_cuts_setting_description">Skips parts marked as cuts. The recording itself isn’t shortened.</string>
     <string name="skip_landing_setting">Skip lands</string>
-    <string name="skip_landing_description">Where playback continues after a skipped cut or ad break.</string>
+    <string name="skip_landing_description">Where playback continues after a skipped cut or ad break</string>
     <string name="skip_landing_end">At the end</string>
     <string name="skip_landing_two_seconds">2 s before the end</string>
     <string name="skip_landing_five_seconds">5 s before the end</string>
@@ -1009,11 +1001,10 @@
     <!-- Audio track feature: an audio mix that makes speech easier to understand. Max 22. -->
     <string name="track_clear_dialogue">Clear dialogue</string>
     <string name="timeshift_behind_live">%1$s behind live</string>
-    <string name="timeshift_seek_clamped">Reached the available buffer limit.</string>
-    <string name="timeshift_reconnect_live">The server could not confirm the previous position. Returned to live television.</string>
-    <string name="timeshift_unavailable">Timeshift is unavailable for this server or stream profile.</string>
-    <string name="pause_unavailable_channel">Pause isn\'t available on this channel.</string>
-    <string name="pause_timeshift_off">Timeshift is off in Settings.</string>
+    <string name="timeshift_reconnect_live">The server couldn’t confirm the previous position. Returned to live TV.</string>
+    <string name="timeshift_unavailable">Timeshift is unavailable for this server or stream profile</string>
+    <string name="pause_unavailable_channel">Pause isn\'t available on this channel</string>
+    <string name="pause_timeshift_off">Timeshift is off in Settings</string>
     <string name="player_timing_unavailable">Playback timing unavailable</string>
     <string name="timeshift_target_expired">That position is no longer in the buffer.</string>
     <string name="timeshift_seek_uncertain">Seek result uncertain. Playback position will update when available.</string>
@@ -1027,19 +1018,18 @@
     <string name="display_refresh_rate_setting">Display refresh rate</string>
     <string name="display_refresh_rate_description">The refresh rate for the app’s screens. Match content frame rate can still switch for a video.</string>
     <string name="display_refresh_rate_system">System default</string>
-    <string name="display_refresh_rate_system_help">Leaves the refresh rate to the TV.</string>
+    <string name="display_refresh_rate_system_help">Leaves the refresh rate to the TV</string>
     <string name="display_refresh_rate_value">%1$s Hz</string>
     <string name="refresh_rate_matching_setting">Match content frame rate</string>
     <string name="frame_rate_switching_always">Always</string>
     <string name="frame_rate_switching_seamless_only">Only if seamless</string>
     <string name="frame_rate_switching_off">Off</string>
-    <string name="frame_rate_switching_always_help">Switches the TV to the video’s frame rate, even if the screen goes dark for a moment.</string>
-    <string name="frame_rate_switching_seamless_help">Switches only when the TV can do it without going dark.</string>
-    <string name="frame_rate_switching_off_help">Keeps the TV’s current display mode.</string>
+    <string name="frame_rate_switching_always_help">Switches the TV to the video’s frame rate, even if the screen goes dark for a moment</string>
+    <string name="frame_rate_switching_seamless_help">Switches only when the TV can do it without going dark</string>
+    <string name="frame_rate_switching_off_help">Keeps the TV’s current display mode</string>
     <string name="audio_passthrough_setting">Audio passthrough</string>
     <string name="audio_passthrough_description">Sends surround sound unchanged to a soundbar or receiver. May briefly interrupt audio.</string>
-    <string name="audio_passthrough_failed">Couldn’t apply this mode.</string>
-    <string name="refresh_rate_matching_setting_description">Let Android match the display refresh rate to the video when supported.</string>
+    <string name="audio_passthrough_failed">Couldn’t apply this mode</string>
     <string name="tunneling_setting">Tunneled playback</string>
     <string name="tunneling_setting_description">Sends video straight to the TV when the decoder supports it. May briefly interrupt the picture.</string>
     <!-- Supporting text while tunneled playback is disabled for this app run after audio output failed. -->
@@ -1053,16 +1043,16 @@
     <string name="connection_loading_channels">Loading channels\u2026</string>
     <string name="retry">Retry</string>
     <string name="settings_channel_groups_loading">Loading channel groups…</string>
-    <string name="settings_channel_groups_description">Choose which groups appear in Channels and the Guide.</string>
-    <string name="channel_settings_load_failed">Couldn’t load channel preferences.</string>
-    <string name="channel_settings_save_failed">Your channel settings are active but couldn’t be saved.</string>
+    <string name="settings_channel_groups_description">Choose which groups appear in Channels and the Guide</string>
+    <string name="channel_settings_load_failed">Couldn’t load channel preferences</string>
+    <string name="channel_settings_save_failed">Your channel settings are active but couldn’t be saved</string>
     <string name="keep_channel_setting">Keep paused TV tuned</string>
     <string name="keep_channel_off">Off</string>
     <string name="keep_channel_description">Handy for a quick look at another app: when you come back, live TV continues where you paused. Meanwhile it keeps a tuner busy. Ends early once the timeshift buffer is full.</string>
-    <string name="keep_channel_needs_timeshift">Available when “%1$s” is on.</string>
+    <string name="keep_channel_needs_timeshift">Available when “%1$s” is on</string>
     <string name="startup_buffer_setting">Start-up buffer</string>
     <string name="startup_buffer_automatic">Automatic • %1$s</string>
-    <string name="startup_buffer_description">Shorter starts faster; longer protects against dropouts.</string>
+    <string name="startup_buffer_description">Shorter starts faster; longer protects against dropouts</string>
     <string name="background_live_stopped">Live TV was stopped while the app was in the background</string>
     <string name="background_tuner_lost">The tuner was needed elsewhere; live TV was restarted</string>
     <string name="background_live_interrupted">Live TV was interrupted in the background and was restarted</string>
@@ -1090,9 +1080,9 @@
     <string name="player_recorded_spoken">%1$s, recorded %2$s, %3$s</string>
     <string name="player_channel">Channel</string>
     <string name="player_row_recent">Recent channels</string>
-    <string name="player_channel_card_hint">Left or right changes channel, OK shows recent channels.</string>
-    <string name="player_identity_info_hint">OK shows the program info.</string>
-    <string name="player_channel_card_hint_no_recents">Left or right changes channel.</string>
+    <string name="player_channel_card_hint">Left or right changes channel, OK shows recent channels</string>
+    <string name="player_identity_info_hint">OK shows the program info</string>
+    <string name="player_channel_card_hint_no_recents">Left or right changes channel</string>
     <string name="player_rail_watching">Watching</string>
     <!-- Trial: program details -->
     <string name="details_read_more">More info</string>
@@ -1109,7 +1099,7 @@
     <!-- Value for the retention label above. Max 36. -->
     <string name="details_kept_until_space_needed">Kept until space is needed</string>
     <!-- Finished recording action opening its expiry choices; keep short for a menu row. -->
-    <string name="context_keep_until">Keep until…</string>
+    <string name="context_keep_until">Keep until</string>
     <!-- Heading over finished recording expiry choices or an automatic recording/timer retention setting. -->
     <string name="recording_keep_until_heading">Keep until</string>
     <!-- Stored expiry that differs from the offered choices; date appears below. -->
@@ -1227,11 +1217,11 @@
     <string name="error_hint_other_recording">Choose another recording.</string>
     <!-- Error title. Max 40. -->
     <string name="error_101_title">Can’t reach the server</string>
-    <!-- Error reason under the title above; "It" is the server. -->
-    <string name="error_101_reason">It didn’t respond to the connection.</string>
+    <!-- Error reason under the title above. -->
+    <string name="error_101_reason">The server didn’t respond to the connection.</string>
     <!-- Error title: the connection to the server timed out. Max 40. -->
     <string name="error_102_title">The server isn’t answering</string>
-    <string name="error_102_reason">It took too long to respond.</string>
+    <string name="error_102_reason">The server took too long to respond.</string>
     <string name="error_103_title">Sign-in failed</string>
     <string name="error_103_reason">The server didn’t accept the username or password.</string>
     <string name="error_104_title">No access to channels</string>
@@ -1284,16 +1274,16 @@
     <string name="error_301_title">Recording interrupted</string>
     <string name="error_301_reason">The server stopped sending this recording.</string>
     <string name="error_302_title">Recording hasn’t started</string>
-    <!-- Reason under "Recording hasn’t started". "It" is the recording; match the grammatical gender of your word for "recording". %1$s = time like "20:15". -->
-    <string name="error_302_reason">It starts at %1$s.</string>
-    <string name="error_302_reason_untimed">It hasn’t started yet.</string>
+    <!-- Reason under "Recording hasn’t started". %1$s = time like "20:15". -->
+    <string name="error_302_reason">This recording starts at %1$s</string>
+    <string name="error_302_reason_untimed">This recording hasn’t started yet</string>
     <string name="error_303_title">Recording file missing</string>
     <string name="error_303_reason">The server has no playable file for this recording.</string>
     <string name="error_304_title">Recording no longer available</string>
-    <!-- Reason under "Recording no longer available". "It" is the recording. -->
-    <string name="error_304_reason">It was changed or deleted on the server.</string>
+    <!-- Reason under "Recording no longer available". -->
+    <string name="error_304_reason">This recording was changed or deleted on the server.</string>
     <string name="error_305_title">Can’t play yet</string>
-    <string name="error_305_reason">This recording can be played once it’s finished.</string>
+    <string name="error_305_reason">This recording can be played once it’s finished</string>
     <string name="error_306_title">Can’t play this recording</string>
     <string name="error_307_title">Can’t play this recording</string>
     <string name="error_306_reason">This device couldn’t play the recording.</string>
@@ -1301,7 +1291,7 @@
     <string name="channel_schedule">Schedule</string>
     <string name="channel_schedule_pane">Schedule, %1$s</string>
     <string name="channel_schedule_loading">Loading schedule</string>
-    <string name="channel_schedule_empty">Tvheadend has no schedule for this channel.</string>
+    <string name="channel_schedule_empty">Tvheadend has no schedule for this channel</string>
     <string name="channel_schedule_offline">Showing the last known schedule. Reconnecting…</string>
     <string name="channel_schedule_today">Today</string>
     <string name="channel_schedule_tomorrow">Tomorrow</string>
@@ -1312,14 +1302,12 @@
     <!-- Home: section headings, card labels and accessible names. -->
     <string name="home_now_playing">Right now</string>
     <string name="home_upcoming_recordings">Upcoming recordings</string>
-    <string name="home_no_history">Recently watched channels will appear here.</string>
     <string name="home_start_watching">Start watching</string>
-    <string name="home_start_watching_hint">Channels you watch and recordings will appear here.</string>
+    <string name="home_start_watching_hint">Channels you watch and recordings will appear here</string>
     <string name="home_browse_channels">Browse channels</string>
     <string name="home_loading_channels">Loading channels…</string>
     <string name="home_still_connecting">Still connecting…</string>
     <string name="home_sections">Sections</string>
-    <string name="home_no_recordings">No recordings yet.</string>
     <string name="home_sections_hidden">Sections are hidden. Use View options to show them.</string>
     <string name="home_recent_channels">Recent channels</string>
     <string name="home_on_now">On now</string>
@@ -1342,8 +1330,8 @@
     </plurals>
     <string name="appliance_companion">Appliance companion</string>
     <string name="appliance_companion_not_installed">Not installed</string>
-    <string name="appliance_companion_description">An optional companion app makes Tvheadend Player behave like the TV\'s own tuner app. It opens the player when the TV turns on, can take over remote buttons such as TV and Guide, and can replace the home screen. It is a separate app from the project\'s GitHub releases and updates itself from there.</string>
-    <string name="appliance_companion_install_info">To set it up, scan the code or open github.com/bernhardberger/tvheadend-player on a phone or computer, then follow the steps under Appliance companion.</string>
+    <string name="appliance_companion_description">An optional companion app makes Tvheadend Player behave like the TV\'s own tuner app. It opens the player when the TV turns on, can take over remote buttons such as TV and Guide, and can replace the home screen. It’s a separate app from the project\'s GitHub releases and updates itself from there.</string>
+    <string name="appliance_companion_install_info">To set it up, scan the code or open github.com/bernhardberger/tvheadend-player on a phone or computer, then follow the steps under Appliance companion</string>
     <string name="appliance_companion_address" translatable="false">github.com/bernhardberger/tvheadend-player</string>
     <string name="appliance_companion_qr_description">QR code for the appliance companion setup steps</string>
     <string name="whats_new">What\'s new</string>

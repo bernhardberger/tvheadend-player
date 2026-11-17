@@ -146,7 +146,7 @@ internal fun ArchiveDepthContent(
     }
     // Sort and Show away from their defaults, quietly under the active headline.
     val valuesLine = rememberUpdatedState(
-        DvrArchiveView(grouping, sort, show).nonDefaultValues().joinToString(" · ").ifEmpty { null },
+        DvrArchiveView(grouping, sort, show).nonDefaultValues().joinToString(" • ").ifEmpty { null },
     )
     val levels = rememberArchiveLevels(
         root, fullRoot, grouping, show, recordingNow, sections, contentPadding, valuesLine,

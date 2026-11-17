@@ -3,21 +3,21 @@
     <string name="automatic_recording_new_title_help">Programmes with exactly this title</string>
     <string name="context_skip_program">Skip this programme</string>
     <string name="context_unskip_program">Record this programme</string>
-    <string name="autorec_editor_title_description">Records every programme whose title exactly matches “%1$s”.</string>
-    <string name="autorec_editor_title_full_description">Uses “%1$s” to find programmes by title, subtitle and description.</string>
-    <string name="autorec_editor_keyword_description">Records every programme whose title contains “%1$s”.</string>
-    <string name="autorec_editor_keyword_full_description">Records every programme whose title, subtitle or description contains “%1$s”.</string>
+    <string name="autorec_editor_title_description">Records every programme whose title exactly matches “%1$s”</string>
+    <string name="autorec_editor_title_full_description">Uses “%1$s” to find programmes by title, subtitle, and description</string>
+    <string name="autorec_editor_keyword_description">Records every programme whose title contains “%1$s”</string>
+    <string name="autorec_editor_keyword_full_description">Records every programme whose title, subtitle, or description contains “%1$s”</string>
     <plurals name="autorec_editor_words_titles_summary">
-        <item quantity="one">“%1$s” in titles · %2$d programme</item>
-        <item quantity="other">“%1$s” in titles · %2$d programmes</item>
+        <item quantity="one">“%1$s” in titles • %2$d programme</item>
+        <item quantity="other">“%1$s” in titles • %2$d programmes</item>
     </plurals>
     <plurals name="autorec_editor_words_full_summary">
-        <item quantity="one">“%1$s” in all text · %2$d programme</item>
-        <item quantity="other">“%1$s” in all text · %2$d programmes</item>
+        <item quantity="one">“%1$s” in all text • %2$d programme</item>
+        <item quantity="other">“%1$s” in all text • %2$d programmes</item>
     </plurals>
     <plurals name="autorec_editor_delete_programs">
-        <item quantity="one">Its %1$d scheduled programme will be removed.</item>
-        <item quantity="other">Its %1$d scheduled programmes will be removed.</item>
+        <item quantity="one">%1$d scheduled programme will be removed.</item>
+        <item quantity="other">%1$d scheduled programmes will be removed.</item>
     </plurals>
     <plurals name="autorec_editor_upcoming_programs">
         <item quantity="one">Records %1$d upcoming programme</item>
@@ -31,14 +31,14 @@
         <item quantity="one">In the guide: %1$d programme, %2$d to be recorded</item>
         <item quantity="other">In the guide: %1$d programmes, %2$d to be recorded</item>
     </plurals>
-    <string name="autorec_editor_duplicate_subtitle_help">Leaves out programmes with a subtitle already recorded.</string>
-    <string name="autorec_editor_duplicate_description_help">Leaves out programmes with a description already recorded.</string>
-    <string name="autorec_editor_duplicate_day_help">Records at most one matching programme each day.</string>
-    <string name="autorec_editor_duplicate_week_help">Records at most one matching programme each week.</string>
+    <string name="autorec_editor_duplicate_subtitle_help">Leaves out programmes with a subtitle already recorded</string>
+    <string name="autorec_editor_duplicate_description_help">Leaves out programmes with a description already recorded</string>
+    <string name="autorec_editor_duplicate_day_help">Records at most one matching programme each day</string>
+    <string name="autorec_editor_duplicate_week_help">Records at most one matching programme each week</string>
     <string name="autorec_editor_empty_words">Enter words and the programmes they find appear here</string>
-    <string name="autorec_editor_broadcast_unavailable">May include programmes this automatic recording leaves out.</string>
+    <string name="autorec_editor_broadcast_unavailable">May include programmes this automatic recording leaves out</string>
     <string name="record_unavailable">Can’t record this programme</string>
-    <string name="record_unavailable_no_programme">There’s no programme information for this channel.</string>
+    <string name="record_unavailable_no_programme">There’s no programme information for this channel</string>
     <string name="settings_channel_numbers">Channel numbers</string>
     <string name="settings_channel_numbers_help">Turn off if your remote has no number keys</string>
     <string name="details_program">Programme details</string>
@@ -51,7 +51,6 @@
     <string name="player_programme_progress_description">Programme progress, %1$s of %2$s</string>
     <string name="epg_empty_day">No programmes in this time window</string>
     <string name="epg_details_action_hint">Programme actions are shown in this panel. Playback never starts directly from the guide.</string>
-    <string name="epg_no_actions">There are no available actions for this programme.</string>
     <string name="epg_already_aired">This programme has already aired. Details remain available for reference.</string>
     <string name="recording_state_cancelled">Cancelled</string>
     <string name="recording_notice_aborted">Recording cancelled</string>
@@ -60,16 +59,15 @@
         <item quantity="one">%d recording cancelled</item>
         <item quantity="other">%d recordings cancelled</item>
     </plurals>
-    <string name="recording_already_scheduled">This programme is recording or scheduled.</string>
     <string name="recordings_failed_cancelled">Failed and cancelled</string>
     <string name="tunneling_setting">Tunnelled playback</string>
-    <string name="player_identity_info_hint">OK shows the programme info.</string>
+    <string name="player_identity_info_hint">OK shows the programme info</string>
     <string name="channel_schedule_gap">No programme information until %1$s</string>
     <string name="channel_schedule_end">No programme information after %1$s</string>
     <string name="appliance_companion">Appliance companion</string>
     <string name="appliance_companion_not_installed">Not installed</string>
     <string name="appliance_companion_description">An optional companion app makes Tvheadend Player behave like the TV\'s own tuner app. It opens the player when the TV turns on, can take over remote buttons such as TV and Guide, and can replace the home screen. It is a separate app from the project\'s GitHub releases and updates itself from there.</string>
-    <string name="appliance_companion_install_info">To set it up, scan the code or open github.com/bernhardberger/tvheadend-player on a phone or computer, then follow the steps under Appliance companion.</string>
+    <string name="appliance_companion_install_info">To set it up, scan the code or open github.com/bernhardberger/tvheadend-player on a phone or computer, then follow the steps under Appliance companion</string>
     <string name="appliance_companion_qr_description">QR code for the appliance companion setup steps</string>
     <string name="recording_mark_program_starts">Programme starts</string>
     <string name="recording_mark_program_ends">Programme ends</string>

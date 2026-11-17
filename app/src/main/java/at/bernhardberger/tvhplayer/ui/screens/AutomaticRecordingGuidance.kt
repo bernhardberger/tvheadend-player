@@ -107,7 +107,7 @@ private fun AutomaticRecordingFocusedEpisode(
         programmeArtwork(event), channel?.icon, null, Modifier.fillMaxWidth().aspectRatio(16f / 9),
     )
     RecordingEditorSecondary(
-        listOfNotNull(automaticRecordingEpisodeMeta(row, state), channel?.name).joinToString(" · "),
+        listOfNotNull(automaticRecordingEpisodeMeta(row, state), channel?.name).joinToString(" • "),
     )
     event?.description?.takeIf(String::isNotBlank)?.let { RecordingEditorSecondary(it) }
 }
@@ -199,7 +199,7 @@ internal fun automaticRecordingEpisodeMeta(row: AutorecPreviewRow, state: Automa
     val locale = LocalConfiguration.current.locales[0]
     val date = formatRecordingDate(row.start.epochSeconds, dateOnly = true, locale = locale,
         nowSec = state.now().epochSeconds)
-    val time = "$date · ${formatClock(java.time.Instant.ofEpochSecond(row.start.epochSeconds)
+    val time = "$date • ${formatClock(java.time.Instant.ofEpochSecond(row.start.epochSeconds)
         .atZone(java.time.ZoneId.systemDefault()), locale)}"
     val status = when (row.state) {
         AutorecEpisodeState.MATCH -> if (state.episodeEnabled(row)) null else R.string.autorec_editor_left_out
@@ -211,5 +211,5 @@ internal fun automaticRecordingEpisodeMeta(row: AutorecPreviewRow, state: Automa
         AutorecEpisodeState.LEFT_OUT -> if (state.episodeEnabled(row)) null else R.string.autorec_editor_left_out
         AutorecEpisodeState.REMOVED -> R.string.autorec_editor_removed
     }
-    return if (status == null) time else "$time · ${stringResource(status)}"
+    return if (status == null) time else "$time • ${stringResource(status)}"
 }

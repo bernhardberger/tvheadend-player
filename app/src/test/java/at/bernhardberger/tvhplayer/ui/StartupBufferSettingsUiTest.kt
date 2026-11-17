@@ -54,8 +54,8 @@ class StartupBufferSettingsUiTest {
         val automatic = if (german) "Automatisch • 0,5 Sek." else "Automatic • 0.5s"
         val half = if (german) "0,5 Sek." else "0.5s"
         val oneAndHalf = if (german) "1,5 Sek." else "1.5s"
-        val description = if (german) "Kürzer startet schneller, länger schützt vor Aussetzern."
-            else "Shorter starts faster; longer protects against dropouts."
+        val description = if (german) "Kürzer startet schneller, länger schützt vor Aussetzern"
+            else "Shorter starts faster; longer protects against dropouts"
         var ui by mutableStateOf(SettingsPlayerUiState())
         var selections = 0
         compose.setContent {

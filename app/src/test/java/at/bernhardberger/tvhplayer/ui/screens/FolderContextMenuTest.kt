@@ -56,7 +56,7 @@ class FolderContextMenuTest {
         compose.onNodeWithText("Delete all").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.onNodeWithText("Delete all the recordings in this folder?").assertExists()
         compose.onNodeWithContentDescription("3 recordings", substring = true).assertIsDisplayed()
-        compose.onNodeWithText("They're deleted from the server. Recordings still running are kept.")
+        compose.onNodeWithText("These recordings are deleted from the server. Recordings still running are kept.")
             .assertExists()
         compose.onNodeWithTag("folder-delete-back").assertIsFocused().performKeyInput { pressKey(Key.DirectionRight) }
         compose.onNodeWithTag("folder-delete-confirm").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }

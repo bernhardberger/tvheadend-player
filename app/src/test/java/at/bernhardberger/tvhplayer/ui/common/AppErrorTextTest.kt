@@ -52,7 +52,7 @@ class AppErrorTextTest {
 
     @Test fun aDeferredRecordingSaysWhenItCanPlay() {
         assertEquals("Can’t play yet", text.title(AppErrorCondition.RECORDING_DEFERRED))
-        assertEquals("This recording can be played once it’s finished.", text.reason(AppErrorCondition.RECORDING_DEFERRED))
+        assertEquals("This recording can be played once it’s finished", text.reason(AppErrorCondition.RECORDING_DEFERRED))
         assertEquals("Try again in a moment.", text.hint(AppErrorCondition.RECORDING_INTERRUPTED))
     }
 
@@ -69,7 +69,7 @@ class AppErrorTextTest {
         // A due or overdue attempt has no countdown left to show.
         assertEquals("Reconnecting…", text.reason(AppErrorCondition.RECONNECTING, reconnectInSeconds = 0))
         assertEquals("Reconnecting…", text.reason(AppErrorCondition.RECONNECTING, reconnectInSeconds = -3))
-        assertEquals("It starts at 8:15 PM.", text.reason(AppErrorCondition.RECORDING_NOT_STARTED, startsAt = "8:15 PM"))
+        assertEquals("This recording starts at 8:15 PM", text.reason(AppErrorCondition.RECORDING_NOT_STARTED, startsAt = "8:15 PM"))
         assertTrue(text.reason(AppErrorCondition.RECORDING_NOT_STARTED).isNotBlank())
     }
 }

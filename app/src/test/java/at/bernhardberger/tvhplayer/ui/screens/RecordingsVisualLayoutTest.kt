@@ -707,7 +707,7 @@ class RecordingsVisualLayoutTest {
         // The button speaks the values that differ from the defaults; the headline names the grouping.
         compose.onNodeWithTag(OPTIONS).assertContentDescriptionEquals("View options, Name A–Z, Unwatched")
         assertEquals("Channels", activeHeading().text)
-        requireNotNull(valuesLine()).assertTextEquals("Name A–Z · Unwatched")
+        requireNotNull(valuesLine()).assertTextEquals("Name A–Z • Unwatched")
         assertNoCommands()
     }
 
@@ -900,14 +900,14 @@ class RecordingsVisualLayoutTest {
         show(entries = listOf(recording(2, "Alpha", "a.ts", playCount = 1), recording(3, "Bravo", "b.ts", playCount = 2)))
         compose.mainClock.advanceTimeUntil { tagFocused(OPTIONS) }
         compose.waitForIdle()
-        compose.onNodeWithText("Everything here has been played.").assertIsDisplayed()
-        compose.onNodeWithText("2 recordings are hidden.").assertIsDisplayed()
+        compose.onNodeWithText("Everything here has been played").assertIsDisplayed()
+        compose.onNodeWithText("2 recordings are hidden").assertIsDisplayed()
         openOptionsLevel("show")
         focused("recordings-show-option-unwatched")
         key(Key.DirectionUp)
         key(Key.DirectionCenter)
         closeOptions()
-        compose.onNodeWithText("Everything here has been played.").assertDoesNotExist()
+        compose.onNodeWithText("Everything here has been played").assertDoesNotExist()
         compose.onNodeWithTag("recording-list-entry-2").assertExists()
     }
 
@@ -1048,7 +1048,7 @@ class RecordingsVisualLayoutTest {
         val withValues = activeHeading()
         assertEquals(active.baseline, withValues.baseline, 1f)
         val values = requireNotNull(valuesLine())
-            .assertTextEquals("Name A–Z · Unwatched").fetchSemanticsNode().boundsInRoot
+            .assertTextEquals("Name A–Z • Unwatched").fetchSemanticsNode().boundsInRoot
         assertEquals("The values line never pushes the preview down", previewIcon,
             firstIconInk(bounds("depth-preview").left, active.bounds.bottom), 1f)
         val above = values.top - withValues.baseline
@@ -1065,7 +1065,7 @@ class RecordingsVisualLayoutTest {
         gone(OPTIONS)
         val inFolder = activeHeading()
         assertEquals(active.baseline, inFolder.baseline, 1f)
-        requireNotNull(valuesLine()).assertTextEquals("Name A–Z · Unwatched")
+        requireNotNull(valuesLine()).assertTextEquals("Name A–Z • Unwatched")
         assertEquals(rootRowWithValues.top, firstListRow().top, 1f)
 
         // With Show back at All the non-default sort alone still names itself below the root.
@@ -1760,11 +1760,11 @@ class RecordingsVisualLayoutTest {
         focused("schedule-new-timer")
         key(Key.DirectionUp)
         compose.onNodeWithText("Schedule").assertIsFocused()
-        compose.onNodeWithText("Nothing is recording or scheduled.").assertIsDisplayed()
+        compose.onNodeWithText("Nothing is recording or scheduled").assertIsDisplayed()
         compose.onNodeWithTag("recording-metadata-pane", useUnmergedTree = true).assertDoesNotExist()
         key(Key.DirectionRight)
         compose.onNodeWithTag("recordings-mode-problems").assertIsFocused()
-        compose.onNodeWithText("No recording problems.").assertIsDisplayed()
+        compose.onNodeWithText("No recording problems").assertIsDisplayed()
         compose.onNodeWithTag("recording-metadata-pane", useUnmergedTree = true).assertDoesNotExist()
         capture("empty-problems", 1f)
         assertNoCommands()
@@ -1953,7 +1953,7 @@ class RecordingsVisualLayoutTest {
         focused("automatic-recording-second")
         publish(emptyList())
         focused("schedule-new-automatic")
-        compose.onNodeWithText("No automatic recordings yet.").assertIsDisplayed()
+        compose.onNodeWithText("No automatic recordings yet").assertIsDisplayed()
         assertEquals("schedule:automatic", screenState.scheduleNavigation.stack.active.levelId)
         key(Key.DirectionCenter)
         compose.onNodeWithTag("automatic-recording-new-keyword").assertIsFocused()
@@ -2610,7 +2610,7 @@ class RecordingsVisualLayoutTest {
     @Test fun emptyLibraryParksFocusOnTheBrowseTabWithoutCommands() {
         show(empty = true)
         compose.mainClock.advanceTimeUntil(10_000) { tagFocused(BROWSE_TAB) }
-        compose.onNodeWithText("No recordings are available.").assertIsDisplayed()
+        compose.onNodeWithText("No recordings are available").assertIsDisplayed()
         capture("empty-archive", 1f)
         key(Key.DirectionDown)
         focused(BROWSE_TAB)
@@ -2752,7 +2752,7 @@ class RecordingsVisualLayoutTest {
         compose.onNodeWithTag("nav-recordings").assertIsFocused()
         key(Key.DirectionRight)
         compose.mainClock.advanceTimeUntil(10_000) { tagFocused(BROWSE_TAB) }
-        compose.onNodeWithText("No recordings are available.").assertIsDisplayed()
+        compose.onNodeWithText("No recordings are available").assertIsDisplayed()
         compose.onNodeWithTag("depth-row-depth-unavailable").assertDoesNotExist()
         assertNoCommands()
     }
@@ -2776,7 +2776,7 @@ class RecordingsVisualLayoutTest {
         key(Key.DirectionRight)
         compose.onNodeWithTag("recordings-mode-problems").assertIsFocused()
         compose.onNodeWithText("Failed").assertDoesNotExist()
-        compose.onNodeWithText("No recording problems.").assertIsDisplayed()
+        compose.onNodeWithText("No recording problems").assertIsDisplayed()
         compose.onNodeWithTag("recording-list-entry-2").assertDoesNotExist()
         assertNoCommands()
     }
@@ -2888,7 +2888,7 @@ class RecordingsVisualLayoutTest {
         compose.onNodeWithTag("recordings-now-cards").assertDoesNotExist()
         // The Recording now folder leads the root and opens on the running recording.
         focused("recordings-recording-now-folder")
-        requireNotNull(valuesLine()).assertTextEquals("Name A–Z · Unwatched")
+        requireNotNull(valuesLine()).assertTextEquals("Name A–Z • Unwatched")
         assertTrue(bounds("recordings-recording-now-folder").top < bounds("recordings-folder-Series").top)
         key(Key.DirectionRight)
         focused("recording-list-entry-10")
@@ -3119,7 +3119,7 @@ class RecordingsVisualLayoutTest {
         key(Key.DirectionCenter)
         compose.mainClock.advanceTimeUntil { deleted.size == 3 }
         focused("recordings-mode-problems")
-        compose.onNodeWithText("No recording problems.").assertIsDisplayed()
+        compose.onNodeWithText("No recording problems").assertIsDisplayed()
         compose.onNodeWithTag("recordings-problems-clear").assertDoesNotExist()
     }
 

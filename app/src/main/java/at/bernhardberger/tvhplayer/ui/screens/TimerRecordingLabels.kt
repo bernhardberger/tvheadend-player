@@ -52,15 +52,15 @@ internal fun timerDateLabel(state: TimerRecordingEditorState, date: LocalDate, r
     val formatted = formatRecordingDate(date.atTime(12, 0).atZone(state.zone).toEpochSecond(),
         dateOnly = true, nowSec = state.now().epochSeconds)
     return when {
-        relative && date == state.today -> "${stringResource(R.string.today)} · $formatted"
-        relative && date == state.today.plusDays(1) -> "${stringResource(R.string.tomorrow)} · $formatted"
+        relative && date == state.today -> "${stringResource(R.string.today)} • $formatted"
+        relative && date == state.today.plusDays(1) -> "${stringResource(R.string.tomorrow)} • $formatted"
         else -> formatted
     }
 }
 
 internal fun timerDateAndClockLabel(state: TimerRecordingEditorState, start: Instant): String =
     formatRecordingDate(start.epochSeconds, dateOnly = true, nowSec = state.now().epochSeconds) +
-        " · ${formatClock(start.epochSeconds)}"
+        " • ${formatClock(start.epochSeconds)}"
 
 @Composable
 internal fun timerRepeatLabel(state: TimerRecordingEditorState): String =
@@ -80,7 +80,7 @@ internal fun formatTimerRecordingDays(context: Context, days: Set<DayOfWeek>): S
 @Composable
 internal fun timerSpanLabel(state: TimerRecordingEditorState): String =
     (if (state.draft.repeating) timerRepeatLabel(state) else timerDateLabel(state, state.draft.date)) +
-        " · ${formatClock(state.draft.start)} – ${formatClock(state.draft.end)}"
+        " • ${formatClock(state.draft.start)}–${formatClock(state.draft.end)}"
 
 @Composable
 internal fun timerEndLabel(state: TimerRecordingEditorState): String =

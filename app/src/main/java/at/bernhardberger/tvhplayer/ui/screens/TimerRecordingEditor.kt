@@ -69,7 +69,7 @@ internal fun TimerRecordingEditor(
         subject = ConfirmationSubject.Rule(R.drawable.ic_schedule, timerNameLabel(state.baseline, channels),
             listOf(timerChannelLabel(state.baseline, channels),
                 formatTimerRecordingDays(LocalContext.current, state.baseline.days),
-                "${formatClock(state.baseline.start)} – ${formatClock(state.baseline.end)}").joinToString(" • ")),
+                "${formatClock(state.baseline.start)}–${formatClock(state.baseline.end)}").joinToString(" • ")),
         scheduledCount = scheduledEntries.size, changed = state.changed,
         onDismiss = state::back, onConfirm = state::confirmDestructiveAction,
     )
@@ -94,7 +94,7 @@ private fun TimerRecordingFirstLevel(state: TimerRecordingEditorState, channels:
         trailingContent = { Switch(state.draft.enabled, null, Modifier.clearAndSetSemantics {}) },
     )
     TimerRecordingField(state, "channel-time", stringResource(R.string.autorec_editor_channel_time),
-        "${timerChannelLabel(state.draft, channels)} · ${timerSpanLabel(state)}", timerChannelTimeFields) {
+        "${timerChannelLabel(state.draft, channels)} • ${timerSpanLabel(state)}", timerChannelTimeFields) {
         state.navigation.open(AutomaticRecordingEditorLevel.CHANNEL_TIME, "channel")
     }
     TimerRecordingField(state, "name", stringResource(R.string.timer_editor_name),

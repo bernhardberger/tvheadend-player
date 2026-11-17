@@ -128,7 +128,7 @@ private fun recordingCardState(entry: DvrEntry, nowSec: Long): PlaybackCardRecor
     val finalLength = recordingFinalLengthSeconds(entry, nowSec)
     val planned = finalLength ?: recordingPlannedSeconds(entry)
     fun line(spoken: Boolean) = if (recorded == null || planned == null) now else
-        "$now · " + resources.getString(R.string.recording_recorded_of,
+        "$now • " + resources.getString(R.string.recording_recorded_of,
             formatRecordedDuration(recorded, resources, spoken), formatRecordedDuration(planned, resources, spoken))
     // The bar sits under those two numbers, so it shows the same share.
     val share = if (recorded != null && finalLength != null && finalLength > 0L) {

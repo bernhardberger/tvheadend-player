@@ -89,7 +89,7 @@ private fun TimerRecordingUpcoming(state: TimerRecordingEditorState, channels: L
     for (occurrence in occurrences) RecordingEditorPreviewPair(
         if (state.draft.name.isNotBlank() || channels.any { it.id == state.draft.channelId })
             timerNameLabel(state.draft, channels) else "",
-        timerDateAndClockLabel(state, occurrence.start) + " – ${formatClock(state.draft.end)}",
+        timerDateAndClockLabel(state, occurrence.start) + "–${formatClock(state.draft.end)}",
     )
     RecordingEditorSecondary(stringResource(R.string.timer_editor_no_padding))
 }
@@ -102,7 +102,7 @@ private fun TimerRecordingRemoved(state: TimerRecordingEditorState, entries: Lis
         RecordingEditorPreviewPair(entry.title.orEmpty(), listOfNotNull(
             entry.start?.let { timerDateAndClockLabel(state, it) },
             stringResource(R.string.autorec_editor_removed),
-        ).joinToString(" · "))
+        ).joinToString(" • "))
     }
     if (entries.size > 3) RecordingEditorSecondary(
         stringResource(R.string.timer_editor_more_removed, entries.size - 3),

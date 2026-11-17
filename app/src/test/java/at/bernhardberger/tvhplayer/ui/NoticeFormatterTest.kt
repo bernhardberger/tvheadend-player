@@ -71,7 +71,7 @@ class NoticeFormatterTest {
                 context.getString(BrowseContextAction.UNSKIP.label(false, kind)))
             for (count in listOf(0, 1, 5)) {
                 val scheduled = if (count == 0) "" else
-                    "Its $count scheduled $singular${if (count == 1) "" else "s"} will be removed. "
+                    "$count scheduled $singular${if (count == 1) "" else "s"} will be removed. "
                 val body = scheduled + "Finished recordings stay."
                 assertEquals(body, formatAutomaticRecordingDeleteBody(context, kind, count, false))
                 assertEquals("$body Your unsaved changes will be discarded.",
@@ -113,16 +113,16 @@ class NoticeFormatterTest {
         val record = Notice.RecordUnavailable(null)
         assertEquals(pause.severity, record.severity)
         assertEquals(formatter.format(pause).icon, formatter.format(record).icon)
-        assertEquals("Timeshift is off in Settings.",
+        assertEquals("Timeshift is off in Settings",
             formatter.format(Notice.PauseUnavailable(PauseUnavailableReason.SETTINGS_OFF)).headline)
-        assertEquals("Pause isn't available on this channel.",
+        assertEquals("Pause isn't available on this channel",
             formatter.format(Notice.PauseUnavailable(PauseUnavailableReason.CHANNEL_UNAVAILABLE)).headline)
     }
 
     @Test @Config(qualifiers = "de") fun unavailablePauseUsesTheGermanSettingsLabel() {
-        assertEquals("Timeshift ist in den Einstellungen ausgeschaltet.",
+        assertEquals("Timeshift ist in den Einstellungen ausgeschaltet",
             formatter.format(Notice.PauseUnavailable(PauseUnavailableReason.SETTINGS_OFF)).headline)
-        assertEquals("Pausieren ist auf diesem Sender nicht möglich.",
+        assertEquals("Pausieren ist auf diesem Sender nicht möglich",
             formatter.format(Notice.PauseUnavailable(PauseUnavailableReason.CHANNEL_UNAVAILABLE)).headline)
     }
 
