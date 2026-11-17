@@ -9,7 +9,7 @@
   "agent": {
     "build": {
       "disable": false,
-      "model": "openai/gpt-6-astra",
+      "model": "openai/gpt-6.2-astra",
       "variant": "medium"
     },
     "app-locator": {
@@ -18,7 +18,7 @@
       "steps": 20
     },
     "app-explore": {
-      "model": "openai/gpt-6.1-sol",
+      "model": "openai/gpt-6.2-sol",
       "variant": "medium",
       "steps": 30
     },
@@ -28,22 +28,22 @@
       "steps": 45
     },
     "app-analyze": {
-      "model": "openai/gpt-6-astra",
+      "model": "openai/gpt-6.2-astra",
       "variant": "high",
       "steps": 30
     },
     "app-research": {
-      "model": "openai/gpt-6-astra",
+      "model": "openai/gpt-6.2-astra",
       "variant": "medium",
       "steps": 35
     },
     "android-reviewer": {
-      "model": "openai/gpt-6-astra",
+      "model": "openai/gpt-6.2-astra",
       "variant": "high",
       "steps": 45
     },
     "tv-evidence-curator": {
-      "model": "openai/gpt-6.1-sol",
+      "model": "openai/gpt-6.2-sol",
       "variant": "medium",
       "steps": 25
     },

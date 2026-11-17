@@ -189,7 +189,7 @@ medium, is only what a forgotten model falls back to.
 
 | Slice | Model |
 |---|---|
-| Well-specified or mechanical; the normal start | `openai/gpt-6.1-sol#medium`, `#high` when medium can't do it |
+| Well-specified or mechanical; the normal start | `openai/gpt-6.2-sol#medium`, `#high` when medium can't do it |
 | Bounded, test-driven UI bug: failing test first, then the fix | `claude-code/claude-sonnet-5-5#high` |
 | Genuinely needs design or visual judgement | `claude-code/claude-opus-5-5#high`, after the route check below |
 
@@ -214,9 +214,9 @@ risk:
 | Change | Independent review |
 |---|---|
 | Documentation, tests, or mechanical work with no production behavior change | Normally none |
-| Non-trivial non-UX slice inside a larger branch | Two independent `android-reviewer` dispatches with task overrides: `openai/gpt-6.1-sol` `xhigh` plus `claude-code/claude-sonnet-5-5` `high` |
-| Standalone non-trivial non-UX change outside a branch | Independent `android-reviewer` with task override `openai/gpt-6.1-sol` `high` (`xhigh` when the change is critical, e.g. security/runtime/lifecycle/concurrency) plus an independent Opus pass (second `android-reviewer` dispatch with task override `model: claude-code/claude-opus-5-5`, `reasoning: high`; no named Opus agent), subject to the quota fallback below |
-| Closing end-of-branch review | Independent Astra `android-reviewer` (`openai/gpt-6-astra` `high`, the agent default; never `xhigh`) plus the same independent Opus pass, subject to the quota fallback below |
+| Non-trivial non-UX slice inside a larger branch | Two independent `android-reviewer` dispatches with task overrides: `openai/gpt-6.2-sol` `xhigh` plus `claude-code/claude-sonnet-5-5` `high` |
+| Standalone non-trivial non-UX change outside a branch | Independent `android-reviewer` with task override `openai/gpt-6.2-sol` `high` (`xhigh` when the change is critical, e.g. security/runtime/lifecycle/concurrency) plus an independent Opus pass (second `android-reviewer` dispatch with task override `model: claude-code/claude-opus-5-5`, `reasoning: high`; no named Opus agent), subject to the quota fallback below |
+| Closing end-of-branch review | Independent Astra `android-reviewer` (`openai/gpt-6.2-astra` `high`, the agent default; never `xhigh`) plus the same independent Opus pass, subject to the quota fallback below |
 | Ordinary release using the existing release path | No additional model approval; retain release artifact and authorization checks |
 | Unresolved visual direction for a substantial new or redesigned TV surface | Optional `tv-ux-brief` against supplied requirements and baseline images |
 | Screenshot-set coverage, metadata, duplication, staleness, or privacy | Primary checks it; optional `tv-evidence-curator` for useful independent work |
@@ -243,7 +243,7 @@ by this existing guard, not duplicated in prompts.
 The guard returns `opus` or `astra`. Use Opus only on successful `opus` output;
 otherwise use independent Astra. Engineering uses a separate `android-reviewer`
 session for the second review. For a UX brief, dispatch the same `tv-ux-brief`
-role with an Astra model override (`openai/gpt-6-astra#xhigh`); do not
+role with an Astra model override (`openai/gpt-6.2-astra#xhigh`); do not
 substitute a source-only runtime review. `app-planner` also defaults to Opus;
 on fallback dispatch it with the same Astra override.
 Record the guard reason, actual reviewer/session/model and explicitly absent Opus
@@ -265,8 +265,8 @@ Opus coverage:
 
 | Stake | Judgement reviewer | Rules reviewer |
 |---|---|---|
-| Medium: iteration rounds, polish, small surfaces | default (`claude-code/claude-sonnet-5-5`, medium) | override `openai/gpt-6.1-sol#medium` |
-| High: new or redesigned surfaces, closing review of a branch | override `claude-code/claude-sonnet-5-5#high` | override `openai/gpt-6.1-sol#medium` |
+| Medium: iteration rounds, polish, small surfaces | default (`claude-code/claude-sonnet-5-5`, medium) | override `openai/gpt-6.2-sol#medium` |
+| High: new or redesigned surfaces, closing review of a branch | override `claude-code/claude-sonnet-5-5#high` | override `openai/gpt-6.2-sol#medium` |
 | Low: small visual tweaks | none; the primary checks the captures | none |
 
 The Sonnet reviewer judges hierarchy, flows and copy; the Sol reviewer measures
