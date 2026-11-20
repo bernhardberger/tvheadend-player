@@ -43,6 +43,7 @@ import at.bernhardberger.tvhplayer.images.ArtworkLogoCorner
 import at.bernhardberger.tvhplayer.images.ArtworkLogoGround
 import at.bernhardberger.tvhplayer.images.ArtworkLogoPlace
 import at.bernhardberger.tvhplayer.images.ArtworkLogoCornerTransformation
+import at.bernhardberger.tvhplayer.images.logoNeedsLightGround
 import coil3.BitmapImage
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -175,7 +176,8 @@ private val ArtworkLogoShadeHeight = 70.dp
 
 /**
  * A channel's logo on a programme picture, in its [place]'s corner. Where the picture is busy or
- * mid-toned there, a shade darkens only that corner: no plate edge, and a ground for the logo.
+ * mid-toned there, a shade tones only that corner: no plate edge, and a ground for the logo, dark
+ * for most logos and light for a dark one.
  * A calm light or dark corner carries the logo as it is, inked for that ground. Sized for an airing card's
  * picture; a smaller picture passes its [scale], so the logo keeps its share. A progress strip
  * along the picture's bottom is its [bottomEdge]: a bottom logo keeps its inset from the strip.
@@ -188,14 +190,25 @@ internal fun BoxScope.ArtworkCornerLogo(
     val corner = place.corner
     val atBottom = corner == ArtworkLogoCorner.BOTTOM_START || corner == ArtworkLogoCorner.BOTTOM_END
     val atStart = corner == ArtworkLogoCorner.BOTTOM_START || corner == ArtworkLogoCorner.TOP_START
-    if (place.ground == ArtworkLogoGround.SHADE) Box(Modifier.matchParentSize().drawBehind {
+    // A dark logo stands on a light shade, and takes one on a calm dark picture too; every other
+    // logo keeps the dark shade. Judged once per logo, and no shade shows before that.
+    var needsLight by remember(picon) { mutableStateOf(logoTones[picon]) }
+    val light = needsLight == true
+    val shaded = when (place.ground) {
+        ArtworkLogoGround.SHADE -> needsLight != null
+        ArtworkLogoGround.DARK_PICTURE -> light
+        ArtworkLogoGround.LIGHT_PICTURE -> false
+    }
+    if (shaded) Box(Modifier.matchParentSize().drawBehind {
         val atLeft = atStart == (layoutDirection == LayoutDirection.Ltr)
         val center = Offset(if (atLeft) 0f else size.width, if (atBottom) size.height else 0f)
         val radius = (ArtworkLogoShadeWidth * scale).toPx()
+        val tone = if (light) Color.White else Color.Black
+        val peak = if (light) .9f else .8f
         scale(1f, ArtworkLogoShadeHeight / ArtworkLogoShadeWidth, pivot = center) {
             drawCircle(Brush.radialGradient(
-                0f to Color.Black.copy(alpha = .8f), .25f to Color.Black.copy(alpha = .58f),
-                .5f to Color.Black.copy(alpha = .37f), .75f to Color.Black.copy(alpha = .17f),
+                0f to tone.copy(alpha = peak), .25f to tone.copy(alpha = peak * .725f),
+                .5f to tone.copy(alpha = peak * .46f), .75f to tone.copy(alpha = peak * .21f),
                 1f to Color.Transparent, center = center, radius = radius), radius, center)
         }
     })
@@ -210,8 +223,19 @@ internal fun BoxScope.ArtworkCornerLogo(
         // Trimmed, so the logo's visible shape and not its file's empty margin keeps the inset.
         alignment = alignment, placeholders = false, trim = true,
         // Parts of the logo that would vanish on a light picture go dark, as on a focused row.
-        ground = if (place.ground == ArtworkLogoGround.LIGHT_PICTURE) Color.White else MaterialTheme.colorScheme.background)
+        ground = if (place.ground == ArtworkLogoGround.LIGHT_PICTURE || light) Color.White else MaterialTheme.colorScheme.background,
+        onLogo = { bitmap ->
+            if (needsLight == null) needsLight = logoTones.getOrPut(picon) {
+                val pixels = IntArray(bitmap.width * bitmap.height)
+                (if (bitmap.config == android.graphics.Bitmap.Config.HARDWARE) bitmap.copy(android.graphics.Bitmap.Config.ARGB_8888, false) else bitmap)
+                    .getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+                logoNeedsLightGround(pixels)
+            }
+        })
 }
+
+/** Each logo's tone, judged once: a logo looks the same on every picture. */
+private val logoTones = java.util.concurrent.ConcurrentHashMap<ChannelIcon, Boolean>()
 
 /**
  * A channel without a logo, named on its programme picture: its name on a scrim along the

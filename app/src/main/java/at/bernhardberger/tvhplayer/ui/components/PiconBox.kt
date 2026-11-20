@@ -63,6 +63,8 @@ fun PiconBox(
     trim: Boolean = false,
     /** The loaded logo's own size, before [contentScale]; a trimmed logo's is its visible shape. */
     onLogoSize: ((Size) -> Unit)? = null,
+    /** The loaded logo as drawn, for a caller that judges its tone. */
+    onLogo: ((android.graphics.Bitmap) -> Unit)? = null,
 ) = profileTrace("P1:compose:picon") {
     require(ground == null || transformation == null) { "a logo is either inked for its ground or transformed" }
     val artwork = LocalArtworkContext.current
@@ -127,6 +129,7 @@ fun PiconBox(
                 onSuccess = {
                     shown[0] = it.result.memoryCacheKey
                     onLogoSize?.invoke(it.painter.intrinsicSize)
+                    if (onLogo != null) (it.result.image as? coil3.BitmapImage)?.bitmap?.let(onLogo)
                     if (prefetchGround != null) loaded = true
                 },
                 onError = { if (!waitingForSession) onError?.invoke() },

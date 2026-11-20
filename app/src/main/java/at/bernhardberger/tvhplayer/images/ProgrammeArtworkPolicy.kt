@@ -412,6 +412,37 @@ internal fun artworkLogoPlaces(
     return ranked
 }
 
+// A logo needs a light ground when little of it is light itself and it reads clearly better on
+// a light ground than on a dark one (linear luminance of the two grounds under their shades).
+private const val LOGO_LIGHT_PART = .6
+private const val LOGO_LIGHT_PART_SHARE = .25
+private const val LOGO_ON_DARK_GROUND = .03
+private const val LOGO_ON_LIGHT_GROUND = .6
+private const val LOGO_GROUND_GAIN = .06
+private const val LOGO_FULL_CONTRAST = 7.0
+
+/**
+ * Whether a logo is a dark one, which a dark corner shade would swallow and a light one carries:
+ * dark blue or black lettering without a light part of its own. [pixels] are non-premultiplied
+ * ARGB; transparent ones do not count. A logo with white in it, or one that reads as well on dark,
+ * keeps the dark shade.
+ */
+internal fun logoNeedsLightGround(pixels: IntArray): Boolean {
+    var count = 0; var light = 0; var onDark = 0.0; var onLight = 0.0
+    fun contrast(a: Double, b: Double) =
+        (kotlin.math.ln((maxOf(a, b) + .05) / (minOf(a, b) + .05)) / kotlin.math.ln(LOGO_FULL_CONTRAST)).coerceAtMost(1.0)
+    for (p in pixels) {
+        if (p ushr 24 <= 127) continue
+        fun linear(v: Int) = (v / 255.0).pow(2.2)
+        val luminance = .2126 * linear(p shr 16 and 255) + .7152 * linear(p shr 8 and 255) + .0722 * linear(p and 255)
+        count++
+        if (luminance.pow(1 / 2.2) >= LOGO_LIGHT_PART) light++
+        onDark += contrast(luminance, LOGO_ON_DARK_GROUND); onLight += contrast(luminance, LOGO_ON_LIGHT_GROUND)
+    }
+    if (count == 0) return false
+    return light < LOGO_LIGHT_PART_SHARE * count && onLight / count > onDark / count + LOGO_GROUND_GAIN
+}
+
 /** HSL in turns, lightness and saturation (the order used by Python colorsys). */
 internal fun artworkHsl(color: Int): DoubleArray {
     val r = (color shr 16 and 255) / 255.0; val g = (color shr 8 and 255) / 255.0; val b = (color and 255) / 255.0
