@@ -740,9 +740,8 @@ only.
   destination's name ("Channels", "Guide") is the row's pane title for
   TalkBack (accepted 2026-10-24). Its Tags and View options buttons end on the
   trailing inset, 20dp apart, on the header row at y28 of the 960×540 reference
-  canvas. Content begins at y80. At larger text the header grows from its
-  actual text measurements. Header actions appear only when backed by working,
-  authorized behavior.
+  canvas. At larger text the header grows from its actual text measurements.
+  Header actions appear only when backed by working, authorized behavior.
 - Every browse header icon button rests on a 40dp disc of `surfaceVariant` at
   40%; the Guide's date pill shares that fill. Focus keeps TV Material's focused
   container, content and scale. Tags always names its set: "All channels" on
@@ -760,6 +759,9 @@ only.
 - The list's leading axis includes the shell's 24dp inset and a further 26dp,
   with its 12dp focus reserve inside that additional inset. Standard rows are
   340dp wide, with a 92dp visual gap to the passive headline pane at x562.
+  At rest the first row starts at y116, 48dp below the header controls as in
+  the Grid. Scrolled focus settles on the same line when the scroll range
+  allows, while earlier rows pass under the top fade.
   The list follows the browse list edges in §9: it runs to the screen bottom
   behind the 140dp fade, and the 48dp top fade appears only while earlier rows
   exist; returning to the first-row boundary removes it. The header and the headline pane
@@ -785,7 +787,7 @@ only.
   and they shorten only the title.
 - **List picture and headline.** The pane beside the list shows the same thing
   in every state, so nothing moves or resizes when playback starts or stops. At
-  its top, level with the first row (y80), a 268×151 picture (the kit's
+  its top, level with the first row (y116), a 268×151 picture (the kit's
   four-column card; the headline below keeps to its width, so picture and text
   form one column) shows the focused programme's 16:9 artwork without its logo
   plate. Without artwork, it is a logo card's picture: the

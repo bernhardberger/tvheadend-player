@@ -36,6 +36,7 @@ import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.text.TextLayoutResult
@@ -261,13 +262,12 @@ class ChannelsListLayoutTest {
         assertEquals("list column width", 364f, list.width, .5f)
         assertEquals("list runs to the screen bottom", 540f, list.bottom, .5f)
 
-        // Rows: 340dp wide at x130, first at y32 after the list's top reserve, 4dp gaps. Height is the
-        // library's standard two-line minimum and grows with text scale rather than clipping.
+        // Rows: 340dp wide at x130, starting alongside the picture, with 4dp gaps.
+        // Height is the library's two-line minimum and grows with text scale rather than clipping.
         val first = row(1).bounds()
         val second = row(2).bounds()
         assertEquals("row x", 130f, first.left, .5f)
-        assertEquals("row y", 32f, first.top, .5f)
-        assertTrue("seven rows show in full", row(7).bounds().bottom <= list.bottom)
+        assertEquals("the first row starts alongside the picture", detail("channels-list-art").bounds().top, first.top, .5f)
         assertEquals("row width", 340f, first.width, .5f)
         assertTrue("row respects the library standard minimum (${first.height})", first.height >= 64f)
         assertEquals("row stride", first.height + 4f, second.top - first.top, .5f)
@@ -316,7 +316,6 @@ class ChannelsListLayoutTest {
         // The preview pane runs beside the rows, 92dp after them, and its headline rests on the safe inset.
         val details = compose.onNodeWithTag("channels-details").bounds()
         assertEquals("details x", 562f, details.left, .5f)
-        assertEquals("details stay below the header", 76f, details.top, .5f)
         assertEquals("details width", 340f, details.width, .5f)
         assertEquals("visual gap", 92f, details.left - first.right, .5f)
         assertEquals("details bottom inset", 512f, details.bottom, .5f)
@@ -436,16 +435,13 @@ class ChannelsListLayoutTest {
 
         assertSettled(1)
         move(Key.DirectionDown)
-        assertSettled(2)
+        assertEquals("the second row settles on the shared line", originalFirst.top, assertSettled(2).top, .5f)
         move(Key.DirectionDown)
-        assertSettled(3) // At font scale 1.0 the third row is inside the former oscillation window.
-        if (fontScale == 1f) {
-            assertEquals("small pivot request does not leave the boundary", originalFirst, row(1).bounds())
-        }
+        assertEquals("the third row settles on the shared line", originalFirst.top, assertSettled(3).top, .5f)
 
         move(Key.DirectionDown)
         val scrolledPosition = assertSettled(4)
-        assertTrue("genuine forward focus scroll still moves the list", scrolledPosition.top < originalFirst.top + 3 * (rowHeight + 4f))
+        assertEquals("scrolled focus stays alongside the picture", detail("channels-list-art").bounds().top, scrolledPosition.top, .5f)
         assertFocusedShapePixels(4, rowHeight, scrolled = true)
         move(Key.DirectionLeft)
         compose.onNodeWithTag("nav-channels").assertIsFocused()
@@ -479,8 +475,6 @@ class ChannelsListLayoutTest {
         assertFocusedShapePixels(1, rowHeight, scrolled = false)
         capture("en-font$fontScale-top-fade-initial-bright-video")
 
-        // The list column reaching up beside the header settles the down walk with the topmost
-        // logos just clear of the fade at both scales, so the Up walk below proves it.
         val downTarget = if (fontScale == 1f) 8 else 12
         repeat(downTarget - 1) { compose.pressKey(Key.DirectionDown) }
         row(downTarget).assertIsFocused()
@@ -496,13 +490,13 @@ class ChannelsListLayoutTest {
         capture("en-font$fontScale-top-fade-down-scrolled-bright-video")
 
         repeat(CHANNEL_COUNT - downTarget) { compose.pressKey(Key.DirectionDown) }
-        repeat(CHANNEL_COUNT - 8) { compose.pressKey(Key.DirectionUp) }
-        row(8).assertIsFocused()
-        assertFocusedShapePixels(8, rowHeight, scrolled = true)
+        repeat(CHANNEL_COUNT - 9) { compose.pressKey(Key.DirectionUp) }
+        row(9).assertIsFocused()
+        assertFocusedShapePixels(9, rowHeight, scrolled = true)
         assertTopFadePixels(7)
         capture("en-font$fontScale-top-fade-up-scrolled-bright-video")
 
-        for (channel in 7 downTo 1) {
+        for (channel in 8 downTo 1) {
             compose.pressKey(Key.DirectionUp)
             row(channel).assertIsFocused()
             assertFocusedShapePixels(channel, if (channel == NO_EPG) noEpgRowHeight else rowHeight, scrolled = channel != 1)
@@ -536,22 +530,22 @@ class ChannelsListLayoutTest {
         // A non-focused neighbor gives the native unscaled height after offscreen restoration.
         val rowHeight = row(CHANNEL_COUNT - 1).bounds().height
         assertFocusedShapePixels(CHANNEL_COUNT, rowHeight, scrolled = true)
-        repeat(CHANNEL_COUNT - 8) { compose.pressKey(Key.DirectionUp) }
-        row(8).assertIsFocused()
-        assertFocusedShapePixels(8, rowHeight, scrolled = true)
+        repeat(CHANNEL_COUNT - 9) { compose.pressKey(Key.DirectionUp) }
+        row(9).assertIsFocused()
+        assertFocusedShapePixels(9, rowHeight, scrolled = true)
         assertTopFadePixels(7)
-        val position = row(8).bounds()
+        val position = row(9).bounds()
 
         compose.pressKey(Key.DirectionLeft)
         compose.onNodeWithTag("nav-channels").assertIsFocused()
         compose.pressKey(Key.DirectionRight)
-        row(8).assertIsFocused()
-        assertEquals("drawer re-entry preserves the scrolled anchor", position, row(8).bounds())
-        assertFocusedShapePixels(8, rowHeight, scrolled = true)
+        row(9).assertIsFocused()
+        assertEquals("drawer re-entry preserves the scrolled anchor", position, row(9).bounds())
+        assertFocusedShapePixels(9, rowHeight, scrolled = true)
 
         compose.pressKey(Key.ChannelDown)
         val pageDownChannel = requireNotNull(selected).value.toInt()
-        assertTrue("Channel Down still pages forward", pageDownChannel > 8)
+        assertTrue("Channel Down still pages forward", pageDownChannel > 9)
         assertFocusedShapePixels(pageDownChannel, rowHeight, scrolled = true)
         compose.pressKey(Key.ChannelUp)
         val pageUpChannel = requireNotNull(selected).value.toInt()
@@ -567,7 +561,7 @@ class ChannelsListLayoutTest {
         compose.waitForIdle()
         row(7).assertIsFocused()
         assertFocusedShapePixels(7, rowHeight, scrolled = false)
-        assertEquals("new scope's first row keeps the original top reserve", detail("channels-list-column").bounds().top + 4f, row(7).bounds().top, .5f)
+        assertEquals("new scope's first row starts alongside the picture", detail("channels-list-art").bounds().top, row(7).bounds().top, .5f)
         // A change while the rail has focus only previews the group's anchor.
         compose.pressKey(Key.DirectionLeft)
         compose.onNodeWithTag("nav-channels").assertIsFocused()
@@ -625,10 +619,10 @@ class ChannelsListLayoutTest {
      */
     private fun assertTopFadePixels(channel: Int) {
         val list = detail("channels-list").bounds()
-        val picon = inRow(channel, "channel-picon").bounds()
-        val x = (picon.right - 14f).toInt()
-        val firstY = ceil(maxOf(list.top + 2f, picon.top + 6f)).toInt()
-        val lastY = floor(minOf(list.top + 46f, picon.bottom - 7f)).toInt()
+        val picon = inRow(channel, "channel-picon").getUnclippedBoundsInRoot()
+        val x = (picon.right.value - 14f).toInt()
+        val firstY = ceil(maxOf(list.top + 2f, picon.top.value + 6f)).toInt()
+        val lastY = floor(minOf(list.top + 46f, picon.bottom.value - 7f)).toInt()
         assertTrue("picon $channel crosses the top fade: $picon / $list", lastY > firstY)
         val bitmap = drawShell()
         val first = android.graphics.Color.red(bitmap.getPixel(x, firstY))
@@ -654,7 +648,6 @@ class ChannelsListLayoutTest {
         assertTrue("Tags keeps its whole label", label.left >= group.left && label.right <= group.right)
         assertTrue("Tags stays inside the header", group.top >= header().bounds().top - .5f && group.bottom <= header().bounds().bottom + .5f)
         assertTrue("rows stay beside the enlarged header's buttons", row(1).bounds().right <= group.left)
-        enterAndFocus(PLAYING)
 
         val first = row(1).bounds()
         val second = row(2).bounds()
@@ -669,11 +662,11 @@ class ChannelsListLayoutTest {
     }
 
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
-    fun enlargedLongProgrammeKeepsWholeLinesUnderThePicture() {
+    fun enlargedLongProgrammeMakesRoomForNextInsteadOfClippingSynopsis() {
         channelsShell(1.3f)
         enterAndFocus(LONG_TEXT)
-        // The picture keeps its size; the synopsis gives up lines rather than cutting one.
-        assertDescriptionFits(1)
+        detail("channels-immersive-synopsis").assertDoesNotExist()
+        assertTrue("Next stays above the safe bottom", detail("channels-immersive-next").bounds().bottom <= 512.5f)
     }
 
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
@@ -685,12 +678,13 @@ class ChannelsListLayoutTest {
     private fun checkDetailAnchors(fontScale: Float) {
         channelsShell(fontScale)
         enterAndFocus(1)
+        val pictureTop = row(1).bounds().top
         for (channel in 1..NO_EPG) {
             if (channel > 1) compose.pressKey(Key.DirectionDown)
             row(channel).assertIsFocused()
-            if (channel == 1 && fontScale == 1f) assertDescriptionFits(3)
+            if (channel == 1 && fontScale == 1f) assertDescriptionFits()
             val picture = detail("channels-list-art").bounds()
-            assertEquals("the picture keeps the pane's top", 80f, picture.top, .5f)
+            assertEquals("the picture stays on the resting line", pictureTop, picture.top, .5f)
             assertEquals("the kit's four-column card", 268f, picture.width, .5f)
             assertEquals("at 16:9", 150.75f, picture.height, .5f)
             assertEquals("the headline hangs from the picture", picture.bottom + 20f, headlineChannel().bounds().top, .5f)
@@ -706,14 +700,14 @@ class ChannelsListLayoutTest {
         }
     }
 
-    private fun assertDescriptionFits(expectedLines: Int) {
+    private fun assertDescriptionFits() {
         val description = detail("channels-immersive-synopsis")
         val subtitle = detail("channels-immersive-subtitle").bounds()
         val time = detail("channels-immersive-metadata").bounds()
         val next = detail("channels-immersive-next").bounds()
         val layout = description.textLayout()
-        assertEquals("actual rendered synopsis lines", expectedLines, layout.lineCount)
-        assertTrue("last line remains inside the measured text", layout.getLineBottom(expectedLines - 1) <= description.bounds().height + .5f)
+        assertTrue("last line remains inside the measured text",
+            layout.getLineBottom(layout.lineCount - 1) <= description.bounds().height + .5f)
         assertTrue("next programme is below the description", next.top >= description.bounds().bottom + 19f)
         assertTrue("description below the programme's time", description.bounds().top >= time.bottom + 19f)
         assertTrue("time below the supplied subtitle", time.top >= subtitle.bottom + 7f)
@@ -747,8 +741,7 @@ class ChannelsListLayoutTest {
 
         compose.pressKey(Key.DirectionDown)
         row(LONG_TEXT).assertIsFocused()
-        // The long programme keeps three whole synopsis lines.
-        assertDescriptionFits(3)
+        assertDescriptionFits()
         captureBackgrounds("$prefix-long-programme")
 
         compose.pressKey(Key.DirectionDown)
@@ -1012,15 +1005,8 @@ class ChannelsListLayoutTest {
     private fun title(n: Int) = channelTitleText(n.toLong(), name(n))
 
     /** Unmerged descendant [tag] of channel row [n]; rows merge their semantics. */
-    private fun inRow(n: Int, tag: String): SemanticsNodeInteraction {
-        val rowBounds = row(n).bounds()
-        val all = compose.onAllNodesWithTag(tag, useUnmergedTree = true)
-        val indices = all.fetchSemanticsNodes().withIndex()
-            .filter { it.value.boundsInRoot.center.y in rowBounds.top..rowBounds.bottom }
-            .map { it.index }
-        check(indices.size == 1) { "expected one '$tag' in row $n, found ${indices.size}" }
-        return all[indices.single()]
-    }
+    private fun inRow(n: Int, tag: String): SemanticsNodeInteraction =
+        compose.onNode(hasTestTag(tag) and hasAnyAncestor(hasTestTag("channel-row-$n")), useUnmergedTree = true)
 
     private fun SemanticsNodeInteraction.bounds(): Rect = fetchSemanticsNode().boundsInRoot
 

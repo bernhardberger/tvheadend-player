@@ -357,7 +357,12 @@ internal fun ChannelsScreenContent(
     // Without a notice above it the list reaches the screen's top under the shell's inset, so
     // a scrolled list's earlier rows fade into the screen edge rather than end at the band.
     val listTopOverflow = if (tagNotice) 0.dp else contentPadding.calculateTopPadding()
-    val bringIntoViewSpec = rememberListEdgeBringIntoView(listState, ChannelsListTopReserve, listTopOverflow)
+    // The resting Grid line leaves room above the first focused List row's native scale.
+    val headerContentLine = TvBrowseHeaderHeight + ChannelsGridFocusLine
+    val listTopReserve = if (tagNotice) ChannelsListTopReserve else headerContentLine
+    val bringIntoViewSpec = rememberListEdgeBringIntoView(
+        listState, listTopReserve, listTopOverflow, anchorAtTopReserve = !tagNotice,
+    )
     val density = LocalDensity.current
     val gridState = rememberLazyGridState()
     val rowState = rememberLazyListState()
@@ -946,7 +951,7 @@ internal fun ChannelsScreenContent(
                         // sit one focus-line gap below the controls; later rows sit at that gap
                         // from the physical top, with the preceding row cut by the screen edge.
                         scrollingHeaderHeight = if (headerScrolls) {
-                            topOverflow + TvBrowseHeaderHeight + ChannelsGridFocusLine - ChannelsGridEdgeInset
+                            topOverflow + headerContentLine - ChannelsGridEdgeInset
                         } else 0.dp,
                         isCurrent = owner.isCurrent,
                         focusRequesters = rowFocusRequesters,
@@ -985,7 +990,6 @@ internal fun ChannelsScreenContent(
                             modifier = Modifier.padding(horizontal = ChannelRowEdgeInset),
                         )
                         if (tagNotice) Spacer(Modifier.height(8.dp))
-                        val topOverflow = if (tagNotice) 0.dp else contentPadding.calculateTopPadding()
                         EndHoldOnInterruption { browseHeld = it }
 
                         CompositionLocalProvider(LocalBringIntoViewSpec provides bringIntoViewSpec) {
@@ -996,12 +1000,12 @@ internal fun ChannelsScreenContent(
                                 contentPadding = PaddingValues(
                                     start = ChannelRowEdgeInset,
                                     end = ChannelRowEdgeInset,
-                                    top = topOverflow + ChannelsListTopReserve,
+                                    top = listTopOverflow + listTopReserve,
                                     bottom = ListBottomReserve,
                                 ),
                                 modifier = Modifier
                                     .weight(1f)
-                                    .overflowTop(topOverflow)
+                                    .overflowTop(listTopOverflow)
                                     .listEdgeFades(listState)
                                     .testTag("channels-list")
                                     .then(contentEntry)
@@ -1105,13 +1109,12 @@ internal fun ChannelsScreenContent(
                             .weight(1f)
                             .profileLayout("channels:details")
                             .padding(detailPanePadding)
-                            .padding(top = listHeaderBand)
+                            .padding(top = if (tagNotice) listHeaderBand else headerContentLine)
                             .fillMaxHeight()
                             .testTag("channels-details"),
                     ) {
-                        // Below the header buttons, with the list's top reserve.
                         ChannelsListArt(channels, frame, nowSecProvider, view.showsProgramArt,
-                            Modifier.padding(top = ChannelsListTopReserve), held = browseHeld)
+                            Modifier.padding(top = if (tagNotice) listTopReserve else 0.dp), held = browseHeld)
                         ChannelsImmersiveHero(channels, frame, nowSecProvider,
                             Modifier.padding(top = ProgrammePanePictureGap).weight(1f).widthIn(max = ProgrammePaneWidth), besideList = true, held = browseHeld)
                     }

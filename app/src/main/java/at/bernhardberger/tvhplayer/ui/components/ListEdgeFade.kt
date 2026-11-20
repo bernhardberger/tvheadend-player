@@ -88,7 +88,8 @@ internal fun PanelListEdges(
  * Focus scrolling for a list drawn with [listEdgeFades]: [topReserve] is the list's own top
  * content padding, kept until earlier rows exist; its bottom content padding is
  * [ListBottomReserve]. A viewport reaching [topOverflow] above the list's band, padded by that
- * much more at the top, keeps both top reserves measured from the band.
+ * much more at the top, keeps both top reserves measured from the band. With
+ * [anchorAtTopReserve], focus uses that same line after scrolling instead of the native pivot.
  */
 @Composable
 @OptIn(ExperimentalFoundationApi::class)
@@ -96,15 +97,16 @@ internal fun rememberListEdgeBringIntoView(
     listState: LazyListState,
     topReserve: Dp,
     topOverflow: Dp = 0.dp,
+    anchorAtTopReserve: Boolean = false,
 ): InsetBringIntoViewSpec {
     val platform = LocalBringIntoViewSpec.current
     val density = LocalDensity.current
-    return remember(platform, density, listState, topReserve, topOverflow) {
+    return remember(platform, density, listState, topReserve, topOverflow, anchorAtTopReserve) {
         with(density) {
             InsetBringIntoViewSpec(
-                delegate = platform,
+                delegate = if (anchorAtTopReserve) TopAlignedBringIntoView else platform,
                 topInsetPx = (topOverflow + topReserve).toPx(),
-                scrolledTopInsetPx = (topOverflow + ListScrolledTopReserve).toPx(),
+                scrolledTopInsetPx = (topOverflow + if (anchorAtTopReserve) topReserve else ListScrolledTopReserve).toPx(),
                 bottomInsetPx = ListBottomReserve.toPx(),
                 scrollBackAvailablePx = {
                     if (listState.firstVisibleItemIndex == 0) {
@@ -114,6 +116,11 @@ internal fun rememberListEdgeBringIntoView(
             )
         }
     }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+private object TopAlignedBringIntoView : BringIntoViewSpec {
+    override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float = offset
 }
 
 /** Room beside a faded list for its focused row's native scale, which the mask's layer would clip. */

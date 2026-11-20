@@ -129,10 +129,26 @@ class ChannelsLayoutFocusTest {
     }
 
     @Test fun gridWallScrollsTheHeaderAwayAndRestoresItWithFirstRowReachability() {
-        gridWallScrollsTheHeaderAwayAndRestoresItWithFirstRowReachability(1f)
+        val firstTop = gridWallScrollsTheHeaderAwayAndRestoresItWithFirstRowReachability(1f)
+        fixture.key(Key.DirectionUp)
+        fixture.key(Key.DirectionRight)
+        fixture.awaitFocus(viewButton)
+        fixture.key(Key.DirectionCenter)
+        fixture.awaitFocus(option("layout-grid"))
+        fixture.key(Key.DirectionUp)
+        fixture.awaitFocus(option("layout-list"))
+        fixture.key(Key.DirectionCenter)
+        fixture.key(Key.Back)
+        fixture.awaitFocus(viewButton)
+        fixture.key(Key.DirectionDown)
+        fixture.awaitFocus(row(1))
+        val listTop = compose.onNode(row(1)).getUnclippedBoundsInRoot().top.value
+        assertEquals("List and Grid start on the same line", firstTop, listTop, 1f)
+        assertEquals("the List picture starts alongside the first row", listTop,
+            compose.onNodeWithTag("channels-list-art").getUnclippedBoundsInRoot().top.value, 1f)
     }
 
-    private fun gridWallScrollsTheHeaderAwayAndRestoresItWithFirstRowReachability(scale: Float) {
+    private fun gridWallScrollsTheHeaderAwayAndRestoresItWithFirstRowReachability(scale: Float): Float {
         fixture.show(grid, scale = scale, channelCount = 30)
         fixture.awaitFocus(card(1))
         val headerTop = compose.onNodeWithTag("channels-header").getUnclippedBoundsInRoot().top
@@ -168,6 +184,7 @@ class ChannelsLayoutFocusTest {
         awaitRail()
         fixture.key(Key.DirectionRight)
         fixture.awaitFocus(card(1))
+        return firstTop
     }
 
     @Test @GraphicsMode(GraphicsMode.Mode.NATIVE) fun gridWallDoesNotFadeThePrecedingRowAtTheScreenEdge() {
