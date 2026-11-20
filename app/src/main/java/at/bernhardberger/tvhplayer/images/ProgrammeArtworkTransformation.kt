@@ -125,7 +125,6 @@ internal fun artworkLogoPlaces(bitmap: Bitmap, ratio: Double, logoShare: Double,
     val block = ((cropWidth + LOGO_CORNER_ANALYSIS_WIDTH - 1) / LOGO_CORNER_ANALYSIS_WIDTH).coerceAtLeast(1)
     val sampleWidth = (cropWidth / block).coerceAtLeast(1)
     val sampleHeight = (cropHeight / block).coerceAtLeast(1)
-    val started = android.os.SystemClock.elapsedRealtimeNanos()
     val read = IntArray(cropWidth * cropHeight)
     source.getPixels(read, 0, cropWidth, left, top, cropWidth, cropHeight)
     val pixels = if (block == 1) read else IntArray(sampleWidth * sampleHeight) { index ->
@@ -137,13 +136,16 @@ internal fun artworkLogoPlaces(bitmap: Bitmap, ratio: Double, logoShare: Double,
         }
         (0xff shl 24) or (r / n shl 16) or (g / n shl 8) or (b / n)
     }
-    val copied = android.os.SystemClock.elapsedRealtimeNanos()
-    val places = artworkLogoPlaces(pixels, if (block == 1) cropWidth else sampleWidth,
-        if (block == 1) cropHeight else sampleHeight, logoShare, startAtRight)
-    // Trial only: what the corner rule costs per picture on the device.
-    val done = android.os.SystemClock.elapsedRealtimeNanos()
-    android.util.Log.i("LogoPlaceTiming", "copyMs=${(copied - started) / 100_000 / 10.0} ruleMs=${(done - copied) / 100_000 / 10.0} " +
-        "source=${source.width}x${source.height} copy=${if (block == 1) cropWidth else sampleWidth}")
+    val width = if (block == 1) cropWidth else sampleWidth
+    val height = if (block == 1) cropHeight else sampleHeight
+    // Trial only: what the corner rule costs per picture on the device, in this thread's own time.
+    val copied = android.os.Debug.threadCpuTimeNanos()
+    val lettering = artworkLettering(pixels, width, height)
+    val lettered = android.os.Debug.threadCpuTimeNanos()
+    val places = artworkLogoPlaces(pixels, width, height, logoShare, startAtRight, lettering)
+    val done = android.os.Debug.threadCpuTimeNanos()
+    android.util.Log.i("LogoPlaceTiming", "letteringCpuMs=${(lettered - copied) / 100_000 / 10.0} " +
+        "cornersCpuMs=${(done - lettered) / 100_000 / 10.0} copy=${width}x$height")
     return places
 }
 
