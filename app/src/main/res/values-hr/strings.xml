@@ -942,9 +942,6 @@
     <string name="player_recorded_spoken">%1$s, snimljeno %2$s, %3$s</string>
     <string name="player_channel">Kanal</string>
     <string name="player_row_recent">Nedavni kanali</string>
-    <string name="player_channel_card_hint">Lijevo ili desno mijenja kanal, OK prikazuje nedavne kanale</string>
-    <string name="player_identity_info_hint">OK prikazuje podatke o emisiji</string>
-    <string name="player_channel_card_hint_no_recents">Lijevo ili desno mijenja kanal</string>
     <string name="player_rail_watching">Gledaš</string>
     <string name="details_read_more">Više informacija</string>
     <string name="details_important_information">Pojedinosti</string>

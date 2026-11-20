@@ -977,9 +977,6 @@
     <string name="player_recorded_spoken">%1$s, записано %2$s, %3$s</string>
     <string name="player_channel">Канал</string>
     <string name="player_row_recent">Недавние каналы</string>
-    <string name="player_channel_card_hint">Влево или вправо — смена канала, OK — недавние каналы</string>
-    <string name="player_identity_info_hint">OK — сведения о передаче</string>
-    <string name="player_channel_card_hint_no_recents">Влево или вправо — смена канала</string>
     <string name="player_rail_watching">Просмотр</string>
     <string name="details_read_more">Подробнее</string>
     <string name="details_important_information">Сведения</string>

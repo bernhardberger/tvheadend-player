@@ -1109,8 +1109,8 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
   top edge and height (300ms, emphasized decelerate), as wide as the entry's
   content; it never shrinks while the entry is open, and its end grows only when
   the content needs it. The plate is a style that changes only colours: dark
-  (shipping; dense dark panel, tile fades from behind a picon), light (the
-  identity's focus container with a soft shadow) or none. Each new digit pushes
+  (shipping; dense dark panel, tile fades from behind a picon), light (a light
+  container with dark content and a soft shadow) or none. Each new digit pushes
   the earlier ones start-ward by one digit while it fades in at the end (150ms);
   each digit keeps its own push and fade, so a digit during any of this motion
   carries the others on from where they stand, never restarting the plate.
@@ -1214,11 +1214,10 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
   With Info, schedule, options, number entry, the channel drawer, recording
   markers or any dialog open, a hold acts as one short Back on release.
 - Controls auto-hide only when they are visible, playback is playing and ready,
-  and the player is stable (`core/PlayerAutoHidePolicy.kt:13-32`). A pending
+  and the player is stable (`core/PlayerAutoHidePolicy.kt:18-25`). A pending
   seek, a modal layer, recovery and an actionable error each prevent it. The
-  delay is 5 s (`ui/player/LivePlayerLayerState.kt:31`,
-  `RecordingPlayerScreen.kt:94`), extended to at least 30 s while focus rests on
-  the identity card or its recent row (`core/PlayerAutoHidePolicy.kt:19-23`). Auto-hide never reveals anything.
+  delay is 5 s (`ui/player/LivePlayerLayerState.kt:22`,
+  `RecordingPlayerScreen.kt:101`). Auto-hide never reveals anything.
 
 ### Retained programme history (revised 2026-09-22)
 

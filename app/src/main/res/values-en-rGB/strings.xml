@@ -62,7 +62,6 @@
     </plurals>
     <string name="recordings_failed_cancelled">Failed and cancelled</string>
     <string name="tunneling_setting">Tunnelled playback</string>
-    <string name="player_identity_info_hint">OK shows the programme info</string>
     <string name="channel_schedule_gap">No programme information until %1$s</string>
     <string name="channel_schedule_end">No programme information after %1$s</string>
     <string name="appliance_companion">Appliance companion</string>

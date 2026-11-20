@@ -977,9 +977,6 @@
     <string name="player_recorded_spoken">%1$s, nahráno %2$s, %3$s</string>
     <string name="player_channel">Kanál</string>
     <string name="player_row_recent">Poslední kanály</string>
-    <string name="player_channel_card_hint">Vlevo nebo vpravo přepne kanál, OK zobrazí poslední kanály</string>
-    <string name="player_identity_info_hint">OK zobrazí informace o pořadu</string>
-    <string name="player_channel_card_hint_no_recents">Vlevo nebo vpravo přepne kanál</string>
     <string name="player_rail_watching">Sleduješ</string>
     <string name="details_read_more">Více informací</string>
     <string name="details_important_information">Podrobnosti</string>

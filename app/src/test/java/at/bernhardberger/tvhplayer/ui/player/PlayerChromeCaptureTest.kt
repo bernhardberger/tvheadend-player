@@ -868,8 +868,6 @@ class PlayerChromeCaptureTest {
         /** The step target's window; by default 3:53 behind live in [window]'s programme. */
         shown: ProgrammeWindow? = null,
         focus: String? = null,
-        /** Trial: the top identity's Recent row, with three recent channels, open. */
-        recentOpen: Boolean = false,
         recordingChannels: Set<ChannelId> = emptySet(),
         browser: PlayerChannelBrowserState? = null,
         emptyRecent: Boolean = false,
@@ -905,15 +903,7 @@ class PlayerChromeCaptureTest {
             actions = PlayerChromeActions(active = !numberEntryShown, paused = paused, restoreFocus = focus ?: "player-seekbar".takeIf { step != null },
                 tracks = tracks),
             onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {}, onInteraction = {},
-            onChannelZap = { _, _, _ -> },
             downHint = androidx.compose.ui.res.stringResource(at.bernhardberger.tvhplayer.R.string.nav_channels),
-            recents = listOf(
-                RecentChannelPeek(ChannelIcon.ImageCache(SPORT_LOGO), "102", "Harbor Sport HD", ChannelId(2), now = "Harbor Kickoff"),
-                RecentChannelPeek(ChannelIcon.ImageCache(LOGO), "101", "Ridge Earth HD", ChannelId(1), now = "Ridge Light"),
-                RecentChannelPeek(null, "103", "Northline News International Service", ChannelId(3), now = "Northline Tonight 19:20"),
-            ),
-            onRecentPick = {},
-            recentRowOpen = recentOpen,
             decorationCoversControls = tray != null,
             numberEntryShown = numberEntryShown,
             controlsDecoration = { actionsAlpha, controls ->

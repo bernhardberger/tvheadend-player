@@ -942,9 +942,6 @@
     <string name="player_recorded_spoken">%1$s, înregistrat %2$s, %3$s</string>
     <string name="player_channel">Canal</string>
     <string name="player_row_recent">Canale recente</string>
-    <string name="player_channel_card_hint">Stânga sau dreapta schimbă canalul, OK arată canalele recente</string>
-    <string name="player_identity_info_hint">OK arată informațiile emisiunii</string>
-    <string name="player_channel_card_hint_no_recents">Stânga sau dreapta schimbă canalul</string>
     <string name="player_rail_watching">În vizionare</string>
     <string name="details_read_more">Mai multe informații</string>
     <string name="details_important_information">Detalii</string>

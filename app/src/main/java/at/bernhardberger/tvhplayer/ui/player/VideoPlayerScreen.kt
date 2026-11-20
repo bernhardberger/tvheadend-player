@@ -1970,7 +1970,6 @@ fun VideoPlayerScreen(
             },
             onDownFromActions = openRailFromActions,
             downHint = stringResource(R.string.nav_channels),
-            onChannelCardFocusChanged = layerState.core.chrome::onChannelCardFocusChanged,
             decorationCoversControls = channelRailOpen,
             controlsDecoration = { actionsAlpha, controls ->
                 // Below the controls, the rail's cards hint at what Down opens.

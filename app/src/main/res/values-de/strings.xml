@@ -891,9 +891,6 @@
     <string name="player_recorded_spoken">%1$s, aufgenommen am %2$s, %3$s</string>
     <string name="player_channel">Sender</string>
     <string name="player_row_recent">Zuletzt gesehene Sender</string>
-    <string name="player_channel_card_hint">Links oder rechts wechselt den Sender, OK zeigt zuletzt gesehene Sender</string>
-    <string name="player_identity_info_hint">OK zeigt die Sendungsinfo</string>
-    <string name="player_channel_card_hint_no_recents">Links oder rechts wechselt den Sender</string>
     <string name="player_rail_watching">Läuft</string>
     <!-- Trial: program details -->
     <string name="details_read_more">Mehr Infos</string>

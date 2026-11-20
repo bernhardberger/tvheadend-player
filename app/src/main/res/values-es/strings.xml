@@ -942,9 +942,6 @@
     <string name="player_recorded_spoken">%1$s, grabado el %2$s, %3$s</string>
     <string name="player_channel">Canal</string>
     <string name="player_row_recent">Canales recientes</string>
-    <string name="player_channel_card_hint">Left o Right cambia de canal, OK muestra los canales recientes</string>
-    <string name="player_identity_info_hint">OK muestra la información del programa</string>
-    <string name="player_channel_card_hint_no_recents">Left o Right cambia de canal</string>
     <string name="player_rail_watching">Viendo</string>
     <string name="details_read_more">Más información</string>
     <string name="details_important_information">Detalles</string>

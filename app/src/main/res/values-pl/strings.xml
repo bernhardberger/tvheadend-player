@@ -977,9 +977,6 @@
     <string name="player_recorded_spoken">%1$s, nagrano %2$s, %3$s</string>
     <string name="player_channel">Kanał</string>
     <string name="player_row_recent">Ostatnie kanały</string>
-    <string name="player_channel_card_hint">Lewo lub prawo zmienia kanał, OK pokazuje ostatnie kanały</string>
-    <string name="player_identity_info_hint">OK pokazuje informacje o programie</string>
-    <string name="player_channel_card_hint_no_recents">Lewo lub prawo zmienia kanał</string>
     <string name="player_rail_watching">Oglądasz</string>
     <string name="details_read_more">Więcej informacji</string>
     <string name="details_important_information">Szczegóły</string>

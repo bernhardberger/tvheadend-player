@@ -907,9 +907,6 @@
     <string name="player_recorded_spoken">%1$s, εγγράφηκε %2$s, %3$s</string>
     <string name="player_channel">Κανάλι</string>
     <string name="player_row_recent">Πρόσφατα κανάλια</string>
-    <string name="player_channel_card_hint">Αριστερά ή δεξιά αλλάζει κανάλι, το OK δείχνει πρόσφατα κανάλια</string>
-    <string name="player_identity_info_hint">Το OK δείχνει τις πληροφορίες της εκπομπής</string>
-    <string name="player_channel_card_hint_no_recents">Αριστερά ή δεξιά αλλάζει κανάλι</string>
     <string name="player_rail_watching">Παρακολούθηση</string>
     <string name="details_read_more">Περισσότερες πληροφορίες</string>
     <string name="details_important_information">Λεπτομέρειες</string>

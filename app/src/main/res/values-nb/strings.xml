@@ -907,9 +907,6 @@
     <string name="player_recorded_spoken">%1$s, tatt opp %2$s, %3$s</string>
     <string name="player_channel">Kanal</string>
     <string name="player_row_recent">Siste kanaler</string>
-    <string name="player_channel_card_hint">Venstre eller høyre bytter kanal, OK viser siste kanaler</string>
-    <string name="player_identity_info_hint">OK viser programinformasjonen</string>
-    <string name="player_channel_card_hint_no_recents">Venstre eller høyre bytter kanal</string>
     <string name="player_rail_watching">Ser på</string>
     <string name="details_read_more">Mer info</string>
     <string name="details_important_information">Detaljer</string>

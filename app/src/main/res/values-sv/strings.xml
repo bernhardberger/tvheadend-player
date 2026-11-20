@@ -907,9 +907,6 @@
     <string name="player_recorded_spoken">%1$s, inspelat %2$s, %3$s</string>
     <string name="player_channel">Kanal</string>
     <string name="player_row_recent">Senaste kanaler</string>
-    <string name="player_channel_card_hint">Vänster eller höger byter kanal, OK visar senaste kanaler</string>
-    <string name="player_identity_info_hint">OK visar programinformationen</string>
-    <string name="player_channel_card_hint_no_recents">Vänster eller höger byter kanal</string>
     <string name="player_rail_watching">Tittar på</string>
     <string name="details_read_more">Mer info</string>
     <string name="details_important_information">Detaljer</string>

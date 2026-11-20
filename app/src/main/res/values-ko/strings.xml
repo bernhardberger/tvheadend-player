@@ -872,9 +872,6 @@
     <string name="player_recorded_spoken">%1$s, %2$s 녹화, %3$s</string>
     <string name="player_channel">채널</string>
     <string name="player_row_recent">최근 채널</string>
-    <string name="player_channel_card_hint">왼쪽 또는 오른쪽으로 채널을 바꾸고, OK로 최근 채널을 표시합니다</string>
-    <string name="player_identity_info_hint">OK로 프로그램 정보를 표시합니다</string>
-    <string name="player_channel_card_hint_no_recents">왼쪽 또는 오른쪽으로 채널을 바꿉니다</string>
     <string name="player_rail_watching">시청 중</string>
     <string name="details_read_more">추가 정보</string>
     <string name="details_important_information">상세 정보</string>

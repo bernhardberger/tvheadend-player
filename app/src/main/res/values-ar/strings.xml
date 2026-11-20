@@ -1047,9 +1047,6 @@
     <string name="player_recorded_spoken">%1$s، سُجّل %2$s، %3$s</string>
     <string name="player_channel">القناة</string>
     <string name="player_row_recent">القنوات الأخيرة</string>
-    <string name="player_channel_card_hint">يتيح اليسار أو اليمين تبديل القناة، ويعرض OK القنوات الأخيرة</string>
-    <string name="player_identity_info_hint">يعرض OK معلومات البرنامج</string>
-    <string name="player_channel_card_hint_no_recents">يتيح اليسار أو اليمين تبديل القناة</string>
     <string name="player_rail_watching">قيد المشاهدة</string>
     <string name="details_read_more">معلومات إضافية</string>
     <string name="details_important_information">التفاصيل</string>

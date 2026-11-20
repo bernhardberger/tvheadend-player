@@ -844,9 +844,6 @@
     <string name="player_recorded_spoken">%1$s，录制于%2$s，%3$s</string>
     <string name="player_channel">频道</string>
     <string name="player_row_recent">最近观看的频道</string>
-    <string name="player_channel_card_hint">按左或右切换频道，按OK显示最近观看的频道</string>
-    <string name="player_identity_info_hint">按OK显示节目信息</string>
-    <string name="player_channel_card_hint_no_recents">按左或右切换频道</string>
     <string name="player_rail_watching">正在观看</string>
     <string name="details_read_more">更多信息</string>
     <string name="details_important_information">详情</string>

@@ -907,9 +907,6 @@
     <string name="player_recorded_spoken">%1$s, opgenomen %2$s, %3$s</string>
     <string name="player_channel">Zender</string>
     <string name="player_row_recent">Recente zenders</string>
-    <string name="player_channel_card_hint">Links of rechts wisselt van zender, OK toont recente zenders</string>
-    <string name="player_identity_info_hint">OK toont de programma-info</string>
-    <string name="player_channel_card_hint_no_recents">Links of rechts wisselt van zender</string>
     <string name="player_rail_watching">Je kijkt naar</string>
     <string name="details_read_more">Meer info</string>
     <string name="details_important_information">Details</string>

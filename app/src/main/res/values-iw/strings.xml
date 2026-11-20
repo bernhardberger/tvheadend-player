@@ -942,9 +942,6 @@
     <string name="player_recorded_spoken">%1$s, הקלטת %2$s, %3$s</string>
     <string name="player_channel">ערוץ</string>
     <string name="player_row_recent">ערוצים אחרונים</string>
-    <string name="player_channel_card_hint">שמאלה או ימינה להחלפת ערוץ, OK להצגת ערוצים אחרונים</string>
-    <string name="player_identity_info_hint">OK להצגת מידע על התוכנית</string>
-    <string name="player_channel_card_hint_no_recents">שמאלה או ימינה להחלפת ערוץ</string>
     <string name="player_rail_watching">כעת בצפייה</string>
     <string name="details_read_more">מידע נוסף</string>
     <string name="details_important_information">פרטים</string>
