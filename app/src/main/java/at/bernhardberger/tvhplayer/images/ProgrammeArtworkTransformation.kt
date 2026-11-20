@@ -114,4 +114,41 @@ internal class ProgrammeArtworkTransformation(
     }
 }
 
+/** [artworkLogoCorner] of [bitmap] as a view of [ratio] shows it, centre-cropped. */
+internal fun artworkLogoCorner(bitmap: Bitmap, ratio: Double, startAtRight: Boolean): ArtworkLogoCorner {
+    val source = if (bitmap.config == Bitmap.Config.HARDWARE) bitmap.copy(Bitmap.Config.ARGB_8888, false) else bitmap
+    val cropWidth = minOf(source.width, (source.height * ratio).roundToInt()).coerceAtLeast(1)
+    val cropHeight = minOf(source.height, (source.width / ratio).roundToInt()).coerceAtLeast(1)
+    val left = (source.width - cropWidth) / 2
+    val top = (source.height - cropHeight) / 2
+    val (sampleWidth, sampleHeight) = artworkAnalysisSize(cropWidth, cropHeight)
+    val pixels = artworkAnalysis(cropWidth, cropHeight, sampleWidth, sampleHeight) { y, row ->
+        source.getPixels(row, 0, cropWidth, left, top + y, cropWidth, 1)
+    }
+    return artworkLogoCorner(pixels, sampleWidth, sampleHeight, startAtRight)
+}
+
+/**
+ * Leaves the picture as it is and notes its [artworkLogoCorner] with the decode, off the main
+ * thread, so the logo can stand in its corner in the frame the picture arrives.
+ */
+internal class ArtworkLogoCornerTransformation(
+    private val ratio: Double,
+    private val startAtRight: Boolean,
+) : Transformation() {
+    override val cacheKey = "artworkLogoCorner-v1($ratio;$startAtRight)"
+
+    override suspend fun transform(input: Bitmap, size: Size): Bitmap {
+        val corner = artworkLogoCorner(input, ratio, startAtRight)
+        synchronized(corners) { corners[input] = corner }
+        return input
+    }
+
+    companion object {
+        // Keyed by the delivered bitmap itself, which the memory cache hands out again unchanged.
+        private val corners = java.util.WeakHashMap<Bitmap, ArtworkLogoCorner>()
+        fun of(bitmap: Bitmap): ArtworkLogoCorner? = synchronized(corners) { corners[bitmap] }
+    }
+}
+
 internal class NoProgrammeBackdropException : IllegalStateException("Programme cover has no backdrop scene")

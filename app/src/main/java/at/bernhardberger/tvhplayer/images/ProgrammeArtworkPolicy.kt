@@ -315,6 +315,44 @@ internal fun attentionWindow(pixels: IntArray, width: Int, height: Int, ratio: D
     return ArtworkWindow(if (vertical) 0 else start, if (vertical) start else 0, cropWidth, cropHeight)
 }
 
+/** Where a channel's logo stands on a programme picture. */
+internal enum class ArtworkLogoCorner { BOTTOM_START, BOTTOM_END, TOP_START }
+
+// A corner this calm never gives the logo up, however flat another one is.
+private const val LOGO_CORNER_CALM = 1600.0
+private const val LOGO_CORNER_BUSIER = 2.0
+
+/**
+ * The logo's corner on the picture as shown: bottom start unless that corner is busy and another is
+ * clearly calmer, bottom end before top start. Busy is the mean squared first-difference energy of
+ * [attentionWindow], so a drawn-in title or a face counts and sky or a plain ground does not.
+ * [pixels] is the analysis copy of exactly what the tile shows.
+ */
+internal fun artworkLogoCorner(pixels: IntArray, width: Int, height: Int, startAtRight: Boolean = false): ArtworkLogoCorner {
+    fun grey(x: Int, y: Int): Double {
+        val p = pixels[y * width + x]
+        return (p shr 16 and 255) * .299 + (p shr 8 and 255) * .587 + (p and 255) * .114
+    }
+    fun busy(atRight: Boolean, atBottom: Boolean): Double {
+        val xs = if (atRight) (.64 * width).roundToInt() until (.97 * width).roundToInt()
+            else (.03 * width).roundToInt() until (.36 * width).roundToInt()
+        val ys = if (atBottom) (.62 * height).roundToInt() until (.97 * height).roundToInt()
+            else (.03 * height).roundToInt() until (.38 * height).roundToInt()
+        var sum = 0.0
+        for (y in ys) for (x in xs) {
+            if (x < 1 || y < 1) continue
+            val gradient = abs(grey(x, y) - grey(x - 1, y)) + abs(grey(x, y) - grey(x, y - 1))
+            sum += gradient * gradient
+        }
+        return sum / maxOf(1, xs.count() * ys.count())
+    }
+    val bottomStart = busy(startAtRight, atBottom = true)
+    if (bottomStart < LOGO_CORNER_CALM) return ArtworkLogoCorner.BOTTOM_START
+    if (bottomStart >= LOGO_CORNER_BUSIER * busy(!startAtRight, atBottom = true)) return ArtworkLogoCorner.BOTTOM_END
+    if (bottomStart >= LOGO_CORNER_BUSIER * busy(startAtRight, atBottom = false)) return ArtworkLogoCorner.TOP_START
+    return ArtworkLogoCorner.BOTTOM_START
+}
+
 /** HSL in turns, lightness and saturation (the order used by Python colorsys). */
 internal fun artworkHsl(color: Int): DoubleArray {
     val r = (color shr 16 and 255) / 255.0; val g = (color shr 8 and 255) / 255.0; val b = (color and 255) / 255.0

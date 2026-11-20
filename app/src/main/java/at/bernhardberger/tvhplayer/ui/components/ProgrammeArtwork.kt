@@ -37,6 +37,7 @@ import coil3.request.ImageRequest
 import coil3.request.transformations
 import at.bernhardberger.tvhplayer.images.ProgrammeArtworkMode
 import at.bernhardberger.tvhplayer.images.ProgrammeArtworkTransformation
+import at.bernhardberger.tvhplayer.images.ArtworkLogoCornerTransformation
 import kotlinx.coroutines.delay
 
 /**
@@ -91,15 +92,18 @@ internal fun rememberProgrammeImageRequest(
     ratio: Double = 16.0 / 9,
     startPlateShare: Double = 0.0,
     keepWideTitleCrop: Boolean = false,
+    /** Also note the picture's [ArtworkLogoCornerTransformation] corner for a logo placed per picture. */
+    logoCorner: Boolean = false,
 ): ImageRequest? {
     val context = LocalPlatformContext.current
     val fallback = TvSurfaceColors.containerLow.toArgb()
     val plateAtEnd = LocalLayoutDirection.current == LayoutDirection.Rtl
     return remember(source, context, mode, avoidPlate, ratio, fallback, plateAtEnd,
-        startPlateShare, keepWideTitleCrop) {
+        startPlateShare, keepWideTitleCrop, logoCorner) {
         source?.let { ImageRequest.Builder(context).data(it)
-            .transformations(ProgrammeArtworkTransformation(mode, ratio, avoidPlate, plateAtEnd, fallback,
-                startPlateShare, keepWideTitleCrop)).build() }
+            .transformations(listOfNotNull(ProgrammeArtworkTransformation(mode, ratio, avoidPlate, plateAtEnd, fallback,
+                startPlateShare, keepWideTitleCrop),
+                if (logoCorner) ArtworkLogoCornerTransformation(ratio, plateAtEnd) else null)).build() }
     }
 }
 
