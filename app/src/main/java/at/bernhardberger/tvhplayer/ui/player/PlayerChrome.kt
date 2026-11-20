@@ -395,7 +395,8 @@ private fun BoxScope.ArtworkCornerLogo(picon: ChannelIcon, corner: ArtworkLogoCo
     }
     PiconBox(picon, Modifier.align(alignment).padding(ArtworkTileLogoInset)
         .size(ArtworkLogoPlateWidth, ArtworkTileLogoHeight).testTag("player-info-artwork-picon"),
-        alignment = alignment, placeholders = false)
+        // Trimmed, so the logo's visible shape and not its file's empty margin keeps the inset.
+        alignment = alignment, placeholders = false, trim = true)
 }
 
 /** The channel in the artwork's place: its picon, or its number, on [channelFallbackGround]. */

@@ -319,14 +319,19 @@ internal fun attentionWindow(pixels: IntArray, width: Int, height: Int, ratio: D
 internal enum class ArtworkLogoCorner { BOTTOM_START, BOTTOM_END, TOP_START }
 
 // A corner this calm never gives the logo up, however flat another one is.
-private const val LOGO_CORNER_CALM = 1600.0
+private const val LOGO_CORNER_CALM = .04
 private const val LOGO_CORNER_BUSIER = 2.0
+// A step in brightness between neighbouring pixels this large is a hard edge: lettering and
+// graphics have many, a photograph's texture few, even where it is busy.
+private const val LOGO_CORNER_HARD_EDGE = 70.0
+/** The widest copy [artworkLogoCorner] is scored on: about the tile's own pixels, so lettering stays sharp. */
+internal const val LOGO_CORNER_ANALYSIS_WIDTH = 384
 
 /**
  * The logo's corner on the picture as shown: bottom start unless that corner is busy and another is
- * clearly calmer, bottom end before top start. Busy is the mean squared first-difference energy of
- * [attentionWindow], so a drawn-in title or a face counts and sky or a plain ground does not.
- * [pixels] is the analysis copy of exactly what the tile shows.
+ * clearly calmer, bottom end before top start. Busy is the share of a corner's pixels on a hard
+ * edge, so a drawn-in title counts and foliage, gravel or sky hardly do. [pixels] is a copy of
+ * exactly what the tile shows, at most [LOGO_CORNER_ANALYSIS_WIDTH] wide.
  */
 internal fun artworkLogoCorner(pixels: IntArray, width: Int, height: Int, startAtRight: Boolean = false): ArtworkLogoCorner {
     fun grey(x: Int, y: Int): Double {
@@ -338,13 +343,13 @@ internal fun artworkLogoCorner(pixels: IntArray, width: Int, height: Int, startA
             else (.03 * width).roundToInt() until (.36 * width).roundToInt()
         val ys = if (atBottom) (.62 * height).roundToInt() until (.97 * height).roundToInt()
             else (.03 * height).roundToInt() until (.38 * height).roundToInt()
-        var sum = 0.0
+        var hard = 0
         for (y in ys) for (x in xs) {
             if (x < 1 || y < 1) continue
-            val gradient = abs(grey(x, y) - grey(x - 1, y)) + abs(grey(x, y) - grey(x, y - 1))
-            sum += gradient * gradient
+            val here = grey(x, y)
+            if (maxOf(abs(here - grey(x - 1, y)), abs(here - grey(x, y - 1))) >= LOGO_CORNER_HARD_EDGE) hard++
         }
-        return sum / maxOf(1, xs.count() * ys.count())
+        return hard.toDouble() / maxOf(1, xs.count() * ys.count())
     }
     val bottomStart = busy(startAtRight, atBottom = true)
     if (bottomStart < LOGO_CORNER_CALM) return ArtworkLogoCorner.BOTTOM_START

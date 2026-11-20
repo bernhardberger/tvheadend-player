@@ -121,7 +121,8 @@ internal fun artworkLogoCorner(bitmap: Bitmap, ratio: Double, startAtRight: Bool
     val cropHeight = minOf(source.height, (source.width / ratio).roundToInt()).coerceAtLeast(1)
     val left = (source.width - cropWidth) / 2
     val top = (source.height - cropHeight) / 2
-    val (sampleWidth, sampleHeight) = artworkAnalysisSize(cropWidth, cropHeight)
+    val sampleWidth = minOf(cropWidth, LOGO_CORNER_ANALYSIS_WIDTH)
+    val sampleHeight = (cropHeight.toLong() * sampleWidth / cropWidth).toInt().coerceAtLeast(1)
     val pixels = artworkAnalysis(cropWidth, cropHeight, sampleWidth, sampleHeight) { y, row ->
         source.getPixels(row, 0, cropWidth, left, top + y, cropWidth, 1)
     }
@@ -136,7 +137,7 @@ internal class ArtworkLogoCornerTransformation(
     private val ratio: Double,
     private val startAtRight: Boolean,
 ) : Transformation() {
-    override val cacheKey = "artworkLogoCorner-v1($ratio;$startAtRight)"
+    override val cacheKey = "artworkLogoCorner-v2($ratio;$startAtRight)"
 
     override suspend fun transform(input: Bitmap, size: Size): Bitmap {
         val corner = artworkLogoCorner(input, ratio, startAtRight)
