@@ -309,8 +309,9 @@ internal fun PlayerPresentedLiveTimeline(
 /**
  * The info bar's programme artwork: the programme's 16:9 image, or without it the channel's [picon]
  * (or [channelNumber]) on the channel's own ground, as the details hero falls back to, so the bar
- * keeps its shape on every channel. A loaded image carries the picon on the logo plate in its
- * bottom-start corner, like the airing cards, so the bar names the channel with or without a picture.
+ * keeps its shape on every channel. A loaded image carries the picon on the airing cards' logo plate,
+ * so the bar names the channel with or without a picture. The plate stands in the top-start corner:
+ * artwork with its title drawn in has it in the lower half more often than not.
  * It takes no focus and has no description; the info bar speaks for the programme.
  */
 @Composable
@@ -329,8 +330,7 @@ private fun ProgrammeArtworkTile(
     val load = rememberPictureLoad(model)
     val plate = picon.takeUnless { withoutChannel }
     val request = rememberProgrammeImageRequest(
-        model, ProgrammeArtworkMode.BOX, avoidPlate = plate != null,
-        ratio = (ArtworkTileWidth / ArtworkTileHeight).toDouble(),
+        model, ProgrammeArtworkMode.BOX, ratio = (ArtworkTileWidth / ArtworkTileHeight).toDouble(),
         startPlateShare = if (plate != null) {
             ((ArtworkTilePlateInset + ArtworkLogoPlateWidth) / ArtworkTileWidth).toDouble()
         } else 0.0,
@@ -344,7 +344,7 @@ private fun ProgrammeArtworkTile(
                 Modifier.fillMaxSize().testTag("player-info-artwork"), contentScale = ContentScale.Crop,
                 onSuccess = load::onSuccess, onError = { load.onError() })
             if (load.loaded && plate != null) ArtworkLogoPlate(plate,
-                Modifier.align(Alignment.BottomStart).padding(ArtworkTilePlateInset).testTag("player-info-artwork-picon"))
+                Modifier.align(Alignment.TopStart).padding(ArtworkTilePlateInset).testTag("player-info-artwork-picon"))
         }
     }
 }
