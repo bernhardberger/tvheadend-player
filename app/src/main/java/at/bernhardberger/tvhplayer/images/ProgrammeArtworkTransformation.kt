@@ -121,12 +121,23 @@ internal fun artworkLogoCorner(bitmap: Bitmap, ratio: Double, startAtRight: Bool
     val cropHeight = minOf(source.height, (source.width / ratio).roundToInt()).coerceAtLeast(1)
     val left = (source.width - cropWidth) / 2
     val top = (source.height - cropHeight) / 2
-    val sampleWidth = minOf(cropWidth, LOGO_CORNER_ANALYSIS_WIDTH)
-    val sampleHeight = (cropHeight.toLong() * sampleWidth / cropWidth).toInt().coerceAtLeast(1)
-    val pixels = artworkAnalysis(cropWidth, cropHeight, sampleWidth, sampleHeight) { y, row ->
-        source.getPixels(row, 0, cropWidth, left, top + y, cropWidth, 1)
+    // Whole-pixel blocks averaged with integers: one read and one pass, nothing allocated per pixel.
+    val block = ((cropWidth + LOGO_CORNER_ANALYSIS_WIDTH - 1) / LOGO_CORNER_ANALYSIS_WIDTH).coerceAtLeast(1)
+    val sampleWidth = (cropWidth / block).coerceAtLeast(1)
+    val sampleHeight = (cropHeight / block).coerceAtLeast(1)
+    val read = IntArray(cropWidth * cropHeight)
+    source.getPixels(read, 0, cropWidth, left, top, cropWidth, cropHeight)
+    val pixels = if (block == 1) read else IntArray(sampleWidth * sampleHeight) { index ->
+        val x0 = index % sampleWidth * block; val y0 = index / sampleWidth * block
+        var r = 0; var g = 0; var b = 0; var n = 0
+        for (y in y0 until minOf(y0 + block, cropHeight)) for (x in x0 until minOf(x0 + block, cropWidth)) {
+            val p = read[y * cropWidth + x]
+            r += p shr 16 and 255; g += p shr 8 and 255; b += p and 255; n++
+        }
+        (0xff shl 24) or (r / n shl 16) or (g / n shl 8) or (b / n)
     }
-    return artworkLogoCorner(pixels, sampleWidth, sampleHeight, startAtRight)
+    return artworkLogoCorner(pixels, if (block == 1) cropWidth else sampleWidth,
+        if (block == 1) cropHeight else sampleHeight, startAtRight)
 }
 
 /**
@@ -137,7 +148,7 @@ internal class ArtworkLogoCornerTransformation(
     private val ratio: Double,
     private val startAtRight: Boolean,
 ) : Transformation() {
-    override val cacheKey = "artworkLogoCorner-v3($ratio;$startAtRight)"
+    override val cacheKey = "artworkLogoCorner-v4($ratio;$startAtRight)"
 
     override suspend fun transform(input: Bitmap, size: Size): Bitmap {
         val corner = artworkLogoCorner(input, ratio, startAtRight)
