@@ -375,8 +375,8 @@ private fun ProgrammeArtworkTile(
  */
 @Composable
 private fun BoxScope.ArtworkCornerLogo(picon: ChannelIcon, corner: ArtworkLogoCorner) {
-    val atBottom = corner != ArtworkLogoCorner.TOP_START
-    val atStart = corner != ArtworkLogoCorner.BOTTOM_END
+    val atBottom = corner == ArtworkLogoCorner.BOTTOM_START || corner == ArtworkLogoCorner.BOTTOM_END
+    val atStart = corner == ArtworkLogoCorner.BOTTOM_START || corner == ArtworkLogoCorner.TOP_START
     Box(Modifier.matchParentSize().drawBehind {
         val atLeft = atStart == (layoutDirection == LayoutDirection.Ltr)
         val center = Offset(if (atLeft) 0f else size.width, if (atBottom) size.height else 0f)
@@ -392,6 +392,7 @@ private fun BoxScope.ArtworkCornerLogo(picon: ChannelIcon, corner: ArtworkLogoCo
         ArtworkLogoCorner.BOTTOM_START -> Alignment.BottomStart
         ArtworkLogoCorner.BOTTOM_END -> Alignment.BottomEnd
         ArtworkLogoCorner.TOP_START -> Alignment.TopStart
+        ArtworkLogoCorner.TOP_END -> Alignment.TopEnd
     }
     PiconBox(picon, Modifier.align(alignment).padding(ArtworkTileLogoInset)
         .size(ArtworkLogoPlateWidth, ArtworkTileLogoHeight).testTag("player-info-artwork-picon"),
@@ -433,8 +434,8 @@ private fun RecordingArtworkFallback() {
 /** The artwork slot: a 16:9 card three grid columns wide, as in every row, so the text starts on the fourth. */
 private val ArtworkTileWidth = TvGridColumnWidth * 3 + TvGridGutter * 2
 /** The logo plate's distance from the picture's corner, the cards' embed inset. */
-private val ArtworkTileLogoInset = 6.dp
-private val ArtworkTileLogoHeight = 32.dp
+private val ArtworkTileLogoInset = 10.dp
+private val ArtworkTileLogoHeight = 24.dp
 private val ArtworkLogoShadeWidth = 115.dp
 private val ArtworkLogoShadeHeight = 70.dp
 private val ArtworkTileHeight = 110.dp

@@ -316,46 +316,63 @@ internal fun attentionWindow(pixels: IntArray, width: Int, height: Int, ratio: D
 }
 
 /** Where a channel's logo stands on a programme picture. */
-internal enum class ArtworkLogoCorner { BOTTOM_START, BOTTOM_END, TOP_START }
+internal enum class ArtworkLogoCorner { BOTTOM_START, BOTTOM_END, TOP_START, TOP_END }
 
-// A corner this calm never gives the logo up, however flat another one is.
+// A corner with this few hard edges never gives the logo up, however flat another one is.
 private const val LOGO_CORNER_CALM = .04
 private const val LOGO_CORNER_BUSIER = 2.0
 // A step in brightness between neighbouring pixels this large is a hard edge: lettering and
 // graphics have many, a photograph's texture few, even where it is busy.
 private const val LOGO_CORNER_HARD_EDGE = 70.0
+// What a corner's soft detail (a face, foliage) weighs beside its hard edges when two corners
+// are both free of lettering.
+private const val LOGO_CORNER_SOFT = .75
 /** The widest copy [artworkLogoCorner] is scored on: about the tile's own pixels, so lettering stays sharp. */
 internal const val LOGO_CORNER_ANALYSIS_WIDTH = 384
 
 /**
- * The logo's corner on the picture as shown: bottom start unless that corner is busy and another is
- * clearly calmer, bottom end before top start. Busy is the share of a corner's pixels on a hard
- * edge, so a drawn-in title counts and foliage, gravel or sky hardly do. [pixels] is a copy of
- * exactly what the tile shows, at most [LOGO_CORNER_ANALYSIS_WIDTH] wide.
+ * The logo's corner on the picture as shown: bottom start unless a drawn-in title stands there,
+ * then the calmest corner that clearly has less lettering, bottom end before top start before top
+ * end. Lettering is the share of a corner's pixels on a hard edge, which foliage, gravel or sky
+ * hardly have; between corners without it, the mean step in brightness tells an empty ground from
+ * a face. [pixels] is a copy of exactly what the tile shows, at most [LOGO_CORNER_ANALYSIS_WIDTH] wide.
  */
 internal fun artworkLogoCorner(pixels: IntArray, width: Int, height: Int, startAtRight: Boolean = false): ArtworkLogoCorner {
     fun grey(x: Int, y: Int): Double {
         val p = pixels[y * width + x]
         return (p shr 16 and 255) * .299 + (p shr 8 and 255) * .587 + (p and 255) * .114
     }
-    fun busy(atRight: Boolean, atBottom: Boolean): Double {
+    // Hard-edge share, and that plus the weighted mean step.
+    fun busy(atRight: Boolean, atBottom: Boolean): Pair<Double, Double> {
         val xs = if (atRight) (.64 * width).roundToInt() until (.97 * width).roundToInt()
             else (.03 * width).roundToInt() until (.36 * width).roundToInt()
         val ys = if (atBottom) (.62 * height).roundToInt() until (.97 * height).roundToInt()
             else (.03 * height).roundToInt() until (.38 * height).roundToInt()
-        var hard = 0
+        var hard = 0; var steps = 0.0
         for (y in ys) for (x in xs) {
             if (x < 1 || y < 1) continue
             val here = grey(x, y)
-            if (maxOf(abs(here - grey(x - 1, y)), abs(here - grey(x, y - 1))) >= LOGO_CORNER_HARD_EDGE) hard++
+            val step = maxOf(abs(here - grey(x - 1, y)), abs(here - grey(x, y - 1)))
+            if (step >= LOGO_CORNER_HARD_EDGE) hard++
+            steps += step
         }
-        return hard.toDouble() / maxOf(1, xs.count() * ys.count())
+        val count = maxOf(1, xs.count() * ys.count())
+        val share = hard.toDouble() / count
+        return share to share + LOGO_CORNER_SOFT * steps / count / 255
     }
-    val bottomStart = busy(startAtRight, atBottom = true)
-    if (bottomStart < LOGO_CORNER_CALM) return ArtworkLogoCorner.BOTTOM_START
-    if (bottomStart >= LOGO_CORNER_BUSIER * busy(!startAtRight, atBottom = true)) return ArtworkLogoCorner.BOTTOM_END
-    if (bottomStart >= LOGO_CORNER_BUSIER * busy(startAtRight, atBottom = false)) return ArtworkLogoCorner.TOP_START
-    return ArtworkLogoCorner.BOTTOM_START
+    val (lettering, _) = busy(startAtRight, atBottom = true)
+    if (lettering < LOGO_CORNER_CALM) return ArtworkLogoCorner.BOTTOM_START
+    var best = ArtworkLogoCorner.BOTTOM_START
+    var bestScore = Double.MAX_VALUE
+    for ((corner, atRight, atBottom) in listOf(
+        Triple(ArtworkLogoCorner.BOTTOM_END, !startAtRight, true),
+        Triple(ArtworkLogoCorner.TOP_START, startAtRight, false),
+        Triple(ArtworkLogoCorner.TOP_END, !startAtRight, false),
+    )) {
+        val (share, score) = busy(atRight, atBottom)
+        if (lettering >= LOGO_CORNER_BUSIER * share && score < bestScore) { best = corner; bestScore = score }
+    }
+    return best
 }
 
 /** HSL in turns, lightness and saturation (the order used by Python colorsys). */
