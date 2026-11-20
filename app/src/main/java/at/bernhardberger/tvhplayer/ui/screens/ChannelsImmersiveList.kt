@@ -597,10 +597,12 @@ internal fun ChannelsRowCard(
             // In the picture's own corner; the top end is the recording mark's, the top start the
             // playing mark's while it shows.
             val artLogo = channel.icon
+            val progress = programmeProgress(running, nowSec)
             if (showsArt && artLogo != null) ArtworkCornerLogo(artLogo,
                 artLoad.logoCorner(setOfNotNull(ArtworkLogoCorner.TOP_END,
                     ArtworkLogoCorner.TOP_START.takeIf { playbackIndicator != ChannelPlaybackIndicator.NONE })),
-                Modifier.testTag("$tag-art-picon"), scale = width / AiringCardWidth)
+                Modifier.testTag("$tag-art-picon"), scale = width / AiringCardWidth,
+                bottomEdge = if (progress != null) TvCardProgressStripHeight else 0.dp)
             if (playbackIndicator != ChannelPlaybackIndicator.NONE) {
                 CardPlaybackPlate(Modifier.align(Alignment.TopStart).padding(ImmersiveCardEmbedInset)) {
                     ChannelPlaybackMarker(playbackIndicator)
@@ -612,7 +614,6 @@ internal fun ChannelsRowCard(
                 recordingDescription = if (showChannelMark) stringResource(R.string.channel_recording_spoken) else null)
             // Same embedded strip as the airing cards; the card's border keeps clear of it.
             // The playing channel's strip follows the viewer, like the other channel cards.
-            val progress = programmeProgress(running, nowSec)
             if (progress != null) ProgressStrip(progress,
                 Modifier.align(Alignment.BottomStart).fillMaxWidth().testTag("$tag-progress"),
                 color = progressColor(watchingIndicator(running, nowSec).isPlayingItem, recording != null),

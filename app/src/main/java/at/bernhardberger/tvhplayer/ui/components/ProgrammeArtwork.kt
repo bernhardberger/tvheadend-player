@@ -18,6 +18,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import at.bernhardberger.tvheadend.sdk.core.*
@@ -145,7 +146,8 @@ internal fun ProgrammeArtwork(
             AsyncImage(request, null,
                 contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize(),
                 onSuccess = load::onSuccess, onError = { load.onError() })
-            if (load.loaded && channelIcon != null) ArtworkCornerLogo(channelIcon, load.logoCorner(takenCorners), plateModifier)
+            if (load.loaded && channelIcon != null) ArtworkCornerLogo(channelIcon, load.logoCorner(takenCorners), plateModifier,
+                bottomEdge = if (progress != null) TvCardProgressStripHeight else 0.dp)
         }
         // Same embedded strip as the player's schedule tiles; card borders keep clear of it.
         if (progress != null) ProgressStrip(progress,
@@ -164,11 +166,13 @@ private val ArtworkLogoShadeHeight = 70.dp
 /**
  * A channel's logo on a programme picture, in [corner], on a shade that darkens only that corner:
  * no plate edge, and a ground for a light logo on a bright picture. Sized for an airing card's
- * picture; a smaller picture passes its [scale], so the logo keeps its share.
+ * picture; a smaller picture passes its [scale], so the logo keeps its share. A progress strip
+ * along the picture's bottom is its [bottomEdge]: a bottom logo keeps its inset from the strip.
  */
 @Composable
 internal fun BoxScope.ArtworkCornerLogo(
     picon: ChannelIcon, corner: ArtworkLogoCorner, modifier: Modifier = Modifier, scale: Float = 1f,
+    bottomEdge: Dp = 0.dp,
 ) {
     val atBottom = corner == ArtworkLogoCorner.BOTTOM_START || corner == ArtworkLogoCorner.BOTTOM_END
     val atStart = corner == ArtworkLogoCorner.BOTTOM_START || corner == ArtworkLogoCorner.TOP_START
@@ -189,8 +193,8 @@ internal fun BoxScope.ArtworkCornerLogo(
         ArtworkLogoCorner.TOP_START -> Alignment.TopStart
         ArtworkLogoCorner.TOP_END -> Alignment.TopEnd
     }
-    PiconBox(picon, Modifier.align(alignment).padding(ArtworkLogoInset * scale)
-        .size(ArtworkLogoPlateWidth * scale, ArtworkLogoHeight * scale).then(modifier),
+    PiconBox(picon, Modifier.align(alignment).padding(bottom = if (atBottom) bottomEdge else 0.dp)
+        .padding(ArtworkLogoInset * scale).size(ArtworkLogoPlateWidth * scale, ArtworkLogoHeight * scale).then(modifier),
         // Trimmed, so the logo's visible shape and not its file's empty margin keeps the inset.
         alignment = alignment, placeholders = false, trim = true)
 }
