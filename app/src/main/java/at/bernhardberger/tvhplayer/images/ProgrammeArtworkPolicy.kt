@@ -497,7 +497,7 @@ private const val LOGO_CALM = .04
 private const val LOGO_LIGHT_GROUND = .4
 private const val LOGO_DARK_GROUND = .03
 /** The widest copy [artworkLogoPlaces] is scored on: about a card's own pixels, so lettering stays sharp. */
-internal const val LOGO_CORNER_ANALYSIS_WIDTH = 384
+internal const val LOGO_CORNER_ANALYSIS_WIDTH = 512
 
 /**
  * The logo's places on the picture as shown, best first: a card takes the first one nothing else

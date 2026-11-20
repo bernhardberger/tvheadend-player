@@ -158,6 +158,31 @@ class BackdropTransformationTest {
         }
     }
 
+    @Test
+    fun thinLetteringKeepsTheSameLogoCornerAtCardAndPlayerTileSizes() {
+        fun picture(width: Int, height: Int): Bitmap {
+            val input = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            input.eraseColor(Color.rgb(160, 160, 160))
+            // The same thin wordmark in the lower left at both delivery sizes.
+            val glyphWidth = width / 40
+            val glyphHeight = height / 16
+            for (letter in 0..2) {
+                val left = width / 32 + letter * (glyphWidth + width / 64)
+                for (y in 0 until glyphHeight) for (x in 0 until glyphWidth) {
+                    if (x == 0 || x == glyphWidth - 1 || y == glyphHeight / 2) {
+                        input.setPixel(left + x, height * 5 / 6 + y, Color.rgb(224, 224, 224))
+                    }
+                }
+            }
+            return input
+        }
+
+        val card = artworkLogoPlaces(picture(356, 200), 356.0 / 200, .2, startAtRight = false).first()
+        val tile = artworkLogoPlaces(picture(392, 220), 392.0 / 220, .2, startAtRight = false).first()
+        assertNotEquals(ArtworkLogoCorner.BOTTOM_START, card.corner)
+        assertEquals(card.corner, tile.corner)
+    }
+
     private fun meanRed(bitmap: Bitmap): Float {
         var sum = 0L
         for (x in 0 until bitmap.width) for (y in 0 until bitmap.height) sum += Color.red(bitmap.getPixel(x, y))

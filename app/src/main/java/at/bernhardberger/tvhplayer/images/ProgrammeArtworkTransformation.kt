@@ -138,15 +138,7 @@ internal fun artworkLogoPlaces(bitmap: Bitmap, ratio: Double, logoShare: Double,
     }
     val width = if (block == 1) cropWidth else sampleWidth
     val height = if (block == 1) cropHeight else sampleHeight
-    // Trial only: what the corner rule costs per picture on the device, in this thread's own time.
-    val copied = android.os.Debug.threadCpuTimeNanos()
-    val lettering = artworkLettering(pixels, width, height)
-    val lettered = android.os.Debug.threadCpuTimeNanos()
-    val places = artworkLogoPlaces(pixels, width, height, logoShare, startAtRight, lettering)
-    val done = android.os.Debug.threadCpuTimeNanos()
-    android.util.Log.i("LogoPlaceTiming", "letteringCpuMs=${(lettered - copied) / 100_000 / 10.0} " +
-        "cornersCpuMs=${(done - lettered) / 100_000 / 10.0} copy=${width}x$height")
-    return places
+    return artworkLogoPlaces(pixels, width, height, logoShare, startAtRight)
 }
 
 /**
