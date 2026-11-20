@@ -17,9 +17,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,6 +47,9 @@ import at.bernhardberger.tvhplayer.ui.TvSpacing4
 import coil3.compose.AsyncImage
 import at.bernhardberger.tvhplayer.images.ProgrammeArtworkMode
 import at.bernhardberger.tvhplayer.ui.components.rememberProgrammeImageRequest
+import at.bernhardberger.tvhplayer.ui.components.rememberPictureLoad
+import at.bernhardberger.tvhplayer.ui.components.ArtworkLogoPlate
+import at.bernhardberger.tvhplayer.ui.components.ArtworkLogoPlateWidth
 import kotlinx.coroutines.launch
 
 /**
@@ -309,8 +309,9 @@ internal fun PlayerPresentedLiveTimeline(
 /**
  * The info bar's programme artwork: the programme's 16:9 image, or without it the channel's [picon]
  * (or [channelNumber]) on the channel's own ground, as the details hero falls back to, so the bar
- * keeps its shape on every channel. It takes no focus and has no description; the info bar speaks
- * for the programme.
+ * keeps its shape on every channel. A loaded image carries the picon on the logo plate in its
+ * bottom-start corner, like the airing cards, so the bar names the channel with or without a picture.
+ * It takes no focus and has no description; the info bar speaks for the programme.
  */
 @Composable
 private fun ProgrammeArtworkTile(
@@ -321,20 +322,29 @@ private fun ProgrammeArtworkTile(
     modifier: Modifier,
     withoutChannel: Boolean,
 ) {
-    val id = artwork
     val currentSession = LocalArtworkContext.current.currentSession
-    var failed by remember(id, currentSession) { mutableStateOf(false) }
+    val model = remember(artwork, currentSession) {
+        if (artwork != null && currentSession != null) programmeArtworkModel(artwork, currentSession) else null
+    }
+    val load = rememberPictureLoad(model)
+    val plate = picon.takeUnless { withoutChannel }
     val request = rememberProgrammeImageRequest(
-        if (id != null && currentSession != null) programmeArtworkModel(id, currentSession) else null,
-        ProgrammeArtworkMode.BOX, ratio = (ArtworkTileWidth / ArtworkTileHeight).toDouble(),
+        model, ProgrammeArtworkMode.BOX, avoidPlate = plate != null,
+        ratio = (ArtworkTileWidth / ArtworkTileHeight).toDouble(),
+        startPlateShare = if (plate != null) {
+            ((ArtworkTilePlateInset + ArtworkLogoPlateWidth) / ArtworkTileWidth).toDouble()
+        } else 0.0,
     )
     Box(modifier.size(ArtworkTileWidth, ArtworkTileHeight).clip(ArtworkTileShape)
         .focusProperties { canFocus = false }.testTag("player-info-artwork-tile")) {
         // Under the picture too, so loading shows the same channel ground as a missing picture.
         if (withoutChannel) RecordingArtworkFallback() else ChannelArtworkFallback(picon, channelId, channelNumber)
-        if (id != null && currentSession != null && !failed) {
+        if (model != null && !load.failed) {
             AsyncImage(request, null,
-                Modifier.fillMaxSize().testTag("player-info-artwork"), contentScale = ContentScale.Crop, onError = { failed = true })
+                Modifier.fillMaxSize().testTag("player-info-artwork"), contentScale = ContentScale.Crop,
+                onSuccess = load::onSuccess, onError = { load.onError() })
+            if (load.loaded && plate != null) ArtworkLogoPlate(plate,
+                Modifier.align(Alignment.BottomStart).padding(ArtworkTilePlateInset).testTag("player-info-artwork-picon"))
         }
     }
 }
@@ -372,5 +382,7 @@ private fun RecordingArtworkFallback() {
 
 /** The artwork slot: a 16:9 card three grid columns wide, as in every row, so the text starts on the fourth. */
 private val ArtworkTileWidth = TvGridColumnWidth * 3 + TvGridGutter * 2
+/** The logo plate's distance from the picture's corner, the cards' embed inset. */
+private val ArtworkTilePlateInset = 8.dp
 private val ArtworkTileHeight = 110.dp
 private val ArtworkTileShape = RoundedCornerShape(8.dp)
