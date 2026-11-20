@@ -149,7 +149,7 @@ internal class ArtworkLogoCornerTransformation(
     private val logoShare: Double,
     private val startAtRight: Boolean,
 ) : Transformation() {
-    override val cacheKey = "artworkLogoPlace-v1($ratio;$logoShare;$startAtRight)"
+    override val cacheKey = "artworkLogoPlace-v2($ratio;$logoShare;$startAtRight)"
 
     override suspend fun transform(input: Bitmap, size: Size): Bitmap {
         val found = artworkLogoPlaces(input, ratio, logoShare, startAtRight)
