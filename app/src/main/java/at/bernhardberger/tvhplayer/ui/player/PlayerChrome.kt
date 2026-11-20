@@ -313,7 +313,7 @@ internal fun PlayerPresentedLiveTimeline(
  * The info bar's programme artwork: the programme's 16:9 image, or without it the channel's [picon]
  * (or [channelNumber]) on the channel's own ground, as the details hero falls back to, so the bar
  * keeps its shape on every channel. A loaded image carries the picon in a corner, so the bar names
- * the channel with or without a picture. [artworkLogoCorners] picks the corner per picture, because
+ * the channel with or without a picture. [artworkLogoPlaces] picks the corner per picture, because
  * artwork with its title drawn in has it in a different place each time.
  * It takes no focus and has no description; the info bar speaks for the programme.
  */
@@ -338,7 +338,7 @@ private fun ProgrammeArtworkTile(
         startPlateShare = if (logo != null) {
             ((ArtworkLogoInset + ArtworkLogoPlateWidth) / ArtworkTileWidth).toDouble()
         } else 0.0,
-        logoCorner = logo != null,
+        logoShare = if (logo != null) (ArtworkLogoPlateWidth / ArtworkTileWidth).toDouble() else 0.0,
     )
     Box(modifier.size(ArtworkTileWidth, ArtworkTileHeight).clip(ArtworkTileShape)
         .focusProperties { canFocus = false }.testTag("player-info-artwork-tile")) {
@@ -349,7 +349,7 @@ private fun ProgrammeArtworkTile(
                 Modifier.fillMaxSize().testTag("player-info-artwork"), contentScale = ContentScale.Crop,
                 onSuccess = load::onSuccess, onError = { load.onError() })
             // Nothing else stands on this tile, so the picture's best corner is the logo's.
-            if (load.loaded && logo != null) ArtworkCornerLogo(logo, load.logoCorner(),
+            if (load.loaded && logo != null) ArtworkCornerLogo(logo, load.logoPlace(),
                 Modifier.testTag("player-info-artwork-picon"))
         }
     }

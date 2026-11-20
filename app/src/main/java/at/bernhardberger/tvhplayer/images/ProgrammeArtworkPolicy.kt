@@ -4,6 +4,7 @@
 package at.bernhardberger.tvhplayer.images
 
 import kotlin.math.abs
+import kotlin.math.pow
 import kotlin.math.roundToInt
 import java.util.Random
 
@@ -318,60 +319,97 @@ internal fun attentionWindow(pixels: IntArray, width: Int, height: Int, ratio: D
 /** Where a channel's logo stands on a programme picture. */
 internal enum class ArtworkLogoCorner { BOTTOM_START, BOTTOM_END, TOP_START, TOP_END }
 
-// A corner with this few hard edges never gives the logo up, however flat another one is.
-private const val LOGO_CORNER_CALM = .04
-private const val LOGO_CORNER_BUSIER = 2.0
-// A step in brightness between neighbouring pixels this large is a hard edge: lettering and
-// graphics have many, a photograph's texture few, even where it is busy.
-private const val LOGO_CORNER_HARD_EDGE = 70.0
-// What a corner's soft detail (a face, foliage) weighs beside its hard edges when two corners
-// are both free of lettering.
-private const val LOGO_CORNER_SOFT = .75
-/** The widest copy [artworkLogoCorner] is scored on: about the tile's own pixels, so lettering stays sharp. */
+/** What a logo stands on in its corner: the corner shade, or the picture itself where that is calm and clearly light or dark. */
+internal enum class ArtworkLogoGround { SHADE, LIGHT_PICTURE, DARK_PICTURE }
+
+internal data class ArtworkLogoPlace(val corner: ArtworkLogoCorner, val ground: ArtworkLogoGround)
+
+// A step between neighbouring pixels counts from the low value and fully at the high one, on the
+// strongest colour channel: lettering in a colour of the picture's own brightness still counts.
+private const val LOGO_STEP_LOW = 24.0
+private const val LOGO_STEP_HIGH = 72.0
+// The room a logo needs around its box, and the wider neighbourhood that only crowds it, in box widths.
+private const val LOGO_ROOM = 6.0 / 56
+private const val LOGO_NEIGHBOURHOOD = 20.0 / 56
+private const val LOGO_NEIGHBOUR_WEIGHT = .5
+// Detail low in a picture is far more often its drawn-in title than detail at the top, where
+// faces and sky are: a logo over a face is the lesser fault.
+private const val LOGO_BOTTOM_WEIGHT = 2.5
+// Corners this close are equally good; the earlier one in reading order from the bottom start wins.
+private const val LOGO_TIE = .01
+// A ground this calm needs no shade when it is also clearly light or dark (linear luminance).
+private const val LOGO_CALM = .04
+private const val LOGO_LIGHT_GROUND = .4
+private const val LOGO_DARK_GROUND = .03
+/** The widest copy [artworkLogoPlaces] is scored on: about a card's own pixels, so lettering stays sharp. */
 internal const val LOGO_CORNER_ANALYSIS_WIDTH = 384
 
 /**
- * The logo's corners on the picture as shown, best first, bottom start always last: a card takes
- * the first one nothing else of its own stands in. Bottom start alone unless a drawn-in title
- * stands there; then the corners that clearly have less lettering, calmest first, bottom end before
- * top start before top end. Lettering is the share of a corner's pixels on a hard edge, which
- * foliage, gravel or sky hardly have; between corners without it, the mean step in brightness tells
- * an empty ground from a face. [pixels] is a copy of exactly what the card shows, at most
- * [LOGO_CORNER_ANALYSIS_WIDTH] wide.
+ * The logo's places on the picture as shown, best first: a card takes the first one nothing else
+ * of its own stands in. A corner is scored on the detail in the space the logo needs, its box of
+ * [logoShare] of the picture's width plus room around it, and on half the detail of its wider
+ * neighbourhood, so a logo keeps off a drawn-in title and does not squeeze in beside one. Detail
+ * in the bottom corners weighs more, because titles stand low. Nearly equal corners go to the
+ * bottom start, then top start, bottom end, top end. [pixels] is a copy of exactly what the card
+ * shows, at most [LOGO_CORNER_ANALYSIS_WIDTH] wide.
  */
-internal fun artworkLogoCorners(pixels: IntArray, width: Int, height: Int, startAtRight: Boolean = false): List<ArtworkLogoCorner> {
-    fun grey(x: Int, y: Int): Double {
-        val p = pixels[y * width + x]
-        return (p shr 16 and 255) * .299 + (p shr 8 and 255) * .587 + (p and 255) * .114
-    }
-    // Hard-edge share, and that plus the weighted mean step.
-    fun busy(atRight: Boolean, atBottom: Boolean): Pair<Double, Double> {
-        val xs = if (atRight) (.64 * width).roundToInt() until (.97 * width).roundToInt()
-            else (.03 * width).roundToInt() until (.36 * width).roundToInt()
-        val ys = if (atBottom) (.62 * height).roundToInt() until (.97 * height).roundToInt()
-            else (.03 * height).roundToInt() until (.38 * height).roundToInt()
-        var hard = 0; var steps = 0.0
-        for (y in ys) for (x in xs) {
-            if (x < 1 || y < 1) continue
-            val here = grey(x, y)
-            val step = maxOf(abs(here - grey(x - 1, y)), abs(here - grey(x, y - 1)))
-            if (step >= LOGO_CORNER_HARD_EDGE) hard++
-            steps += step
+internal fun artworkLogoPlaces(
+    pixels: IntArray, width: Int, height: Int, logoShare: Double, startAtRight: Boolean = false,
+): List<ArtworkLogoPlace> {
+    val boxWidth = logoShare * width
+    val boxHeight = boxWidth * 24 / 56
+    val inset = boxWidth * 10 / 56
+    val room = LOGO_ROOM * boxWidth
+    val reach = LOGO_NEIGHBOURHOOD * boxWidth
+    class Scored(val place: ArtworkLogoPlace, val cost: Double)
+    fun score(corner: ArtworkLogoCorner, atRight: Boolean, atBottom: Boolean): Scored {
+        val left = if (atRight) width - inset - boxWidth else inset
+        val top = if (atBottom) height - inset - boxHeight else inset
+        val x0 = (left - reach).roundToInt().coerceAtLeast(1); val x1 = (left + boxWidth + reach).roundToInt().coerceAtMost(width)
+        val y0 = (top - reach).roundToInt().coerceAtLeast(1); val y1 = (top + boxHeight + reach).roundToInt().coerceAtMost(height)
+        val rx0 = (left - room).roundToInt(); val rx1 = (left + boxWidth + room).roundToInt()
+        val ry0 = (top - room).roundToInt(); val ry1 = (top + boxHeight + room).roundToInt()
+        val bx0 = left.roundToInt(); val bx1 = (left + boxWidth).roundToInt()
+        val by0 = top.roundToInt(); val by1 = (top + boxHeight).roundToInt()
+        var near = 0.0; var nearCount = 0; var needed = 0.0; var neededCount = 0
+        var r = 0L; var g = 0L; var b = 0L; var boxCount = 0
+        for (y in y0 until y1) for (x in x0 until x1) {
+            val p = pixels[y * width + x]; val l = pixels[y * width + x - 1]; val u = pixels[(y - 1) * width + x]
+            val pr = p shr 16 and 255; val pg = p shr 8 and 255; val pb = p and 255
+            val step = maxOf(
+                maxOf(abs(pr - (l shr 16 and 255)), abs(pg - (l shr 8 and 255)), abs(pb - (l and 255))),
+                maxOf(abs(pr - (u shr 16 and 255)), abs(pg - (u shr 8 and 255)), abs(pb - (u and 255))))
+            val detail = ((step - LOGO_STEP_LOW) / (LOGO_STEP_HIGH - LOGO_STEP_LOW)).coerceIn(0.0, 1.0)
+            near += detail; nearCount++
+            if (x in rx0 until rx1 && y in ry0 until ry1) { needed += detail; neededCount++ }
+            if (x in bx0 until bx1 && y in by0 until by1) { r += pr; g += pg; b += pb; boxCount++ }
         }
-        val count = maxOf(1, xs.count() * ys.count())
-        val share = hard.toDouble() / count
-        return share to share + LOGO_CORNER_SOFT * steps / count / 255
+        val neededShare = needed / maxOf(1, neededCount)
+        val cost = maxOf(neededShare, LOGO_NEIGHBOUR_WEIGHT * near / maxOf(1, nearCount)) *
+            if (atBottom) LOGO_BOTTOM_WEIGHT else 1.0
+        fun linear(sum: Long) = (sum.toDouble() / maxOf(1, boxCount) / 255).pow(2.2)
+        val luminance = .2126 * linear(r) + .7152 * linear(g) + .0722 * linear(b)
+        val ground = when {
+            neededShare >= LOGO_CALM -> ArtworkLogoGround.SHADE
+            luminance >= LOGO_LIGHT_GROUND -> ArtworkLogoGround.LIGHT_PICTURE
+            luminance <= LOGO_DARK_GROUND -> ArtworkLogoGround.DARK_PICTURE
+            else -> ArtworkLogoGround.SHADE
+        }
+        return Scored(ArtworkLogoPlace(corner, ground), cost)
     }
-    val (lettering, _) = busy(startAtRight, atBottom = true)
-    if (lettering < LOGO_CORNER_CALM) return listOf(ArtworkLogoCorner.BOTTOM_START)
-    return listOf(
-        Triple(ArtworkLogoCorner.BOTTOM_END, !startAtRight, true),
-        Triple(ArtworkLogoCorner.TOP_START, startAtRight, false),
-        Triple(ArtworkLogoCorner.TOP_END, !startAtRight, false),
-    ).mapNotNull { (corner, atRight, atBottom) ->
-        val (share, score) = busy(atRight, atBottom)
-        if (lettering >= LOGO_CORNER_BUSIER * share) corner to score else null
-    }.sortedBy { it.second }.map { it.first } + ArtworkLogoCorner.BOTTOM_START
+    val left = mutableListOf(
+        score(ArtworkLogoCorner.BOTTOM_START, startAtRight, atBottom = true),
+        score(ArtworkLogoCorner.TOP_START, startAtRight, atBottom = false),
+        score(ArtworkLogoCorner.BOTTOM_END, !startAtRight, atBottom = true),
+        score(ArtworkLogoCorner.TOP_END, !startAtRight, atBottom = false),
+    )
+    val ranked = mutableListOf<ArtworkLogoPlace>()
+    while (left.isNotEmpty()) {
+        val best = left.minOf { it.cost }
+        val next = left.first { it.cost <= best + LOGO_TIE }
+        ranked += next.place; left -= next
+    }
+    return ranked
 }
 
 /** HSL in turns, lightness and saturation (the order used by Python colorsys). */

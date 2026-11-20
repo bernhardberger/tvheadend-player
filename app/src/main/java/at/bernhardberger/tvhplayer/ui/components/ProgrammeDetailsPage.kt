@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.components
 
+import at.bernhardberger.tvhplayer.images.ArtworkLogoCorner
 import android.content.res.Resources
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
@@ -956,13 +957,18 @@ private fun AiringCard(
         art = programmeArtwork(item),
         picon = channel?.icon,
         picture = {
+            val markState = recording?.state
             ProgrammeArtwork(programmeArtwork(item), channel?.icon, item.progress(nowSec).takeIf { running },
                 Modifier.fillMaxSize(),
                 plateModifier = Modifier.testTag("details-card-plate-${item.id.value}"),
-                progressModifier = Modifier.testTag("details-card-progress-${item.id.value}"))
+                progressModifier = Modifier.testTag("details-card-progress-${item.id.value}"),
+                // The top end is the recording mark's only while one shows.
+                takenCorners = setOfNotNull(ArtworkLogoCorner.TOP_END.takeIf {
+                    markState == DvrEntryState.RECORDING || markState == DvrEntryState.RECORDING_ERROR ||
+                        markState == DvrEntryState.SCHEDULED
+                }))
             // A recording airing carries the REC badge in the embed corner, as the zap cards do;
             // a scheduled one the Home shelf's mark.
-            val markState = recording?.state
             if (markState == DvrEntryState.RECORDING || markState == DvrEntryState.RECORDING_ERROR) RecordingBadge(markState,
                 Modifier.align(Alignment.TopEnd).padding(8.dp).testTag("details-card-recording-${item.id.value}"),
                 rule = recording.rule)

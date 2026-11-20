@@ -114,8 +114,8 @@ internal class ProgrammeArtworkTransformation(
     }
 }
 
-/** [artworkLogoCorners] of [bitmap] as a view of [ratio] shows it, centre-cropped. */
-internal fun artworkLogoCorners(bitmap: Bitmap, ratio: Double, startAtRight: Boolean): List<ArtworkLogoCorner> {
+/** [artworkLogoPlaces] of [bitmap] as a view of [ratio] shows it, centre-cropped. */
+internal fun artworkLogoPlaces(bitmap: Bitmap, ratio: Double, logoShare: Double, startAtRight: Boolean): List<ArtworkLogoPlace> {
     val source = if (bitmap.config == Bitmap.Config.HARDWARE) bitmap.copy(Bitmap.Config.ARGB_8888, false) else bitmap
     val cropWidth = minOf(source.width, (source.height * ratio).roundToInt()).coerceAtLeast(1)
     val cropHeight = minOf(source.height, (source.width / ratio).roundToInt()).coerceAtLeast(1)
@@ -136,30 +136,31 @@ internal fun artworkLogoCorners(bitmap: Bitmap, ratio: Double, startAtRight: Boo
         }
         (0xff shl 24) or (r / n shl 16) or (g / n shl 8) or (b / n)
     }
-    return artworkLogoCorners(pixels, if (block == 1) cropWidth else sampleWidth,
-        if (block == 1) cropHeight else sampleHeight, startAtRight)
+    return artworkLogoPlaces(pixels, if (block == 1) cropWidth else sampleWidth,
+        if (block == 1) cropHeight else sampleHeight, logoShare, startAtRight)
 }
 
 /**
- * Leaves the picture as it is and notes its [artworkLogoCorners] with the decode, off the main
+ * Leaves the picture as it is and notes its [artworkLogoPlaces] with the decode, off the main
  * thread, so the logo can stand in its corner in the frame the picture arrives.
  */
 internal class ArtworkLogoCornerTransformation(
     private val ratio: Double,
+    private val logoShare: Double,
     private val startAtRight: Boolean,
 ) : Transformation() {
-    override val cacheKey = "artworkLogoCorner-v5($ratio;$startAtRight)"
+    override val cacheKey = "artworkLogoPlace-v1($ratio;$logoShare;$startAtRight)"
 
     override suspend fun transform(input: Bitmap, size: Size): Bitmap {
-        val found = artworkLogoCorners(input, ratio, startAtRight)
-        synchronized(corners) { corners[input] = found }
+        val found = artworkLogoPlaces(input, ratio, logoShare, startAtRight)
+        synchronized(places) { places[input] = found }
         return input
     }
 
     companion object {
         // Keyed by the delivered bitmap itself, which the memory cache hands out again unchanged.
-        private val corners = java.util.WeakHashMap<Bitmap, List<ArtworkLogoCorner>>()
-        fun of(bitmap: Bitmap): List<ArtworkLogoCorner>? = synchronized(corners) { corners[bitmap] }
+        private val places = java.util.WeakHashMap<Bitmap, List<ArtworkLogoPlace>>()
+        fun of(bitmap: Bitmap): List<ArtworkLogoPlace>? = synchronized(places) { places[bitmap] }
     }
 }
 

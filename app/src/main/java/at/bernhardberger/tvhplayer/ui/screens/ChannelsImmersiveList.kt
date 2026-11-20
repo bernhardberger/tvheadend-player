@@ -69,6 +69,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -177,6 +178,7 @@ import at.bernhardberger.tvhplayer.ui.components.ChannelAccentFill
 import at.bernhardberger.tvhplayer.ui.components.channelAccentGround
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.ArtworkCornerLogo
+import at.bernhardberger.tvhplayer.ui.components.ArtworkChannelName
 import at.bernhardberger.tvhplayer.ui.components.AiringCardWidth
 import at.bernhardberger.tvhplayer.ui.components.ArtworkLogoPlateWidth
 
@@ -541,7 +543,9 @@ internal fun ChannelsRowCard(
         ((ImmersiveCardEmbedInset + ArtworkLogoPlateWidth * (width / AiringCardWidth)) / width).toDouble()
     } else 0.0
     val artRequest = rememberProgrammeImageRequest(artModel, mode = ProgrammeArtworkMode.BOX,
-        startPlateShare = plateShare, keepWideTitleCrop = true, logoCorner = channel.icon != null)
+        startPlateShare = plateShare, keepWideTitleCrop = true,
+        // The logo keeps an airing card's share of the picture at every card width.
+        logoShare = if (channel.icon != null) (ArtworkLogoPlateWidth / AiringCardWidth).toDouble() else 0.0)
     val showsArt = artModel != null && artLoad.loaded
     val recording = programmeRecording.takeIf { running != null }
     val showChannelMark = showChannelRecordingMark(
@@ -566,7 +570,12 @@ internal fun ChannelsRowCard(
                     )
                     val logo = Modifier.fillMaxWidth(ImmersiveCardLogoWidthFraction)
                         .fillMaxHeight().testTag("$tag-picon")
-                    PiconBox(channel.icon, logo, ground = ground)
+                    val name = channel.name.orEmpty()
+                    // Without a logo the channel's name stands in its place, unless the card names it below.
+                    if (channel.icon == null && !channelName && name.isNotBlank()) Text(name, logo.wrapContentHeight(),
+                        style = MaterialTheme.typography.titleMedium, color = TvTextColors.primary,
+                        textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    else PiconBox(channel.icon, logo, ground = ground)
                 }
             }
             val lineModifier = Modifier.align(Alignment.BottomStart).fillMaxWidth()
@@ -594,15 +603,19 @@ internal fun ChannelsRowCard(
                 contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().testTag("$tag-art"),
                 onSuccess = artLoad::onSuccess, onError = { artLoad.onError() })
             // The picture carries the channel's logo in its embed corner, like the airing cards.
-            // In the picture's own corner; the top end is the recording mark's, the top start the
-            // playing mark's while it shows.
+            // In the picture's own corner; the top end is the recording mark's and the top start
+            // the playing mark's, each only while it shows.
             val artLogo = channel.icon
             val progress = programmeProgress(running, nowSec)
+            val bottomEdge = if (progress != null) TvCardProgressStripHeight else 0.dp
             if (showsArt && artLogo != null) ArtworkCornerLogo(artLogo,
-                artLoad.logoCorner(setOfNotNull(ArtworkLogoCorner.TOP_END,
+                artLoad.logoPlace(setOfNotNull(
+                    ArtworkLogoCorner.TOP_END.takeIf { recording != null || showChannelMark },
                     ArtworkLogoCorner.TOP_START.takeIf { playbackIndicator != ChannelPlaybackIndicator.NONE })),
-                Modifier.testTag("$tag-art-picon"), scale = width / AiringCardWidth,
-                bottomEdge = if (progress != null) TvCardProgressStripHeight else 0.dp)
+                Modifier.testTag("$tag-art-picon"), scale = width / AiringCardWidth, bottomEdge = bottomEdge)
+            // A channel without a logo is named on the picture, unless the card names it below.
+            else if (showsArt && !channelName && !channel.name.isNullOrBlank()) ArtworkChannelName(
+                channel.name.orEmpty(), Modifier.testTag("$tag-art-name"), scale = width / AiringCardWidth, bottomEdge = bottomEdge)
             if (playbackIndicator != ChannelPlaybackIndicator.NONE) {
                 CardPlaybackPlate(Modifier.align(Alignment.TopStart).padding(ImmersiveCardEmbedInset)) {
                     ChannelPlaybackMarker(playbackIndicator)
