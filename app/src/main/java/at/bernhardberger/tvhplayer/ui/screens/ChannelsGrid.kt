@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvhplayer.core.runningRecordingForEvent
+
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.gestures.BringIntoViewSpec
@@ -170,7 +172,8 @@ internal fun ChannelsGrid(
                     nowSec = now,
                     playbackIndicator = frame.playbackIndicator.takeIf { channelId == frame.playbackChannelId }
                         ?: ChannelPlaybackIndicator.NONE,
-                    recording = channelId in frame.recordingIds,
+                    channelRecording = channelId in frame.recordingIds,
+                    programmeRecording = frame.observation.runningRecordingForEvent(event),
                     onClick = { onPlay(channel) },
                     onLongClick = { onOpenContextMenu(channelId) },
                     programmeLoading = frame.guideLoading,

@@ -961,6 +961,7 @@
     <string name="rail_now_playing_description">Зараз відтворюється: %1$s, %2$s, %3$s.</string>
     <string name="rail_now_playing_description_channel">Зараз відтворюється: %1$s, %2$s.</string>
     <string name="player_recording">Триває запис</string>
+    <string name="channel_recording_spoken">На цьому каналі триває запис</string>
     <string name="player_recorded_on">Записано %1$s</string>
     <string name="player_recorded_ends">Записано %1$s • Кінець %2$s</string>
     <string name="player_recording_until">Запис до %1$s</string>
@@ -1194,8 +1195,6 @@
     <string name="home_recording_starts_at">Початок о %1$s</string>
     <string name="home_all_recordings">Усі записи</string>
     <string name="home_activity_watching_live">Перегляд прямого ефіру</string>
-    <string name="home_activity_recording">Триває запис</string>
-    <string name="home_activity_watching_and_recording">Перегляд і запис</string>
     <string name="home_upcoming_summary">Далі: %1$s • %2$s</string>
     <plurals name="home_upcoming_more">
         <item quantity="one">Ще %1$d запланований запис</item>
@@ -1255,4 +1254,5 @@
     <string name="server_none_in_use">Жодне підключення не використовується</string>
     <string name="server_list_unavailable">Зараз не вдається прочитати збережені підключення на цьому телевізорі</string>
     <string name="server_none_in_use_description">Жодне підключення не використовується. Виберіть підключення, щоб знову дивитися ТБ.</string>
+    <string name="return_to_full_screen">Повернутися до повноекранного режиму</string>
 </resources>

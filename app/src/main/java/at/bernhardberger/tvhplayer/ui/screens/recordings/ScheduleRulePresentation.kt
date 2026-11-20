@@ -219,7 +219,7 @@ private fun ScheduleUpcomingEntries(item: AutomaticRecordingListItem, channels: 
                 Box(Modifier.padding(end = TvSpacing4).height(titleLine), contentAlignment = Alignment.Center) {
                     CompositionLocalProvider(LocalContentColor provides TvTextColors.tertiary) {
                         RecordingStatusIndicator(DvrEntryState.SCHEDULED,
-                            Modifier.testTag("automatic-recording-pane-next-mark"),
+                            Modifier.size(StatusIconSize).testTag("automatic-recording-pane-next-mark"),
                             rule = recordingRule(item.kind), announceState = false)
                     }
                 }

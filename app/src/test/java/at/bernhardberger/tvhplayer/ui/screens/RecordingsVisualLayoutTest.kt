@@ -11,6 +11,10 @@ import at.bernhardberger.tvhplayer.testutil.pressKey
 import at.bernhardberger.tvhplayer.testutil.settleFrames
 
 import android.app.Application
+import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
+import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
+import at.bernhardberger.tvhplayer.ui.components.LocalWatchingIndicator
+import at.bernhardberger.tvhplayer.ui.components.LocalWatchingTarget
 import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import at.bernhardberger.tvhplayer.ui.TvCardFocusedScale
@@ -1573,9 +1577,11 @@ class RecordingsVisualLayoutTest {
             useUnmergedTree = true).assertIsDisplayed()
         key(Key.DirectionRight)
         focused("recording-list-entry-21")
-        compose.onNodeWithTag("recording-list-state-failed", useUnmergedTree = true).assertIsDisplayed()
-        compose.onNode(hasTestTag("recording-list-metadata-21") and hasText("Failed", substring = true),
-            useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("recording-list-state-21", useUnmergedTree = true).assertIsDisplayed()
+        val failedMark = compose.onNode(hasTestTag("recording-list-state-21") and
+            hasContentDescription(ApplicationProvider.getApplicationContext<Application>().getString(R.string.recording_state_failed)),
+            useUnmergedTree = true)
+        assertTrue(bounds("recording-list-headline-21").right <= failedMark.fetchSemanticsNode().boundsInRoot.left)
         // The state no longer leads the row, so the logo keeps the column it has on every other tab.
         assertEquals(32f * 1.05f, bounds("recording-list-leading-21").width, .1f)
         capture("problems", 1f)
@@ -2416,7 +2422,8 @@ class RecordingsVisualLayoutTest {
         assertTrue("'$shown' lines=${hint.lineCount} size=${hint.size} c=${hint.layoutInput.constraints}",
             shown.endsWith(if (german) "20 Min. • $size Vorzeitig beendet" else "20m • $size Stopped early"))
         compose.onNodeWithTag("recording-list-stopped-early", useUnmergedTree = true).assertIsDisplayed()
-        assertEquals(1, hint.lineCount)
+        // The trailing marks slot narrows the text column at large text sizes.
+        if (!german) assertEquals(1, hint.lineCount)
         assertFalse("The stopped-early marker must remain whole", hint.hasVisualOverflow)
         // A plain completed recording does not repeat its state.
         compose.onNode(hasTestTag("recording-list-metadata-1") and
@@ -2439,12 +2446,19 @@ class RecordingsVisualLayoutTest {
                 at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingMetadataPane(entry, null, null)
             }
         }
-        val elapsed = formatRecordedDuration(600, ApplicationProvider.getApplicationContext<Application>().resources)
-        compose.onNodeWithText("$elapsed recorded", substring = true).assertIsDisplayed()
+        val resources = ApplicationProvider.getApplicationContext<Application>().resources
+        val length = resources.getString(R.string.recording_length_recorded, formatRecordedDuration(600, resources))
+        val lengthText = hasText(length, substring = true) or hasText(length.replace(' ', '\u00a0'), substring = true)
+        compose.onNode(lengthText and hasAnyAncestor(hasTestTag("recording-metadata-facts")), useUnmergedTree = true)
+            .assertIsDisplayed()
+        val timing = hasAnyAncestor(hasTestTag("recording-metadata-metadata"))
+        compose.onNode(lengthText and timing, useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithText("until", substring = true).assertDoesNotExist()
         val origin = ApplicationProvider.getApplicationContext<Application>().getString(R.string.recording_from_automatic)
-        compose.onNodeWithTag("recording-badge", useUnmergedTree = true)
+        compose.onNode(hasTestTag("recording-badge") and hasAnyAncestor(hasTestTag("recording-metadata-eyebrow")),
+            useUnmergedTree = true)
             .assert(hasContentDescription(origin, substring = true))
+        compose.onNode(hasTestTag("recording-badge") and timing, useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithTag("recording-metadata-time-left", useUnmergedTree = true).assertDoesNotExist()
     }
 
@@ -2466,14 +2480,15 @@ class RecordingsVisualLayoutTest {
             hasAnyAncestor(hasTestTag("recordings-problems-list")), useUnmergedTree = true).assertCountEquals(2)
         assertTrue(bounds("recording-list-entry-30").bottom <= bounds("recording-list-entry-31").top)
         // A missed row carries the failure mark, read out as what happened.
-        compose.onNode(hasTestTag("recording-list-metadata-30") and hasText("Missed", substring = true),
+        compose.onNode(hasTestTag("recording-list-state-30") and
+            hasContentDescription(ApplicationProvider.getApplicationContext<Application>().getString(R.string.recording_notice_missed)),
             useUnmergedTree = true).assertExists()
         // Neither left a file, so both rows give their date but no length.
         compose.onNode(hasTestTag("recording-list-metadata-30") and hasText("90m", substring = true),
             useUnmergedTree = true).assertDoesNotExist()
         compose.onNode(hasTestTag("recording-list-metadata-31") and hasText("90m", substring = true),
             useUnmergedTree = true).assertDoesNotExist()
-        compose.onAllNodesWithTag("recording-list-state-failed", useUnmergedTree = true).assertCountEquals(2)
+        compose.onNodeWithTag("recording-list-state-31", useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("recording-list-state-cancelled", useUnmergedTree = true).assertDoesNotExist()
         capture("problems-missed", 1f)
     }
@@ -2572,19 +2587,30 @@ class RecordingsVisualLayoutTest {
         val now = System.currentTimeMillis() / 1000L
         show(entries = listOf(
             recording(1, "Archived", "Documentaries/archived.ts"),
-            DvrEntry.create(DvrEntryId(30), title = "Live match", state = DvrEntryState.RECORDING,
+            DvrEntry.create(DvrEntryId(30), title = "Live match", state = DvrEntryState.RECORDING_ERROR,
                 start = Instant.fromEpochSeconds(now - 600), stop = Instant.fromEpochSeconds(now + 3_000),
                 files = listOf(DvrRecordingFile.create(sizeBytes = 2_400_000_000L)),
-                channelName = "Ridge Earth HD", subtitle = "Second half"),
+                channelName = "Ridge Earth HD", subtitle = "Second half", playCount = 1),
             DvrEntry.create(DvrEntryId(31), title = "Weak signal", state = DvrEntryState.RECORDING_ERROR,
                 start = Instant.fromEpochSeconds(now - 300), stop = Instant.fromEpochSeconds(now + 3_300),
                 channelName = "Ridge Earth HD"),
-        ))
+        ), watchingRecording = DvrEntryId(30))
         awaitList()
         openScheduleSubnav()
         compose.onNodeWithText("Schedule").assertIsFocused()
         repeat(3) { key(Key.DirectionDown) }
         focused("recording-list-entry-30")
+        val playing = hasTestTag("channel-playing-indicator")
+        val logo = bounds("recording-list-leading-30")
+        val mark = compose.onNode(playing and hasAnyAncestor(hasTestTag("recording-list-entry-30")),
+            useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        assertTrue("Playback stays off the logo", logo.right < mark.left)
+        assertEquals(bounds("recording-list-entry-30").center.y, mark.center.y, 1f)
+        assertTrue(bounds("recording-list-state-30").right < mark.left)
+        assertEquals(bounds("recording-list-state-30").width, mark.width, .5f)
+        compose.onNodeWithTag("recording-list-watched-30", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNode(playing and hasAnyAncestor(hasTestTag("recording-metadata-eyebrow")),
+            useUnmergedTree = true).assertDoesNotExist()
         assertOverlineAboveTitle(30)
         // The overline gives the start and the stop; the state is the dot at the row's end.
         compose.onNode(hasTestTag("recording-list-metadata-30") and hasText("• until", substring = true),
@@ -2594,15 +2620,21 @@ class RecordingsVisualLayoutTest {
         val size = formatFileSize(2_400_000_000L, ApplicationProvider.getApplicationContext<Application>())
         compose.onNodeWithTag("recording-list-metadata-30", useUnmergedTree = true)
             .assert(!hasText(size, substring = true))
-        assertTrailingStateMark(30, "Recording now")
+        val recordingErrors = ApplicationProvider.getApplicationContext<Application>()
+            .getString(R.string.recording_state_recording_errors)
+        assertTrailingStateMark(30, recordingErrors)
         // Only the 32dp logo (with the focus scale) leads the row.
         assertEquals(32f * 1.05f, bounds("recording-list-leading-30").width, .1f)
-        compose.onNodeWithTag("recording-list-errors-30", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithTag("recording-list-errors-30", useUnmergedTree = true).assertExists()
         key(Key.DirectionDown)
         focused("recording-list-entry-31")
+        compose.onNode(playing and hasAnyAncestor(hasTestTag("recording-list-entry-30")),
+            useUnmergedTree = true).assertExists()
         // Errors while recording add the error mark beside the dot.
-        assertTrailingStateMark(31, "Recording • errors")
+        assertTrailingStateMark(31, recordingErrors)
         assertTrue(bounds("recording-list-errors-31").left > bounds("recording-list-state-31").right)
+        // Compare the same native focus scale on both rows.
+        assertEquals(mark.right, bounds("recording-list-errors-31").right, 1f)
         capture("schedule-running-row", 1f)
         assertNoCommands()
     }
@@ -3152,7 +3184,7 @@ class RecordingsVisualLayoutTest {
         diskSpace: DvrDiskSpaceState = DvrDiskSpaceState.Unknown, channels: List<Channel> = emptyList(),
         snapshotLoaded: Boolean = true, autorecRules: List<at.bernhardberger.tvheadend.sdk.core.AutorecRule> = emptyList(),
         canModify: Boolean = true, repository: (DvrRepository) -> DvrRepository = { it },
-        shellBackEnabled: Boolean = false) {
+        shellBackEnabled: Boolean = false, watchingRecording: DvrEntryId? = null) {
         endPaddingState.value = endPadding
         val recordings = entries ?: if (empty) emptyList() else listOf(
             recording(1, LONG_TITLE, "Documentaries/northern.ts"),
@@ -3179,6 +3211,9 @@ class RecordingsVisualLayoutTest {
             CompositionLocalProvider(
                 LocalDensity provides Density(LocalDensity.current.density, scale),
                 LocalBrowsePreparationContext provides preparationContext.value,
+                LocalWatchingTarget provides watchingRecording?.let(AppPlaybackTarget::Recording),
+                LocalWatchingIndicator provides if (watchingRecording == null) ChannelPlaybackIndicator.NONE
+                    else ChannelPlaybackIndicator.PLAYING,
             ) {
                 TVHeadendPlayerTheme {
                     var shellBack by androidx.compose.runtime.remember { mutableStateOf<() -> Unit>({}) }
@@ -3408,11 +3443,10 @@ class RecordingsVisualLayoutTest {
     private fun assertTrailingStateMark(id: Int, description: String) {
         compose.onNodeWithTag("recording-list-state-$id", useUnmergedTree = true)
             .assertIsDisplayed().assertContentDescriptionEquals(description)
-        // At the right end of the title line, so the overline and supporting line keep their full width.
         val mark = bounds("recording-list-state-$id")
         val title = bounds("recording-list-headline-$id")
         assertTrue(mark.left > title.right)
-        assertTrue((mark.top + mark.bottom) / 2 in title.top..title.bottom)
+        assertEquals(bounds("recording-list-entry-$id").center.y, mark.center.y, 1f)
         compose.onNode(hasTestTag("recording-list-metadata-$id") and hasText(description, substring = true),
             useUnmergedTree = true).assertDoesNotExist()
     }
@@ -3423,7 +3457,7 @@ class RecordingsVisualLayoutTest {
         val mark = bounds("recording-list-watched-$id")
         val title = bounds("recording-list-headline-$id")
         assertTrue(mark.left > title.right)
-        assertTrue((mark.top + mark.bottom) / 2 in title.top..title.bottom)
+        assertEquals(bounds("recording-list-entry-$id").center.y, mark.center.y, 1f)
     }
 
     private fun assertOverlineAboveTitle(id: Long) {

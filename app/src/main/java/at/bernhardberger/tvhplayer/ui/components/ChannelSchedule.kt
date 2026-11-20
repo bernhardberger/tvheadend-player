@@ -465,7 +465,8 @@ private fun ChannelScheduleRow(
             val headlineColor = LocalContentColor.current.let { if (ended) it.copy(alpha = TvTextSecondaryAlpha) else it }
             CompositionLocalProvider(LocalContentColor provides headlineColor) {
                 ScheduleHeadline(formatHm(start), timeWidth) {
-                    Text(event.title.orEmpty(), Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(event.title.orEmpty(), Modifier.weight(1f, fill = recording == null),
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
                     if (recording != null && !failed) {
                         Spacer(Modifier.width(TvSpacing8))
                         RecordingStatusIndicator(recording, rule = entry.rule, focused = focused)
@@ -473,7 +474,7 @@ private fun ChannelScheduleRow(
                     if (failed) {
                         Spacer(Modifier.width(TvSpacing8))
                         Icon(painterResource(R.drawable.ic_error_outlined), contentDescription = null,
-                            modifier = Modifier.size(StatusIconSize), tint = errorMarkColor(focused))
+                            modifier = Modifier.size(recordingMarkSize()), tint = errorMarkColor(focused))
                     }
                 }
             }

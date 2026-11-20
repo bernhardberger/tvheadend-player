@@ -6,12 +6,16 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.isSpecified
 import androidx.tv.material3.Icon
 import androidx.tv.material3.LocalContentColor
+import androidx.tv.material3.LocalTextStyle
 import androidx.tv.material3.MaterialTheme
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
@@ -23,6 +27,12 @@ import at.bernhardberger.tvhplayer.ui.TvTextSecondaryAlpha
 
 /** Icon size for status marks set next to small text: chips, guide cells, list rows. */
 val StatusIconSize: Dp = 16.dp
+
+@Composable
+internal fun recordingMarkSize(style: TextStyle = LocalTextStyle.current): Dp {
+    val fontSize = style.fontSize.takeIf { it.isSpecified } ?: MaterialTheme.typography.labelMedium.fontSize
+    return with(LocalDensity.current) { fontSize.toDp() } * (16f / 14f)
+}
 
 /** The kind of rule a recording comes from, when the server says it has one. */
 enum class RecordingRule(@StringRes val label: Int) {
@@ -53,12 +63,15 @@ fun recordingRule(kind: AutomaticRecordingKind?): RecordingRule? = when (kind) {
  */
 @Composable
 fun RecordingStatusIndicator(
-    state: DvrEntryState,
+    state: DvrEntryState?,
     modifier: Modifier = Modifier,
     rule: RecordingRule? = null,
     announceState: Boolean = true,
     focused: Boolean = false,
     skipped: Boolean = false,
+    descriptionOverride: String? = null,
+    textStyle: TextStyle = LocalTextStyle.current,
+    size: Dp = recordingMarkSize(textStyle),
 ) {
     val content = LocalContentColor.current
     val (@DrawableRes icon, tint) = when (state) {
@@ -66,6 +79,7 @@ fun RecordingStatusIndicator(
             (if (rule != null) R.drawable.ic_fiber_smart_record else R.drawable.ic_fiber_manual_record) to
                 recordingMarkColor(focused)
         DvrEntryState.COMPLETED -> R.drawable.ic_video_library to content.copy(alpha = TvTextSecondaryAlpha)
+        DvrEntryState.COMPLETED_ERROR, DvrEntryState.MISSED -> R.drawable.ic_error_outlined to errorMarkColor(focused)
         DvrEntryState.SCHEDULED ->
             (when {
                 skipped -> R.drawable.ic_event_busy
@@ -74,17 +88,23 @@ fun RecordingStatusIndicator(
             }) to content
         else -> return
     }
-    val stateDescription = stringResource(recordingStatusDescription(state, rule, skipped))
-    val description = if (rule != null &&
-        state in listOf(DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR)) {
-        stringResource(R.string.recording_state_and_origin, stateDescription, stringResource(rule.label))
-    } else stateDescription
     Icon(
         painter = painterResource(icon),
-        contentDescription = description.takeIf { announceState },
-        modifier = modifier.size(StatusIconSize),
+        contentDescription = if (announceState) {
+            descriptionOverride ?: recordingStatusSpoken(state, rule, skipped)
+        } else null,
+        modifier = modifier.size(size),
         tint = tint,
     )
+}
+
+@Composable
+internal fun recordingStatusSpoken(state: DvrEntryState?, rule: RecordingRule?, skipped: Boolean = false): String? {
+    if (state == null) return null
+    val stateDescription = stringResource(recordingStatusDescription(state, rule, skipped))
+    return if (rule != null && (state == DvrEntryState.RECORDING || state == DvrEntryState.RECORDING_ERROR)) {
+        stringResource(R.string.recording_state_and_origin, stateDescription, stringResource(rule.label))
+    } else stateDescription
 }
 
 @StringRes
@@ -96,6 +116,8 @@ private fun recordingStatusDescription(
     DvrEntryState.RECORDING_ERROR -> R.string.recording_state_recording_errors
     DvrEntryState.RECORDING -> R.string.recording_state_recording
     DvrEntryState.COMPLETED -> R.string.details_recorded
+    DvrEntryState.COMPLETED_ERROR -> R.string.recording_state_failed
+    DvrEntryState.MISSED -> R.string.recording_notice_missed
     DvrEntryState.SCHEDULED -> if (skipped) R.string.autorec_editor_skipped
         else rule?.label ?: R.string.recording_state_scheduled
     else -> rule?.label ?: R.string.recording_state_scheduled
@@ -115,11 +137,12 @@ fun ScheduledIndicator(
     modifier: Modifier = Modifier,
     tint: Color = LocalContentColor.current,
     contentDescription: String? = null,
+    textStyle: TextStyle = LocalTextStyle.current,
 ) {
     Icon(
         painter = painterResource(R.drawable.ic_schedule),
         contentDescription = contentDescription,
-        modifier = modifier.size(StatusIconSize),
+        modifier = modifier.size(recordingMarkSize(textStyle)),
         tint = tint,
     )
 }

@@ -1,5 +1,8 @@
 package at.bernhardberger.tvhplayer.core
 
+import at.bernhardberger.tvheadend.sdk.core.SessionObservation
+import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
+
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
@@ -131,13 +134,13 @@ private const val RECENTLY_RECORDED_WINDOW_SECONDS = 7L * 24 * 60 * 60
  * Home's rows in the fixed spec order, each omitted when nothing fills it. Pure classification: playback,
  * Guide and DVR detail cards draw themselves from these items; the All recordings card belongs to the UI.
  */
-fun homeSections(input: HomeInput): List<HomeSection> {
+fun homeSections(input: HomeInput, observation: SessionObservation): List<HomeSection> {
     val resumeOffered = input.dvrEntries
         .associate { it.id to (offeredResumePosition(input.admission(it)) != null) }
     val continueWatching = continueWatchingSection(input, resumeOffered)
         .takeUnless { HomeSectionKind.CONTINUE_WATCHING in input.hiddenSections }
     return buildList {
-        currentActivitySection(input)?.let(::add)
+        currentActivitySection(input, observation)?.let(::add)
         recentChannelsSection(input)?.let(::add)
         onNowSection(input)?.let(::add)
         genresSection(input)?.let(::add)
@@ -175,35 +178,25 @@ fun homeRestoreFocus(sections: List<HomeSection>, previous: HomeFocusKey): HomeF
 }
 
 /**
- * Playback first, then everything else recording right now. A playing live channel that is itself being
- * recorded stays one card marked as recording; a running recording of a playing channel is that channel,
- * so any further entries for it drop rather than repeat it.
+ * Playback first, then every other running recording. Only the displayed programme's own entry
+ * (or the exact DVR entry being played) can share the playback card.
  */
-private fun currentActivitySection(input: HomeInput): HomeSection.CurrentActivity? {
+@OptIn(ExperimentalTvheadendApi::class)
+private fun currentActivitySection(input: HomeInput, observation: SessionObservation): HomeSection.CurrentActivity? {
     val running = input.dvrEntries
         .filter(::recordingIsRunning)
         .sortedBy { it.start?.epochSeconds ?: Long.MAX_VALUE }
     val playing = input.playing
+    val playingEntryId = when (playing) {
+        is HomePlaying.LiveChannel -> observation.runningRecordingForEvent(input.currentEvents[playing.channelId])?.id
+        is HomePlaying.Recording -> playing.entryId
+        null -> null
+    }
     val items = buildList {
-        when (playing) {
-            is HomePlaying.LiveChannel -> add(
-                CurrentActivityItem(
-                    playing = playing,
-                    recording = running.firstOrNull { it.channelId == playing.channelId },
-                ),
-            )
-            is HomePlaying.Recording -> add(
-                CurrentActivityItem(
-                    playing = playing,
-                    recording = running.firstOrNull { it.id == playing.entryId },
-                ),
-            )
-            null -> Unit
+        if (playing != null) {
+            add(CurrentActivityItem(playing, running.firstOrNull { it.id == playingEntryId }))
         }
-        val playingChannelId = (playing as? HomePlaying.LiveChannel)?.channelId
-        val playingEntryId = (playing as? HomePlaying.Recording)?.entryId
         running.forEach { entry ->
-            if (playingChannelId != null && entry.channelId == playingChannelId) return@forEach
             if (entry.id == playingEntryId) return@forEach
             add(CurrentActivityItem(playing = null, recording = entry))
         }

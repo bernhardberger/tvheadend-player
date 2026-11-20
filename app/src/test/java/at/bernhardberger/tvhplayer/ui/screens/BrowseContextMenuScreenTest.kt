@@ -786,6 +786,7 @@ class BrowseContextMenuScreenTest {
     @Test fun runningRecordingMenuWatchesLiveAfterPlaybackActions() {
         show(recordings = true, recordingState = DvrEntryState.RECORDING, growingFile = true)
         compose.onNodeWithTag("recording-list-entry-1").requestFocus().performKeyInput { pressKey(Key.Menu) }
+        compose.onNodeWithTag("browse-context-recording", useUnmergedTree = true).assertExists()
         compose.onNodeWithText("Watch").assertIsFocused().performKeyInput {
             pressKey(Key.DirectionDown); pressKey(Key.DirectionDown)
         }

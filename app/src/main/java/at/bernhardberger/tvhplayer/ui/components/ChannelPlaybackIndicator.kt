@@ -129,22 +129,7 @@ internal fun ChannelPlaybackMarker(
     })
     val slot = modifier.size(size).testTag("channel-${indicator.name.lowercase()}-indicator")
     if (indicator == ChannelPlaybackIndicator.TUNING) {
-        // TV Material 1.1.0 has no progress primitive; use the installed Material one.
-        Box(slot) {
-            val progressModifier = Modifier.fillMaxSize().clearAndSetSemantics {
-                if (announceState) contentDescription = description
-            }
-            if (animated) CircularProgressIndicator(
-                modifier = progressModifier,
-                color = LocalContentColor.current,
-                strokeWidth = 2.dp,
-            ) else CircularProgressIndicator(
-                progress = { 0.75f },
-                modifier = progressModifier,
-                color = LocalContentColor.current,
-                strokeWidth = 2.dp,
-            )
-        }
+        ChannelTuningMarker(description.takeIf { announceState }, animated, modifier = slot)
     } else if (indicator == ChannelPlaybackIndicator.PLAYING) {
         val phase = if (animated) rememberInfiniteTransition(label = "watching").animateFloat(
             initialValue = 0f, targetValue = 1f,
@@ -169,6 +154,26 @@ internal fun ChannelPlaybackMarker(
             contentDescription = description.takeIf { announceState },
             tint = LocalContentColor.current,
             modifier = slot,
+        )
+    }
+}
+
+@Composable
+private fun ChannelTuningMarker(description: String?, animated: Boolean, modifier: Modifier = Modifier) {
+    // TV Material 1.1.0 has no progress primitive; use the installed Material one.
+    Box(modifier) {
+        val progressModifier = Modifier.fillMaxSize().clearAndSetSemantics {
+            if (description != null) contentDescription = description
+        }
+        if (animated) CircularProgressIndicator(
+            modifier = progressModifier,
+            color = LocalContentColor.current,
+            strokeWidth = 2.dp,
+        ) else CircularProgressIndicator(
+            progress = { 0.75f },
+            modifier = progressModifier,
+            color = LocalContentColor.current,
+            strokeWidth = 2.dp,
         )
     }
 }

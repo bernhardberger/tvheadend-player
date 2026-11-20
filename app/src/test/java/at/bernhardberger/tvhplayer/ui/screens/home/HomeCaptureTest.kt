@@ -861,7 +861,7 @@ class HomeCaptureTest {
                 dvrState = DvrRepositoryState.Current(DvrSnapshot.create(emptyList())),
             ) else SessionObservation.create(), playing = null,
         ) else base
-        val sections = homeSections(scene.input)
+        val sections = homeSections(scene.input, scene.observation)
         installFixtures(portraitArtwork)
         val playing = scene.playing
         val nowPlaying = playing?.let {

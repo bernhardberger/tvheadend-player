@@ -891,6 +891,7 @@
     <string name="rail_now_playing_description">Lejátszás alatt: %1$s, %2$s, %3$s.</string>
     <string name="rail_now_playing_description_channel">Lejátszás alatt: %1$s, %2$s.</string>
     <string name="player_recording">Felvétel folyamatban</string>
+    <string name="channel_recording_spoken">Felvétel folyamatban ezen a csatornán</string>
     <string name="player_recorded_on">Felvéve: %1$s</string>
     <string name="player_recorded_ends">Felvéve: %1$s • Vége: %2$s</string>
     <string name="player_recording_until">Felvétel vége: %1$s</string>
@@ -1105,8 +1106,6 @@
     <string name="home_recording_starts_at">Kezdés: %1$s</string>
     <string name="home_all_recordings">Összes felvétel</string>
     <string name="home_activity_watching_live">Élő adás nézése</string>
-    <string name="home_activity_recording">Felvétel folyamatban</string>
-    <string name="home_activity_watching_and_recording">Nézés és felvétel</string>
     <string name="home_upcoming_summary">Következő: %1$s • %2$s</string>
     <plurals name="home_upcoming_more">
         <item quantity="one">Még %1$d ütemezett</item>
@@ -1164,4 +1163,5 @@
     <string name="server_none_in_use">Nincs használatban kapcsolat</string>
     <string name="server_list_unavailable">A mentett kapcsolatok jelenleg nem olvashatók ezen a TV-n</string>
     <string name="server_none_in_use_description">Nincs használatban kapcsolat. Válassz egyet, hogy újra TV-t nézhess.</string>
+    <string name="return_to_full_screen">Vissza a teljes képernyőre</string>
 </resources>

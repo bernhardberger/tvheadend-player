@@ -188,7 +188,10 @@ class ChannelsScreenshotTest(private val scenario: String) {
                     .assertTextContains(channelTitleText(channels[1].number, channels[1].name!!))
             }
             if (scenario == "playing-recording") {
-                focus.assertIsSelected().assertContentDescriptionEquals("Currently playing", "Recording now")
+                focus.assertIsSelected().assertContentDescriptionEquals(
+                    instrumentation.targetContext.getString(R.string.channel_recording_spoken),
+                    instrumentation.targetContext.getString(R.string.player_on_now),
+                )
                 composeRule.onNodeWithTag("channel-recording-indicator", useUnmergedTree = true).assertIsDisplayed()
             }
             if (scenario == "populated") focus.assertIsNotSelected()

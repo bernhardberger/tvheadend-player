@@ -24,6 +24,11 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.State
+import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
+import at.bernhardberger.tvhplayer.ui.components.LiveViewerPosition
+import at.bernhardberger.tvhplayer.ui.components.LocalLivePosition
+import at.bernhardberger.tvhplayer.ui.components.LocalWatchingTarget
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -237,7 +242,7 @@ abstract class GuideScreenFixture {
         }
     }
 
-    fun show(scale: Float = 1f, direction: LayoutDirection = LayoutDirection.Ltr, history: Boolean = true,
+    internal fun show(scale: Float = 1f, direction: LayoutDirection = LayoutDirection.Ltr, history: Boolean = true,
         lastOffset: Int = 5, eventHour: Long = hour, historyOffset: Int = -1, longProgramme: Boolean = false,
         longProgrammeHours: Int = 5, longProgrammeSuccessor: Boolean = false, initialCoverage: Boolean = true,
         beforeCoverageBatch: (suspend (List<ChannelId>, Instant) -> Unit)? = null, headline: Boolean = false,
@@ -250,6 +255,9 @@ abstract class GuideScreenFixture {
         lastPlayedChannel: ChannelId? = null, rating: EpgRating? = null, events: List<EpgEvent>? = null,
         channelNames: List<String>? = null, uiPreferences: DataStore<Preferences> = preferences(),
         coverageAcquisitionContext: kotlinx.coroutines.CoroutineDispatcher = acquisition,
+        captureHistory: List<EpgEvent>? = null,
+        watching: ChannelId? = null,
+        viewerPosition: State<LiveViewerPosition?>? = null,
         preparationBlocker: @Composable () -> Unit = {}) {
         val channels = channelNames?.mapIndexed { index, name ->
             Channel.create(ChannelId(index + 1L), name = name, number = index + 1L, icon = ChannelIcon.ImageCache(ArtworkId(index + 1)),
@@ -284,7 +292,7 @@ abstract class GuideScreenFixture {
                         listOf(event(ch, 0)) + if (longProgrammeSuccessor) listOf(event(ch, longProgrammeHours)) else emptyList()
                     } else (0..lastOffset).map { event(ch, it) }
                 },
-                historicalEvents = if (history) channels.filterNot { it.id == ChannelId(3) }.map { event(it, historyOffset) } else emptyList(),
+                historicalEvents = captureHistory ?: if (history) channels.filterNot { it.id == ChannelId(3) }.map { event(it, historyOffset) } else emptyList(),
                 coverages = if (initialCoverage) channels.map {
                     EpgCoverage.create(it.id, Instant.fromEpochSeconds(hour), Instant.fromEpochSeconds(hour + 7 * 86400))
                 } else emptyList(),
@@ -359,6 +367,13 @@ abstract class GuideScreenFixture {
                 LocalBrowsePreparationContext provides preparationContext,
                 LocalGuideCoverageAcquisitionContext provides coverageAcquisitionContext,
                 LocalArtworkSamplingContext provides EmptyCoroutineContext,
+                LocalLivePosition provides (viewerPosition ?: LocalLivePosition.current),
+                LocalWatchingTarget provides (watching?.let { AppPlaybackTarget.Live(it) } ?: LocalWatchingTarget.current),
+                at.bernhardberger.tvhplayer.ui.components.LocalWatchingChannel provides
+                    (watching ?: at.bernhardberger.tvhplayer.ui.components.LocalWatchingChannel.current),
+                at.bernhardberger.tvhplayer.ui.components.LocalWatchingIndicator provides
+                    (if (watching == null) at.bernhardberger.tvhplayer.ui.components.LocalWatchingIndicator.current
+                    else at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator.PLAYING),
                 LocalChannelAccents provides accents) {
                 TVHeadendPlayerTheme {
                     view = LocalView.current

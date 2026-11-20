@@ -103,6 +103,7 @@ import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.getBoundsInRoot
@@ -264,11 +265,10 @@ class PlayerChromeCaptureTest {
                             behind = false, paused = false,
                             content = PlayerChromeContent(
                                 clock = formatClock(now),
-                                // Tide Watch is scheduled and Harbor Kickoff recording, as in the Guide.
+                                // Tide Watch is scheduled. The rail's Harbor Sport mark is an unlinked timer.
                                 info = liveInfoBarData(app.resources, playingIndex + 1L, names[playingIndex], programme, next, nextScheduled = !concert,
                                     nowSec = now, unavailableTitle = "No program information"),
                                 state = playerStateCell(false),
-                                recordingNow = false,
                                 picon = ChannelIcon.ImageCache(ArtworkId(201 + playingIndex)),
                                 artwork = programme.image?.let(ChannelIcon::ImageCache),
                                 // The decoded format of the concert stream, as the stream-badge scenes supply it.
@@ -453,11 +453,15 @@ class PlayerChromeCaptureTest {
                 val card = hasAnyAncestor(hasTestTag("player-channel-card-1"))
                 val label = compose.onNodeWithTag("player-channel-1-now", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
                 val playing = compose.onNode(hasTestTag("channel-playing-indicator") and card, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-                val recording = compose.onNode(hasTestTag("recording-badge") and card, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-                assertTrue("the playing marker trails the programme",
-                    if (view.layoutDirection == View.LAYOUT_DIRECTION_RTL) playing.right <= label.left else label.right <= playing.left)
-                // As on the Channels cards, the recording badge sits in the picture's corner, not beside the name.
-                assertTrue("the recording badge sits in the picture above", recording.bottom < label.top)
+                val channelSpeech = ApplicationProvider.getApplicationContext<Application>()
+                    .getString(R.string.channel_recording_spoken)
+                val recording = compose.onNode(hasTestTag("recording-badge") and hasContentDescription(channelSpeech) and card,
+                    useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+                assertTrue("the playback status is in the image above the programme", playing.bottom <= label.top)
+                assertTrue("the channel badge occupies the opposite image corner to playback",
+                    recording.bottom <= label.top &&
+                        if (view.layoutDirection == View.LAYOUT_DIRECTION_RTL) recording.right <= playing.left
+                        else playing.right <= recording.left)
                 compose.onNode(hasTestTag("channel-recording-indicator") and card, useUnmergedTree = true).assertDoesNotExist()
             }
             if (next == Scene.PROGRAMME_AIRINGS) {
@@ -583,7 +587,8 @@ class PlayerChromeCaptureTest {
                 }
             },
             state = state,
-            recordingNow = scene == Scene.CONTROLS_BEHIND || scene == Scene.BANNER_BEHIND,
+            // The live-channel recording is unlinked to the programme shown in these scenes.
+            channelRecording = scene == Scene.CONTROLS_BEHIND || scene == Scene.BANNER_BEHIND,
             badges = when (scene) {
                 Scene.BANNER_TUNING -> emptyList()
                 Scene.CONTROLS_BEHIND, Scene.BANNER_BEHIND ->

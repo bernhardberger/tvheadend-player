@@ -553,36 +553,70 @@ class HomeActionsTest {
     @Test fun playingAndRecordingKeepsTheLiveProgramme() {
         val event = EpgEvent.create(EventId(1), channel.id, Instant.fromEpochSeconds(now - 600),
             Instant.fromEpochSeconds(now + 600), title = "Live programme")
-        val entry = DvrEntry.create(DvrEntryId(1), channelId = channel.id, title = "Recorded programme",
-            state = DvrEntryState.RECORDING, start = Instant.fromEpochSeconds(now + 300),
+        val entry = DvrEntry.create(DvrEntryId(1), channelId = channel.id, eventId = event.id, title = "Recorded programme",
+            state = DvrEntryState.RECORDING_ERROR, start = Instant.fromEpochSeconds(now - 300),
             stop = Instant.fromEpochSeconds(now + 3900))
+        val input = homeInput(listOf(channel), now, currentEvents = mapOf(channel.id to event),
+            dvrEntries = listOf(entry), playing = HomePlaying.LiveChannel(channel.id))
+        val observation = SessionObservation.create(dvrState = DvrRepositoryState.Current(DvrSnapshot.create(listOf(entry))))
         compose.setContent { TVHeadendPlayerTheme {
-            at.bernhardberger.tvhplayer.ui.components.HomeActivityCard(channel, event, entry, true, now,
-                androidx.compose.ui.unit.Dp(400f), "Playing", {})
+            CompositionLocalProvider(LocalWatchingChannel provides channel.id,
+                LocalWatchingIndicator provides ChannelPlaybackIndicator.PLAYING) {
+                homeScreen(input, observation)
+            }
         } }
-        compose.onNodeWithText("Live programme", useUnmergedTree = true).assertExists()
-        compose.onNodeWithText("Recorded programme", useUnmergedTree = true).assertDoesNotExist()
-        compose.onNodeWithText("Back to live TV", useUnmergedTree = true).assertExists()
-        compose.onAllNodes(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.ProgressBarRangeInfo,
-            androidx.compose.ui.semantics.ProgressBarRangeInfo(0.5f, 0f..1f)), useUnmergedTree = true).assertCountEquals(1)
+        val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<Application>()
+        val card = hasTestTag("home-activity-0")
+        val insideCard = hasAnyAncestor(card)
+        compose.onNode(card).assert(
+            androidx.compose.ui.test.hasContentDescription(
+                context.getString(at.bernhardberger.tvhplayer.R.string.recording_state_recording_errors), substring = true),
+        )
+        compose.onNodeWithTag("home-activity-1").assertDoesNotExist()
+        compose.onNode(hasTestTag("channel-playing-indicator") and insideCard, useUnmergedTree = true).assertExists()
+        compose.onNode(card).assert(
+            !androidx.compose.ui.test.hasContentDescription(
+                context.getString(at.bernhardberger.tvhplayer.R.string.player_on_now), substring = true),
+        )
+        compose.onNode(hasText("Live programme") and insideCard, useUnmergedTree = true).assertExists()
+        compose.onNode(hasText("Recorded programme") and insideCard, useUnmergedTree = true).assertDoesNotExist()
+        compose.onNode(hasText("Back to live TV") and insideCard, useUnmergedTree = true).assertExists()
+        val halfway = SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.ProgressBarRangeInfo,
+            androidx.compose.ui.semantics.ProgressBarRangeInfo(0.5f, 0f..1f))
+        compose.onNode(halfway and insideCard, useUnmergedTree = true).assertExists()
     }
 
     @Test fun activityCardIconFollowsThePlaybackStateAndNeverClaimsPlayingByItself() {
         val indicator = mutableStateOf(ChannelPlaybackIndicator.PAUSED)
+        val input = homeInput(listOf(channel), now, playing = HomePlaying.LiveChannel(channel.id))
         compose.setContent { TVHeadendPlayerTheme {
             CompositionLocalProvider(LocalWatchingChannel provides channel.id, LocalWatchingIndicator provides indicator.value) {
-                HomeActivityCard(channel, null, null, true, now, androidx.compose.ui.unit.Dp(400f), "Playing", {})
+                homeScreen(input)
             }
         } }
+        val card = hasTestTag("home-activity-0")
         fun marks() = ChannelPlaybackIndicator.entries.filter {
-            compose.onAllNodesWithTag("channel-${it.name.lowercase()}-indicator", useUnmergedTree = true)
+            val marker = hasTestTag("channel-${it.name.lowercase()}-indicator")
+            compose.onAllNodes(marker and hasAnyAncestor(card), useUnmergedTree = true)
                 .fetchSemanticsNodes().isNotEmpty()
         }
+        val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<Application>()
+        fun assertPlaybackDescription(expected: Int) {
+            val description = compose.onNode(card).fetchSemanticsNode()
+                .config[androidx.compose.ui.semantics.SemanticsProperties.ContentDescription]
+                .flatMap { it.split(", ") }
+            val playbackLabels = listOf(at.bernhardberger.tvhplayer.R.string.player_paused,
+                at.bernhardberger.tvhplayer.R.string.loading, at.bernhardberger.tvhplayer.R.string.home_activity_watching_live)
+                .map(context::getString)
+            assertEquals(listOf(context.getString(expected)), description.filter { it in playbackLabels })
+        }
         assertEquals(listOf(ChannelPlaybackIndicator.PAUSED), marks())
+        assertPlaybackDescription(at.bernhardberger.tvhplayer.R.string.player_paused)
         for (shown in listOf(ChannelPlaybackIndicator.TUNING, ChannelPlaybackIndicator.PLAYING, ChannelPlaybackIndicator.NONE)) {
             compose.runOnIdle { indicator.value = shown }
             compose.waitForIdle()
             assertEquals(if (shown == ChannelPlaybackIndicator.NONE) emptyList() else listOf(shown), marks())
+            if (shown == ChannelPlaybackIndicator.TUNING) assertPlaybackDescription(at.bernhardberger.tvhplayer.R.string.loading)
         }
     }
 

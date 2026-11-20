@@ -856,6 +856,7 @@
     <string name="rail_now_playing_description">再生中：%1$s、%2$s、%3$s。</string>
     <string name="rail_now_playing_description_channel">再生中：%1$s、%2$s。</string>
     <string name="player_recording">録画中</string>
+    <string name="channel_recording_spoken">このチャンネルで録画中</string>
     <string name="player_recorded_on">%1$sに録画</string>
     <string name="player_recorded_ends">%1$sに録画 • %2$sに終了</string>
     <string name="player_recording_until">%1$sまで録画</string>
@@ -1061,8 +1062,6 @@
     <string name="home_recording_starts_at">%1$s に開始</string>
     <string name="home_all_recordings">すべての録画</string>
     <string name="home_activity_watching_live">ライブ視聴中</string>
-    <string name="home_activity_recording">録画中</string>
-    <string name="home_activity_watching_and_recording">視聴・録画中</string>
     <string name="home_upcoming_summary">次：%1$s • %2$s</string>
     <plurals name="home_upcoming_more">
         <item quantity="other">ほか %1$d 件の録画予約</item>
@@ -1119,4 +1118,5 @@
     <string name="server_none_in_use">使用中の接続なし</string>
     <string name="server_list_unavailable">現在、このテレビに保存されている接続を読み取れません</string>
     <string name="server_none_in_use_description">使用中の接続がありません。テレビの視聴を再開するには接続を選んでください。</string>
+    <string name="return_to_full_screen">全画面表示に戻る</string>
 </resources>

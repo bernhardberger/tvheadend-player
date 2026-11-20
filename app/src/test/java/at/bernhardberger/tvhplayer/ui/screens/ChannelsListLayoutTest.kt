@@ -91,6 +91,7 @@ import coil3.request.Options
 import kotlinx.coroutines.Dispatchers
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -149,9 +150,20 @@ class ChannelsListLayoutTest {
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
     fun playbackMarkerSlotAndRecordingStayStableAcrossPauseAndTune() {
         channelsShell(1f)
+        inRow(PLAYING, "channel-playing-indicator").assertExists()
         enterAndFocus(PLAYING)
         val slot = inRow(PLAYING, "channel-playing-indicator").bounds()
+        val logo = inRow(PLAYING, "channel-picon").bounds()
+        val name = inRow(PLAYING, "channel-title").bounds()
+        assertTrue("Playback mark is not on the logo", slot.left >= logo.right)
+        assertEquals(name.center.y, slot.center.y, 1f)
+        assertEquals(inRow(PLAYING, "channel-progress").bounds().right, slot.right, .5f)
+        val action = row(PLAYING).fetchSemanticsNode().config[SemanticsActions.OnClick]
+        val returnLabel = ApplicationProvider.getApplicationContext<Application>().getString(R.string.return_to_full_screen)
+        assertEquals(returnLabel, action.label)
+        assertTrue(action.action != null)
         val recording = inRow(PLAYING, "channel-recording-indicator").bounds()
+        assertEquals("The trailing status marks have equal slots", slot.width, recording.width, .5f)
         val title = inRow(PLAYING, "channel-title").bounds()
         compose.runOnIdle { playbackIndicator = ChannelPlaybackIndicator.PAUSED }
         assertEquals(slot, inRow(PLAYING, "channel-paused-indicator").bounds())
@@ -163,7 +175,9 @@ class ChannelsListLayoutTest {
         compose.mainClock.advanceTimeByFrame()
         compose.mainClock.advanceTimeBy(96)
         assertEquals(slot, inRow(PLAYING, "channel-tuning-indicator").bounds())
-        assertEquals(recording, inRow(PLAYING, "channel-recording-indicator").bounds())
+        assertNotEquals(returnLabel, row(PLAYING).fetchSemanticsNode().config[SemanticsActions.OnClick].label)
+        assertTrue(inRow(PLAYING, "channel-recording-indicator").bounds().left >
+            inRow(PLAYING, "channel-title").bounds().right)
         compose.runOnIdle { playbackIndicator = ChannelPlaybackIndicator.NONE }
         compose.waitForIdle()
         compose.mainClock.advanceTimeByFrame()
@@ -276,19 +290,16 @@ class ChannelsListLayoutTest {
         assertEquals("progress 3dp under the programme line", subtitle.bottom + 3f, progress.top, .5f)
         assertTrue("programme line under the title", subtitle.top >= title.bottom - .5f)
 
-        // Markers sit beside the title and appear only when they apply, so the
+        // The recording dot sits beside the title, so the
         // programme line and progress keep one width on every row.
         val playing = inRow(PLAYING, "channel-playing-indicator").bounds()
         val recording = inRow(PLAYING, "channel-recording-indicator").bounds()
-        assertTrue("markers inside the row", recording.right <= row(PLAYING).bounds().right - 16f + .5f)
-        assertTrue("markers beside the headline", playing.center.y in inRow(PLAYING, "channel-title").bounds().top..inRow(PLAYING, "channel-title").bounds().bottom)
-        assertTrue("playing marker precedes the recording dot", playing.right <= recording.left + .5f)
+        val markedTitle = inRow(PLAYING, "channel-title").bounds()
+        assertTrue("the channel recording dot comes before playback", recording.right < playing.left)
+        assertEquals("playback and progress share the end keyline", progress.right, playing.right, .5f)
+        assertEquals(markedTitle.center.y, recording.center.y, .5f)
+        assertTrue("the recording dot follows the name", markedTitle.right <= recording.left + .5f)
         assertEquals(progress.width, inRow(PLAYING, "channel-progress").bounds().width, .5f)
-        val plainTitle = inRow(1, "channel-title").bounds()
-        assertTrue(
-            "a status marker shortens only the title line",
-            inRow(PLAYING, "channel-title").bounds().right < plainTitle.right,
-        )
 
         // The focused row keeps the library's own focus scale, uncancelled, and the
         // list reserves it horizontally instead of clipping.

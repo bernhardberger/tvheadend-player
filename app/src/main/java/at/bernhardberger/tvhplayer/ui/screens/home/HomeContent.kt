@@ -93,6 +93,8 @@ import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
+import at.bernhardberger.tvhplayer.core.runningRecordingForEvent
+import at.bernhardberger.tvhplayer.core.activeRecordingChannelIds
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.HomeFocusKey
 import at.bernhardberger.tvhplayer.core.recordingArtwork
@@ -166,6 +168,8 @@ import at.bernhardberger.tvhplayer.ui.components.rememberHeldBack
 import at.bernhardberger.tvhplayer.ui.screens.isScheduled
 import at.bernhardberger.tvhplayer.ui.components.overflowingRowViewport
 import at.bernhardberger.tvhplayer.ui.components.progressColor
+import at.bernhardberger.tvhplayer.ui.components.recordingStatusSpoken
+import at.bernhardberger.tvhplayer.ui.components.rule
 import at.bernhardberger.tvhplayer.ui.components.rowContentEmphasis
 import at.bernhardberger.tvhplayer.ui.components.watchingIndicator
 import java.time.Instant
@@ -545,11 +549,8 @@ internal fun HomeContent(
         val cardWidth = homeRowCardWidth(maxWidth - keyline - endMargin, 4, TvGridGutter)
         val recentWidth = homeRowCardWidth(maxWidth - keyline - endMargin, 6, HomeRecentGap)
         val emptyHeight = (maxHeight - HomeTopSlot).coerceAtLeast(0.dp)
-        val recordingChannelIds = remember(input?.dvrEntries) {
-            input?.dvrEntries.orEmpty()
-                .filter(::recordingIsRunning)
-                .mapNotNull { it.channelId }
-                .toSet()
+        val recordingChannelIds = remember(input?.dvrEntries, nowSec) {
+            activeRecordingChannelIds(input?.dvrEntries.orEmpty(), nowSec)
         }
         val onNow = renderedSections.filterIsInstance<HomeSection.OnNow>().firstOrNull()
         if (observation != null && onNow != null) {
@@ -746,6 +747,7 @@ internal fun HomeContent(
 
                             is HomeSection.RecentChannels -> HomeRecentRow(
                                 items = section.items,
+                                recordingChannelIds = recordingChannelIds,
                                 width = recentWidth,
                                 keyline = keyline,
                                 emphasis = emphasis,
@@ -762,6 +764,7 @@ internal fun HomeContent(
 
                             is HomeSection.OnNow -> HomeOnNowRow(
                                 items = section.items,
+                                observation = observation,
                                 width = cardWidth,
                                 keyline = keyline,
                                 emphasis = emphasis,
@@ -1105,17 +1108,9 @@ private fun HomeActivityRow(
                 input?.channels?.firstOrNull { it.id == id }
             }
         }
-        val event = ((playing as? HomePlaying.LiveChannel)?.channelId
-            ?: runningRecording?.channelId?.takeIf { playing !is HomePlaying.Recording })
+        val event = (playing as? HomePlaying.LiveChannel)?.channelId
             ?.let { input?.currentEvents?.get(it) }
-        val label = stringResource(
-            when {
-                playing != null && item.recording != null -> R.string.home_activity_watching_and_recording
-                playing is HomePlaying.Recording -> R.string.home_back_to_recording
-                playing != null -> R.string.home_activity_watching_live
-                else -> R.string.home_activity_recording
-            },
-        )
+        val recordingLabel = item.recording?.let { recordingStatusSpoken(it.state, it.rule) }
         val title = event?.title?.takeIf(String::isNotBlank)
             ?: runningRecording?.title?.takeIf(String::isNotBlank)
             ?: stringResource(R.string.no_epg)
@@ -1125,7 +1120,7 @@ private fun HomeActivityRow(
                 it.name.orEmpty(),
             )
         } ?: runningRecording?.channelName.orEmpty()
-        val description = listOf(label, title, channelLabel)
+        val description = listOfNotNull(recordingLabel, title, channelLabel)
             .filter(String::isNotBlank)
             .joinToString(", ")
         HomeActivityCard(
@@ -1149,6 +1144,7 @@ private fun HomeActivityRow(
 @Composable
 private fun HomeRecentRow(
     items: List<at.bernhardberger.tvhplayer.core.RecentChannelItem>,
+    recordingChannelIds: Set<ChannelId>,
     width: Dp,
     keyline: Dp,
     emphasis: () -> Float,
@@ -1185,6 +1181,7 @@ private fun HomeRecentRow(
                 channel = item.channel,
                 width = width,
                 nameShown = textShown,
+                channelRecording = item.channel.id in recordingChannelIds,
                 onClick = { onActivate(index, "channel:${item.channel.id.value}") },
                 onLongClick = { onContextMenu(index, "channel:${item.channel.id.value}") },
                 modifier = itemModifier
@@ -1200,6 +1197,7 @@ private fun HomeRecentRow(
 @Composable
 private fun HomeOnNowRow(
     items: List<at.bernhardberger.tvhplayer.core.OnNowItem>,
+    observation: SessionObservation?,
     width: Dp,
     keyline: Dp,
     emphasis: () -> Float,
@@ -1240,7 +1238,8 @@ private fun HomeOnNowRow(
             event = item.event,
             nowSec = nowSec,
             playbackIndicator = watchingIndicator(item.event, nowSec),
-            recording = item.channel.id in recordingChannelIds,
+            channelRecording = item.channel.id in recordingChannelIds,
+            programmeRecording = observation?.runningRecordingForEvent(item.event),
             onClick = { onActivate(index, "onnow:${item.channel.id.value}") },
             onLongClick = { onContextMenu(index, "onnow:${item.channel.id.value}") },
             programmeLoading = false,
@@ -1313,7 +1312,8 @@ private fun HomeOnNowDetails(
                 current = shown.event,
                 next = next,
                 nextScheduled = observation.isScheduled(next),
-                recording = shown.channel.id in recordingChannelIds,
+                channelRecording = shown.channel.id in recordingChannelIds,
+                observation = observation,
                 nowSec = nowSec,
                 keyline = keyline,
                 modifier = Modifier.wrapContentHeight(Alignment.Bottom),
@@ -1332,7 +1332,8 @@ private fun HomeOnNowBlock(
     current: EpgEvent?,
     next: EpgEvent?,
     nextScheduled: Boolean,
-    recording: Boolean,
+    channelRecording: Boolean,
+    observation: SessionObservation,
     nowSec: Long,
     keyline: Dp,
     modifier: Modifier = Modifier,
@@ -1342,7 +1343,7 @@ private fun HomeOnNowBlock(
         current = current,
         next = next,
         nextScheduled = nextScheduled,
-        recording = recording,
+        channelRecording = channelRecording,
         now = nowSec,
         synopsisLines = 2,
         fitSynopsis = true,
@@ -1352,6 +1353,7 @@ private fun HomeOnNowBlock(
             .widthIn(max = ImmersiveHeroWidth),
         showNext = true,
         titleStyle = MaterialTheme.typography.headlineLarge.copy(lineHeight = 36.sp),
+        observation = observation,
     )
 }
 

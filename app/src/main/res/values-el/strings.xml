@@ -891,6 +891,7 @@
     <string name="rail_now_playing_description">Τώρα παίζει: %1$s, %2$s, %3$s.</string>
     <string name="rail_now_playing_description_channel">Τώρα παίζει: %1$s, %2$s.</string>
     <string name="player_recording">Εγγραφή τώρα</string>
+    <string name="channel_recording_spoken">Γίνεται εγγραφή σε αυτό το κανάλι</string>
     <string name="player_recorded_on">Εγγράφηκε %1$s</string>
     <string name="player_recorded_ends">Εγγράφηκε %1$s • Λήγει %2$s</string>
     <string name="player_recording_until">Εγγραφή έως %1$s</string>
@@ -1105,8 +1106,6 @@
     <string name="home_recording_starts_at">Έναρξη στις %1$s</string>
     <string name="home_all_recordings">Όλες οι εγγραφές</string>
     <string name="home_activity_watching_live">Ζωντανή προβολή</string>
-    <string name="home_activity_recording">Εγγραφή σε εξέλιξη</string>
-    <string name="home_activity_watching_and_recording">Προβολή και εγγραφή</string>
     <string name="home_upcoming_summary">Επόμενο: %1$s • %2$s</string>
     <plurals name="home_upcoming_more">
         <item quantity="one">%1$d ακόμη προγραμματισμένη</item>
@@ -1164,4 +1163,5 @@
     <string name="server_none_in_use">Καμία σύνδεση σε χρήση</string>
     <string name="server_list_unavailable">Δεν είναι δυνατή η ανάγνωση των αποθηκευμένων συνδέσεων σε αυτήν την TV αυτήν τη στιγμή</string>
     <string name="server_none_in_use_description">Καμία σύνδεση σε χρήση. Επίλεξε μία για να δεις ξανά TV.</string>
+    <string name="return_to_full_screen">Επιστροφή σε πλήρη οθόνη</string>
 </resources>

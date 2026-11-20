@@ -1,14 +1,11 @@
 package at.bernhardberger.tvhplayer.ui.components
 
+import at.bernhardberger.tvhplayer.core.showChannelRecordingMark
+
 import at.bernhardberger.tvhplayer.images.ProgrammeArtworkMode
 
 import at.bernhardberger.tvhplayer.ui.TvCompactProgressStripHeight
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.togetherWith
 import android.graphics.LinearGradient
 import android.graphics.Shader
 import androidx.compose.foundation.background
@@ -55,13 +52,12 @@ import at.bernhardberger.tvhplayer.core.programmeArtworkModel
 import at.bernhardberger.tvhplayer.images.LogoHaloTransformation
 import at.bernhardberger.tvhplayer.images.ScrimTransformation
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
-import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
-import at.bernhardberger.tvhplayer.ui.player.leaving
 import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import coil3.request.transformations
 import at.bernhardberger.tvhplayer.images.ProgrammeArtworkTransformation
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 
 /** Width of a compact zap card in a row; grids let the card fill its column instead. */
@@ -84,7 +80,7 @@ internal fun CompactZapCard(
     event: EpgEvent?,
     nowSec: Long,
     playbackIndicator: ChannelPlaybackIndicator,
-    recording: Boolean,
+    channelRecording: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     onLongClick: (() -> Unit)? = null,
@@ -94,11 +90,13 @@ internal fun CompactZapCard(
     preferredHeight: Dp? = null,
     channelLed: Boolean = false,
     programmeLoading: Boolean = false,
+    programmeRecording: DvrEntry? = null,
 ) {
     val contextMenu = rememberBrowseContextMenuTrigger(onLongClick, menuKey = menuKey)
     val currentEvent = event?.takeIf { it.start.epochSeconds <= nowSec && nowSec < it.stop.epochSeconds }
     // The programme leads unless the card is channel-led; without one, the channel does.
     val programme = currentEvent?.title?.takeIf { it.isNotBlank() }
+    val titleIsChannel = channelLed || programme == null
     val identity = channelTitleText(number, channel.name.orEmpty())
     val tag = "$tagPrefix-${channel.id.value}"
     val textBlockHeight = compactZapTextBlockHeight()
@@ -107,6 +105,8 @@ internal fun CompactZapCard(
     val artwork = currentEvent?.let(::programmeArtwork)?.takeIf { programmePicture && currentSession != null }
     var artworkFailed by remember(artwork, currentSession) { mutableStateOf(false) }
     val showArtwork = artwork != null && !artworkFailed
+    val recording = programmeRecording.takeIf { currentEvent != null }
+    val showChannelMark = showChannelRecordingMark(channelRecording, recording != null)
     val context = LocalPlatformContext.current
     val textTop = ((imageHeight - textBlockHeight) / imageHeight).coerceIn(0f, 1f)
     val artworkFallback = TvSurfaceColors.containerLow.toArgb()
@@ -142,7 +142,8 @@ internal fun CompactZapCard(
         // A scrim keeps text legible over artwork; the logo card's text sits on a flat surface.
         // The player rail keeps the kit's.
         scrimBrush = if (showArtwork && !channelLed) CardDefaults.ScrimBrush else SolidColor(Color.Transparent),
-        modifier = modifier.then(contextMenu.modifier).cardFocusRing(ring, MaterialTheme.colorScheme.onSurface),
+        modifier = modifier.then(contextMenu.modifier).cardFocusRing(ring, MaterialTheme.colorScheme.onSurface)
+            .returnToFullScreenAction(playbackIndicator.isPlayingItem),
         image = {
             Box(Modifier.fillMaxWidth().height(imageHeight).background(TvSurfaceColors.containerLowest)) {
                 if (artworkModel != null && !artworkFailed) AsyncImage(
@@ -177,53 +178,51 @@ internal fun CompactZapCard(
                         },
                     )
                 }
-                // The kit's embed corner holds the recording badge, as on the player's schedule tiles.
-                if (recording) RecordingBadge(DvrEntryState.RECORDING, Modifier.align(Alignment.TopEnd).padding(CompactZapEmbedInset))
-            }
-        },
-        title = {
-            Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = if (channelLed) identity else programme ?: identity,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f).testTag("$tag-${if (programme != null && !channelLed) "now" else "identity"}"),
+                if (recording != null || showChannelMark) RecordingBadge(
+                    recording?.state ?: DvrEntryState.RECORDING,
+                    Modifier.align(Alignment.TopEnd).padding(CompactZapEmbedInset),
+                    compact = true, rule = recording?.rule,
+                    recordingDescription = if (showChannelMark) {
+                        stringResource(R.string.channel_recording_spoken)
+                    } else null,
                 )
-                // The new marker fades in; the old one leaves at once so two glyphs never
-                // overlap in the slot and its tag and announcement go with it.
-                AnimatedContent(
-                    targetState = playbackIndicator,
-                    transitionSpec = {
-                        (fadeIn(tween(PlayerMotion.ShortMs, easing = PlayerMotion.StandardDecelerate)) togetherWith
-                            ExitTransition.None).using(null)
-                    },
-                    label = "zap-card-marker",
-                ) { indicator ->
-                    if (!leaving) ChannelNowIndicators(playingNow = indicator == ChannelPlaybackIndicator.PLAYING,
-                        recordingNow = false, playbackIndicator = indicator)
+                if (playbackIndicator != ChannelPlaybackIndicator.NONE) {
+                    CardPlaybackPlate(Modifier.align(Alignment.TopStart).padding(CompactZapEmbedInset)) {
+                        ChannelPlaybackMarker(playbackIndicator)
+                    }
                 }
             }
         },
+        title = {
+            Text(
+                text = if (titleIsChannel) identity else programme.orEmpty(),
+                maxLines = 1, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)
+                    .testTag("$tag-${if (titleIsChannel) "identity" else "now"}"),
+            )
+        },
         subtitle = {
-            // Only the text shortens; time left stays whole.
-            val subtitleModifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(bottom = CompactZapStripRoom - 2.dp)
-            if (channelLed && programme != null && currentEvent != null) {
-                ChannelProgrammeSubtitle(programme, currentEvent.start.epochSeconds, subtitleModifier.testTag("$tag-now"))
-            } else if (programme == null && programmeLoading) {
-                SkeletonLine(subtitleModifier.testTag("$tag-loading"))
-            } else Row(subtitleModifier) {
-                Text(
-                    text = if (programme != null && !channelLed) identity else stringResource(R.string.no_epg),
-                    maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false)
-                        .testTag("$tag-${if (programme != null && !channelLed) "identity" else "now"}"),
-                )
-                if (!channelLed && programme != null && currentEvent != null) {
+            Box(Modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(bottom = CompactZapStripRoom - 2.dp)) {
+                val text = Modifier.fillMaxWidth()
+                if (channelLed && programme != null && currentEvent != null) {
+                    ChannelProgrammeSubtitle(programme, currentEvent.start.epochSeconds, text.testTag("$tag-now"))
+                } else if (programme == null && programmeLoading) {
+                    SkeletonLine(text.testTag("$tag-loading"))
+                } else Row(text, verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        " • " + stringResource(R.string.player_minutes_left,
-                            formatDurationMinutes(minutesLeft(currentEvent, nowSec), LocalResources.current)),
-                        maxLines = 1, softWrap = false,
-                        modifier = Modifier.testTag("$tag-left"),
+                        text = if (programme != null && !channelLed) identity else stringResource(R.string.no_epg),
+                        maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                            .testTag("$tag-${if (programme != null && !channelLed) "identity" else "now"}"),
                     )
+                    if (!channelLed && programme != null && currentEvent != null) {
+                        Text(
+                            " • " + stringResource(R.string.player_minutes_left,
+                                formatDurationMinutes(minutesLeft(currentEvent, nowSec), LocalResources.current)),
+                            maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.testTag("$tag-left"),
+                        )
+                    }
                 }
             }
         },
@@ -232,7 +231,7 @@ internal fun CompactZapCard(
             if (progress != null) {
                 ProgressStrip(
                     progress = progress,
-                    color = progressColor(watchingIndicator(currentEvent, nowSec).isPlayingItem, recording),
+                    color = progressColor(watchingIndicator(currentEvent, nowSec).isPlayingItem, recording != null),
                     height = TvCompactProgressStripHeight,
                     modifier = Modifier.fillMaxWidth().testTag("$tag-progress"),
                 )

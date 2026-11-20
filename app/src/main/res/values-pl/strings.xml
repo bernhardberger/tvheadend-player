@@ -961,6 +961,7 @@
     <string name="rail_now_playing_description">Teraz odtwarzane: %1$s, %2$s, %3$s.</string>
     <string name="rail_now_playing_description_channel">Teraz odtwarzane: %1$s, %2$s.</string>
     <string name="player_recording">Trwa nagrywanie</string>
+    <string name="channel_recording_spoken">Trwa nagrywanie na tym kanale</string>
     <string name="player_recorded_on">Nagrano %1$s</string>
     <string name="player_recorded_ends">Nagrano %1$s • Koniec %2$s</string>
     <string name="player_recording_until">Nagrywanie do %1$s</string>
@@ -1193,8 +1194,6 @@
     <string name="home_recording_starts_at">Początek o %1$s</string>
     <string name="home_all_recordings">Wszystkie nagrania</string>
     <string name="home_activity_watching_live">Oglądanie na żywo</string>
-    <string name="home_activity_recording">Nagrywanie</string>
-    <string name="home_activity_watching_and_recording">Oglądanie i nagrywanie</string>
     <string name="home_upcoming_summary">Następnie: %1$s • %2$s</string>
     <plurals name="home_upcoming_more">
         <item quantity="one">Jeszcze %1$d zaplanowane nagranie</item>
@@ -1254,4 +1253,5 @@
     <string name="server_none_in_use">Żadne połączenie nie jest używane</string>
     <string name="server_list_unavailable">Nie można teraz odczytać zapisanych połączeń na tym telewizorze</string>
     <string name="server_none_in_use_description">Żadne połączenie nie jest używane. Wybierz jedno, aby znów oglądać telewizję.</string>
+    <string name="return_to_full_screen">Wróć do pełnego ekranu</string>
 </resources>

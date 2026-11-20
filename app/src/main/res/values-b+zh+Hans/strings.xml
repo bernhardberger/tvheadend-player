@@ -828,6 +828,7 @@
     <string name="rail_now_playing_description">正在播放：%1$s，%2$s，%3$s。</string>
     <string name="rail_now_playing_description_channel">正在播放：%1$s，%2$s。</string>
     <string name="player_recording">正在录制</string>
+    <string name="channel_recording_spoken">此频道正在录制</string>
     <string name="player_recorded_on">录制于%1$s</string>
     <string name="player_recorded_ends">录制于%1$s • %2$s结束</string>
     <string name="player_recording_until">录制至%1$s</string>
@@ -1021,8 +1022,6 @@
     <string name="home_recording_starts_at">%1$s 开始</string>
     <string name="home_all_recordings">全部录制内容</string>
     <string name="home_activity_watching_live">正在观看直播</string>
-    <string name="home_activity_recording">正在录制</string>
-    <string name="home_activity_watching_and_recording">正在观看并录制</string>
     <string name="home_upcoming_summary">接下来：%1$s • %2$s</string>
     <plurals name="home_upcoming_more">
         <item quantity="other">另有 %1$d 项录制计划</item>
@@ -1079,4 +1078,5 @@
     <string name="server_none_in_use">没有正在使用的连接</string>
     <string name="server_list_unavailable">目前无法读取此电视上保存的连接</string>
     <string name="server_none_in_use_description">没有正在使用的连接。请选择连接以继续观看电视。</string>
+    <string name="return_to_full_screen">返回全屏</string>
 </resources>

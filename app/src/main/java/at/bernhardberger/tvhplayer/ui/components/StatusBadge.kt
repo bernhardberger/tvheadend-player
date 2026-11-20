@@ -108,13 +108,14 @@ fun RecordingBadge(
     compact: Boolean = false,
     rule: RecordingRule? = null,
     skipped: Boolean = false,
+    recordingDescription: String? = null,
 ) {
     when (state) {
         DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR -> {
             val stateDescription = stringResource(
                 if (state == DvrEntryState.RECORDING) R.string.player_recording else R.string.recording_state_recording_errors
             )
-            val description = if (rule == null) stateDescription else stringResource(
+            val description = recordingDescription ?: if (rule == null) stateDescription else stringResource(
                 R.string.recording_state_and_origin, stateDescription, stringResource(rule.label))
             // One announcement for the pair; a caller's tag wins over the default one.
             Row(modifier.testTag("recording-badge").clearAndSetSemantics { contentDescription = description },

@@ -124,10 +124,12 @@ class ProgrammeDetailsPageTest {
         fun airingEntry(id: Long, state: DvrEntryState, rule: Boolean = false, enabled: Boolean = true) =
             DvrEntry.create(DvrEntryId(id), eventId = EventId(id), title = event.title, state = state, enabled = enabled,
                 autorecRuleId = AutorecRuleId("rule").takeIf { rule })
-        show(airingRecordings = mapOf(EventId(2) to airingEntry(2, DvrEntryState.RECORDING),
+        val recordings = androidx.compose.runtime.mutableStateMapOf(
+            EventId(2) to airingEntry(2, DvrEntryState.RECORDING),
             EventId(3) to airingEntry(3, DvrEntryState.SCHEDULED, rule = true),
             EventId(4) to airingEntry(4, DvrEntryState.SCHEDULED, enabled = false),
-            EventId(5) to airingEntry(5, DvrEntryState.COMPLETED)))
+            EventId(5) to airingEntry(5, DvrEntryState.COMPLETED))
+        show(airingRecordings = recordings)
         compose.onNodeWithTag("details-watch").assertIsFocused()
         // An airing being recorded or scheduled carries the programme cards' mark, in its rule or skipped form;
         // the others carry none.
@@ -143,11 +145,18 @@ class ProgrammeDetailsPageTest {
         mark(5).assertDoesNotExist()
         mark(6).assertDoesNotExist()
         compose.onNodeWithText("21:00 • 112m left", substring = true).assertExists()
-        compose.onNodeWithText("101 Ridge Earth HD").assertExists()
+        val channel = compose.onNodeWithText("101 Ridge Earth HD").assertExists().getBoundsInRoot()
         compose.onNodeWithTag("details-metadata").assertTextEquals("120m • Documentary • S2\u00a0E3")
             .assertContentDescriptionEquals("120m, Documentary, Season 2, Episode 3")
         compose.onNodeWithTag("details-timeline").assertExists()
-        compose.onNodeWithTag("details-progress", useUnmergedTree = true).assertExists()
+        for (state in listOf(DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR)) {
+            compose.runOnIdle { recordings[event.id] = airingEntry(event.id.value, state) }
+            val badge = compose.onNodeWithTag("recording-badge", useUnmergedTree = true).getBoundsInRoot()
+            val timeline = compose.onNodeWithTag("details-timeline").getBoundsInRoot()
+            Assert.assertTrue("Running REC follows the channel in the eyebrow",
+                badge.left >= channel.right && badge.top < channel.bottom && badge.bottom > channel.top)
+            Assert.assertTrue("The timeline is below the badge", timeline.top >= badge.bottom)
+        }
         // The lower section follows the natural header instead of reserving an empty first screen.
         val heading = compose.onNodeWithText("Other airings of Ridge Light").getBoundsInRoot()
         Assert.assertTrue("$heading", heading.bottom.value <= 540f - 48f)
@@ -1325,6 +1334,13 @@ class ProgrammeDetailsPageTest {
         capture("details-expiry-en-font1.0", settle = false)
     }
 
+    @Test @org.junit.experimental.categories.Category(at.bernhardberger.tvhplayer.testutil.VisualCapture::class)
+    fun recordingEyebrowCapture() {
+        show(airingRecordings = mapOf(event.id to DvrEntry.create(DvrEntryId(1), eventId = event.id,
+            title = event.title, state = DvrEntryState.RECORDING, autorecRuleId = AutorecRuleId("rule"))))
+        capture("details-recording-eyebrow", folder = "status-marks")
+    }
+
     @Test fun recordingDeleteChipAndFactsKeepTheAnchorWithoutAirings() {
         val creditsPresent = androidx.compose.runtime.mutableStateOf(true)
         val factsPresent = androidx.compose.runtime.mutableStateOf(true)
@@ -1666,7 +1682,8 @@ class ProgrammeDetailsPageTest {
                             image = event.image, description = aboutSource.value) else shown
                         val currentRecording = if (factsPresent?.value == false)
                             DvrEntry.create(entry.id, title = entry.title, state = entry.state) else entry
-                        ProvideArtworkSession(session) { ProgrammeDetailsPage(current.takeUnless { recording }, currentRecording.takeIf { recording || future }, channel, now,
+                        val linked = currentRecording.takeIf { recording || future } ?: airingRecordings[current.id]
+                        ProvideArtworkSession(session) { ProgrammeDetailsPage(current.takeUnless { recording }, linked, channel, now,
                             if (recording) recordingDetailsActions(entry, admitted(entry), true, true, nowSec = now)
                             else programmeDetailsActions(shown, now, entry.takeIf { future }, admitted(entry.takeIf { future }), true, true),
                               {}, onClose, related = if (recording || noAirings) emptyList() else if (runningCard)

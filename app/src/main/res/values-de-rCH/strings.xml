@@ -1,5 +1,6 @@
 <resources>
     <string name="settings_channel_numbers">Kanalnummern</string>
+    <string name="channel_recording_spoken">Auf diesem Sender läuft eine Aufnahme</string>
     <string name="settings_channel_numbers_help">Ausschalten, wenn die Fernbedienung keine Zifferntasten hat</string>
     <string name="appliance_setup">TV-Start einrichten</string>
     <string name="close">Schliessen</string>
@@ -15,4 +16,5 @@
     <string name="appliance_companion_qr_description">QR-Code zur Einrichtung der TV-Start-Begleitapp</string>
     <string name="whats_new">Was ist neu?</string>
     <string name="whats_new_badge">Neu</string>
+    <string name="return_to_full_screen">Zurück zum Vollbild</string>
 </resources>

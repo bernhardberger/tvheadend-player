@@ -891,6 +891,7 @@
     <string name="rail_now_playing_description">Şimdi oynatılıyor: %1$s, %2$s, %3$s.</string>
     <string name="rail_now_playing_description_channel">Şimdi oynatılıyor: %1$s, %2$s.</string>
     <string name="player_recording">Şimdi kaydediliyor</string>
+    <string name="channel_recording_spoken">Bu kanalda kayıt yapılıyor</string>
     <string name="player_recorded_on">Kayıt tarihi: %1$s</string>
     <string name="player_recorded_ends">Kayıt tarihi: %1$s • Bitiş: %2$s</string>
     <string name="player_recording_until">Kayıt bitişi: %1$s</string>
@@ -1105,8 +1106,6 @@
     <string name="home_recording_starts_at">Başlangıç: %1$s</string>
     <string name="home_all_recordings">Tüm kayıtlar</string>
     <string name="home_activity_watching_live">Canlı izleniyor</string>
-    <string name="home_activity_recording">Kaydediliyor</string>
-    <string name="home_activity_watching_and_recording">İzleniyor ve kaydediliyor</string>
     <string name="home_upcoming_summary">Sıradaki: %1$s • %2$s</string>
     <plurals name="home_upcoming_more">
         <item quantity="one">%1$d kayıt daha planlandı</item>
@@ -1164,4 +1163,5 @@
     <string name="server_none_in_use">Kullanılan bağlantı yok</string>
     <string name="server_list_unavailable">Kayıtlı bağlantılar şu anda bu TV’de okunamıyor</string>
     <string name="server_none_in_use_description">Kullanılan bağlantı yok. Tekrar TV izlemek için birini seçin.</string>
+    <string name="return_to_full_screen">Tam ekrana dön</string>
 </resources>

@@ -704,10 +704,18 @@ abstract class LivePlayerChromeFixture {
         settle()
     }
 
-    protected fun publishInfoRecording(state: DvrEntryState, eventId: EventId = EventId(11)) {
+    protected fun publishInfoRecording(
+        state: DvrEntryState,
+        eventId: EventId = EventId(11),
+        linked: Boolean = true,
+        eventOverride: EpgEvent? = null,
+    ) {
         val current = session.observation.value.epgState as EpgRepositoryState.Current
-        session.publish(observation(System.currentTimeMillis() / 1_000, current.snapshot.events,
-            recordings = listOf(DvrEntry.create(DvrEntryId(7), eventId = eventId, state = state))))
+        val event = eventOverride ?: current.snapshot.events.firstOrNull { it.id == eventId }
+        val events = eventOverride?.let { listOf(it) } ?: current.snapshot.events
+        session.publish(observation(System.currentTimeMillis() / 1_000, events,
+            recordings = listOf(DvrEntry.create(DvrEntryId(7), eventId = (eventOverride?.id ?: eventId).takeIf { linked }, state = state,
+                channelId = event?.channelId, start = event?.start, stop = event?.stop))))
         settle()
     }
 

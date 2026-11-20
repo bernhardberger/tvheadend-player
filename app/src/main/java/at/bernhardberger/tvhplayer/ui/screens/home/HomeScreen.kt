@@ -216,7 +216,7 @@ internal fun HomeScreenContent(
     val detailsLayering = LocalBrowseContentLayering.current
     val owner = LocalTabOwner.current
     val playingRecordingId = (input.playing as? HomePlaying.Recording)?.entryId
-    val sections = remember(input) { homeSections(input) }
+    val sections = remember(input, observation) { homeSections(input, observation) }
     var focused by focusMemory
     // Startup priority applies until a card lands; later metadata must not replace that card.
     var followInitialFocus by remember { mutableStateOf(focused == null) }

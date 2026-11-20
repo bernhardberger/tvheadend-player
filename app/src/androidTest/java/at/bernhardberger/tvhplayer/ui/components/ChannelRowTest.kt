@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertLeftPositionInRootIsEqualTo
@@ -19,17 +20,26 @@ import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.requestFocus
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
+import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.EventId
 import kotlin.time.Instant
@@ -80,6 +90,14 @@ class ChannelRowTest {
 
     @Test
     fun statusMarkersPreserveProgressWidth_andCoexistWithLongTitle() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val channelRecording = context.getString(R.string.channel_recording_spoken)
+        val programmeRecording = context.getString(R.string.recording_state_recording)
+        val playing = context.getString(R.string.player_on_now)
+        val ownEntry = DvrEntry.create(
+            id = DvrEntryId(1), channelId = runningEvent.channelId, eventId = runningEvent.id,
+            state = DvrEntryState.RECORDING,
+        )
         composeTestRule.setContent {
             TVHeadendPlayerTheme {
                 Column {
@@ -92,12 +110,13 @@ class ChannelRowTest {
                             name = if (index == 2) {
                                 "Short title"
                             } else {
-                                "A very long localized channel title that must ellipsize"
+                                "A very long localized channel title with a regional station name that must ellipsize"
                             },
                             programTitle = "Večerní zprávy",
                             programme = runningEvent, nowSec = 500,
                             piconPath = null,
-                            recordingNow = index != 1,
+                            channelRecording = index != 1,
+                            programmeRecording = ownEntry.takeIf { index == 2 },
                             playingNow = index != 1,
                             onFocus = {},
                             onConfirm = {},
@@ -114,25 +133,39 @@ class ChannelRowTest {
             "channel-playing-indicator",
             useUnmergedTree = true,
         )[0].assertIsDisplayed()
-        composeTestRule.onAllNodesWithTag(
-            "channel-recording-indicator",
-            useUnmergedTree = true,
-        )[0].assertIsDisplayed()
         composeTestRule.onNodeWithTag("status-row-0")
-            .assertContentDescriptionEquals("Currently playing", "Recording now")
+            .assertContentDescriptionEquals(channelRecording, playing)
             .assertIsSelected()
         composeTestRule.onNodeWithTag("status-row-1").assertIsNotSelected()
+        composeTestRule.onNodeWithTag("status-row-2")
+            .assertContentDescriptionEquals(programmeRecording, playing)
+
+        fun inRow(index: Int) = hasAnyAncestor(hasTestTag("status-row-$index"))
+        val channelTitle = composeTestRule.onNode(hasTestTag("channel-title") and inRow(0), useUnmergedTree = true)
+        val layouts = mutableListOf<TextLayoutResult>()
+        channelTitle.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        assertTrue("Long channel title ellipsizes", layouts.single().isLineEllipsized(0))
+        val channelMark = composeTestRule.onNode(
+            hasTestTag("channel-recording-indicator") and inRow(0), useUnmergedTree = true,
+        ).assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val channelTitleBounds = channelTitle.fetchSemanticsNode().boundsInRoot
+        assertTrue(channelMark.left >= channelTitleBounds.right)
+        assertEquals(channelTitleBounds.center.y, channelMark.center.y, 1f)
+
+        val programmeChannelBounds = composeTestRule.onNode(
+            hasTestTag("channel-title") and inRow(2), useUnmergedTree = true,
+        ).fetchSemanticsNode().boundsInRoot
+        val programmeMark = composeTestRule.onNode(
+            hasContentDescription(programmeRecording) and inRow(2), useUnmergedTree = true,
+        ).assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        assertTrue(programmeMark.left >= programmeChannelBounds.right)
+        assertEquals(programmeChannelBounds.center.y, programmeMark.center.y, 1f)
+
         val progressNodes = composeTestRule.onAllNodesWithTag("channel-progress")
-        val statusWidth = progressNodes[0].fetchSemanticsNode().boundsInRoot.width
         val plainWidth = progressNodes[1].fetchSemanticsNode().boundsInRoot.width
-        assertEquals(plainWidth, statusWidth, 0.5f)
-        val playingIndicators = composeTestRule.onAllNodesWithTag(
-            "channel-playing-indicator",
-            useUnmergedTree = true,
-        )
-        val longTitleIndicatorLeft = playingIndicators[0].fetchSemanticsNode().boundsInRoot.left
-        val shortTitleIndicatorLeft = playingIndicators[1].fetchSemanticsNode().boundsInRoot.left
-        assertEquals(shortTitleIndicatorLeft, longTitleIndicatorLeft, 0.5f)
+        for (index in listOf(0, 2)) {
+            assertEquals(plainWidth, progressNodes[index].fetchSemanticsNode().boundsInRoot.width, 0.5f)
+        }
     }
 
     @OptIn(ExperimentalTestApi::class)

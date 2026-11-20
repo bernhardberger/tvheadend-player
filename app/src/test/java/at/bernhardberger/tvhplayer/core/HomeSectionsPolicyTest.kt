@@ -1,5 +1,9 @@
 package at.bernhardberger.tvhplayer.core
 
+import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
+import at.bernhardberger.tvheadend.sdk.core.DvrSnapshot
+import at.bernhardberger.tvheadend.sdk.core.SessionObservation
+
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.ContentGenre
@@ -25,6 +29,7 @@ import org.junit.Test
 @OptIn(ExperimentalTvheadendApi::class, TvheadendTestingApi::class)
 class HomeSectionsPolicyTest {
     private val nowSec = 1_000_000_000L
+    private val emptyObservation = SessionObservation.create()
 
     @Test fun expiringSoonUsesTheSharedWindowFinishedFilesAndWatchStateInExpiryOrder() {
         fun expiring(id: Long, seconds: Long, state: DvrEntryState = DvrEntryState.COMPLETED,
@@ -41,41 +46,41 @@ class HomeSectionsPolicyTest {
         ) + listOf(DvrEntryState.SCHEDULED, DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR,
             DvrEntryState.MISSED, DvrEntryState.INVALID).mapIndexed { index, state -> expiring(20L + index, 60, state) }
         val input = homeInput(dvrEntries = entries, admission = admissions(mapOf(4L to 60L)))
-        val sections = homeSections(input)
+        val sections = homeSections(input, emptyObservation)
         val expiring = sections.filterIsInstance<HomeSection.ExpiringSoon>().single()
         assertEquals(listOf(2L, 1L), expiring.items.map { it.entry.id.value })
         assertEquals(sections.indexOfFirst { it is HomeSection.ContinueWatching } + 1, sections.indexOf(expiring))
-        assertTrue(homeSections(input.copy(hiddenSections = setOf(HomeSectionKind.EXPIRING_SOON)))
+        assertTrue(homeSections(input.copy(hiddenSections = setOf(HomeSectionKind.EXPIRING_SOON)), emptyObservation)
             .none { it is HomeSection.ExpiringSoon })
-        assertTrue(homeSections(input.copy(dvrEntries = entries.filter { it.id.value == 3L }))
+        assertTrue(homeSections(input.copy(dvrEntries = entries.filter { it.id.value == 3L }), emptyObservation)
             .none { it is HomeSection.ExpiringSoon })
         val previous = HomeFocusKey(HomeSectionKind.EXPIRING_SOON, "recording:2", 0)
-        val remaining = homeSections(input.copy(dvrEntries = entries.filterNot { it.id.value == 2L }))
+        val remaining = homeSections(input.copy(dvrEntries = entries.filterNot { it.id.value == 2L }), emptyObservation)
         assertEquals(HomeFocusKey(HomeSectionKind.EXPIRING_SOON, "recording:1", 0), homeRestoreFocus(remaining, previous))
-        val empty = homeSections(input.copy(dvrEntries = emptyList()))
+        val empty = homeSections(input.copy(dvrEntries = emptyList()), emptyObservation)
         assertEquals(homeInitialFocus(empty), homeRestoreFocus(empty, previous))
         val resumed = (100L..111L).map { expiring(it, 3600) }
         val capped = homeSections(homeInput(dvrEntries = resumed,
             admission = admissions(resumed.associate { it.id.value to 60L }))
-            .copy(recentRecordingIds = resumed.map { it.id }))
+            .copy(recentRecordingIds = resumed.map { it.id }), emptyObservation)
         val continued = capped.filterIsInstance<HomeSection.ContinueWatching>().single()
         assertEquals((100L..109L).toList(), continued.items.map { it.entry.id.value })
         assertEquals(listOf(110L, 111L),
             capped.filterIsInstance<HomeSection.ExpiringSoon>().single().items.map { it.entry.id.value })
         assertEquals(listOf(2L, 4L, 1L), homeSections(input.copy(
-            hiddenSections = setOf(HomeSectionKind.CONTINUE_WATCHING)))
+            hiddenSections = setOf(HomeSectionKind.CONTINUE_WATCHING)), emptyObservation)
             .filterIsInstance<HomeSection.ExpiringSoon>().single().items.map { it.entry.id.value })
     }
 
     @Test fun hiddenSectionsAreOmittedBeforeInitialAndRestoreFocusSelection() {
         val input = homeInput(playing = HomePlaying.LiveChannel(ChannelId(1)))
-        val original = homeSections(input)
+        val original = homeSections(input, emptyObservation)
         assertEquals(HomeSectionKind.CURRENT_ACTIVITY, homeInitialFocus(original)?.section)
         val hidden = setOf(HomeSectionKind.CURRENT_ACTIVITY)
-        val visible = homeSections(input.copy(hiddenSections = hidden))
+        val visible = homeSections(input.copy(hiddenSections = hidden), emptyObservation)
         assertTrue(visible.none { it.kind in hidden })
         assertEquals(homeInitialFocus(visible), homeRestoreFocus(visible, requireNotNull(homeInitialFocus(original))))
-        assertTrue(homeSections(input.copy(hiddenSections = HomeSectionKind.entries.toSet())).isEmpty())
+        assertTrue(homeSections(input.copy(hiddenSections = HomeSectionKind.entries.toSet()), emptyObservation).isEmpty())
     }
 
     private fun channel(id: Long, number: Long? = id, name: String = "Ch $id") = Channel.create(
@@ -105,11 +110,15 @@ class HomeSectionsPolicyTest {
         state: DvrEntryState = DvrEntryState.COMPLETED,
         start: Long? = null,
         channelId: Long? = null,
+        eventId: Long? = null,
+        stop: Long? = null,
     ) = DvrEntry.create(
         DvrEntryId(id),
         channelId = channelId?.let(::ChannelId),
         state = state,
         start = start?.let(Instant::fromEpochSeconds),
+        stop = stop?.let(Instant::fromEpochSeconds),
+        eventId = eventId?.let(::EventId),
     )
 
     /** A completed admission with an SDK-verified resume position; null means none is offered. */
@@ -126,29 +135,33 @@ class HomeSectionsPolicyTest {
             ),
             playing = HomePlaying.LiveChannel(ChannelId(1)),
         )
-        val records = homeSections(input).filterIsInstance<HomeSection.CurrentActivity>().single().items
-        assertEquals(2, records.size)
+        val records = homeSections(input, emptyObservation).filterIsInstance<HomeSection.CurrentActivity>().single().items
+        assertEquals(3, records.size)
         assertEquals(HomePlaying.LiveChannel(ChannelId(1)), records[0].playing)
-        assertEquals(11L, records[0].recording?.id?.value)
+        assertNull(records[0].recording)
         assertNull(records[1].playing)
-        assertEquals(12L, records[1].recording?.id?.value)
+        assertEquals(listOf(11L, 12L), records.drop(1).map { it.recording?.id?.value })
     }
 
-    @Test fun playingChannelBeingRecordedStaysOneCard() {
-        val input = homeInput(
-            dvrEntries = listOf(
-                entry(11, DvrEntryState.RECORDING, start = nowSec - 300, channelId = 1),
-                entry(13, DvrEntryState.RECORDING, start = nowSec - 200, channelId = 1),
-                entry(12, DvrEntryState.RECORDING, start = nowSec - 100, channelId = 2),
-            ),
-            playing = HomePlaying.LiveChannel(ChannelId(1)),
-        )
-        val records = homeSections(input).filterIsInstance<HomeSection.CurrentActivity>().single().items
-        assertEquals(2, records.size)
-        assertEquals(HomePlaying.LiveChannel(ChannelId(1)), records[0].playing)
-        assertEquals(11L, records[0].recording?.id?.value)
-        assertEquals(12L, records[1].recording?.id?.value)
-        assertTrue(records.none { it.recording?.id?.value == 13L })
+    @Test fun liveActivityMergesOnlyTheDisplayedProgrammesOwnRecording() {
+        val channel = ChannelId(1)
+        val current = event(21, channelId = 1, start = nowSec - 60, stop = nowSec + 3600)
+        val padding = entry(11, DvrEntryState.RECORDING, start = nowSec - 3600, channelId = 1,
+            eventId = 20, stop = nowSec - 60)
+        val timer = entry(12, DvrEntryState.RECORDING, start = nowSec - 600, channelId = 1)
+        val own = entry(13, DvrEntryState.RECORDING, start = nowSec - 60, channelId = 1, eventId = 21)
+        val playing = HomePlaying.LiveChannel(channel)
+        for ((entries, expected) in listOf(
+            listOf(padding) to listOf(null, padding),
+            listOf(timer) to listOf(null, timer),
+            listOf(padding, timer, own) to listOf(own, padding, timer),
+        )) {
+            val input = homeInput(currentEvents = mapOf(channel to current), dvrEntries = entries, playing = playing)
+            val observation = SessionObservation.create(dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = entries)))
+            val records = homeSections(input, observation).filterIsInstance<HomeSection.CurrentActivity>().single().items
+            assertEquals(expected, records.map { it.recording })
+            assertEquals(listOf(playing), records.mapNotNull { it.playing })
+        }
     }
 
     @Test fun playingRecordingKeepsOneMarkedCard() {
@@ -159,7 +172,7 @@ class HomeSectionsPolicyTest {
             ),
             playing = HomePlaying.Recording(DvrEntryId(11)),
         )
-        val records = homeSections(input).filterIsInstance<HomeSection.CurrentActivity>().single().items
+        val records = homeSections(input, emptyObservation).filterIsInstance<HomeSection.CurrentActivity>().single().items
         assertEquals(2, records.size)
         assertEquals(HomePlaying.Recording(DvrEntryId(11)), records[0].playing)
         assertEquals(11L, records[0].recording?.id?.value)
@@ -172,7 +185,7 @@ class HomeSectionsPolicyTest {
             dvrEntries = listOf(entry(20, start = nowSec - 100)),
             playing = HomePlaying.Recording(DvrEntryId(20)),
         )
-        val records = homeSections(input).filterIsInstance<HomeSection.CurrentActivity>().single().items
+        val records = homeSections(input, emptyObservation).filterIsInstance<HomeSection.CurrentActivity>().single().items
         assertEquals(1, records.size)
         assertEquals(HomePlaying.Recording(DvrEntryId(20)), records[0].playing)
         assertNull(records[0].recording)
@@ -184,7 +197,7 @@ class HomeSectionsPolicyTest {
             recentChannelIds = listOf(ChannelId(4), ChannelId(9), ChannelId(2), ChannelId(1), ChannelId(3)),
             playing = HomePlaying.LiveChannel(ChannelId(3)),
         )
-        val recents = homeSections(input).filterIsInstance<HomeSection.RecentChannels>().single().items
+        val recents = homeSections(input, emptyObservation).filterIsInstance<HomeSection.RecentChannels>().single().items
         assertEquals(listOf(4L, 2L, 1L), recents.map { it.channel.id.value })
         assertTrue(recents.none { it.channel.id.value == 9L })
         assertTrue(recents.none { it.channel.id.value == 3L })
@@ -195,7 +208,7 @@ class HomeSectionsPolicyTest {
             channels = (1L..10L).map(::channel),
             recentChannelIds = (10L downTo 1L).map(::ChannelId),
         )
-        val recents = homeSections(input).filterIsInstance<HomeSection.RecentChannels>().single().items
+        val recents = homeSections(input, emptyObservation).filterIsInstance<HomeSection.RecentChannels>().single().items
         assertEquals(listOf(10L, 9L, 8L, 7L, 6L, 5L, 4L, 3L), recents.map { it.channel.id.value })
     }
 
@@ -208,7 +221,7 @@ class HomeSectionsPolicyTest {
                 ChannelId(102) to event(3, 102, nowSec - 100, nowSec - 1),
             ),
         )
-        val onNow = homeSections(input).filterIsInstance<HomeSection.OnNow>().single().items
+        val onNow = homeSections(input, emptyObservation).filterIsInstance<HomeSection.OnNow>().single().items
         assertEquals(listOf(101L, 100L), onNow.map { it.channel.id.value })
         assertTrue(onNow.none { it.channel.id.value == 102L })
     }
@@ -219,7 +232,7 @@ class HomeSectionsPolicyTest {
             channels = channels,
             currentEvents = channels.associate { it.id to event(it.id.value, it.id.value, nowSec - 10, nowSec + 10) },
         )
-        assertEquals(12, homeSections(input).filterIsInstance<HomeSection.OnNow>().single().items.size)
+        assertEquals(12, homeSections(input, emptyObservation).filterIsInstance<HomeSection.OnNow>().single().items.size)
     }
 
     @Test fun genreRowUsesGuideOrderWithinScope() {
@@ -235,7 +248,7 @@ class HomeSectionsPolicyTest {
                 event(5, 9, nowSec + 10, nowSec + 20, contentType = 0x40L), // SPORT, out of scope
             ),
         )
-        val genres = homeSections(input).filterIsInstance<HomeSection.Genres>().single().items
+        val genres = homeSections(input, emptyObservation).filterIsInstance<HomeSection.Genres>().single().items
         assertEquals(
             listOf(ProgrammeCategory.FILM_DRAMA, ProgrammeCategory.NEWS, ProgrammeCategory.ENTERTAINMENT, ProgrammeCategory.CHILDREN),
             genres.map { it.category },
@@ -250,7 +263,7 @@ class HomeSectionsPolicyTest {
             ),
             upcomingEvents = listOf(event(2, 1, nowSec + 10, nowSec + 20)),
         )
-        assertTrue(homeSections(input).none { it is HomeSection.Genres })
+        assertTrue(homeSections(input, emptyObservation).none { it is HomeSection.Genres })
     }
 
     @Test fun genreRowKeepsProgrammesWithin24Hours() {
@@ -262,14 +275,14 @@ class HomeSectionsPolicyTest {
         )
         assertEquals(
             listOf(ProgrammeCategory.FILM_DRAMA),
-            homeSections(inside).filterIsInstance<HomeSection.Genres>().single().items.map { it.category },
+            homeSections(inside, emptyObservation).filterIsInstance<HomeSection.Genres>().single().items.map { it.category },
         )
         val outside = inside.copy(
             upcomingEvents = listOf(
                 event(1, 1, nowSec + 24 * 3600 + 1, nowSec + 24 * 3600 + 100, contentType = 0x10L),
             ),
         )
-        assertTrue(homeSections(outside).none { it is HomeSection.Genres })
+        assertTrue(homeSections(outside, emptyObservation).none { it is HomeSection.Genres })
     }
 
     @Test fun continueWatchingKeepsOfferedResumePositionsNewestFirst() {
@@ -288,7 +301,7 @@ class HomeSectionsPolicyTest {
                 }
             },
         )
-        val watching = homeSections(input).filterIsInstance<HomeSection.ContinueWatching>().single().items
+        val watching = homeSections(input, emptyObservation).filterIsInstance<HomeSection.ContinueWatching>().single().items
         assertEquals(listOf(20L, 30L), watching.map { it.entry.id.value })
     }
 
@@ -304,7 +317,7 @@ class HomeSectionsPolicyTest {
             admission = { if (it.id == DvrEntryId(5)) null else savedPosition(300L) },
         ).copy(recentRecordingIds = listOf(99L, 5L, 4L, 3L).map(::DvrEntryId))
 
-        val watching = homeSections(input).filterIsInstance<HomeSection.ContinueWatching>().single().items
+        val watching = homeSections(input, emptyObservation).filterIsInstance<HomeSection.ContinueWatching>().single().items
         assertEquals(listOf(4L, 3L, 1L, 2L), watching.map { it.entry.id.value })
     }
 
@@ -315,7 +328,7 @@ class HomeSectionsPolicyTest {
                 TvheadendTestResultFactory.completedRecordingAdmission(30.seconds, RecordingProgressCapability.SUPPORTED)
             },
         )
-        val watching = homeSections(input).filterIsInstance<HomeSection.ContinueWatching>().single().items
+        val watching = homeSections(input, emptyObservation).filterIsInstance<HomeSection.ContinueWatching>().single().items
         assertEquals((1L..10L).toList(), watching.map { it.entry.id.value })
     }
 
@@ -336,7 +349,7 @@ class HomeSectionsPolicyTest {
                 }
             },
         )
-        val recorded = homeSections(input).filterIsInstance<HomeSection.RecentlyRecorded>().single().items
+        val recorded = homeSections(input, emptyObservation).filterIsInstance<HomeSection.RecentlyRecorded>().single().items
         assertEquals(listOf(50L), recorded.map { it.entry.id.value })
     }
 
@@ -348,7 +361,7 @@ class HomeSectionsPolicyTest {
             ),
             admission = admissions(mapOf(70L to 30L, 71L to null)),
         )
-        val sections = homeSections(input)
+        val sections = homeSections(input, emptyObservation)
         assertEquals(listOf(70L), sections.filterIsInstance<HomeSection.ContinueWatching>().single().items.map { it.entry.id.value })
         assertEquals(listOf(71L), sections.filterIsInstance<HomeSection.RecentlyRecorded>().single().items.map { it.entry.id.value })
     }
@@ -370,7 +383,7 @@ class HomeSectionsPolicyTest {
             admission = admissions(mapOf(21L to 30L, 22L to null)),
             playing = HomePlaying.LiveChannel(ChannelId(1)),
         )
-        val sections = homeSections(input)
+        val sections = homeSections(input, emptyObservation)
         assertEquals(
             listOf(
                 HomeSectionKind.CURRENT_ACTIVITY,
@@ -389,12 +402,14 @@ class HomeSectionsPolicyTest {
 
     @Test fun upcomingIsNextFirstCappedAtTenAndSkipsOtherStates() {
         val scheduled = (1L..12L).map { entry(it, DvrEntryState.SCHEDULED, start = nowSec + it * 60) }
-        val sections = homeSections(homeInput(dvrEntries = scheduled.reversed() + entry(20, DvrEntryState.COMPLETED)))
+        val sections = homeSections(
+            homeInput(dvrEntries = scheduled.reversed() + entry(20, DvrEntryState.COMPLETED)), emptyObservation,
+        )
         assertEquals((1L..10L).toList(), sections.filterIsInstance<HomeSection.Upcoming>().single().items.map { it.entry.id.value })
     }
 
     @Test fun emptyInputYieldsNoSections() {
-        assertTrue(homeSections(homeInput()).isEmpty())
+        assertTrue(homeSections(homeInput(), emptyObservation).isEmpty())
         assertNull(homeInitialFocus(emptyList()))
         assertNull(homeRestoreFocus(emptyList(), HomeFocusKey(HomeSectionKind.ON_NOW, "x", 0)))
     }
@@ -406,7 +421,7 @@ class HomeSectionsPolicyTest {
         )
         assertEquals(
             HomeFocusKey(HomeSectionKind.CURRENT_ACTIVITY, "live:1", 0),
-            homeInitialFocus(homeSections(input)),
+            homeInitialFocus(homeSections(input, emptyObservation)),
         )
     }
 
@@ -414,7 +429,7 @@ class HomeSectionsPolicyTest {
         val input = homeInput(dvrEntries = listOf(entry(11, DvrEntryState.RECORDING, start = nowSec - 600)))
         assertEquals(
             HomeFocusKey(HomeSectionKind.CURRENT_ACTIVITY, "recording:11", 0),
-            homeInitialFocus(homeSections(input)),
+            homeInitialFocus(homeSections(input, emptyObservation)),
         )
     }
 
@@ -425,7 +440,7 @@ class HomeSectionsPolicyTest {
         )
         assertEquals(
             HomeFocusKey(HomeSectionKind.ON_NOW, "onnow:5", 0),
-            homeInitialFocus(homeSections(input)),
+            homeInitialFocus(homeSections(input, emptyObservation)),
         )
     }
 
@@ -458,7 +473,7 @@ class HomeSectionsPolicyTest {
             channels = listOf(channel(5)),
             currentEvents = mapOf(ChannelId(5) to event(1, 5, nowSec - 10, nowSec + 10)),
         )
-        val sections = homeSections(input)
+        val sections = homeSections(input, emptyObservation)
         assertEquals(
             homeInitialFocus(sections),
             homeRestoreFocus(sections, HomeFocusKey(HomeSectionKind.RECENT_CHANNELS, "channel:5", 0)),
@@ -489,5 +504,6 @@ class HomeSectionsPolicyTest {
             dvrEntries = ids.map { entry(it, start = nowSec - it) },
             admission = { savedPosition(10L) },
         ),
+        emptyObservation,
     )
 }

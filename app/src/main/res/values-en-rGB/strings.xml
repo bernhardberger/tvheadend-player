@@ -1,4 +1,5 @@
 <resources>
+    <string name="channel_recording_spoken">Recording on this channel</string>
     <string name="automatic_recording_new_keyword_help">Programmes that mention your words</string>
     <string name="automatic_recording_new_title_help">Programmes with exactly this title</string>
     <string name="context_skip_program">Skip this programme</string>
@@ -75,4 +76,5 @@
         <item quantity="one">%1$d cancelled</item>
         <item quantity="other">%1$d cancelled</item>
     </plurals>
+    <string name="return_to_full_screen">Return to full screen</string>
 </resources>

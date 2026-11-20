@@ -4,7 +4,6 @@ import at.bernhardberger.tvhplayer.images.ProgrammeArtworkMode
 
 import at.bernhardberger.tvhplayer.ui.components.programmeMinutesLeft
 import at.bernhardberger.tvhplayer.ui.TvCardProgressStripHeight
-import at.bernhardberger.tvhplayer.ui.TvLogoPlateColor
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
@@ -82,6 +81,7 @@ import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
@@ -89,6 +89,9 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.core.browsingFocusChannelId
 import at.bernhardberger.tvhplayer.core.programmeAgeRating
+import at.bernhardberger.tvhplayer.core.showChannelRecordingMark
+import at.bernhardberger.tvhplayer.core.runningRecordingForEvent
+import at.bernhardberger.tvhplayer.core.linkedRecordingForEvent
 import at.bernhardberger.tvhplayer.core.visibleChannelNumber
 import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy
 import at.bernhardberger.tvhplayer.ui.LocalWarmPlayback
@@ -103,7 +106,9 @@ import at.bernhardberger.tvhplayer.ui.common.progress
 import at.bernhardberger.tvhplayer.ui.components.CardGlowReach
 import at.bernhardberger.tvhplayer.ui.components.cardGlowRoom
 import at.bernhardberger.tvhplayer.ui.components.ChannelLogoGlow
-import at.bernhardberger.tvhplayer.ui.components.ChannelNowIndicators
+import at.bernhardberger.tvhplayer.ui.components.CardPlaybackPlate
+import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackMarker
+import at.bernhardberger.tvhplayer.ui.components.returnToFullScreenAction
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
 import at.bernhardberger.tvhplayer.ui.components.CompactZapCardGap
 import at.bernhardberger.tvhplayer.ui.components.CompactZapRowOffscreen
@@ -127,6 +132,9 @@ import at.bernhardberger.tvhplayer.ui.components.ProgrammePanePicture
 import at.bernhardberger.tvhplayer.ui.components.ProgrammePaneWidth
 import at.bernhardberger.tvhplayer.ui.components.ProgressStrip
 import at.bernhardberger.tvhplayer.ui.components.RecordingBadge
+import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
+import at.bernhardberger.tvhplayer.ui.components.recordingStatusSpoken
+import at.bernhardberger.tvhplayer.ui.components.rule
 import at.bernhardberger.tvhplayer.ui.components.ScheduledIndicator
 import at.bernhardberger.tvhplayer.ui.components.SkeletonLine
 import at.bernhardberger.tvhplayer.ui.components.StandardProgrammeCard
@@ -339,7 +347,7 @@ internal class ChannelsImmersiveCards(
 
 /** Whether a recording is scheduled for [event], the mark on a headline's Next line. */
 internal fun SessionObservation.isScheduled(event: EpgEvent?): Boolean =
-    event?.let { dvrEntryForEvent(it.id) }?.state == DvrEntryState.SCHEDULED
+    linkedRecordingForEvent(event)?.state == DvrEntryState.SCHEDULED
 
 /**
  * The immersive list: the focused channel's programme above one row of compact zap cards along
@@ -457,7 +465,8 @@ private fun ChannelsCardRow(
                     nowSec = now,
                     playbackIndicator = frame.playbackIndicator.takeIf { channelId == frame.playbackChannelId }
                         ?: ChannelPlaybackIndicator.NONE,
-                    recording = channelId in frame.recordingIds,
+                    channelRecording = channelId in frame.recordingIds,
+                    programmeRecording = frame.observation.runningRecordingForEvent(event),
                     onClick = { if (current) cards.onPlay(channel) },
                     onLongClick = { if (current) cards.onOpenContextMenu(channelId) },
                     programmeLoading = frame.guideLoading,
@@ -492,8 +501,7 @@ private fun ChannelsCardRow(
  * A card of the immersive row and the grid, the details page's standard card: the current programme inside
  * its picture, always, as a browse card names what it shows. With [programmePicture] the channel's
  * logo sits in the picture's corner; without a picture the logo stands on its ambient colour above
- * the programme. With [channelName] the channel's number and name go below, and the playing mark
- * with them; without, the mark ends the programme line or sits in the picture's other bottom corner.
+ * the programme. With [channelName] the channel's number and name go below.
  * While the guide is [programmeLoading], a missing
  * programme line is a [SkeletonLine] rather than "No program information".
  */
@@ -503,7 +511,7 @@ internal fun ChannelsRowCard(
     event: EpgEvent?,
     nowSec: Long,
     playbackIndicator: ChannelPlaybackIndicator,
-    recording: Boolean,
+    channelRecording: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     programmeLoading: Boolean,
@@ -512,6 +520,7 @@ internal fun ChannelsRowCard(
     channelName: Boolean,
     width: Dp = ImmersiveCardWidth,
     tagPrefix: String = "channels-immersive",
+    programmeRecording: DvrEntry? = null,
 ) {
     val contextMenu = rememberBrowseContextMenuTrigger(onLongClick, menuKey = true)
     val running = event?.takeIf { it.isRunning(nowSec) }
@@ -533,11 +542,16 @@ internal fun ChannelsRowCard(
     val artRequest = rememberProgrammeImageRequest(artModel, mode = ProgrammeArtworkMode.BOX,
         startPlateShare = plateShare, keepWideTitleCrop = true)
     val showsArt = artModel != null && artLoad.loaded
+    val recording = programmeRecording.takeIf { running != null }
+    val showChannelMark = showChannelRecordingMark(
+        channelRecording, recording != null,
+    )
     StandardProgrammeCard(
         width = width,
         onClick = onClick,
         onLongClick = contextMenu.onLongClick,
-        modifier = modifier.then(contextMenu.modifier),
+        modifier = modifier.then(contextMenu.modifier)
+            .returnToFullScreenAction(playbackIndicator.isPlayingItem),
         art = art.takeUnless { artLoad.failed },
         picon = channel.icon,
         picture = {
@@ -546,9 +560,12 @@ internal fun ChannelsRowCard(
                 Box(Modifier.fillMaxSize().padding(top = ImmersiveCardLogoInset, bottom = textHeight + ImmersiveCardLogoInset),
                     contentAlignment = Alignment.Center) {
                     val pictureHeight = width * 9f / 16f
-                    PiconBox(channel.icon, Modifier.fillMaxWidth(ImmersiveCardLogoWidthFraction).fillMaxHeight()
-                        .testTag("$tag-picon"),
-                        ground = channelAccentGround(channel.icon, channel.id, depth = (pictureHeight - textHeight) / 2 / pictureHeight))
+                    val ground = channelAccentGround(
+                        channel.icon, channel.id, depth = (pictureHeight - textHeight) / 2 / pictureHeight,
+                    )
+                    val logo = Modifier.fillMaxWidth(ImmersiveCardLogoWidthFraction)
+                        .fillMaxHeight().testTag("$tag-picon")
+                    PiconBox(channel.icon, logo, ground = ground)
                 }
             }
             val lineModifier = Modifier.align(Alignment.BottomStart).fillMaxWidth()
@@ -569,10 +586,6 @@ internal fun ChannelsRowCard(
                             else -> Text(stringResource(R.string.no_epg), textModifier.testTag("$tag-now"),
                                 maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
-                        // Without the line below, the playing mark ends the programme line.
-                        if (!channelName) ChannelNowIndicators(
-                            playingNow = playbackIndicator == ChannelPlaybackIndicator.PLAYING,
-                            recordingNow = false, playbackIndicator = playbackIndicator)
                     }
                 }
             }
@@ -583,42 +596,30 @@ internal fun ChannelsRowCard(
             if (showsArt && channel.icon != null) ArtworkLogoPlate(channel.icon,
                 Modifier.align(Alignment.BottomStart).padding(ImmersiveCardEmbedInset).testTag("$tag-art-picon"),
                 scale = width / AiringCardWidth)
-            // Without the line below, a picture card's playing mark takes the picture's other bottom corner.
-            if (showsArt && !channelName && playbackIndicator != ChannelPlaybackIndicator.NONE) Box(
-                Modifier.align(Alignment.BottomEnd).padding(ImmersiveCardEmbedInset)
-                    .height(32.dp * (width / AiringCardWidth))
-                    .background(TvLogoPlateColor, MaterialTheme.shapes.extraSmall)
-                    .padding(horizontal = 6.dp).testTag("$tag-art-playing"),
-                contentAlignment = Alignment.Center,
-            ) {
-                CompositionLocalProvider(LocalContentColor provides TvTextColors.primary) {
-                    ChannelNowIndicators(playingNow = playbackIndicator == ChannelPlaybackIndicator.PLAYING,
-                        recordingNow = false, playbackIndicator = playbackIndicator)
+            if (playbackIndicator != ChannelPlaybackIndicator.NONE) {
+                CardPlaybackPlate(Modifier.align(Alignment.TopStart).padding(ImmersiveCardEmbedInset)) {
+                    ChannelPlaybackMarker(playbackIndicator)
                 }
             }
-            // The kit's embed corner holds the recording badge, as on the player's schedule tiles.
-            if (recording) RecordingBadge(DvrEntryState.RECORDING, Modifier.align(Alignment.TopEnd).padding(ImmersiveCardEmbedInset),
-                compact = true)
+            if (recording != null || showChannelMark) RecordingBadge(recording?.state ?: DvrEntryState.RECORDING,
+                Modifier.align(Alignment.TopEnd).padding(ImmersiveCardEmbedInset),
+                compact = true, rule = recording?.rule,
+                recordingDescription = if (showChannelMark) stringResource(R.string.channel_recording_spoken) else null)
             // Same embedded strip as the airing cards; the card's border keeps clear of it.
             // The playing channel's strip follows the viewer, like the other channel cards.
             val progress = programmeProgress(running, nowSec)
             if (progress != null) ProgressStrip(progress,
                 Modifier.align(Alignment.BottomStart).fillMaxWidth().testTag("$tag-progress"),
-                color = progressColor(watchingIndicator(running, nowSec).isPlayingItem, recording),
+                color = progressColor(watchingIndicator(running, nowSec).isPlayingItem, recording != null),
                 height = TvCardProgressStripHeight)
         },
         title = {
             if (!channelName) return@StandardProgrammeCard
             // Start-aligned like the kit's content block.
-            Row(Modifier.fillMaxWidth().padding(top = ImmersiveCardLabelGap), verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                // The card's content colour: muted, and white on the focused card, so the eye goes there.
-                Text(channelTitleText(channel.visibleChannelNumber, channel.name.orEmpty()),
-                    Modifier.weight(1f).testTag("$tag-identity"),
-                    style = at.bernhardberger.tvhplayer.ui.components.channelCaptionStyle(), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                ChannelNowIndicators(playingNow = playbackIndicator == ChannelPlaybackIndicator.PLAYING,
-                    recordingNow = false, playbackIndicator = playbackIndicator)
-            }
+            // The card's content colour: muted, and white on the focused card, so the eye goes there.
+            Text(channelTitleText(channel.visibleChannelNumber, channel.name.orEmpty()),
+                Modifier.fillMaxWidth().padding(top = ImmersiveCardLabelGap).testTag("$tag-identity"),
+                style = at.bernhardberger.tvhplayer.ui.components.channelCaptionStyle(), maxLines = 1, overflow = TextOverflow.Ellipsis)
         },
         subtitle = {},
         contentColor = CardContainerDefaults.contentColor(contentColor = TvTextColors.secondary,
@@ -683,7 +684,8 @@ internal fun ChannelsImmersiveHero(
             },
             // The kit's 16sp description; the narrow column beside the list keeps 14sp for its line length.
             synopsisStyle = if (besideList) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.wrapContentHeight(if (besideList) Alignment.Top else Alignment.Bottom))
+            modifier = Modifier.wrapContentHeight(if (besideList) Alignment.Top else Alignment.Bottom),
+            observation = observation)
     }
 }
 
@@ -697,10 +699,11 @@ internal fun channelsProgrammeSynopsis(event: EpgEvent): String? =
  */
 @Composable
 internal fun ChannelsHeadline(
-    channel: Channel, current: EpgEvent?, next: EpgEvent?, nextScheduled: Boolean, recording: Boolean, now: Long,
+    channel: Channel, current: EpgEvent?, next: EpgEvent?, nextScheduled: Boolean, channelRecording: Boolean, now: Long,
     synopsisLines: Int, loading: Boolean, modifier: Modifier, fitSynopsis: Boolean = false, showNext: Boolean = true,
     titleStyle: TextStyle = MaterialTheme.typography.headlineLarge,
     synopsisStyle: TextStyle = MaterialTheme.typography.bodyLarge,
+    observation: SessionObservation,
 ) {
     val resources = LocalContext.current.resources
     val locale = LocalConfiguration.current.locales[0]
@@ -709,12 +712,17 @@ internal fun ChannelsHeadline(
             programmeHeaderMetadata(programmeAboutFacts(it, null, resources, locale), resources, it.episode, it.firstAired, locale, it.contentGenre)
         }.orEmpty()
     }
+    val recording = observation.runningRecordingForEvent(current)
+    val showChannelMark = showChannelRecordingMark(channelRecording, recording != null)
+    val nextRecording = observation.runningRecordingForEvent(next)
     ProgrammeHeadline(
         eyebrow = {
-            // Everything here is on now, so only a recording earns a mark: the player's REC badge.
             ProgrammeEyebrow(channel.icon, channelTitleText(channel.visibleChannelNumber, channel.name.orEmpty()),
                 Modifier.semantics(mergeDescendants = true) {}.testTag("channels-headline-channel")) {
-                if (recording) RecordingBadge(DvrEntryState.RECORDING)
+                if (recording != null || showChannelMark) RecordingBadge(
+                    recording?.state ?: DvrEntryState.RECORDING, rule = recording?.rule,
+                    recordingDescription = if (showChannelMark) stringResource(R.string.channel_recording_spoken)
+                    else recordingStatusSpoken(recording?.state, recording?.rule))
             }
         },
         title = current?.title?.takeIf(String::isNotBlank) ?: stringResource(R.string.no_epg),
@@ -727,7 +735,7 @@ internal fun ChannelsHeadline(
         rating = current?.rating?.let { programmeAgeRating(it.label, it.age) },
         timing = current?.let { formatTimeInterval(it.start.epochSeconds, it.stop.epochSeconds) },
         progress = programmeProgress(current, now),
-        progressColor = progressColor(watchingIndicator(current, now).isPlayingItem, recording),
+        progressColor = progressColor(watchingIndicator(current, now).isPlayingItem, recording != null),
         minutesLeft = programmeMinutesLeft(current, now),
         synopsis = current?.takeIf { synopsisLines > 0 }?.let(::channelsProgrammeSynopsis),
         fitSynopsis = fitSynopsis,
@@ -735,13 +743,15 @@ internal fun ChannelsHeadline(
         titleStyle = titleStyle,
         synopsisStyle = synopsisStyle,
         // As the player's info bar has it: now above, what follows on the bottom edge, quieter.
-        footer = next?.takeIf { showNext }?.let { { footerModifier -> NextProgramme(it, nextScheduled, footerModifier) } },
+        footer = next?.takeIf { showNext }?.let {
+            { footerModifier -> NextProgramme(it, nextScheduled, nextRecording, footerModifier) }
+        },
     )
 }
 
 /** What follows, with a scheduled recording marked on the programme as the rows mark theirs. */
 @Composable
-private fun NextProgramme(next: EpgEvent, scheduled: Boolean, modifier: Modifier) {
+private fun NextProgramme(next: EpgEvent, scheduled: Boolean, recording: DvrEntry?, modifier: Modifier) {
     val color = TvTextColors.tertiary
     Row(modifier.testTag("channels-immersive-next"), verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -749,7 +759,11 @@ private fun NextProgramme(next: EpgEvent, scheduled: Boolean, modifier: Modifier
         Text(stringResource(R.string.player_next, "${formatHm(next.start.epochSeconds)} $title"),
             Modifier.weight(1f, fill = false), style = MaterialTheme.typography.labelMedium, color = color,
             maxLines = 1, overflow = TextOverflow.Ellipsis)
-        if (scheduled) ScheduledIndicator(Modifier.testTag("channels-next-scheduled"), tint = color)
+        if (recording != null) RecordingStatusIndicator(recording.state, rule = recording.rule,
+            textStyle = MaterialTheme.typography.labelMedium)
+        else if (scheduled) ScheduledIndicator(Modifier.testTag("channels-next-scheduled"), tint = color,
+            contentDescription = stringResource(R.string.player_scheduled),
+            textStyle = MaterialTheme.typography.labelMedium)
     }
 }
 

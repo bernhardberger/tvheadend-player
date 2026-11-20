@@ -212,7 +212,6 @@ class InProgressRecordingResumeTest {
         compose.onNodeWithText("Resume").assertDoesNotExist()
         compose.onNodeWithText("Watch live").assertDoesNotExist()
         compose.onNodeWithText("Watch from beginning").assertExists()
-        // The playing mark is the button's icon, and the only one in the menu; the list beneath keeps its own.
         val menuMark = hasTestTag("channel-playing-indicator") and hasAnyAncestor(hasTestTag("browse-context-menu"))
         compose.onAllNodes(menuMark, useUnmergedTree = true).assertCountEquals(1)
         compose.onNode(menuMark, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.let { mark ->

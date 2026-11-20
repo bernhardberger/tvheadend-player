@@ -32,6 +32,7 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy
 import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
 import at.bernhardberger.tvhplayer.ui.components.CardGlowReach
+import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
 import at.bernhardberger.tvhplayer.ui.components.RowTravelMotion
 import at.bernhardberger.tvhplayer.ui.components.horizontalHold
 import at.bernhardberger.tvhplayer.ui.components.RowDimAlpha
@@ -100,6 +101,9 @@ internal fun PlayerChannelBrowser(
     onClose: (Int?) -> Unit,
     /** The first row's title: the active channel group, or All channels. */
     channelsTitle: String = stringResource(R.string.all_channels),
+    runningRecordingForEvent: (EpgEvent) -> DvrEntry? = { null },
+    playbackIndicator: ChannelPlaybackIndicator =
+        if (playingChannelId != null) ChannelPlaybackIndicator.PLAYING else ChannelPlaybackIndicator.NONE,
 ) {
     var activationKeyCode by remember(state) { mutableStateOf<Int?>(null) }
     val pageActive = LocalPlayerPageActive.current
@@ -205,7 +209,9 @@ internal fun PlayerChannelBrowser(
                             channels = if (row == PlayerChannelRow.ON_NOW) channels else recentChannels,
                             selectedId = state.collection(row).focusedId,
                             playingChannelId = playingChannelId,
+                            playbackIndicator = playbackIndicator,
                             recordingChannelIds = recordingChannelIds, nowEvent = nowEvent, nowSec = nowSec,
+                            runningRecordingForEvent = runningRecordingForEvent,
                             active = active && row == current,
                             browserState = state.collection(row),
                             onFocusChannel = { if (owns(row)) onFocusChannel(it) },

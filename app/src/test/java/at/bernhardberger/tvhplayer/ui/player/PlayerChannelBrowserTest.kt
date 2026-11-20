@@ -11,6 +11,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import at.bernhardberger.tvheadend.sdk.core.Channel
@@ -18,6 +19,9 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
+import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
+import at.bernhardberger.tvhplayer.R
+import androidx.test.core.app.ApplicationProvider
 import kotlin.time.Instant
 import org.junit.Assert.*
 import org.junit.Rule
@@ -34,6 +38,7 @@ class PlayerChannelBrowserTest {
     private var state by mutableStateOf(PlayerChannelBrowserState())
     private var shown by mutableStateOf(true)
     private var active by mutableStateOf(true)
+    private var playback by mutableStateOf(ChannelPlaybackIndicator.PLAYING)
     private var channels by mutableStateOf((1L..16L).map { Channel.create(ChannelId(it), name = "Channel $it", number = it) })
     private var recent by mutableStateOf(channels.drop(1).reversed())
     private val picks = mutableListOf<ChannelId>()
@@ -49,7 +54,7 @@ class PlayerChannelBrowserTest {
                             { id -> if (events) EpgEvent.create(EventId(id.value), id, Instant.fromEpochSeconds(1),
                                 Instant.fromEpochSeconds(100), title = "Programme ${id.value}") else null },
                             50, active, {}, { picks += it.id }, { channel, _, _ -> details += channel.id },
-                            { closes += it }, channelsTitle = "Sport")
+                            { closes += it }, channelsTitle = "Sport", playbackIndicator = playback)
                         PlayerChannelBrowserHint(state, recent.isNotEmpty(), "Sport", Modifier.testTag("hint"))
                     }
                 }
@@ -143,6 +148,18 @@ class PlayerChannelBrowserTest {
         focused(1)
         assertEquals(PlayerChannelRow.ON_NOW, state.row)
         assertTrue(closes.isEmpty())
+    }
+
+    @Test fun pausedCardAdvertisesReturnToFullScreenButTuningCardDoesNot() {
+        playback = ChannelPlaybackIndicator.PAUSED
+        screen()
+        val card = hasTestTag("player-channel-card-1")
+        val returnLabel = ApplicationProvider.getApplicationContext<Application>().getString(R.string.return_to_full_screen)
+        compose.onNode(hasTestTag("channel-paused-indicator") and hasAnyAncestor(card), useUnmergedTree = true).assertExists()
+        assertEquals(returnLabel, focused(1).fetchSemanticsNode().config[SemanticsActions.OnClick].label)
+        compose.runOnIdle { playback = ChannelPlaybackIndicator.TUNING }
+        compose.onNode(hasTestTag("channel-tuning-indicator") and hasAnyAncestor(card), useUnmergedTree = true).assertExists()
+        assertNotEquals(returnLabel, focused(1).fetchSemanticsNode().config[SemanticsActions.OnClick].label)
     }
 
     @Test fun removedChannelFallsBackAndNewSessionDropsBothCollections() {

@@ -55,6 +55,7 @@ import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.core.visibleChannelNumber
@@ -88,6 +89,7 @@ fun ChannelDrawer(
     onCloseDrawer: (Int?) -> Unit,
     onLongClickChannel: ((Channel, EpgEvent) -> Unit)? = null,
     browserState: PlayerChannelCollectionState? = null,
+    runningRecordingForEvent: (EpgEvent) -> DvrEntry? = { null },
 ) {
     val ids = remember(channels) { channels.map { it.id } }
     val numbers = remember(channels) { channels.associate { it.id to it.visibleChannelNumber } }
@@ -241,15 +243,17 @@ fun ChannelDrawer(
                 // Details consume the opening release. Retire the native Card's held-click state
                 // when input ownership leaves, without replacing the remembered row or viewport.
                 androidx.compose.runtime.key(ownsInput()) {
+                val event = nowEvent(channel.id)
                 CompactZapCard(
                     channel = channel,
                     number = ChannelNavigation.numberForId(ids, numbers, channel.id),
-                    event = nowEvent(channel.id),
+                    event = event,
                     nowSec = nowSec,
                     // The peek stays still: the sound bars start once the rail opens.
                     playbackIndicator = playbackIndicator.takeIf { channel.id == playbackChannelId && peek?.resting != true }
                         ?: ChannelPlaybackIndicator.NONE,
-                    recording = channel.id in recordingChannelIds,
+                    channelRecording = channel.id in recordingChannelIds,
+                    programmeRecording = event?.let(runningRecordingForEvent),
                     onClick = {
                         if (ownsInput()) {
                             if (channel.id != playingChannelId) pendingPickId = channel.id
@@ -283,4 +287,3 @@ fun ChannelDrawer(
         }
     }
 }
-

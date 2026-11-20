@@ -79,7 +79,7 @@ import at.bernhardberger.tvhplayer.ui.TvCardFocusedScale
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
-import at.bernhardberger.tvhplayer.ui.components.RecordingBadge
+import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 
 /** The live top identity's test tag. */
@@ -287,8 +287,7 @@ private fun identitySpoken(content: PlayerChromeContent): String {
     val info = content.info
     val channel = if (info.channelNumber.isBlank()) info.channelName
         else stringResource(R.string.player_channel_spoken, channelTitleText(info.channelNumber.toLongOrNull(), info.channelName))
-    // The REC badge beside the name says it too.
-    return if (content.recordingNow) "$channel, ${stringResource(R.string.player_recording)}" else channel
+    return if (content.showChannelMark) "$channel, ${stringResource(R.string.channel_recording_spoken)}" else channel
 }
 
 @Composable
@@ -314,7 +313,11 @@ private fun IdentityContent(
             // The focusable identity's description, or the Banner's info bar, names the channel.
             modifier = Modifier.weight(1f, fill = false).widthIn(max = IdentityTextMaxWidth)
                 .testTag("player-top-identity-name").clearAndSetSemantics {})
-        if (content.recordingNow) RecordingBadge(DvrEntryState.RECORDING)
+        if (content.showChannelMark) {
+            RecordingStatusIndicator(
+                DvrEntryState.RECORDING, Modifier.testTag("player-identity-recording-mark"), announceState = false,
+                textStyle = MaterialTheme.typography.titleLarge)
+        }
     }
 }
 

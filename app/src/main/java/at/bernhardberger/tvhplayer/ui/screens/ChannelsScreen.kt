@@ -60,6 +60,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -105,6 +106,7 @@ import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.core.visibleChannelNumber
 import at.bernhardberger.tvhplayer.core.activeRecordingChannelIds
 import at.bernhardberger.tvhplayer.core.channelNowStatus
+import at.bernhardberger.tvhplayer.core.runningRecordingForEvent
 import at.bernhardberger.tvhplayer.core.AppErrorAction
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.recordingWasRemoved
@@ -309,7 +311,6 @@ internal fun ChannelsScreenContent(
     val headerEntryFocus = header.entry(hasTagChoice = groups.size > 1)
     var openPanel by remember { mutableStateOf<ChannelsPanel?>(null) }
     val dvrEntries = observation.dvrSnapshotForDisplay?.entries.orEmpty().filterNot(::recordingWasRemoved)
-    val recordingChannelIds = remember(dvrEntries) { activeRecordingChannelIds(dvrEntries) }
     val channels = channelScope.visibleChannels
     val orderedChannelIds = remember(channels) { channels.map { it.id } }
     val rowFocusRequesters = remember(orderedChannelIds) {
@@ -346,6 +347,9 @@ internal fun ChannelsScreenContent(
     var isRestoring by remember { mutableStateOf(false) }
 
     val nowSec = rememberCurrentEpochSeconds()
+    val recordingChannelIds by remember(dvrEntries, nowSec) {
+        derivedStateOf { activeRecordingChannelIds(dvrEntries, nowSec()) }
+    }
 
     val listState = rememberLazyListState()
     // Native focus scrolling and the explicit preview anchor share one viewport policy:
@@ -1069,7 +1073,8 @@ internal fun ChannelsScreenContent(
                                         nowSec = nowSec,
                                         piconPath = ch.icon,
                                         programStartSec = now?.start?.epochSeconds,
-                                        recordingNow = status.recordingNow,
+                                        channelRecording = status.channelRecording,
+                                        programmeRecording = frame.observation.runningRecordingForEvent(now),
                                         playingNow = status.playingNow,
                                         playbackIndicator = frame.playbackIndicator.takeIf {
                                             channelId == frame.playbackChannelId

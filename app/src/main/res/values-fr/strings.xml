@@ -926,6 +926,7 @@
     <string name="rail_now_playing_description">Lecture en cours : %1$s, %2$s, %3$s.</string>
     <string name="rail_now_playing_description_channel">Lecture en cours : %1$s, %2$s.</string>
     <string name="player_recording">Enregistrement en cours</string>
+    <string name="channel_recording_spoken">Enregistrement en cours sur cette chaîne</string>
     <string name="player_recorded_on">Enregistré le %1$s</string>
     <string name="player_recorded_ends">Enregistré le %1$s • Fin à %2$s</string>
     <string name="player_recording_until">Enregistrement jusqu’à %1$s</string>
@@ -1150,8 +1151,6 @@
     <string name="home_recording_starts_at">Début à %1$s</string>
     <string name="home_all_recordings">Tous les enregistrements</string>
     <string name="home_activity_watching_live">Visionnage en direct</string>
-    <string name="home_activity_recording">Enregistrement</string>
-    <string name="home_activity_watching_and_recording">Visionnage et enregistrement</string>
     <string name="home_upcoming_summary">À suivre : %1$s • %2$s</string>
     <plurals name="home_upcoming_more">
         <item quantity="one">%1$d autre programmé</item>
@@ -1210,4 +1209,5 @@
     <string name="server_none_in_use">Aucune connexion utilisée</string>
     <string name="server_list_unavailable">Les connexions enregistrées ne peuvent pas être lues sur ce téléviseur pour le moment</string>
     <string name="server_none_in_use_description">Aucune connexion utilisée. Choisis-en une pour regarder à nouveau la TV.</string>
+    <string name="return_to_full_screen">Revenir en plein écran</string>
 </resources>

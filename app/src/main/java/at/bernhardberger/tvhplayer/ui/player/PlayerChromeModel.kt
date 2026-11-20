@@ -4,6 +4,7 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvhplayer.core.PlayerStateCell
 import at.bernhardberger.tvhplayer.core.GlanceBadge
+import at.bernhardberger.tvhplayer.core.showChannelRecordingMark
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.playback.LivePauseAvailability
 import at.bernhardberger.tvhplayer.playback.TimeshiftSeekDecision
@@ -32,8 +33,6 @@ internal data class PlayerChromeContent(
     val info: PlayerInfoBarData,
     /** What playback is doing: the bar row's state cell, always the real state, also during a step. */
     val state: PlayerStateCell = PlayerStateCell.PLAYING,
-    /** The watched channel or recording is being recorded now: the info bar's REC badge. */
-    val recordingNow: Boolean = false,
     val badges: List<GlanceBadge> = emptyList(),
     val picon: ChannelIcon? = null,
     /** The programme's artwork, the identity card's backdrop. */
@@ -42,7 +41,11 @@ internal data class PlayerChromeContent(
     val channelId: at.bernhardberger.tvheadend.sdk.core.ChannelId? = null,
     /** A recording with no channel: the artwork's place shows the recordings symbol instead of an empty channel. */
     val withoutChannel: Boolean = false,
-)
+    /** A DVR entry is running in its unpadded window on the live channel. */
+    val channelRecording: Boolean = false,
+) {
+    val showChannelMark: Boolean get() = showChannelRecordingMark(channelRecording, info.nowRecording != null)
+}
 
 /** Facts the chrome's timeline shows. */
 internal sealed interface PlayerChromeTimeline {

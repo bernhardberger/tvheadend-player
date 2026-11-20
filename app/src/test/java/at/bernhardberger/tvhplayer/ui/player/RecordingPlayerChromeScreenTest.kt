@@ -869,16 +869,22 @@ class RecordingPlayerChromeScreenTest {
         assertEquals("closing details shows the controls on Info", listOf("player-info"), focused())
     }
 
-    @Test fun aGrowingRecordingShowsItsLengthAndBehindLiveAndTheBadgeSaysItStillRecords() {
+    @Test fun aGrowingRecordingShowsItsLengthAndBehindLiveAndMarksItsTimingLine() {
         compose.setContent {
-            TVHeadendPlayerTheme { RecordingChromeFixture(mode = PlayerChromeMode.BANNER, growing = true) }
+            TVHeadendPlayerTheme {
+                RecordingChromeFixture(mode = PlayerChromeMode.BANNER, growing = true,
+                    info = fixtureRecordingInfo(growing = true, state = DvrEntryState.SCHEDULED))
+            }
         }
         compose.waitForIdle()
         assertTrue("the annotation names the distance from the recording head", texts("30:00 behind live"))
         assertEquals("Behind live", description("player-live-state"))
         assertEquals("the length carries no recording dot", "1:00:00", endClock())
-        assertEquals("the badge says it", "Recording now", description("recording-badge"))
-        assertTrue("and the top identity, which carries it, speaks it", identitySpeech(compose).contains("Recording now"))
+        val mark = compose.onNodeWithTag("player-info-timing-mark", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val facts = compose.onNodeWithTag("player-info-programme", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        assertTrue(mark.right < facts.left && mark.center.y in facts.top..facts.bottom)
+        assertTrue(description("player-info-bar").contains("Recording now"))
+        assertFalse(identitySpeech(compose).contains("Recording now"))
     }
 
     @Test fun markSymbolsShowOnlyWhileTheSeekbarIsFocused() {

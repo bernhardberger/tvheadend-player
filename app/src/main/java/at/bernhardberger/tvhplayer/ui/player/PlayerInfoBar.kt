@@ -20,10 +20,16 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.GlanceBadge
 import at.bernhardberger.tvhplayer.ui.components.ScheduledIndicator
+import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
+import at.bernhardberger.tvhplayer.ui.components.RecordingBadge
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
+import at.bernhardberger.tvhplayer.ui.components.recordingStatusSpoken
+import at.bernhardberger.tvhplayer.ui.components.rule
 
 private val InfoBarFactsBadgeGap = 12.dp
 
@@ -43,6 +49,9 @@ data class PlayerInfoBarData(
     val nextScheduled: Boolean = false,
     val recordedDate: String? = null,
     val spokenTimeRange: String = "",
+    val nowRecording: DvrEntry? = null,
+    val nextRecording: DvrEntry? = null,
+    val nowRecordingStateOverride: DvrEntryState? = null,
 )
 
 /**
@@ -73,16 +82,22 @@ fun PlayerInfoBar(
         else listOfNotNull(data.timeRange.takeIf(String::isNotBlank), data.metadata?.takeIf(String::isNotBlank)).joinToString(" • ")
     val next = data.next?.let { stringResource(R.string.player_next, it) }
     val remaining = data.remainingMinutes?.let { playerMinutesLeft(it, spoken = true) }
-    val scheduled = if (data.nextScheduled && next != null) stringResource(R.string.player_scheduled) else null
+    val nextRecording = data.nextRecording.takeIf { next != null && !recorded }
+    val nowRecordingState = data.nowRecordingStateOverride ?: data.nowRecording?.state
+    val nextStatus = when {
+        nextRecording != null -> recordingStatusSpoken(nextRecording.state, nextRecording.rule)
+        data.nextScheduled && next != null && !recorded -> stringResource(R.string.player_scheduled)
+        else -> null
+    }
     val description = listOfNotNull(
         if (data.channelNumber.isBlank()) data.channelName else stringResource(R.string.player_channel_spoken,
             channelTitleText(data.channelNumber.toLongOrNull(), data.channelName)),
         if (data.recordedDate == null) stringResource(R.string.player_now_spoken, data.title, data.spokenTimeRange)
         else stringResource(R.string.player_recorded_spoken, data.title, data.recordedDate, data.spokenTimeRange),
-        remaining, next, scheduled,
+        data.nowRecording?.let { recordingStatusSpoken(nowRecordingState, it.rule) },
+        remaining, next, nextStatus,
         badges.takeIf { it.isNotEmpty() }?.map { glanceBadgeSpoken(it) }?.joinToString(". "),
     ).joinToString(". ")
-    val secondary = MaterialTheme.colorScheme.onSurface.copy(alpha = TvTextTertiaryAlpha)
     val faded = Modifier.graphicsLayer { alpha = contentAlpha() }
     // Live ends on Next; a recording has none, its episode stands on the subtitle's line.
     val lastText = next.takeIf { !recorded }
@@ -100,10 +115,12 @@ fun PlayerInfoBar(
         horizontalArrangement = Arrangement.spacedBy(TvGridGutter), verticalAlignment = Alignment.Top) {
         identity(faded)
         Column(Modifier.weight(1f).fillMaxHeight()) {
-            PlayerInfoFacts(facts, badges, faded.then(if (reserveOn == "facts") reserved else Modifier))
+            PlayerInfoFacts(facts, badges, data.nowRecording, nowRecordingState,
+                faded.then(if (reserveOn == "facts") reserved else Modifier))
             Spacer(Modifier.height(4.dp))
-            Text(data.title, style = MaterialTheme.typography.headlineMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                color = MaterialTheme.colorScheme.onSurface, modifier = faded.then(if (reserveOn == "title") reserved else Modifier)
+            Text(data.title, style = MaterialTheme.typography.headlineMedium, maxLines = 1,
+                overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurface,
+                modifier = faded.then(if (reserveOn == "title") reserved else Modifier)
                     .testTag("player-info-title").clearAndSetSemantics {})
             Spacer(Modifier.height(2.dp))
             Text(subtitle.orEmpty(), style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -112,23 +129,54 @@ fun PlayerInfoBar(
                     .then(if (subtitle != null) Modifier.testTag("player-info-subtitle") else Modifier).clearAndSetSemantics {})
             // Now above, Next on the artwork's bottom edge.
             Spacer(Modifier.weight(1f).heightIn(min = 8.dp))
-            if (lastText != null) Row(faded.fillMaxWidth().testTag("player-info-last-row"),
-                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                // Centred on the text line without adding to its height: the row is as tall as its text.
-                if (!recorded && data.nextScheduled && next != null) ScheduledIndicator(
-                    Modifier.noHeight().testTag("player-scheduled-marker"), tint = secondary)
-                Text(lastText, style = MaterialTheme.typography.labelLarge,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    color = secondary,
-                    modifier = reserved.testTag("player-info-last-text").clearAndSetSemantics {})
-            } else Text("", style = MaterialTheme.typography.labelLarge, maxLines = 1, modifier = Modifier.clearAndSetSemantics {})
+            if (lastText != null) {
+                PlayerInfoNext(lastText, nextRecording, data.nextScheduled, lastLineEndReserve, faded)
+            } else {
+                Text("", style = MaterialTheme.typography.labelLarge, maxLines = 1,
+                    modifier = Modifier.clearAndSetSemantics {})
+            }
         }
     }
 }
 
 @Composable
-private fun PlayerInfoFacts(facts: String, badges: List<GlanceBadge>, modifier: Modifier = Modifier) {
+private fun PlayerInfoNext(
+    title: String,
+    recording: DvrEntry?,
+    scheduled: Boolean,
+    endReserve: Dp,
+    modifier: Modifier,
+) {
+    val secondary = MaterialTheme.colorScheme.onSurface.copy(alpha = TvTextTertiaryAlpha)
+    Row(
+        modifier.fillMaxWidth().testTag("player-info-last-row").padding(end = endReserve),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(title, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            color = secondary,
+            modifier = Modifier.weight(1f, fill = false)
+                .testTag("player-info-last-text").clearAndSetSemantics {})
+        // Centred on the text line without adding to its height: the row is as tall as its text.
+        if (recording != null) RecordingStatusIndicator(
+            recording.state, Modifier.noHeight(), rule = recording.rule, announceState = false,
+            textStyle = MaterialTheme.typography.labelLarge)
+        else if (scheduled) ScheduledIndicator(
+            Modifier.noHeight().testTag("player-scheduled-marker"), tint = secondary,
+            textStyle = MaterialTheme.typography.labelLarge)
+    }
+}
+
+@Composable
+private fun PlayerInfoFacts(
+    facts: String, badges: List<GlanceBadge>, recording: DvrEntry?, state: DvrEntryState?, modifier: Modifier,
+) {
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        if (recording != null) {
+            Box(Modifier.testTag("player-info-timing-mark").clearAndSetSemantics {}) {
+                RecordingBadge(state, compact = true, rule = recording.rule)
+            }
+            if (facts.isNotEmpty()) Spacer(Modifier.width(8.dp))
+        }
         Text(facts, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = TvTextTertiaryAlpha),
             modifier = Modifier.weight(1f, fill = false).testTag("player-info-programme").clearAndSetSemantics {})

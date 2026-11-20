@@ -29,6 +29,9 @@ internal fun fixtureRecordingInfo(
     nowSec: Long = 1_700_010_000,
     stopExtra: kotlin.time.Duration? = null,
     startSec: Long = 1_700_000_000,
+    state: at.bernhardberger.tvheadend.sdk.core.DvrEntryState =
+        if (growing) at.bernhardberger.tvheadend.sdk.core.DvrEntryState.RECORDING
+        else at.bernhardberger.tvheadend.sdk.core.DvrEntryState.COMPLETED,
 ): PlayerInfoBarData =
     recordingInfoBarData(
         DvrEntry.create(
@@ -39,8 +42,7 @@ internal fun fixtureRecordingInfo(
             start = Instant.fromEpochSeconds(startSec),
             stop = Instant.fromEpochSeconds(startSec + 3_600),
             stopExtraMinutes = stopExtra,
-            state = if (growing) at.bernhardberger.tvheadend.sdk.core.DvrEntryState.RECORDING
-                else at.bernhardberger.tvheadend.sdk.core.DvrEntryState.COMPLETED,
+            state = state,
         ),
         channelNumber = 1,
         nowSec = nowSec,
@@ -97,7 +99,6 @@ internal fun RecordingChromeFixture(
             clock = "20:15",
             info = info ?: fixtureRecordingInfo(growing = growing, positionMs = positionMs, durationMs = durationMs),
             state = playerStateCell(paused),
-            recordingNow = growing,
             badges = badges,
             picon = picon?.let { ChannelIcon.ImageCache(it) },
             artwork = artwork?.let(ChannelIcon::ImageCache),

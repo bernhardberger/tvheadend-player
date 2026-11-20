@@ -29,6 +29,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -84,6 +85,18 @@ internal fun HomeActivityCard(
     val running = event?.takeIf { it.isRunning(nowSec) }
     val recordingOnly = !playing && entry != null
     val recordingNow = entry?.state == DvrEntryState.RECORDING || entry?.state == DvrEntryState.RECORDING_ERROR
+    val playback = when {
+        !playing -> ChannelPlaybackIndicator.NONE
+        playingRecording -> watchingIndicator(entry?.id)
+        else -> channelWatchingIndicator(channel?.id)
+    }
+    val playbackLabel = when {
+        playback == ChannelPlaybackIndicator.PAUSED -> stringResource(R.string.player_paused)
+        playback == ChannelPlaybackIndicator.TUNING -> stringResource(R.string.loading)
+        playingRecording -> stringResource(R.string.home_back_to_recording)
+        playing -> stringResource(R.string.home_activity_watching_live)
+        else -> null
+    }
     val viewer = if (playingRecording) recordingViewerPosition(entry?.id) else null
     val session = LocalArtworkContext.current.currentSession
     val image = (if (recordingOnly) entry?.let(::recordingArtwork)
@@ -106,7 +119,10 @@ internal fun HomeActivityCard(
         onLongClick = contextMenu.onLongClick,
         interactionSource = interaction,
         modifier = modifier
-            .semantics(mergeDescendants = true) { contentDescription = description }
+            .returnToFullScreenAction(playing)
+            .semantics(mergeDescendants = true) {
+                contentDescription = listOfNotNull(playbackLabel, description).joinToString(", ")
+            }
             .cardFocusRing(ring, MaterialTheme.colorScheme.onSurface)
             .width(width)
             .aspectRatio(16f / 9f)
@@ -152,12 +168,6 @@ internal fun HomeActivityCard(
                     ),
                 ),
             )
-            // The loaded item's own state, as on every other surface: playing, paused or tuning.
-            val playback = when {
-                !playing -> ChannelPlaybackIndicator.NONE
-                playingRecording -> watchingIndicator(entry?.id)
-                else -> channelWatchingIndicator(channel?.id)
-            }
             if (playback != ChannelPlaybackIndicator.NONE || entry != null) {
                 Row(
                     Modifier.align(if (pictured) Alignment.TopEnd else Alignment.TopStart).padding(12.dp),
@@ -173,16 +183,13 @@ internal fun HomeActivityCard(
                             androidx.compose.runtime.CompositionLocalProvider(
                                 LocalContentColor provides TvTextColors.primary,
                             ) {
-                                // REC below already owns the recording dot; keep only playback here.
-                                ChannelNowIndicators(
-                                    playingNow = false,
-                                    recordingNow = false,
-                                    playbackIndicator = playback,
-                                )
+                                ChannelPlaybackMarker(playback, announceState = false)
                             }
                         }
                     }
-                    if (recordingNow) entry?.let { RecordingBadge(it.state) }
+                    if (recordingNow) entry?.let {
+                        Box(Modifier.clearAndSetSemantics {}) { RecordingBadge(it.state, rule = it.rule) }
+                    }
                 }
             }
             Column(

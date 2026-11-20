@@ -430,7 +430,6 @@
     <ID>MaxLineLength:ChannelDrawer.kt:modifier = Modifier.padding(start = 58.dp, end = 58.dp, top = 16.dp).focusRequester(emptyFocus).testTag("player-shelf-close")</ID>
     <ID>MaxLineLength:ChannelDrawer.kt:playbackIndicator</ID>
     <ID>MaxLineLength:ChannelDrawer.kt:playbackIndicator: ChannelPlaybackIndicator = if (playingChannelId != null) ChannelPlaybackIndicator.PLAYING else ChannelPlaybackIndicator.NONE</ID>
-    <ID>MaxLineLength:ChannelNowIndicators.kt:playbackIndicator: ChannelPlaybackIndicator = if (playingNow) ChannelPlaybackIndicator.PLAYING else ChannelPlaybackIndicator.NONE</ID>
     <ID>MaxLineLength:ChannelNumberOverlay.kt:ChannelNumberName(entry.target, Modifier.weight(1f, fill = false).padding(start = with(density) { spaceWidth.toDp() }))</ID>
     <ID>MaxLineLength:ChannelNumberOverlay.kt:DigitArrivals$private fun progress</ID>
     <ID>MaxLineLength:ChannelNumberOverlay.kt:color</ID>

@@ -828,6 +828,7 @@
     <string name="rail_now_playing_description">正在播放：%1$s，%2$s，%3$s。</string>
     <string name="rail_now_playing_description_channel">正在播放：%1$s，%2$s。</string>
     <string name="player_recording">錄影中</string>
+    <string name="channel_recording_spoken">此頻道錄影中</string>
     <string name="player_recorded_on">錄製於%1$s</string>
     <string name="player_recorded_ends">錄製於%1$s • %2$s結束</string>
     <string name="player_recording_until">錄影至%1$s</string>
@@ -1021,8 +1022,6 @@
     <string name="home_recording_starts_at">%1$s 開始</string>
     <string name="home_all_recordings">所有錄影</string>
     <string name="home_activity_watching_live">正在觀看直播</string>
-    <string name="home_activity_recording">正在錄影</string>
-    <string name="home_activity_watching_and_recording">正在觀看與錄影</string>
     <string name="home_upcoming_summary">接下來：%1$s • %2$s</string>
     <plurals name="home_upcoming_more">
         <item quantity="other">另有 %1$d 項預約</item>
@@ -1079,4 +1078,5 @@
     <string name="server_none_in_use">目前沒有使用中的連線</string>
     <string name="server_list_unavailable">目前無法讀取這台電視上儲存的連線</string>
     <string name="server_none_in_use_description">目前沒有使用中的連線。請選取連線以繼續觀看電視。</string>
+    <string name="return_to_full_screen">返回全螢幕</string>
 </resources>

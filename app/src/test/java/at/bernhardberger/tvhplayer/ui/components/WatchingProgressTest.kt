@@ -148,21 +148,12 @@ class WatchingProgressTest {
         assertEquals(1f, RecordingViewerPosition(recording.id, 9000, 1000).fraction)
     }
 
-    @Test fun guideHeadlineMarksOnlyThePlayingProgramme() {
+    @Test fun guideHeadlineKeepsViewerProgressWithoutAPlaybackMark() {
         show("guide")
-        marker().assertExists()
-        val bounds = marker().fetchSemanticsNode().boundsInRoot
-        val bitmap = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
-        compose.runOnIdle { view.draw(Canvas(bitmap)) }
-        assertTrue("The passive headline's marker must have a visible neutral tint",
-            (bounds.top.toInt() until bounds.bottom.toInt()).any { y ->
-                (bounds.left.toInt() until bounds.right.toInt()).any { x ->
-                    android.graphics.Color.red(bitmap.getPixel(x, y)) > 100
-                }
-            })
-        bitmap.recycle()
-        compose.runOnIdle { target.value = AppPlaybackTarget.Live(ChannelId(2)) }
         marker().assertDoesNotExist()
+        assertOrangeProgress()
+        compose.runOnIdle { target.value = AppPlaybackTarget.Live(ChannelId(2)) }
+        assertProgressColor(ambientColor)
     }
     @Test fun programmeDetailsReplacePlayIconAndRetainPauseMark() {
         show("programme")
@@ -177,7 +168,6 @@ class WatchingProgressTest {
         compose.onNodeWithText("Continue watching").assertIsFocused()
         compose.onNodeWithText("Watch").assertDoesNotExist()
         compose.onNodeWithText("Watch live").assertDoesNotExist()
-        // The only mark is the button's icon; the item column beside it draws none.
         compose.onAllNodesWithTag("channel-playing-indicator", useUnmergedTree = true).assertCountEquals(1)
         assertMarkInside("Continue watching")
         compose.runOnIdle { indicator.value = ChannelPlaybackIndicator.PAUSED }
@@ -714,7 +704,8 @@ class WatchingProgressTest {
                                     programme = event, nowSec = now, piconPath = picon, playbackIndicator = indicator.value,
                                     onFocus = {}, onConfirm = {}, modifier = Modifier.padding(48.dp).width(396.dp))
                                 "channels-headline" -> at.bernhardberger.tvhplayer.ui.screens.ChannelsHeadline(channel, event, null,
-                                    false, false, now, 3, false, Modifier.padding(48.dp).width(600.dp))
+                                    false, false, now, 3, false, Modifier.padding(48.dp).width(600.dp),
+                                    observation = at.bernhardberger.tvheadend.sdk.core.SessionObservation.create())
                                 "row" -> Column(Modifier.padding(48.dp).width(480.dp)) {
                                     RecordingListRow(recording, channel.icon, 60.seconds, false, onClick = {})
                                     RecordingListRow(DvrEntry.create(DvrEntryId(2), title = "Other recording"), null, null, true, onClick = {})

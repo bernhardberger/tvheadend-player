@@ -141,7 +141,6 @@ class ChannelNumberEntryLayoutTest {
                                     101, "Ridge Earth HD", programme, next, nextScheduled = true, nowSec = NOW,
                                     unavailableTitle = "No program information"),
                                 state = playerStateCell(false),
-                                recordingNow = false,
                                 picon = ChannelIcon.ImageCache(LOGO),
                                 artwork = programme.image?.let(ChannelIcon::ImageCache),
                             ),

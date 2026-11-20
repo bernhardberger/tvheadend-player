@@ -69,8 +69,10 @@ Meaning of colour:
   surface needs both, show two bars rather than one bar in two colours.
   The playing item carries the same neutral playing mark and orange progress on
   every surface showing it: Channels List, Grid, Immersive, Quick Zap (including
-  its now-playing strip), the Guide headline, context menus, programme and recording
-  details, and the recording browser. A playing recording's progress follows the
+  its now-playing strip), the watched programme's Guide cell, context menus,
+  programme and recording details, and the recording browser (§9 says where the
+  mark goes). The Guide headline keeps the orange progress without the mark. A
+  playing recording's progress follows the
   viewer's current position, not its saved resume point. Live viewer progress uses
   the runtime's correlated time-shift wall-clock estimate, including when paused
   or rewound. Without time-shift, at a confirmed live edge, or before the first sample
@@ -78,8 +80,8 @@ Meaning of colour:
   unknown viewer timing has no progress bar. Other programmes keep broadcast-time
   progress in cyan.
   Paused or rewound items retain orange and the playing identity (the pause mark
-  replaces the animated bars when paused). Guide grid cells stay unchanged;
-  focus/selection styling and buttons remain neutral. Only Playing/Buffering
+  replaces the animated bars when paused). Guide grid cells keep their fill and
+  carry no progress; focus/selection styling and buttons remain neutral. Only Playing/Buffering
   (including paused intent) identifies a playing item. Starting's tuning spinner
   is loading feedback, not playing identity or orange progress; Recovering, Failed,
   Idle and Finished have neither playing identity nor viewer progress.
@@ -88,41 +90,78 @@ Meaning of colour:
   from `RecordingStatusIndicator` (dot) and `RecordingBadge` (badge), progress
   bars and other drawn marks from `recordingMarkColor`, and a source test keeps
   the recording reds inside those owners and the theme.
-  - **Dot** (16dp; a clock when scheduled, stacked clocks when a series or
-    timer rule scheduled it; the muted library mark when finished) only in rows
-    and grid cells, at the
-    right end of the title line: channel rows, Recordings rows, Guide cells
-    (the title ellipsizes first). The lines above and
-    below keep their full width, so progress and metadata never shorten for a
-    mark. Watch state ends the same line in the muted content colour: a check
-    circle when watched, Material's clock loader filled about as far as the saved
-    position when partly watched, nothing when unwatched. A folder row uses the
-    same marks: the check when everything in it is watched, the clock loader
-    filled by the share watched to the end otherwise, which its line counts as
-    "N watched". Tvheadend's play count counts file opens, so the app never shows
-    it as a number. The
-    trailing slot belongs to where OK leads, such as a folder's chevron.
-    A running recording with errors adds the `error` "!" beside the dot. Guide
-    cells and the channel schedule also mark a finished recording with the library mark and a failed or missed one
-    with the `error` "!". No dot
-    on section headings or titles; the "Recording now" folder carries its dot
-    as a badge on the folder icon.
-  - **Badge** (one size: 20dp, 4dp corners, `labelMedium`) in eyebrows, info
-    headers, menu headers, side panes and image corners: the solid red `● REC`
-    after the channel name in the player's top identity, the Channels headline
-    and cards, the zap rail cards, the player's programme info and schedule
-    tiles, programme details, the context menu header and the Recordings pane.
-    Scheduled is a neutral badge with a clock and "Scheduled", failed an `error`
-    badge with "Failed" (or "Missed" for a recording that never ran), canceled
-    (an invalid entry) a neutral badge with the cancel mark and "Canceled", errors
-    while recording a red `● REC` plus an `error` "Errors" badge. "On now"
-    and "Available until" are neutral badges. The Guide headline badges what
-    its cells mark: also a neutral "Recorded" with the library mark.
-    "Scheduled" carries stacked clocks wherever a rule scheduled it. Running uses a
-    red dot with a half ring for a rule, otherwise the plain dot. The origin stays
-    visible because a running rule-made recording now offers "Edit …".
-  - In Recordings overlines a failure, missed recordings included, is an
-    `error` "!" symbol; cancelled and stopped early are muted symbols. Problems
+  - **One mark per item, about what it is attached to** (decided 2026-11-18,
+    #47). A programme's mark comes only from its own linked entry. Padding
+    belongs to that entry and never marks the programme whose airtime it
+    overlaps. The channel mark says the channel records something inside an
+    entry's own start and stop, without padding: a timer without a programme
+    link, or an entry whose link no longer matches. It shows only where the
+    item carries no programme mark, and padding never raises it. A headline and
+    the card it describes are separate items, so each carries the mark.
+    TalkBack says "Recording" for a programme and "Recording on this channel"
+    for a channel. Recording red on a strip follows the programme: only its own
+    running entry turns the strip red, the channel mark never does.
+  - **Each kind of item has one fixed place for the mark** (decided 2026-11-19),
+    where the eye already scans, so a mark never moves with the length of a
+    title and a title never loses a line to it:
+    - *Pictures* carry the solid red `● REC` badge (20dp, 4dp corners,
+      `labelMedium`; compact on cards) in the top-end corner, on programme art
+      and on a logo alike: Channels Grid and Immersive cards, Home On-now
+      cards, zap rail cards and Home recent channel tiles. The channel mark is
+      the same badge in the same corner. The Right now card is the exception:
+      its full-size badge sits beside its playing mark, top-end on a picture
+      and top-start without one, clear of the faded logo.
+    - *Headers* end their eyebrow with the badge; the eyebrow is the header's
+      status slot. That covers the Channels headline (Immersive, the pane
+      beside the List, Home's On-now block), the Guide headline and the
+      Recordings pane, where the worded states below stand in the same place.
+      The player's info bar and the Quick Zap preview have no channel line, so
+      the compact badge starts their facts line.
+    - *Rows* keep marks in their end column at 16dp (`StatusIconSize`).
+      Channels List rows end the channel-name line with one recording dot, then
+      the playing mark; the programme's own entry wins over the channel mark.
+      Recordings rows centre the recording status, the playing mark and the
+      watch state in the trailing slot.
+    - *Short text in a cell or line* takes the dot directly after it, sized to
+      that text (`recordingMarkSize`): Guide cells, channel schedule rows, the
+      Next lines of the player, Quick Zap and the Channels headline, and the
+      channel name in the player's top identity (the channel mark, shown only
+      when the Now programme carries none). The text is shortened, the mark
+      never.
+  - The dot is plain while recording, with a half ring when a series or timer
+    rule made the entry; a clock when scheduled, stacked clocks when a rule
+    scheduled it; the muted library mark when finished. The badge shows the
+    same half ring for a rule. The channel mark is always plain.
+  - Watch state follows the recording status in a Recordings row's trailing
+    slot, in the muted content colour: a check circle when watched, Material's
+    clock loader filled about as far as the saved position when partly
+    watched, nothing when unwatched. It is hidden while that recording plays or
+    is paused, because the playing mark already says more. A folder row uses
+    the same marks: the check when everything in it is watched, the clock
+    loader filled by the share watched to the end otherwise, which its line
+    counts as "N watched". Tvheadend's play count counts file opens, so the app
+    never shows it as a number. A folder's trailing slot holds its chevron. A
+    running recording with errors adds the `error` "!" beside the dot. Guide
+    cells and the channel schedule also mark a finished recording with the
+    library mark. A failed or missed recording is the `error` "!" in the same
+    place as the dot: after the title in Guide cells and the channel schedule,
+    in the trailing slot of a Recordings row. No dot on section headings; the
+    "Recording now" folder carries its dot as a badge on the folder icon.
+  - Worded status badges state a status where it is the topic: programme
+    details, the Guide headline, the Recordings pane and the context menu
+    header. Scheduled is a
+    neutral badge with a clock and "Scheduled" (stacked clocks for a rule),
+    failed an `error` badge with "Failed" (or "Missed" for a recording that
+    never ran), canceled (an invalid entry) a neutral badge with the cancel
+    mark and "Canceled", errors while recording a red `● REC` plus an `error`
+    "Errors" badge. "On now" and "Available until" are neutral badges. A
+    running entry is the `● REC` badge in the same slot. The Guide headline
+    badges what its cells mark: also a neutral "Recorded" with the library
+    mark. The origin stays visible because a running rule-made recording offers
+    "Edit …".
+  - Recordings overlines carry only muted symbols: stopped early, canceled and
+    expiry. A failure, missed recordings included, is the row's `error` "!"
+    (see above). Problems
     lists missed recordings under "Failed"; only invalid entries are "Canceled"
     (decided 2026-10-24). Server-deleted recordings are hidden throughout the app.
     A running row's overline shows its start and
@@ -637,15 +676,32 @@ tuner loss and interruption are failures, limit expiry is informational.
 ## 9. Lists, cards, progress
 
 - Rows and cards are TV Material `ListItem`/`Card` with library indication.
-  The playing-item marker, shared by live channels/programmes and recordings on
-  every surface (including context menus and the Guide headline), is three small animated sound bars in the existing
-  neutral content colour and icon slot, with its existing accessible description.
+  The playing-item marker, shared by live channels/programmes and recordings, is
+  three small animated sound bars in the existing neutral content colour and icon
+  slot, with its existing accessible description.
   Animation is read in the draw phase, not row composition, and stays still when
   the system animator duration scale is zero. Pause and tuning keep their own marks.
   Recording and playing markers are separate data states shown by badge/icon,
   never by overloading focus or selection styling.
-  In context menus and on details pages it is the icon of Continue watching, without
-  changing the action or button colour; menus draw no separate mark beside the title.
+  The mark goes on the playing item, on the action that returns to it, and on
+  the now-playing display (the drawer's now-playing line, the player's
+  now-playing strip). Rows show it in their end column after the recording
+  mark; picture cards and zap rail cards show it on a small plate in the
+  picture's top-start corner, opposite the `● REC` badge (the Right now card
+  keeps the two side by side, section 2); the Guide shows it
+  after the title of the watched programme's cell, which follows the viewer's
+  position under time-shift. It never goes on text that describes the focused
+  item: Guide headline, Channels headline, Home On-now block, Recordings side
+  pane and player info bar stay unmarked (decided 2026-11-18, issue #47
+  follow-up; no TV, music or media centre app studied repeats it there).
+  The mark never changes with focus, and items carry no separate "Full screen"
+  hint: OK on the playing item returns to the player without retuning (#31),
+  which TalkBack names as the item's click action, "Return to full screen".
+  Only the Right now card words it, with the Full screen icon beside "Back to
+  live TV" or "Back to recording".
+  In context menus and on details pages it is the icon of Continue watching (and of
+  Watch, Play or Resume when that leads to the playing item), without changing the
+  action or button colour; menus draw no separate mark beside the title.
   Recording list rows show it independently of selection.
 - Passive on-air progress on cards and rows is cyan and has no terminal marker
   that implies completion; watched progress (resume position) is orange, per the
@@ -723,9 +779,10 @@ only.
   with no timing and no progress.
 - Passive progress is a 2dp strip under the supporting line, spanning the text
   column, identical on focused, unfocused, playing and recording rows.
-- Playing and recording markers sit beside the title and appear only when they
-  apply; no slot is reserved for an absent state. They are decorative and
-  non-focusable, and they shorten only the title.
+- The recording dot and the playing mark end the title line, in that order,
+  and appear only when they apply; no slot is reserved for an absent state.
+  The row has one recording mark (§2). They are decorative and non-focusable,
+  and they shorten only the title.
 - **List picture and headline.** The pane beside the list shows the same thing
   in every state, so nothing moves or resizes when playback starts or stops. At
   its top, level with the first row (y80), a 268×151 picture (the kit's
@@ -735,16 +792,17 @@ only.
   logo on the logo cards' ambient colour from the logo, which here keeps its
   strength to the bottom, since no text sits on it. The headline that Immersive also
   uses hangs 20dp below it, start-aligned and at most 480dp wide. In the details
-  page's order: an eyebrow with the 36×20 picon and `[number] [name]` (plus the
-  player's REC badge while recording), the title in the kit's 32sp `headlineLarge`
-  (two lines; `titleLarge` beside the list, so it doesn't compete with the rows),
+  page's order: an eyebrow with the 36×20 picon and `[number] [name]`, ended by the `● REC`
+  badge when the programme or the channel records (§2), the title in the kit's
+  32sp `headlineLarge` (two lines;
+  `titleLarge` beside the list, so it doesn't compete with the rows),
   a supplied subtitle in `bodyLarge` (one line; absent subtitles leave no gap),
   the facts line with the age-rating box, the start–end time with a 160dp on-air
   strip, then the synopsis in the kit's 16sp `bodyLarge` (`bodyMedium` in the
   narrow column beside the list). Eyebrow, facts, time and Next are metadata in the
   kit's 12sp `labelMedium`. The list alone ends on a quiet
   `Next • HH:MM title` line, with the scheduled clock when that
-  programme is to be recorded. The lines form groups (accepted 2026-10-25): the
+  programme is to be recorded and its red dot once its own entry runs (pre-padding included). The lines form groups (accepted 2026-10-25): the
   eyebrow 2dp above the title, so it reads as the title's label, and the subtitle
   4dp under it; 12dp to the facts, with the time 4dp under them; 20dp before the
   synopsis and before Next. The Guide and Recordings share this headline.
@@ -1004,7 +1062,7 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
     end is the length. Completed recordings have no remaining-time label; their
     information row retains `Ends HH:MM`. A growing recording shows its current
     length and the same `3:23 behind live` annotation above it when behind its
-    recording head; the `REC` badge names it. At the head the annotation is hidden.
+    recording head; the `● REC` badge starting its facts line names it. At the head the annotation is hidden.
     Without a known length there is no end or behind-live annotation.
   - A zap shows the new channel's airing programme (bar, title, Next) from the
     channel change until the committed programme window resolves; only a pause or
@@ -1191,8 +1249,8 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
 - Use the compact channel-card anatomy: 196×110dp at default font scale, a
   centered picon on the channel's own colour fading down (the artwork tile's
   ground; a card without a picon stays neutral, and cards show no programme art)
-  without the kit's text scrim, the current
-  programme title (with the playing and recording markers) as the main line,
+  without the kit's text scrim, the playing mark and the `● REC` badge in the
+  picture's top corners (§2, §9), the current programme title as the main line,
   `<number> <name> • Nm left` below it, and a 2dp cyan progress strip. Use TV
   Material `CompactCard` indication; card height grows with localized text scale.
 - The rail follows the kit's immersive list: focus stays on the first slot and a

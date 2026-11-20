@@ -891,6 +891,7 @@
     <string name="rail_now_playing_description">Spilles nå: %1$s, %2$s, %3$s.</string>
     <string name="rail_now_playing_description_channel">Spilles nå: %1$s, %2$s.</string>
     <string name="player_recording">Tar opp nå</string>
+    <string name="channel_recording_spoken">Tar opp på denne kanalen</string>
     <string name="player_recorded_on">Tatt opp %1$s</string>
     <string name="player_recorded_ends">Tatt opp %1$s • Slutter %2$s</string>
     <string name="player_recording_until">Tar opp til %1$s</string>
@@ -1105,8 +1106,6 @@
     <string name="home_recording_starts_at">Starter kl. %1$s</string>
     <string name="home_all_recordings">Alle opptak</string>
     <string name="home_activity_watching_live">Ser direkte</string>
-    <string name="home_activity_recording">Tar opp</string>
-    <string name="home_activity_watching_and_recording">Ser og tar opp</string>
     <string name="home_upcoming_summary">Neste: %1$s • %2$s</string>
     <plurals name="home_upcoming_more">
         <item quantity="one">%1$d til planlagt</item>
@@ -1164,4 +1163,5 @@
     <string name="server_none_in_use">Ingen tilkobling i bruk</string>
     <string name="server_list_unavailable">De lagrede tilkoblingene kan ikke leses på denne TV-en akkurat nå</string>
     <string name="server_none_in_use_description">Ingen tilkobling i bruk. Velg en for å se TV igjen.</string>
+    <string name="return_to_full_screen">Tilbake til fullskjerm</string>
 </resources>
