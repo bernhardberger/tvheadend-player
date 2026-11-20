@@ -20,10 +20,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.focusProperties
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -34,34 +32,27 @@ import androidx.compose.ui.res.painterResource
 import at.bernhardberger.tvhplayer.ui.TvTextTertiaryAlpha
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
-import at.bernhardberger.tvhplayer.ui.components.channelTitleText
 import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.ui.components.LocalArtworkContext
 import at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers
 import at.bernhardberger.tvhplayer.core.programmeArtworkModel
 import at.bernhardberger.tvhplayer.core.PlayerStateCell
-import at.bernhardberger.tvhplayer.core.timeshiftSeekbarRange
 import at.bernhardberger.tvhplayer.ui.TvOverlayFooterGradientRunout
-import at.bernhardberger.tvhplayer.ui.TvSpacing4
 import coil3.compose.AsyncImage
 import at.bernhardberger.tvhplayer.images.ProgrammeArtworkMode
 import at.bernhardberger.tvhplayer.ui.components.rememberProgrammeImageRequest
 import at.bernhardberger.tvhplayer.ui.components.rememberPictureLoad
-import at.bernhardberger.tvhplayer.ui.components.ArtworkLogoPlateWidth
-import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
+import at.bernhardberger.tvhplayer.ui.components.ArtworkCornerLogo
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.stringResource
+import at.bernhardberger.tvhplayer.ui.components.channelTitleText
+import at.bernhardberger.tvhplayer.core.timeshiftSeekbarRange
+import at.bernhardberger.tvhplayer.ui.TvSpacing4
 import androidx.compose.ui.graphics.Color
+import at.bernhardberger.tvhplayer.ui.components.ArtworkLogoInset
+import at.bernhardberger.tvhplayer.ui.components.ArtworkLogoPlateWidth
 import androidx.compose.ui.graphics.drawscope.scale
-import androidx.compose.ui.unit.LayoutDirection
-import at.bernhardberger.tvhplayer.images.ArtworkLogoCorner
-import at.bernhardberger.tvhplayer.images.ArtworkLogoCornerTransformation
-import coil3.toBitmap
 import kotlinx.coroutines.launch
 
 /**
@@ -322,7 +313,7 @@ internal fun PlayerPresentedLiveTimeline(
  * The info bar's programme artwork: the programme's 16:9 image, or without it the channel's [picon]
  * (or [channelNumber]) on the channel's own ground, as the details hero falls back to, so the bar
  * keeps its shape on every channel. A loaded image carries the picon in a corner, so the bar names
- * the channel with or without a picture. [artworkLogoCorner] picks the corner per picture, because
+ * the channel with or without a picture. [artworkLogoCorners] picks the corner per picture, because
  * artwork with its title drawn in has it in a different place each time.
  * It takes no focus and has no description; the info bar speaks for the programme.
  */
@@ -345,12 +336,10 @@ private fun ProgrammeArtworkTile(
     val request = rememberProgrammeImageRequest(
         model, ProgrammeArtworkMode.BOX, ratio = ratio,
         startPlateShare = if (logo != null) {
-            ((ArtworkTileLogoInset + ArtworkLogoPlateWidth) / ArtworkTileWidth).toDouble()
+            ((ArtworkLogoInset + ArtworkLogoPlateWidth) / ArtworkTileWidth).toDouble()
         } else 0.0,
         logoCorner = logo != null,
     )
-    // Chosen once per picture from what it shows, and known when it arrives, so the logo never jumps.
-    var corner by remember(model) { mutableStateOf<ArtworkLogoCorner?>(null) }
     Box(modifier.size(ArtworkTileWidth, ArtworkTileHeight).clip(ArtworkTileShape)
         .focusProperties { canFocus = false }.testTag("player-info-artwork-tile")) {
         // Under the picture too, so loading shows the same channel ground as a missing picture.
@@ -358,46 +347,12 @@ private fun ProgrammeArtworkTile(
         if (model != null && !load.failed) {
             AsyncImage(request, null,
                 Modifier.fillMaxSize().testTag("player-info-artwork"), contentScale = ContentScale.Crop,
-                onSuccess = {
-                    load.onSuccess(it)
-                    corner = ArtworkLogoCornerTransformation.of(it.result.image.toBitmap())
-                        ?: ArtworkLogoCorner.BOTTOM_START
-                }, onError = { load.onError() })
-            val at = corner
-            if (load.loaded && logo != null && at != null) ArtworkCornerLogo(logo, at)
+                onSuccess = load::onSuccess, onError = { load.onError() })
+            // Nothing else stands on this tile, so the picture's best corner is the logo's.
+            if (load.loaded && logo != null) ArtworkCornerLogo(logo, load.logoCorner(),
+                Modifier.testTag("player-info-artwork-picon"))
         }
     }
-}
-
-/**
- * The channel's logo on the programme picture, on a shade that darkens only its corner: no plate
- * edge, and a ground for a light logo on a bright picture.
- */
-@Composable
-private fun BoxScope.ArtworkCornerLogo(picon: ChannelIcon, corner: ArtworkLogoCorner) {
-    val atBottom = corner == ArtworkLogoCorner.BOTTOM_START || corner == ArtworkLogoCorner.BOTTOM_END
-    val atStart = corner == ArtworkLogoCorner.BOTTOM_START || corner == ArtworkLogoCorner.TOP_START
-    Box(Modifier.matchParentSize().drawBehind {
-        val atLeft = atStart == (layoutDirection == LayoutDirection.Ltr)
-        val center = Offset(if (atLeft) 0f else size.width, if (atBottom) size.height else 0f)
-        val radius = ArtworkLogoShadeWidth.toPx()
-        scale(1f, ArtworkLogoShadeHeight / ArtworkLogoShadeWidth, pivot = center) {
-            drawCircle(Brush.radialGradient(
-                0f to Color.Black.copy(alpha = .8f), .25f to Color.Black.copy(alpha = .58f),
-                .5f to Color.Black.copy(alpha = .37f), .75f to Color.Black.copy(alpha = .17f),
-                1f to Color.Transparent, center = center, radius = radius), radius, center)
-        }
-    })
-    val alignment = when (corner) {
-        ArtworkLogoCorner.BOTTOM_START -> Alignment.BottomStart
-        ArtworkLogoCorner.BOTTOM_END -> Alignment.BottomEnd
-        ArtworkLogoCorner.TOP_START -> Alignment.TopStart
-        ArtworkLogoCorner.TOP_END -> Alignment.TopEnd
-    }
-    PiconBox(picon, Modifier.align(alignment).padding(ArtworkTileLogoInset)
-        .size(ArtworkLogoPlateWidth, ArtworkTileLogoHeight).testTag("player-info-artwork-picon"),
-        // Trimmed, so the logo's visible shape and not its file's empty margin keeps the inset.
-        alignment = alignment, placeholders = false, trim = true)
 }
 
 /** The channel in the artwork's place: its picon, or its number, on [channelFallbackGround]. */
@@ -433,10 +388,5 @@ private fun RecordingArtworkFallback() {
 
 /** The artwork slot: a 16:9 card three grid columns wide, as in every row, so the text starts on the fourth. */
 private val ArtworkTileWidth = TvGridColumnWidth * 3 + TvGridGutter * 2
-/** The logo plate's distance from the picture's corner, the cards' embed inset. */
-private val ArtworkTileLogoInset = 10.dp
-private val ArtworkTileLogoHeight = 24.dp
-private val ArtworkLogoShadeWidth = 115.dp
-private val ArtworkLogoShadeHeight = 70.dp
 private val ArtworkTileHeight = 110.dp
 private val ArtworkTileShape = RoundedCornerShape(8.dp)

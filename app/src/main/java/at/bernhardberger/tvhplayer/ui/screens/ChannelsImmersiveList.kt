@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvhplayer.images.ArtworkLogoCorner
 import at.bernhardberger.tvhplayer.images.ProgrammeArtworkMode
 
 import at.bernhardberger.tvhplayer.ui.components.programmeMinutesLeft
@@ -175,7 +176,7 @@ import at.bernhardberger.tvhplayer.ui.components.rememberPictureLoad
 import at.bernhardberger.tvhplayer.ui.components.ChannelAccentFill
 import at.bernhardberger.tvhplayer.ui.components.channelAccentGround
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
-import at.bernhardberger.tvhplayer.ui.components.ArtworkLogoPlate
+import at.bernhardberger.tvhplayer.ui.components.ArtworkCornerLogo
 import at.bernhardberger.tvhplayer.ui.components.AiringCardWidth
 import at.bernhardberger.tvhplayer.ui.components.ArtworkLogoPlateWidth
 
@@ -540,7 +541,7 @@ internal fun ChannelsRowCard(
         ((ImmersiveCardEmbedInset + ArtworkLogoPlateWidth * (width / AiringCardWidth)) / width).toDouble()
     } else 0.0
     val artRequest = rememberProgrammeImageRequest(artModel, mode = ProgrammeArtworkMode.BOX,
-        startPlateShare = plateShare, keepWideTitleCrop = true)
+        startPlateShare = plateShare, keepWideTitleCrop = true, logoCorner = channel.icon != null)
     val showsArt = artModel != null && artLoad.loaded
     val recording = programmeRecording.takeIf { running != null }
     val showChannelMark = showChannelRecordingMark(
@@ -593,9 +594,13 @@ internal fun ChannelsRowCard(
                 contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().testTag("$tag-art"),
                 onSuccess = artLoad::onSuccess, onError = { artLoad.onError() })
             // The picture carries the channel's logo in its embed corner, like the airing cards.
-            if (showsArt && channel.icon != null) ArtworkLogoPlate(channel.icon,
-                Modifier.align(Alignment.BottomStart).padding(ImmersiveCardEmbedInset).testTag("$tag-art-picon"),
-                scale = width / AiringCardWidth)
+            // In the picture's own corner; the top end is the recording mark's, the top start the
+            // playing mark's while it shows.
+            val artLogo = channel.icon
+            if (showsArt && artLogo != null) ArtworkCornerLogo(artLogo,
+                artLoad.logoCorner(setOfNotNull(ArtworkLogoCorner.TOP_END,
+                    ArtworkLogoCorner.TOP_START.takeIf { playbackIndicator != ChannelPlaybackIndicator.NONE })),
+                Modifier.testTag("$tag-art-picon"), scale = width / AiringCardWidth)
             if (playbackIndicator != ChannelPlaybackIndicator.NONE) {
                 CardPlaybackPlate(Modifier.align(Alignment.TopStart).padding(ImmersiveCardEmbedInset)) {
                     ChannelPlaybackMarker(playbackIndicator)

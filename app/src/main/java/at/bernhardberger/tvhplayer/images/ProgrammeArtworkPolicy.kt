@@ -331,13 +331,15 @@ private const val LOGO_CORNER_SOFT = .75
 internal const val LOGO_CORNER_ANALYSIS_WIDTH = 384
 
 /**
- * The logo's corner on the picture as shown: bottom start unless a drawn-in title stands there,
- * then the calmest corner that clearly has less lettering, bottom end before top start before top
- * end. Lettering is the share of a corner's pixels on a hard edge, which foliage, gravel or sky
- * hardly have; between corners without it, the mean step in brightness tells an empty ground from
- * a face. [pixels] is a copy of exactly what the tile shows, at most [LOGO_CORNER_ANALYSIS_WIDTH] wide.
+ * The logo's corners on the picture as shown, best first, bottom start always last: a card takes
+ * the first one nothing else of its own stands in. Bottom start alone unless a drawn-in title
+ * stands there; then the corners that clearly have less lettering, calmest first, bottom end before
+ * top start before top end. Lettering is the share of a corner's pixels on a hard edge, which
+ * foliage, gravel or sky hardly have; between corners without it, the mean step in brightness tells
+ * an empty ground from a face. [pixels] is a copy of exactly what the card shows, at most
+ * [LOGO_CORNER_ANALYSIS_WIDTH] wide.
  */
-internal fun artworkLogoCorner(pixels: IntArray, width: Int, height: Int, startAtRight: Boolean = false): ArtworkLogoCorner {
+internal fun artworkLogoCorners(pixels: IntArray, width: Int, height: Int, startAtRight: Boolean = false): List<ArtworkLogoCorner> {
     fun grey(x: Int, y: Int): Double {
         val p = pixels[y * width + x]
         return (p shr 16 and 255) * .299 + (p shr 8 and 255) * .587 + (p and 255) * .114
@@ -361,18 +363,15 @@ internal fun artworkLogoCorner(pixels: IntArray, width: Int, height: Int, startA
         return share to share + LOGO_CORNER_SOFT * steps / count / 255
     }
     val (lettering, _) = busy(startAtRight, atBottom = true)
-    if (lettering < LOGO_CORNER_CALM) return ArtworkLogoCorner.BOTTOM_START
-    var best = ArtworkLogoCorner.BOTTOM_START
-    var bestScore = Double.MAX_VALUE
-    for ((corner, atRight, atBottom) in listOf(
+    if (lettering < LOGO_CORNER_CALM) return listOf(ArtworkLogoCorner.BOTTOM_START)
+    return listOf(
         Triple(ArtworkLogoCorner.BOTTOM_END, !startAtRight, true),
         Triple(ArtworkLogoCorner.TOP_START, startAtRight, false),
         Triple(ArtworkLogoCorner.TOP_END, !startAtRight, false),
-    )) {
+    ).mapNotNull { (corner, atRight, atBottom) ->
         val (share, score) = busy(atRight, atBottom)
-        if (lettering >= LOGO_CORNER_BUSIER * share && score < bestScore) { best = corner; bestScore = score }
-    }
-    return best
+        if (lettering >= LOGO_CORNER_BUSIER * share) corner to score else null
+    }.sortedBy { it.second }.map { it.first } + ArtworkLogoCorner.BOTTOM_START
 }
 
 /** HSL in turns, lightness and saturation (the order used by Python colorsys). */

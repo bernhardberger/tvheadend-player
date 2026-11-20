@@ -25,7 +25,6 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.*
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.TvCardProgressStripHeight
-import at.bernhardberger.tvhplayer.ui.TvLogoPlateColor
 import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.common.isRunning
 import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
@@ -37,7 +36,13 @@ import coil3.request.ImageRequest
 import coil3.request.transformations
 import at.bernhardberger.tvhplayer.images.ProgrammeArtworkMode
 import at.bernhardberger.tvhplayer.images.ProgrammeArtworkTransformation
+import at.bernhardberger.tvhplayer.images.ArtworkLogoCorner
 import at.bernhardberger.tvhplayer.images.ArtworkLogoCornerTransformation
+import coil3.BitmapImage
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.drawscope.scale
 import kotlinx.coroutines.delay
 
 /**
@@ -57,7 +62,16 @@ internal class PictureLoad {
     private var covered by mutableStateOf(false)
     val needsFallback: Boolean get() = !covered
 
+    /** The picture's own corners for a channel logo, best first; null when its request did not ask. */
+    private var logoCorners by mutableStateOf<List<ArtworkLogoCorner>?>(null)
+
+    /** The first of the picture's corners that nothing else on the card has [taken]; bottom start is never taken. */
+    fun logoCorner(taken: Set<ArtworkLogoCorner> = emptySet()): ArtworkLogoCorner =
+        logoCorners?.firstOrNull { it !in taken } ?: ArtworkLogoCorner.BOTTOM_START
+
     fun onSuccess(state: AsyncImagePainter.State.Success) {
+        // Known with the picture, so the logo never jumps after it shows.
+        logoCorners = (state.result.image as? BitmapImage)?.bitmap?.let(ArtworkLogoCornerTransformation::of)
         loaded = true
         if (state.result.dataSource == DataSource.MEMORY_CACHE) covered = true else fadingIn = true
     }
@@ -114,13 +128,15 @@ internal fun ProgrammeArtwork(
     modifier: Modifier = Modifier,
     plateModifier: Modifier = Modifier, progressModifier: Modifier = Modifier,
     progressColor: Color = MaterialTheme.colorScheme.primary,
+    /** Corners the caller draws its own marks in; the top end is the cards' recording mark. */
+    takenCorners: Set<ArtworkLogoCorner> = setOf(ArtworkLogoCorner.TOP_END),
 ) {
     val session = LocalArtworkContext.current.currentSession
     val model = remember(session, image) {
         if (image != null && session != null) programmeArtworkModel(image, session) else null
     }
     val load = rememberPictureLoad(model)
-    val request = rememberProgrammeImageRequest(model, avoidPlate = channelIcon != null)
+    val request = rememberProgrammeImageRequest(model, avoidPlate = channelIcon != null, logoCorner = channelIcon != null)
     Box(modifier.clip(MaterialTheme.shapes.small).background(TvSurfaceColors.containerLowest)) {
         if (model == null || load.failed || (channelIcon != null && load.needsFallback)) {
             PiconBox(channelIcon, Modifier.align(Alignment.Center).size(100.dp, 45.dp))
@@ -129,8 +145,7 @@ internal fun ProgrammeArtwork(
             AsyncImage(request, null,
                 contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize(),
                 onSuccess = load::onSuccess, onError = { load.onError() })
-            if (load.loaded && channelIcon != null) ArtworkLogoPlate(channelIcon,
-                Modifier.align(Alignment.BottomStart).padding(8.dp).then(plateModifier))
+            if (load.loaded && channelIcon != null) ArtworkCornerLogo(channelIcon, load.logoCorner(takenCorners), plateModifier)
         }
         // Same embedded strip as the player's schedule tiles; card borders keep clear of it.
         if (progress != null) ProgressStrip(progress,
@@ -140,15 +155,44 @@ internal fun ProgrammeArtwork(
 
 internal val ArtworkLogoPlateWidth = 56.dp
 
+/** The logo's distance from the picture's edges, measured to its visible shape. */
+internal val ArtworkLogoInset = 10.dp
+private val ArtworkLogoHeight = 24.dp
+private val ArtworkLogoShadeWidth = 115.dp
+private val ArtworkLogoShadeHeight = 70.dp
+
 /**
- * A channel's logo embedded in a programme picture's bottom-start corner, on a dark plate. Sized
- * for an airing card's picture; a smaller picture passes its [scale], so the plate keeps its share.
+ * A channel's logo on a programme picture, in [corner], on a shade that darkens only that corner:
+ * no plate edge, and a ground for a light logo on a bright picture. Sized for an airing card's
+ * picture; a smaller picture passes its [scale], so the logo keeps its share.
  */
 @Composable
-internal fun ArtworkLogoPlate(channelIcon: ChannelIcon?, modifier: Modifier = Modifier, scale: Float = 1f) {
-    PiconBox(channelIcon, modifier.size(ArtworkLogoPlateWidth * scale, 32.dp * scale)
-        .background(TvLogoPlateColor, MaterialTheme.shapes.extraSmall)
-        .padding(horizontal = 4.dp * scale, vertical = 3.dp * scale))
+internal fun BoxScope.ArtworkCornerLogo(
+    picon: ChannelIcon, corner: ArtworkLogoCorner, modifier: Modifier = Modifier, scale: Float = 1f,
+) {
+    val atBottom = corner == ArtworkLogoCorner.BOTTOM_START || corner == ArtworkLogoCorner.BOTTOM_END
+    val atStart = corner == ArtworkLogoCorner.BOTTOM_START || corner == ArtworkLogoCorner.TOP_START
+    Box(Modifier.matchParentSize().drawBehind {
+        val atLeft = atStart == (layoutDirection == LayoutDirection.Ltr)
+        val center = Offset(if (atLeft) 0f else size.width, if (atBottom) size.height else 0f)
+        val radius = (ArtworkLogoShadeWidth * scale).toPx()
+        scale(1f, ArtworkLogoShadeHeight / ArtworkLogoShadeWidth, pivot = center) {
+            drawCircle(Brush.radialGradient(
+                0f to Color.Black.copy(alpha = .8f), .25f to Color.Black.copy(alpha = .58f),
+                .5f to Color.Black.copy(alpha = .37f), .75f to Color.Black.copy(alpha = .17f),
+                1f to Color.Transparent, center = center, radius = radius), radius, center)
+        }
+    })
+    val alignment = when (corner) {
+        ArtworkLogoCorner.BOTTOM_START -> Alignment.BottomStart
+        ArtworkLogoCorner.BOTTOM_END -> Alignment.BottomEnd
+        ArtworkLogoCorner.TOP_START -> Alignment.TopStart
+        ArtworkLogoCorner.TOP_END -> Alignment.TopEnd
+    }
+    PiconBox(picon, Modifier.align(alignment).padding(ArtworkLogoInset * scale)
+        .size(ArtworkLogoPlateWidth * scale, ArtworkLogoHeight * scale).then(modifier),
+        // Trimmed, so the logo's visible shape and not its file's empty margin keeps the inset.
+        alignment = alignment, placeholders = false, trim = true)
 }
 
 @Composable
