@@ -64,8 +64,8 @@ import org.robolectric.annotation.GraphicsMode
 /**
  * Recording marks evidence: the production recording chrome over a still at the 960×540 dp
  * canvas with ad breaks, cuts and chapters on the timeline — the Banner's passive bar, the
- * focused seekbar's hint symbols, dense thinning, the marks row on each kind, a chapters-only
- * recording, a recording without a channel, and ad-break controls without a resting Skip plus the hidden-controls prompt.
+ * focused seekbar's hint symbols, the marks row on an ad break and a cut, a chapters-only
+ * recording, and ad-break controls with Skip present while the seekbar is focused.
  * English, font scale 1.0, fictional fixture art.
  * Writes to build/outputs/recording-marks (ignored).
  */
@@ -109,9 +109,9 @@ class RecordingMarksCaptureTest {
     @Test fun openCut() = capture("open-cut", MIXED, focus = "player-seekbar", openAt = 2_400_000L, name = "Cut")
     /** Chapters from the file only: hints appear as dots, the marks row opens on a named chapter. */
     @Test fun chaptersOnly() = capture("chapters-only", CHAPTERS, focus = "player-seekbar")
-    /** Up from Settings in an ad break reaches the seekbar, not a separate Skip. */
+    /** Up from Settings in an ad break reaches the seekbar while Skip remains in the controls. */
     @Test fun adBreakSeekbar() = capture("ad-break-seekbar", MIXED, positionMs = AD_MIDDLE, focus = "player-settings",
-        keys = listOf(Key.DirectionUp), focused = "player-seekbar")
+        keys = listOf(Key.DirectionUp), focused = "player-seekbar", expectSkip = true)
 
     /**
      * Store scene: Ridge Light recorded on Ridge Earth on 2026-10-03 20:00, played back under the store set's
@@ -132,6 +132,7 @@ class RecordingMarksCaptureTest {
         name: String? = null,
         keys: List<Key> = emptyList(),
         focused: String? = null,
+        expectSkip: Boolean = false,
         /** The store set's channel, dates and output, see docs/presentation-captures.md. */
         store: Boolean = false,
     ) {
@@ -178,7 +179,8 @@ class RecordingMarksCaptureTest {
             settle()
         }
         if (focused != null) compose.onNodeWithTag(focused).assertIsFocused()
-        compose.onNodeWithTag("recording-skip").assertDoesNotExist()
+        val skip = compose.onNodeWithTag("recording-skip")
+        if (expectSkip) skip.assertExists() else skip.assertDoesNotExist()
         if (openAt != null) {
             compose.runOnIdle { navigation.show(recordingMarkStops(marks, durationMs).map { it.positionMs }, openAt - 1) }
             settle()
