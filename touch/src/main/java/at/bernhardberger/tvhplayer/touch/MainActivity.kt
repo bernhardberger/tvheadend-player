@@ -6,8 +6,14 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
+import at.bernhardberger.tvhplayer.di.SdkRuntimeOwner
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
+import at.bernhardberger.tvhplayer.touch.player.PlayerActivity
+import at.bernhardberger.tvhplayer.touch.player.playingChannelId
 import at.bernhardberger.tvhplayer.ui.MobileDarkColors
 import at.bernhardberger.tvhplayer.ui.screens.onboarding.discoverServers
 import at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel
@@ -20,6 +26,7 @@ import org.koin.androidx.viewmodel.ext.android.viewModel
 class MainActivity : ComponentActivity() {
     private val session: TvheadendSession by inject()
     private val owner: AppProfileOwner by inject()
+    private val sdk: SdkRuntimeOwner by inject()
     private val connection: AppConnectionViewModel by viewModel()
     private val channels: ChannelsViewModel by viewModel()
     private val recordings: RecordingsViewModel by viewModel()
@@ -33,10 +40,21 @@ class MainActivity : ComponentActivity() {
         )
         setContent {
             MaterialTheme(colorScheme = MobileDarkColors) {
-                TouchApp(session, owner, connection, channels, recordings, guide) {
-                    discoverServers(applicationContext)
-                }
+                val target by sdk.playbackRuntime.activeTarget.collectAsStateWithLifecycle()
+                val playback by sdk.playbackRuntime.state.collectAsStateWithLifecycle()
+                TouchApp(
+                    session, owner, connection, channels, recordings, guide,
+                    playingId = playingChannelId(target, playback)?.value?.toString(),
+                    onWatch = ::watch,
+                    discovery = { discoverServers(applicationContext) },
+                )
             }
         }
+    }
+
+    private fun watch(channelId: String) {
+        // The tap is the viewing intent: a stop from before it must not close the player it opens.
+        sdk.playbackRuntime.notePlaybackIntent()
+        startActivity(PlayerActivity.intent(this, ChannelId(channelId.toLong())))
     }
 }

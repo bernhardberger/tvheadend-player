@@ -3,6 +3,7 @@ package at.bernhardberger.tvhplayer.touch.player
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import at.bernhardberger.tvhplayer.core.AppErrorCondition
 import at.bernhardberger.tvhplayer.touch.channels.ChannelList
 import at.bernhardberger.tvhplayer.touch.channels.ChannelRow
 import at.bernhardberger.tvhplayer.touch.guide.GuideProgram
@@ -13,14 +14,23 @@ internal data class LivePlayerState(
     val channel: ChannelRow,
     val channels: ChannelList,
     val frame: Painter?,
-    val timeline: LiveTimeline,
+    val timeline: LiveTimeline?,
     val status: LivePlayerStatus = LivePlayerStatus.Playing,
     val paused: Boolean = false,
     val brightness: Float = 0.62f,
     val tracks: PlayerTracks = PlayerTracks(),
     val options: PlaybackOptions = PlaybackOptions(),
     val schedule: ChannelSchedule? = null,
+    val offered: Set<PlayerControl> = PlayerControl.entries.toSet(),
 )
+
+/**
+ * The face's controls that have something behind them; one not offered is left out, not dimmed.
+ * [Timeshift] is pause, the skips, the drag and Go live; the timeline itself always shows the program.
+ */
+internal enum class PlayerControl {
+    Timeshift, Record, Audio, Subtitles, Settings, Channels, Info, PictureInPicture, FullScreen,
+}
 
 /**
  * The watched channel's day for the Info sheet, as the Guide's By channel view shows it: [days] for the
@@ -138,7 +148,9 @@ internal sealed interface LivePlayerStatus {
     data object Tuning : LivePlayerStatus
     data class Reconnecting(val nextAttemptSeconds: Int?) : LivePlayerStatus
     data object PauseEnded : LivePlayerStatus
-    data object Unavailable : LivePlayerStatus
+
+    /** The channel can't play; [condition] says why, null for the drawn busy-tuner case. */
+    data class Unavailable(val condition: AppErrorCondition? = null) : LivePlayerStatus
 }
 
 internal enum class PlayerAction {

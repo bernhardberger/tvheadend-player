@@ -43,7 +43,7 @@ internal data class ChannelRow(
 )
 
 /** The producer supplies the viewer's position, not the on-air position. */
-internal data class ChannelPlayback(val progress: Float)
+internal data class ChannelPlayback(val progress: Float?)
 
 /** A channel fallback mark is distinct from a linked program's running recording. */
 internal enum class ChannelRecording { Program, Channel }

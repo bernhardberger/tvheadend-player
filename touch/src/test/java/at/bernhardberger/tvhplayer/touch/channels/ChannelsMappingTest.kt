@@ -73,7 +73,7 @@ class ChannelsMappingTest {
     }
 
     @Test
-    fun rowsCarryTheGuideAroundNow() {
+    fun rowsCarryTheGuideAroundNowAndThePlayingChannel() {
         val scope = ChannelScopeState(
             ChannelBrowsingScope(
                 allChannels = listOf(guide.first, guide.second), visibleChannels = listOf(guide.first, guide.second),
@@ -81,7 +81,9 @@ class ChannelsMappingTest {
             ),
             channelCatalogCurrent = true,
         )
-        val list = (channelsState(scope, ConnectionUiState.Ready, false, observation, guide.now) as ChannelsState.Ready).list
+        val playing = guide.first.id.value.toString()
+        val state = channelsState(scope, ConnectionUiState.Ready, false, observation, guide.now, playingId = playing)
+        val list = (state as ChannelsState.Ready).list
 
         assertEquals(listOf(ChannelTag(guide.news.id.value.toString(), "News")), list.tags)
         val (first, second) = list.rows
@@ -89,6 +91,9 @@ class ChannelsMappingTest {
         assertEquals(guide.programs[0], first.now?.title)
         assertEquals(guide.programs[1], first.next?.title)
         assertEquals(guide.programs.drop(2), first.details?.following?.map { it.title })
+        // The playing row shows how far its running program is: half of the hour.
+        assertEquals(0.5f, first.playback?.progress)
+        assertEquals(null, second.playback)
         // A channel without guide data has nothing to open.
         assertEquals(null, second.now)
         assertEquals(null, second.details)

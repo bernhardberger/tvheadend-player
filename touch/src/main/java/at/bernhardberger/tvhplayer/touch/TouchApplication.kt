@@ -1,7 +1,10 @@
 package at.bernhardberger.tvhplayer.touch
 
 import android.app.Application
+import at.bernhardberger.tvhplayer.di.SdkRuntimeOwner
 import at.bernhardberger.tvhplayer.touch.di.touchModule
+import at.bernhardberger.tvhplayer.touch.player.countStartedActivities
+import org.koin.android.ext.android.get
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.context.startKoin
 
@@ -12,5 +15,7 @@ class TouchApplication : Application() {
             androidContext(this@TouchApplication)
             modules(touchModule)
         }
+        val runtime = get<SdkRuntimeOwner>().playbackRuntime
+        countStartedActivities(runtime::onAppForegrounded) { interactive -> runtime.onAppBackgrounded(interactive) }
     }
 }

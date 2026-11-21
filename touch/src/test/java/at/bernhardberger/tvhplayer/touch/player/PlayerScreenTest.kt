@@ -341,7 +341,7 @@ class PlayerScreenTest {
         }
         compose.runOnIdle { status.value = LivePlayerStatus.PauseEnded }
         capture("$prefix-player-pause-ended", canvas)
-        compose.runOnIdle { status.value = LivePlayerStatus.Unavailable }
+        compose.runOnIdle { status.value = LivePlayerStatus.Unavailable() }
         capture("$prefix-player-unavailable", canvas)
     }
 

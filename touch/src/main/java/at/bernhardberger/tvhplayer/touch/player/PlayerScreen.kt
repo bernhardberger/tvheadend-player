@@ -50,6 +50,7 @@ internal fun PlayerScreen(
     onChannel: (String) -> Unit,
     onChoice: (PlayerChoice) -> Unit,
     modifier: Modifier = Modifier,
+    video: (@Composable (Modifier) -> Unit)? = null,
 ) {
     var visible by rememberSaveable(state.channel.id) { mutableStateOf(true) }
     var panel by rememberSaveable { mutableStateOf<PlayerPanel?>(null) }
@@ -75,11 +76,12 @@ internal fun PlayerScreen(
                     .windowInsetsPadding(WindowInsets.statusBars),
             ) {
                 Box(Modifier.fillMaxWidth().aspectRatio(16f / 9).background(Color.Black)) {
-                    Picture(state, layout, controls, toggle)
+                    Picture(state, layout, controls, toggle, video)
                     PictureControls(state, layout, controls, preview, onAction, onBrightness, openOptions)
-                    if (state.status.hasTimeline) {
+                    val timeline = state.timeline
+                    if (state.status.hasTimeline && timeline != null) {
                         PlayerTimeline(
-                            state.timeline, state.status, layout, controls, preview, { preview = it }, onSeek,
+                            timeline, state.status, layout, controls, preview, { preview = it }, onSeek,
                             Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(24.dp),
                         )
                     }
@@ -87,21 +89,9 @@ internal fun PlayerScreen(
                 UprightPlayerContent(state, layout, preview != null, onAction, panels, onChannel)
             }
         } else {
-            Picture(state, layout, controls, toggle)
+            Picture(state, layout, controls, toggle, video)
             PictureControls(state, layout, controls, preview, onAction, onBrightness, openOptions)
-            val showFooter = controls && state.status !is LivePlayerStatus.Reconnecting &&
-                state.status != LivePlayerStatus.PauseEnded
-            if (showFooter) {
-                LandscapePlayerContent(
-                    state, layout, preview, onAction, panels, { preview = it }, onSeek,
-                    Modifier.align(Alignment.BottomCenter),
-                )
-            } else if (!controls && !sheet) {
-                PlayerTimeline(
-                    state.timeline, state.status, layout, false, null, {}, onSeek,
-                    Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(28.dp).offset(y = 20.dp),
-                )
-            }
+            LandscapeFooter(state, layout, controls, sheet, preview, { preview = it }, onAction, panels, onSeek)
         }
         // On the upright phone a sheet rises only to the picture's foot, so the picture stays in view.
         val belowPicture = maxHeight - WindowInsets.statusBars.asPaddingValues().calculateTopPadding() -
@@ -114,11 +104,40 @@ internal fun PlayerScreen(
 }
 
 @Composable
+private fun BoxScope.LandscapeFooter(
+    state: LivePlayerState,
+    layout: PlayerLayout,
+    controls: Boolean,
+    sheet: Boolean,
+    preview: Int?,
+    onPreview: (Int?) -> Unit,
+    onAction: (PlayerAction) -> Unit,
+    panels: PanelHost,
+    onSeek: (Int) -> Unit,
+) {
+    val timeline = state.timeline
+    val showFooter = controls && state.status !is LivePlayerStatus.Reconnecting &&
+        state.status != LivePlayerStatus.PauseEnded
+    if (showFooter) {
+        LandscapePlayerContent(
+            state, layout, preview, onAction, panels, onPreview, onSeek, Modifier.align(Alignment.BottomCenter),
+        )
+    } else if (!controls && !sheet && timeline != null) {
+        // Controls hidden: the thin line stays on the edge.
+        PlayerTimeline(
+            timeline, state.status, layout, false, null, {}, onSeek,
+            Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(28.dp).offset(y = 20.dp),
+        )
+    }
+}
+
+@Composable
 private fun BoxScope.Picture(
     state: LivePlayerState,
     layout: PlayerLayout,
     controls: Boolean,
     toggle: (() -> Unit)?,
+    video: (@Composable (Modifier) -> Unit)?,
 ) {
     val playing = state.status == LivePlayerStatus.Playing
     val reconnecting = state.status is LivePlayerStatus.Reconnecting
@@ -128,14 +147,16 @@ private fun BoxScope.Picture(
         tall -> Modifier.fillMaxWidth().aspectRatio(16f / 9)
         else -> Modifier.matchParentSize()
     }
-    if (state.frame != null && (playing || reconnecting)) {
+    // The video stays composed through every status, so its surface lives as long as the screen.
+    val still = state.frame != null && (playing || reconnecting)
+    if (video != null || still) {
         if (layout == PlayerLayout.PhoneLandscape) {
             BoxWithConstraints(frameModifier) {
                 val fitted = Modifier.align(Alignment.Center).width(maxHeight * (16f / 9)).height(maxHeight)
-                Frame(state, layout, controls, fitted)
+                Frame(state, layout, controls, fitted, video)
             }
         } else {
-            Frame(state, layout, controls, frameModifier.align(Alignment.Center))
+            Frame(state, layout, controls, frameModifier.align(Alignment.Center), video)
         }
     }
     if (toggle != null) {
@@ -148,7 +169,13 @@ private fun BoxScope.Picture(
 }
 
 @Composable
-private fun Frame(state: LivePlayerState, layout: PlayerLayout, controls: Boolean, modifier: Modifier) {
+private fun Frame(
+    state: LivePlayerState,
+    layout: PlayerLayout,
+    controls: Boolean,
+    modifier: Modifier,
+    video: (@Composable (Modifier) -> Unit)?,
+) {
     val shades = when {
         !controls -> listOf(0f, 0f, 0.05f)
         layout == PlayerLayout.Tablet -> listOf(.66f, .45f, .25f, .20f, .22f, .39f, .54f, .70f, .77f, .84f, .90f)
@@ -156,11 +183,24 @@ private fun Frame(state: LivePlayerState, layout: PlayerLayout, controls: Boolea
             listOf(.77f, .58f, .38f, .28f, .42f, .57f, .70f, .76f, .82f, .88f, .94f)
         else -> listOf(.58f, .49f, .39f, .32f, .32f, .41f, .54f, .68f, .74f, .79f, .85f)
     }
+    val shown = state.status == LivePlayerStatus.Playing || state.status is LivePlayerStatus.Reconnecting
     Box(modifier) {
-        Image(checkNotNull(state.frame), null, Modifier.matchParentSize(), contentScale = ContentScale.Fit)
-        Box(Modifier.matchParentSize().background(Brush.verticalGradient(shades.map { Color.Black.copy(alpha = it) })))
-        if (state.status is LivePlayerStatus.Reconnecting) {
-            Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = .5f)))
+        if (video != null) {
+            video(Modifier.matchParentSize())
+        } else {
+            Image(checkNotNull(state.frame), null, Modifier.matchParentSize(), contentScale = ContentScale.Fit)
+        }
+        if (!shown) {
+            // Tuning, unavailable and pause ended show no picture, as drawn; a kept frame is not the channel's.
+            Box(Modifier.matchParentSize().background(Color.Black))
+        } else {
+            Box(
+                Modifier.matchParentSize()
+                    .background(Brush.verticalGradient(shades.map { Color.Black.copy(alpha = it) })),
+            )
+            if (state.status is LivePlayerStatus.Reconnecting) {
+                Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = .5f)))
+            }
         }
     }
 }
