@@ -27,7 +27,7 @@ import at.bernhardberger.tvhplayer.touch.guide.GuideOfflineBanner
 import at.bernhardberger.tvhplayer.touch.guide.GuideProgram
 import at.bernhardberger.tvhplayer.touch.guide.NoSchedule
 import at.bernhardberger.tvhplayer.touch.guide.ProgramDetailsColumn
-import at.bernhardberger.tvhplayer.touch.ui.ChannelLogoTile
+import at.bernhardberger.tvhplayer.touch.ui.channelLogoSlot
 import at.bernhardberger.tvhplayer.touch.ui.ListFailure
 import at.bernhardberger.tvhplayer.touch.ui.ListMessage
 import at.bernhardberger.tvhplayer.touch.ui.MessageKind
@@ -143,15 +143,10 @@ private fun ColumnScope.InfoDay(
 }
 
 /** The sheet head's channel logo, sized as the Guide's channel head draws it. */
-@Composable
-internal fun InfoLogo(logo: Painter?, tint: Color?, model: Any? = null) {
-    ChannelLogoTile(
+internal fun infoLogoSlot(logo: Painter?, tint: Color?, model: Any?): (@Composable () -> Unit)? =
+    channelLogoSlot(
         logo, tint, Modifier.size(64.dp, 36.dp).testTag("player-info-logo"), RoundedCornerShape(8.dp), model,
     )
-}
-
-internal fun infoLogoSlot(logo: Painter?, tint: Color?, model: Any?): (@Composable () -> Unit)? =
-    if (logo == null && model == null) null else ({ InfoLogo(logo, tint, model) })
 
 /** [ChannelDay]'s list index of the program [id]: each program is one item, a date heading one more. */
 private fun itemIndex(programs: List<GuideProgram>, id: String?): Int {

@@ -2,6 +2,7 @@ package at.bernhardberger.tvhplayer.touch.guide
 
 import at.bernhardberger.tvhplayer.touch.ui.ProgramRecordControl
 import at.bernhardberger.tvhplayer.touch.ui.RuleSchedule
+import at.bernhardberger.tvhplayer.touch.ui.hasChannelLogo
 import androidx.annotation.PluralsRes
 import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
@@ -70,7 +71,10 @@ internal data class GuideState(
     val availability: GuideAvailability = GuideAvailability.Current,
     /** The picked day's or time's programs are still coming: a short wait inside the shown Guide. */
     val dayLoading: Boolean = false,
-)
+) {
+    val channelsHaveLogos = channels.any { hasChannelLogo(it.logo, it.logoModel) }
+    val overviewHasLogos = channels.any { it.programs.isNotEmpty() && hasChannelLogo(it.logo, it.logoModel) }
+}
 
 /** Section 12's states of the Guide as a whole; only [Current] and [Offline] show the list. */
 internal sealed interface GuideAvailability {
@@ -180,6 +184,7 @@ internal data class ProgramDetails(
     val pictureModel: Any? = null,
 ) {
     val onNow: Boolean get() = progress != null
+    val airingsHaveLogos = otherAirings.any { hasChannelLogo(it.logo, it.logoModel) }
 }
 
 internal data class ProgramAiring(

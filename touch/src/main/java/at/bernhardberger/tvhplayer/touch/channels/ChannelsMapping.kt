@@ -57,13 +57,13 @@ internal fun channelsState(
         browsing.allChannels.isEmpty() -> {
             val shown = connection.forEmptyChannelPresentation(current)
             when {
-                shown == ConnectionUiState.Ready -> ChannelsState.Ready(ChannelList(emptyList(), hasLogos = true))
+                shown == ConnectionUiState.Ready -> ChannelsState.Ready(ChannelList(emptyList()))
                 else -> shown.browseAppError()?.let(ChannelsState::Failed) ?: ChannelsState.Loading
             }
         }
         browsing.visibleChannels.isEmpty() -> when {
             shouldPresentEmptyTag(current, connection, true, browsing.activeTagId != null) ->
-                ChannelsState.Ready(ChannelList(emptyList(), tags, selectedTagId, hasLogos = true))
+                ChannelsState.Ready(ChannelList(emptyList(), tags, selectedTagId))
             else -> connection.browseAppError()?.let(ChannelsState::Failed) ?: ChannelsState.Loading
         }
         else -> {
@@ -72,7 +72,7 @@ internal fun channelsState(
                 checkpoint()
                 mapper.row(channel, playing = channel.id.value.toString() == playingId, programs?.get(index))
             }
-            val list = ChannelList(rows, tags, selectedTagId, hasLogos = true)
+            val list = ChannelList(rows, tags, selectedTagId)
             if (degraded) ChannelsState.Offline(list) else ChannelsState.Ready(list)
         }
     }

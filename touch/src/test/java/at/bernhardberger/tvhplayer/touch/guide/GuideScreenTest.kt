@@ -9,6 +9,9 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getBoundsInRoot
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasProgressBarRangeInfo
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDisplayed
@@ -79,7 +82,9 @@ class GuideScreenTest {
     @Test
     @Config(qualifiers = TABLET)
     fun tabletOverviewOpensAProgramInPlaceAndAChannelHeadOpensItsDay() {
-        show(overviewFixture())
+        val fixture = overviewFixture()
+        val state = mutableStateOf(fixture)
+        show(fixture, state = { state.value })
         capture("tablet-guide-overview", TouchCanvas.TABLET)
 
         // A tap opens the program where it is and plays nothing; only on-air programs offer Watch.
@@ -101,7 +106,16 @@ class GuideScreenTest {
         back()
         compose.onAllNodes(hasText(COASTAL_MILES_SYNOPSIS_START, substring = true)).assertCountEquals(0)
 
-        compose.onNodeWithContentDescription("Ridge Earth, by channel").performClick()
+        compose.runOnIdle { state.value = fixture.withoutLogo("ridge-earth") }
+        val head = hasContentDescription("Ridge Earth, by channel")
+        compose.onNode(hasTestTag("channel-logo-tile") and hasAnyAncestor(head), useUnmergedTree = true)
+            .assertDoesNotExist()
+        assertEquals(
+            compose.onNode(head).getBoundsInRoot().left,
+            compose.onNode(hasText("Ridge Earth") and hasAnyAncestor(head), useUnmergedTree = true).getBoundsInRoot().left,
+        )
+        capture("tablet-guide-overview-no-logo", TouchCanvas.TABLET)
+        compose.onNode(head).performClick()
         compose.onNodeWithText("Sunday, November 15").assertIsDisplayed()
         compose.onNodeWithText("Six Bridges and a River That Changed Its Mind").assertIsDisplayed()
     }

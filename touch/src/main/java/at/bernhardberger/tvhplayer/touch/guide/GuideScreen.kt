@@ -50,7 +50,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.channels.ChannelActionLabel
-import at.bernhardberger.tvhplayer.touch.ui.ChannelLogoTile
+import at.bernhardberger.tvhplayer.touch.ui.channelLogoSlot
 import at.bernhardberger.tvhplayer.touch.ui.Destination
 import at.bernhardberger.tvhplayer.touch.ui.ListMessage
 import at.bernhardberger.tvhplayer.touch.ui.MessageKind
@@ -207,7 +207,7 @@ private fun Overview(
             DayLoading()
         } else if (layout.compact) {
             val padding = PaddingValues(start = margin, end = margin, bottom = 16.dp)
-            OverviewRows(state.channels, openId, onOpen, actions, onDetails, padding)
+            OverviewRows(state.channels, state.overviewHasLogos, openId, onOpen, actions, onDetails, padding)
         } else {
             val padding = PaddingValues(horizontal = margin)
             OverviewColumns(state.channels, layout, openId, onOpen, onChannel, actions, onDetails, padding)
@@ -242,7 +242,7 @@ private fun ByChannel(
     }
     Row(Modifier.fillMaxSize().padding(start = 24.dp, end = 24.dp, top = 8.dp)) {
         ChannelList(
-            state.channels, channel.id, onChannel,
+            state.channels, state.channelsHaveLogos, channel.id, onChannel,
             if (layout == GuideLayout.Wide) Modifier.width(344.dp).fillMaxHeight() else Modifier.weight(1f),
         )
         Spacer(Modifier.size(24.dp))
@@ -289,11 +289,13 @@ private fun Day(
 @Composable
 private fun DayHead(channel: GuideChannel, date: String?) {
     Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
-        ChannelLogoTile(
+        val logo = channelLogoSlot(
             channel.logo, channel.logoTint, Modifier.size(64.dp, 36.dp), RoundedCornerShape(8.dp), channel.logoModel,
         )
+        logo?.invoke()
         Text(
-            channel.name, Modifier.weight(1f).padding(start = 12.dp).semantics { heading() },
+            channel.name,
+            Modifier.weight(1f).padding(start = if (logo != null) 12.dp else 0.dp).semantics { heading() },
             style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis,
         )
         date?.let {
@@ -310,6 +312,7 @@ private fun DayHead(channel: GuideChannel, date: String?) {
 @Composable
 private fun ChannelList(
     channels: List<GuideChannel>,
+    showLogoSlots: Boolean,
     selectedId: String,
     onChannel: (String) -> Unit,
     modifier: Modifier,
@@ -331,11 +334,10 @@ private fun ChannelList(
                     selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
                     selectedContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
                 ),
-                leadingContent = {
-                    ChannelLogoTile(
-                        channel.logo, channel.logoTint, Modifier.size(112.dp, 56.dp), model = channel.logoModel,
-                    )
-                },
+                leadingContent = channelLogoSlot(
+                    channel.logo, channel.logoTint, Modifier.size(112.dp, 56.dp),
+                    model = channel.logoModel, showSlot = showLogoSlots,
+                ),
             ) {
                 Text(channel.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
@@ -350,17 +352,15 @@ private fun ChannelTabs(channels: List<GuideChannel>, selectedId: String, onChan
         selectedTabIndex = channels.indexOfFirst { it.id == selectedId }.coerceAtLeast(0), edgePadding = 12.dp,
     ) {
         channels.forEach { channel ->
-            LeadingIconTab(
-                selected = channel.id == selectedId,
-                onClick = { onChannel(channel.id) },
-                icon = {
-                    ChannelLogoTile(
-                        channel.logo, channel.logoTint, Modifier.size(52.dp, 30.dp), RoundedCornerShape(7.dp),
-                        channel.logoModel,
-                    )
-                },
-                text = { Text(channel.name, maxLines = 1) },
+            val logo = channelLogoSlot(
+                channel.logo, channel.logoTint, Modifier.size(52.dp, 30.dp), RoundedCornerShape(7.dp),
+                channel.logoModel,
             )
+            val selected = channel.id == selectedId
+            val pick = { onChannel(channel.id) }
+            val text: @Composable () -> Unit = { Text(channel.name, maxLines = 1) }
+            if (logo != null) LeadingIconTab(selected, pick, icon = logo, text = text)
+            else Tab(selected, pick, text = text)
         }
     }
 }
