@@ -23,6 +23,9 @@ const val TvGuidedActionFocusedScale = 1.1f
 /** Minimum title/action slot height shared by peer top-level browse destinations. */
 val TvBrowseHeaderHeight = 40.dp
 
+/** Space below the controls before the Channels or Recordings content starts. */
+val TvBrowseHeaderContentGap = 32.dp
+
 /** Nominal browse columns; native focus overflow is reserved inside the leading inset. */
 val TvBrowseColumnWidth = 340.dp
 val TvBrowseColumnGap = 92.dp

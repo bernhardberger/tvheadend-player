@@ -759,7 +759,7 @@ only.
 - The list's leading axis includes the shell's 24dp inset and a further 26dp,
   with its 12dp focus reserve inside that additional inset. Standard rows are
   340dp wide, with a 92dp visual gap to the passive headline pane at x562.
-  At rest the first row starts at y116, 48dp below the header controls as in
+  At rest the first row starts at y100, 32dp below the header controls as in
   the Grid. Scrolled focus settles on the same line when the scroll range
   allows, while earlier rows pass under the top fade.
   The list follows the browse list edges in §9: it runs to the screen bottom
@@ -787,7 +787,7 @@ only.
   and they shorten only the title.
 - **List picture and headline.** The pane beside the list shows the same thing
   in every state, so nothing moves or resizes when playback starts or stops. At
-  its top, level with the first row (y116), a 268×151 picture (the kit's
+  its top, level with the first row (y100), a 268×151 picture (the kit's
   four-column card; the headline below keeps to its width, so picture and text
   form one column) shows the focused programme's 16:9 artwork without its logo
   plate. Without artwork, it is a logo card's picture: the
@@ -838,7 +838,7 @@ only.
 - **Grid.** Four columns of the immersive row's compact cards form a wall,
   without a programme headline or backdrop. The header scrolls away with the
   rows and returns at the first row, with no fade or scrim. At rest on the
-  960×540 reference canvas, cards start at y116, 48dp below the header controls;
+  960×540 reference canvas, cards start at y100, 32dp below the header controls;
   scrolled focus sits at y48 while earlier rows are cut by the physical top
   edge. A partial row peeks at both ends where more rows remain. Card sizes
   and gutters are unchanged. Up from the first row reaches the header, Down
@@ -944,8 +944,17 @@ activation, DVR eligibility, confirmations and current-session guards remain.
   with enlarged text). This does not change the three-hour acquisition window
   or the existing history/future availability policy.
 - Recordings uses native growing rows, with date/duration/status below titles.
-  Archive, Schedule and Problems remain separate; Schedule and Problems are flat
-  lists with full-row native focus clearance. Reserve trailing layout space so
+  Every tab and depth starts 32dp below the header controls, as in Channels.
+  At default text size the headline starts at y100 and the list at y144 on the
+  reference canvas, with room added for values or counts when shown. Passive
+  recording and rule panes start at the list's top, before any date label.
+  Folder previews keep their label on the headline baseline. Their entries
+  share the first row's band at default Sort and Show, and stay in place when
+  a values line moves the active list down.
+  Archive, Schedule and Problems remain separate. Schedule and Problems are flat
+  lists with full-row native focus clearance. Their group labels use the same
+  list section style and spacing as the flat Archive list; Upcoming and Problems
+  remain view headlines. Reserve trailing layout space so
   the complete focused shape remains at least 48dp from the physical screen edge;
   an unclipped shape alone is not sufficient. Preserve larger caller safe insets.
   There is no Continue watching tab (tried and dropped 2026-10-25: TV apps put
@@ -962,8 +971,9 @@ activation, DVR eligibility, confirmations and current-session guards remain.
   root, Back reaches the Archive tab and Left reaches the drawer; Up from the
   first row reaches mode tabs without losing the folder location.
 - Keep a 32dp level-heading slot above the rows, growing with text metrics. Root
-  leaves it blank; nested levels show their current folder. Do not add a focusable
-  breadcrumb or duplicate Up action. Preview and active headings share geometry.
+  shows the current grouping; nested levels show their current folder. Do not
+  add a focusable breadcrumb or duplicate Up action. Preview and active headings
+  share geometry.
 - Removed paths reconcile to a surviving ancestor; valid empty levels retain an
   explicit empty state and usable Back. Refreshes cannot steal focus from tabs,
   the drawer or a dialog. Rendered-visit ownership and permission to request focus

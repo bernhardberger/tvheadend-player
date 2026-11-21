@@ -153,7 +153,7 @@ class ChannelsLayoutFocusTest {
         fixture.awaitFocus(card(1))
         val headerTop = compose.onNodeWithTag("channels-header").getUnclippedBoundsInRoot().top
         val firstTop = compose.onNode(card(1)).getUnclippedBoundsInRoot().top.value
-        assertEquals("resting first row", 116f, firstTop, 1f)
+        assertEquals("resting first row", 100f, firstTop, 1f)
         if (scale == 1.3f) {
             val headerBottom = compose.onNode(tagsButton).getUnclippedBoundsInRoot().bottom.value
             assertTrue("cards clear the enlarged header: first row $firstTop, controls bottom $headerBottom",
@@ -214,7 +214,7 @@ class ChannelsLayoutFocusTest {
         assertEquals(48f, compose.onNode(card(5)).getUnclippedBoundsInRoot().top.value, 1f)
         fixture.key(Key.DirectionUp)
         fixture.awaitFocus(card(1))
-        assertEquals(116f, compose.onNode(card(1)).getUnclippedBoundsInRoot().top.value, 1f)
+        assertEquals(100f, compose.onNode(card(1)).getUnclippedBoundsInRoot().top.value, 1f)
     }
 
     @Test fun gridWallKeepsANoticeClearOfTheHeader() {

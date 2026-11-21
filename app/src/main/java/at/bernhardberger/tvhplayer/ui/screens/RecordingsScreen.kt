@@ -160,7 +160,7 @@ import at.bernhardberger.tvhplayer.core.recordingIsRunning
 import at.bernhardberger.tvhplayer.core.recordingWasRemoved
 import at.bernhardberger.tvhplayer.core.watchedCount
 import at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection
-import at.bernhardberger.tvhplayer.ui.TvSpacing12
+import at.bernhardberger.tvhplayer.ui.TvBrowseHeaderContentGap
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.core.recordingWatchState
 import at.bernhardberger.tvhplayer.ui.rememberCloseBehindPlayer
@@ -881,8 +881,7 @@ internal fun RecordingsScreenContent(
         val problemGroups = frame.problems
         val scheduleReady = mode == DvrLibraryMode.SCHEDULE && automaticRecordings.available &&
             recordingsAppError(true, frame.connection, frame.failure) == null
-        // Every tab's content starts at y80, as the channel list's first row does.
-        Spacer(Modifier.height(TvSpacing12))
+        Spacer(Modifier.height(TvBrowseHeaderContentGap))
 
         if (frame.empty && recordingsLoading(frame.connection, frame.failure)) {
             // In the Archive column's place, running to the bottom edge as its list does.

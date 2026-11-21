@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.ui.Modifier
 import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
@@ -15,6 +16,7 @@ import at.bernhardberger.tvhplayer.core.offeredResumePosition
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthItem
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthLevel
+import at.bernhardberger.tvhplayer.ui.components.depth.DepthListTopReserve
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthRow
 
 internal fun recordingNowRow(item: ArchiveListItem.RecordingNow) = DepthRow(
@@ -35,13 +37,15 @@ internal fun recordingPreviewLevel(
     kind: RecordingRowKind = RecordingRowKind.ARCHIVE,
     latestRuleForEntry: State<(DvrEntry) -> RecordingRule?>? = null,
     paneModifier: Modifier = Modifier,
+    heading: @Composable () -> Unit = { ArchiveLevelHeading("", { 1f }, valuesLine = null) },
 ) = DepthLevel(
     id = id,
     rows = emptyList(),
-    heading = { ArchiveLevelHeading("", it, valuesLine = null) },
+    heading = { heading() },
     passiveContent = {
         RecordingMetadataPane(entry, latestPiconForEntry.value(entry), latestAdmissionForEntry.value(entry),
-            paneModifier.padding(bottom = contentPadding.calculateBottomPadding()), kind = kind,
+            paneModifier.padding(top = DepthListTopReserve, bottom = contentPadding.calculateBottomPadding()),
+            kind = kind,
             recordingRule = latestRuleForEntry?.value?.invoke(entry))
     },
 )

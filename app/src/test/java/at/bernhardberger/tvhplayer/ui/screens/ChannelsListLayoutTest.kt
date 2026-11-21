@@ -489,14 +489,15 @@ class ChannelsListLayoutTest {
         )
         capture("en-font$fontScale-top-fade-down-scrolled-bright-video")
 
+        val fadeTarget = topFadeFocusTarget(fontScale)
         repeat(CHANNEL_COUNT - downTarget) { compose.pressKey(Key.DirectionDown) }
-        repeat(CHANNEL_COUNT - 9) { compose.pressKey(Key.DirectionUp) }
-        row(9).assertIsFocused()
-        assertFocusedShapePixels(9, rowHeight, scrolled = true)
-        assertTopFadePixels(7)
+        repeat(CHANNEL_COUNT - fadeTarget) { compose.pressKey(Key.DirectionUp) }
+        row(fadeTarget).assertIsFocused()
+        assertFocusedShapePixels(fadeTarget, rowHeight, scrolled = true)
+        assertTopFadePixels(fadeTarget - 2)
         capture("en-font$fontScale-top-fade-up-scrolled-bright-video")
 
-        for (channel in 8 downTo 1) {
+        for (channel in fadeTarget - 1 downTo 1) {
             compose.pressKey(Key.DirectionUp)
             row(channel).assertIsFocused()
             assertFocusedShapePixels(channel, if (channel == NO_EPG) noEpgRowHeight else rowHeight, scrolled = channel != 1)
@@ -530,22 +531,23 @@ class ChannelsListLayoutTest {
         // A non-focused neighbor gives the native unscaled height after offscreen restoration.
         val rowHeight = row(CHANNEL_COUNT - 1).bounds().height
         assertFocusedShapePixels(CHANNEL_COUNT, rowHeight, scrolled = true)
-        repeat(CHANNEL_COUNT - 9) { compose.pressKey(Key.DirectionUp) }
-        row(9).assertIsFocused()
-        assertFocusedShapePixels(9, rowHeight, scrolled = true)
-        assertTopFadePixels(7)
-        val position = row(9).bounds()
+        val fadeTarget = topFadeFocusTarget(fontScale)
+        repeat(CHANNEL_COUNT - fadeTarget) { compose.pressKey(Key.DirectionUp) }
+        row(fadeTarget).assertIsFocused()
+        assertFocusedShapePixels(fadeTarget, rowHeight, scrolled = true)
+        assertTopFadePixels(fadeTarget - 2)
+        val position = row(fadeTarget).bounds()
 
         compose.pressKey(Key.DirectionLeft)
         compose.onNodeWithTag("nav-channels").assertIsFocused()
         compose.pressKey(Key.DirectionRight)
-        row(9).assertIsFocused()
-        assertEquals("drawer re-entry preserves the scrolled anchor", position, row(9).bounds())
-        assertFocusedShapePixels(9, rowHeight, scrolled = true)
+        row(fadeTarget).assertIsFocused()
+        assertEquals("drawer re-entry preserves the scrolled anchor", position, row(fadeTarget).bounds())
+        assertFocusedShapePixels(fadeTarget, rowHeight, scrolled = true)
 
         compose.pressKey(Key.ChannelDown)
         val pageDownChannel = requireNotNull(selected).value.toInt()
-        assertTrue("Channel Down still pages forward", pageDownChannel > 9)
+        assertTrue("Channel Down still pages forward", pageDownChannel > fadeTarget)
         assertFocusedShapePixels(pageDownChannel, rowHeight, scrolled = true)
         compose.pressKey(Key.ChannelUp)
         val pageUpChannel = requireNotNull(selected).value.toInt()
@@ -612,6 +614,9 @@ class ChannelsListLayoutTest {
             }
         }
     }
+
+    // At large font scale, the shorter no-EPG row keeps the preceding 5:3 logo inside the fade.
+    private fun topFadeFocusTarget(fontScale: Float): Int = if (fontScale == 1f) 9 else NO_EPG + 1
 
     /**
      * The fixture's 5:3 picon has a uniform bright right-hand stripe through the fade; fitted 4dp
@@ -1035,12 +1040,16 @@ class ChannelsListLayoutTest {
         val next = compose.onAllNodesWithTag("channels-immersive-next", useUnmergedTree = true).fetchSemanticsNodes().singleOrNull()
         val synopsisLines = if (compose.onAllNodesWithTag("channels-immersive-synopsis", useUnmergedTree = true).fetchSemanticsNodes().isEmpty()) 0 else
             detail("channels-immersive-synopsis").textLayout().lineCount
+        val restingRows = if ("entry-first-row-focused" in name) {
+            "row1LayoutTop=${row(1).getUnclippedBoundsInRoot().top.value}; row7VisibleHeight=${row(7).bounds().height}; "
+        } else ""
         val sidecar = (
             "canvas=960x540 logical; pixels=${bitmap.width}x${bitmap.height}; density=1.0; " +
                 "locale=${name.substringBefore("-font")}; fontScale=${name.substringAfter("-font").substringBefore("-")}; " +
                 "focus/scenario=${name.substringAfter("-font").substringAfter("-").removeSuffix("-bright-video").removeSuffix("-dark-video")}; " +
                 "background=${if (name.endsWith("bright-video")) "white #FFFFFF" else "dark #182330"}; " +
                 "picture=${picture?.boundsInRoot ?: "absent"}; headlineTop=${headlineChannel().bounds().top}; " +
+                restingRows +
                 "nextBottom=${next?.boundsInRoot?.bottom ?: "absent"}; synopsisLines=$synopsisLines; " +
                 "production=MainStartupComposition+SideRail+ChannelsScreenContent; " +
                 "synthetic video; static offline composition only\n"
