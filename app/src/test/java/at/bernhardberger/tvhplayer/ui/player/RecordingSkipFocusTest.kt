@@ -4,6 +4,7 @@ import at.bernhardberger.tvhplayer.testutil.tagExists
 import at.bernhardberger.tvhplayer.testutil.settleFrames
 import at.bernhardberger.tvhplayer.testutil.pressKey
 import at.bernhardberger.tvhplayer.testutil.focusedTags
+import at.bernhardberger.tvhplayer.testutil.changeState
 import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -270,13 +271,30 @@ class RecordingSkipFocusTest {
         assertEquals(listOf(ad, ad), state.timeouts)
     }
 
-    @Test fun anotherLayerHidesThePromptWhileItsTimeRunsOn() {
-        val prompt = prompt()
-        prompt.shown = false
-        prompt.offer(ad)
+    @Test fun thePromptTimesOutOnlyAfterTenSecondsShownAcrossVisibilityChanges() {
+        val state = prompt()
+        compose.changeState {
+            state.shown = false
+            state.prompt = ad
+        }
+        compose.mainClock.advanceTimeBy(SKIP_PROMPT_MS + 200L)
         assertFalse(compose.tagExists("recording-skip-prompt"))
-        advance(SKIP_PROMPT_MS + 200L)
-        assertEquals(listOf(ad), prompt.timeouts)
+        assertEquals("the hidden offer must not time out", emptyList<RecordingMark>(), state.timeouts)
+
+        compose.changeState { state.shown = true }
+        compose.mainClock.advanceTimeBy(2_000L)
+        assertTrue(compose.tagExists("recording-skip-prompt"))
+        compose.changeState { state.shown = false }
+        compose.mainClock.advanceTimeBy(SKIP_PROMPT_MS)
+        assertFalse(compose.tagExists("recording-skip-prompt"))
+        assertEquals(emptyList<RecordingMark>(), state.timeouts)
+
+        compose.changeState { state.shown = true }
+        compose.mainClock.advanceTimeBy(SKIP_PROMPT_MS - 2_100L)
+        assertTrue(compose.tagExists("recording-skip-prompt"))
+        assertEquals(emptyList<RecordingMark>(), state.timeouts)
+        advance(200L)
+        assertEquals(listOf(ad), state.timeouts)
     }
 
     @Test fun theOfferStandsBackWhilePausedBufferingOrUnseekable() {
@@ -288,10 +306,10 @@ class RecordingSkipFocusTest {
         assertFalse(recordingSkipPromptShown(offered = false, playing = true, canSeek = true, bannerVisible = false))
     }
 
-    @Test fun anOutstandingOfferHidesWhilePausedOrBufferingAndKeepsItsTimeout() =
+    @Test fun anOutstandingOfferStandsBackWhilePausedOrBuffering() =
         outstandingOfferStandsBack(recordingSkipPromptShown(true, playing = false, canSeek = true, bannerVisible = false))
 
-    @Test fun anOutstandingOfferHidesWhenSeekingIsLostAndKeepsItsTimeout() =
+    @Test fun anOutstandingOfferStandsBackWhenSeekingIsLost() =
         outstandingOfferStandsBack(recordingSkipPromptShown(true, playing = true, canSeek = false, bannerVisible = false))
 
     private fun outstandingOfferStandsBack(stopped: Boolean) {
@@ -299,7 +317,6 @@ class RecordingSkipFocusTest {
         val prompt = prompt()
         prompt.offer(ad)
         assertEquals(listOf("recording-skip-prompt"), compose.focusedTags())
-        // Each settle below runs two seconds of the offer's time.
         compose.runOnIdle { prompt.shown = stopped }
         compose.settleFrames(20)
         assertFalse(compose.tagExists("recording-skip-prompt"))
@@ -310,9 +327,6 @@ class RecordingSkipFocusTest {
         compose.settleFrames(20)
         assertEquals(listOf("recording-skip-prompt"), compose.focusedTags())
         assertEquals(emptyList<RecordingMark>(), prompt.timeouts)
-        // The offer's ten seconds ran on while it stood back; they don't start again.
-        advance(2_200L)
-        assertEquals(listOf(ad), prompt.timeouts)
     }
 
     @Test fun allActionsReachTheSeekbarAndReturnDuringABreakAndSkipReturnsToPause() {

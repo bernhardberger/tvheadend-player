@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
@@ -125,9 +126,10 @@ internal fun PlayerActionRow(
                         Button(
                             onClick = { onInteraction(); action() },
                             colors = ButtonDefaults.colors(
-                                containerColor = Color.Transparent,
+                                containerColor = PlayerChromeTokens.chipScrim,
                                 contentColor = MaterialTheme.colorScheme.onSurface,
                             ),
+                            contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
                             modifier = actionModifier.height(TvIconButtonSize).onPreviewKeyEvent { event ->
                                 if (event.key !in RecordingSkipActivationKeys) false else when (event.type) {
                                     KeyEventType.KeyDown -> {
@@ -138,7 +140,15 @@ internal fun PlayerActionRow(
                                     else -> false
                                 }
                             },
-                        ) { Text(label, maxLines = 1, softWrap = false) }
+                        ) {
+                            Icon(
+                                painterResource(R.drawable.ic_skip_next),
+                                contentDescription = null,
+                                modifier = Modifier.size(IconButtonDefaults.MediumIconSize),
+                            )
+                            Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                            Text(label, maxLines = 1, softWrap = false)
+                        }
                     } else IconButton(
                         onClick = { onInteraction(); action() },
                         colors = IconButtonDefaults.colors(

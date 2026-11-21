@@ -60,13 +60,13 @@ import at.bernhardberger.tvhplayer.core.RecordingMark
 import at.bernhardberger.tvhplayer.core.RecordingMarkKind
 import kotlin.math.roundToInt
 
-/** How long the Skip prompt stays over the hidden chrome, counted from the break's offer. */
+/** Total time the Skip prompt can be shown, excluding time behind other layers. */
 internal const val SKIP_PROMPT_MS = 10_000L
 
 /**
  * The offered prompt comes forward only while the recording plays and can seek, and stands
  * back while the Banner shows (it is not part of the passive Banner). Paused, buffering or
- * unseekable, OK keeps its usual meaning; the offer's timeout keeps running meanwhile.
+ * unseekable, OK keeps its usual meaning and the countdown pauses.
  */
 internal fun recordingSkipPromptShown(offered: Boolean, playing: Boolean, canSeek: Boolean, bannerVisible: Boolean): Boolean =
     offered && playing && canSeek && !bannerVisible
@@ -152,8 +152,8 @@ private fun SkipCountdown(color: Color, elapsed: () -> Float) {
 
 /**
  * The Skip prompt over the hidden chrome while [shown]: it takes focus when it appears and
- * announces itself. Its time runs from [prompt]'s offer, also while another layer hides it;
- * then [onTimeout] withdraws the offer.
+ * announces itself. The countdown pauses while hidden and resumes with the remaining time;
+ * after [SKIP_PROMPT_MS] of shown time, [onTimeout] withdraws the offer.
  */
 @Composable
 internal fun RecordingSkipPrompt(
@@ -170,12 +170,16 @@ internal fun RecordingSkipPrompt(
     var elapsedMs by remember(presentation) { mutableLongStateOf(0L) }
     val timeout by rememberUpdatedState(onTimeout)
     LaunchedEffect(prompt) {
-        val offered = prompt ?: return@LaunchedEffect
-        elapsedMs = 0L
+        // An equal mark can be offered again before the old presentation finishes exiting.
+        if (prompt != null) elapsedMs = 0L
+    }
+    LaunchedEffect(prompt, shown) {
+        if (prompt == null || !shown) return@LaunchedEffect
         // Frame time, so the prompt's time does not follow the animator duration scale.
-        val start = withFrameMillis { it }
+        val start = withFrameMillis { it } - elapsedMs
+        if (elapsedMs >= SKIP_PROMPT_MS) return@LaunchedEffect
         while (elapsedMs < SKIP_PROMPT_MS) elapsedMs = withFrameMillis { it } - start
-        timeout(offered)
+        timeout(prompt)
     }
     val visible = prompt != null && shown
     val visibility = remember { MutableTransitionState(false) }
