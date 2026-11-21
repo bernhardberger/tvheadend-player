@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -66,7 +67,10 @@ internal fun guideLayout(): GuideLayout {
     }
 }
 
-/** Watch (on now only), Record with its series arrow, Details; they wrap in a narrow place. */
+/**
+ * Watch (on now only), Record with its series arrow, Details; they wrap in a narrow place. The first action
+ * is filled: Record is tonal beside Watch and filled where it leads (section 9, "Which button is filled").
+ */
 @Composable
 internal fun ProgramActions(
     channelId: String,
@@ -86,7 +90,10 @@ internal fun ProgramActions(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         if (onNow) WatchButton(contentPadding = padding) { actions.onWatch(channelId) }
-        RecordButton({ actions.onRecord(programId) }, { actions.onRecordOptions(programId) }, contentPadding = padding)
+        RecordButton(
+            { actions.onRecord(programId) }, { actions.onRecordOptions(programId) },
+            contentPadding = padding, leads = !onNow,
+        )
         if (onDetails != null) {
             TextButton(onClick = onDetails) {
                 if (detailsIcon) {
@@ -110,7 +117,10 @@ internal fun WatchButton(
     }
 }
 
-/** Record, and an arrow for the ways that need a choice (the series). */
+/**
+ * Record, and an arrow for the ways that need a choice (the series). Tonal beside Watch; filled where
+ * Record [leads]: no Watch before it, as on a later program or in the player's Info sheet.
+ */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun RecordButton(
@@ -118,27 +128,35 @@ internal fun RecordButton(
     onOptions: () -> Unit,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = SplitButtonDefaults.leadingButtonContentPaddingFor(ButtonDefaults.MinHeight),
+    leads: Boolean = false,
 ) {
     val options = stringResource(R.string.guide_record_options)
+    val label: @Composable RowScope.() -> Unit = {
+        ChannelActionLabel(R.drawable.channels_record, stringResource(R.string.channels_record))
+    }
+    val arrow: @Composable RowScope.() -> Unit = {
+        Icon(painterResource(R.drawable.channels_expand), null, Modifier.size(SplitButtonDefaults.TrailingIconSize))
+    }
+    val describe = Modifier.semantics { contentDescription = options }
     SplitButtonLayout(
         modifier = modifier,
         leadingButton = {
-            SplitButtonDefaults.TonalLeadingButton(
-                onClick = onRecord,
-                contentPadding = contentPadding,
-            ) {
-                ChannelActionLabel(R.drawable.channels_record, stringResource(R.string.channels_record))
+            if (leads) {
+                SplitButtonDefaults.LeadingButton(onClick = onRecord, contentPadding = contentPadding, content = label)
+            } else {
+                SplitButtonDefaults.TonalLeadingButton(
+                    onClick = onRecord, contentPadding = contentPadding, content = label,
+                )
             }
         },
         trailingButton = {
-            SplitButtonDefaults.TonalTrailingButton(
-                checked = false,
-                onCheckedChange = { onOptions() },
-                modifier = Modifier.semantics { contentDescription = options },
-            ) {
-                Icon(
-                    painterResource(R.drawable.channels_expand), null,
-                    Modifier.size(SplitButtonDefaults.TrailingIconSize),
+            if (leads) {
+                SplitButtonDefaults.TrailingButton(
+                    checked = false, onCheckedChange = { onOptions() }, modifier = describe, content = arrow,
+                )
+            } else {
+                SplitButtonDefaults.TonalTrailingButton(
+                    checked = false, onCheckedChange = { onOptions() }, modifier = describe, content = arrow,
                 )
             }
         },
@@ -160,22 +178,35 @@ internal fun OnNowBadge() {
     }
 }
 
-/** How far the program has run: the program's own color, red while it records. */
+/**
+ * How far the program has run: the program's own color, red while it records; orange, as the Channels
+ * list's playing row, when it is the item [watching] (section 13: orange wins over red).
+ */
 @Composable
-internal fun ProgramBar(progress: Float, recording: Boolean, modifier: Modifier) {
+internal fun ProgramBar(progress: Float, recording: Boolean, modifier: Modifier, watching: Boolean = false) {
     val scheme = MaterialTheme.colorScheme
     LinearProgressIndicator(
         progress = { progress.coerceIn(0f, 1f) }, modifier = modifier,
-        color = if (recording) TvRecordingColor else scheme.primary,
+        color = when {
+            watching -> scheme.tertiary
+            recording -> TvRecordingColor
+            else -> scheme.primary
+        },
         trackColor = scheme.onSurface.copy(alpha = TRACK_ALPHA), gapSize = 0.dp, drawStopIndicator = {},
     )
 }
 
 /** The bar with what is left after it. */
 @Composable
-internal fun ProgramProgress(progress: Float, timeLeft: String?, recording: Boolean, modifier: Modifier) {
+internal fun ProgramProgress(
+    progress: Float,
+    timeLeft: String?,
+    recording: Boolean,
+    modifier: Modifier,
+    watching: Boolean = false,
+) {
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        ProgramBar(progress, recording, Modifier.weight(1f).height(4.dp))
+        ProgramBar(progress, recording, Modifier.weight(1f).height(4.dp), watching)
         timeLeft?.let {
             Text(
                 stringResource(R.string.channels_time_left, it), Modifier.padding(start = 12.dp),

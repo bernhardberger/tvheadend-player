@@ -194,17 +194,7 @@ private fun ByChannel(
     if (layout.compact) {
         Column(Modifier.fillMaxSize()) {
             ChannelTabs(state.channels, channel.id, onChannel)
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                MenuButton(R.drawable.calendar_month_outline, state.days, state.selectedDay, actions.onDay)
-                Spacer(Modifier.weight(1f))
-                Text(
-                    state.date, style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                )
-            }
+            DayBar(state.days, state.selectedDay, state.date, actions.onDay)
             Day(channel, layout, openId, onOpen, actions, onDetails, Modifier.padding(horizontal = 12.dp))
         }
         return

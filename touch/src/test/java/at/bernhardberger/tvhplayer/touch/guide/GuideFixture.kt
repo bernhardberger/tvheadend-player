@@ -268,3 +268,56 @@ internal fun glassHarborDetails() = ProgramDetails(
         ProgramFact(FactKey.Categories, "Drama • Mystery"),
     ),
 )
+
+/** Ridge Light's details, for the player's Info sheet; the Guide's own captures do not open them. */
+internal fun ridgeLightDetails() = ProgramDetails(
+    id = RIDGE_LIGHT_ID,
+    channelId = RidgeEarth.id,
+    channel = RidgeEarth.name,
+    channelLogo = picon(RidgeEarth.id),
+    logoTint = RidgeEarth.tint,
+    title = "Ridge Light",
+    episode = "S2 E3 • Winter on the ridge",
+    length = "60m",
+    year = "2024",
+    genre = "Documentary",
+    ageRating = null,
+    timeRange = "8:00–9:00 PM",
+    progress = 0.78f,
+    timeLeft = "13m",
+    picture = art("still-ridge-light"),
+    art = art("ridge-light"),
+    synopsis = "$RIDGE_LIGHT_SYNOPSIS while the valley holds on to the last warm days.",
+    otherAirings = listOf(
+        ProgramAiring("rl-1", picon(RidgeEarth.id), RidgeEarth.tint, "Tomorrow 2:00 AM", listOf("Ridge Earth", "S2 E2", "The long autumn")),
+        ProgramAiring("rl-2", picon(RidgeEarth.id), RidgeEarth.tint, "Sat 9:00 PM", listOf("Ridge Earth", "S2 E4", "First snow")),
+        ProgramAiring(
+            RIDGE_LIGHT_REPEAT_ID, picon(NorthlineWorld.id), NorthlineWorld.tint, "Sun 4:00 PM",
+            listOf("Northline World", "S2 E3", "Winter on the ridge"),
+        ),
+    ),
+    credits = listOf(ProgramCredit(CreditRole.Director, listOf("Morgan Vale"))),
+    facts = listOf(
+        ProgramFact(FactKey.Genre, "Documentary"),
+        ProgramFact(FactKey.Season, "2"),
+        ProgramFact(FactKey.Episode, "3"),
+        ProgramFact(FactKey.Year, "2024"),
+    ),
+)
+
+internal const val RIDGE_LIGHT_REPEAT_ID = "rl-northline"
+
+/** The same episode repeated on another channel: its Details names that channel. */
+internal fun ridgeLightRepeatDetails() = ridgeLightDetails().copy(
+    id = RIDGE_LIGHT_REPEAT_ID,
+    channelId = NorthlineWorld.id,
+    channel = NorthlineWorld.name,
+    channelLogo = picon(NorthlineWorld.id),
+    logoTint = NorthlineWorld.tint,
+    timeRange = "Sun 4:00–5:00 PM",
+    progress = null,
+    timeLeft = null,
+    otherAirings = listOf(
+        ProgramAiring(RIDGE_LIGHT_ID, picon(RidgeEarth.id), RidgeEarth.tint, "Today 8:00 PM", listOf("Ridge Earth", "S2 E3", "Winter on the ridge")),
+    ),
+)

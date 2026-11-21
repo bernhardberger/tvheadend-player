@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -42,7 +43,7 @@ import at.bernhardberger.tvhplayer.touch.ui.PartsLine
 /**
  * The programs of one channel's day in start order, with a date heading where the night crosses
  * midnight. A tap opens a program in place ([openId]); a tap on the opened one folds it again.
- * Nothing here plays: Watch is the opened program's button.
+ * Nothing here plays: Watch is the opened program's button; the player, already showing it, passes [watch] false.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -56,6 +57,7 @@ internal fun ChannelDay(
     modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState(),
     contentPadding: PaddingValues = PaddingValues(bottom = 16.dp),
+    watch: Boolean = true,
 ) {
     LazyColumn(
         modifier, state = listState, contentPadding = contentPadding,
@@ -72,7 +74,9 @@ internal fun ChannelDay(
             }
             item(key = program.id) {
                 if (program.id == openId) {
-                    OpenProgram(program, layout, actions, onCollapse = { onOpen(null) }) { onDetails(program.id) }
+                    OpenProgram(program, layout, actions, watch, onCollapse = { onOpen(null) }) {
+                        onDetails(program.id)
+                    }
                 } else {
                     DayRow(program, layout, dayShapes(programs, index)) { onOpen(program.id) }
                 }
@@ -131,9 +135,11 @@ private fun OpenProgram(
     program: GuideProgram,
     layout: GuideLayout,
     actions: GuideActions,
+    watch: Boolean,
     onCollapse: () -> Unit,
     onDetails: () -> Unit,
 ) {
+    val onNow = program.onNow && watch
     val wide = layout == GuideLayout.Wide
     Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
         Box {
@@ -157,7 +163,7 @@ private fun OpenProgram(
                         if (wide) {
                             OpenFacts(program, Modifier.padding(top = 4.dp))
                             ProgramActions(
-                                program.channelId, program.id, program.onNow, actions, Modifier.padding(top = 16.dp),
+                                program.channelId, program.id, onNow, actions, Modifier.padding(top = 16.dp),
                                 onDetails,
                             )
                         }
@@ -167,7 +173,9 @@ private fun OpenProgram(
                     GuideLayout.Wide -> Unit
                     GuideLayout.Upright -> OpenFacts(program, Modifier.padding(top = 12.dp))
                     GuideLayout.Phone -> program.progress?.let {
-                        ProgramProgress(it, program.timeLeft, program.recording, Modifier.padding(top = 12.dp))
+                        ProgramProgress(
+                            it, program.timeLeft, program.recording, Modifier.padding(top = 12.dp), program.watching,
+                        )
                     }
                 }
                 program.synopsis?.let {
@@ -178,7 +186,7 @@ private fun OpenProgram(
                 }
                 if (!wide) {
                     ProgramActions(
-                        program.channelId, program.id, program.onNow, actions, Modifier.padding(top = 16.dp), onDetails,
+                        program.channelId, program.id, onNow, actions, Modifier.padding(top = 16.dp), onDetails,
                         compact = true,
                     )
                 }
@@ -227,7 +235,9 @@ private fun OpenFacts(program: GuideProgram, modifier: Modifier) {
     Column(modifier.fillMaxWidth()) {
         OpenLine(program, phone = false, Modifier)
         program.progress?.let {
-            ProgramProgress(it, program.timeLeft, program.recording, Modifier.padding(top = 12.dp))
+            ProgramProgress(
+                it, program.timeLeft, program.recording, Modifier.padding(top = 12.dp), program.watching,
+            )
         }
     }
 }
@@ -248,4 +258,20 @@ internal fun ScheduledIcon() {
         painterResource(R.drawable.channels_schedule), stringResource(R.string.channels_scheduled),
         Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant,
     )
+}
+
+/** The compact By channel bar: the day picker, and the date at the end. The player's Info sheet shows it too. */
+@Composable
+internal fun DayBar(days: List<String>, selectedDay: Int, date: String, onDay: (Int) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        MenuButton(R.drawable.calendar_month_outline, days, selectedDay, onDay)
+        Spacer(Modifier.weight(1f))
+        Text(
+            date, style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
+        )
+    }
 }

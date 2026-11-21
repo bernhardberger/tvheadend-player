@@ -132,18 +132,42 @@ private fun UprightPage(details: ProgramDetails, actions: GuideActions, onBack: 
 private fun PhonePage(details: ProgramDetails, actions: GuideActions, onBack: () -> Unit) {
     Column(Modifier.fillMaxSize()) {
         PageBar(details, onBack, transparent = false)
-        Column(
+        ProgramDetailsColumn(
+            details, actions,
             Modifier.fillMaxSize().verticalScroll(rememberScrollState())
                 .windowInsetsPadding(WindowInsets.navigationBars).padding(horizontal = 16.dp),
-        ) {
-            ProgramPicture(details.art ?: details.picture, Modifier.fillMaxWidth(), strip = false)
-            Lead(details, MaterialTheme.typography.headlineMedium, Modifier.padding(top = 16.dp))
-            Timing(details, Modifier.padding(top = 16.dp))
+        )
+    }
+}
+
+/**
+ * The phone's single column of details. The player's Info sheet shows it too ([inPlayer]): the program
+ * is already playing and in view, so Record stands alone, without Watch or Show in Guide.
+ */
+@Composable
+internal fun ProgramDetailsColumn(
+    details: ProgramDetails,
+    actions: GuideActions,
+    modifier: Modifier,
+    inPlayer: Boolean = false,
+) {
+    Column(modifier) {
+        ProgramPicture(details.art ?: details.picture, Modifier.fillMaxWidth(), strip = false)
+        Lead(details, MaterialTheme.typography.headlineMedium, Modifier.padding(top = 16.dp))
+        Timing(details, Modifier.padding(top = 16.dp))
+        if (inPlayer) {
+            RecordButton(
+                { actions.onRecord(details.id) },
+                { actions.onRecordOptions(details.id) },
+                Modifier.padding(top = 16.dp),
+                leads = true,
+            )
+        } else {
             Actions(details, actions, Modifier.padding(top = 16.dp), equalWidth = true)
-            DetailsSynopsis(details.synopsis, Modifier.padding(top = 20.dp))
-            Sections(details, actions, columns = 1, keyWidth = 116.dp, Modifier)
-            Spacer(Modifier.height(24.dp))
         }
+        DetailsSynopsis(details.synopsis, Modifier.padding(top = 20.dp))
+        Sections(details, actions, columns = 1, keyWidth = 116.dp, Modifier)
+        Spacer(Modifier.height(24.dp))
     }
 }
 
@@ -220,7 +244,7 @@ private fun Timing(details: ProgramDetails, modifier: Modifier) {
             color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1,
         )
         details.progress?.let {
-            ProgramProgress(it, details.timeLeft, details.recording, Modifier.weight(1f))
+            ProgramProgress(it, details.timeLeft, details.recording, Modifier.weight(1f), details.watching)
         }
     }
 }
@@ -238,7 +262,10 @@ private fun Actions(details: ProgramDetails, actions: GuideActions, modifier: Mo
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 val share = Modifier.weight(1f).heightIn(min = 48.dp)
                 if (details.onNow) WatchButton(share) { actions.onWatch(details.channelId) }
-RecordButton({ actions.onRecord(details.id) }, { actions.onRecordOptions(details.id) }, share)
+                RecordButton(
+                    { actions.onRecord(details.id) }, { actions.onRecordOptions(details.id) }, share,
+                    leads = !details.onNow,
+                )
             }
             showInGuide()
         }
@@ -249,7 +276,10 @@ RecordButton({ actions.onRecord(details.id) }, { actions.onRecordOptions(details
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             if (details.onNow) WatchButton { actions.onWatch(details.channelId) }
-            RecordButton({ actions.onRecord(details.id) }, { actions.onRecordOptions(details.id) })
+            RecordButton(
+                { actions.onRecord(details.id) }, { actions.onRecordOptions(details.id) },
+                leads = !details.onNow,
+            )
             showInGuide()
         }
     }

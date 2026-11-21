@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- TV: back -->
+    <string name="player_back">Back</string>
+    <!-- TV: playback_options -->
+    <string name="player_settings">Playback options</string>
+    <string name="player_picture_in_picture">Picture-in-picture</string>
+    <!-- TV: player_full_screen -->
+    <string name="player_full_screen">Full screen</string>
+    <string name="player_brightness">Brightness</string>
+    <string name="player_show_controls">Show playback controls</string>
+    <string name="player_hide_controls">Hide playback controls</string>
+    <string name="player_back_ten">Back 10 seconds</string>
+    <!-- TV: seek_forward_30 -->
+    <string name="player_forward_thirty">Forward 30 seconds</string>
+    <!-- TV: play -->
+    <string name="player_play">Play</string>
+    <!-- TV: pause -->
+    <string name="player_pause">Pause</string>
+    <!-- TV: player_tuning -->
+    <string name="player_tuning">Tuning</string>
+    <string name="player_go_live">Go live</string>
+    <!-- TV: timeshift_live -->
+    <string name="player_live">Live</string>
+    <!-- TV: timeshift_behind_live -->
+    <string name="player_behind_live">%1$s behind live</string>
+    <string name="player_timeline">Playback position</string>
+    <string name="player_next_program">Next • %1$s %2$s</string>
+    <string name="player_time_and_genre">%1$s • %2$s</string>
+    <!-- TV: context_record -->
+    <string name="player_record">Record</string>
+    <!-- TV: details_audio -->
+    <string name="player_audio">Audio</string>
+    <!-- TV: subtitles -->
+    <string name="player_subtitles">Subtitles</string>
+    <!-- TV: player_info -->
+    <string name="player_info">Info</string>
+    <!-- TV: nav_channels -->
+    <string name="player_channels">Channels</string>
+    <!-- TV: error_110_title -->
+    <string name="player_disconnected">Can’t reach the server</string>
+    <!-- TV: error_110_reason -->
+    <string name="player_reconnect_in">Reconnecting in %1$d s…</string>
+    <!-- TV: error_110_reason_pending -->
+    <string name="player_reconnecting">Reconnecting…</string>
+    <string name="player_pause_ended">The pause ended</string>
+    <string name="player_pause_expired">A paused channel stays tuned for 10 minutes</string>
+    <!-- TV: context_watch_live -->
+    <string name="player_watch_live">Watch live</string>
+    <!-- TV: error_201_title -->
+    <string name="player_no_tuner">No free tuner</string>
+    <!-- TV: error_201_reason (first sentence) -->
+    <string name="player_no_tuner_reason">Every tuner is in use right now. Try again later or choose another channel.</string>
+    <string name="player_record_program_detail">This program, until %1$s</string>
+    <!-- TV: context_record_series -->
+    <string name="player_record_series">Record series</string>
+    <string name="player_record_series_detail">Every episode of this series</string>
+    <!-- TV: context_record_title -->
+    <string name="player_record_all">Record all</string>
+    <string name="player_record_all_detail">Every airing of %1$s</string>
+    <!-- TV: audio_automatic -->
+    <string name="player_audio_automatic">Automatic</string>
+    <!-- TV: audio_automatic_playing -->
+    <string name="player_audio_playing">Playing: %1$s</string>
+    <!-- TV: audio_description -->
+    <string name="player_audio_description">Audio description</string>
+    <!-- TV: playback_option_default -->
+    <string name="player_option_default">Default (%1$s)</string>
+    <!-- TV: subtitles_off -->
+    <string name="player_off">Off</string>
+    <!-- TV: display_mode -->
+    <string name="player_display_mode">Display mode</string>
+    <!-- TV: display_mode_auto -->
+    <string name="player_display_auto">Auto (original aspect)</string>
+    <!-- TV: display_mode_16_9 -->
+    <string name="player_display_16_9">Fill 16:9</string>
+    <!-- TV: display_mode_4_3 -->
+    <string name="player_display_4_3">Fill 4:3</string>
+    <!-- TV: profile -->
+    <string name="player_stream_profile">Stream profile</string>
+    <!-- TV: profile_direct_streaming -->
+    <string name="player_direct_streaming">Direct streaming</string>
+    <!-- TV: stats_for_nerds -->
+    <string name="player_stats">Stats for nerds</string>
+    <!-- TV: stats_stream_path -->
+    <string name="player_stats_path">Stream path</string>
+    <!-- TV: stats_stream_path_debug -->
+    <string name="player_stats_debug">Stream path + debug details</string>
+</resources>

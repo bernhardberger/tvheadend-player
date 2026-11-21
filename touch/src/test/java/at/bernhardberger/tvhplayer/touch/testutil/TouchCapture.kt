@@ -2,7 +2,11 @@ package at.bernhardberger.tvhplayer.touch.testutil
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.view.View
 import android.view.ViewGroup
+import android.view.WindowManager
+import android.view.inspector.WindowInspector
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.captureToImage
@@ -22,6 +26,7 @@ enum class TouchCanvas(val qualifiers: String, val width: Int, val height: Int, 
     TABLET("en-rUS-w1280dp-h800dp-land-xhdpi", 2560, 1600, 32),
     TABLET_UPRIGHT("en-rUS-w800dp-h1280dp-port-xhdpi", 1600, 2560, 32),
     PHONE("en-rUS-w412dp-h892dp-port-xhdpi", 824, 1784, 40),
+    PHONE_LANDSCAPE("en-rUS-w892dp-h412dp-land-xhdpi", 1784, 824, 0),
 }
 
 /**
@@ -30,24 +35,63 @@ enum class TouchCanvas(val qualifiers: String, val width: Int, val height: Int, 
  * The test's `@Config(qualifiers = canvas.qualifiers)` must match [canvas].
  */
 fun AndroidComposeTestRule<*, out ComponentActivity>.captureTouch(group: String, name: String, canvas: TouchCanvas) {
-    runOnIdle {
-        val content = activity.findViewById<ViewGroup>(android.R.id.content).getChildAt(0)
-        val density = content.resources.displayMetrics.density
-        ViewCompat.dispatchApplyWindowInsets(
-            content,
-            WindowInsetsCompat.Builder()
-                .setInsets(WindowInsetsCompat.Type.statusBars(), Insets.of(0, (canvas.statusBarDp * density).roundToInt(), 0, 0))
-                .setInsets(WindowInsetsCompat.Type.navigationBars(), Insets.of(0, 0, 0, (24 * density).roundToInt()))
-                .setVisible(WindowInsetsCompat.Type.systemBars(), true)
-                .build(),
-        )
-    }
+    runOnIdle { reserveSystemBars(activity.findViewById<ViewGroup>(android.R.id.content).getChildAt(0), canvas) }
     // With a dialog open, onRoot() matches the dialog's root too, and a capture of several roots takes
     // Robolectric's screenshot of all windows, which draws each at its origin rather than where its
     // gravity puts it. The frame is the activity's window alone; a test draws a dialog over it once.
     val frame = isRoot() and !isDialog() and !hasAnyDescendant(isDialog())
     val bitmap = onNode(frame).captureToImage().asAndroidBitmap()
     assertEquals(canvas.width to canvas.height, bitmap.width to bitmap.height)
+    write(group, name, bitmap)
+}
+
+/**
+ * [captureTouch] with the popups and dialogs open over the activity drawn in, which Robolectric
+ * keeps in windows of their own: a popup (a menu) at its window position, a dialog (a bottom
+ * sheet) against the bottom edge as the system lays it out.
+ */
+fun AndroidComposeTestRule<*, out ComponentActivity>.captureTouchWindows(group: String, name: String, canvas: TouchCanvas) {
+    val views = runOnIdle { WindowInspector.getGlobalWindowViews().filter { it.isAttachedToWindow } }
+    runOnIdle {
+        views.forEach { view ->
+            view.findViewById<ViewGroup>(android.R.id.content)?.getChildAt(0)?.let { reserveSystemBars(it, canvas) }
+        }
+    }
+    waitForIdle()
+    val bitmap = Bitmap.createBitmap(canvas.width, canvas.height, Bitmap.Config.ARGB_8888)
+    runOnIdle {
+        val frame = Canvas(bitmap)
+        views.forEach { view ->
+            val params = view.layoutParams as? WindowManager.LayoutParams
+            val popup = params != null &&
+                params.type in WindowManager.LayoutParams.FIRST_SUB_WINDOW..WindowManager.LayoutParams.LAST_SUB_WINDOW
+            val decor = view == activity.window.decorView
+            frame.save()
+            when {
+                decor -> Unit
+                popup -> frame.translate(params.x.toFloat(), params.y.toFloat())
+                else -> frame.translate(0f, (canvas.height - view.height).toFloat())
+            }
+            view.draw(frame)
+            frame.restore()
+        }
+    }
+    write(group, name, bitmap)
+}
+
+private fun reserveSystemBars(content: View, canvas: TouchCanvas) {
+    val density = content.resources.displayMetrics.density
+    ViewCompat.dispatchApplyWindowInsets(
+        content,
+        WindowInsetsCompat.Builder()
+            .setInsets(WindowInsetsCompat.Type.statusBars(), Insets.of(0, (canvas.statusBarDp * density).roundToInt(), 0, 0))
+            .setInsets(WindowInsetsCompat.Type.navigationBars(), Insets.of(0, 0, 0, (24 * density).roundToInt()))
+            .setVisible(WindowInsetsCompat.Type.systemBars(), true)
+            .build(),
+    )
+}
+
+private fun write(group: String, name: String, bitmap: Bitmap) {
     val directory = File(checkNotNull(System.getProperty("touch.captureDir")), group)
     directory.mkdirs()
     File(directory, "$name.png").outputStream().use {

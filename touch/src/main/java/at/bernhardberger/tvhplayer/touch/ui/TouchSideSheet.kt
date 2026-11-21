@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -77,8 +78,8 @@ private enum class SideSheetValue { Hidden, Expanded }
  * margins, 16dp corners, surface container low). Material 3 1.5 has no side sheet; this is built
  * from the pieces its ModalBottomSheet uses: an anchored drag toward the edge, predictive Back and
  * the theme's motion scheme. A tap outside always dismisses; [scrim] only decides whether the
- * content behind it is dimmed. The head always has Close; with [onBack] it also starts with Back,
- * which system Back then calls.
+ * content behind it is dimmed. The head always has Close, after any [actions]; with [onBack] it
+ * also starts with Back, which system Back then calls.
  */
 @Composable
 internal fun TouchSideSheet(
@@ -87,6 +88,8 @@ internal fun TouchSideSheet(
     modifier: Modifier = Modifier,
     onBack: (() -> Unit)? = null,
     scrim: Boolean = true,
+    leading: (@Composable () -> Unit)? = null,
+    actions: @Composable RowScope.() -> Unit = {},
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val motion = MaterialTheme.motionScheme
@@ -137,7 +140,7 @@ internal fun TouchSideSheet(
             color = MaterialTheme.colorScheme.surfaceContainerLow,
         ) {
             Column(Modifier.fillMaxSize()) {
-                SheetHead(title, onBack, closeLabel, hide)
+                SheetHead(title, onBack, leading, closeLabel, hide, actions)
                 content()
             }
         }
@@ -203,7 +206,14 @@ private fun Modifier.predictiveBackShrink(progress: () -> Float, rtl: Boolean) =
 }
 
 @Composable
-private fun SheetHead(title: String, onBack: (() -> Unit)?, closeLabel: String, onClose: () -> Unit) {
+private fun SheetHead(
+    title: String,
+    onBack: (() -> Unit)?,
+    leading: (@Composable () -> Unit)?,
+    closeLabel: String,
+    onClose: () -> Unit,
+    actions: @Composable RowScope.() -> Unit,
+) {
     // Spec: 24dp start padding, 16dp beside a leading icon, 12dp between the top elements.
     Row(
         Modifier.fillMaxWidth().heightIn(min = 72.dp)
@@ -215,12 +225,17 @@ private fun SheetHead(title: String, onBack: (() -> Unit)?, closeLabel: String, 
                 Icon(painterResource(R.drawable.connect_back_outline), stringResource(R.string.side_sheet_back))
             }
         }
+        leading?.let {
+            Box(Modifier.padding(start = if (onBack == null) 0.dp else 4.dp, end = 12.dp)) { it() }
+        }
         Text(
             title,
-            Modifier.weight(1f).padding(start = if (onBack == null) 0.dp else 4.dp).semantics { heading() },
+            Modifier.weight(1f).padding(start = if (onBack == null || leading != null) 0.dp else 4.dp)
+                .semantics { heading() },
             style = MaterialTheme.typography.titleLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        actions()
         IconButton(onClick = onClose) {
             Icon(painterResource(R.drawable.connect_close_outline), closeLabel)
         }
