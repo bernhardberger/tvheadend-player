@@ -39,6 +39,11 @@ internal class PlayerWindow(private val activity: ComponentActivity, private val
 
     /** The display mode the picture is drawn in, so the window takes the same shape. */
     var mode: AspectRatioMode = AspectRatioMode.FIT
+        set(value) {
+            if (field == value) return
+            field = value
+            update()
+        }
     private val relayout = View.OnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> update() }
     private val videoSize = object : Player.Listener {
         override fun onVideoSizeChanged(videoSize: VideoSize) = update()
@@ -48,7 +53,10 @@ internal class PlayerWindow(private val activity: ComponentActivity, private val
     // Each resume sets the parameters: the first one after creation, and the return from the window
     // to full screen. A window closed with its X never resumes the activity again.
     private val resumed = object : DefaultLifecycleObserver {
-        override fun onResume(owner: LifecycleOwner) = update()
+        override fun onResume(owner: LifecycleOwner) {
+            inWindow.value = activity.isInPictureInPictureMode
+            update()
+        }
     }
 
     fun open() {
@@ -106,7 +114,12 @@ internal class PlayerWindow(private val activity: ComponentActivity, private val
     fun enter(): Boolean {
         available.value = activity.canUseWindow()
         if (!available.value || activity.isFinishing || activity.isInPictureInPictureMode) return false
-        val entered = activity.enterPictureInPictureMode(params())
+        val entered = try {
+            activity.enterPictureInPictureMode(params())
+        } catch (gone: IllegalStateException) {
+            Log.d(TAG, "Window entry refused before the activity could enter", gone)
+            false
+        }
         if (entered) inWindow.value = true
         return entered
     }

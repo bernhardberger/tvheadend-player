@@ -4,6 +4,7 @@ import androidx.compose.runtime.State
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import at.bernhardberger.tvheadend.sdk.media3.TimeshiftTimeline
 import at.bernhardberger.tvhplayer.core.AppErrorCondition
 import at.bernhardberger.tvhplayer.core.HumanTrackLabel
 import at.bernhardberger.tvhplayer.core.RecordingMark
@@ -173,6 +174,8 @@ internal data class LiveTimeline(
     val live: Int,
     val behind: Int = live - position,
     val liveEdge: Boolean = true,
+    val programmeStartSec: Long? = null,
+    val segment: TimeshiftTimeline? = null,
 ) {
     init {
         require(duration > 0 && position in 0..live && live <= duration && behind >= 0)
@@ -181,6 +184,11 @@ internal data class LiveTimeline(
 
     /** Pause, the skips and the drag have a buffer to move in. */
     val seekable: Boolean get() = bufferStart != null && bufferStart < live
+
+    fun canContinueDrag(next: LiveTimeline): Boolean =
+        next.seekable && programmeStartSec == next.programmeStartSec &&
+            programStart == next.programStart && duration == next.duration &&
+            (segment?.describesSameSegment(next.segment) ?: (next.segment == null))
 
     /** How far behind live the viewer would be at [shown], a dragged position or the current one. */
     fun behindAt(shown: Int): Int = (behind + position - shown).coerceAtLeast(0)

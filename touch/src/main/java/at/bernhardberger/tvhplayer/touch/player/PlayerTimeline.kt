@@ -133,6 +133,10 @@ private fun timelineDrag(
         .dragOnBar(
             snapPx, { x, width -> latestTimeline.dragTarget(x, width, snapPx) },
             { latestTimeline.position }, { latestPreview(it) }, { latestSeek(it) },
+            startValidation = {
+                val original = latestTimeline
+                { original.canContinueDrag(latestTimeline) }
+            },
         )
 }
 
@@ -144,26 +148,30 @@ internal fun <T : Any> Modifier.dragOnBar(
     onPreview: (T?) -> Unit,
     onSeek: (T) -> Unit,
     onTargetChanged: (T?) -> Unit = {},
+    startValidation: () -> (() -> Boolean) = { { true } },
 ): Modifier {
     val latestTarget by rememberUpdatedState(targetAt)
     val latestCurrent by rememberUpdatedState(current)
     val latestPreview by rememberUpdatedState(onPreview)
     val latestSeek by rememberUpdatedState(onSeek)
     val latestChanged by rememberUpdatedState(onTargetChanged)
+    val latestValidation by rememberUpdatedState(startValidation)
     return pointerInput(snapPx) {
         var target: T? = null
+        var valid: (() -> Boolean)? = null
         detectHorizontalDragGestures(
-            onDragStart = { target = null },
+            onDragStart = { target = null; valid = latestValidation() },
             onHorizontalDrag = { change, _ ->
                 val previous = target
-                target = latestTarget(change.position.x, size.width)
+                if (valid?.invoke() == false) valid = null
+                target = if (valid != null) latestTarget(change.position.x, size.width) else null
                 if (target != previous) latestChanged(target)
                 latestPreview(target)
             },
             onDragCancel = { latestPreview(null) },
             onDragEnd = {
                 latestPreview(null)
-                target?.takeUnless { it == latestCurrent() }?.let(latestSeek)
+                if (valid?.invoke() == true) target?.takeUnless { it == latestCurrent() }?.let(latestSeek)
             },
         )
     }

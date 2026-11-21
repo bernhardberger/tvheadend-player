@@ -200,6 +200,14 @@ class PlayerScreenTest {
         tapPicture()
         noticeOnlyOutsideTheWindow("tablet-player-notice", canvas)
         dragToLiveWithNotice()
+        val old = liveTimeline.value
+        dragTo(.525f)
+        compose.runOnIdle { liveTimeline.value = old.copy(programStart = old.programStart.plusHours(1)) }
+        timeline().performTouchInput { up() }
+        compose.runOnIdle {
+            assertEquals("Lifting on a new program does not seek", listOf(2820), seeks)
+            liveTimeline.value = old
+        }
         captureStatuses("tablet", canvas, reconnecting = true)
     }
 

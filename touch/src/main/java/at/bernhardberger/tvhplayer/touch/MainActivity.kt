@@ -83,8 +83,8 @@ class MainActivity : ComponentActivity() {
         // A tap that tunes is the viewing intent: a stop from before it must not close the player it opens.
         // Watch on the playing channel only brings its player back.
         val playing = playingChannelId(runtime.activeTarget.value, runtime.state.value)
-        if (watchTunes(id, playing)) runtime.notePlaybackIntent()
-        startActivity(PlayerActivity.intent(this, id))
+        val watch = if (watchTunes(id, playing)) runtime.notePlaybackIntent() else null
+        startActivity(PlayerActivity.intent(this, id, watch))
     }
 
     @OptIn(UnstableApi::class)

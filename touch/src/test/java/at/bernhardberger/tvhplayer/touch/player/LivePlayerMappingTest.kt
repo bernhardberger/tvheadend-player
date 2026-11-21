@@ -2,7 +2,9 @@ package at.bernhardberger.tvhplayer.touch.player
 
 import androidx.annotation.OptIn
 import androidx.compose.runtime.mutableStateOf
+import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.ExoPlayer
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
@@ -35,6 +37,7 @@ import at.bernhardberger.tvhplayer.touch.testutil.ServerGuide
 import at.bernhardberger.tvhplayer.viewmodels.ChannelScopeState
 import java.time.LocalTime
 import java.time.ZoneOffset
+import java.lang.reflect.Proxy
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
@@ -87,6 +90,8 @@ class LivePlayerMappingTest {
             Case("start rejected", AppPlaybackState.Idle,
                 LivePlayerStatus.Unavailable(AppErrorCondition.STREAM_STOPPED),
                 playing = false, requestFailed = true),
+            Case("requested channel recovered after its rejected start", AppPlaybackState.Playing,
+                LivePlayerStatus.Playing, requestFailed = true),
             Case("server stopped the stream", AppPlaybackState.Playing,
                 LivePlayerStatus.Unavailable(AppErrorCondition.STREAM_STOPPED), serverStopped = true),
             Case("this device's player failed",
@@ -126,7 +131,8 @@ class LivePlayerMappingTest {
             Case("no timeshift and nothing on air", AppTimeshiftState(), null, now = live + 3.hours),
         )
         cases.forEach { case ->
-            assertEquals(case.name, case.expected, liveTimeline(case.sample, case.now.epochSeconds, ZoneOffset.UTC, ::eventAt))
+            val mapped = liveTimeline(case.sample, case.now.epochSeconds, ZoneOffset.UTC, ::eventAt)
+            assertEquals(case.name, case.expected, mapped?.copy(programmeStartSec = null, segment = null))
         }
     }
 
@@ -298,6 +304,17 @@ class LivePlayerMappingTest {
 
     @Test
     fun windowFollowsThePictureInsideAndroidsAspectLimits() {
+        val player = Proxy.newProxyInstance(ExoPlayer::class.java.classLoader, arrayOf(ExoPlayer::class.java)) {
+                _, method, _ ->
+            when (method.name) {
+                "getVideoSize" -> VideoSize(1_920, 1_080)
+                "getVideoFormat" -> null
+                else -> error("Unexpected player call: ${method.name}")
+            }
+        } as ExoPlayer
+        assertEquals(4f / 3, pictureAspect(player, AspectRatioMode.FORCE_4_3))
+        assertEquals("Auto restores the source aspect", 16f / 9, pictureAspect(player, AspectRatioMode.FIT))
+        assertEquals(17_778 to 10_000, windowAspect(pictureAspect(player)))
         assertEquals(17_778 to 10_000, windowAspect(16f / 9))
         assertEquals(239 to 100, windowAspect(3f))
         assertEquals(100 to 239, windowAspect(0.2f))
