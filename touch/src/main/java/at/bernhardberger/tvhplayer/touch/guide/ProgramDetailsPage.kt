@@ -166,7 +166,10 @@ internal fun ProgramDetailsColumn(
         )
         Timing(details, Modifier.padding(top = 16.dp))
         if (inPlayer) {
-            ProgramRecordAction(details.record, details.id, actions, Modifier.padding(top = 16.dp), leads = true)
+            ProgramRecordAction(
+                details.record, details.id, actions, Modifier.padding(top = 16.dp), leads = true,
+                ruleSchedule = details.ruleSchedule,
+            )
         } else {
             Actions(details, actions, Modifier.padding(top = 16.dp), equalWidth = true)
         }
@@ -259,7 +262,7 @@ private fun Timing(details: ProgramDetails, modifier: Modifier) {
 @Composable
 private fun Actions(details: ProgramDetails, actions: GuideActions, modifier: Modifier, equalWidth: Boolean) {
     val watch = actions.onWatch?.takeIf { details.onNow }
-    val record = actions.offers(details.record)
+    val record = details.ruleSchedule != null || actions.offers(details.record)
     val showInGuide = actions.onShowInGuide
     if (watch == null && !record && showInGuide == null) return
     val showInGuideButton: @Composable () -> Unit = {
@@ -274,7 +277,12 @@ private fun Actions(details: ProgramDetails, actions: GuideActions, modifier: Mo
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 val share = Modifier.weight(1f).heightIn(min = 48.dp)
                 if (watch != null) WatchButton(share) { watch(details.channelId) }
-                if (record) ProgramRecordAction(details.record, details.id, actions, share, leads = watch == null)
+                if (record) {
+                    ProgramRecordAction(
+                        details.record, details.id, actions, share, leads = watch == null,
+                        ruleSchedule = details.ruleSchedule,
+                    )
+                }
             }
             showInGuideButton()
         }
@@ -285,7 +293,12 @@ private fun Actions(details: ProgramDetails, actions: GuideActions, modifier: Mo
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             if (watch != null) WatchButton { watch(details.channelId) }
-            if (record) ProgramRecordAction(details.record, details.id, actions, leads = watch == null)
+            if (record) {
+                ProgramRecordAction(
+                    details.record, details.id, actions, leads = watch == null,
+                    ruleSchedule = details.ruleSchedule,
+                )
+            }
             showInGuideButton()
         }
     }
@@ -325,7 +338,7 @@ private fun OtherAirings(details: ProgramDetails, actions: GuideActions) {
             }
             val supporting: @Composable () -> Unit = { PartsLine(airing.line) }
             val trailing: (@Composable () -> Unit)? = if (airing.scheduled) {
-                { ScheduledIcon() }
+                { ScheduledIcon(airing.ruleSchedule) }
             } else {
                 null
             }

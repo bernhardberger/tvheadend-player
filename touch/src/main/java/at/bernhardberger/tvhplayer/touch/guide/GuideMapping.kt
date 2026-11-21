@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.touch.guide
 
 import at.bernhardberger.tvhplayer.touch.ui.programRecordControl
+import at.bernhardberger.tvhplayer.touch.ui.ruleSchedule
 import at.bernhardberger.tvhplayer.ui.screens.programmeRecordKeyAction
 import at.bernhardberger.tvhplayer.core.programmeArtwork
 import at.bernhardberger.tvhplayer.touch.ui.ArtworkModels
@@ -248,6 +249,7 @@ private class GuideMapper(
             timeLeft = texts.duration(event.stop.epochSeconds - clock.nowSec).takeIf { running },
             recording = observation.runningRecordingForEvent(event) != null,
             scheduled = observation.isScheduled(event),
+            ruleSchedule = observation.ruleSchedule(event),
             record = programRecordControl(programmeRecordKeyAction(event, observation, clock.nowSec)),
             watching = running && channelId == playing,
         )
@@ -272,6 +274,7 @@ private class GuideMapper(
             timeLeft = program.timeLeft,
             recording = program.recording,
             record = program.record,
+            ruleSchedule = program.ruleSchedule,
             pictureModel = program.stillModel,
             watching = program.watching,
             synopsis = program.synopsis,
@@ -313,6 +316,7 @@ private class GuideMapper(
         time = texts.airing(event.start.epochSeconds, today),
         line = listOfNotNull(names[event.channelId], texts.number(event), event.subtitle?.takeIf(String::isNotBlank)),
         scheduled = observation.isScheduled(event),
+        ruleSchedule = observation.ruleSchedule(event),
     )
 
     @OptIn(ExperimentalTvheadendApi::class)

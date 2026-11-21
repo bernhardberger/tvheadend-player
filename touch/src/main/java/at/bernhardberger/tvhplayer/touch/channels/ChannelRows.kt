@@ -354,8 +354,10 @@ private fun NextProgram(program: ChannelProgram?, showMarks: Boolean, modifier: 
             )
             if (showMarks && program?.scheduled == true) {
                 Icon(
-                    painterResource(R.drawable.channels_schedule), stringResource(R.string.channels_scheduled),
-                    Modifier.size(16.dp), tint = MaterialTheme.colorScheme.outline,
+                    painterResource(program.ruleSchedule?.icon ?: R.drawable.channels_schedule),
+                    stringResource(program.ruleSchedule?.markDescription ?: R.string.channels_scheduled),
+                    Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.outline,
                 )
             }
         }

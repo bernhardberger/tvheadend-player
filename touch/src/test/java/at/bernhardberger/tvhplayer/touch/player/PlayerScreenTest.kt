@@ -31,16 +31,19 @@ import org.junit.Before
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -48,6 +51,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.SemanticsProperties
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.channels.ChannelDetails
 import at.bernhardberger.tvhplayer.touch.channels.channelsFixture
@@ -148,7 +153,6 @@ class PlayerScreenTest {
         show()
         val canvas = TouchCanvas.TABLET
         capture("tablet-player", canvas)
-        noticeOnlyOutsideTheWindow("tablet-player-notice", canvas)
 
         timeline().performTouchInput { click(center) }
         compose.runOnIdle { assertTrue(seeks.isEmpty()) }
@@ -169,7 +173,27 @@ class PlayerScreenTest {
         tapPicture()
         capture("tablet-player-hidden", canvas)
         tapPicture()
+        noticeOnlyOutsideTheWindow("tablet-player-notice", canvas)
+        dragToLiveWithNotice()
         captureStatuses("tablet", canvas, reconnecting = true)
+    }
+
+    private fun dragToLiveWithNotice() {
+        notice.value = Notice.CacheClear(success = true)
+        val snackbar = compose.onNode(
+            SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite),
+        )
+        snackbar.assertIsDisplayed()
+        val liveEdge = 2820f / 3600
+        dragTo(.525f)
+        moveTo(liveEdge)
+        val track = timeline().fetchSemanticsNode().boundsInRoot
+        val label = text(R.string.player_live).fetchSemanticsNode().boundsInRoot
+        val thumbX = track.left + track.width * liveEdge
+        snackbar.assertIsDisplayed()
+        assertEquals("Live drag label follows the thumb while the notice shows", thumbX, label.center.x, 1f)
+        timeline().performTouchInput { cancel() }
+        notice.value = null
     }
 
     @Test
@@ -262,6 +286,7 @@ class PlayerScreenTest {
         timeline().performTouchInput { cancel() }
         chromeIsVisible()
         compose.runOnIdle { assertTrue(seeks.isEmpty()) }
+        noticeOnlyOutsideTheWindow("phone-player-landscape-notice", canvas)
     }
 
     @Test
@@ -384,14 +409,60 @@ class PlayerScreenTest {
     private fun noticeOnlyOutsideTheWindow(name: String, canvas: TouchCanvas) {
         val failure = Notice.DvrActionFailed(DvrMutationKind.CANCEL, DvrMutationFeedback.CONNECTION_LIMIT)
         val headline = NoticeFormatter(compose.activity).format(failure).headline
+        val landscape = canvas == TouchCanvas.TABLET || canvas == TouchCanvas.PHONE_LANDSCAPE
+        val program = if (landscape) tag("player-program").fetchSemanticsNode().boundsInRoot else null
         notice.value = failure
         compose.onNodeWithText(headline).assertIsDisplayed()
         capture(name, canvas)
+        if (program != null) {
+            landscapeNoticePlacement(program, replacesProgram = canvas == TouchCanvas.PHONE_LANDSCAPE)
+            notice.value = failure
+            compose.onNodeWithText(headline).assertIsDisplayed()
+        }
         inWindow.value = true
         compose.onNodeWithText(headline).assertDoesNotExist()
         inWindow.value = false
         notice.value = null
         compose.waitForIdle()
+        if (landscape) compose.onNodeWithText("Ridge Light").assertIsDisplayed()
+    }
+
+    private fun landscapeNoticePlacement(program: Rect, replacesProgram: Boolean) {
+        val snackbar = compose.onNode(
+            SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite),
+        )
+        val picture = tag("player-picture").fetchSemanticsNode().boundsInRoot
+        val top = tag("player-top").fetchSemanticsNode().boundsInRoot
+        val twoLine = snackbar.fetchSemanticsNode().boundsInRoot
+        val transport = tag("player-transport").fetchSemanticsNode().boundsInRoot
+        assertTrue("The two-line notice must clear transport", !twoLine.overlaps(transport))
+        assertEquals("Notice starts at the program keyline", program.left, twoLine.left, 1f)
+        if (replacesProgram) {
+            compose.onNodeWithText("Ridge Light").assertIsNotDisplayed()
+            assertEquals("Notice stands at the foot of the slot", program.bottom, twoLine.bottom, 1f)
+        } else {
+            assertTrue("Notice must be above the program", twoLine.bottom < program.top)
+        }
+        val buttons = compose.onAllNodes(hasClickAction()).fetchSemanticsNodes()
+            .filter { it.config.getOrElse(SemanticsProperties.TestTag) { "" } != "player-picture" }
+            .map { it.boundsInRoot }
+        notice.value = Notice.CacheClear(success = true)
+        val oneLine = snackbar.fetchSemanticsNode().boundsInRoot
+        val obstacles = buttons + timeline().fetchSemanticsNode().boundsInRoot + top + transport
+        assertTrue("Notice overlaps the top row, a timeline or a button", obstacles.none {
+            oneLine.overlaps(it) || twoLine.overlaps(it)
+        })
+        tapPicture()
+        val hidden = snackbar.fetchSemanticsNode().boundsInRoot
+        assertEquals("Hidden notice uses the bottom margin", twoLine.left - picture.left, picture.bottom - hidden.bottom, 1f)
+        tapPicture()
+        val restored = snackbar.fetchSemanticsNode().boundsInRoot
+        if (replacesProgram) {
+            compose.onNodeWithText("Ridge Light").assertIsNotDisplayed()
+            assertEquals("Notice returns to the program slot", program.bottom, restored.bottom, 1f)
+        } else {
+            assertTrue("Notice returns above the program", restored.bottom < program.top)
+        }
     }
 
         /** Each menu opens at its button with the controls kept; each sheet clears the picture and closes on it. */

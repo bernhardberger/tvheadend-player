@@ -4,6 +4,7 @@ package at.bernhardberger.tvhplayer.touch.channels
 
 import at.bernhardberger.tvhplayer.touch.guide.RecordControlButton
 import at.bernhardberger.tvhplayer.touch.ui.ProgramRecordControl
+import at.bernhardberger.tvhplayer.touch.ui.RuleScheduleState
 import at.bernhardberger.tvhplayer.touch.ui.rememberStandalonePicture
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Image
@@ -62,7 +63,7 @@ private fun WideDetails(row: ChannelRow, details: ChannelDetails, actions: Chann
         Column(Modifier.weight(3.8f)) {
             Episode(details)
             Synopsis(details)
-            ProgramActions(row.id, row.now?.record, actions)
+            ProgramActions(row.id, row.now, actions)
         }
         Column(Modifier.weight(3.4f)) {
             Following(details.following, actions.onShowInGuide?.let { { it(row.id) } })
@@ -77,7 +78,7 @@ private fun UprightDetails(row: ChannelRow, details: ChannelDetails, actions: Ch
         Column(Modifier.weight(6f)) {
             Episode(details)
             Synopsis(details)
-            ProgramActions(row.id, row.now?.record, actions)
+            ProgramActions(row.id, row.now, actions)
         }
     }
     Spacer(Modifier.height(12.dp))
@@ -91,7 +92,7 @@ private fun PhoneDetails(row: ChannelRow, details: ChannelDetails, actions: Chan
         Column(Modifier.weight(3f)) { Episode(details, row.now?.timeRange, compact = true) }
     }
     Synopsis(details)
-    ProgramActions(row.id, row.now?.record, actions)
+    ProgramActions(row.id, row.now, actions)
     CompactFollowing(row, details, actions)
 }
 
@@ -130,19 +131,26 @@ private fun Synopsis(details: ChannelDetails) {
 }
 
 @Composable
-private fun ProgramActions(id: String, record: ProgramRecordControl?, actions: ChannelsActions) {
+private fun ProgramActions(id: String, now: ChannelProgram?, actions: ChannelsActions) {
     FlowRow(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         actions.onPlay?.let { play ->
             Button(onClick = { play(id) }) {
                 ChannelActionLabel(R.drawable.channels_play, stringResource(R.string.channels_watch))
             }
         }
+        val record = now?.record
         val onControl = when (record) {
             ProgramRecordControl.Record -> actions.onRecord
             ProgramRecordControl.Cancel -> actions.onCancel
+            ProgramRecordControl.Stop -> actions.onStop
             null -> null
         }
-        if (record != null && onControl != null) RecordControlButton(record) { onControl(id) }
+        val ruleSchedule = now?.ruleSchedule
+        if (ruleSchedule != null) {
+            RuleScheduleState(ruleSchedule)
+        } else if (record != null && onControl != null) {
+            RecordControlButton(record) { onControl(id) }
+        }
         actions.onDetails?.let { details ->
             TextButton(onClick = { details(id) }) {
                 ChannelActionLabel(R.drawable.channels_info, stringResource(R.string.channels_details))

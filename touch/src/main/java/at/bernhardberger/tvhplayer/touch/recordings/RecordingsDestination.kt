@@ -60,6 +60,7 @@ internal fun RecordingsDestination(
             onView = recordings::setView,
             onPlay = null,
             onDelete = dvr::delete,
+            onStop = dvr::stopRecording,
             onMore = null,
             onRetry = { connection.reconnectNow() },
             onOpenConnectionSettings = onOpenConnections,

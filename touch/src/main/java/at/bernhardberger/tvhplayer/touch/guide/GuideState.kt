@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.touch.guide
 
 import at.bernhardberger.tvhplayer.touch.ui.ProgramRecordControl
+import at.bernhardberger.tvhplayer.touch.ui.RuleSchedule
 import androidx.annotation.PluralsRes
 import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
@@ -129,6 +130,8 @@ internal data class GuideProgram(
     val timeLeft: String? = null,
     val recording: Boolean = false,
     val scheduled: Boolean = false,
+    /** A schedule created by a rule shows its status in place of [record]. */
+    val ruleSchedule: RuleSchedule? = null,
     /** What its recording control does; null offers none. */
     val record: ProgramRecordControl? = ProgramRecordControl.Record,
     /** The date heading a By channel day starts here, "Monday, November 16". */
@@ -162,6 +165,8 @@ internal data class ProgramDetails(
     val recording: Boolean = false,
     /** What its recording control does; null offers none. */
     val record: ProgramRecordControl? = ProgramRecordControl.Record,
+    /** As [GuideProgram.ruleSchedule]. */
+    val ruleSchedule: RuleSchedule? = null,
     /** A still: across the tablet's page. */
     val picture: Painter? = null,
     /** Key art: the phone's picture card; the still stands in. */
@@ -189,6 +194,7 @@ internal data class ProgramAiring(
     /** As parts: "Amber Stage", "S2 E5", "Low Water". */
     val line: List<String>,
     val scheduled: Boolean = false,
+    val ruleSchedule: RuleSchedule? = null,
     /** The server image's model for the touch-level image composable; the fixture painter wins. */
     val logoModel: Any? = null,
 )
@@ -239,11 +245,13 @@ internal class GuideActions(
     val onSignIn: (() -> Unit)? = null,
     /** Cancel of a scheduled program's recording; it asks first. */
     val onCancel: ((programId: String) -> Unit)? = null,
+    val onStop: ((programId: String) -> Unit)? = null,
 ) {
     /** Whether there is something behind a program's [record] control. */
     fun offers(record: ProgramRecordControl?): Boolean = when (record) {
         ProgramRecordControl.Record -> onRecord != null
         ProgramRecordControl.Cancel -> onCancel != null
+        ProgramRecordControl.Stop -> onStop != null
         null -> false
     }
 }

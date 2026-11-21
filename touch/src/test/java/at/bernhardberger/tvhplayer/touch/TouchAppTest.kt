@@ -18,6 +18,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
@@ -27,6 +28,7 @@ import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
+import at.bernhardberger.tvheadend.sdk.core.AutorecRuleId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrMutationResult
 import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
@@ -456,6 +458,7 @@ class TouchAppTest {
         compose.onNodeWithContentDescription(compose.activity.getString(R.string.channels_expand, guide.first.name))
             .performClick()
         compose.onNodeWithText(guide.programs[2]).assertIsDisplayed()
+        compose.onNode(hasClickAction() and hasText(label(SharedR.string.stop_recording))).assertIsDisplayed()
         listOf(R.string.channels_watch, R.string.channels_record, R.string.channels_details, R.string.channels_show_in_guide)
             .forEach { compose.onNodeWithText(label(it)).assertDoesNotExist() }
         // The logo and the open program's picture come from the server through the image loader.
@@ -512,7 +515,7 @@ class TouchAppTest {
         connection.session.dvrRepository.scriptDeleteEntry(DvrMutationResult.Confirmed(Unit))
         openRecordings()
         compose.onNodeWithText(guide.film.title!!).performClick()
-        compose.onNodeWithContentDescription(label(R.string.recordings_delete)).performClick()
+        compose.onNodeWithContentDescription(label(SharedR.string.context_delete)).performClick()
 
         compose.onNodeWithText(label(SharedR.string.delete_recording_confirm_title)).assertIsDisplayed()
         assertTrue(FakeSessionCall.DVR_DELETE_ENTRY !in connection.session.calls)
@@ -547,6 +550,25 @@ class TouchAppTest {
 
     @Test
     @Config(qualifiers = TABLET)
+    fun aProgramAnAutomaticRecordingScheduledSaysSoInsteadOfOfferingRecord() {
+        val guide = savedConnectionWithGuide()
+        val bySeries = guide.scheduling(WEATHER_ENTRY, event = 2, rule = AutorecRuleId("weather"))
+        connection.session.publish(guide.connected(guide.dvr.entries + bySeries))
+        openGuide()
+        compose.onNodeWithText(guide.programs[1]).performClick()
+        compose.onNodeWithText(label(SharedR.string.recording_state_scheduled)).assertIsDisplayed()
+        listOf(label(R.string.channels_record), label(SharedR.string.cancel_recording)).forEach {
+            compose.onAllNodes(hasClickAction() and hasText(it)).assertCountEquals(0)
+        }
+        val skipped = guide.scheduling(WEATHER_ENTRY, event = 2, rule = AutorecRuleId("weather"), enabled = false)
+        connection.session.publish(guide.connected(guide.dvr.entries + skipped))
+        compose.onNodeWithText(label(SharedR.string.autorec_editor_skipped)).assertIsDisplayed()
+        compose.onNode(hasText(guide.programs[1]) and hasContentDescription(label(R.string.channels_scheduled)))
+            .assertDoesNotExist()
+    }
+
+    @Test
+    @Config(qualifiers = TABLET)
     fun cancellingAScheduledProgramAsksFirst() {
         val guide = savedConnectionWithGuide()
         connection.session.dvrRepository.scriptCancelEntry(DvrMutationResult.Confirmed(Unit))
@@ -572,6 +594,30 @@ class TouchAppTest {
         compose.waitForIdle()
         compose.onNode(scheduled).assertDoesNotExist()
         compose.onNodeWithText(guide.programs[2]).assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = TABLET)
+    fun stoppingARunningProgrammeAsksBeforeChangingIt() {
+        val guide = savedConnectionWithGuide()
+        connection.session.dvrRepository.scriptStopEntry(DvrMutationResult.Confirmed(Unit))
+        openGuide()
+        compose.onNodeWithText(guide.programs[0]).performClick()
+        val stop = hasClickAction() and hasText(label(SharedR.string.stop_recording))
+
+        compose.onNode(stop).performClick()
+        compose.onNodeWithText(label(SharedR.string.stop_recording_confirm_title)).assertIsDisplayed()
+        inDialog(SharedR.string.keep_recording).performClick()
+        compose.onNode(isDialog()).assertDoesNotExist()
+        assertTrue(FakeSessionCall.DVR_STOP_ENTRY !in connection.session.calls)
+
+        compose.onNode(stop).performClick()
+        inDialog(SharedR.string.stop_recording).performClick()
+        compose.waitForIdle()
+        assertTrue(FakeSessionCall.DVR_STOP_ENTRY in connection.session.calls)
+        compose.onNode(stop).assertIsDisplayed()
+        connection.session.publish(guide.connected(guide.dvr.entries - guide.recordingNow))
+        compose.onNode(stop).assertDoesNotExist()
     }
 
     @Test
