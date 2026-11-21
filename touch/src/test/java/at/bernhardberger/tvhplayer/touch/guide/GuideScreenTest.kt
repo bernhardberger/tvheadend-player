@@ -210,6 +210,28 @@ class GuideScreenTest {
     }
 
     @Test
+    @Config(qualifiers = "en-rUS-w1024dp-h558dp-land-xhdpi")
+    fun tabletChannelDayRevealsActionsWhenTheLastVisibleProgramOpens() = assertChannelDayRevealsActions(phone = false)
+
+    @Test
+    @Config(qualifiers = "en-rUS-w412dp-h558dp-port-xhdpi")
+    fun phoneChannelDayRevealsActionsWhenTheLastVisibleProgramOpens() = assertChannelDayRevealsActions(phone = true)
+
+    private fun assertChannelDayRevealsActions(phone: Boolean) {
+        val fixture = byChannelFixture(phone)
+        val selected = fixture.channels.first()
+        val programs = selected.programs.distinctBy { it.title }.map {
+            it.copy(art = selected.programs.first().art, synopsis = selected.programs.first().synopsis)
+        }
+        show(fixture.copy(channels = listOf(selected.copy(programs = programs))), GuideView.ByChannel, channel = selected.id)
+
+        val lastVisible = programs.map { compose.onNodeWithText(it.title) }.last { it.isDisplayed() }
+        lastVisible.performClick()
+        compose.onNodeWithText("Details").assertIsDisplayed()
+        lastVisible.assertIsDisplayed()
+    }
+
+    @Test
     @Config(qualifiers = TABLET)
     fun tabletChannelWithoutGuideDataOffersWatch() {
         show(byChannelFixture(), GuideView.ByChannel, channel = "glass-drama")

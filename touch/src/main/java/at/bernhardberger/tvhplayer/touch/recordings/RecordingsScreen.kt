@@ -21,6 +21,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -28,6 +29,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -81,7 +84,7 @@ internal fun RecordingsScreen(
             showNavigation = { !(it == Destination.Recordings && page && layout == RecordingsLayout.Phone) },
             actions = { destination ->
                 if (destination == Destination.Recordings && listed) {
-                    TitleActions(state.space, layout) { sheet = SheetPage.Main }
+                    TitleActions(state.space, layout, sheetOpen = sheet != null) { sheet = SheetPage.Main }
                 }
             },
             belowTopBar = { destination ->
@@ -149,16 +152,33 @@ private fun RecordingFolder.find(id: String): RecordingItem? =
     recordings.find { it.id == id } ?: folders.firstNotNullOfOrNull { it.find(id) }
 
 @Composable
-private fun TitleActions(space: RecordingSpace?, layout: RecordingsLayout, openViewOptions: () -> Unit) {
+private fun TitleActions(
+    space: RecordingSpace?,
+    layout: RecordingsLayout,
+    sheetOpen: Boolean,
+    openViewOptions: () -> Unit,
+) {
     val label = stringResource(R.string.recordings_view_options)
     if (layout.compact) {
         IconButton(onClick = openViewOptions) { Icon(painterResource(R.drawable.recordings_tune), label) }
         return
     }
+    val viewOptionsFocus = remember { FocusRequester() }
+    var restoreFocus by remember { mutableStateOf(false) }
+    LaunchedEffect(sheetOpen) {
+        if (!sheetOpen && restoreFocus) {
+            viewOptionsFocus.requestFocus()
+            restoreFocus = false
+        }
+    }
     if (space != null) FreeSpace(space)
     FilledTonalButton(
-        onClick = openViewOptions,
-        modifier = Modifier.padding(start = 16.dp, end = 12.dp),
+        onClick = {
+            restoreFocus = true
+            openViewOptions()
+        },
+        modifier = Modifier.padding(start = 16.dp, end = 12.dp)
+            .focusRequester(viewOptionsFocus),
         colors = ButtonDefaults.filledTonalButtonColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             contentColor = MaterialTheme.colorScheme.onSurface,

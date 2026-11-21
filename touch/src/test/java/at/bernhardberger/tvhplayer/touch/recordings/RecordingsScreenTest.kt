@@ -5,6 +5,7 @@ import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.view.ViewGroup
 import androidx.activity.ComponentActivity
+import androidx.activity.ComponentDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.geometry.Offset
@@ -17,10 +18,15 @@ import at.bernhardberger.tvhplayer.touch.testutil.markedLogos
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -31,6 +37,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.test.platform.app.InstrumentationRegistry
 import at.bernhardberger.tvhplayer.touch.testutil.TouchCanvas
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouch
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouchWindows
@@ -126,28 +133,50 @@ class RecordingsScreenTest {
     @Test
     @Config(qualifiers = "en-rUS-w1280dp-h800dp-land-xhdpi")
     fun tabletViewOptionsChangeTheGrouping() {
+        fun sheetBack() = compose.runOnUiThread {
+            (ShadowDialog.getLatestDialog() as ComponentDialog).onBackPressedDispatcher.onBackPressed()
+        }
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        instrumentation.setInTouchMode(true)
         show()
+        compose.onNodeWithText("View options").assertIsDisplayed()
         openViewOptions()
-        capture("tablet-recordings-view", TouchCanvas.TABLET)
+        val sheet = hasAnyAncestor(isDialog())
+        compose.onNodeWithText("Group by").assert(sheet)
+        // The test harness still enumerates inactive windows; inspect the dialog's tree only.
+        compose.onNode(hasText("Recordings") and sheet).assertDoesNotExist()
+        compose.onNodeWithContentDescription("Close").assertIsNotFocused()
+        compose.captureTouchWindows(GROUP, "tablet-recordings-view", TouchCanvas.TABLET)
         compose.onNodeWithText("Group by").performClick()
         compose.onNodeWithText("The server’s folder tree").assertIsDisplayed()
-        capture("tablet-recordings-view-group", TouchCanvas.TABLET)
+        compose.captureTouchWindows(GROUP, "tablet-recordings-view-group", TouchCanvas.TABLET)
 
         // Back inside the sheet returns to its rows; a choice applies and returns there too.
-        back()
+        sheetBack()
         compose.onNodeWithText("Sort").assertIsDisplayed()
         compose.onNodeWithText("Group by").performClick()
         compose.onNodeWithText("Folders").performClick()
         assertEquals(DvrArchiveGrouping.FOLDERS, state.value.view.grouping)
         compose.onNodeWithText("Show").assertIsDisplayed()
 
-        // A tap outside closes the sheet; so does system Back.
-        compose.onRoot().performTouchInput { click(Offset(width * 0.3f, height * 0.5f)) }
+        // A tap outside closes the sheet without focusing the opener in touch mode.
+        compose.onNode(isDialog()).performTouchInput { click(Offset(width * 0.3f, height * 0.5f)) }
         assertSheetClosed()
+        compose.onNodeWithText("View options").assertIsNotFocused()
         compose.onNodeWithText("Recording now").assertIsDisplayed()
-        openViewOptions()
-        back()
-        assertSheetClosed()
+
+        instrumentation.setInTouchMode(false)
+        try {
+            // Robolectric's instrumentation flag seeds new windows, but the activity is already attached.
+            compose.runOnUiThread { compose.activity.window.decorView.requestFocusFromTouch() }
+            openViewOptions()
+            compose.onNodeWithContentDescription("Close").assertIsFocused()
+            sheetBack()
+            assertSheetClosed()
+            compose.onNodeWithText("View options").assertIsFocused()
+        } finally {
+            instrumentation.setInTouchMode(true)
+        }
     }
 
     @Test
