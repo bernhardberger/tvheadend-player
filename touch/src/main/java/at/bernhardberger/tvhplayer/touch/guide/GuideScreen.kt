@@ -373,7 +373,7 @@ private fun ChannelTabs(channels: List<GuideChannel>, selectedId: String, onChan
 
 /** Section 12's empty list for a channel without guide data; Watch is the way on. */
 @Composable
-private fun NoSchedule(onWatch: (() -> Unit)?) {
+internal fun NoSchedule(onWatch: (() -> Unit)?) {
     Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
         Column(
             Modifier.widthIn(max = 400.dp),

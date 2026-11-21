@@ -29,6 +29,8 @@ import at.bernhardberger.tvhplayer.playback.LivePauseAvailability
 import at.bernhardberger.tvhplayer.playback.toAppPresentation
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsState
+import at.bernhardberger.tvhplayer.touch.channels.ChannelsTexts
+import at.bernhardberger.tvhplayer.touch.guide.GuideClock
 import at.bernhardberger.tvhplayer.touch.testutil.ServerGuide
 import at.bernhardberger.tvhplayer.viewmodels.ChannelScopeState
 import java.time.LocalTime
@@ -218,19 +220,21 @@ class LivePlayerMappingTest {
                 settingsLoaded = loaded,
             ),
             observation, ConnectionUiState.Ready, degraded, status, mutableStateOf(null), pause, guide.now,
-            window,
+            window, texts = ChannelsTexts(guide.texts.clock, guide.texts.timeRange, guide.texts.duration, { null }, { null }),
         )
 
         val playing = face(shown)
         assertEquals("Channel One", playing.channel.name)
         assertEquals(guide.programs[0], playing.channel.now?.title)
-        val channelsOnly = setOf(PlayerControl.Channels)
-        val pausable = channelsOnly + PlayerControl.Timeshift
+        assertEquals("30m", playing.channels.displayedList?.rows?.first()?.now?.timeLeft)
+        val sheets = setOf(PlayerControl.Channels, PlayerControl.Info)
+        val pausable = sheets + PlayerControl.Timeshift
         assertEquals(pausable, playing.offered)
         assertEquals(pausable, face(shown, pause = LivePauseAvailability.STARTING).offered)
-        assertEquals(channelsOnly, face(shown, pause = LivePauseAvailability.UNAVAILABLE).offered)
-        assertEquals(channelsOnly, face(shown, pause = LivePauseAvailability.OFF).offered)
-        assertEquals(channelsOnly, face(shown, status = LivePlayerStatus.Tuning).offered)
+        assertEquals(sheets, face(shown, pause = LivePauseAvailability.UNAVAILABLE).offered)
+        assertEquals(sheets, face(shown, pause = LivePauseAvailability.OFF).offered)
+        assertEquals(sheets, face(shown, status = LivePlayerStatus.Tuning).offered)
+        assertEquals(sheets, face(shown, status = LivePlayerStatus.Reconnecting(null)).offered)
         // The picture-in-picture button only where the window can be used.
         assertEquals(
             pausable + PlayerControl.PictureInPicture, face(shown, window = true).offered,
@@ -243,6 +247,27 @@ class LivePlayerMappingTest {
         assertSame(ChannelsState.Loading, face(shown, loaded = false).channels)
         // A channel the scope doesn't know yet has no name.
         assertEquals("", face(shown, known = false).channel.name)
+        assertTrue(PlayerControl.Info !in face(shown, known = false).offered)
+    }
+
+    @Test
+    fun infoUsesTheSelectedChannelsGuideAndFollowsTheProgramBehindLive() {
+        val watched = guide.snapshot.events.first()
+        val clock = GuideClock((guide.now + 45.minutes).epochSeconds, ZoneOffset.UTC)
+        val channels = listOf(guide.first, guide.second)
+        val observation = guide.connected()
+        val programs = ShownPrograms(watched, guide.snapshot.events[1])
+        val schedule = requireNotNull(playerSchedule(shown, channels, observation, programs, clock, guide.texts))
+        assertEquals(guide.programs, schedule.programs.map { it.title })
+        assertEquals(watched.id.value.toString(), schedule.watchingId)
+        assertTrue(schedule.programs.first().recording)
+        assertTrue(schedule.programs.first { it.title == guide.programs[2] }.scheduled)
+        val details = requireNotNull(schedule.details(requireNotNull(schedule.watchingId)))
+        assertEquals(watched.description, details.synopsis)
+        assertTrue(details.watching)
+        val otherSchedule = requireNotNull(playerSchedule(other, channels, observation, programs, clock, guide.texts))
+        assertTrue(otherSchedule.programs.isEmpty())
+        assertEquals(null, otherSchedule.watchingId)
     }
 
     @Test

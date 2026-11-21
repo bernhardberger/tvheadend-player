@@ -23,9 +23,11 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalResources
@@ -54,6 +56,7 @@ import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.touch.channels.ChannelDetails
 import at.bernhardberger.tvhplayer.touch.channels.ChannelProgram
 import at.bernhardberger.tvhplayer.touch.channels.ChannelRow
+import at.bernhardberger.tvhplayer.touch.channels.rememberChannelsTexts
 import at.bernhardberger.tvhplayer.ui.MobileDarkColors
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.common.formatTimeInterval
@@ -80,6 +83,9 @@ import org.koin.android.ext.android.get
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.touch.ui.ArtworkModels
+import at.bernhardberger.tvhplayer.touch.guide.GuideClock
+import at.bernhardberger.tvhplayer.touch.guide.GuideViewModel
+import java.time.ZoneId
 import at.bernhardberger.tvhplayer.touch.ui.LocalChannelAccents
 import at.bernhardberger.tvhplayer.touch.ui.FrameNotices
 import at.bernhardberger.tvhplayer.touch.ui.LocalFrameNotices
@@ -100,6 +106,7 @@ class PlayerActivity : ComponentActivity() {
     private val notices: NoticeCenter by inject()
     private val owner: AppProfileOwner by inject()
     private val connection: AppConnectionViewModel by viewModel()
+    private val guide: GuideViewModel by viewModel()
     private val channels: ChannelsViewModel by inject()
     private val runtime get() = sdk.playbackRuntime
 
@@ -231,6 +238,7 @@ class PlayerActivity : ComponentActivity() {
     }
 
     @Composable
+    @Suppress("LongMethod") // Keep runtime, Info and screen callbacks wired in one place.
     private fun Player() {
         val presentation by connection.uiState.collectAsStateWithLifecycle()
         val scope by channels.scope.collectAsStateWithLifecycle()
@@ -263,21 +271,40 @@ class PlayerActivity : ComponentActivity() {
         ConsumePauseNotices(runtime, notices)
         SystemBarsForOrientation(window)
         val now = Instant.fromEpochSeconds(minute * SECONDS_PER_MINUTE)
+        val programs = timeshift.programs.value
         val state = livePlayerState(
             shown, scope, observation, presentation.connection, presentation.degraded, status,
             timeshift.timeline, pause.availability, now, window = windowAvailable, artwork = artwork,
+            texts = rememberChannelsTexts(),
         )
+        var infoShown by remember { mutableStateOf(false) }
+        var infoDay by rememberSaveable(shown.value) { mutableIntStateOf(0) }
+        val schedule = if (infoShown && !inWindow && PlayerControl.Info in state.offered) {
+            playerInfoSchedule(
+                guide, shown, scope.scope.allChannels, observation, programs,
+                GuideClock(now.epochSeconds, ZoneId.systemDefault()), infoDay, artwork, presentation,
+            )
+        } else {
+            null
+        }
         PlayerScreen(
             state = state.copy(
-                channel = state.channel.withProgramTexts(timeshift.programs.value, now, LocalResources.current),
+                channel = state.channel.withProgramTexts(programs, now, LocalResources.current),
                 brightness = brightness, paused = paused,
                 tracks = options.tracks, options = options.options, offered = state.offered + options.offered,
+                schedule = schedule,
             ),
             onAction = { act(it, timeshift, paused) },
             onSeek = timeshift::seek,
             onBrightness = { brightness = it; applyBrightness(window, it) },
             onChannel = { id -> requested.update { tuneTo(it, ChannelId(id.toLong())) } },
-            onChoice = { if (!options.choose(it)) channels.choose(it) },
+            onChoice = {
+                if (it is PlayerChoice.Day) infoDay = it.index else if (!options.choose(it)) channels.choose(it)
+            },
+            onInfoShown = { open ->
+                if (!open) infoDay = 0
+                infoShown = open
+            },
             video = { TouchVideoSurface(runtime.player, video.visible, it, pictureWindow::attach, options.aspect) },
             onControlsShown = { controlsShown = it },
             inWindow = inWindow,

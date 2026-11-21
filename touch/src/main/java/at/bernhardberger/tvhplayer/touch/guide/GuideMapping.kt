@@ -138,12 +138,19 @@ internal fun guideCoverage(
     observation: SessionObservation,
     selection: GuideSelection,
     clock: GuideClock,
+): GuideCoverage? = guideCoverage(scope.scope.visibleChannels.map { it.id }, observation, selection.day, clock)
+
+internal fun guideCoverage(
+    ids: List<ChannelId>,
+    observation: SessionObservation,
+    day: Int,
+    clock: GuideClock,
 ): GuideCoverage? {
-    val ids = scope.scope.visibleChannels.map { it.id }.takeIf { it.isNotEmpty() } ?: return null
+    if (ids.isEmpty()) return null
     val shown = ids.toSet()
     val events = observation.epgSnapshotForDisplay?.events.orEmpty().filter { it.channelId in shown }
     val days = guideDays(events, clock)
-    val window = guideWindow(days[selection.day.coerceIn(days.indices)], null, clock)
+    val window = guideWindow(days[day.coerceIn(days.indices)], null, clock)
     return GuideCoverage(ids, window.daySec.first, window.daySec.last + 1)
 }
 
@@ -162,7 +169,7 @@ internal fun guideWindow(date: LocalDate, jump: LocalTime?, clock: GuideClock): 
 }
 
 @Suppress("LongParameterList")
-private class GuideMapper(
+internal class GuideMapper(
     private val channels: List<Channel>,
     private val observation: SessionObservation,
     private val events: List<EpgEvent>,
@@ -172,13 +179,14 @@ private class GuideMapper(
     private val artwork: ArtworkModels?,
     private val playing: String?,
 ) {
-    private val byChannel: Map<ChannelId?, List<EpgEvent>> = events.asSequence()
+    private fun upcoming(events: Sequence<EpgEvent>) = events
         .filter { it.stop > it.start && it.stop.epochSeconds > clock.nowSec }
         .distinctBy { it.id }
         .sortedBy { it.start }
-        .groupBy { it.channelId }
-    private val names = channels.associate { it.id to it.name.orEmpty() }
-    private val logos = channels.associate { it.id to artwork?.logo(it.icon, observation) }
+
+    private val byChannel by lazy { upcoming(events.asSequence()).groupBy { it.channelId } }
+    private val names by lazy { channels.associate { it.id to it.name.orEmpty() } }
+    private val logos by lazy { channels.associate { it.id to artwork?.logo(it.icon, observation) } }
 
     fun state(selection: GuideSelection, tags: List<ChannelTag>, selectedTagId: String?): GuideState {
         val days = guideDays(channels.flatMap { byChannel[it.id].orEmpty() }, clock)
@@ -188,7 +196,7 @@ private class GuideMapper(
         val jumpIndex = selection.jump.coerceIn(0, jumps.size)
         val window = guideWindow(date, jumps.getOrNull(jumpIndex - 1), clock)
         val guideChannels = channels.map { channel(it, window) }
-        val details = selection.detailsId?.let { id -> events.find { it.id.value.toString() == id } }?.let(::details)
+        val details = selection.detailsId?.let { details(it) }
         return GuideState(
             channels = guideChannels,
             tags = tags,
@@ -216,20 +224,33 @@ private class GuideMapper(
             }
             overview += event
         }
-        val day = schedule.filter {
-            it.stop.epochSeconds > window.daySec.first && it.start.epochSeconds <= window.daySec.last
-        }
         return GuideChannel(
             id = channel.id.value.toString(),
             name = channel.name.orEmpty(),
             logoModel = logos[channel.id],
-            programs = overview.map(::program),
+            programs = overview.map { program(it) },
             gap = gap,
-            day = day.map(::program),
+            day = dayPrograms(schedule.asSequence(), window.daySec, null),
         )
     }
 
-    private fun program(event: EpgEvent): GuideProgram {
+    /** The player can also be watching a past program, which belongs at the top of its Today list. */
+    fun channelDay(id: ChannelId, date: LocalDate, watched: EpgEvent?): List<GuideProgram> {
+        val schedule = upcoming(events.asSequence().filter { it.channelId == id })
+        val playingEvent = watched?.takeIf { it.channelId == id && it.stop > it.start }
+        val day = dayPrograms(schedule, guideWindow(date, null, clock).daySec, playingEvent)
+        return if (playingEvent != null && date == today && day.none { it.watching }) {
+            listOf(program(playingEvent, playingEvent)) + day
+        } else {
+            day
+        }
+    }
+
+    private fun dayPrograms(schedule: Sequence<EpgEvent>, window: LongRange, watched: EpgEvent?): List<GuideProgram> =
+        schedule.filter { it.stop.epochSeconds > window.first && it.start.epochSeconds <= window.last }
+            .map { program(it, watched) }.toList()
+
+    private fun program(event: EpgEvent, watched: EpgEvent? = null): GuideProgram {
         val running = event.isRunning(clock.nowSec)
         val channelId = event.channelId?.value?.toString().orEmpty()
         return GuideProgram(
@@ -251,12 +272,14 @@ private class GuideMapper(
             scheduled = observation.isScheduled(event),
             ruleSchedule = observation.ruleSchedule(event),
             record = programRecordControl(programmeRecordKeyAction(event, observation, clock.nowSec)),
-            watching = running && channelId == playing,
+            watching = if (watched != null) event.id == watched.id else running && channelId == playing,
         )
     }
 
-    private fun details(event: EpgEvent): ProgramDetails {
-        val program = program(event)
+    fun details(id: String, watched: EpgEvent? = null): ProgramDetails? {
+        val event = events.find { it.id.value.toString() == id }
+            ?: watched?.takeIf { it.id.value.toString() == id } ?: return null
+        val program = program(event, watched)
         val episode = event.episode
         return ProgramDetails(
             id = program.id,

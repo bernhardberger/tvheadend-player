@@ -97,7 +97,7 @@ internal fun GuideDestination(
     )
 }
 
-private fun guideTexts(context: Context, locale: Locale): GuideTexts {
+internal fun guideTexts(context: Context, locale: Locale): GuideTexts {
     val resources = context.resources
     val zone = ZoneId.systemDefault()
     fun at(epochSec: Long) = Instant.ofEpochSecond(epochSec).atZone(zone)

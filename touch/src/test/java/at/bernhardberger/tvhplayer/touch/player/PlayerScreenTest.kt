@@ -62,6 +62,7 @@ import at.bernhardberger.tvhplayer.touch.channels.ChannelPlayback
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsState
 import at.bernhardberger.tvhplayer.touch.channels.channelsFixture
 import at.bernhardberger.tvhplayer.touch.guide.RIDGE_LIGHT_ID
+import at.bernhardberger.tvhplayer.touch.guide.GuideAvailability
 import at.bernhardberger.tvhplayer.touch.guide.RIDGE_LIGHT_REPEAT_ID
 import at.bernhardberger.tvhplayer.touch.guide.byChannelFixture
 import at.bernhardberger.tvhplayer.touch.guide.ridgeLightDetails
@@ -422,6 +423,10 @@ class PlayerScreenTest {
     private val status = mutableStateOf<LivePlayerStatus>(LivePlayerStatus.Playing)
     private val channelId = mutableStateOf<String?>(null)
     private val channelState = mutableStateOf<ChannelsState?>(null)
+    private val scheduleDay = mutableStateOf(0)
+    private val scheduleHasRows = mutableStateOf(true)
+    private val schedulePending = mutableStateOf(false)
+    private val scheduleAvailability = mutableStateOf<GuideAvailability>(GuideAvailability.Current)
 
     private val paused = mutableStateOf(false)
     private val offered = mutableStateOf(PlayerControl.entries.toSet())
@@ -465,7 +470,7 @@ class PlayerScreenTest {
                     details = mapOf(
                         RIDGE_LIGHT_ID to ridgeLightDetails().copy(watching = true),
                         RIDGE_LIGHT_REPEAT_ID to ridgeLightRepeatDetails(),
-                    ),
+                    )::get,
                 )
             },
         )
@@ -476,6 +481,15 @@ class PlayerScreenTest {
                         channel = channels.rows.firstOrNull { it.id == channelId.value } ?: fixture.channel,
                         channels = channelState.value ?: fixture.channels,
                         status = status.value, paused = paused.value, offered = offered.value,
+                        schedule = fixture.schedule?.let { schedule ->
+                            schedule.copy(
+                                programs = schedule.programs.takeIf { channelId.value == null && scheduleHasRows.value }
+                                    .orEmpty(),
+                                selectedDay = scheduleDay.value,
+                                dayLoading = schedulePending.value && scheduleAvailability.value == GuideAvailability.Current,
+                                availability = scheduleAvailability.value,
+                            )
+                        },
                     ),
                     { actions += it }, { seeks += it }, {}, { played += it }, { choices += it },
                     inWindow = inWindow.value, hideAfterMs = hideAfterMs,
@@ -595,8 +609,7 @@ class PlayerScreenTest {
     private fun infoSheet(prefix: String, canvas: TouchCanvas, details: Boolean) {
         val recordOptions = compose.activity.getString(R.string.guide_record_options)
         button(R.string.player_info).performClick()
-        // The phone held sideways shows the open program's head; its buttons scroll into view.
-        compose.onNodeWithContentDescription(recordOptions).assertExists()
+        compose.onNodeWithContentDescription(recordOptions).assertDoesNotExist()
         button(R.string.channels_details).assertExists()
         text(R.string.channels_watch).assertDoesNotExist()
         tag("player-transport").assertDoesNotExist()
@@ -608,8 +621,7 @@ class PlayerScreenTest {
             text(R.string.channels_watch).assertDoesNotExist()
             text(R.string.channels_show_in_guide).assertDoesNotExist()
             captureWindows("$prefix-info-details", canvas)
-            compose.onNodeWithContentDescription(recordOptions).performClick()
-            compose.runOnIdle { assertEquals(PlayerChoice.RecordOptions(RIDGE_LIGHT_ID), choices.last()) }
+            compose.onNodeWithContentDescription(recordOptions).assertDoesNotExist()
             // A repeat on another channel opens its Details in the sheet, under that channel's name.
             compose.onNodeWithText("Sun 4:00 PM").performScrollTo().performClick()
             compose.runOnIdle { assertEquals(PlayerChoice.Details(RIDGE_LIGHT_REPEAT_ID), choices.last()) }
@@ -625,6 +637,48 @@ class PlayerScreenTest {
         back()
         compose.onNodeWithContentDescription(recordOptions).assertDoesNotExist()
         tag("player-transport").assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w1280dp-h800dp-land-xhdpi")
+    fun infoReturnsToTheNewChannelsDayAfterZapAndClosesWhenWithdrawn() {
+        show()
+        button(R.string.player_info).performClick()
+        button(R.string.channels_details).performClick()
+        compose.onNodeWithText("Tomorrow 2:00 AM").assertExists()
+        compose.runOnIdle { channelId.value = "harbor-sport" }
+        compose.onNodeWithText("Tomorrow 2:00 AM").assertDoesNotExist()
+        compose.onNodeWithText("Harbor Sport").assertIsDisplayed()
+        text(R.string.guide_no_schedule).assertIsDisplayed()
+        compose.runOnIdle { offered.value = offered.value - PlayerControl.Info }
+        compose.onNodeWithContentDescription(compose.activity.getString(R.string.side_sheet_close)).assertDoesNotExist()
+        tag("player-transport").assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w1280dp-h800dp-land-xhdpi")
+    fun infoKeepsSavedRowsAndOnlyShowsPendingIndicatorForAnEmptyDay() {
+        show()
+        button(R.string.player_info).performClick()
+        compose.onNodeWithText("Today").performClick()
+        compose.onNodeWithText("Tomorrow").performClick()
+        compose.runOnIdle {
+            assertEquals(PlayerChoice.Day(1), choices.last())
+            scheduleDay.value = 1
+            schedulePending.value = true
+        }
+        val loading = compose.onNodeWithContentDescription(compose.activity.getString(SharedR.string.epg_loading))
+        button(R.string.channels_details).assertIsDisplayed()
+        loading.assertDoesNotExist()
+        compose.runOnIdle { scheduleHasRows.value = false }
+        loading.assertIsDisplayed()
+        compose.runOnIdle {
+            scheduleHasRows.value = true
+            scheduleAvailability.value = GuideAvailability.Offline
+        }
+        text(R.string.guide_saved).assertIsDisplayed()
+        button(R.string.channels_details).assertIsDisplayed()
+        loading.assertDoesNotExist()
     }
 
     /** Playback options: a row opens its list inside the sheet, and Back returns to the rows. */

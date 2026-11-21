@@ -317,7 +317,7 @@ private fun PlayerActionRow(
         )
         Spacer(Modifier.weight(1f))
         MenuButton(
-            menu, R.drawable.channels_info, R.string.player_info, !dragging && state.schedule != null,
+            menu, R.drawable.channels_info, R.string.player_info, !dragging,
             PlayerPanel.Info,
         )
         if (!layout.upright && PlayerControl.Channels in state.offered) {

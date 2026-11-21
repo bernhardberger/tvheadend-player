@@ -22,6 +22,8 @@ import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
+import at.bernhardberger.tvhplayer.touch.guide.GuideTexts
+import java.time.LocalTime
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
@@ -40,6 +42,21 @@ internal class ServerGuide(val now: Instant) {
     val second = Channel.create(ChannelId(SECOND), name = "Channel Two")
     val catalog = ChannelCatalog.create(listOf(first, second), listOf(news))
     val programs = listOf("Evening News", "Weather", "Late Film", "Night Talk")
+
+    val texts = GuideTexts(
+        clock = { LocalTime.ofSecondOfDay(it % DAY_SEC).toString() },
+        timeRange = { start, stop -> "${LocalTime.ofSecondOfDay(start % DAY_SEC)}–${LocalTime.ofSecondOfDay(stop % DAY_SEC)}" },
+        duration = { "${it / 60}m" },
+        day = { date, today -> if (date == today) "Today" else date.toString() },
+        date = { it.toString() },
+        airing = { start, _ -> start.toString() },
+        number = { null },
+        episode = { null },
+        genre = { it.genre },
+        firstAired = { it.toString() },
+        count = { number, of -> if (of == null) "$number" else "$number of $of" },
+        broadcast = { if (it) "New" else "Repeat" },
+    )
 
     val snapshot = EpgSnapshot.create(
         programs.mapIndexed { index, title ->
@@ -110,5 +127,6 @@ internal class ServerGuide(val now: Instant) {
         const val SECOND = 2L
         const val LOGO = 21L
         const val PICTURE = 31L
+        const val DAY_SEC = 86_400L
     }
 }
