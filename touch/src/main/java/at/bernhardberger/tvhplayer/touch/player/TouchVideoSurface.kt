@@ -35,7 +35,12 @@ import at.bernhardberger.tvhplayer.ui.player.surfaceFrameAspect
  */
 @OptIn(UnstableApi::class)
 @Composable
-internal fun TouchVideoSurface(player: ExoPlayer, videoVisible: Boolean, modifier: Modifier = Modifier) {
+internal fun TouchVideoSurface(
+    player: ExoPlayer,
+    videoVisible: Boolean,
+    modifier: Modifier = Modifier,
+    onView: (PlayerView?) -> Unit = {},
+) {
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     var keepScreenOn by remember { mutableStateOf(false) }
     // The last presented picture's aspect stays while a new channel starts.
@@ -74,7 +79,7 @@ internal fun TouchVideoSurface(player: ExoPlayer, videoVisible: Boolean, modifie
                     isFocusable = false
                     isClickable = false
                     importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
-                }
+                }.also(onView)
             },
             update = { view ->
                 view.player = player
@@ -83,6 +88,7 @@ internal fun TouchVideoSurface(player: ExoPlayer, videoVisible: Boolean, modifie
             onRelease = { view ->
                 view.keepScreenOn = false
                 view.player = null
+                onView(null)
             },
             modifier = aspect?.let { Modifier.aspectRatio(it) } ?: Modifier.fillMaxSize(),
         )
@@ -92,7 +98,7 @@ internal fun TouchVideoSurface(player: ExoPlayer, videoVisible: Boolean, modifie
 
 /** The decoded size, else the input format's (tunnelled playback may report no decoded size). */
 @OptIn(UnstableApi::class)
-private fun pictureAspect(player: ExoPlayer): Float? {
+internal fun pictureAspect(player: ExoPlayer): Float? {
     val size = player.videoSize
     val format = player.videoFormat
     return when {
@@ -103,3 +109,12 @@ private fun pictureAspect(player: ExoPlayer): Float? {
         else -> null
     }
 }
+
+/** The TV's rule: the screen stays on only while a visible picture plays without an error. */
+internal fun keepPlayerScreenOn(
+    foreground: Boolean,
+    videoVisible: Boolean,
+    playing: Boolean,
+    hasVideo: Boolean,
+    failed: Boolean,
+): Boolean = foreground && videoVisible && playing && hasVideo && !failed

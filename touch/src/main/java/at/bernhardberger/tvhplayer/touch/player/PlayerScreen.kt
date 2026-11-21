@@ -54,9 +54,12 @@ internal fun PlayerScreen(
     modifier: Modifier = Modifier,
     video: (@Composable (Modifier) -> Unit)? = null,
     onControlsShown: (Boolean) -> Unit = {},
+    inWindow: Boolean = false,
 ) {
     var visible by rememberSaveable(state.channel.id) { mutableStateOf(true) }
     var panel by rememberSaveable { mutableStateOf<PlayerPanel?>(null) }
+    // Sheets and menus close on entering the picture-in-picture window; they don't come back.
+    LaunchedEffect(inWindow) { if (inWindow) panel = null }
     // Info opens on the program being watched each time; inside the sheet the viewer opens others.
     var infoStack by rememberSaveable(stateSaver = InfoStackSaver) { mutableStateOf(InfoStack()) }
     val showPanel: (PlayerPanel?) -> Unit = {
@@ -67,43 +70,77 @@ internal fun PlayerScreen(
     val openOptions = { panel = PlayerPanel.Options }
     var preview by remember(state.channel.id, state.status) { mutableStateOf<Int?>(null) }
     BoxWithConstraints(modifier.fillMaxSize().background(Color.Black)) {
-        val layout = playerLayout(maxWidth, maxHeight)
+        // In the window the layout stays the one the player had, so the picture keeps its place in
+        // the composition and its surface is never rebuilt across the transition.
+        val held = remember { HeldLayout(playerLayout(maxWidth, maxHeight)) }
+        if (!inWindow) held.layout = playerLayout(maxWidth, maxHeight)
+        val layout = held.layout
         val playing = state.status == LivePlayerStatus.Playing
         // A sheet takes the controls off the picture; a menu keeps them, it belongs to a button.
         val sheet = panel?.let { !it.atButton(layout) } == true
-        val controls = !sheet && (visible || !playing)
-        val toggle = if (playing) ({ visible = !visible }) else null
+        val controls = !inWindow && !sheet && (visible || !playing)
+        val toggle = if (playing && !inWindow) ({ visible = !visible }) else null
         val latestShown by rememberUpdatedState(onControlsShown)
         LaunchedEffect(controls) { latestShown(controls) }
         if (layout.upright) {
-            Column(
-                Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)
-                    .windowInsetsPadding(WindowInsets.statusBars),
-            ) {
-                Box(Modifier.fillMaxWidth().aspectRatio(16f / 9).background(Color.Black)) {
-                    Picture(state, layout, controls, toggle, video)
-                    PictureControls(state, layout, controls, preview, onAction, onBrightness, openOptions)
-                    if (state.status.hasTimeline) {
-                        PlayerTimeline(
-                            state.timeline, state.status, layout, controls, preview, { preview = it }, onSeek,
-                            Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(24.dp),
-                        )
-                    }
-                }
-                UprightPlayerContent(state, layout, preview != null, onAction, panels, onChannel)
-            }
+            UprightPlayer(
+                state, layout, controls, toggle, video, inWindow, preview, { preview = it }, onAction,
+                onBrightness, openOptions, onSeek, panels, onChannel,
+            )
         } else {
-            Picture(state, layout, controls, toggle, video)
-            PictureControls(state, layout, controls, preview, onAction, onBrightness, openOptions)
-            LandscapeFooter(state, layout, controls, sheet, preview, { preview = it }, onAction, panels, onSeek)
+            Picture(state, layout, controls, toggle, video, inWindow)
+            if (!inWindow) {
+                PictureControls(state, layout, controls, preview, onAction, onBrightness, openOptions)
+                LandscapeFooter(state, layout, controls, sheet, preview, { preview = it }, onAction, panels, onSeek)
+            }
         }
         // On the upright phone a sheet rises only to the picture's foot, so the picture stays in view.
         val belowPicture = maxHeight - WindowInsets.statusBars.asPaddingValues().calculateTopPadding() -
             maxWidth * (9f / 16)
-        PlayerSheets(
-            panel, state, layout, showPanel, onAction, onChoice, onChannel,
-            InfoPage(infoStack) { infoStack = it }, belowPicture,
-        )
+        if (!inWindow) {
+            PlayerSheets(
+                panel, state, layout, showPanel, onAction, onChoice, onChannel,
+                InfoPage(infoStack) { infoStack = it }, belowPicture,
+            )
+        }
+    }
+}
+
+/** The upright layout: the picture on top with its controls, the program and the channel list below. */
+@Composable
+private fun UprightPlayer(
+    state: LivePlayerState,
+    layout: PlayerLayout,
+    controls: Boolean,
+    toggle: (() -> Unit)?,
+    video: (@Composable (Modifier) -> Unit)?,
+    inWindow: Boolean,
+    preview: Int?,
+    onPreview: (Int?) -> Unit,
+    onAction: (PlayerAction) -> Unit,
+    onBrightness: (Float) -> Unit,
+    openOptions: () -> Unit,
+    onSeek: (Int) -> Unit,
+    panels: PanelHost,
+    onChannel: (String) -> Unit,
+) {
+    Column(
+        Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)
+            .windowInsetsPadding(WindowInsets.statusBars),
+    ) {
+        Box(Modifier.fillMaxWidth().aspectRatio(16f / 9).background(Color.Black)) {
+            Picture(state, layout, controls, toggle, video, inWindow)
+            if (!inWindow) {
+                PictureControls(state, layout, controls, preview, onAction, onBrightness, openOptions)
+                if (state.status.hasTimeline) {
+                    PlayerTimeline(
+                        state.timeline, state.status, layout, controls, preview, onPreview, onSeek,
+                        Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(24.dp),
+                    )
+                }
+            }
+        }
+        if (!inWindow) UprightPlayerContent(state, layout, preview != null, onAction, panels, onChannel)
     }
 }
 
@@ -141,6 +178,7 @@ private fun BoxScope.Picture(
     controls: Boolean,
     toggle: (() -> Unit)?,
     video: (@Composable (Modifier) -> Unit)?,
+    inWindow: Boolean,
 ) {
     val playing = state.status == LivePlayerStatus.Playing
     val reconnecting = state.status is LivePlayerStatus.Reconnecting
@@ -156,10 +194,10 @@ private fun BoxScope.Picture(
         if (layout == PlayerLayout.PhoneLandscape) {
             BoxWithConstraints(frameModifier) {
                 val fitted = Modifier.align(Alignment.Center).width(maxHeight * (16f / 9)).height(maxHeight)
-                Frame(state, layout, controls, fitted, video)
+                Frame(state, layout, controls, fitted, video, inWindow)
             }
         } else {
-            Frame(state, layout, controls, frameModifier.align(Alignment.Center), video)
+            Frame(state, layout, controls, frameModifier.align(Alignment.Center), video, inWindow)
         }
     }
     if (toggle != null) {
@@ -178,8 +216,11 @@ private fun Frame(
     controls: Boolean,
     modifier: Modifier,
     video: (@Composable (Modifier) -> Unit)?,
+    inWindow: Boolean,
 ) {
     val shades = when {
+        // The window shows the picture alone, without a scrim.
+        inWindow -> listOf(0f, 0f)
         !controls -> listOf(0f, 0f, 0.05f)
         layout == PlayerLayout.Tablet -> listOf(.66f, .45f, .25f, .20f, .22f, .39f, .54f, .70f, .77f, .84f, .90f)
         layout == PlayerLayout.PhoneLandscape ->
@@ -207,6 +248,9 @@ private fun Frame(
         }
     }
 }
+
+/** The layout last measured outside the window; not state, it only carries the value across compositions. */
+private class HeldLayout(var layout: PlayerLayout)
 
 private fun playerLayout(width: Dp, height: Dp) = when {
     width >= height && height >= 600.dp -> PlayerLayout.Tablet

@@ -19,7 +19,10 @@
         <activity
             android:name=".player.PlayerActivity"
             android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation"
+            android:excludeFromRecents="true"
             android:exported="false"
-            android:launchMode="singleTask" />
+            android:launchMode="singleTask"
+            android:supportsPictureInPicture="true"
+            android:taskAffinity="${applicationId}.player" />
     </application>
 </manifest>

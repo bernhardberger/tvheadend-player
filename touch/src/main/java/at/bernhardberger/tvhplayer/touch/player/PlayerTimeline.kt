@@ -47,9 +47,8 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.core.os.ConfigurationCompat
 import at.bernhardberger.tvhplayer.touch.R
+import at.bernhardberger.tvhplayer.ui.common.formatClock
 import java.time.LocalTime
-import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -239,8 +238,8 @@ private fun DragLabel(time: String, live: Boolean, compact: Boolean, markerX: Dp
 internal fun playerClock(programStart: LocalTime, seconds: Int): String {
     val config = LocalConfiguration.current
     val locale = checkNotNull(ConfigurationCompat.getLocales(config)[0])
-    return programStart.plusSeconds(seconds.toLong())
-        .format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).withLocale(locale))
+    // The shared clock, so the bar's times follow the 24-hour setting like every other time.
+    return formatClock(programStart.plusSeconds(seconds.toLong()), locale)
 }
 
 @Composable

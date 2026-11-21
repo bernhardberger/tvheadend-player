@@ -2,6 +2,17 @@ package at.bernhardberger.tvhplayer.touch.player
 
 import androidx.activity.ComponentActivity
 import androidx.activity.ComponentDialog
+import android.os.Looper
+import androidx.annotation.OptIn
+import androidx.compose.runtime.SideEffect
+import androidx.media3.common.Player
+import androidx.media3.common.SimpleBasePlayer
+import androidx.media3.common.util.UnstableApi
+import at.bernhardberger.tvhplayer.ui.common.AppClock
+import com.google.common.util.concurrent.Futures
+import com.google.common.util.concurrent.ListenableFuture
+import org.junit.After
+import org.junit.Before
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.geometry.Offset
@@ -51,6 +62,34 @@ import org.robolectric.shadows.ShadowDialog
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class PlayerScreenTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
+
+    private val uses24Hour = AppClock.systemUses24Hour
+
+    /** The drawings show a 12-hour clock. */
+    @Before
+    fun twelveHourClock() {
+        AppClock.systemUses24Hour = false
+    }
+
+    @After
+    fun restoreClock() {
+        AppClock.systemUses24Hour = uses24Hour
+    }
+
+    /** Playback starting while the face is composed must not leave the Play glyph behind. */
+    @Test
+    @OptIn(UnstableApi::class)
+    fun playIntentKeepsAChangeMadeBeforeItsListenerIsRegistered() {
+        val player = PlayIntentPlayer()
+        lateinit var playing: () -> Boolean
+        compose.setContent {
+            val state = rememberPlayWhenReady(player)
+            playing = { state.value }
+            SideEffect { player.play() }
+        }
+        compose.waitForIdle()
+        assertTrue(playing())
+    }
 
     @Test
     @Config(qualifiers = "en-rUS-w1280dp-h800dp-land-xhdpi")
@@ -394,4 +433,19 @@ class PlayerScreenTest {
     )
 
     private fun capture(name: String, canvas: TouchCanvas) = compose.captureTouch("slice2-player", name, canvas)
+}
+
+@OptIn(UnstableApi::class)
+private class PlayIntentPlayer : SimpleBasePlayer(Looper.getMainLooper()) {
+    private var playWhenReady = false
+
+    override fun getState(): State = State.Builder()
+        .setAvailableCommands(Player.Commands.Builder().add(Player.COMMAND_PLAY_PAUSE).build())
+        .setPlayWhenReady(playWhenReady, Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST)
+        .build()
+
+    override fun handleSetPlayWhenReady(playWhenReady: Boolean): ListenableFuture<*> {
+        this.playWhenReady = playWhenReady
+        return Futures.immediateVoidFuture()
+    }
 }
