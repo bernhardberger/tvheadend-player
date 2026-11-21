@@ -2,6 +2,7 @@ package at.bernhardberger.tvhplayer.touch.player
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
+import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import at.bernhardberger.tvhplayer.touch.R
 
 /** One line of a player list; [selected] is null for a command (Record) rather than a choice. */
@@ -78,21 +79,15 @@ private fun EntryMaker.audio(tracks: PlayerTracks): List<PanelEntry> = buildList
     add(
         choice(
             stringResource(R.string.player_audio_automatic),
-            playing?.let { stringResource(R.string.player_audio_playing, details(it.language, it.layout)) },
+            playing?.let { stringResource(R.string.player_audio_playing, it.summary) },
             tracks.audioPick == TrackPick.Default,
             PlayerChoice.Audio(TrackPick.Default),
         ),
     )
-    val description = stringResource(R.string.player_audio_description)
     tracks.audio.forEachIndexed { index, track ->
         val pick = TrackPick.Track(index)
-        val selected = tracks.audioPick == pick
-        val entry = if (track.audioDescription) {
-            choice(description, details(track.language, track.layout, track.format), selected, PlayerChoice.Audio(pick))
-        } else {
-            choice(track.language, details(track.layout, track.format), selected, PlayerChoice.Audio(pick))
-        }
-        add(entry)
+        val detail = details(track.overline, track.detail)
+        add(choice(track.name, detail, tracks.audioPick == pick, PlayerChoice.Audio(pick)))
     }
 }
 
@@ -104,16 +99,14 @@ private fun EntryMaker.subtitles(tracks: PlayerTracks): List<PanelEntry> = build
     add(choice(off, null, tracks.subtitlePick == TrackPick.Off, PlayerChoice.Subtitles(TrackPick.Off)))
     tracks.subtitles.forEachIndexed { index, track ->
         val pick = TrackPick.Track(index)
-        add(choice(track.language, track.format, tracks.subtitlePick == pick, PlayerChoice.Subtitles(pick)))
+        val detail = details(track.overline, track.detail)
+        add(choice(track.name, detail, tracks.subtitlePick == pick, PlayerChoice.Subtitles(pick)))
     }
 }
 
 @Composable
 private fun EntryMaker.profiles(options: PlaybackOptions): List<PanelEntry> = buildList {
-    val default = stringResource(
-        R.string.player_option_default,
-        profileName(options.profiles.getOrNull(options.defaultProfile)),
-    )
+    val default = stringResource(R.string.player_option_default, defaultProfileName(options))
     add(choice(default, null, options.profilePick == null, PlayerChoice.Profile(null)))
     options.profiles.forEachIndexed { index, profile ->
         val detail = profile.name.takeIf { profile.direct }
@@ -121,7 +114,13 @@ private fun EntryMaker.profiles(options: PlaybackOptions): List<PanelEntry> = bu
     }
 }
 
-private fun details(vararg parts: String?) = parts.filterNotNull().joinToString(" • ")
+private fun details(vararg parts: String?) = parts.filterNotNull().joinToString(" • ").ifEmpty { null }
+
+/** The connection's profile, or the server's default when the connection names none the server lists. */
+@Composable
+internal fun defaultProfileName(options: PlaybackOptions): String =
+    options.defaultProfile?.let(options.profiles::getOrNull)?.let { profileName(it) }
+        ?: stringResource(SharedR.string.profile_server_default)
 
 @Composable
 internal fun profileName(profile: StreamProfile?) = when {

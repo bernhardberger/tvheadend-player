@@ -67,8 +67,10 @@ internal fun PlayerScreen(
     var touches by remember { mutableIntStateOf(0) }
     var touching by remember { mutableStateOf(false) }
     var panel by rememberSaveable { mutableStateOf<PlayerPanel?>(null) }
-    // Sheets and menus close on entering the picture-in-picture window; they don't come back.
-    LaunchedEffect(inWindow) { if (inWindow) panel = null }
+    // Sheets and menus close on entering the picture-in-picture window (they don't come back), and
+    // when their control leaves (the tracks went away).
+    val panelGone = panelGone(panel, state.offered, inWindow)
+    LaunchedEffect(panelGone) { if (panelGone) panel = null }
     // Info opens on the program being watched each time; inside the sheet the viewer opens others.
     var infoStack by rememberSaveable(stateSaver = InfoStackSaver) { mutableStateOf(InfoStack()) }
     val showPanel: (PlayerPanel?) -> Unit = {
@@ -120,6 +122,9 @@ internal fun PlayerScreen(
         }
     }
 }
+
+private fun panelGone(panel: PlayerPanel?, offered: Set<PlayerControl>, inWindow: Boolean) =
+    inWindow || panel?.button?.control?.let { it !in offered } == true
 
 /** The upright layout: the picture on top with its controls, the program and the channel list below. */
 @Composable

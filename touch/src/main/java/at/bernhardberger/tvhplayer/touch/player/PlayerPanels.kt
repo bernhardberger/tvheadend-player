@@ -275,16 +275,17 @@ private fun PlayerBottomSheet(
 @Composable
 private fun OptionRows(options: PlaybackOptions, onPanel: (PlayerPanel?) -> Unit) {
     val profile = options.profilePick?.let { options.profiles.getOrNull(it) }
-    val rows = listOf(
+    val rows = listOfNotNull(
         Triple(R.string.player_display_mode, stringResource(options.displayMode.label), PlayerPanel.DisplayMode),
-        Triple(
-            R.string.player_stream_profile,
-            profile?.let { profileName(it) } ?: stringResource(
-                R.string.player_option_default, profileName(options.profiles.getOrNull(options.defaultProfile)),
-            ),
-            PlayerPanel.Profile,
-        ),
-        Triple(R.string.player_stats, stringResource(options.stats.label), PlayerPanel.Stats),
+        options.profiles.takeIf { it.isNotEmpty() }?.let {
+            Triple(
+                R.string.player_stream_profile,
+                profile?.let { profileName(it) }
+                    ?: stringResource(R.string.player_option_default, defaultProfileName(options)),
+                PlayerPanel.Profile,
+            )
+        },
+        options.stats?.let { Triple(R.string.player_stats, stringResource(it.label), PlayerPanel.Stats) },
     )
     Rows {
         rows.forEachIndexed { index, (label, value, target) ->

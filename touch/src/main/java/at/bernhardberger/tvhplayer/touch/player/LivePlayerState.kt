@@ -5,6 +5,7 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.core.AppErrorCondition
+import at.bernhardberger.tvhplayer.core.HumanTrackLabel
 import at.bernhardberger.tvhplayer.touch.channels.ChannelList
 import at.bernhardberger.tvhplayer.touch.channels.ChannelRow
 import at.bernhardberger.tvhplayer.touch.guide.GuideProgram
@@ -62,14 +63,6 @@ internal data class InfoStack(val open: String? = null, val details: List<String
     fun back(): InfoStack = copy(details = details.dropLast(1))
 }
 
-/** A stream's audio or subtitle track, named by its language or role with layout and format below. */
-internal data class PlayerTrack(
-    val language: String,
-    val format: String,
-    val layout: String? = null,
-    val audioDescription: Boolean = false,
-)
-
 /** [Default] is Automatic for audio and `Default (<the Subtitles setting>)` for subtitles. */
 internal sealed interface TrackPick {
     data object Default : TrackPick
@@ -77,13 +70,17 @@ internal sealed interface TrackPick {
     data class Track(val index: Int) : TrackPick
 }
 
-/** [playingAudio] is the track Automatic plays; [subtitlesSetting] null means the setting is Off. */
+/**
+ * The stream's tracks in the shared label lines (name, overline, detail; summary for the track
+ * Automatic plays). [playingAudio] is the track Automatic plays; a null pick marks no line;
+ * [subtitlesSetting] null means the setting is Off.
+ */
 internal data class PlayerTracks(
-    val audio: List<PlayerTrack> = emptyList(),
-    val audioPick: TrackPick = TrackPick.Default,
+    val audio: List<HumanTrackLabel> = emptyList(),
+    val audioPick: TrackPick? = TrackPick.Default,
     val playingAudio: Int? = null,
-    val subtitles: List<PlayerTrack> = emptyList(),
-    val subtitlePick: TrackPick = TrackPick.Default,
+    val subtitles: List<HumanTrackLabel> = emptyList(),
+    val subtitlePick: TrackPick? = TrackPick.Default,
     val subtitlesSetting: String? = null,
 )
 
@@ -94,13 +91,17 @@ internal enum class StatsLevel { Off, StreamPath, Debug }
 /** A server stream profile; the direct one is shown as Direct streaming with its server name below. */
 internal data class StreamProfile(val name: String, val direct: Boolean = false)
 
-/** [profilePick] null is `Default (<the connection's profile>)`, the profile at [defaultProfile]. */
+/**
+ * [profilePick] null is `Default (<the connection's profile>)`, the profile at [defaultProfile]
+ * (null: the server's default). No [profiles] leaves out the Stream profile row, null [stats] the
+ * Stats row.
+ */
 internal data class PlaybackOptions(
     val displayMode: DisplayMode = DisplayMode.Auto,
     val profiles: List<StreamProfile> = emptyList(),
-    val defaultProfile: Int = 0,
+    val defaultProfile: Int? = 0,
     val profilePick: Int? = null,
-    val stats: StatsLevel = StatsLevel.Off,
+    val stats: StatsLevel? = StatsLevel.Off,
 )
 
 /** A choice made in one of the player's menus or sheets. */

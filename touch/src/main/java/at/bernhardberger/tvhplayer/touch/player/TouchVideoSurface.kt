@@ -40,12 +40,13 @@ internal fun TouchVideoSurface(
     videoVisible: Boolean,
     modifier: Modifier = Modifier,
     onView: (PlayerView?) -> Unit = {},
+    mode: AspectRatioMode = AspectRatioMode.FIT,
 ) {
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     var keepScreenOn by remember { mutableStateOf(false) }
     // The last presented picture's aspect stays while a new channel starts.
     var aspect by remember { mutableStateOf<Float?>(null) }
-    DisposableEffect(player, lifecycle, videoVisible) {
+    DisposableEffect(player, lifecycle, videoVisible, mode) {
         fun update() {
             keepScreenOn = keepPlayerScreenOn(
                 foreground = lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED),
@@ -54,7 +55,7 @@ internal fun TouchVideoSurface(
                 hasVideo = player.currentTracks.isTypeSelected(C.TRACK_TYPE_VIDEO),
                 failed = player.playerError != null,
             )
-            if (videoVisible) pictureAspect(player)?.let { aspect = it }
+            if (videoVisible) pictureAspect(player, mode)?.let { aspect = it }
         }
         val listener = object : Player.Listener {
             override fun onEvents(player: Player, events: Player.Events) = update()
@@ -96,16 +97,19 @@ internal fun TouchVideoSurface(
     }
 }
 
-/** The decoded size, else the input format's (tunnelled playback may report no decoded size). */
+/**
+ * The decoded size, else the input format's (tunnelled playback may report no decoded size), in
+ * the display [mode] the viewer chose.
+ */
 @OptIn(UnstableApi::class)
-internal fun pictureAspect(player: ExoPlayer): Float? {
+internal fun pictureAspect(player: ExoPlayer, mode: AspectRatioMode = AspectRatioMode.FIT): Float? {
     val size = player.videoSize
     val format = player.videoFormat
     return when {
         size.width > 0 && size.height > 0 ->
-            surfaceFrameAspect(AspectRatioMode.FIT, size.width, size.height, size.pixelWidthHeightRatio)
+            surfaceFrameAspect(mode, size.width, size.height, size.pixelWidthHeightRatio)
         format != null && format.width > 0 && format.height > 0 ->
-            surfaceFrameAspect(AspectRatioMode.FIT, format.width, format.height, format.pixelWidthHeightRatio)
+            surfaceFrameAspect(mode, format.width, format.height, format.pixelWidthHeightRatio)
         else -> null
     }
 }

@@ -16,6 +16,8 @@ import androidx.media3.common.Player
 import androidx.media3.common.SimpleBasePlayer
 import androidx.media3.common.util.UnstableApi
 import at.bernhardberger.tvhplayer.ui.common.AppClock
+import at.bernhardberger.tvhplayer.core.HumanTrackLabel
+import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import org.junit.After
@@ -199,6 +201,17 @@ class PlayerScreenTest {
         tag("player-transport").assertIsDisplayed()
         compose.mainClock.advanceTimeBy(hideMs / 2)
         tag("player-transport").assertDoesNotExist()
+        // A list whose control leaves (audio down to one track) closes and stops holding them.
+        tapPicture()
+        compose.mainClock.advanceTimeByFrame()
+        button(R.string.player_audio).performClick()
+        compose.mainClock.advanceTimeBy(hideMs * 2)
+        text(SharedR.string.audio_description).assertExists()
+        offered.value -= PlayerControl.Audio
+        compose.mainClock.advanceTimeBy(hideMs * 3 / 4)
+        text(SharedR.string.audio_description).assertDoesNotExist()
+        compose.mainClock.advanceTimeBy(hideMs * 2)
+        tag("player-transport").assertDoesNotExist()
         compose.mainClock.autoAdvance = true
     }
 
@@ -298,6 +311,7 @@ class PlayerScreenTest {
     private val status = mutableStateOf<LivePlayerStatus>(LivePlayerStatus.Playing)
 
     private val paused = mutableStateOf(false)
+    private val offered = mutableStateOf(PlayerControl.entries.toSet())
     private val hideMs = 1_000L
 
     private fun show(hideAfterMs: Long? = null) {
@@ -315,12 +329,17 @@ class PlayerScreenTest {
             timeline = mutableStateOf(LiveTimeline(LocalTime.of(20, 0), 3600, 1510, 2568, 2820)),
             tracks = PlayerTracks(
                 audio = listOf(
-                    PlayerTrack("English", "MPEG-1 Layer II", "Stereo"),
-                    PlayerTrack("English", "Dolby Digital", "5.1"),
-                    PlayerTrack("English", "AAC", "Stereo", audioDescription = true),
+                    HumanTrackLabel("English • Stereo", "English", null, "Stereo • MPEG-1 Layer II"),
+                    HumanTrackLabel("English • 5.1", "English", null, "5.1 • Dolby Digital"),
+                    HumanTrackLabel(
+                        "English • Stereo • Audio description", "Audio description", "English", "Stereo • AAC",
+                    ),
                 ),
                 playingAudio = 0,
-                subtitles = listOf(PlayerTrack("English", "DVB"), PlayerTrack("English", "Teletext")),
+                subtitles = listOf(
+                    HumanTrackLabel("English", "English", null, "DVB"),
+                    HumanTrackLabel("English", "English", null, "Teletext"),
+                ),
             ),
             options = PlaybackOptions(
                 profiles = listOf(StreamProfile("htsp", direct = true), StreamProfile("h264-720p"), StreamProfile("hevc-1080p")),
@@ -340,8 +359,8 @@ class PlayerScreenTest {
         compose.setContent {
             MaterialTheme(colorScheme = MobileDarkColors) {
                 PlayerScreen(
-                    fixture.copy(status = status.value, paused = paused.value), { actions += it }, { seeks += it }, {},
-                    { played += it }, { choices += it }, hideAfterMs = hideAfterMs,
+                    fixture.copy(status = status.value, paused = paused.value, offered = offered.value),
+                    { actions += it }, { seeks += it }, {}, { played += it }, { choices += it }, hideAfterMs = hideAfterMs,
                 )
             }
         }
@@ -358,11 +377,11 @@ class PlayerScreenTest {
         text(R.string.player_record_all).assertDoesNotExist()
 
         button(R.string.player_audio).performClick()
-        text(R.string.player_audio_description).assertIsDisplayed()
+        text(SharedR.string.audio_description).assertIsDisplayed()
         captureWindows("$prefix-audio", canvas)
-        text(R.string.player_audio_description).performClick()
+        text(SharedR.string.audio_description).performClick()
         compose.runOnIdle { assertEquals(listOf(PlayerChoice.Audio(TrackPick.Track(2))), choices) }
-        text(R.string.player_audio_description).assertDoesNotExist()
+        text(SharedR.string.audio_description).assertDoesNotExist()
 
         if (subtitles) {
             button(R.string.player_subtitles).performClick()

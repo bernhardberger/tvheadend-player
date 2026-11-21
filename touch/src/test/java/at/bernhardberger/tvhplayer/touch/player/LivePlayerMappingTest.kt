@@ -9,7 +9,9 @@ import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.EpgSnapshot
 import at.bernhardberger.tvheadend.sdk.core.EventId
+import at.bernhardberger.tvheadend.sdk.core.StreamProfile as SdkStreamProfile
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
+import at.bernhardberger.tvheadend.sdk.core.StreamProfileId
 import at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackRecoveryReason
 import at.bernhardberger.tvheadend.sdk.media3.testing.TimeshiftTestFixture
@@ -17,6 +19,7 @@ import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssue
 import at.bernhardberger.tvhplayer.core.AppErrorCondition
 import at.bernhardberger.tvhplayer.core.ChannelBrowsingScope
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
+import at.bernhardberger.tvhplayer.core.HumanTrackLabel
 import at.bernhardberger.tvhplayer.playback.AppPlaybackFailureReason
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
@@ -24,6 +27,7 @@ import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.playback.BackgroundPlaybackNotice
 import at.bernhardberger.tvhplayer.playback.LivePauseAvailability
 import at.bernhardberger.tvhplayer.playback.toAppPresentation
+import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.touch.testutil.ServerGuide
 import at.bernhardberger.tvhplayer.viewmodels.ChannelScopeState
 import java.time.LocalTime
@@ -331,6 +335,54 @@ class LivePlayerMappingTest {
         historicalEvents = listOf(program(1, "2026-09-07T19:00:00Z", "2026-09-07T20:00:00Z")),
     )
     private val schedule = SessionObservation.create(epgState = EpgRepositoryState.Current(programs))
+
+    @Test
+    fun menusListTheTracksAndOptionsAsTheTvDoes() {
+        val lines = listOf(
+            HumanTrackLabel("English • Stereo", "English", null, "Stereo • AAC"),
+            HumanTrackLabel("German • Stereo • Audio description", "Audio description", "German", "Stereo • AAC"),
+        )
+        fun tracks(automatic: Boolean = true, default: Boolean = false, off: Boolean = false, picked: Int? = null) =
+            playerTracks(lines, 0, lines, picked, TrackSettings(automatic, default, off), "English")
+        assertEquals(lines, tracks().audio)
+        data class Case(val name: String, val tracks: PlayerTracks, val audio: TrackPick?, val subtitles: TrackPick?)
+        listOf(
+            Case("Automatic marks only itself", tracks(), TrackPick.Default, null),
+            Case("a picked track marks itself", tracks(automatic = false, picked = 1), TrackPick.Track(0), TrackPick.Track(1)),
+            Case("Default subtitles over a pick", tracks(default = true, picked = 1), TrackPick.Default, TrackPick.Default),
+            Case("subtitles off", tracks(off = true), TrackPick.Default, TrackPick.Off),
+        ).forEach {
+            assertEquals(it.name, it.audio, it.tracks.audioPick)
+            assertEquals(it.name, it.subtitles, it.tracks.subtitlePick)
+            assertEquals(it.name, 0, it.tracks.playingAudio)
+        }
+
+        // Audio only with another track to choose, Subtitles with one; neither for a picture not yet the shown one.
+        assertEquals(setOf(PlayerControl.Settings), optionControls(1, 0, targetCurrent = true))
+        assertEquals(
+            setOf(PlayerControl.Settings, PlayerControl.Audio, PlayerControl.Subtitles),
+            optionControls(2, 1, targetCurrent = true),
+        )
+        assertEquals(setOf(PlayerControl.Settings), optionControls(2, 1, targetCurrent = false))
+
+        val direct = SdkStreamProfile(StreamProfileId("1".repeat(32)), "htsp", "")
+        val small = SdkStreamProfile(StreamProfileId("2".repeat(32)), "h264-720p", "")
+        val listed = listOf(direct, small)
+        assertEquals(
+            PlaybackOptions(
+                DisplayMode.Fill4By3, listOf(StreamProfile("htsp", direct = true), StreamProfile("h264-720p")),
+                defaultProfile = 1, profilePick = 0, stats = null,
+            ),
+            playbackOptions(listed, small.id, direct.id.value, AspectRatioMode.FORCE_4_3),
+        )
+        // A setting the server doesn't list is the server's default; no list leaves out the profile row.
+        assertEquals(null, playbackOptions(listed, null, null, AspectRatioMode.FIT).defaultProfile)
+        assertEquals(
+            PlaybackOptions(DisplayMode.Auto, emptyList(), defaultProfile = null, stats = null),
+            playbackOptions(emptyList(), small.id, null, AspectRatioMode.FIT),
+        )
+        DisplayMode.entries.forEach { assertEquals(it, it.aspectMode.displayMode) }
+    }
 
     private fun program(id: Long, start: String, stop: String) = EpgEvent.create(
         id = EventId(id), channelId = ChannelId(1), start = Instant.parse(start), stop = Instant.parse(stop),
