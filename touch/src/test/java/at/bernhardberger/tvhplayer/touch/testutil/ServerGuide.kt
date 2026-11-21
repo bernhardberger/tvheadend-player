@@ -10,6 +10,7 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.ChannelTag
 import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
+import at.bernhardberger.tvheadend.sdk.core.ContentGenre
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
@@ -36,7 +37,7 @@ import kotlin.time.Instant
  * description. The running recording and the scheduled one are linked to their programs. The first
  * channel has a logo in the server's image cache, the program on now and the finished film a picture.
  */
-internal class ServerGuide(val now: Instant) {
+internal class ServerGuide(val now: Instant, genres: List<ContentGenre?> = emptyList()) {
     val news = ChannelTag.create(ChannelTagId(NEWS_TAG), name = "News")
     val logo = checkNotNull(ChannelIcon.parse("imagecache/$LOGO"))
     val picture = checkNotNull(ArtworkId.parse("imagecache/$PICTURE"))
@@ -66,6 +67,7 @@ internal class ServerGuide(val now: Instant) {
             EpgEvent.create(
                 EventId(index + 1L), first.id, start, start + 60.minutes, title = title,
                 description = "About $title".takeIf { index == 0 }, image = picture.takeIf { index == 0 },
+                contentGenre = genres.getOrNull(index),
             )
         },
     )
