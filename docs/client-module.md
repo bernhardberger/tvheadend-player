@@ -71,7 +71,7 @@ directly. `:client` mirrors the app build types (`debug`, `release`, `profile`,
 - Recordings and Guide policy, each in its existing package:
   `core/ChannelNowStatusPolicy` (with `linkedRecordingForEvent`),
   `ui/screens/RecordingScheduledMark` (`isScheduled`), `core/GlanceBadges`,
-  `core/ProgrammeAgeRating`, `core/RecordingPlaybackPresentation`,
+  `core/ProgrammeAgeRating`, `core/ProgrammeAboutText`, `core/RecordingPlaybackPresentation`,
   `settings/ClockFormat`, `ui/player/ChannelSchedulePolicy` and
   `ui/screens/GuideCoverageRequestOwner`.
 
@@ -91,7 +91,7 @@ trims transparent margins before fitting the logo to its slot.
 DVR actions and the formatters behind recordings and programme details:
 `ui/screens/DvrMutationActions` (record, stop, delete, series rules and folder
 actions, with `currentDvrMutation` and `currentDvrConfigurations`; the caller
-passes the preferred recording profile), `ui/common/TimeConverter`,
+passes the preferred recording profile), `ui/common/DetailsFacts`, `ui/common/TimeConverter`,
 `ui/common/Epg`, `ui/common/RecordingExpiry`, `ui/common/NumberFormatting` and
 `programmeCategoryLabelRes` in `ui/common/ProgrammeCategoryLabelRes`, and the
 stop-recording sentence in `ui/screens/recordings/StopConfirmationSentence`.

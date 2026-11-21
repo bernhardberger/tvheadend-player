@@ -128,8 +128,6 @@
     <ID>CyclomaticComplexMethod:ProgrammeDetailsPage.kt:@Composable private fun DetailsActions</ID>
     <ID>CyclomaticComplexMethod:ProgrammeDetailsPage.kt:@Composable private fun DetailsInformation</ID>
     <ID>CyclomaticComplexMethod:ProgrammeDetailsPage.kt:@OptIn(ExperimentalFoundationApi::class) @Composable internal fun ProgrammeDetailsPage</ID>
-    <ID>CyclomaticComplexMethod:ProgrammeDetailsPage.kt:@OptIn(ExperimentalTvheadendApi::class) @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class) internal fun recordingMetadataFacts: List&lt;Pair&lt;String, String&gt;&gt;</ID>
-    <ID>CyclomaticComplexMethod:ProgrammeDetailsPage.kt:internal fun programmeAboutFacts: List&lt;Pair&lt;String, String&gt;&gt;</ID>
     <ID>CyclomaticComplexMethod:ProgrammeInfoSheet.kt:@Composable internal fun &lt;T : Any&gt; PlayerPage</ID>
     <ID>CyclomaticComplexMethod:ProgrammePane.kt:@Composable internal fun ProgrammeHeadline</ID>
     <ID>CyclomaticComplexMethod:ProgrammePane.kt:@Composable private fun HeadlineColumn</ID>
@@ -718,15 +716,9 @@
     <ID>MaxLineLength:ProgrammeDetailsPage.kt:drawnWidth = with(density) { inlineLogoDrawnWidth(logo, Size(InlineLogoWidth.toPx(), InlineLogoHeight.toPx())).toDp() }</ID>
     <ID>MaxLineLength:ProgrammeDetailsPage.kt:else</ID>
     <ID>MaxLineLength:ProgrammeDetailsPage.kt:else -&gt; formatRecordingSchedule(fact.seconds, locale = LocalConfiguration.current.locales[0], nowSec = nowSec)</ID>
-    <ID>MaxLineLength:ProgrammeDetailsPage.kt:fact(R.string.details_broadcast, resources.getString(if (it) R.string.details_broadcast_new else R.string.details_broadcast_repeat))</ID>
-    <ID>MaxLineLength:ProgrammeDetailsPage.kt:fact(R.string.details_categories, event?.categories?.map(String::trim)?.filter(String::isNotEmpty)?.distinct()?.joinToString(" • "))</ID>
-    <ID>MaxLineLength:ProgrammeDetailsPage.kt:fact(R.string.details_keywords, event?.keywords?.map(String::trim)?.filter(String::isNotEmpty)?.distinct()?.joinToString(" • "))</ID>
-    <ID>MaxLineLength:ProgrammeDetailsPage.kt:fact(R.string.details_year, (event?.copyrightYear ?: recording?.copyrightYear)?.let { formatMetadataNumber(it, locale) })</ID>
     <ID>MaxLineLength:ProgrammeDetailsPage.kt:factsScroll.animateScrollTo(factsScroll.value + with(density) { 60.dp.roundToPx() }, RowChangeMotion)</ID>
     <ID>MaxLineLength:ProgrammeDetailsPage.kt:floor: Float = if (sharp) 0f else DetailsScrolledDimAlpha</ID>
     <ID>MaxLineLength:ProgrammeDetailsPage.kt:formatRecordingDate(removal, dateOnly = true, locale = LocalConfiguration.current.locales[0], nowSec = nowSec)</ID>
-    <ID>MaxLineLength:ProgrammeDetailsPage.kt:formatTimeInterval(start.epochSeconds, stop.epochSeconds, withDate = true, locale = locale, nowSec = nowSec)</ID>
-    <ID>MaxLineLength:ProgrammeDetailsPage.kt:humanLanguageName</ID>
     <ID>MaxLineLength:ProgrammeDetailsPage.kt:if</ID>
     <ID>MaxLineLength:ProgrammeDetailsPage.kt:if (focused) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = .12f)</ID>
     <ID>MaxLineLength:ProgrammeDetailsPage.kt:if (listState.layoutInfo.visibleItemsInfo.none { it.key == target.value }) listState.scrollToItem(ids.indexOf(target))</ID>
@@ -738,7 +730,6 @@
     <ID>MaxLineLength:ProgrammeDetailsPage.kt:section == DetailsSection.FACTS &amp;&amp; (key.key == Key.DirectionLeft || key.key == Key.DirectionRight) -&gt; true</ID>
     <ID>MaxLineLength:ProgrammeDetailsPage.kt:textAreas = textAreas.values.toList()</ID>
     <ID>MaxLineLength:ProgrammeDetailsPage.kt:tint = if (focused) MaterialTheme.colorScheme.inverseOnSurface else MaterialTheme.colorScheme.onSurface</ID>
-    <ID>MaxLineLength:ProgrammeDetailsPage.kt:total?.takeIf { it &gt;= n }?.let { resources.getString(R.string.details_count_of, n.toInt(), it.toInt()) } ?: formatMetadataNumber(n, locale)</ID>
     <ID>MaxLineLength:ProgrammeDetailsPage.kt:transitionSpec = { tween(PlayerMotion.MediumMs * 2, easing = PlayerMotion.Standard) }</ID>
     <ID>MaxLineLength:ProgrammeDetailsPage.kt:val</ID>
     <ID>MaxLineLength:ProgrammeDetailsPage.kt:val (width, height) = with(density) { DetailsHeroLogoSize.first.roundToPx() to DetailsHeroLogoSize.second.roundToPx() }</ID>

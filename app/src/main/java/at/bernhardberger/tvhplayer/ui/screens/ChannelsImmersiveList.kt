@@ -153,7 +153,7 @@ import at.bernhardberger.tvhplayer.ui.components.mutedTextPastRowStart
 import at.bernhardberger.tvhplayer.ui.components.rememberHeldBack
 import at.bernhardberger.tvhplayer.ui.components.rememberHeldBackReader
 import at.bernhardberger.tvhplayer.ui.components.overflowingRowViewport
-import at.bernhardberger.tvhplayer.ui.components.programmeAboutFacts
+import at.bernhardberger.tvhplayer.ui.common.programmeAboutFacts
 import at.bernhardberger.tvhplayer.ui.components.programmeHeaderMetadata
 import at.bernhardberger.tvhplayer.ui.components.programmeSynopsis
 import at.bernhardberger.tvhplayer.ui.components.rememberBrowseContextMenuTrigger

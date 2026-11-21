@@ -17,6 +17,7 @@ entry points are exhausted; avoid asking them to rediscover this table.
 | Live-player presentation, focus, keys, overlays, and timeline | `app/src/main/java/at/bernhardberger/tvhplayer/ui/player/VideoPlayerScreen.kt` |
 | Recording-player presentation | `app/src/main/java/at/bernhardberger/tvhplayer/ui/player/RecordingPlayerScreen.kt` |
 | Guide grid, programme details, filtering, and Guide-local DVR actions | `app/src/main/java/at/bernhardberger/tvhplayer/ui/screens/EpgGridScreen.kt` |
+| Shared programme and recording Details facts | `presentation/src/main/java/at/bernhardberger/tvhplayer/ui/common/DetailsFacts.kt`; About text selection is in `client/src/main/java/at/bernhardberger/tvhplayer/core/ProgrammeAboutText.kt`. |
 | Channel browsing and focus restoration | `app/src/main/java/at/bernhardberger/tvhplayer/ui/screens/ChannelsScreen.kt` |
 | Shared channel-tag selection, scope visibility, hydration and ordered persistence | `presentation/src/main/java/at/bernhardberger/tvhplayer/viewmodels/ChannelsViewModel.kt`, created once above `NavDisplay` in `AppRoot.kt` and passed to Channels, Guide, Settings and live playback |
 | Recordings browsing and DVR actions | `app/src/main/java/at/bernhardberger/tvhplayer/ui/screens/RecordingsScreen.kt`; the DVR mutations themselves (record, stop, delete, rules, folder actions) are `presentation/src/main/java/at/bernhardberger/tvhplayer/ui/screens/DvrMutationActions.kt`, shared by every screen that records |
