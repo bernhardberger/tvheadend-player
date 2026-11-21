@@ -40,6 +40,7 @@ import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.common.formatRecordingDate
 import at.bernhardberger.tvhplayer.ui.common.formatTimeInterval
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
+import at.bernhardberger.tvhplayer.ui.components.depth.DepthListTopReserve
 import at.bernhardberger.tvhplayer.ui.components.ConfirmationSubject
 import at.bernhardberger.tvhplayer.ui.components.LocalTabOwner
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeEyebrow
@@ -164,7 +165,7 @@ internal fun ScheduleRulePane(item: AutomaticRecordingListItem, channels: List<C
             keepLabel = automaticRecordingKeepLabel(draft.removal)
         }
     }
-    Column(modifier.padding(top = 4.dp).testTag("automatic-recording-pane")) {
+    Column(modifier.padding(top = DepthListTopReserve).testTag("automatic-recording-pane")) {
         ProgrammeHeadline(
             eyebrow = { ProgrammeEyebrow(channel?.icon, subject.detail) {
                 if (!item.enabled) StatusBadge(stringResource(R.string.schedule_automatic_off), StatusBadgeTone.NEUTRAL)

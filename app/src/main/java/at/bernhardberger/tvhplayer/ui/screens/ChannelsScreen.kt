@@ -135,6 +135,7 @@ import at.bernhardberger.tvhplayer.ui.components.ProgrammePanePictureGap
 import at.bernhardberger.tvhplayer.ui.components.ProgrammePaneWidth
 import at.bernhardberger.tvhplayer.ui.components.UnavailableTagNotice
 import at.bernhardberger.tvhplayer.ui.TvPanelBrowseAlpha
+import at.bernhardberger.tvhplayer.ui.TvBrowseHeaderContentGap
 import at.bernhardberger.tvhplayer.ui.TvBrowseHeaderHeight
 import at.bernhardberger.tvhplayer.ui.TvBrowseLeadingInset
 import at.bernhardberger.tvhplayer.ui.TvBrowseTrailingInset
@@ -352,17 +353,14 @@ internal fun ChannelsScreenContent(
     }
 
     val listState = rememberLazyListState()
-    // Native focus scrolling and the explicit preview anchor share one viewport policy:
-    // the readable band between the fades, with the original reserve at the top boundary.
+    // Preview restoration uses the same pivot as native focus scrolling.
     // Without a notice above it the list reaches the screen's top under the shell's inset, so
     // a scrolled list's earlier rows fade into the screen edge rather than end at the band.
     val listTopOverflow = if (tagNotice) 0.dp else contentPadding.calculateTopPadding()
     // The resting Grid line leaves room above the first focused List row's native scale.
-    val headerContentLine = TvBrowseHeaderHeight + ChannelsGridFocusLine
+    val headerContentLine = TvBrowseHeaderHeight + TvBrowseHeaderContentGap
     val listTopReserve = if (tagNotice) ChannelsListTopReserve else headerContentLine
-    val bringIntoViewSpec = rememberListEdgeBringIntoView(
-        listState, listTopReserve, listTopOverflow, anchorAtTopReserve = !tagNotice,
-    )
+    val bringIntoViewSpec = rememberListEdgeBringIntoView(listState, listTopReserve, listTopOverflow)
     val density = LocalDensity.current
     val gridState = rememberLazyGridState()
     val rowState = rememberLazyListState()
@@ -947,9 +945,8 @@ internal fun ChannelsScreenContent(
                         state = rememberTabGridState(gridState),
                         programmePicture = view.showsProgramArt,
                         channelNames = view.showsChannelNames,
-                        // The grid's own edge inset completes this reserve. At rest the cards
-                        // sit one focus-line gap below the controls; later rows sit at that gap
-                        // from the physical top, with the preceding row cut by the screen edge.
+                        // The grid's own edge inset completes the shared rest line. Once scrolled,
+                        // Grid uses its own focus line from the physical top.
                         scrollingHeaderHeight = if (headerScrolls) {
                             topOverflow + headerContentLine - ChannelsGridEdgeInset
                         } else 0.dp,

@@ -7,12 +7,14 @@ import at.bernhardberger.tvhplayer.notices.NoticeContext
 import at.bernhardberger.tvhplayer.notices.DvrMutationFeedback
 import at.bernhardberger.tvhplayer.testutil.tagBounds
 import at.bernhardberger.tvhplayer.testutil.labelToFocusedFillGap
+import at.bernhardberger.tvhplayer.testutil.LeanbackFeature
 import at.bernhardberger.tvhplayer.testutil.pressKey
 import at.bernhardberger.tvhplayer.testutil.settleFrames
 
 import android.app.Application
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
+import at.bernhardberger.tvhplayer.ui.components.ListBottomFadeHeight
 import at.bernhardberger.tvhplayer.ui.components.LocalWatchingIndicator
 import at.bernhardberger.tvhplayer.ui.components.LocalWatchingTarget
 import at.bernhardberger.tvhplayer.testutil.CaptureOutput
@@ -49,6 +51,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.*
@@ -78,6 +81,7 @@ import at.bernhardberger.tvhplayer.ui.screens.recordings.SCHEDULE_UPCOMING_SHOWN
 import at.bernhardberger.tvhplayer.ui.AppDestination
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.TvBrowseColumnWidth
+import at.bernhardberger.tvhplayer.ui.components.depth.DepthListTopReserve
 import at.bernhardberger.tvhplayer.ui.TvIconButtonSize
 import at.bernhardberger.tvhplayer.ui.screens.recordings.ArchiveLevelHeading
 import at.bernhardberger.tvhplayer.ui.common.formatFileSize
@@ -121,6 +125,7 @@ import org.koin.dsl.module
 class RecordingsVisualLayoutTest {
     @get:Rule val images = ImageLoaderRule()
     @get:Rule val compose = createComposeRule()
+    @get:Rule val leanback = LeanbackFeature()
     private lateinit var session: FakeTvheadendSession
     private lateinit var view: View
     private lateinit var backDispatcher: OnBackPressedDispatcher
@@ -512,10 +517,13 @@ class RecordingsVisualLayoutTest {
     }
 
     @Test fun scheduleDeepLinkScrollsToTheEntryBeforeFocus() {
+        leanback.enable()
         screenState.open(at.bernhardberger.tvhplayer.core.DvrLibraryMode.SCHEDULE, DvrEntryId(48))
         show(entries = (40L..49L).map { recording(it, "Scheduled expedition ${it - 39}", null,
             DvrEntryState.SCHEDULED, startEpochSeconds = 1_900_000_000L + it * 3600) })
         compose.onNodeWithTag("recording-list-entry-48").assertIsFocused().assertIsDisplayed()
+        compose.onNodeWithTag("schedule-upcoming-heading", useUnmergedTree = true).assertIsDisplayed()
+        assertHeaderGap(activeHeading().bounds.top)
         capture("schedule-deep-linked", 1f, "focused entry=48", outputs = "build/outputs/home")
     }
 
@@ -781,6 +789,8 @@ class RecordingsVisualLayoutTest {
         // The running recording is the newest row of the list, with its dot: no card, no virtual row.
         compose.onNodeWithTag("recordings-now-cards").assertDoesNotExist()
         focused("recording-list-entry-6")
+        assertHeaderGap(activeHeading().bounds.top)
+        assertEquals("Flat pane starts before the first date label", depthListTop(), bounds("recording-metadata-art").top, .5f)
         assertTrailingStateMark(6, "Recording now")
         compose.onAllNodesWithTag("archive-date-divider", useUnmergedTree = true).fetchSemanticsNodes().let {
             assertTrue("A day opens with its label", it.isNotEmpty())
@@ -993,6 +1003,7 @@ class RecordingsVisualLayoutTest {
         focused("recordings-folder-Documentaries")
         compose.onNodeWithTag("depth-back-hint").assertDoesNotExist()
         val active = activeHeading()
+        assertHeaderGap(active.bounds.top)
         val rootHeadingBand = bounds("depth-heading")
         capture("recordings-root", 1f, "hint=absent; headline=$rootHeadingBand", outputs = "build/outputs/back-hint")
         assertEquals("Folders", active.text)
@@ -1035,6 +1046,7 @@ class RecordingsVisualLayoutTest {
         gone(OPTIONS)
         assertEquals(null, valuesLine())
         assertEquals(active.baseline, activeHeading().baseline, 1f)
+        assertHeaderGap(nestedHeading.top)
         assertEquals(defaultRow.top, firstListRow().top, 1f)
         key(Key.Back)
         focused("recordings-folder-Documentaries")
@@ -1086,6 +1098,10 @@ class RecordingsVisualLayoutTest {
         requireNotNull(valuesLine()).assertTextEquals("Name A–Z")
         assertEquals(active.baseline, activeHeading().baseline, 1f)
         assertEquals(rootRowWithValues.top, firstListRow().top, 1f)
+        key(Key.DirectionDown)
+        awaitList()
+        assertEquals("Folder pane follows the list below the values line", depthListTop(),
+            bounds("recording-metadata-art").top, .5f)
         assertNoCommands()
     }
 
@@ -1215,7 +1231,15 @@ class RecordingsVisualLayoutTest {
 
     @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
         instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
-    fun headerFrameFlatDefault() = headerFrame("flat-default", DvrArchiveView())
+    fun headerFrameFlatDefault() {
+        leanback.enable()
+        headerFrame("flat-default", DvrArchiveView())
+        val headline = activeHeading().bounds.top
+        repeat(7) { if (!tagFocused("recording-list-entry-8")) key(Key.DirectionDown) }
+        focused("recording-list-entry-8")
+        assertEquals(headline, activeHeading().bounds.top, .5f)
+        capture("flat-scrolled", 1f, assertScrolledPivot(8, previous = 3), outputs = HEADER_CAPTURES)
+    }
 
     @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
         instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
@@ -1262,7 +1286,20 @@ class RecordingsVisualLayoutTest {
 
     @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
         instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
-    fun problemsClearResting() = problemsClearFrame("resting")
+    fun problemsClearResting() {
+        leanback.enable()
+        problemsClearFrame("resting")
+        val headline = bounds("archive-level-heading").top
+        val entries = requireNotNull(session.observation.value.dvrSnapshotForDisplay).entries
+        publish(entries + (60L..67L).map {
+            recording(it, "Unfinished expedition ${it - 59}", "expedition$it.ts", DvrEntryState.COMPLETED_ERROR,
+                startEpochSeconds = nowSeconds() - (it - 60) * 2400 - 8 * 86400L)
+        })
+        repeat(9) { if (!tagFocused("recording-list-entry-65")) key(Key.DirectionDown) }
+        focused("recording-list-entry-65")
+        assertEquals(headline, bounds("archive-level-heading").top, .5f)
+        capture("scrolled", 1f, assertScrolledPivot(65, problems = true, previous = 64), outputs = "build/outputs/problems-clear")
+    }
 
     @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
         instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
@@ -1458,6 +1495,8 @@ class RecordingsVisualLayoutTest {
         compose.onNode(previewText).assertDoesNotExist()
         compose.onNode(previewText, useUnmergedTree = true).assertIsDisplayed()
         assertEquals(340f, bounds("recording-metadata-pane").width, .1f)
+        assertEquals("Folder recording pane starts on the list's top line", firstListRow().top,
+            bounds("recording-metadata-art").top, .5f)
         assertEquals(562f, bounds("recording-metadata-pane").left, .1f)
         capture("focused-recording-metadata", 1f)
         key(Key.Menu)
@@ -1539,17 +1578,32 @@ class RecordingsVisualLayoutTest {
     }
 
     private fun scheduleAndProblemsKeepNativeRowsAndTruthfulStatus(endPadding: Dp?) {
+        startView = DvrArchiveView()
         show(endPadding = endPadding)
-        focused("recordings-folder-Documentaries")
+        awaitList()
         compose.mainClock.advanceTimeBy(600)
-        val archiveRow = bounds("recordings-folder-Documentaries")
+        val archiveRow = firstListRow()
+        val archiveLabel = visibleSectionLabels().first()
+        val sectionStyle = sectionLabelLayout(archiveLabel).layoutInput.style
+        val sectionAir = archiveRow.top - archiveLabel.boundsInRoot.bottom
+        fun assertFirstSectionLabel(rowTag: String) {
+            val label = visibleSectionLabels().single()
+            assertEquals("Section label uses the flat list's typography", sectionStyle, sectionLabelLayout(label).layoutInput.style)
+            assertEquals("Section label keeps the flat list's first-row air",
+                sectionAir, bounds(rowTag).top - label.boundsInRoot.bottom, .5f)
+        }
         if (endPadding != null) assertEquals(860f, bounds("recordings-header").right, .1f)
         openScheduleSubnav()
         compose.onNodeWithText("Schedule").assertIsFocused()
-        repeat(3) { key(Key.DirectionDown) }
+        key(Key.DirectionDown)
+        focused("schedule-new-timer")
+        val scheduleRestTop = bounds("schedule-new-timer").top
+        repeat(2) { key(Key.DirectionDown) }
         focused("recording-list-entry-20")
+        assertFirstSectionLabel("recording-list-entry-20")
         assertOverlineAboveTitle(20)
-        assertArchiveColumns(20, archiveRow, "Tomorrow's documentary", paneTopTag = "schedule-new-timer")
+        assertHeaderGap(activeHeading().bounds.top)
+        assertArchiveColumns(20, archiveRow, "Tomorrow's documentary", paneTop = scheduleRestTop)
         if (endPadding != null) assertTrue(bounds("recording-metadata-pane").right <= 860f)
         // A scheduled row carries its clock at the end, as channel rows do; the overline keeps only times.
         assertTrailingStateMark(20, "Scheduled")
@@ -1562,10 +1616,10 @@ class RecordingsVisualLayoutTest {
         compose.onNodeWithTag("recordings-mode-problems").assertIsFocused()
         key(Key.DirectionDown)
         focused("recording-list-entry-21")
+        assertFirstSectionLabel("recording-list-entry-21")
         assertOverlineAboveTitle(21)
-        // The headline and its counts line stay in the list column: the pane starts beside the headline,
-        // at the top of the tab's content, never pushed below the left column's header.
-        assertArchiveColumns(21, archiveRow, "Unfinished expedition", paneBesideHeadline = true)
+        assertHeaderGap(bounds("archive-level-heading").top)
+        assertArchiveColumns(21, archiveRow, "Unfinished expedition", paneTop = bounds("recordings-problems-list").top)
         // The headline and its counts line end short of Clear, whatever the label's length.
         val clear = bounds(PROBLEMS_CLEAR_TAG)
         assertTrue(bounds("archive-level-heading").right <= clear.left)
@@ -1589,26 +1643,28 @@ class RecordingsVisualLayoutTest {
     }
 
     @Test fun multiItemListsExposeMiddleRowNativeFocusAndGeometry() {
+        leanback.enable()
+        startView = DvrArchiveView()
         val entries = (1L..8L).map { recording(it, "Expedition episode $it", "Documentaries/episode$it.ts") } +
             (40L..47L).map { recording(it, "Scheduled expedition ${it - 39}", null, DvrEntryState.SCHEDULED,
                 startEpochSeconds = 1_791_086_400) } +
             (60L..67L).map { recording(it, "Unfinished expedition ${it - 59}", null, DvrEntryState.COMPLETED_ERROR,
                 startEpochSeconds = 1_791_000_000) }
         show(entries = entries)
-        focused("recordings-folder-Documentaries")
-        key(Key.DirectionCenter)
         focused("recording-list-entry-1")
         val archivePane = bounds("recording-metadata-pane")
         key(Key.DirectionDown)
         focused("recording-list-entry-2")
         // Archive spacing is unchanged: record its existing overlap, but still require complete focus growth.
         assertMiddleFocus(2, checkNeighbourClearance = false)
-        key(Key.DirectionUp)
+        repeat(4) { key(Key.DirectionDown) }
+        focused("recording-list-entry-6")
+        assertScrolledPivot(6)
         openScheduleSubnav()
         compose.onNodeWithText("Schedule").assertIsFocused()
         repeat(3) { key(Key.DirectionDown) }
         focused("recording-list-entry-40")
-        assertDenseListGeometry(expectedRows = 3)
+        assertDenseListGeometry()
         // The focused entry's pane takes the column of the Archive's recording preview.
         assertEquals(archivePane.width, bounds("recording-metadata-pane").width, .1f)
         assertEquals(archivePane.left, bounds("recording-metadata-pane").left, .1f)
@@ -1632,8 +1688,27 @@ class RecordingsVisualLayoutTest {
         focused("recording-list-entry-61")
         assertPaneTitle("Unfinished expedition 2")
         assertMiddleFocus(61)
+        repeat(4) { key(Key.DirectionDown) }
+        focused("recording-list-entry-65")
+        assertScrolledPivot(65, problems = true)
         assertNoCommands()
     }
+
+    private fun assertScrolledPivot(focused: Long, problems: Boolean = false, previous: Long? = null): String =
+        with(compose.density) {
+            val viewport = bounds(if (problems) "recordings-problems-list" else "depth-active")
+            val top = if (problems) viewport.top else bounds("depth-heading").bottom
+            val height = viewport.bottom - top
+            val focusedTop = bounds("recording-list-entry-$focused").top
+            assertEquals("scrolled focus uses the whole viewport", top + .3f * height, focusedTop, 2.dp.toPx())
+            val fadeEnd = top + ListBottomFadeHeight.toPx()
+            assertTrue("focused row starts below the top fade", focusedTop >= fadeEnd)
+            val readingBand = previous?.let {
+                val title = bounds("recording-list-headline-$it")
+                "; previousTitle=${title.top.toDp()}..${title.bottom.toDp()}; fadeEnd=${fadeEnd.toDp()}"
+            }.orEmpty()
+            "pivotDp: viewportTop=${top.toDp()}; viewportHeight=${height.toDp()}; focusedTop=${focusedTop.toDp()}$readingBand"
+        }
 
     @Test fun ruleMenuRejectsAnEntryThatCompletedBeforeActivation() {
         val entry = paneEntries(long = false).single { it.id == DvrEntryId(40) }
@@ -1921,6 +1996,8 @@ class RecordingsVisualLayoutTest {
         focused("schedule-new-automatic")
         key(Key.DirectionDown)
         focused("automatic-recording-first")
+        assertHeaderGap(activeHeading().bounds.top)
+        assertEquals("Rule pane starts on the list's top line", depthListTop(), bounds("automatic-recording-pane").top, .5f)
         key(Key.DirectionDown)
         focused("automatic-recording-second")
         compose.pressKey(Key.Back)
@@ -2344,6 +2421,7 @@ class RecordingsVisualLayoutTest {
     @Test @Category(VisualCapture::class) @Config(qualifiers = "en-rUS-w960dp-h540dp-land-xhdpi",
         instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
     fun scheduleEntryRowsPhase2Captures() {
+        leanback.enable()
         val outputs = "build/outputs/slice-7b"
         presentationLibrary(firstRow = true, scheduled = true)
         val entries = requireNotNull(session.observation.value.dvrSnapshotForDisplay).entries
@@ -2356,6 +2434,7 @@ class RecordingsVisualLayoutTest {
         publish(entries, autorecRules = automaticRules)
         openScheduleScreen()
         focused("recording-list-entry-9")
+        val headline = activeHeading().bounds.top
         capture("Bx1-schedule-opens", 1f, activeHeading().let {
             "Fixture pack artwork and channel picons. Heading=${it.bounds}; baseline=${it.baseline}"
         }, outputs)
@@ -2363,16 +2442,20 @@ class RecordingsVisualLayoutTest {
         focused("schedule-new-timer")
         capture("Bx2-new-timer-focused", 1f, "Right column is intentionally blank.", outputs)
         val ridge = entries.first { it.id == DvrEntryId(1) }
-        publish(entries + (40L..51L).map {
+        publish(entries.filterNot { it.state == DvrEntryState.SCHEDULED } + (40L..51L).map {
             val start = nowSeconds() + 10_000 + (it - 40) * 86_400
             DvrEntry.create(DvrEntryId(it), title = ridge.title, state = DvrEntryState.SCHEDULED,
                 start = Instant.fromEpochSeconds(start), stop = Instant.fromEpochSeconds(start + 3_600),
                 channelId = ridge.channelId, channelName = ridge.channelName,
                 image = ridge.image, description = ridge.description)
         }, autorecRules = automaticRules)
+        // Automatic recordings, the running match, then the seven newly scheduled entries.
         repeat(9) { key(Key.DirectionDown) }
-        compose.onNodeWithTag("schedule-upcoming-heading", useUnmergedTree = true).assertIsNotDisplayed()
-        capture("Bx5-schedule-scrolled", 1f, "Upcoming and management rows scrolled away.", outputs)
+        focused("recording-list-entry-46")
+        assertEquals(headline, activeHeading().bounds.top, .5f)
+        compose.onNodeWithTag("schedule-new-timer").assertIsNotDisplayed()
+        compose.onNodeWithTag("schedule-automatic-recordings").assertIsNotDisplayed()
+        capture("Bx5-schedule-scrolled", 1f, assertScrolledPivot(46, previous = 45), outputs)
         publish(listOf(DvrEntry.create(
             DvrEntryId(12), title = ridge.title, state = DvrEntryState.SCHEDULED, enabled = false,
             start = Instant.fromEpochSeconds(nowSeconds() + 3_600),
@@ -2502,12 +2585,12 @@ class RecordingsVisualLayoutTest {
         openScheduleSubnav()
         key(Key.DirectionRight)
         compose.onNodeWithTag("recordings-mode-problems").assertIsFocused()
-        compose.onNodeWithText("Today", useUnmergedTree = true).assertExists()
+        compose.onNodeWithContentDescription("Today", useUnmergedTree = true).assertExists()
         // The clock passes midnight while the server's list stays the same.
         compose.runOnIdle { clock.value += 2 }
         compose.mainClock.advanceTimeByFrame()
-        compose.onNodeWithText("Today", useUnmergedTree = true).assertDoesNotExist()
-        compose.onNodeWithText("Yesterday", useUnmergedTree = true).assertExists()
+        compose.onNodeWithContentDescription("Today", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithContentDescription("Yesterday", useUnmergedTree = true).assertExists()
     }
 
     @Test fun scheduleDayHeadingsFollowTheClockAcrossMidnight() {
@@ -2517,12 +2600,12 @@ class RecordingsVisualLayoutTest {
         show(entries = listOf(recording(20, "Night documentary", null, DvrEntryState.SCHEDULED,
             startEpochSeconds = clock.value + 3_600)))
         focused("recording-list-entry-20")
-        compose.onNodeWithText("Tomorrow", useUnmergedTree = true).assertExists()
+        compose.onNodeWithContentDescription("Tomorrow", useUnmergedTree = true).assertExists()
         // The clock passes midnight while the server's list stays the same.
         compose.runOnIdle { clock.value += 2 }
         compose.mainClock.advanceTimeByFrame()
-        compose.onNodeWithText("Tomorrow", useUnmergedTree = true).assertDoesNotExist()
-        compose.onNodeWithText("Today", useUnmergedTree = true).assertExists()
+        compose.onNodeWithContentDescription("Tomorrow", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithContentDescription("Today", useUnmergedTree = true).assertExists()
     }
 
     @Test fun missedAndCanceledPaneBadgesNameTheirState() {
@@ -2663,6 +2746,7 @@ class RecordingsVisualLayoutTest {
         val tab = bounds(BROWSE_TAB)
         val spaceLine = bounds("recordings-space")
         val skeleton = bounds("recordings-skeleton")
+        assertHeaderGap(skeleton.top)
         capture("loading-skeleton", 1f)
         key(Key.DirectionDown)
         focused(BROWSE_TAB)
@@ -2925,6 +3009,8 @@ class RecordingsVisualLayoutTest {
         key(Key.DirectionRight)
         focused("recording-list-entry-10")
         assertEquals("Sort and Show do not apply to Recording now", null, valuesLine())
+        assertEquals("Recording now pane starts on the list's top line", depthListTop(),
+            bounds("recording-metadata-art").top, .5f)
         compose.runOnIdle { assertEquals(listOf("recording-now"), screenState.archiveNavigation.stack.frames.drop(1).map { it.levelId }) }
         key(Key.DirectionLeft)
         focused("recordings-recording-now-folder")
@@ -2938,6 +3024,8 @@ class RecordingsVisualLayoutTest {
         key(Key.DirectionRight)
         focused("recording-list-entry-10")
         assertTrailingStateMark(10, "Recording now")
+        assertEquals("Ordinary folder pane starts below the values line", depthListTop(),
+            bounds("recording-metadata-art").top, .5f)
         key(Key.DirectionLeft)
         key(Key.DirectionLeft)
         focused("recordings-folder-Series")
@@ -3479,15 +3567,14 @@ class RecordingsVisualLayoutTest {
 
     /** The row in Archive's first column, the pane where Archive shows its preview, level with the first row. */
     private fun assertArchiveColumns(
-        id: Long, archiveRow: Rect, paneTitle: String, paneTopTag: String? = null, paneBesideHeadline: Boolean = false,
+        id: Long, archiveRow: Rect, paneTitle: String, paneTop: Float,
     ) {
         val row = bounds("recording-list-entry-$id")
         assertEquals(archiveRow.left, row.left, .5f)
         assertEquals(archiveRow.width, row.width, .5f)
         val pane = bounds("recording-metadata-pane")
         assertEquals(row.left + 340f + 92f, pane.left, .5f)
-        if (paneBesideHeadline) assertTrue(pane.top < bounds("archive-level-heading").bottom)
-        else assertEquals(paneTopTag?.let { bounds(it).top } ?: row.top, pane.top, .5f)
+        assertEquals("Pane starts on the list's top line", paneTop, bounds("recording-metadata-art").top, .5f)
         assertPaneTitle(paneTitle)
     }
 
@@ -3588,9 +3675,21 @@ class RecordingsVisualLayoutTest {
             !tag.contains("-logo-") && !tag.contains("-watched-") && !tag.contains("-supporting-")
     }).fetchSemanticsNodes().map { it.boundsInRoot }.sortedBy { it.top }
 
-    private fun assertDenseListGeometry(expectedRows: Int = 6) {
+    private fun visibleSectionLabels() = compose.onAllNodes(
+        SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading) and !hasTestTag("archive-level-heading"),
+        useUnmergedTree = true,
+    ).fetchSemanticsNodes().filter { it.boundsInRoot.height > 0f }.sortedBy { it.boundsInRoot.top }
+
+    private fun sectionLabelLayout(node: SemanticsNode): TextLayoutResult {
+        val results = mutableListOf<TextLayoutResult>()
+        node.config[SemanticsActions.GetTextLayoutResult].action?.invoke(results)
+        return results.single()
+    }
+
+    private fun assertDenseListGeometry(expectedRows: Int? = null) {
         val rows = visibleListRows().filter { it.height > 63.5f }
-        assertEquals(expectedRows, rows.size)
+        assertTrue("at least two visible rows are needed to check spacing", rows.size >= 2)
+        if (expectedRows != null) assertEquals(expectedRows, rows.size)
         rows.forEachIndexed { index, row ->
             assertEquals(rows.first().top + index * 68f, row.top, .5f)
             assertEquals(64f, row.height, .5f)
@@ -3666,6 +3765,14 @@ class RecordingsVisualLayoutTest {
             it.width > 100f && it.bottom > 0f && it.left < previewLeft && it.left > bounds("recordings-header").left - 1f
         }.minBy { it.top }
     }
+
+    private fun assertHeaderGap(contentTop: Float) {
+        val gap = (contentTop - bounds("recordings-header").bottom) / view.resources.displayMetrics.density
+        assertEquals("Header-to-content gap in dp", 32f, gap, .5f)
+    }
+
+    private fun depthListTop(): Float =
+        bounds("depth-heading").bottom + with(compose.density) { DepthListTopReserve.toPx() }
 
     /** The first line below [fromY] with ink in the 40 dp band where a column starting at [left] draws its row icons. */
     private fun firstIconInk(left: Float, fromY: Float): Float = compose.runOnIdle {
@@ -3803,10 +3910,28 @@ class RecordingsVisualLayoutTest {
         if (!CaptureOutput.enabled) return
         assertNoCommands()
         val rows = visibleListRows()
+        val labels = visibleSectionLabels().map { it.boundsInRoot }
+        fun taggedBounds(tag: String) = compose.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes()
+            .map { it.boundsInRoot }.filter { it.width > 0f && it.height > 0f }
+        fun tagged(tag: String) = taggedBounds(tag).firstOrNull()
+        val density = view.resources.displayMetrics.density
+        val headerBottom = tagged("recordings-header")?.bottom
+        val headlineTop = runCatching { activeHeading().bounds.top }.getOrNull()
+            ?: tagged("archive-level-heading")?.top
+        val buttonTop = tagged(PROBLEMS_CLEAR_TAG)?.top ?: tagged(OPTIONS)?.top
+        val listTop = tagged("recordings-problems-list")?.top
+            ?: tagged("depth-heading")?.let { it.bottom + with(compose.density) { DepthListTopReserve.toPx() } }
+        val firstRowTop = (rows + listOfNotNull(tagged("schedule-new-timer"), tagged("schedule-automatic-recordings"),
+            tagged("schedule-new-automatic"))).filter { it.height > 0f }.minOfOrNull { it.top }
+        val paneTop = tagged("recording-metadata-art")?.top ?: tagged("automatic-recording-pane")?.top
+        val previewLeft = tagged("depth-preview")?.left
+        val previewHeadingTop = previewLeft?.let { left ->
+            taggedBounds("archive-level-heading").firstOrNull { it.left >= left - 1f }?.top
+        }
+        fun dp(px: Float?) = px?.div(density)
         compose.runOnIdle {
             val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
             view.draw(Canvas(bitmap))
-            val density = view.resources.displayMetrics.density
             assertEquals((960 * density).toInt(), bitmap.width)
             assertEquals((540 * density).toInt(), bitmap.height)
             val directory = File(outputs).apply { mkdirs() }
@@ -3819,6 +3944,10 @@ class RecordingsVisualLayoutTest {
                     "Opaque theme background, no video; SDK/playback/navigation calls=0\n" +
                     "Static composition only, not physical-TV focus feel, overscan, motion or SurfaceView proof.\n" +
                     "rows=$rows\n" +
+                    "sectionLabels=$labels\n" +
+                    "geometryDp: headerBottom=${dp(headerBottom)}; headlineTop=${dp(headlineTop)}; " +
+                    "buttonTop=${dp(buttonTop)}; listTop=${dp(listTop)}; firstRowTop=${dp(firstRowTop)}; paneTop=${dp(paneTop)}\n" +
+                    (previewHeadingTop?.let { "previewHeadingTopDp=${dp(it)}\n" } ?: "") +
                     (focusEvidence?.let { "$it\n" } ?: ""),
             )
             bitmap.recycle()

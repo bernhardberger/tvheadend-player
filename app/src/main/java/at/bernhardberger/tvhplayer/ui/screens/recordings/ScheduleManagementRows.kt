@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.offset
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
@@ -50,9 +49,6 @@ internal fun scheduleManagementRows(
         DepthItem(SCHEDULE_NEW_TIMER), onActivate = { if (canAdd) onNewTimer.value() },
     ) { modifier, activate ->
         Column {
-            Column(Modifier.offset(y = (-4).dp).testTag("schedule-upcoming-heading")) {
-                ArchiveLevelHeading(stringResource(R.string.schedule_upcoming), { 1f }, null, atRoot = false)
-            }
             ScheduleManagementRow(SCHEDULE_NEW_TIMER, stringResource(R.string.schedule_new_timer),
                 stringResource(R.string.schedule_new_timer_help), R.drawable.ic_schedule, R.drawable.ic_add,
                 modifier, activate, enabled = canAdd)
@@ -63,9 +59,6 @@ internal fun scheduleManagementRows(
         DepthItem(SCHEDULE_AUTOMATIC_ROW, SCHEDULE_AUTOMATIC_LEVEL),
     ) { modifier, activate ->
         Column {
-            if (!canModify) Column(Modifier.offset(y = (-4).dp)) {
-                ArchiveLevelHeading(stringResource(R.string.schedule_upcoming), { 1f }, null, atRoot = false)
-            }
             ScheduleManagementRow(SCHEDULE_AUTOMATIC_ROW, stringResource(R.string.automatic_recording_new_overline),
                 automaticRecordingCountLabel(automatic), R.drawable.ic_fiber_smart_record,
                 R.drawable.ic_keyboard_arrow_right, modifier, activate)

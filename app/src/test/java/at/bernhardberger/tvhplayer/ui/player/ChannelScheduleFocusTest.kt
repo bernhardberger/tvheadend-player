@@ -384,10 +384,10 @@ class ChannelScheduleFocusTest {
         } } }
         compose.onNodeWithTag("schedule-row-5").assertIsFocused()
         val list = compose.onNodeWithTag("channel-schedule-list").getUnclippedBoundsInRoot()
-        compose.onNodeWithTag("schedule-row-4").assertTopPositionInRootIsAtLeast(list.top + ListTopFadeHeight)
+        compose.onNodeWithTag("schedule-row-4").assertTopPositionInRootIsAtLeast(list.top + PlayerScheduleTopFadeHeight)
         compose.onNodeWithTag("schedule-row-5").performKeyInput { pressKey(Key.DirectionUp) }
         compose.onNodeWithTag("schedule-row-4").assertIsFocused()
-        compose.onNodeWithTag("schedule-row-3").assertTopPositionInRootIsAtLeast(list.top + ListTopFadeHeight)
+        compose.onNodeWithTag("schedule-row-3").assertTopPositionInRootIsAtLeast(list.top + PlayerScheduleTopFadeHeight)
     }
 
     @Test fun rowsWithAndWithoutAPictureShareTheirHeightAndTextStart() {

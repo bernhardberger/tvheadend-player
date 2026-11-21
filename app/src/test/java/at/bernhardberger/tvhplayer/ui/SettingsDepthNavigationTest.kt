@@ -3,6 +3,7 @@ package at.bernhardberger.tvhplayer.ui
 import at.bernhardberger.tvhplayer.di.PlayerStatsLevel
 
 import at.bernhardberger.tvhplayer.testutil.pressKey
+import at.bernhardberger.tvhplayer.testutil.LeanbackFeature
 
 import android.app.Application
 import android.graphics.Bitmap
@@ -82,6 +83,7 @@ import org.robolectric.annotation.GraphicsMode
 @OptIn(ExperimentalTestApi::class)
 class SettingsDepthNavigationTest {
     @get:Rule val compose = createComposeRule()
+    @get:Rule val leanback = LeanbackFeature()
     private lateinit var captureView: View
 
     @Test fun nestedHeadingHintUsesTheLogicalStartGutterAndDirectionInRtl() {
@@ -544,8 +546,7 @@ class SettingsDepthNavigationTest {
     }
 
     @Test fun recordingMarksChoiceLevelsBackToTheRowThatOpenedThem() {
-        // The native TV pivot is what scrolls a focused row to the list's reading band on the TV.
-        enableLeanback()
+        leanback.enable()
         compose.setContent {
             TVHeadendPlayerTheme {
                 val navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.PLAYER.name)
@@ -564,6 +565,12 @@ class SettingsDepthNavigationTest {
                 press(Key.DirectionDown)
             }
             val before = compose.onNode(isFocused() and hasText(title) and hasClickAction()).fetchSemanticsNode().boundsInRoot
+            if (title == "Ad breaks") {
+                val top = compose.onNodeWithTag("depth-heading").fetchSemanticsNode().boundsInRoot.bottom
+                val bottom = compose.onNodeWithTag("depth-active").fetchSemanticsNode().boundsInRoot.bottom
+                assertEquals("scrolled focus uses the whole viewport", top + .3f * (bottom - top), before.top,
+                    with(compose.density) { 2.dp.toPx() })
+            }
             press(Key.DirectionCenter)
             press(Key.Back)
             val after = compose.onNode(isFocused() and hasText(title) and hasClickAction()).fetchSemanticsNode().boundsInRoot
@@ -580,7 +587,7 @@ class SettingsDepthNavigationTest {
     }
 
     @Test fun aMoveInTheFrameBackRestoredFocusIsTheRowOkActsOn() {
-        enableLeanback()
+        leanback.enable()
         compose.setContent {
             TVHeadendPlayerTheme {
                 val navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.PLAYER.name)
@@ -611,11 +618,6 @@ class SettingsDepthNavigationTest {
         compose.onNode(isFocused() and hasText("Keep paused TV tuned")).assertExists()
         press(Key.DirectionCenter)
         compose.onAllNodes(hasText("Keep paused TV tuned") and hasClickAction()).assertCountEquals(0)
-    }
-
-    private fun enableLeanback() {
-        val app = androidx.test.core.app.ApplicationProvider.getApplicationContext<Application>()
-        org.robolectric.Shadows.shadowOf(app.packageManager).setSystemFeature("android.software.leanback", true)
     }
 
     @Test fun recordingsLevelNeedsAProfileChoiceOrRecordingSpace() {

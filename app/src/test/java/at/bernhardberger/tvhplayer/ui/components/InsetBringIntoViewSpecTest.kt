@@ -1,4 +1,4 @@
-package at.bernhardberger.tvhplayer.ui.screens
+package at.bernhardberger.tvhplayer.ui.components
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.BringIntoViewSpec
@@ -6,16 +6,15 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.math.abs
-import at.bernhardberger.tvhplayer.ui.components.InsetBringIntoViewSpec
 
 /**
- * Rows may draw beneath either fade, but native focus scrolling must keep the focused
- * row in the readable band and restore the original top boundary without oscillation.
- * The spec is pure policy so this covers it without a composition.
+ * Exercises viewport delegation and boundary convergence without a composition.
+ * Uses illustrative insets to test the retained-inset policy, and zero scrolled
+ * insets to test the browse policy.
  */
 @OptIn(ExperimentalFoundationApi::class)
-class ChannelsListViewportTest {
-    private val container = 416f // 540 - (32dp heading inset + 36dp heading + 12dp gap + 44dp scopes)
+class InsetBringIntoViewSpecTest {
+    private val container = 416f
     private val top = 4f
     private val scrolledTop = 56f
     private val bottom = 56f
@@ -183,29 +182,29 @@ class ChannelsListViewportTest {
     }
 
     @Test
-    fun delegateSeesTheInsetViewportSoAPivotPolicyStaysAboveTheFade() {
-        val seen = mutableListOf<Triple<Float, Float, Float>>()
-        val recording = InsetBringIntoViewSpec(
-            delegate = object : BringIntoViewSpec {
-                override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float {
-                    seen += Triple(offset, size, containerSize)
-                    return 70f
-                }
-            },
-            topInsetPx = top,
-            scrolledTopInsetPx = scrolledTop,
-            bottomInsetPx = bottom,
-            scrollBackAvailablePx = { scrollBackAvailable },
-        )
+    fun delegateSeesTheBoundaryAndScrolledViewports() {
+        for ((scrolledTopInset, scrolledBottomInset) in listOf(scrolledTop to bottom, 0f to 0f)) {
+            val seen = mutableListOf<Triple<Float, Float, Float>>()
+            val recording = InsetBringIntoViewSpec(
+                delegate = object : BringIntoViewSpec {
+                    override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float {
+                        seen += Triple(offset, size, containerSize)
+                        return 70f
+                    }
+                },
+                topInsetPx = top,
+                bottomInsetPx = bottom,
+                scrolledTopInsetPx = scrolledTopInset,
+                scrolledBottomInsetPx = scrolledBottomInset,
+            )
+            val boundary = Triple(100f - top, 56f, container - top - bottom)
+            val scrolled = Triple(100f - scrolledTopInset, 56f, container - scrolledTopInset - scrolledBottomInset)
 
-        assertEquals(70f, recording.calculateScrollDistance(offset = 100f, size = 56f, containerSize = container))
-        assertEquals(listOf(
-            Triple(100f - top, 56f, container - top - bottom),
-            Triple(100f - scrolledTop, 56f, container - scrolledTop - bottom),
-        ), seen)
-        seen.clear()
-        scrollBackAvailable = Float.POSITIVE_INFINITY
-        assertEquals(70f, recording.calculateScrollDistance(offset = 100f, size = 56f, containerSize = container))
-        assertEquals(listOf(Triple(100f - scrolledTop, 56f, container - scrolledTop - bottom)), seen)
+            assertEquals(70f, recording.calculateScrollDistance(100f, 56f, container, 0f))
+            assertEquals(listOf(boundary, scrolled), seen)
+            seen.clear()
+            assertEquals(70f, recording.calculateScrollDistance(100f, 56f, container, Float.POSITIVE_INFINITY))
+            assertEquals(listOf(scrolled), seen)
+        }
     }
 }

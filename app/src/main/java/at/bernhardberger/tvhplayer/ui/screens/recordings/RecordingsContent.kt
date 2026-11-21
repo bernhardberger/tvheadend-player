@@ -85,7 +85,6 @@ import androidx.tv.material3.NavigationDrawerItemDefaults
 import at.bernhardberger.tvhplayer.ui.components.recordingMarkColor
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.Placeholder
@@ -142,9 +141,9 @@ import at.bernhardberger.tvhplayer.core.summarizeDvrFolder
 import at.bernhardberger.tvhplayer.core.watchedCount
 import at.bernhardberger.tvhplayer.ui.TvBrowseColumnGap
 import at.bernhardberger.tvhplayer.ui.TvBrowseColumnWidth
+import at.bernhardberger.tvhplayer.ui.TvBrowseHeaderContentGap
 import at.bernhardberger.tvhplayer.ui.TvBrowseHeaderHeight
 import at.bernhardberger.tvhplayer.ui.TvBrowseLeadingInset
-import at.bernhardberger.tvhplayer.ui.TvSpacing12
 import at.bernhardberger.tvhplayer.ui.TvSpacing16
 import at.bernhardberger.tvhplayer.ui.TvSpacing4
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
@@ -435,8 +434,8 @@ internal fun FolderListRow(
 }
 
 /**
- * The shared section label that opens a day or month in the flat list. It is only drawn:
- * the recording row under it is the focus stop, so Down from a day's last row lands on the next day's first.
+ * The shared group label for recording lists. The row under it is the focus stop,
+ * so Down from one group's last row lands on the next group's first.
  */
 @Composable
 internal fun ArchiveDateDivider(label: String, first: Boolean, modifier: Modifier = Modifier) {
@@ -509,8 +508,7 @@ internal fun RecordingMetadataPane(
     val paddedStop = recordingPaddedStop(entry)?.takeIf {
         kind == RecordingRowKind.SCHEDULE && it.epochSeconds != entry.stop?.epochSeconds
     }?.let { stringResource(R.string.recordings_until, formatClock(it.epochSeconds)) }
-    // Level with the first row, below the list's own top padding.
-    Column(modifier.fillMaxSize().padding(top = 4.dp).testTag("recording-metadata-pane")) {
+    Column(modifier.fillMaxSize().testTag("recording-metadata-pane")) {
         ProgrammePanePicture(
             art = LocalArtworkContext.current.currentSession?.let { recordingArtwork(entry) },
             logo = piconPath, accent = entry.channelId, logoTag = "recording-metadata-logo",
@@ -611,9 +609,7 @@ private fun recordingRuleLabel(rule: RecordingRule?): Pair<String, Int>? =
     rule?.let { stringResource(it.label) to R.drawable.ic_schedule_rule }
 
 /**
- * The Problems list in Archive's first column, with the focused recording's pane where Schedule
- * shows its own: at the top of the content, whatever heads the list. The pane is passive; focus
- * stays in the list.
+ * The Problems list and passive pane share the space below the headline.
  */
 @Composable
 private fun RecordingListWithPane(
@@ -703,31 +699,31 @@ internal fun RecordingProblems(
         }
     }
     val paneEntry = entries.firstOrNull { "recording:${recordingItemKey(it.id)}" == focusTargetKey }
-    RecordingListWithPane(paneEntry, RecordingRowKind.PROBLEM, piconForEntry, admissionForEntry, paneBottom) {
-        Column {
-            Box {
-                // The counts line ends short of Clear, however long its label runs.
-                ArchiveLevelHeading(
-                    stringResource(R.string.recordings_problems), { 1f }, countsLine,
-                    endReserve = if (onClear != null) clearWidth + TvSpacing16 else 0.dp,
-                )
-                if (onClear != null && clearFocus != null) RecordingsHeadlineButton(
-                    icon = R.drawable.ic_cleaning_services,
-                    label = stringResource(R.string.problems_clear),
-                    value = stringResource(R.string.problems_clear_button),
-                    description = stringResource(R.string.problems_clear),
-                    active = false,
-                    focusable = active,
-                    focusRequester = clearFocus,
-                    upFocus = upFocus ?: FocusRequester.Default,
-                    navigationFocus = navigationFocus,
-                    onClick = onClear,
-                    onDown = { runCatching { selectedFocus.requestFocus() } },
-                    onFocusChanged = onClearFocusChanged,
-                    tag = PROBLEMS_CLEAR_TAG,
-                    onWidth = { clearWidth = with(density) { it.toDp() } },
-                )
-            }
+    Column {
+        Box(Modifier.width(TvBrowseColumnWidth)) {
+            // The counts line ends short of Clear, however long its label runs.
+            ArchiveLevelHeading(
+                stringResource(R.string.recordings_problems), { 1f }, countsLine,
+                endReserve = if (onClear != null) clearWidth + TvSpacing16 else 0.dp,
+            )
+            if (onClear != null && clearFocus != null) RecordingsHeadlineButton(
+                icon = R.drawable.ic_cleaning_services,
+                label = stringResource(R.string.problems_clear),
+                value = stringResource(R.string.problems_clear_button),
+                description = stringResource(R.string.problems_clear),
+                active = false,
+                focusable = active,
+                focusRequester = clearFocus,
+                upFocus = upFocus ?: FocusRequester.Default,
+                navigationFocus = navigationFocus,
+                onClick = onClear,
+                onDown = { runCatching { selectedFocus.requestFocus() } },
+                onFocusChanged = onClearFocusChanged,
+                tag = PROBLEMS_CLEAR_TAG,
+                onWidth = { clearWidth = with(density) { it.toDp() } },
+            )
+        }
+        RecordingListWithPane(paneEntry, RecordingRowKind.PROBLEM, piconForEntry, admissionForEntry, paneBottom) {
             CompositionLocalProvider(LocalBringIntoViewSpec provides bringIntoViewSpec) {
                 LazyColumn(
                     state = listState,
@@ -788,7 +784,6 @@ internal fun RecordingProblems(
                             true
                         },
                 ) {
-                    // Day headings as on Schedule: each opens its first row, the first sits on the list's top.
                     sections.forEachIndexed { sectionIndex, section ->
                         itemsIndexed(
                             section.entries, key = { _, entry -> recordingItemKey(entry.id) },
@@ -805,8 +800,7 @@ internal fun RecordingProblems(
                             }
                             Column {
                                 if (entryIndex == 0 && section.hasDay()) {
-                                    RecordingSectionHeader(scheduleSectionLabel(section), first = sectionIndex == 0)
-                                    if (sectionIndex != 0) Spacer(Modifier.height(4.dp))
+                                    ArchiveDateDivider(scheduleSectionLabel(section), first = sectionIndex == 0)
                                 }
                                 RecordingListRow(
                                     entry = entry,
@@ -926,22 +920,6 @@ internal fun RecordingListRow(
     )
 }
 
-@Composable
-internal fun RecordingSectionHeader(
-    text: String,
-    first: Boolean = false,
-) {
-    // Headings use the Archive heading band; later ones keep a gap to the section above.
-    Box(Modifier.padding(top = if (first) 0.dp else 8.dp).height(recordingsHeadingBandHeight())) {
-        Text(
-            text = text,
-            modifier = Modifier.align(Alignment.CenterStart).semantics { heading() },
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-    }
-}
-
 /**
  * The row's overline: the programme start, length (a running recording says when it stops) and
  * finished file size, then muted symbols for an early stop, expiry or a cancellation whose words
@@ -1058,7 +1036,7 @@ internal fun recordingsHeaderMinHeight(): Dp = with(LocalDensity.current) {
 internal fun RecordingsPreparationSkeleton(contentPadding: PaddingValues, startPadding: Dp) {
     Column(Modifier.fillMaxSize().padding(top = contentPadding.calculateTopPadding())) {
         Spacer(Modifier.height(recordingsHeaderMinHeight()))
-        Spacer(Modifier.height(TvSpacing12))
+        Spacer(Modifier.height(TvBrowseHeaderContentGap))
         RecordingsSkeleton(Modifier.padding(start = startPadding + TvBrowseLeadingInset))
     }
 }
