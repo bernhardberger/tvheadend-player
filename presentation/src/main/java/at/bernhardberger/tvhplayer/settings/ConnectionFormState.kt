@@ -12,14 +12,14 @@ import at.bernhardberger.tvheadend.sdk.core.ServerAuthentication
 import at.bernhardberger.tvheadend.sdk.core.ServerProfile
 import kotlinx.coroutines.CancellationException
 
-internal enum class ConnectionFormFeedback {
+enum class ConnectionFormFeedback {
     SAVED,
     INVALID,
     SAVE_FAILED,
 }
 
 @Stable
-internal class ConnectionFormState(
+class ConnectionFormState(
     host: String = "",
     port: String = DEFAULT_HTSP_PORT.toString(),
     username: String = "",
@@ -166,7 +166,7 @@ internal val ConnectionFormStateSaver = listSaver<ConnectionFormState, String>(
 )
 
 @Composable
-internal fun rememberConnectionFormState(): ConnectionFormState = rememberSaveable(
+fun rememberConnectionFormState(): ConnectionFormState = rememberSaveable(
     saver = ConnectionFormStateSaver,
 ) {
     ConnectionFormState()

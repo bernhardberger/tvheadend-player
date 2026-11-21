@@ -1,86 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- TV key: app_name -->
+    <!-- Same as the shared app_name, which this app's own app_name overrides. -->
     <string name="connect_brand">Tvheadend Player</string>
-    <!-- TV key: onboarding_find_title -->
-    <string name="connect_find_title">Find your server</string>
-    <!-- TV key: onboarding_welcome_body -->
-    <string name="connect_welcome">Watch live TV and recordings from your own Tvheadend server</string>
-    <!-- TV key: onboarding_find_body -->
-    <string name="connect_find_body">Tvheadend servers that announce themselves on this network show up here</string>
-    <!-- TV key: onboarding_find_on_network -->
-    <string name="connect_on_network">On this network</string>
-    <!-- TV key: onboarding_found_server_detail -->
-    <string name="connect_found_detail">%1$s • port %2$d</string>
-    <!-- TV key: onboarding_find_searching -->
-    <string name="connect_searching">Searching…</string>
-    <!-- TV key: onboarding_find_none_body -->
-    <string name="connect_no_servers">No servers found. Many Tvheadend servers don’t announce themselves on the network. Enter the address you use for Tvheadend’s web interface instead.</string>
-    <!-- TV key: onboarding_enter_address_manually -->
-    <string name="connect_enter_manually">Enter address manually</string>
-    <!-- TV key: onboarding_search_again -->
-    <string name="connect_search_again">Search again</string>
-    <!-- TV key: onboarding_sign_in_title -->
-    <string name="connect_account_title">Your account</string>
-    <!-- TV key: onboarding_sign_in_body -->
-    <string name="connect_sign_in_help">Use a Tvheadend user with streaming access. If your server allows access without a sign-in, leave both fields empty.</string>
-    <!-- TV key: onboarding_server_address -->
-    <string name="connect_address">Server address</string>
-    <!-- TV key: onboarding_server_address_support -->
-    <string name="connect_address_help">Name or IP address, without http://</string>
-    <!-- TV key: onboarding_server_address_missing -->
-    <string name="connect_address_missing">Enter the server address</string>
     <string name="connect_port">Port</string>
-    <!-- TV key: onboarding_port_support -->
-    <string name="connect_port_help">Usually %1$d</string>
-    <!-- TV key: onboarding_port_invalid -->
-    <string name="connect_port_invalid">Enter a port from 1 to 65535</string>
-    <!-- TV key: username -->
-    <string name="connect_username">Username</string>
-    <!-- TV key: password -->
-    <string name="connect_password">Password</string>
-    <!-- TV key: show_password -->
-    <string name="connect_show_password">Show password</string>
     <string name="connect_hide_password">Hide password</string>
-    <!-- TV key: onboarding_sign_in_pair -->
-    <string name="connect_pair_needed">Enter both a username and a password, or neither</string>
     <!-- TV key: error_103_reason (without the trailing period for supporting text) -->
     <string name="connect_refused">The server didn’t accept the username or password</string>
-    <!-- TV key: server_name_field -->
-    <string name="connect_name">Name (optional)</string>
-    <!-- TV key: server_name_body -->
-    <string name="connect_name_help">Settings shows the name instead of the address. Leave it empty to show %1$s.</string>
     <string name="connect_name_help_no_address">Settings shows the name instead of the address</string>
-    <!-- TV key: onboarding_connect -->
-    <string name="connect_submit">Connect</string>
-    <!-- TV key: onboarding_connecting_title -->
-    <string name="connect_connecting">Connecting to %1$s</string>
-    <!-- TV key: setup_connection -->
-    <string name="connect_edit">Edit connection</string>
-    <!-- TV key: server_name_save -->
-    <string name="connect_save">Save</string>
-    <!-- TV key: onboarding_save_connection -->
-    <string name="connect_save_connection">Save connection</string>
-    <!-- TV key: cancel -->
-    <string name="connect_cancel">Cancel</string>
-    <!-- TV key: close -->
-    <string name="connect_close">Close</string>
-    <!-- TV key: back -->
-    <string name="connect_back">Back</string>
-    <!-- TV key: autorec_editor_discard -->
-    <string name="connect_discard">Discard changes</string>
-    <!-- TV key: autorec_editor_leave_body -->
-    <string name="connect_unsaved">Your changes haven’t been saved</string>
-    <!-- TV key: server_list_title -->
-    <string name="connect_list_title">Connections</string>
-    <!-- TV key: server_in_use -->
-    <string name="connect_in_use">In use</string>
-    <!-- TV key: server_no_sign_in -->
-    <string name="connect_no_sign_in">No sign-in</string>
-    <!-- TV key: connection_overview_connected -->
-    <string name="connect_connected">Connected</string>
-    <!-- TV key: server_remove -->
-    <string name="connect_remove_description">Remove connection</string>
     <string name="connect_port_detail">port %1$d</string>
     <string name="connect_remove_title">Remove %1$s?</string>
     <!-- TV key: server_remove_body_active (this device instead of this TV) -->

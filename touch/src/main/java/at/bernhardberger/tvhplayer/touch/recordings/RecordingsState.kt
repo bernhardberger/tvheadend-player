@@ -4,15 +4,18 @@ import androidx.annotation.StringRes
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import at.bernhardberger.tvhplayer.touch.R
+import java.time.Duration
+import java.time.Instant
 
 /**
  * Recordings > Browse on supplied state. The producer arranges [root] for [view] (the shared
- * `buildDvrArchive` and `dvrDateSectionStarts`) and formats every text; the screen walks the tree
- * one level at a time and keeps the picked recording.
+ * `buildDvrArchive` and `dvrDateSectionStarts`); the screen walks the tree one level at a time,
+ * keeps the picked recording and writes the rows' lines against [clock].
  */
 internal data class RecordingsState(
     val view: RecordingsView,
     val root: RecordingFolder,
+    val clock: RecordingClock,
     val space: RecordingSpace? = null,
 )
 
@@ -74,24 +77,23 @@ internal data class RecordingItem(
     val channelLogo: Painter? = null,
     val logoTint: Color? = null,
     val picture: Painter? = null,
-    /** The date label a flat list starts here (`dvrDateSectionStarts`), or null when it continues. */
-    val section: String? = null,
-    /** The start's day ("Today", "Wed, Nov 11") and time ("8:30 PM"). */
-    val day: String,
-    val time: String,
-    val length: String,
-    /** The row's line under the title, formatted by the producer for the canvas it is shown on. */
-    val line: String,
+    /** The date label a list starts here (`dvrDateSectionStarts`), or null when it continues. */
+    val section: RecordingSection? = null,
+    val start: Instant,
+    val length: Duration,
     val state: RecordingProgress = RecordingProgress.Unwatched,
     val details: RecordingDetails = RecordingDetails(),
 )
 
+/** A date label: a day's ("Today", "Wed, Nov 11") or a month's ("October"). */
+internal data class RecordingSection(val label: String, val dates: RowDates)
+
 internal sealed interface RecordingProgress {
     /** Still recording: [progress] is how much of the planned time has been recorded. */
-    data class Recording(val until: String, val progress: Float) : RecordingProgress
+    data class Recording(val until: Instant, val progress: Float) : RecordingProgress
     data object Unwatched : RecordingProgress
     /** The viewer's resume point. */
-    data class PartlyWatched(val left: String, val progress: Float) : RecordingProgress
+    data class PartlyWatched(val left: Duration, val progress: Float) : RecordingProgress
     data object Watched : RecordingProgress
 }
 

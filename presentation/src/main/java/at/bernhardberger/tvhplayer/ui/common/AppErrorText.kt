@@ -11,7 +11,7 @@ import at.bernhardberger.tvhplayer.core.AppErrorCondition
  * happened (the reason), then what helps (an optional hint shared by conditions with the same
  * advice). Its catalog number stays internal and is never shown.
  */
-internal class AppErrorText(private val context: Context) {
+class AppErrorText(private val context: Context) {
     fun title(condition: AppErrorCondition): String = context.getString(condition.titleRes())
 
     /**
@@ -57,7 +57,7 @@ internal class AppErrorText(private val context: Context) {
 }
 
 @StringRes
-internal fun AppErrorCondition.titleRes(): Int = when (this) {
+fun AppErrorCondition.titleRes(): Int = when (this) {
     AppErrorCondition.UNREACHABLE -> R.string.error_101_title
     AppErrorCondition.TIMEOUT -> R.string.error_102_title
     AppErrorCondition.AUTHENTICATION_REJECTED -> R.string.error_103_title
@@ -126,7 +126,7 @@ private fun AppErrorCondition.reasonRes(): Int = when (this) {
 
 /** Hints are shared: conditions with the same advice point at one string. */
 @StringRes
-internal fun AppErrorCondition.hintRes(): Int? = when (this) {
+fun AppErrorCondition.hintRes(): Int? = when (this) {
     AppErrorCondition.UNREACHABLE -> R.string.error_hint_check_server
     AppErrorCondition.TIMEOUT -> R.string.error_hint_try_in_a_moment
     AppErrorCondition.AUTHENTICATION_REJECTED -> R.string.error_hint_check_sign_in

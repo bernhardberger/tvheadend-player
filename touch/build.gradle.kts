@@ -34,11 +34,29 @@ tasks.withType<Test>().configureEach {
 
 dependencies {
     implementation(project(":brand"))
+    implementation(project(":client"))
+    implementation(project(":presentation"))
+    implementation(libs.tvheadend.sdk.android) {
+        version { strictly(libs.versions.tvheadend.sdk.get()) }
+    }
+    implementation(libs.tvheadend.sdk.media3) {
+        version { strictly(libs.versions.tvheadend.sdk.get()) }
+    }
+    implementation(libs.androidx.media3.exoplayer)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.koin.android)
+    implementation(libs.koin.androidx.compose)
     implementation("androidx.compose.material3:material3:1.5.0-rc01")
     implementation("androidx.compose.material3.adaptive:adaptive:1.3.0")
     implementation(libs.androidx.activity.compose)
 
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.androidx.datastore.preferences)
+    testImplementation(libs.tvheadend.sdk.testing) {
+        version { strictly(libs.versions.tvheadend.sdk.get()) }
+    }
     testImplementation("org.robolectric:robolectric:4.17")
     testImplementation(libs.androidx.compose.ui.test.junit4)
     // ComponentActivity for screen tests that compose a single screen on fixture state.

@@ -41,6 +41,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
+import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import at.bernhardberger.tvhplayer.touch.R
 
 @Composable
@@ -55,9 +56,9 @@ internal fun ConnectionsScreen(
     Surface(Modifier.fillMaxSize()) {
         Column(Modifier.windowInsetsPadding(WindowInsets.safeDrawing)) {
             TopAppBar(
-                title = { Text(stringResource(R.string.connect_list_title), Modifier.semantics { heading() }) },
+                title = { Text(stringResource(SharedR.string.server_list_title), Modifier.semantics { heading() }) },
                 navigationIcon = {
-                    ConnectionIconButton(R.drawable.connect_back_outline, R.string.connect_back, onClick = onBack)
+                    ConnectionIconButton(R.drawable.connect_back_outline, SharedR.string.back, onClick = onBack)
                 },
                 windowInsets = WindowInsets(0, 0, 0, 0),
             )
@@ -68,7 +69,7 @@ internal fun ConnectionsScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Text(
-                        stringResource(R.string.connect_in_use),
+                        stringResource(SharedR.string.server_in_use),
                         Modifier.padding(start = 4.dp).semantics { heading() },
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.labelLarge,
@@ -111,7 +112,7 @@ private fun ActiveConnectionCard(active: ActiveConnectionUiState, onEdit: () -> 
                 ConnectionDetails(
                     active.address,
                     stringResource(R.string.connect_port_detail, active.port),
-                    active.username.ifBlank { stringResource(R.string.connect_no_sign_in) },
+                    active.username.ifBlank { stringResource(SharedR.string.server_no_sign_in) },
                 )
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -124,7 +125,7 @@ private fun ActiveConnectionCard(active: ActiveConnectionUiState, onEdit: () -> 
                         tint = MaterialTheme.colorScheme.primary,
                     )
                     Text(
-                        stringResource(R.string.connect_connected),
+                        stringResource(SharedR.string.connection_overview_connected),
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.primary,
                     )
@@ -138,10 +139,10 @@ private fun ActiveConnectionCard(active: ActiveConnectionUiState, onEdit: () -> 
         ) {
             FilledTonalButton(onClick = onEdit, modifier = Modifier.weight(1f, fill = false)) {
                 Icon(painterResource(R.drawable.connect_edit_outline), null, Modifier.size(18.dp))
-                Text(stringResource(R.string.connect_edit), Modifier.padding(start = 8.dp))
+                Text(stringResource(SharedR.string.setup_connection), Modifier.padding(start = 8.dp))
             }
             ConnectionIconButton(
-                R.drawable.connect_delete_outline, R.string.connect_remove_description, onClick = onRemove,
+                R.drawable.connect_delete_outline, SharedR.string.server_remove, onClick = onRemove,
             )
         }
     }
@@ -206,7 +207,7 @@ private fun RemoveConnectionDialog(name: String, onCancel: () -> Unit, onRemove:
         title = { Text(stringResource(R.string.connect_remove_title, name)) },
         text = { Text(stringResource(R.string.connect_remove_body_active)) },
         confirmButton = { TextButton(onClick = onRemove) { Text(stringResource(R.string.connect_remove)) } },
-        dismissButton = { TextButton(onClick = onCancel) { Text(stringResource(R.string.connect_cancel)) } },
+        dismissButton = { TextButton(onClick = onCancel) { Text(stringResource(SharedR.string.cancel)) } },
         properties = DialogProperties(usePlatformDefaultWidth = false),
     )
 }

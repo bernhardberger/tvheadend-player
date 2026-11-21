@@ -36,6 +36,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import androidx.window.core.layout.WindowSizeClass
+import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import at.bernhardberger.tvhplayer.touch.R
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -66,16 +67,16 @@ internal fun ConnectionEditor(
     if (confirmDiscard) {
         AlertDialog(
             onDismissRequest = { confirmDiscard = false },
-            title = { Text(stringResource(R.string.connect_discard)) },
-            text = { Text(stringResource(R.string.connect_unsaved)) },
+            title = { Text(stringResource(SharedR.string.autorec_editor_discard)) },
+            text = { Text(stringResource(SharedR.string.autorec_editor_leave_body)) },
             dismissButton = {
-                TextButton(onClick = { confirmDiscard = false }) { Text(stringResource(R.string.connect_cancel)) }
+                TextButton(onClick = { confirmDiscard = false }) { Text(stringResource(SharedR.string.cancel)) }
             },
             confirmButton = {
                 TextButton(onClick = {
                     confirmDiscard = false
                     onCancel()
-                }) { Text(stringResource(R.string.connect_discard)) }
+                }) { Text(stringResource(SharedR.string.autorec_editor_discard)) }
             },
         )
     }
@@ -89,15 +90,10 @@ private fun ConnectionEditorContent(
     onSave: (ConnectionFields) -> Unit,
     onClose: () -> Unit,
 ) {
-    var showValidation by rememberSaveable { mutableStateOf(false) }
     val focus = LocalFocusManager.current
     val save = {
-        if (state.fields.canSubmit) {
-            focus.clearFocus()
-            onSave(state.fields)
-        } else {
-            showValidation = true
-        }
+        focus.clearFocus()
+        onSave(state.fields)
     }
     Surface(
         modifier = if (compact) Modifier.fillMaxSize() else Modifier.widthIn(max = 560.dp).fillMaxWidth(),
@@ -113,7 +109,7 @@ private fun ConnectionEditorContent(
                     Modifier.fillMaxWidth().padding(start = 4.dp, end = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    ConnectionIconButton(R.drawable.connect_close_outline, R.string.connect_close, onClick = onClose)
+                    ConnectionIconButton(R.drawable.connect_close_outline, SharedR.string.close, onClick = onClose)
                     EditorTitle(Modifier.weight(1f).padding(start = 4.dp), compact = true)
                     EditorSave(state.phase, save, compact = true)
                 }
@@ -125,7 +121,6 @@ private fun ConnectionEditorContent(
                 onFieldsChange,
                 compact,
                 showSignInHelp = true,
-                showValidation = showValidation,
                 modifier = Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())
                     .padding(horizontal = if (compact) 24.dp else 0.dp, vertical = if (compact) 12.dp else 8.dp),
             )
@@ -134,7 +129,7 @@ private fun ConnectionEditorContent(
                     Modifier.fillMaxWidth().padding(top = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
                 ) {
-                    TextButton(onClick = onClose) { Text(stringResource(R.string.connect_cancel)) }
+                    TextButton(onClick = onClose) { Text(stringResource(SharedR.string.cancel)) }
                     EditorSave(state.phase, save, compact = false)
                 }
             }
@@ -145,7 +140,7 @@ private fun ConnectionEditorContent(
 @Composable
 private fun EditorTitle(modifier: Modifier, compact: Boolean) {
     Text(
-        stringResource(R.string.connect_edit),
+        stringResource(SharedR.string.setup_connection),
         modifier.semantics { heading() },
         style = if (compact) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineSmall,
     )
@@ -157,7 +152,11 @@ private fun EditorSave(phase: ConnectionPhase, onSave: () -> Unit, compact: Bool
         ConnectAction(phase, onSave)
     } else {
         TextButton(onClick = onSave) {
-            Text(stringResource(if (compact) R.string.connect_save else R.string.connect_save_connection))
+            Text(
+                stringResource(
+                    if (compact) SharedR.string.server_name_save else SharedR.string.onboarding_save_connection,
+                ),
+            )
         }
     }
 }
