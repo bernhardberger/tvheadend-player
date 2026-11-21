@@ -165,6 +165,15 @@ class ProgrammeArtworkPolicyTest {
             artworkLogoPlaces(pixels, 96, 144, logoShare = .42).first().corner)
     }
 
+    @Test fun logoLeavesSpaceBesideDrawnInLettering() {
+        // The lettering ends above the logo's own space, but still crowds it.
+        val pixels = titlePixels(IntRange.EMPTY).apply { drawLettering(top = 98) }
+
+        assertTrue(artworkLettering(pixels, 96, 144).isNotEmpty())
+        assertNotEquals(ArtworkLogoCorner.BOTTOM_START,
+            artworkLogoPlaces(pixels, 96, 144, logoShare = .42).first().corner)
+    }
+
     @Test fun drawnInLetteringCostsMoreThanBusyTexture() {
         val pixels = titlePixels(IntRange.EMPTY, textureRows = 106..143).apply { drawLettering(top = 8) }
 

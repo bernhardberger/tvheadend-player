@@ -490,6 +490,8 @@ private const val LOGO_NEIGHBOUR_WEIGHT = .5
 // The share of the logo's space that drawn-in lettering covers weighs this much against detail:
 // a logo over a face or scenery is the lesser fault than one over the programme's own title.
 private const val LOGO_LETTERING_WEIGHT = 4.0
+// Lettering close by weighs less than lettering in the logo's own space, but still crowds it.
+private const val LOGO_LETTERING_NEAR_WEIGHT = 1.0
 // Corners this close are equally good; the earlier one in reading order from the bottom start wins.
 private const val LOGO_TIE = .03
 // A ground this calm needs no shade when it is also clearly light or dark (linear luminance).
@@ -504,7 +506,8 @@ internal const val LOGO_CORNER_ANALYSIS_WIDTH = 512
  * of its own stands in. A corner is scored on the detail in the space the logo needs, its box of
  * [logoShare] of the picture's width plus room around it, and on half the detail of its wider
  * neighbourhood, so a logo does not squeeze in beside a busy part. Lettering drawn into the
- * picture ([artworkLettering]) weighs far more than any other detail in that space. Nearly equal
+ * picture ([artworkLettering]) weighs far more than any other detail in that space, and counts
+ * even when it stands close beside it. Nearly equal
  * corners go to the bottom start, then top start, bottom end, top end. [pixels] is a copy of exactly what the card
  * shows, at most [LOGO_CORNER_ANALYSIS_WIDTH] wide.
  */
@@ -542,15 +545,17 @@ internal fun artworkLogoPlaces(
         }
         val full = (LOGO_STEP_HIGH - LOGO_STEP_LOW).toDouble()
         val neededShare = needed / full / maxOf(1, neededCount)
-        var lettered = 0.0
-        for (line in lettering) {
-            val across = minOf(left + boxWidth + room, line.right.toDouble()) - maxOf(left - room, line.left.toDouble())
-            val down = minOf(top + boxHeight + room, line.bottom.toDouble()) - maxOf(top - room, line.top.toDouble())
-            if (across > 0 && down > 0) lettered += across * down
+        fun lettered(margin: Double): Double {
+            var covered = 0.0
+            for (line in lettering) {
+                val across = minOf(left + boxWidth + margin, line.right.toDouble()) - maxOf(left - margin, line.left.toDouble())
+                val down = minOf(top + boxHeight + margin, line.bottom.toDouble()) - maxOf(top - margin, line.top.toDouble())
+                if (across > 0 && down > 0) covered += across * down
+            }
+            return minOf(1.0, covered / ((boxWidth + 2 * margin) * (boxHeight + 2 * margin)))
         }
-        val letteredShare = minOf(1.0, lettered / ((boxWidth + 2 * room) * (boxHeight + 2 * room)))
         val cost = maxOf(neededShare, LOGO_NEIGHBOUR_WEIGHT * near / full / maxOf(1, nearCount)) +
-            LOGO_LETTERING_WEIGHT * letteredShare
+            LOGO_LETTERING_WEIGHT * lettered(room) + LOGO_LETTERING_NEAR_WEIGHT * lettered(reach)
         fun linear(sum: Int) = (sum.toDouble() / maxOf(1, boxCount) / 255).pow(2.2)
         val luminance = .2126 * linear(r) + .7152 * linear(g) + .0722 * linear(b)
         val ground = when {
