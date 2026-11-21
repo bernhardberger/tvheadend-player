@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -52,6 +53,19 @@ internal fun DetailsBackButton(label: String, onBack: () -> Unit) {
     }
 }
 
+internal fun hasChannelLogo(logo: Painter?, model: Any?): Boolean = logo != null || model != null
+
+/** No leading slot in a head without a logo; a mixed list can reserve the slot for all rows. */
+internal fun channelLogoSlot(
+    logo: Painter?,
+    tint: Color?,
+    modifier: Modifier,
+    shape: RoundedCornerShape = LogoShape,
+    model: Any? = null,
+    showSlot: Boolean = hasChannelLogo(logo, model),
+): (@Composable () -> Unit)? =
+    if (showSlot) ({ ChannelLogoTile(logo, tint, modifier, shape, model) }) else null
+
 /** A channel's logo on its tinted tile, as the Channels list draws it; the caller gives the size. */
 @Composable
 internal fun ChannelLogoTile(
@@ -63,7 +77,7 @@ internal fun ChannelLogoTile(
     model: Any? = null,
 ) {
     val scheme = MaterialTheme.colorScheme
-    val hasLogo = logo != null || model != null
+    val hasLogo = hasChannelLogo(logo, model)
     val accent = if (tint == null) rememberChannelAccent(model) else null
     val fill = if (!hasLogo || (tint == null && accent == null)) {
         Modifier.background(scheme.surfaceContainerHigh)
@@ -74,7 +88,7 @@ internal fun ChannelLogoTile(
         }
     }
     Box(
-        modifier.clip(shape).then(fill).border(1.dp, scheme.outlineVariant, shape),
+        modifier.testTag("channel-logo-tile").clip(shape).then(fill).border(1.dp, scheme.outlineVariant, shape),
         contentAlignment = Alignment.Center,
     ) {
         ChannelLogoImage(logo, model, tint ?: accent?.settled ?: scheme.surfaceContainerHigh) {

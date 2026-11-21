@@ -25,6 +25,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.core.os.BundleCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel as lifecycleViewModel
@@ -58,6 +59,8 @@ import at.bernhardberger.tvhplayer.ui.common.rememberCurrentEpochSeconds
 import at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
@@ -67,7 +70,6 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.android.ext.android.inject
@@ -105,14 +107,19 @@ class PlayerActivity : ComponentActivity() {
 
     private lateinit var requested: MutableStateFlow<PlayerRoute>
     private lateinit var pictureWindow: PlayerWindow
-    private val requestFailed = MutableStateFlow(false)
+    private val requestFailed = MutableStateFlow<TuneFailure?>(null)
     private var leaving = false
+    private val zap: (ChannelId) -> Unit = { channel ->
+        if (!leaving && (requested.value as? Tune)?.channelId != channel) {
+            setIntent(intent(this, channel))
+            requested.value = Tune(channel, runtime.notePlaybackIntent())
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val route = intent.playerRoute()
-        // First, before any playback: a user stop since the tap that opened this closes it.
-        if (route == null || runtime.enterPlayerScreen(this) == null) {
+        val route = restoreRoute(savedInstanceState, runtime)
+        if (route == null) {
             leaving = true
             finish()
             return
@@ -130,13 +137,18 @@ class PlayerActivity : ComponentActivity() {
                 val current = requested.value as? Tune ?: return@PlayerMediaSession
                 val order = channels.scope.value.scope.visibleChannels.map { it.id }
                 adjacentChannel(order, current.channelId, direction)
-                    ?.takeUnless { leaving }?.let { next -> requested.update { tuneTo(it, next) } }
+                    ?.let(zap)
             },
         )
         lifecycleScope.launch {
+            runtime.sessionStops.first()
+            leaving = true
+            finish()
+        }
+        lifecycleScope.launch {
             requested.collectLatest {
                 when (it) {
-                    is Tune -> tune(runtime, session, it, requestFailed)
+                    is Tune -> tune(runtime, session, it, requestFailed) { !leaving && requested.value == it }
                     is RecordingRoute -> restoreRecording(runtime, session, it, pictureWindow.inWindow)
                 }
             }
@@ -149,11 +161,6 @@ class PlayerActivity : ComponentActivity() {
             }
         }
         finishRecordingAtEof(lifecycleScope, runtime, requested)
-        lifecycleScope.launch {
-            runtime.sessionStops.first()
-            leaving = true
-            finish()
-        }
         setContent {
             SystemBarsForOrientation(window, pictureWindow.inWindow.collectAsStateWithLifecycle().value)
             MaterialTheme(colorScheme = MobileDarkColors) {
@@ -179,9 +186,16 @@ class PlayerActivity : ComponentActivity() {
         if (route is RecordingRoute && runtime.enterPlayerScreen(this) == null) {
             leaving = true
             finish()
-        } else {
+        } else if (route !is Tune || route.intent != null) {
             setIntent(intent)
-            requested.update { if (route is Tune) tuneTo(it, route.channelId) else route }
+            requested.value = route
+        }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        if (::requested.isInitialized) {
+            outState.putParcelable(SAVED_ROUTE, Intent(intent).apply { removeExtra(EXTRA_WATCH_INTENT) })
         }
     }
 
@@ -191,17 +205,15 @@ class PlayerActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S && ::pictureWindow.isInitialized &&
             leavePlayer(LeaveTrigger.UserLeave, canUseWindow(), isInPictureInPictureMode, false) == Leave.EnterWindow
         ) {
-            pictureWindow.enter()
+            if (!pictureWindow.enter()) leave()
         }
     }
 
     override fun onPictureInPictureUiStateChanged(pipState: PictureInPictureUiState) {
         super.onPictureInPictureUiStateChanged(pipState)
         // Android 15 and later say early, so the controls go before the window's animation.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM && pipState.isTransitioningToPip &&
-            ::pictureWindow.isInitialized
-        ) {
-            pictureWindow.inWindow.value = true
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM && ::pictureWindow.isInitialized) {
+            pictureWindow.inWindow.value = pipState.isTransitioningToPip || isInPictureInPictureMode
         }
     }
 
@@ -242,13 +254,16 @@ class PlayerActivity : ComponentActivity() {
         }
     }
 
-    private fun act(action: PlayerAction, timeshift: LiveTimeshift, paused: Boolean) {
+    private val act: (PlayerAction, LiveTimeshift, Boolean) -> Unit = { action, timeshift, paused ->
         when (action) {
             PlayerAction.Back -> back()
             PlayerAction.PictureInPicture -> pictureWindow.enter()
             PlayerAction.WatchLive -> {
                 runtime.consumeBackgroundNotice(BackgroundPlaybackNotice.LIMIT_EXPIRED)
-                requested.update { if (it is Tune) it.copy(token = it.token + 1) else it }
+                val route = requested.value as? Tune
+                if (!leaving && route != null) {
+                    requested.value = route.copy(intent = runtime.notePlaybackIntent(), force = true)
+                }
             }
             PlayerAction.TogglePlay -> timeshift.toggle(paused)
             PlayerAction.BackTen -> timeshift.skip(-BACK_SKIP_MS)
@@ -279,7 +294,7 @@ class PlayerActivity : ComponentActivity() {
         var controlsShown by remember { mutableStateOf(true) }
         var brightness by remember { mutableFloatStateOf(brightnessSlider(systemBrightness(this))) }
         val shown = tune.channelId
-        val status = currentStatus(runtime, observation, shown, failed)
+        val status = currentStatus(runtime, observation, shown, failed?.appliesTo(tune.intent, video.epoch) == true)
         val paused = !livePlayWhenReady(pause, playWhenReady)
         val options = rememberPlayerOptions(runtime, settings, AppPlaybackTarget.Live(shown),
             status == LivePlayerStatus.Playing)
@@ -308,7 +323,7 @@ class PlayerActivity : ComponentActivity() {
             onAction = { act(it, timeshift, paused) },
             onSeek = timeshift::seek,
             onBrightness = { brightness = it; applyBrightness(window, it) },
-            onChannel = { id -> requested.update { tuneTo(it, ChannelId(id.toLong())) } },
+            onChannel = { id -> zap(ChannelId(id.toLong())) },
             onChoice = playerChoices(dvr, info, options, channels) {
                 session.currentLiveRecord((requested.value as? Tune)?.channelId, timeshift.programs.value, clock())
             },
@@ -323,52 +338,68 @@ class PlayerActivity : ComponentActivity() {
     }
 
     companion object {
-        private const val EXTRA_CHANNEL = "channel"
         private const val SECONDS_PER_MINUTE = 60L
         private const val BACK_SKIP_MS = 10_000L
         private const val FORWARD_SKIP_MS = 30_000L
 
-        internal fun intent(context: Context, channelId: ChannelId): Intent =
+        internal fun intent(context: Context, channelId: ChannelId, watch: Long? = null): Intent =
             Intent(context, PlayerActivity::class.java).putExtra(EXTRA_CHANNEL, channelId.value)
-
-        private fun Intent.channelId(): ChannelId? =
-            getLongExtra(EXTRA_CHANNEL, -1L).takeIf { it >= 0 }?.let(::ChannelId)
-
-        private fun Intent.playerRoute(): PlayerRoute? = recordingRoute() ?: channelId()?.let { Tune(it) }
+                .apply { if (watch != null) putExtra(EXTRA_WATCH_INTENT, watch) }
     }
 }
 
-/** The channel asked for; a new [token] tunes again (Watch live after the pause ended). */
-private data class Tune(val channelId: ChannelId, val token: Int = 0) : PlayerRoute
+private const val EXTRA_CHANNEL = "channel"
+private const val EXTRA_WATCH_INTENT = "watch_intent"
+private const val SAVED_ROUTE = "player_route"
 
-/** A newer tap replaces one still starting; the same channel again changes nothing. */
-private fun tuneTo(current: PlayerRoute, channelId: ChannelId): Tune =
-    if (current is Tune && current.channelId == channelId) current else Tune(channelId)
+private fun Intent.playerRoute(): PlayerRoute? =
+    recordingRoute() ?: getLongExtra(EXTRA_CHANNEL, -1L).takeIf { it >= 0 }?.let {
+        Tune(ChannelId(it), getLongExtra(EXTRA_WATCH_INTENT, -1L).takeIf { generation -> generation >= 0 })
+    }
+
+private fun PlayerActivity.restoreRoute(state: Bundle?, runtime: AppPlaybackRuntime): PlayerRoute? {
+    val launch = state?.let { BundleCompat.getParcelable(it, SAVED_ROUTE, Intent::class.java) } ?: intent
+    val route = launch.playerRoute() ?: return null
+    // Entry may join a pending session Stop, or refuse entry if Stop already won.
+    return runtime.enterPlayerScreen(this)?.let { generation ->
+        setIntent(launch)
+        if (route is Tune) route.copy(intent = generation) else route
+    }
+}
+
+private data class Tune(val channelId: ChannelId, val intent: Long?, val force: Boolean = false) : PlayerRoute
+
+private data class TuneFailure(val intent: Long, val epoch: Long) {
+    fun appliesTo(request: Long?, currentEpoch: Long): Boolean = request == intent && epoch == currentEpoch
+}
 
 @OptIn(UnstableApi::class)
 private suspend fun tune(
     runtime: AppPlaybackRuntime,
     session: TvheadendSession,
     tune: Tune,
-    requestFailed: MutableStateFlow<Boolean>,
+    requestFailed: MutableStateFlow<TuneFailure?>,
+    isCurrent: () -> Boolean,
 ) {
-    requestFailed.value = false
-    val intent = runtime.notePlaybackIntent()
+    val intent = tune.intent?.takeUnless(runtime::isPlaybackIntentStopped) ?: return
     val state = runtime.state.value
-    if (tune.token == 0 && playingChannelId(runtime.activeTarget.value, state) == tune.channelId &&
+    if (!tune.force && playingChannelId(runtime.activeTarget.value, state) == tune.channelId &&
         state !is AppPlaybackState.Idle
     ) {
         // Already playing (or starting) this channel: adopt it instead of tuning it again.
         runtime.notePlaybackIntentServed(intent)
         withContext(NonCancellable) { runtime.retuneAfterReconnect() }
-        return
-    }
-    val selection = session.observation.mapNotNull { currentLivePlaybackSelection(it, tune.channelId) }.first()
-    if (runtime.isPlaybackIntentStopped(intent)) return
-    val result = runtime.playLive(selection, intent)
-    if (result?.isStarted != true && !runtime.isPlaybackIntentStopped(intent)) {
-        requestFailed.value = true
-        runtime.stopAfterLoss()
+    } else {
+        val selection = session.observation.mapNotNull { currentLivePlaybackSelection(it, tune.channelId) }.first()
+        fun stillRequested() = isCurrent() && !runtime.isPlaybackIntentStopped(intent)
+        if (!stillRequested()) return
+        val result = runtime.playLive(selection, intent)
+        currentCoroutineContext().ensureActive()
+        if (result != null && !result.isStarted && stillRequested()) {
+            runtime.stopAfterLoss()
+            currentCoroutineContext().ensureActive()
+            if (stillRequested()) requestFailed.value = TuneFailure(intent, runtime.videoPresentation.value.epoch)
+        }
     }
 }
 

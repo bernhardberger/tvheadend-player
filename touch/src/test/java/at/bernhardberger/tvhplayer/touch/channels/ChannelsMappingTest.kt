@@ -72,7 +72,10 @@ class ChannelsMappingTest {
                 it is ChannelsState.Ready && it.list.rows.isEmpty() && it.list.selectedTagId == guide.news.id.value.toString()
             },
             Case("offline with saved channels", unreachable, all, degraded = true) {
-                it is ChannelsState.Offline && it.list.rows.size == 2
+                it is ChannelsState.Offline && it.list.rows.size == 2 && !it.list.hasLogos
+            },
+            Case("only visible channel has no logo", ConnectionUiState.Ready, all, visible = listOf(guide.second)) {
+                it is ChannelsState.Ready && it.list.rows.size == 1 && !it.list.hasLogos
             },
             Case("connected", ConnectionUiState.Ready, all) { it is ChannelsState.Ready && it.list.rows.size == 2 },
         )
@@ -169,6 +172,7 @@ class ChannelsMappingTest {
         val logo = AppArtworkSource(session, (guide.logo as ChannelIcon.ImageCache).artworkId)
         val row = channelRow(guide.first, connected, guide.now, texts = texts, artwork = artwork)
         assertEquals(logo, row.logoModel)
+        assertEquals(true, ChannelList(listOf(row)).hasLogos)
         assertEquals(AppArtworkSource(session, guide.picture), row.details?.artworkModel)
         assertEquals(null, channelRow(guide.second, connected, guide.now, artwork = artwork).logoModel)
         // Without a current session the logo falls back to its saved copy and pictures stay out.

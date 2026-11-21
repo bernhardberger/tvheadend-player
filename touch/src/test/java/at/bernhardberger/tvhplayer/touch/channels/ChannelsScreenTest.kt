@@ -24,6 +24,8 @@ import androidx.compose.ui.test.hasProgressBarRangeInfo
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.getBoundsInRoot
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
@@ -107,6 +109,23 @@ class ChannelsScreenTest {
         assertTrue(layouts.single().isLineEllipsized(0))
         compose.onNodeWithContentDescription("Recording", useUnmergedTree = true).assertIsDisplayed()
         compose.onNodeWithContentDescription("Recording scheduled", useUnmergedTree = true).assertIsDisplayed()
+
+        val ridge = compose.onNodeWithText("Ridge Earth", useUnmergedTree = true)
+        val harbor = compose.onNodeWithText("Harbor Sport", useUnmergedTree = true)
+        val tiles = compose.onAllNodes(hasTestTag("channel-logo-tile"), useUnmergedTree = true)
+        val withColumn = ridge.getBoundsInRoot().left
+        compose.runOnIdle { state.value = ChannelsState.Ready(list.withoutLogos("ridge-earth")) }
+        assertEquals(withColumn, ridge.getBoundsInRoot().left)
+        assertEquals(harbor.getBoundsInRoot().left, ridge.getBoundsInRoot().left)
+        val name = ridge.fetchSemanticsNode().boundsInRoot
+        val tile = tiles.fetchSemanticsNodes().single { name.center.y in it.boundsInRoot.top..it.boundsInRoot.bottom }
+        assertTrue("The row without a logo still has a leading tile", tile.boundsInRoot.right < name.left)
+        capture("tablet-channels-some-logos", TouchCanvas.TABLET)
+        compose.runOnIdle { state.value = ChannelsState.Ready(list.withoutLogos()) }
+        assertTrue("No tiles remain when the entire list has no logos", tiles.fetchSemanticsNodes().isEmpty())
+        assertTrue("Without logos the names no longer reserve a column", ridge.getBoundsInRoot().left < withColumn)
+        assertEquals(harbor.getBoundsInRoot().left, ridge.getBoundsInRoot().left)
+        capture("tablet-channels-no-logos", TouchCanvas.TABLET)
     }
 
     @Test

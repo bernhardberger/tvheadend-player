@@ -76,6 +76,9 @@ private fun glassHarborLead() = program(AmberStage, "7:50 PM", "Glass Harbor", "
     .copy(episode = "S2 E4 • The Long Tide", synopsis = GLASS_HARBOR_SYNOPSIS)
 
 /** The tablet's magazine; the upright tablet's columns run further down the night. */
+internal fun GuideState.withoutLogo(id: String) =
+    copy(channels = channels.map { if (it.id == id) it.copy(logo = null, logoModel = null) else it })
+
 internal fun overviewFixture(upright: Boolean = false): GuideState {
     val ridge = listOf(ridgeLightLead()) + same(RidgeEarth, "Documentary", "9:00 PM" to "Tide Watch", number = "S1 E6") +
         program(RidgeEarth, "10:00 PM", "Snowline", "Documentary").copy(scheduled = true) +

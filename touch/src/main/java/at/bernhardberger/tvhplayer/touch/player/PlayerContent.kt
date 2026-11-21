@@ -250,9 +250,10 @@ internal fun UprightPlayerContent(
         ) {
             val channel = state.channel
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                ChannelLogo(channel, Modifier.size(64.dp, 36.dp))
+                val logo = playerChannelLogo(channel, Modifier.size(64.dp, 36.dp))
+                logo?.invoke()
                 Text(
-                    channel.name, Modifier.weight(1f).padding(horizontal = 12.dp),
+                    channel.name, Modifier.weight(1f).padding(start = if (logo != null) 12.dp else 0.dp, end = 12.dp),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )

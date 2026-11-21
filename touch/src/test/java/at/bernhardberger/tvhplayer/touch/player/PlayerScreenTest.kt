@@ -78,6 +78,7 @@ import at.bernhardberger.tvhplayer.touch.channels.ChannelDetails
 import at.bernhardberger.tvhplayer.touch.channels.ChannelPlayback
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsState
 import at.bernhardberger.tvhplayer.touch.channels.channelsFixture
+import at.bernhardberger.tvhplayer.touch.channels.withoutLogos
 import at.bernhardberger.tvhplayer.touch.guide.RIDGE_LIGHT_ID
 import at.bernhardberger.tvhplayer.touch.guide.GuideAvailability
 import at.bernhardberger.tvhplayer.touch.guide.RIDGE_LIGHT_REPEAT_ID
@@ -201,6 +202,14 @@ class PlayerScreenTest {
         tapPicture()
         noticeOnlyOutsideTheWindow("tablet-player-notice", canvas)
         dragToLiveWithNotice()
+        val old = liveTimeline.value
+        dragTo(.525f)
+        compose.runOnIdle { liveTimeline.value = old.copy(programStart = old.programStart.plusHours(1)) }
+        timeline().performTouchInput { up() }
+        compose.runOnIdle {
+            assertEquals("Lifting on a new program does not seek", listOf(2820), seeks)
+            liveTimeline.value = old
+        }
         captureStatuses("tablet", canvas, reconnecting = true)
     }
 
@@ -371,6 +380,22 @@ class PlayerScreenTest {
         show()
         menusAndSheets("tablet-player", TouchCanvas.TABLET, subtitles = true, profile = true)
         infoSheet("tablet-player", TouchCanvas.TABLET, details = true)
+        val top = hasAnyAncestor(hasTestTag("player-top"))
+        val tile = compose.onNode(hasTestTag("channel-logo-tile") and top, useUnmergedTree = true)
+        val keyline = tile.getBoundsInRoot().left
+        compose.runOnIdle {
+            channelId.value = "harbor-sport"
+            channelState.value = ChannelsState.Ready(channelsFixture().withoutLogos("harbor-sport"))
+        }
+        tile.assertDoesNotExist()
+        val name = compose.onNode(hasText("Harbor Sport") and top, useUnmergedTree = true)
+        assertEquals(
+            "A channel without a logo starts next to Back, with no logo padding",
+            keyline, name.getBoundsInRoot().left,
+        )
+        button(R.string.player_info).performClick()
+        tag("player-info-logo").assertDoesNotExist()
+        compose.onNodeWithText("Harbor Sport").assertIsDisplayed()
     }
 
     @Test
@@ -559,7 +584,8 @@ class PlayerScreenTest {
             MaterialTheme(colorScheme = MobileDarkColors) {
                 PlayerScreen(
                     fixture.copy(
-                        channel = channels.rows.firstOrNull { it.id == channelId.value } ?: fixture.channel,
+                        channel = ((channelState.value as? ChannelsState.Ready)?.list ?: channels)
+                            .rows.firstOrNull { it.id == channelId.value } ?: fixture.channel,
                         channels = channelState.value ?: fixture.channels,
                         status = status.value, paused = paused.value, offered = offered.value,
                         schedule = fixture.schedule?.let { schedule ->
