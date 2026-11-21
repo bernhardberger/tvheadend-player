@@ -24,7 +24,11 @@ internal fun markedLogos(): List<BitmapPainter> = listOf(ImageBitmap(100, 100), 
  * The logo rule of the touch design (section 13): the [LogoMark] logo drawn in [slot] of this image stays within
  * 76% of the slot's width and 62% of its height, reaches that box on one side ("contain") and is centered.
  */
-internal fun PixelMap.assertLogoFitsItsShare(name: String, slot: IntRect = IntRect(0, 0, width, height)) {
+internal fun PixelMap.assertLogoFitsItsShare(
+    name: String,
+    slot: IntRect = IntRect(0, 0, width, height),
+    fillsWidth: Boolean? = null,
+) {
     val drawn = (slot.left until slot.right).flatMap { x -> (slot.top until slot.bottom).map { y -> x to y } }
         .filter { (x, y) -> this[x, y] == LogoMark }
     assertTrue("$name: no logo drawn in its slot", drawn.isNotEmpty())
@@ -36,10 +40,13 @@ internal fun PixelMap.assertLogoFitsItsShare(name: String, slot: IntRect = IntRe
     val height = slot.height - top - bottom
     assertTrue("$name: width $width of ${slot.width}", width <= slot.width * WIDTH_SHARE + 1)
     assertTrue("$name: height $height of ${slot.height}", height <= slot.height * HEIGHT_SHARE + 1)
-    assertTrue(
-        "$name: $width×$height does not fill its box on either side",
-        width >= slot.width * WIDTH_SHARE - 2 || height >= slot.height * HEIGHT_SHARE - 2,
-    )
+    val reachesWidth = width >= slot.width * WIDTH_SHARE - 2
+    val reachesHeight = height >= slot.height * HEIGHT_SHARE - 2
+    when (fillsWidth) {
+        true -> assertTrue("$name: $width×$height does not fill the width of its box", reachesWidth)
+        false -> assertTrue("$name: $width×$height does not fill the height of its box", reachesHeight)
+        null -> assertTrue("$name: $width×$height does not fill its box on either side", reachesWidth || reachesHeight)
+    }
     assertTrue("$name: off center horizontally", abs(left - right) <= 1)
     assertTrue("$name: off center vertically", abs(top - bottom) <= 1)
 }
