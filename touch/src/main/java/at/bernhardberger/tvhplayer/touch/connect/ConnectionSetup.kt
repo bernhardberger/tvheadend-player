@@ -44,10 +44,6 @@ import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
@@ -61,23 +57,25 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import at.bernhardberger.tvheadend.sdk.android.DiscoveredTvheadendServer
+import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import at.bernhardberger.tvhplayer.touch.R
 
 @Composable
 internal fun FindServerScreen(
     state: ServerSearchUiState,
-    onServerPicked: (FoundServer) -> Unit,
+    onServerPicked: (DiscoveredTvheadendServer) -> Unit,
     onEnterManually: () -> Unit,
     onSearchAgain: () -> Unit,
 ) {
     SetupLayout(
         intro = { compact ->
             SetupIntro(
-                title = stringResource(R.string.connect_find_title),
-                description = stringResource(R.string.connect_welcome),
+                title = stringResource(SharedR.string.onboarding_find_title),
+                description = stringResource(SharedR.string.onboarding_welcome_body),
                 compact = compact,
                 showBrand = true,
-                detail = stringResource(R.string.connect_find_body),
+                detail = stringResource(SharedR.string.onboarding_find_body),
             )
         },
         actions = { _, _ -> DiscoveredServers(state, onServerPicked, onEnterManually, onSearchAgain) },
@@ -91,28 +89,23 @@ internal fun ConnectionAccountScreen(
     onConnect: (ConnectionFields) -> Unit,
     onBack: () -> Unit,
 ) {
-    var showValidation by rememberSaveable { mutableStateOf(false) }
     val focus = LocalFocusManager.current
     val submit = {
-        if (state.fields.canSubmit) {
-            focus.clearFocus()
-            onConnect(state.fields)
-        } else {
-            showValidation = true
-        }
+        focus.clearFocus()
+        onConnect(state.fields)
     }
     BackHandler(onBack = onBack)
     SetupLayout(
         intro = { compact ->
             SetupIntro(
-                title = stringResource(R.string.connect_account_title),
-                description = stringResource(R.string.connect_sign_in_help),
+                title = stringResource(SharedR.string.onboarding_sign_in_title),
+                description = stringResource(SharedR.string.onboarding_sign_in_body),
                 compact = compact,
                 showBrand = !compact,
             )
         },
         actions = { compact, stacked ->
-            ConnectionForm(state, onFieldsChange, compact, showSignInHelp = false, showValidation = showValidation)
+            ConnectionForm(state, onFieldsChange, compact, showSignInHelp = false)
             if (!stacked) {
                 Box(Modifier.fillMaxWidth().padding(top = 20.dp), contentAlignment = Alignment.CenterEnd) {
                     ConnectAction(state.phase, submit)
@@ -139,7 +132,7 @@ private fun SetupLayout(
             val top = setupTopPadding(maxHeight, stacked, compact, hasBack = onBack != null)
             Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).imePadding()) {
                 if (stacked && onBack != null) {
-                    ConnectionIconButton(R.drawable.connect_back_outline, R.string.connect_back, onClick = onBack)
+                    ConnectionIconButton(R.drawable.connect_back_outline, SharedR.string.back, onClick = onBack)
                 }
                 Box(
                     Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())
@@ -170,7 +163,7 @@ private fun SetupLayout(
             }
             if (!stacked && onBack != null) {
                 Box(Modifier.windowInsetsPadding(WindowInsets.safeDrawing).padding(start = 8.dp)) {
-                    ConnectionIconButton(R.drawable.connect_back_outline, R.string.connect_back, onClick = onBack)
+                    ConnectionIconButton(R.drawable.connect_back_outline, SharedR.string.back, onClick = onBack)
                 }
             }
         }
@@ -254,13 +247,13 @@ private fun SetupParagraph(text: String, modifier: Modifier = Modifier) {
 @Composable
 private fun DiscoveredServers(
     state: ServerSearchUiState,
-    onServerPicked: (FoundServer) -> Unit,
+    onServerPicked: (DiscoveredTvheadendServer) -> Unit,
     onEnterManually: () -> Unit,
     onSearchAgain: () -> Unit,
 ) {
     Column {
         Text(
-            stringResource(R.string.connect_on_network),
+            stringResource(SharedR.string.onboarding_find_on_network),
             Modifier.padding(start = 4.dp, bottom = 8.dp).semantics { heading() },
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.labelLarge,
@@ -270,7 +263,7 @@ private fun DiscoveredServers(
                 ListItem(
                     onClick = { onServerPicked(server) },
                     supportingContent = {
-                        Text(stringResource(R.string.connect_found_detail, server.address, server.port))
+                        Text(stringResource(SharedR.string.onboarding_found_server_detail, server.host, server.port))
                     },
                     leadingContent = {
                         Icon(painterResource(R.drawable.connect_server_outline), contentDescription = null)
@@ -287,7 +280,13 @@ private fun DiscoveredServers(
         }
         if (state.searching || state.servers.isEmpty()) {
             SetupParagraph(
-                stringResource(if (state.searching) R.string.connect_searching else R.string.connect_no_servers),
+                stringResource(
+                    if (state.searching) {
+                        SharedR.string.onboarding_find_searching
+                    } else {
+                        SharedR.string.onboarding_find_none_body
+                    },
+                ),
                 Modifier.semantics { liveRegion = LiveRegionMode.Polite },
             )
         }
@@ -295,10 +294,12 @@ private fun DiscoveredServers(
             Modifier.padding(top = 20.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            OutlinedButton(onClick = onEnterManually) { Text(stringResource(R.string.connect_enter_manually)) }
+            OutlinedButton(onClick = onEnterManually) {
+                Text(stringResource(SharedR.string.onboarding_enter_address_manually))
+            }
             TextButton(onClick = onSearchAgain, enabled = !state.searching) {
                 Icon(painterResource(R.drawable.connect_refresh_outline), null, Modifier.size(20.dp))
-                Text(stringResource(R.string.connect_search_again), Modifier.padding(start = 8.dp))
+                Text(stringResource(SharedR.string.onboarding_search_again), Modifier.padding(start = 8.dp))
             }
         }
     }
@@ -320,11 +321,14 @@ internal fun ConnectAction(phase: ConnectionPhase, onClick: () -> Unit, modifier
             ),
         ) {
             LoadingIndicator(Modifier.size(24.dp), color = scheme.onPrimary)
-            Text(stringResource(R.string.connect_connecting, phase.address), Modifier.padding(start = 8.dp))
+            Text(
+                stringResource(SharedR.string.onboarding_connecting_title, phase.address),
+                Modifier.padding(start = 8.dp),
+            )
         }
     } else {
         Button(onClick = onClick, modifier = modifier.heightIn(min = 48.dp)) {
-            Text(stringResource(R.string.connect_submit))
+            Text(stringResource(SharedR.string.onboarding_connect))
         }
     }
 }

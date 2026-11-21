@@ -1,16 +1,17 @@
 package at.bernhardberger.tvhplayer.touch.connect
 
-internal const val USUAL_PORT = 9982
+import at.bernhardberger.tvheadend.sdk.android.DiscoveredTvheadendServer
 
-internal data class FoundServer(val name: String, val address: String, val port: Int)
+internal const val USUAL_PORT = 9982
 
 internal data class ActiveConnectionUiState(val name: String, val address: String, val port: Int, val username: String)
 
 internal data class ServerSearchUiState(
-    val servers: List<FoundServer>,
+    val servers: List<DiscoveredTvheadendServer>,
     val searching: Boolean = false,
 )
 
+/** What the connection form shows; validation and saving belong to the shared setup state. */
 internal data class ConnectionFields(
     val address: String = "",
     val port: String = USUAL_PORT.toString(),
@@ -18,11 +19,6 @@ internal data class ConnectionFields(
     val password: String = "",
     val name: String = "",
 ) {
-    val addressMissing: Boolean get() = address.isBlank()
-    val portInvalid: Boolean get() = port.toIntOrNull() !in 1..65535
-    val signInIncomplete: Boolean get() = username.isBlank() != password.isBlank()
-    val canSubmit: Boolean get() = !addressMissing && !portInvalid && !signInIncomplete
-
     override fun toString(): String = "ConnectionFields(<redacted>)"
 }
 
@@ -32,7 +28,11 @@ internal sealed interface ConnectionPhase {
     data object Refused : ConnectionPhase
 }
 
+/** The errors are the shared setup state's, shown once an attempt found them. */
 internal data class ConnectionUiState(
     val fields: ConnectionFields,
     val phase: ConnectionPhase = ConnectionPhase.Editing,
+    val addressError: Boolean = false,
+    val portError: Boolean = false,
+    val signInError: Boolean = false,
 )

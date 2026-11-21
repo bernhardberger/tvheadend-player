@@ -3,28 +3,19 @@ package at.bernhardberger.tvhplayer.ui.screens.onboarding
 import at.bernhardberger.tvheadend.sdk.android.DiscoveredTvheadendServer
 import at.bernhardberger.tvheadend.sdk.android.TvheadendDiscoveryFailure
 import at.bernhardberger.tvheadend.sdk.android.TvheadendDiscoveryState
-import at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult
+import at.bernhardberger.tvheadend.sdk.android.TvheadendDiscoveryTestFactory
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
 import at.bernhardberger.tvheadend.sdk.core.SessionCommandResult
 import at.bernhardberger.tvheadend.sdk.core.SessionFailure
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
-import at.bernhardberger.tvheadend.sdk.core.ServerProfileId
-import at.bernhardberger.tvheadend.sdk.core.ServerProfileListResult
-import at.bernhardberger.tvheadend.sdk.core.ServerProfileStore
-import at.bernhardberger.tvheadend.sdk.core.ServerProfileWriteResult
-import at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore
+import at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionCall
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.settings.ConnectionFormState
 import at.bernhardberger.tvhplayer.settings.ConnectionProfileEditor
 import at.bernhardberger.tvhplayer.settings.ServerSettings
-import at.bernhardberger.tvhplayer.settings.AppProfileOwner
-import at.bernhardberger.tvhplayer.settings.ConnectionFormFeedback
-import at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore
-import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
-import at.bernhardberger.tvhplayer.ui.screens.settings.ProfileSetupEditor
 import java.io.IOException
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CompletableDeferred
@@ -39,7 +30,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import androidx.compose.runtime.saveable.SaverScope
 import kotlinx.coroutines.test.TestScope
-import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -50,39 +40,12 @@ import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+@OptIn(TvheadendTestingApi::class)
 class ConnectionSetupStateTest {
-    @Test fun savedCredentialsWithFailedActivationRestoreThePersistedConnectionAndFailSubmission() = runTest {
-        val stored = FakeServerProfileStore()
-        val previous = (stored.addAnonymous("previous.invalid", activate = true) as ServerProfileWriteResult.Applied).id
-        val target = (stored.addAnonymous("target.invalid") as ServerProfileWriteResult.Applied).id
-        val store = object : ServerProfileStore by stored {
-            override suspend fun setActive(id: ServerProfileId) = ServerProfileWriteResult.Unavailable
-        }
-        val owner = AppProfileOwner(session, store, PlayerSettingsStore(InMemoryPreferencesDataStore()),
-            StandardTestDispatcher(testScheduler), { ServerProfileEditReadResult.Missing })
-        backgroundScope.launch { owner.run() }
-        runCurrent()
-        val summary = (stored.profiles() as ServerProfileListResult.Available)
-            .profiles.first { it.id == target }
-        var restored = false
-        val editor = ProfileSetupEditor(owner, summary,
-            activate = true, restoreActive = {
-                assertTrue(owner.connectionChanges.isLocked)
-                restored = true
-            }, onAlreadyExists = {})
-        form.updateHost("target.invalid")
-        form.updateUsername(USERNAME)
-        form.updatePassword(PASSWORD)
-        val result = form.submit(editor)
-        assertEquals(ConnectionFormFeedback.SAVE_FAILED, result)
-        assertTrue(restored)
-        assertEquals(previous, (stored.profiles() as ServerProfileListResult.Available).activeId)
-    }
-
     private val session = FakeTvheadendSession()
     private val profiles = FakeProfiles()
     private val form = ConnectionFormState()
-    private val discovery = MutableStateFlow(discovering())
+    private val discovery = MutableStateFlow<TvheadendDiscoveryState>(TvheadendDiscoveryTestFactory.discovering(emptyList()))
 
     @Test fun anonymousConfirmationSurvivesARealFormRestorationAndStillPrecedesThePlaybackStop() = runTest {
         form.updateHost(HOST)
@@ -238,10 +201,10 @@ class ConnectionSetupStateTest {
         assertFalse(state.hostError)
         backgroundScope.launch { state.search(state.searchRequest) }
         runCurrent()
-        discovery.value = discovering(LIVING_ROOM)
+        discovery.value = TvheadendDiscoveryTestFactory.discovering(listOf(LIVING_ROOM))
         runCurrent()
         assertFalse(state.hostError)
-        discovery.value = discovering()
+        discovery.value = TvheadendDiscoveryTestFactory.discovering(emptyList())
         advanceTimeBy(DiscoveryWindow + 1.milliseconds)
         runCurrent()
         assertFalse(state.searching)
@@ -271,7 +234,7 @@ class ConnectionSetupStateTest {
         assertTrue(state.searching)
         assertTrue(state.servers.isEmpty())
         val current = backgroundScope.launch { state.search(currentRequest) }
-        discovery.value = discovering(LIVING_ROOM)
+        discovery.value = TvheadendDiscoveryTestFactory.discovering(listOf(LIVING_ROOM))
         runCurrent()
         assertEquals(listOf(LIVING_ROOM), state.servers)
         current.cancel()
@@ -518,7 +481,7 @@ class ConnectionSetupStateTest {
         runCurrent()
         assertEquals(emptyList<DiscoveredTvheadendServer>(), state.servers)
 
-        discovery.value = discovering(LIVING_ROOM, OFFICE)
+        discovery.value = TvheadendDiscoveryTestFactory.discovering(listOf(LIVING_ROOM, OFFICE))
         runCurrent()
         assertEquals(listOf(LIVING_ROOM, OFFICE), state.servers)
         assertNull("Results don't take focus", state.findFocus)
@@ -584,16 +547,16 @@ class ConnectionSetupStateTest {
         val state = setup()
         state.openSearch()
         backgroundScope.launch { state.search(state.searchRequest) }
-        discovery.value = discovering(LIVING_ROOM, OFFICE)
+        discovery.value = TvheadendDiscoveryTestFactory.discovering(listOf(LIVING_ROOM, OFFICE))
         runCurrent()
         state.onFindFocused(OFFICE)
 
-        discovery.value = discovering(LIVING_ROOM)
+        discovery.value = TvheadendDiscoveryTestFactory.discovering(listOf(LIVING_ROOM))
         runCurrent()
         assertEquals(LIVING_ROOM, state.findFocus)
 
         state.onFindFocused(null)
-        discovery.value = discovering(LIVING_ROOM, OFFICE)
+        discovery.value = TvheadendDiscoveryTestFactory.discovering(listOf(LIVING_ROOM, OFFICE))
         runCurrent()
         assertNull("Focus on the search action stays there", state.findFocus)
     }

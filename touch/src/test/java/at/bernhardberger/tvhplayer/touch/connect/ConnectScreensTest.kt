@@ -34,6 +34,8 @@ import androidx.compose.ui.test.performTextReplacement
 import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import at.bernhardberger.tvheadend.sdk.android.DiscoveredTvheadendServer
+import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.testutil.TouchCanvas
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouch
@@ -70,7 +72,7 @@ class ConnectScreensTest {
     @Test
     @Config(qualifiers = Phone)
     fun phoneFindServerHandsOverPickedServer() {
-        var picked: FoundServer? = null
+        var picked: DiscoveredTvheadendServer? = null
         findServer("phone-setup", TouchCanvas.PHONE) { picked = it }
         compose.onNode(hasClickAction() and hasText(servers.last().name)).performClick()
         compose.runOnIdle { assertEquals(servers.last(), picked) }
@@ -85,18 +87,18 @@ class ConnectScreensTest {
     fun phoneAccountSubmitsEditedFields() {
         var submitted: ConnectionFields? = null
         account("phone-setup-connection", TouchCanvas.PHONE, onConnect = { submitted = it })
-        field(R.string.connect_address).performTextReplacement(servers.last().address)
-        compose.onNodeWithText(label(R.string.connect_submit)).performClick()
-        compose.runOnIdle { assertEquals(fields.copy(address = servers.last().address), submitted) }
+        field(SharedR.string.onboarding_server_address).performTextReplacement(servers.last().host)
+        compose.onNodeWithText(label(SharedR.string.onboarding_connect)).performClick()
+        compose.runOnIdle { assertEquals(fields.copy(address = servers.last().host), submitted) }
     }
 
     @Test
     @Config(qualifiers = Tablet)
     fun tabletConnectingDisablesFieldsAndSubmit() {
         account("tablet-setup-connecting", TouchCanvas.TABLET, ConnectionPhase.Connecting(fields.address))
-        listOf(R.string.connect_address, R.string.connect_port, R.string.connect_username, R.string.connect_password,
-            R.string.connect_name).forEach { field(it).assertIsNotEnabled() }
-        compose.onNodeWithText(compose.activity.getString(R.string.connect_connecting, fields.address))
+        listOf(SharedR.string.onboarding_server_address, R.string.connect_port, SharedR.string.username, SharedR.string.password,
+            SharedR.string.server_name_field).forEach { field(it).assertIsNotEnabled() }
+        compose.onNodeWithText(compose.activity.getString(SharedR.string.onboarding_connecting_title, fields.address))
             .assertIsNotEnabled()
     }
 
@@ -128,8 +130,8 @@ class ConnectScreensTest {
     fun phoneEditorSavesEditedFields() {
         var saved: ConnectionFields? = null
         editor("phone-connection-editor", TouchCanvas.PHONE, onSave = { saved = it })
-        field(R.string.connect_name).performTextReplacement(servers.last().name)
-        compose.onNodeWithText(label(R.string.connect_save)).performClick()
+        field(SharedR.string.server_name_field).performTextReplacement(servers.last().name)
+        compose.onNodeWithText(label(SharedR.string.server_name_save)).performClick()
         compose.runOnIdle { assertEquals(editorFields.copy(name = servers.last().name), saved) }
     }
 
@@ -149,7 +151,7 @@ class ConnectScreensTest {
     fun phoneConnectionsOpensEditorForActiveConnection() {
         var editing: ActiveConnectionUiState? = null
         connections("phone-settings-connection", TouchCanvas.PHONE, onEdit = { editing = it })
-        compose.onNodeWithText(label(R.string.connect_edit)).performClick()
+        compose.onNodeWithText(label(SharedR.string.setup_connection)).performClick()
         compose.runOnIdle { assertEquals(active, editing) }
     }
 
@@ -163,14 +165,14 @@ class ConnectScreensTest {
         var removed: ActiveConnectionUiState? = null
         connections("phone-connection-remove", TouchCanvas.PHONE, openRemove = true, onRemove = { removed = it })
         compose.runOnIdle { assertNull(removed) }
-        compose.onNodeWithText(label(R.string.connect_cancel)).performClick()
+        compose.onNodeWithText(label(SharedR.string.cancel)).performClick()
         compose.runOnIdle { assertNull(removed) }
         openRemove()
         compose.onNodeWithText(label(R.string.connect_remove)).performClick()
         compose.runOnIdle { assertEquals(active, removed) }
     }
 
-    private fun findServer(name: String, canvas: TouchCanvas, onPick: (FoundServer) -> Unit = {}) {
+    private fun findServer(name: String, canvas: TouchCanvas, onPick: (DiscoveredTvheadendServer) -> Unit = {}) {
         show { FindServerScreen(ServerSearchUiState(servers), onPick, {}, {}) }
         capture(name, canvas)
     }
@@ -265,13 +267,13 @@ class ConnectScreensTest {
     }
 
     private fun openRemove() =
-        compose.onNodeWithContentDescription(label(R.string.connect_remove_description)).performClick()
+        compose.onNodeWithContentDescription(label(SharedR.string.server_remove)).performClick()
 
     private fun assertRefused() {
         val message = label(R.string.connect_refused)
         val error = SemanticsMatcher.expectValue(SemanticsProperties.Error, message)
-        field(R.string.connect_username).assert(error)
-        field(R.string.connect_password).assert(error)
+        field(SharedR.string.username).assert(error)
+        field(SharedR.string.password).assert(error)
         // Both fields carry the sentence as their error; it is written out once for the pair.
         compose.onAllNodes(hasText(message), useUnmergedTree = true).assertCountEquals(1)
     }
@@ -284,11 +286,11 @@ class ConnectScreensTest {
     private fun label(@StringRes id: Int): String = compose.activity.getString(id)
 
     private val servers = listOf(
-        FoundServer("Tvheadend", "192.168.1.20", 9982),
-        FoundServer("tvh-test", "192.168.1.31", 9982),
+        DiscoveredTvheadendServer("Tvheadend", "192.168.1.20", 9982),
+        DiscoveredTvheadendServer("tvh-test", "192.168.1.31", 9982),
     )
-    private val active = ActiveConnectionUiState("Home server", servers.first().address, 9982, "alex")
-    private val fields = ConnectionFields(address = servers.first().address)
+    private val active = ActiveConnectionUiState("Home server", servers.first().host, 9982, "alex")
+    private val fields = ConnectionFields(address = servers.first().host)
     private val signedInFields = fields.copy(
         username = active.username,
         password = "•".repeat(8), // Mask-only fixture; not a credential.

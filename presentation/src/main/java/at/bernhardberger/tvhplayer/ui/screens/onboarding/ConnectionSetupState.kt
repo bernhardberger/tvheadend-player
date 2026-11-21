@@ -57,7 +57,7 @@ import kotlinx.coroutines.withTimeoutOrNull
  * it stays the app's connection until the new one passed and is saved, or the user saved anyway.
  */
 @Stable
-internal class ConnectionSetupState(
+class ConnectionSetupState(
     val form: ConnectionFormState,
     private val session: TvheadendSession,
     private val profiles: ConnectionProfileEditor,
@@ -530,7 +530,7 @@ internal class ConnectionSetupState(
 }
 
 /** NSD discovery of announcing servers; a device without the NSD service has none to offer. */
-internal fun discoverServers(context: Context): Flow<TvheadendDiscoveryState> = try {
+fun discoverServers(context: Context): Flow<TvheadendDiscoveryState> = try {
     TvheadendDiscovery(context).state
 } catch (_: IllegalArgumentException) {
     flowOf(TvheadendDiscoveryState.Unavailable(TvheadendDiscoveryFailure.START_FAILED))
@@ -583,7 +583,7 @@ private val SessionState.isOutcome: Boolean
     get() = this is SessionState.Ready || this is SessionState.Unavailable
 
 @Composable
-internal fun rememberConnectionSetupState(
+fun rememberConnectionSetupState(
     session: TvheadendSession,
     profiles: ConnectionProfileEditor,
     discovery: () -> Flow<TvheadendDiscoveryState>,
@@ -630,3 +630,7 @@ internal fun rememberConnectionSetupState(
         )
     }
 }
+
+enum class AddressFocus { SEARCH, HOST, PORT, CONTINUE }
+
+enum class SignInFocus { USERNAME, PASSWORD, CONNECT }

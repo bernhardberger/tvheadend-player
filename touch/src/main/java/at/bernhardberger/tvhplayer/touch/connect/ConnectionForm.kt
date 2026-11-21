@@ -32,6 +32,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import at.bernhardberger.tvhplayer.touch.R
 
 @Composable
@@ -40,25 +41,28 @@ internal fun ConnectionForm(
     onFieldsChange: (ConnectionFields) -> Unit,
     compact: Boolean,
     showSignInHelp: Boolean,
-    showValidation: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val fields = state.fields
     val enabled = state.phase !is ConnectionPhase.Connecting
-    val addressError = showValidation && fields.addressMissing
-    val portError = showValidation && fields.portInvalid
+    val addressError = state.addressError
+    val portError = state.portError
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             ConnectionField(
-                label = R.string.connect_address,
+                label = SharedR.string.onboarding_server_address,
                 value = fields.address,
                 onChange = { onFieldsChange(fields.copy(address = it)) },
                 enabled = enabled,
                 modifier = Modifier.weight(1f),
                 support = stringResource(
-                    if (addressError) R.string.connect_address_missing else R.string.connect_address_help,
+                    if (addressError) {
+                        SharedR.string.onboarding_server_address_missing
+                    } else {
+                        SharedR.string.onboarding_server_address_support
+                    },
                 ),
-                error = stringResource(R.string.connect_address_missing).takeIf { addressError },
+                error = stringResource(SharedR.string.onboarding_server_address_missing).takeIf { addressError },
                 keyboardType = KeyboardType.Uri,
             )
             ConnectionField(
@@ -67,21 +71,21 @@ internal fun ConnectionForm(
                 onChange = { onFieldsChange(fields.copy(port = it)) },
                 enabled = enabled,
                 modifier = Modifier.width(if (compact) 124.dp else 140.dp),
-                support = if (portError) stringResource(R.string.connect_port_invalid)
-                else stringResource(R.string.connect_port_help, USUAL_PORT),
-                error = stringResource(R.string.connect_port_invalid).takeIf { portError },
+                support = if (portError) stringResource(SharedR.string.onboarding_port_invalid)
+                else stringResource(SharedR.string.onboarding_port_support, USUAL_PORT),
+                error = stringResource(SharedR.string.onboarding_port_invalid).takeIf { portError },
                 keyboardType = KeyboardType.Number,
             )
         }
-        SignInFields(state, onFieldsChange, compact, showSignInHelp, showValidation)
+        SignInFields(state, onFieldsChange, compact, showSignInHelp)
         ConnectionField(
-            label = R.string.connect_name,
+            label = SharedR.string.server_name_field,
             value = fields.name,
             onChange = { onFieldsChange(fields.copy(name = it)) },
             enabled = enabled,
             modifier = Modifier.fillMaxWidth(),
-            support = if (fields.addressMissing) stringResource(R.string.connect_name_help_no_address)
-            else stringResource(R.string.connect_name_help, fields.address),
+            support = if (fields.address.isBlank()) stringResource(R.string.connect_name_help_no_address)
+            else stringResource(SharedR.string.server_name_body, fields.address),
             imeAction = ImeAction.Done,
         )
     }
@@ -93,18 +97,17 @@ private fun SignInFields(
     onFieldsChange: (ConnectionFields) -> Unit,
     compact: Boolean,
     showHelp: Boolean,
-    showValidation: Boolean,
 ) {
     val fields = state.fields
     val enabled = state.phase !is ConnectionPhase.Connecting
     val errorMessage = when {
         state.phase == ConnectionPhase.Refused -> stringResource(R.string.connect_refused)
-        showValidation && fields.signInIncomplete -> stringResource(R.string.connect_pair_needed)
+        state.signInError -> stringResource(SharedR.string.onboarding_sign_in_pair)
         else -> null
     }
     val username: @Composable (Modifier) -> Unit = { modifier ->
         ConnectionField(
-            label = R.string.connect_username,
+            label = SharedR.string.username,
             value = fields.username,
             onChange = { onFieldsChange(fields.copy(username = it)) },
             enabled = enabled,
@@ -121,8 +124,11 @@ private fun SignInFields(
             onChange = { onFieldsChange(fields.copy(password = it)) },
             enabled = enabled,
             // The sentence is shown once for the pair: under Password when stacked, under both fields side by side.
-            support = if (compact) errorMessage ?: stringResource(R.string.connect_sign_in_help).takeIf { showHelp }
-            else null,
+            support = if (compact) {
+                errorMessage ?: stringResource(SharedR.string.onboarding_sign_in_body).takeIf { showHelp }
+            } else {
+                null
+            },
             error = errorMessage,
             modifier = modifier,
         )
@@ -144,7 +150,7 @@ private fun SignInFields(
                     errorMessage, MaterialTheme.colorScheme.error, Modifier.semantics { hideFromAccessibility() },
                 )
                 showHelp -> PairLine(
-                    stringResource(R.string.connect_sign_in_help), MaterialTheme.colorScheme.onSurfaceVariant,
+                    stringResource(SharedR.string.onboarding_sign_in_body), MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -171,7 +177,7 @@ private fun PasswordField(
 ) {
     var visible by remember(enabled) { mutableStateOf(false) }
     ConnectionField(
-        label = R.string.connect_password,
+        label = SharedR.string.password,
         value = value,
         onChange = onChange,
         enabled = enabled,
@@ -187,7 +193,7 @@ private fun PasswordField(
             {
                 ConnectionIconButton(
                     if (visible) R.drawable.connect_hide_outline else R.drawable.connect_show_outline,
-                    if (visible) R.string.connect_hide_password else R.string.connect_show_password,
+                    if (visible) R.string.connect_hide_password else SharedR.string.show_password,
                     enabled = enabled,
                 ) {
                     visible = !visible
