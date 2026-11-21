@@ -22,7 +22,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.GlanceBadge
 import at.bernhardberger.tvhplayer.ui.components.ScheduledIndicator
 import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator

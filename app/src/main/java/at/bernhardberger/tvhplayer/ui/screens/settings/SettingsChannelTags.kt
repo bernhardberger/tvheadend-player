@@ -4,7 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.ui.SettingsSection
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthLevel
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel

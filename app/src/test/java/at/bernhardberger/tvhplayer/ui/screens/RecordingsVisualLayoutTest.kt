@@ -88,7 +88,7 @@ import at.bernhardberger.tvhplayer.ui.screens.recordings.ArchiveLevelHeading
 import at.bernhardberger.tvhplayer.ui.common.formatFileSize
 import at.bernhardberger.tvhplayer.ui.common.formatRecordedDuration
 import at.bernhardberger.tvhplayer.ui.common.formatRecordingDate
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.ui.components.SideRail
 import java.io.File
 import java.util.Locale
@@ -170,7 +170,7 @@ class RecordingsVisualLayoutTest {
         val now = System.currentTimeMillis() / 1000L
         val resources = ApplicationProvider.getApplicationContext<Application>().resources
         val relative = resources.getQuantityString(
-            at.bernhardberger.tvhplayer.R.plurals.recording_expiry_minutes, 45, 45)
+            at.bernhardberger.tvhplayer.presentation.R.plurals.recording_expiry_minutes, 45, 45)
         val row = compose.onNodeWithTag("recording-list-metadata-1", useUnmergedTree = true)
             .fetchSemanticsNode().config[SemanticsProperties.Text].single().text
         assertTrue("Expiry is the final overline segment", row.substringAfterLast(" • ").endsWith(relative))
@@ -2849,7 +2849,7 @@ class RecordingsVisualLayoutTest {
             val preparing = hasTestTag("recordings-skeleton") and hasAnyAncestor(hasTestTag("browse-preparing"))
             val skeleton = compose.onNode(preparing, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
             compose.onAllNodesWithText(ApplicationProvider.getApplicationContext<android.content.Context>()
-                .getString(at.bernhardberger.tvhplayer.R.string.loading)).assertCountEquals(0)
+                .getString(at.bernhardberger.tvhplayer.presentation.R.string.loading)).assertCountEquals(0)
             assertEquals("The preparing skeleton stands where the syncing one does at font $scale", syncing, skeleton)
         } finally {
             compose.mainClock.autoAdvance = true

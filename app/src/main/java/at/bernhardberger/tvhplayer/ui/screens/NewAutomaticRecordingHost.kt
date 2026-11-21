@@ -21,7 +21,8 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.AutomaticRecordingKind
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.ui.TvTextSecondaryAlpha
@@ -102,16 +103,16 @@ private fun NewAutomaticRecordingKinds(
         val id = kind.name.lowercase()
         val (title, description, icon) = when (kind) {
             AutomaticRecordingKind.KEYWORD -> Triple(R.string.automatic_recording_new_keyword,
-                R.string.automatic_recording_new_keyword_help, R.drawable.ic_search)
+                R.string.automatic_recording_new_keyword_help, AppR.drawable.ic_search)
             AutomaticRecordingKind.TITLE -> Triple(R.string.automatic_recording_new_title_kind,
-                R.string.automatic_recording_new_title_help, R.drawable.ic_title)
+                R.string.automatic_recording_new_title_help, AppR.drawable.ic_title)
             else -> Triple(R.string.automatic_recording_new_timer,
-                R.string.automatic_recording_new_timer_help, R.drawable.ic_schedule)
+                R.string.automatic_recording_new_timer_help, AppR.drawable.ic_schedule)
         }
         GuidedStepAction(
             title = stringResource(title), subtitleMaxLines = 2, subtitle = stringResource(description),
             leadingIcon = { Icon(painterResource(icon), contentDescription = null) },
-            trailingIcon = R.drawable.ic_keyboard_arrow_right,
+            trailingIcon = AppR.drawable.ic_keyboard_arrow_right,
             modifier = editorRowModifier(navigation, id).focusProperties {
                 if (kind == AutomaticRecordingKind.KEYWORD) up = FocusRequester.Cancel
                 if (kind == AutomaticRecordingKind.TIMER) down = FocusRequester.Cancel

@@ -31,7 +31,8 @@ import androidx.media3.common.Player
 import androidx.tv.material3.Icon
 import androidx.tv.material3.LocalContentColor
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import at.bernhardberger.tvhplayer.playback.LivePauseState
@@ -150,7 +151,10 @@ internal fun ChannelPlaybackMarker(
         }
     } else {
         Icon(
-            painterResource(if (indicator == ChannelPlaybackIndicator.PAUSED) R.drawable.ic_pause else R.drawable.ic_play_arrow),
+            painterResource(
+                if (indicator == ChannelPlaybackIndicator.PAUSED) AppR.drawable.ic_pause
+                else AppR.drawable.ic_play_arrow,
+            ),
             contentDescription = description.takeIf { announceState },
             tint = LocalContentColor.current,
             modifier = slot,

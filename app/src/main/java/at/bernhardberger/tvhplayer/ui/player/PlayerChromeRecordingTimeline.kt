@@ -15,7 +15,7 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.PlayerStateCell
 import at.bernhardberger.tvhplayer.core.RecordingTimelinePresentation
 import at.bernhardberger.tvhplayer.core.StepReadout

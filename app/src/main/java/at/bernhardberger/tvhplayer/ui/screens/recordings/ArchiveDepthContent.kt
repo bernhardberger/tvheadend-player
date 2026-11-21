@@ -37,7 +37,7 @@ import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.DvrArchiveFolder
 import at.bernhardberger.tvhplayer.core.DvrArchiveGrouping
 import at.bernhardberger.tvhplayer.core.DvrArchiveShow

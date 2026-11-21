@@ -63,7 +63,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.focus.focusRequester
 import androidx.tv.material3.Button
 import androidx.tv.material3.OutlinedButton
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.MainStartupPresentation
 import at.bernhardberger.tvhplayer.core.MainStartupPlaybackOutcome
 import at.bernhardberger.tvhplayer.core.mainStartupPlaybackOutcome

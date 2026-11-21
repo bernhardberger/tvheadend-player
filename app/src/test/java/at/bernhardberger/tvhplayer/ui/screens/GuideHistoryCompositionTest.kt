@@ -14,7 +14,7 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.Density
 import at.bernhardberger.tvheadend.sdk.core.*
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.guideDisplayEvents
 import at.bernhardberger.tvhplayer.core.programmeDetailsActions

@@ -39,7 +39,7 @@ import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import at.bernhardberger.tvhplayer.core.RecordingMark
 import at.bernhardberger.tvhplayer.core.RecordingMarkKind
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import androidx.test.core.app.ApplicationProvider
 import androidx.compose.ui.test.assertTextEquals
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme

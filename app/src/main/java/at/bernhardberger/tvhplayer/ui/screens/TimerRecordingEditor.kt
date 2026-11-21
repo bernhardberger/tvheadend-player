@@ -18,7 +18,8 @@ import androidx.tv.material3.Switch
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.DvrConfiguration
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.AutomaticRecordingKind
 import at.bernhardberger.tvhplayer.core.RecordingDraftField
 import at.bernhardberger.tvhplayer.ui.common.formatClock
@@ -61,12 +62,12 @@ internal fun TimerRecordingEditor(
     if (state.navigation.leaveConfirmation) RecordingEditorLeaveDialog(
         state.navigation, timerMainLabel(state),
         state::back, state::submit, state::confirmDestructiveAction,
-        mainIcon = if (state.editing) R.drawable.ic_save else R.drawable.ic_schedule,
+        mainIcon = if (state.editing) AppR.drawable.ic_save else AppR.drawable.ic_schedule,
         unavailableReason = timerUnavailableLabel(state),
     )
     if (state.navigation.confirmation == AutomaticRecordingEditorConfirmation.DELETE) RecordingRuleDeleteDialog(
         kind = AutomaticRecordingKind.TIMER,
-        subject = ConfirmationSubject.Rule(R.drawable.ic_schedule, timerNameLabel(state.baseline, channels),
+        subject = ConfirmationSubject.Rule(AppR.drawable.ic_schedule, timerNameLabel(state.baseline, channels),
             listOf(timerChannelLabel(state.baseline, channels),
                 formatTimerRecordingDays(LocalContext.current, state.baseline.days),
                 "${formatClock(state.baseline.start)}–${formatClock(state.baseline.end)}").joinToString(" • ")),
@@ -79,7 +80,7 @@ internal fun TimerRecordingEditor(
 private fun TimerRecordingFirstLevel(state: TimerRecordingEditorState, channels: List<Channel>) {
     GuidedStepAction(
         timerMainLabel(state), state::submit, editorRowModifier(state.navigation, "main"),
-        icon = if (state.editing) R.drawable.ic_save else R.drawable.ic_schedule,
+        icon = if (state.editing) AppR.drawable.ic_save else AppR.drawable.ic_schedule,
         enabled = !state.busy,
         leadingIcon = if (state.busy) ({
             CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 3.dp)
@@ -122,7 +123,7 @@ internal fun TimerRecordingField(
 ) {
     GuidedStepAction(title, { if (state.navigation.canNavigate()) onClick() },
         editorRowModifier(state.navigation, id), subtitleMaxLines = 2, subtitle = value,
-        trailingIcon = R.drawable.ic_keyboard_arrow_right,
+        trailingIcon = AppR.drawable.ic_keyboard_arrow_right,
         trailingContent = {
             if (state.changedFields.any { it in fields })
                 StatusBadge(stringResource(R.string.autorec_editor_changed), StatusBadgeTone.CHANGED)

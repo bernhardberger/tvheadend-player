@@ -104,7 +104,8 @@ def find_static_rule_violations(root: Path) -> list[str]:
     source_root = root / "app/src/main"
     # Production sources of the UI-free :client library carry the same no-probe contract.
     # Shared brand and companion sources retain the UI rules outside :app.
-    production_roots = (source_root, root / "client/src/main", root / "brand/src/main", root / "appliance/src/main")
+    production_roots = (source_root, root / "client/src/main", root / "brand/src/main",
+                        root / "presentation/src/main", root / "appliance/src/main")
     kotlin_paths = [path for production_root in production_roots
                     for path in sorted(production_root.rglob("*.kt"))]
     for path in kotlin_paths:

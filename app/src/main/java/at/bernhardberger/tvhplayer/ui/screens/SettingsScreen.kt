@@ -23,7 +23,8 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.ui.*
@@ -109,22 +110,47 @@ internal fun settingsRootLevel(
     showRecordings: Boolean = false,
     connectionStatus: ConnectionOverviewStatus? = null,
 ): DepthLevel = settingsLevel(SETTINGS_ROOT, stringResource(R.string.nav_settings), buildList {
-    add(settingsRow(SettingsSection.GENERAL.name, stringResource(R.string.settings_general), child = SettingsSection.GENERAL.name, icon = R.drawable.ic_tune))
+    add(
+        settingsRow(
+            SettingsSection.GENERAL.name, stringResource(R.string.settings_general),
+            child = SettingsSection.GENERAL.name, icon = AppR.drawable.ic_tune,
+        ),
+    )
     add(
         settingsRow(
             SettingsSection.CONNECTION.name, stringResource(R.string.settings_connection_nav), connectionStatus?.title,
             child = SettingsSection.CONNECTION.name, leading = { connectionStatusIcon(connectionStatus?.state) },
         ),
     )
-    add(settingsRow(SettingsSection.CHANNEL_TAGS.name, stringResource(R.string.settings_channel_tags_nav), child = SettingsSection.CHANNEL_TAGS.name, icon = R.drawable.ic_filter_list))
-    add(settingsRow(SettingsSection.PLAYER.name, stringResource(R.string.settings_player), child = SettingsSection.PLAYER.name, icon = R.drawable.ic_play_arrow))
-    add(settingsRow(SettingsSection.AUDIO.name, stringResource(R.string.settings_audio_nav), child = SettingsSection.AUDIO.name, icon = R.drawable.ic_subtitles))
+    add(
+        settingsRow(
+            SettingsSection.CHANNEL_TAGS.name, stringResource(R.string.settings_channel_tags_nav),
+            child = SettingsSection.CHANNEL_TAGS.name, icon = AppR.drawable.ic_filter_list,
+        ),
+    )
+    add(
+        settingsRow(
+            SettingsSection.PLAYER.name, stringResource(R.string.settings_player),
+            child = SettingsSection.PLAYER.name, icon = AppR.drawable.ic_play_arrow,
+        ),
+    )
+    add(
+        settingsRow(
+            SettingsSection.AUDIO.name, stringResource(R.string.settings_audio_nav),
+            child = SettingsSection.AUDIO.name, icon = AppR.drawable.ic_subtitles,
+        ),
+    )
     if (showRecordings) add(settingsRow(RECORDINGS_LEVEL, stringResource(R.string.nav_recordings), child = RECORDINGS_LEVEL,
-        icon = R.drawable.ic_fiber_manual_record))
-    add(settingsRow(SettingsSection.APPLIANCE.name, stringResource(R.string.settings_appliance), child = SettingsSection.APPLIANCE.name, icon = R.drawable.ic_home))
+        icon = AppR.drawable.ic_fiber_manual_record))
+    add(
+        settingsRow(
+            SettingsSection.APPLIANCE.name, stringResource(R.string.settings_appliance),
+            child = SettingsSection.APPLIANCE.name, icon = AppR.drawable.ic_home,
+        ),
+    )
     add(settingsRow(ABOUT_LEVEL, stringResource(R.string.settings_about),
         supporting = stringResource(R.string.settings_about_version_summary, BuildConfig.VERSION_NAME),
-        child = ABOUT_LEVEL, icon = R.drawable.ic_info))
+        child = ABOUT_LEVEL, icon = AppR.drawable.ic_info))
 })
 
 /** The Connection row's icon says the state; a connected one is announced since its row drops the word. */
@@ -132,9 +158,9 @@ internal fun settingsRootLevel(
 private fun connectionStatusIcon(state: ConnectionOverviewState?) {
     val connected = stringResource(R.string.connection_overview_connected)
     val (icon, description) = when (state) {
-        ConnectionOverviewState.CONNECTED -> R.drawable.ic_cloud_done to connected
-        ConnectionOverviewState.CONNECTING -> R.drawable.ic_cloud_sync to null
-        else -> R.drawable.ic_cloud_off_rounded to null
+        ConnectionOverviewState.CONNECTED -> AppR.drawable.ic_cloud_done to connected
+        ConnectionOverviewState.CONNECTING -> AppR.drawable.ic_cloud_sync to null
+        else -> AppR.drawable.ic_cloud_off_rounded to null
     }
     Icon(painterResource(icon), description, Modifier.size(ListItemDefaults.IconSize))
 }

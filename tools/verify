@@ -116,7 +116,7 @@ COMPANION_UPDATE_RESULTS
 
 # Build the final artifacts without the test-only loopback feed override.
 ./gradlew \
-    :client:lintDebug :brand:lintDebug :decoder-ffmpeg:lintDebug :app:lintPlayDebug :app:assemblePlayDebug \
+    :client:lintDebug :brand:lintDebug :presentation:lintDebug :decoder-ffmpeg:lintDebug :app:lintPlayDebug :app:assemblePlayDebug \
     "${appliance_tasks[@]}" "${provenance_tasks[@]}" \
     "${gradle_common[@]}"
 

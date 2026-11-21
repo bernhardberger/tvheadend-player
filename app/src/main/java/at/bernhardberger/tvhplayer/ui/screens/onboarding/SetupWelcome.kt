@@ -48,7 +48,8 @@ import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.BuildConfig
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.ui.TvBrowseColumnGap
 import at.bernhardberger.tvhplayer.ui.TvBrowseColumnWidth
 import at.bernhardberger.tvhplayer.ui.TvFullScreenPadding
@@ -197,7 +198,7 @@ internal fun SetupSignature() {
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Image(
-                    painter = painterResource(R.drawable.startup_brand_symbol),
+                    painter = painterResource(AppR.drawable.startup_brand_symbol),
                     contentDescription = null,
                     modifier = Modifier.size(SignatureMarkSize),
                 )

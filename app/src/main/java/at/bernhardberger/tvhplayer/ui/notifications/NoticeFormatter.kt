@@ -8,7 +8,7 @@ import at.bernhardberger.tvheadend.sdk.core.DvrChangeOrigin
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.DvrMutationKind
 import at.bernhardberger.tvheadend.sdk.core.DvrSubscriptionError
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.notices.ConnectionNoticeKind
 import at.bernhardberger.tvhplayer.notices.DvrMutationFeedback
 import at.bernhardberger.tvhplayer.notices.Notice

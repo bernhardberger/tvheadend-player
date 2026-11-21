@@ -8,7 +8,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import android.app.Application
 import androidx.test.core.app.ApplicationProvider
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.view.View

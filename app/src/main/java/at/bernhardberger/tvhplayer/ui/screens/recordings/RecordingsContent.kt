@@ -103,7 +103,8 @@ import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.core.recordingArtwork
 import at.bernhardberger.tvhplayer.core.AppError
@@ -312,13 +313,13 @@ internal fun RecordingNowFolderRow(
         },
         leadingContent = {
             Icon(
-                painterResource(R.drawable.ic_folder),
+                painterResource(AppR.drawable.ic_folder),
                 contentDescription = null,
                 modifier = Modifier.size(32.dp).folderRecordingDot { focused },
             )
         },
         trailingContent = {
-            Icon(painterResource(R.drawable.ic_keyboard_arrow_right), contentDescription = null)
+            Icon(painterResource(AppR.drawable.ic_keyboard_arrow_right), contentDescription = null)
         },
         modifier = modifier
             .tabFocus()
@@ -413,7 +414,7 @@ internal fun FolderListRow(
                         modifier = Modifier.size(32.dp).testTag("recordings-folder-logo-$tag"),
                     )
                 } else Icon(
-                    painter = painterResource(R.drawable.ic_folder),
+                    painter = painterResource(AppR.drawable.ic_folder),
                     contentDescription = null,
                     tint = (if (focused) focusedIconTint else iconTint)
                         ?: androidx.tv.material3.LocalContentColor.current,
@@ -422,7 +423,7 @@ internal fun FolderListRow(
             }
         },
         trailingContent = {
-            Icon(painterResource(R.drawable.ic_keyboard_arrow_right), contentDescription = null)
+            Icon(painterResource(AppR.drawable.ic_keyboard_arrow_right), contentDescription = null)
         },
         modifier = modifier
             .tabFocus()
@@ -472,7 +473,7 @@ internal fun RecordingMetadataPane(
     if (entry == null) {
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Icon(
-                painter = painterResource(R.drawable.ic_video_library),
+                painter = painterResource(AppR.drawable.ic_video_library),
                 contentDescription = null,
                 modifier = Modifier.size(44.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -559,27 +560,27 @@ internal fun RecordingMetadataPane(
                 !stoppedEarly && !watched) null else { statusModifier ->
                 Column(statusModifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     expiry?.let {
-                        StatusBadge(it, StatusBadgeTone.NEUTRAL, icon = R.drawable.ic_hourglass_bottom,
+                        StatusBadge(it, StatusBadgeTone.NEUTRAL, icon = AppR.drawable.ic_hourglass_bottom,
                             modifier = Modifier.testTag("recording-metadata-expiry"))
                     }
                     rule?.let { (text, icon) ->
                         ProgrammeStatusLine(text, icon, "recording-metadata-rule", maxLines = 2)
                     }
                     failure?.let {
-                        ProgrammeStatusLine(it, R.drawable.ic_error_outlined, "recording-metadata-failure",
+                        ProgrammeStatusLine(it, AppR.drawable.ic_error_outlined, "recording-metadata-failure",
                             color = MaterialTheme.colorScheme.error, maxLines = 2)
                     }
                     partialSize?.let {
                         ProgrammeStatusLine(stringResource(R.string.recording_partial_file, formatFileSize(it, LocalContext.current)),
-                            R.drawable.ic_folder, "recording-metadata-partial-file")
+                            AppR.drawable.ic_folder, "recording-metadata-partial-file")
                     }
                     if (stoppedEarly) {
                         ProgrammeStatusLine(stringResource(R.string.recordings_stopped_early),
-                            R.drawable.ic_warning_outlined, "recording-metadata-stopped-early")
+                            AppR.drawable.ic_warning_outlined, "recording-metadata-stopped-early")
                     }
                     when {
                         watched -> ProgrammeStatusLine(stringResource(R.string.recording_watched),
-                            R.drawable.ic_check_circle_outlined, "recording-metadata-watched")
+                            AppR.drawable.ic_check_circle_outlined, "recording-metadata-watched")
                         timeLeft != null -> {
                             val partly = watchState as? RecordingWatchState.PartlyWatched
                             ProgrammeStatusLine(
@@ -606,7 +607,7 @@ private fun problemStateLabel(state: DvrEntryState?): String? = when (state) {
 /** The rule a scheduled recording comes from, with its mark, when the server says it has one. */
 @Composable
 private fun recordingRuleLabel(rule: RecordingRule?): Pair<String, Int>? =
-    rule?.let { stringResource(it.label) to R.drawable.ic_schedule_rule }
+    rule?.let { stringResource(it.label) to AppR.drawable.ic_schedule_rule }
 
 /**
  * The Problems list and passive pane share the space below the headline.
@@ -707,7 +708,7 @@ internal fun RecordingProblems(
                 endReserve = if (onClear != null) clearWidth + TvSpacing16 else 0.dp,
             )
             if (onClear != null && clearFocus != null) RecordingsHeadlineButton(
-                icon = R.drawable.ic_cleaning_services,
+                icon = AppR.drawable.ic_cleaning_services,
                 label = stringResource(R.string.problems_clear),
                 value = stringResource(R.string.problems_clear_button),
                 description = stringResource(R.string.problems_clear),
@@ -984,9 +985,9 @@ private fun recordingOverlineLeading(entry: DvrEntry, showFileSize: Boolean): St
 }.joinToString(" • ")
 
 private enum class RecordingOverlineMark(@DrawableRes val icon: Int, val tag: String) {
-    STOPPED_EARLY(R.drawable.ic_warning_outlined, "recording-list-stopped-early"),
-    CANCELLED(R.drawable.ic_cancel_outlined, "recording-list-state-cancelled"),
-    EXPIRY(R.drawable.ic_hourglass_bottom, "recording-list-expiry"),
+    STOPPED_EARLY(AppR.drawable.ic_warning_outlined, "recording-list-stopped-early"),
+    CANCELLED(AppR.drawable.ic_cancel_outlined, "recording-list-state-cancelled"),
+    EXPIRY(AppR.drawable.ic_hourglass_bottom, "recording-list-expiry"),
 }
 
 /** A completed recording is the normal case and carries no mark; running and scheduled ones carry theirs at the row's end. */
@@ -1208,7 +1209,7 @@ private fun RecordingRowMarks(
                 )
                 if (status == DvrEntryState.RECORDING_ERROR) {
                     Icon(
-                        painter = painterResource(R.drawable.ic_error_outlined), contentDescription = null,
+                        painter = painterResource(AppR.drawable.ic_error_outlined), contentDescription = null,
                         modifier = Modifier.size(StatusIconSize).testTag("recording-list-errors-$itemKey"),
                         tint = errorMarkColor(focused),
                     )
@@ -1230,7 +1231,7 @@ private fun RecordingRowMarks(
 private fun RecordingWatchMark(state: RecordingWatchState, modifier: Modifier = Modifier) {
     @DrawableRes val icon = when (state) {
         RecordingWatchState.Unwatched -> return
-        RecordingWatchState.Watched -> R.drawable.ic_check_circle_outlined
+        RecordingWatchState.Watched -> AppR.drawable.ic_check_circle_outlined
         is RecordingWatchState.PartlyWatched -> partlyWatchedIcon(state.fraction)
     }
     val description =
@@ -1246,11 +1247,11 @@ private fun RecordingWatchMark(state: RecordingWatchState, modifier: Modifier = 
 /** Material's clock loader comes in six steps; an unknown share shows the middle one. */
 @DrawableRes
 private fun partlyWatchedIcon(fraction: Double?): Int = when {
-    fraction == null -> R.drawable.ic_clock_loader_40_outlined
-    fraction < 0.15 -> R.drawable.ic_clock_loader_10_outlined
-    fraction < 0.3 -> R.drawable.ic_clock_loader_20_outlined
-    fraction < 0.5 -> R.drawable.ic_clock_loader_40_outlined
-    fraction < 0.7 -> R.drawable.ic_clock_loader_60_outlined
-    fraction < 0.85 -> R.drawable.ic_clock_loader_80_outlined
-    else -> R.drawable.ic_clock_loader_90_outlined
+    fraction == null -> AppR.drawable.ic_clock_loader_40_outlined
+    fraction < 0.15 -> AppR.drawable.ic_clock_loader_10_outlined
+    fraction < 0.3 -> AppR.drawable.ic_clock_loader_20_outlined
+    fraction < 0.5 -> AppR.drawable.ic_clock_loader_40_outlined
+    fraction < 0.7 -> AppR.drawable.ic_clock_loader_60_outlined
+    fraction < 0.85 -> AppR.drawable.ic_clock_loader_80_outlined
+    else -> AppR.drawable.ic_clock_loader_90_outlined
 }

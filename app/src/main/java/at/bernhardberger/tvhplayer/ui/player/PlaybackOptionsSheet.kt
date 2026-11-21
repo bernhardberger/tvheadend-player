@@ -86,7 +86,8 @@ import androidx.tv.material3.SurfaceDefaults
 import at.bernhardberger.tvhplayer.ui.components.SettingsSwitchRow
 import androidx.tv.material3.Text
 import androidx.tv.material3.IconButtonDefaults
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
 import at.bernhardberger.tvhplayer.core.PlaybackTrackContentState
 import at.bernhardberger.tvhplayer.core.PlaybackTrackFocusTarget
@@ -1371,7 +1372,7 @@ internal fun OptionsHeader(
                     .testTag("playback-options-header-back"),
             ) {
                 Icon(
-                    painter = painterResource(R.drawable.ic_keyboard_arrow_left),
+                    painter = painterResource(AppR.drawable.ic_keyboard_arrow_left),
                     contentDescription = stringResource(R.string.back),
                     modifier = Modifier.size(IconButtonDefaults.MediumIconSize),
                 )
@@ -1477,10 +1478,10 @@ internal fun PlaybackOptionRow(
                         selectedColor = androidx.tv.material3.LocalContentColor.current,
                         unselectedColor = androidx.tv.material3.LocalContentColor.current))
                 showChevron -> Icon(
-                    painterResource(R.drawable.ic_keyboard_arrow_right),
+                    painterResource(AppR.drawable.ic_keyboard_arrow_right),
                     contentDescription = null,
                 )
-                selected -> Icon(painterResource(R.drawable.ic_check), contentDescription = null)
+                selected -> Icon(painterResource(AppR.drawable.ic_check), contentDescription = null)
                 trailingLabel != null -> Text(text = trailingLabel, maxLines = 1, softWrap = false)
             }
         },

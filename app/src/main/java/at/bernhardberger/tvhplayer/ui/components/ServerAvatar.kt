@@ -35,7 +35,8 @@ import androidx.tv.material3.Text
 import androidx.tv.material3.contentColorFor
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileAuthenticationMode
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileSummary
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.ui.TvServerAvatarColors
 import java.util.Locale
 import kotlin.math.sin
@@ -169,7 +170,7 @@ fun ServerAvatar(
             contentAlignment = Alignment.Center,
         ) {
             if (look.letter == null) {
-                Icon(painterResource(R.drawable.ic_dns), contentDescription = null, tint = content,
+                Icon(painterResource(AppR.drawable.ic_dns), contentDescription = null, tint = content,
                     modifier = Modifier.size(size * 0.5f))
             } else {
                 val fontSize = with(LocalDensity.current) { (size * 0.45f).toSp() }
@@ -247,19 +248,19 @@ private class BadgeLook(val fill: Color, val tint: Color, @DrawableRes val icon:
                 ServerAvatarStatus.CONNECTED -> BadgeLook(
                     fill = colors.primary,
                     tint = colors.onPrimary,
-                    icon = R.drawable.ic_check,
+                    icon = AppR.drawable.ic_check,
                     description = stringResource(R.string.connection_overview_connected),
                 )
                 ServerAvatarStatus.FAILED -> BadgeLook(
                     fill = colors.error,
                     tint = colors.onError,
-                    icon = R.drawable.ic_priority_high,
+                    icon = AppR.drawable.ic_priority_high,
                     description = stringResource(R.string.connection_overview_unavailable),
                 )
                 else -> BadgeLook(
                     fill = contentColorFor(badgeRing),
                     tint = badgeRing,
-                    icon = R.drawable.ic_check,
+                    icon = AppR.drawable.ic_check,
                     description = stringResource(R.string.server_in_use),
                 )
             }

@@ -6,7 +6,7 @@ import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.tv.material3.MaterialTheme
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test

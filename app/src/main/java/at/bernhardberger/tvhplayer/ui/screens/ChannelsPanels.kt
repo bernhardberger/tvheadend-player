@@ -3,7 +3,8 @@ package at.bernhardberger.tvhplayer.ui.screens
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.settings.ChannelsLayout
 import at.bernhardberger.tvhplayer.settings.ChannelsView
 
@@ -87,9 +88,9 @@ private fun ChannelsLayout.label(): Int = when (this) {
 }
 
 private fun ChannelsLayout.icon(): Int = when (this) {
-    ChannelsLayout.LIST -> R.drawable.ic_view_list
-    ChannelsLayout.GRID -> R.drawable.ic_grid_view
-    ChannelsLayout.IMMERSIVE -> R.drawable.ic_view_carousel
+    ChannelsLayout.LIST -> AppR.drawable.ic_view_list
+    ChannelsLayout.GRID -> AppR.drawable.ic_grid_view
+    ChannelsLayout.IMMERSIVE -> AppR.drawable.ic_view_carousel
 }
 
 /** The heading over a layout's own options; the list has none. */

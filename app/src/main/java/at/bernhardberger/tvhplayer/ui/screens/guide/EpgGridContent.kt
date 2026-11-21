@@ -86,7 +86,8 @@ import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
 import at.bernhardberger.tvheadend.sdk.core.EventId
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.settings.GuideRows
 import at.bernhardberger.tvhplayer.core.ProgrammeCategory
 import at.bernhardberger.tvhplayer.core.programmeCategory
@@ -655,7 +656,7 @@ internal fun TimelineProgrammeCell(
                 }
                 if (failed != null) {
                     Icon(
-                        painter = painterResource(R.drawable.ic_error_outlined),
+                        painter = painterResource(AppR.drawable.ic_error_outlined),
                         // The dot of a running recording already names its errors.
                         contentDescription = stringResource(failed).takeIf { markState == null },
                         modifier = Modifier.markAtFullSizeOrNone(markSize)

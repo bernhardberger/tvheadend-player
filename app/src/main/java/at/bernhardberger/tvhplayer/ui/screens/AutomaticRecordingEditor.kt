@@ -18,7 +18,8 @@ import androidx.tv.material3.Switch
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.DvrConfiguration
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.AutomaticRecordingKind
 import at.bernhardberger.tvhplayer.core.AutorecEpisodeState
 import at.bernhardberger.tvhplayer.core.AutorecPreviewRow
@@ -63,7 +64,7 @@ internal fun AutomaticRecordingEditor(
     if (state.navigation.leaveConfirmation) RecordingEditorLeaveDialog(
         state.navigation, automaticRecordingMainLabel(state),
         state::back, state::submit, state::confirmDestructiveAction,
-        mainIcon = if (state.editing) R.drawable.ic_save else R.drawable.ic_fiber_smart_record,
+        mainIcon = if (state.editing) AppR.drawable.ic_save else AppR.drawable.ic_fiber_smart_record,
         unavailableReason = automaticRecordingUnavailableLabel(state),
     )
     if (state.navigation.confirmation == AutomaticRecordingEditorConfirmation.DELETE)
@@ -75,7 +76,7 @@ private fun AutomaticRecordingFirstLevel(state: AutomaticRecordingEditorState, c
     GuidedStepAction(
         title = automaticRecordingMainLabel(state), onClick = state::submit,
         modifier = editorRowModifier(state.navigation, "main"),
-        icon = if (state.editing) R.drawable.ic_save else R.drawable.ic_fiber_smart_record,
+        icon = if (state.editing) AppR.drawable.ic_save else AppR.drawable.ic_fiber_smart_record,
         enabled = !state.busy,
         leadingIcon = if (state.busy) ({
             CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 3.dp)
@@ -97,7 +98,7 @@ private fun AutomaticRecordingFirstLevel(state: AutomaticRecordingEditorState, c
         subtitle = if (series) automaticRecordingPreviewSummary(state) else automaticRecordingWordsSummary(state),
         modifier = editorRowModifier(state.navigation, "matches"),
         onClick = { state.navigation.open(if (series) AutomaticRecordingEditorLevel.UPCOMING else
-            AutomaticRecordingEditorLevel.WORDS, "done") }, trailingIcon = R.drawable.ic_keyboard_arrow_right,
+            AutomaticRecordingEditorLevel.WORDS, "done") }, trailingIcon = AppR.drawable.ic_keyboard_arrow_right,
         trailingContent = if (!series) ({
             AutomaticRecordingChanged(state, setOf(RecordingDraftField.WORDS, RecordingDraftField.SEARCH_IN))
         }) else null,
@@ -107,7 +108,7 @@ private fun AutomaticRecordingFirstLevel(state: AutomaticRecordingEditorState, c
         subtitleMaxLines = 2, subtitle = automaticRecordingChannelTimeLabel(state.draft, channels),
         onClick = { state.navigation.open(AutomaticRecordingEditorLevel.CHANNEL_TIME, "channel") },
         modifier = editorRowModifier(state.navigation, "channel-time"),
-        trailingIcon = R.drawable.ic_keyboard_arrow_right,
+        trailingIcon = AppR.drawable.ic_keyboard_arrow_right,
         trailingContent = { AutomaticRecordingChanged(state, setOf(
             RecordingDraftField.CHANNEL, RecordingDraftField.DAYS, RecordingDraftField.START_WINDOW,
         )) },
@@ -116,7 +117,7 @@ private fun AutomaticRecordingFirstLevel(state: AutomaticRecordingEditorState, c
         title = stringResource(R.string.recording_keep_until_heading),
         subtitleMaxLines = 2, subtitle = automaticRecordingKeepLabel(state.draft.removal),
         onClick = { state.navigation.open(AutomaticRecordingEditorLevel.KEEP, "keep-${state.draft.removal}") },
-        modifier = editorRowModifier(state.navigation, "keep"), trailingIcon = R.drawable.ic_keyboard_arrow_right,
+        modifier = editorRowModifier(state.navigation, "keep"), trailingIcon = AppR.drawable.ic_keyboard_arrow_right,
         trailingContent = { AutomaticRecordingChanged(state, setOf(RecordingDraftField.KEEP_UNTIL)) },
     )
     GuidedStepAction(
@@ -124,7 +125,7 @@ private fun AutomaticRecordingFirstLevel(state: AutomaticRecordingEditorState, c
         subtitleMaxLines = 2, subtitle = recordingEditorMoreSummary(
             state.changedFields.intersect(automaticRecordingMoreFields), state.editing),
         onClick = { state.navigation.open(AutomaticRecordingEditorLevel.MORE, "duplicate") },
-        modifier = editorRowModifier(state.navigation, "more"), trailingIcon = R.drawable.ic_keyboard_arrow_right,
+        modifier = editorRowModifier(state.navigation, "more"), trailingIcon = AppR.drawable.ic_keyboard_arrow_right,
         trailingContent = { AutomaticRecordingChanged(state, automaticRecordingMoreFields) },
     )
 }

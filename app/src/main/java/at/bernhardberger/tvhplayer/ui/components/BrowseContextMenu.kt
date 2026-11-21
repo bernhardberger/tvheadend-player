@@ -17,7 +17,8 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.BrowseContextAction
 import at.bernhardberger.tvhplayer.core.AutomaticRecordingKind
 import at.bernhardberger.tvhplayer.core.RecordingKeepUntilOption
@@ -128,7 +129,7 @@ internal fun BrowseContextMenu(
                     subtitle = keepUntilSupport?.takeIf { action == BrowseContextAction.KEEP_UNTIL }
                         ?: contextActionSupport(action, recordingKind)?.let { stringResource(it) }
                         ?: resumePositionMs?.takeIf { action == BrowseContextAction.RESUME && it > 0 }
-                        ?.let { stringResource(at.bernhardberger.tvhplayer.R.string.context_resume_from,
+                        ?.let { stringResource(at.bernhardberger.tvhplayer.presentation.R.string.context_resume_from,
                             at.bernhardberger.tvhplayer.core.formatPlaybackDuration(it)) },
                 ) {
                     BrowseContextActionIcon(action, playbackIndicator.takeIf {
@@ -205,29 +206,29 @@ private fun contextActionSupport(action: BrowseContextAction, kind: AutomaticRec
 
 /** [watchChannel] as for [label]: Watch channel tunes the live programme, so it shows live TV's icon. */
 internal fun BrowseContextAction.icon(watchChannel: Boolean): Int =
-    if (this == BrowseContextAction.WATCH && watchChannel) R.drawable.ic_live_tv_outlined else icon()
+    if (this == BrowseContextAction.WATCH && watchChannel) AppR.drawable.ic_live_tv_outlined else icon()
 
 private fun BrowseContextAction.icon(): Int = when (this) {
-    BrowseContextAction.DETAILS -> R.drawable.ic_info
-    BrowseContextAction.RECORD -> R.drawable.ic_fiber_manual_record
-    BrowseContextAction.RECORD_SERIES, BrowseContextAction.RECORD_TITLE -> R.drawable.ic_fiber_smart_record
+    BrowseContextAction.DETAILS -> AppR.drawable.ic_info
+    BrowseContextAction.RECORD -> AppR.drawable.ic_fiber_manual_record
+    BrowseContextAction.RECORD_SERIES, BrowseContextAction.RECORD_TITLE -> AppR.drawable.ic_fiber_smart_record
     BrowseContextAction.KEEP_UNTIL, BrowseContextAction.EDIT_RULE,
     BrowseContextAction.SKIP, BrowseContextAction.UNSKIP -> recordingActionIcon(this)
-    BrowseContextAction.STOP, BrowseContextAction.CANCEL -> R.drawable.ic_stop
+    BrowseContextAction.STOP, BrowseContextAction.CANCEL -> AppR.drawable.ic_stop
     BrowseContextAction.DELETE, BrowseContextAction.REMOVE_ENTRY, BrowseContextAction.DELETE_WATCHED ->
-        R.drawable.ic_delete_outlined
-    BrowseContextAction.DELETE_ALL -> R.drawable.ic_delete_sweep_outlined
-    BrowseContextAction.SHOW_GUIDE -> R.drawable.ic_event
-    BrowseContextAction.WATCH_LIVE -> R.drawable.ic_live_tv_outlined
-    BrowseContextAction.START_OVER -> R.drawable.ic_replay
-    BrowseContextAction.MARK_WATCHED, BrowseContextAction.MARK_ALL_WATCHED -> R.drawable.ic_check_circle_outlined
-    BrowseContextAction.MARK_UNWATCHED, BrowseContextAction.MARK_ALL_UNWATCHED -> R.drawable.ic_unpublished_outlined
-    else -> R.drawable.ic_play_arrow
+        AppR.drawable.ic_delete_outlined
+    BrowseContextAction.DELETE_ALL -> AppR.drawable.ic_delete_sweep_outlined
+    BrowseContextAction.SHOW_GUIDE -> AppR.drawable.ic_event
+    BrowseContextAction.WATCH_LIVE -> AppR.drawable.ic_live_tv_outlined
+    BrowseContextAction.START_OVER -> AppR.drawable.ic_replay
+    BrowseContextAction.MARK_WATCHED, BrowseContextAction.MARK_ALL_WATCHED -> AppR.drawable.ic_check_circle_outlined
+    BrowseContextAction.MARK_UNWATCHED, BrowseContextAction.MARK_ALL_UNWATCHED -> AppR.drawable.ic_unpublished_outlined
+    else -> AppR.drawable.ic_play_arrow
 }
 
 private fun recordingActionIcon(action: BrowseContextAction): Int = when (action) {
-    BrowseContextAction.KEEP_UNTIL -> R.drawable.ic_hourglass_bottom
-    BrowseContextAction.SKIP -> R.drawable.ic_event_busy
-    BrowseContextAction.UNSKIP -> R.drawable.ic_fiber_manual_record
-    else -> R.drawable.ic_edit
+    BrowseContextAction.KEEP_UNTIL -> AppR.drawable.ic_hourglass_bottom
+    BrowseContextAction.SKIP -> AppR.drawable.ic_event_busy
+    BrowseContextAction.UNSKIP -> AppR.drawable.ic_fiber_manual_record
+    else -> AppR.drawable.ic_edit
 }

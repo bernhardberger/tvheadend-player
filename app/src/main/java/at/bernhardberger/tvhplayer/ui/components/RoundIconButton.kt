@@ -28,7 +28,7 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.IconButtonDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.ui.TvGhostFillAlpha
 import at.bernhardberger.tvhplayer.ui.TvIconButtonSize
 import at.bernhardberger.tvhplayer.ui.TvSpacing8

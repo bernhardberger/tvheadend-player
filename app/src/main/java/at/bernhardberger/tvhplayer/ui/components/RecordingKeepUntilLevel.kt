@@ -45,7 +45,7 @@ import androidx.tv.material3.RadioButton
 import androidx.tv.material3.RadioButtonDefaults
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.RecordingKeepUntilChoice
 import at.bernhardberger.tvhplayer.core.RecordingKeepUntilOption
 import at.bernhardberger.tvhplayer.ui.common.formatRecordingDate

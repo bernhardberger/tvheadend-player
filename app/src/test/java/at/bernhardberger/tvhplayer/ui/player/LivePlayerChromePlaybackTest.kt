@@ -9,7 +9,7 @@ import at.bernhardberger.tvhplayer.di.PlayerStatsLevel
 
 import at.bernhardberger.tvhplayer.testutil.pressKey
 import at.bernhardberger.tvhplayer.testutil.settleFrames
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue

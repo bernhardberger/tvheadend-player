@@ -570,13 +570,13 @@ class HomeActionsTest {
         val insideCard = hasAnyAncestor(card)
         compose.onNode(card).assert(
             androidx.compose.ui.test.hasContentDescription(
-                context.getString(at.bernhardberger.tvhplayer.R.string.recording_state_recording_errors), substring = true),
+                context.getString(at.bernhardberger.tvhplayer.presentation.R.string.recording_state_recording_errors), substring = true),
         )
         compose.onNodeWithTag("home-activity-1").assertDoesNotExist()
         compose.onNode(hasTestTag("channel-playing-indicator") and insideCard, useUnmergedTree = true).assertExists()
         compose.onNode(card).assert(
             !androidx.compose.ui.test.hasContentDescription(
-                context.getString(at.bernhardberger.tvhplayer.R.string.player_on_now), substring = true),
+                context.getString(at.bernhardberger.tvhplayer.presentation.R.string.player_on_now), substring = true),
         )
         compose.onNode(hasText("Live programme") and insideCard, useUnmergedTree = true).assertExists()
         compose.onNode(hasText("Recorded programme") and insideCard, useUnmergedTree = true).assertDoesNotExist()
@@ -605,18 +605,18 @@ class HomeActionsTest {
             val description = compose.onNode(card).fetchSemanticsNode()
                 .config[androidx.compose.ui.semantics.SemanticsProperties.ContentDescription]
                 .flatMap { it.split(", ") }
-            val playbackLabels = listOf(at.bernhardberger.tvhplayer.R.string.player_paused,
-                at.bernhardberger.tvhplayer.R.string.loading, at.bernhardberger.tvhplayer.R.string.home_activity_watching_live)
+            val playbackLabels = listOf(at.bernhardberger.tvhplayer.presentation.R.string.player_paused,
+                at.bernhardberger.tvhplayer.presentation.R.string.loading, at.bernhardberger.tvhplayer.presentation.R.string.home_activity_watching_live)
                 .map(context::getString)
             assertEquals(listOf(context.getString(expected)), description.filter { it in playbackLabels })
         }
         assertEquals(listOf(ChannelPlaybackIndicator.PAUSED), marks())
-        assertPlaybackDescription(at.bernhardberger.tvhplayer.R.string.player_paused)
+        assertPlaybackDescription(at.bernhardberger.tvhplayer.presentation.R.string.player_paused)
         for (shown in listOf(ChannelPlaybackIndicator.TUNING, ChannelPlaybackIndicator.PLAYING, ChannelPlaybackIndicator.NONE)) {
             compose.runOnIdle { indicator.value = shown }
             compose.waitForIdle()
             assertEquals(if (shown == ChannelPlaybackIndicator.NONE) emptyList() else listOf(shown), marks())
-            if (shown == ChannelPlaybackIndicator.TUNING) assertPlaybackDescription(at.bernhardberger.tvhplayer.R.string.loading)
+            if (shown == ChannelPlaybackIndicator.TUNING) assertPlaybackDescription(at.bernhardberger.tvhplayer.presentation.R.string.loading)
         }
     }
 

@@ -2,7 +2,7 @@ package at.bernhardberger.tvhplayer.ui.screens
 
 import at.bernhardberger.tvhplayer.testutil.pressKey
 import android.app.Application
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.settings.ChannelsLayout
 import at.bernhardberger.tvhplayer.settings.ChannelsView
 import at.bernhardberger.tvhplayer.testutil.CaptureOutput

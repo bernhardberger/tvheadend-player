@@ -45,7 +45,8 @@ import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionObservation
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.ProgrammeAction
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import at.bernhardberger.tvhplayer.testutil.settleFrames
@@ -141,7 +142,7 @@ class ConfirmationDialogCaptureTest {
                 target = stringResource(R.string.recording_confirmation_profile, "Sports HD (high bitrate)")),
             sentence = stringResource(R.string.stop_recording_confirm_body_open,
                 formatNarrowDuration(7_500L, LocalContext.current.resources)),
-            safe = keep(R.string.keep_recording), action = choice(R.string.stop_recording, R.drawable.ic_stop),
+            safe = keep(R.string.keep_recording), action = choice(R.string.stop_recording, AppR.drawable.ic_stop),
             onDismiss = {}, onConfirm = {},
         )
     }
@@ -196,7 +197,7 @@ class ConfirmationDialogCaptureTest {
             subject = ConfirmationSubject.Folder("Documentaries", stringResource(R.string.server_detail_separator,
                 pluralStringResource(R.plurals.recordings_folder_recording_count, 3, 3), "6.6 GB")),
             sentence = stringResource(R.string.delete_folder_confirm_body) + " " + stringResource(R.string.delete_folder_running_kept),
-            safe = keep(R.string.keep), action = choice(R.string.context_delete_all, R.drawable.ic_delete_outlined),
+            safe = keep(R.string.keep), action = choice(R.string.context_delete_all, AppR.drawable.ic_delete_outlined),
             onDismiss = {}, onConfirm = {},
         )
     }
@@ -206,7 +207,7 @@ class ConfirmationDialogCaptureTest {
             question = stringResource(R.string.delete_folder_watched_confirm_question),
             subject = ConfirmationSubject.Folder("Documentaries", pluralStringResource(R.plurals.recordings_folder_recording_count, 3, 3)),
             sentence = stringResource(R.string.delete_folder_confirm_body),
-            safe = keep(R.string.keep), action = choice(R.string.context_delete_watched, R.drawable.ic_delete_outlined),
+            safe = keep(R.string.keep), action = choice(R.string.context_delete_watched, AppR.drawable.ic_delete_outlined),
             onDismiss = {}, onConfirm = {},
         )
     }
@@ -267,7 +268,7 @@ class ConfirmationDialogCaptureTest {
         bitmap.recycle()
     }
 
-    @Composable private fun keep(label: Int) = ConfirmationChoice(stringResource(label), R.drawable.ic_check, SAFE)
+    @Composable private fun keep(label: Int) = ConfirmationChoice(stringResource(label), AppR.drawable.ic_check, SAFE)
 
     @Composable private fun choice(label: Int, icon: Int) = ConfirmationChoice(stringResource(label), icon, ACTION)
 

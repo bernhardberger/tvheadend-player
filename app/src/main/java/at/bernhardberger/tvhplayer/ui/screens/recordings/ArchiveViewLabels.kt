@@ -7,7 +7,8 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.DvrArchiveGrouping
 import at.bernhardberger.tvhplayer.core.DvrArchiveShow
 import at.bernhardberger.tvhplayer.core.DvrArchiveSort
@@ -33,10 +34,10 @@ internal fun DvrArchiveGrouping.detailRes(): Int = when (this) {
 }
 
 internal fun DvrArchiveGrouping.iconRes(): Int = when (this) {
-    DvrArchiveGrouping.FLAT -> R.drawable.ic_view_list
-    DvrArchiveGrouping.FOLDERS -> R.drawable.ic_folder
-    DvrArchiveGrouping.CHANNELS -> R.drawable.ic_live_tv_outlined
-    DvrArchiveGrouping.GENRES -> R.drawable.ic_theater_comedy
+    DvrArchiveGrouping.FLAT -> AppR.drawable.ic_view_list
+    DvrArchiveGrouping.FOLDERS -> AppR.drawable.ic_folder
+    DvrArchiveGrouping.CHANNELS -> AppR.drawable.ic_live_tv_outlined
+    DvrArchiveGrouping.GENRES -> AppR.drawable.ic_theater_comedy
 }
 
 internal fun DvrArchiveSort.labelRes(): Int = when (this) {
@@ -49,12 +50,12 @@ internal fun DvrArchiveSort.labelRes(): Int = when (this) {
 }
 
 internal fun DvrArchiveSort.iconRes(): Int = when (this) {
-    DvrArchiveSort.NEWEST -> R.drawable.ic_sort_newest_first
-    DvrArchiveSort.OLDEST -> R.drawable.ic_sort_oldest_first
-    DvrArchiveSort.NAME -> R.drawable.ic_sort_name_a_z
-    DvrArchiveSort.NAME_DESCENDING -> R.drawable.ic_sort_name_z_a
-    DvrArchiveSort.LARGEST -> R.drawable.ic_sort_largest_first
-    DvrArchiveSort.SMALLEST -> R.drawable.ic_sort_smallest_first
+    DvrArchiveSort.NEWEST -> AppR.drawable.ic_sort_newest_first
+    DvrArchiveSort.OLDEST -> AppR.drawable.ic_sort_oldest_first
+    DvrArchiveSort.NAME -> AppR.drawable.ic_sort_name_a_z
+    DvrArchiveSort.NAME_DESCENDING -> AppR.drawable.ic_sort_name_z_a
+    DvrArchiveSort.LARGEST -> AppR.drawable.ic_sort_largest_first
+    DvrArchiveSort.SMALLEST -> AppR.drawable.ic_sort_smallest_first
 }
 
 internal fun DvrArchiveShow.labelRes(): Int = when (this) {
@@ -66,10 +67,10 @@ internal fun DvrArchiveShow.labelRes(): Int = when (this) {
 
 /** The mark a row of that kind carries, so the choice and the rows speak the same symbols. */
 internal fun DvrArchiveShow.iconRes(): Int = when (this) {
-    DvrArchiveShow.ALL -> R.drawable.ic_visibility
-    DvrArchiveShow.UNWATCHED -> R.drawable.ic_radio_button_unchecked
-    DvrArchiveShow.PARTIALLY_WATCHED -> R.drawable.ic_clock_loader_40_outlined
-    DvrArchiveShow.WATCHED -> R.drawable.ic_check_circle_outlined
+    DvrArchiveShow.ALL -> AppR.drawable.ic_visibility
+    DvrArchiveShow.UNWATCHED -> AppR.drawable.ic_radio_button_unchecked
+    DvrArchiveShow.PARTIALLY_WATCHED -> AppR.drawable.ic_clock_loader_40_outlined
+    DvrArchiveShow.WATCHED -> AppR.drawable.ic_check_circle_outlined
 }
 
 /** The plain-language line under a Show choice; All needs none. */

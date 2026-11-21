@@ -78,7 +78,8 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Button
 import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.Text
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
 import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
 
@@ -464,9 +465,11 @@ private fun RecordingMarkSymbol(kind: RecordingMarkKind, large: Boolean, tint: C
     when (kind) {
         RecordingMarkKind.CHAPTER -> Box(modifier.size(if (large) 6.dp else 4.dp).background(tint, CircleShape))
         RecordingMarkKind.PROGRAM_START, RecordingMarkKind.PROGRAM_END -> Icon(
-            painterResource(if (kind == RecordingMarkKind.PROGRAM_START) R.drawable.ic_flag else R.drawable.ic_sports_score),
+            painterResource(
+                if (kind == RecordingMarkKind.PROGRAM_START) AppR.drawable.ic_flag else AppR.drawable.ic_sports_score,
+            ),
             contentDescription = null, tint = tint, modifier = modifier.size(if (large) 14.dp else 10.dp))
-        RecordingMarkKind.CUT -> Icon(painterResource(R.drawable.ic_content_cut), contentDescription = null, tint = tint,
+        RecordingMarkKind.CUT -> Icon(painterResource(AppR.drawable.ic_content_cut), contentDescription = null, tint = tint,
             modifier = modifier.size(if (large) 14.dp else 10.dp))
         RecordingMarkKind.AD_BREAK -> {
             // Sized as a symbol, not as text: it keeps its size at every font scale, like the icons beside it.

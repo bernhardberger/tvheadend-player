@@ -2,7 +2,7 @@ package at.bernhardberger.tvhplayer.ui.screens.guide
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.settings.GuideRows
 import at.bernhardberger.tvhplayer.settings.GuideView
 import at.bernhardberger.tvhplayer.ui.screens.BrowsePanelEntry
