@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.touch.recordings
 
+import at.bernhardberger.tvhplayer.touch.ui.RecordingRemoveControl
+import at.bernhardberger.tvhplayer.touch.ui.recordingRemoveControl
 import at.bernhardberger.tvhplayer.core.recordingArtwork
 import at.bernhardberger.tvhplayer.touch.ui.ArtworkModels
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
@@ -79,7 +81,7 @@ internal fun recordingsState(
     val folder = buildDvrArchive(archive.distinctBy { it.id }, view.grouping, naming, view.sort, view.show) {
         recordingWatchState(it, null, nowSec)
     }
-    val rows = RowMapper(naming, texts, clock) { entry ->
+    val rows = RowMapper(naming, texts, clock, observation::recordingRemoveControl) { entry ->
         val logo = entry.channelId?.let(icons::get)
         RowArtwork(artwork?.logo(logo, observation), artwork?.picture(recordingArtwork(entry), observation))
     }
@@ -107,6 +109,7 @@ private class RowMapper(
     val naming: DvrArchiveNaming,
     val texts: RecordingsTexts,
     val clock: RecordingClock,
+    val remove: (DvrEntry) -> RecordingRemoveControl?,
     val artwork: (DvrEntry) -> RowArtwork,
 ) {
     private val nowSec = clock.now.epochSecond
@@ -147,6 +150,7 @@ private class RowMapper(
             size = recordingSizeBytes(entry)?.takeIf { it > 0 }?.let(texts.size),
             retention = texts.keepUntil(entry, nowSec),
         ),
+        remove = remove(entry),
     )
 
     private fun progress(entry: DvrEntry): RecordingProgress {

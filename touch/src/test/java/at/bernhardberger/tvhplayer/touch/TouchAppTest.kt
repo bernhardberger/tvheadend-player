@@ -23,8 +23,14 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasContentDescription
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvheadend.sdk.core.DvrMutationResult
+import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
+import at.bernhardberger.tvheadend.sdk.testing.FakeSessionCall
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -493,13 +499,111 @@ class TouchAppTest {
         }
         compose.onNodeWithText(guide.scheduled.title!!).assertDoesNotExist()
 
-        // A picked recording shows its details but nothing to play, delete or change yet.
+        // A picked recording shows its details but nothing to play or change yet.
         compose.onNodeWithText(guide.film.title!!).performClick()
         listOf(R.string.recordings_watch, R.string.recordings_resume, R.string.recordings_watch_from_beginning)
             .forEach { compose.onNodeWithText(label(it)).assertDoesNotExist() }
-        listOf(R.string.recordings_delete, R.string.recordings_more)
-            .forEach { compose.onNodeWithContentDescription(label(it)).assertDoesNotExist() }
+        compose.onNodeWithContentDescription(label(R.string.recordings_more)).assertDoesNotExist()
     }
+
+    @Test
+    fun deletingARecordingAsksFirstAndRemovesItsRow() {
+        val guide = savedConnectionWithGuide()
+        connection.session.dvrRepository.scriptDeleteEntry(DvrMutationResult.Confirmed(Unit))
+        openRecordings()
+        compose.onNodeWithText(guide.film.title!!).performClick()
+        compose.onNodeWithContentDescription(label(R.string.recordings_delete)).performClick()
+
+        compose.onNodeWithText(label(SharedR.string.delete_recording_confirm_title)).assertIsDisplayed()
+        assertTrue(FakeSessionCall.DVR_DELETE_ENTRY !in connection.session.calls)
+        inDialog(SharedR.string.context_delete).performClick()
+        compose.waitForIdle()
+        assertTrue(FakeSessionCall.DVR_DELETE_ENTRY in connection.session.calls)
+
+        connection.session.publish(guide.connected(listOf(guide.recordingNow, guide.diary, guide.scheduled)))
+        compose.waitForIdle()
+        compose.onNodeWithText(label(SharedR.string.delete_recording_confirm_title)).assertDoesNotExist()
+        compose.onNodeWithText(guide.film.title!!).assertDoesNotExist()
+    }
+
+    @Test
+    @Config(qualifiers = TABLET)
+    fun recordOnALaterProgramSchedulesItAtOnce() {
+        val guide = savedConnectionWithGuide()
+        connection.session.dvrRepository.scriptScheduleEntry(DvrMutationResult.Confirmed(DvrEntryId(WEATHER_ENTRY)))
+        openGuide()
+        compose.onNodeWithText(guide.programs[1]).performClick()
+        compose.onNode(hasClickAction() and hasText(label(R.string.channels_record))).performClick()
+        compose.waitForIdle()
+        assertTrue(FakeSessionCall.DVR_SCHEDULE_ENTRY in connection.session.calls)
+
+        // No dialog and no notice: the program's scheduled mark is the answer.
+        connection.session.publish(guide.connected(guide.dvr.entries + guide.scheduling(WEATHER_ENTRY, event = 2)))
+        compose.waitForIdle()
+        compose.onNode(isDialog()).assertDoesNotExist()
+        compose.onNode(hasText(guide.programs[1]) and hasContentDescription(label(R.string.channels_scheduled)))
+            .assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = TABLET)
+    fun cancellingAScheduledProgramAsksFirst() {
+        val guide = savedConnectionWithGuide()
+        connection.session.dvrRepository.scriptCancelEntry(DvrMutationResult.Confirmed(Unit))
+        openGuide()
+        val scheduled = hasText(guide.programs[2]) and hasContentDescription(label(R.string.channels_scheduled))
+        compose.onNode(scheduled).assertIsDisplayed()
+        compose.onNodeWithText(guide.programs[2]).performClick()
+        val cancel = hasClickAction() and hasText(label(SharedR.string.cancel_recording))
+
+        // Keep recording changes nothing.
+        compose.onNode(cancel).performClick()
+        compose.onNodeWithText(label(SharedR.string.cancel_recording_confirm_title)).assertIsDisplayed()
+        inDialog(SharedR.string.keep_recording).performClick()
+        compose.waitForIdle()
+        compose.onNode(isDialog()).assertDoesNotExist()
+        assertTrue(FakeSessionCall.DVR_CANCEL_ENTRY !in connection.session.calls)
+
+        compose.onNode(cancel).performClick()
+        inDialog(SharedR.string.cancel_recording).performClick()
+        compose.waitForIdle()
+        assertTrue(FakeSessionCall.DVR_CANCEL_ENTRY in connection.session.calls)
+        connection.session.publish(guide.connected(guide.dvr.entries - guide.scheduled))
+        compose.waitForIdle()
+        compose.onNode(scheduled).assertDoesNotExist()
+        compose.onNodeWithText(guide.programs[2]).assertIsDisplayed()
+    }
+
+    @Test
+    fun recordOnAChannelRecordsWhatIsOnNow() {
+        val guide = savedConnectionWithGuide()
+        connection.session.dvrRepository.scriptScheduleEntry(DvrMutationResult.Confirmed(DvrEntryId(WEATHER_ENTRY)))
+        connection.session.publish(guide.connected(guide.dvr.entries - guide.recordingNow))
+        compose.onNodeWithContentDescription(compose.activity.getString(R.string.channels_expand, guide.first.name))
+            .performClick()
+        compose.onNode(hasClickAction() and hasText(label(R.string.channels_record))).performClick()
+        compose.waitForIdle()
+        assertTrue(FakeSessionCall.DVR_SCHEDULE_ENTRY in connection.session.calls)
+    }
+
+    @Test
+    @Config(qualifiers = TABLET)
+    fun aFailedRecordShowsTheSharedFailureNotice() {
+        val guide = savedConnectionWithGuide()
+        connection.session.dvrRepository.scriptScheduleEntry(
+            DvrMutationResult.Failed(TvheadendFailure.ACCESS_DENIED, mayHaveApplied = false),
+        )
+        openGuide()
+        compose.onNodeWithText(guide.programs[1]).performClick()
+        compose.onNode(hasClickAction() and hasText(label(R.string.channels_record))).performClick()
+        compose.waitForIdle()
+
+        val failed = Notice.DvrActionFailed(DvrMutationKind.SCHEDULE, DvrMutationFeedback.PERMISSION_DENIED)
+        notice(NoticeFormatter(compose.activity).format(failed).headline).assertIsDisplayed()
+    }
+
+    private fun inDialog(@StringRes id: Int) =
+        compose.onNode(hasClickAction() and hasText(label(id)) and hasAnyAncestor(isDialog()))
 
     @Test
     fun recordingsWriteClockTimesByTheDevicesSetting() {
@@ -766,5 +870,9 @@ class TouchAppTest {
         const val FAILURE_MILLIS = 6_000L
         const val INFO_MILLIS = 4_000L
         const val KEYBOARD_PX = 600
+        const val WEATHER_ENTRY = 15L
+
+        /** The Guide overview lists the later programs only in the tablet's columns. */
+        const val TABLET = "en-rUS-w1280dp-h800dp-land-xhdpi"
     }
 }

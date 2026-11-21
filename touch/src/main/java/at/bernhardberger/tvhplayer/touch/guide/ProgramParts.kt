@@ -56,6 +56,7 @@ import androidx.window.core.layout.WindowSizeClass
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.channels.ChannelActionLabel
 import at.bernhardberger.tvhplayer.touch.recordings.RecPill
+import at.bernhardberger.tvhplayer.touch.ui.ProgramRecordControl
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 
 @Composable
@@ -77,6 +78,7 @@ internal fun ProgramActions(
     channelId: String,
     programId: String,
     onNow: Boolean,
+    record: ProgramRecordControl?,
     actions: GuideActions,
     modifier: Modifier = Modifier,
     onDetails: (() -> Unit)? = null,
@@ -92,13 +94,7 @@ internal fun ProgramActions(
     ) {
         val watch = actions.onWatch?.takeIf { onNow }
         if (watch != null) WatchButton(contentPadding = padding) { watch(channelId) }
-        val record = actions.onRecord
-        val recordOptions = actions.onRecordOptions
-        if (record != null && recordOptions != null) {
-            RecordButton(
-                { record(programId) }, { recordOptions(programId) }, contentPadding = padding, leads = watch == null,
-            )
-        }
+        ProgramRecordAction(record, programId, actions, contentPadding = padding, leads = watch == null)
         if (onDetails != null) {
             TextButton(onClick = onDetails) {
                 if (detailsIcon) {
@@ -119,6 +115,55 @@ internal fun WatchButton(
 ) {
     Button(onClick = onClick, modifier = modifier, contentPadding = contentPadding) {
         ChannelActionLabel(R.drawable.channels_play, stringResource(R.string.channels_watch))
+    }
+}
+
+/**
+ * The program's recording control: Record, split with its options arrow when there are options, or Cancel
+ * of its scheduled recording. Without an action behind it, it is left out.
+ */
+@Composable
+internal fun ProgramRecordAction(
+    record: ProgramRecordControl?,
+    programId: String,
+    actions: GuideActions,
+    modifier: Modifier = Modifier,
+    contentPadding: PaddingValues? = null,
+    leads: Boolean = false,
+) {
+    val onRecord = actions.onRecord
+    val onOptions = actions.onRecordOptions
+    val onCancel = actions.onCancel
+    when {
+        record == ProgramRecordControl.Record && onRecord != null && onOptions != null -> RecordButton(
+            { onRecord(programId) }, { onOptions(programId) }, modifier,
+            contentPadding ?: SplitButtonDefaults.leadingButtonContentPaddingFor(ButtonDefaults.MinHeight), leads,
+        )
+        record == ProgramRecordControl.Record && onRecord != null ->
+            RecordControlButton(record, modifier, contentPadding ?: ButtonDefaults.ContentPadding, leads) {
+                onRecord(programId)
+            }
+        record == ProgramRecordControl.Cancel && onCancel != null ->
+            RecordControlButton(record, modifier, contentPadding ?: ButtonDefaults.ContentPadding, leads) {
+                onCancel(programId)
+            }
+    }
+}
+
+/** Record without options, or Cancel: filled where it [leads], else tonal, as Record is. */
+@Composable
+internal fun RecordControlButton(
+    control: ProgramRecordControl,
+    modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
+    leads: Boolean = false,
+    onClick: () -> Unit,
+) {
+    val label: @Composable RowScope.() -> Unit = { ChannelActionLabel(control.icon, stringResource(control.label)) }
+    if (leads) {
+        Button(onClick = onClick, modifier = modifier, contentPadding = contentPadding, content = label)
+    } else {
+        FilledTonalButton(onClick = onClick, modifier = modifier, contentPadding = contentPadding, content = label)
     }
 }
 
