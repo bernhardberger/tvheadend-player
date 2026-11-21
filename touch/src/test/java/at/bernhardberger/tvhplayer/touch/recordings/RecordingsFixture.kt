@@ -134,7 +134,7 @@ private fun kickoffSaturday() =
     recording("kickoff-saturday", "Harbor Kickoff", "harbor-kickoff", HarborSport, at(14, 20, 15), 105)
         .copy(episode = "Kingsbridge – Northport")
 
-private fun kickoffPicked() =
+internal fun kickoffPicked() =
     recording(PickedId, "Harbor Kickoff", "still-harbor-kickoff", HarborSport, at(11, 20, 30), 105)
         .copy(
             episode = "Westvale – Ridge Town",
@@ -162,6 +162,15 @@ internal val FixtureClock = RecordingClock(
     now = Instant.parse("2026-11-16T21:00:00Z"), zone = ZoneOffset.UTC, locale = Locale.US,
     // The drawings' "8:30 PM", in the JDK's short style the captures were drawn with.
     time = { DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).withLocale(Locale.US).format(it) },
+)
+
+internal val FixtureRecordingsTexts = RecordingsTexts(
+    noChannel = "No channel", noGenre = "No genre", recordingNow = "Recording now",
+    genre = { null }, episode = { null }, section = { it.toString() }, size = { "$it B" },
+    keepUntil = { _, _ -> null },
+    recorded = { start, stop, _ -> "$start to $stop" },
+    errors = { "$it errors" },
+    language = { if (it == "eng") "English" else null },
 )
 
 private fun at(dayOfNovember: Int, hour: Int, minute: Int): Instant =

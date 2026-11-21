@@ -40,14 +40,7 @@ class RecordingsMappingTest {
     private val clock = RecordingClock(java.time.Instant.ofEpochSecond(NOW), ZoneOffset.UTC, Locale.US) {
         formatClock(it, Locale.US, uses24Hour = false)
     }
-    private val texts = RecordingsTexts(
-        noChannel = "No channel", noGenre = "No genre", recordingNow = "Recording now",
-        genre = { null }, episode = { null }, section = { it.toString() }, size = { "$it B" },
-        keepUntil = { _, _ -> null },
-        recorded = { start, stop, _ -> "$start to $stop" },
-        errors = { "$it errors" },
-        language = { if (it == "eng") "English" else null },
-    )
+    private val texts = FixtureRecordingsTexts
     private val unreachable = ConnectionUiState.Error(
         ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.EXPLICIT_RETRY,
     )

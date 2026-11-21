@@ -184,7 +184,8 @@ private fun sheetHead(
     state: PlayerFaceState,
     info: InfoPage,
 ): Pair<String, (@Composable () -> Unit)?> {
-    val shown = (state as? LivePlayerState)?.schedule?.details?.get(info.stack.shown)
+    val shown = ((state as? LivePlayerState)?.schedule?.details?.get(info.stack.shown)
+        ?: (state as? RecordingPlayerState)?.info?.airingDetails?.get(info.stack.shown))
         ?.takeIf { panel == PlayerPanel.InfoDetails }
     return when {
         shown != null -> shown.channel to { InfoLogo(shown.channelLogo, shown.logoTint, shown.channelLogoModel) }
@@ -221,7 +222,7 @@ private fun ColumnScope.SheetBody(
         PlayerPanel.Options -> OptionRows(state, onPanel)
         PlayerPanel.Info, PlayerPanel.InfoDetails -> when (state) {
             is LivePlayerState -> state.schedule?.let { InfoBody(panel, it, info, onPanel, onChoice) }
-            is RecordingPlayerState -> RecordingInfo(state)
+            is RecordingPlayerState -> state.info?.let { RecordingInfo(it, panel, info, onPanel, onChoice) }
         }
         PlayerPanel.Markers -> if (state is RecordingPlayerState) {
             RecordingMarkerRows(state, onSeek, Modifier.weight(1f))

@@ -7,6 +7,9 @@ import at.bernhardberger.tvhplayer.core.recordingMarkStops
 import at.bernhardberger.tvhplayer.playback.RecordingSkipAction
 import at.bernhardberger.tvhplayer.settings.AdBreakMode
 import at.bernhardberger.tvhplayer.touch.channels.ChannelRow
+import at.bernhardberger.tvhplayer.touch.guide.ProgramDetails
+import at.bernhardberger.tvhplayer.touch.recordings.RecordingClock
+import at.bernhardberger.tvhplayer.touch.recordings.RecordingItem
 
 /** The properties used by the same picture, transport and menus in both faces. */
 internal sealed interface PlayerFaceState {
@@ -27,7 +30,6 @@ internal data class RecordingPlayerState(
     override val channel: ChannelRow,
     val title: String,
     val episode: String?,
-    val summary: String?,
     val artwork: Painter?,
     /** Localized date of the recording, and a formatted wall clock for its projected finish. */
     val recordedOn: String,
@@ -56,8 +58,17 @@ internal data class RecordingPlayerState(
     val growing: Boolean = false,
     val artworkModel: Any? = null,
     val failureDetail: String? = null,
+    val info: RecordingPlayerInfo? = null,
 ) : PlayerFaceState {
     val stops = recordingMarkStops(marks, durationMs)
     val hasMarkers get() = PlayerControl.Markers in offered && stops.isNotEmpty()
     override val seekable get() = durationMs > 0
 }
+
+/** The recording's Details and any EPG metadata supplied for it. */
+internal data class RecordingPlayerInfo(
+    val item: RecordingItem,
+    val clock: RecordingClock,
+    val program: ProgramDetails? = null,
+    val airingDetails: Map<String, ProgramDetails> = emptyMap(),
+)

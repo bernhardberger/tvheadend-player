@@ -25,6 +25,15 @@ import at.bernhardberger.tvhplayer.playback.RecordingSkipAction
 import at.bernhardberger.tvhplayer.settings.AdBreakMode
 import at.bernhardberger.tvhplayer.touch.channels.ChannelRow
 import at.bernhardberger.tvhplayer.touch.channels.channelRow
+import at.bernhardberger.tvhplayer.touch.guide.ProgramDetails
+import at.bernhardberger.tvhplayer.touch.recordings.RecordingClock
+import at.bernhardberger.tvhplayer.touch.recordings.RecordingItem
+import at.bernhardberger.tvhplayer.touch.recordings.RecordingLinePart
+import at.bernhardberger.tvhplayer.touch.recordings.RecordingsTexts
+import at.bernhardberger.tvhplayer.touch.recordings.RowContext
+import at.bernhardberger.tvhplayer.touch.recordings.RowDates
+import at.bernhardberger.tvhplayer.touch.recordings.recordingItem
+import at.bernhardberger.tvhplayer.touch.recordings.recordingLine
 import at.bernhardberger.tvhplayer.touch.ui.ArtworkModels
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
@@ -62,8 +71,10 @@ internal fun recordingPlayerState(
     allowPictureInPicture: Boolean,
     artwork: ArtworkModels? = null,
     failure: RecordingFailureDetail? = null,
+    info: RecordingPlayerInfo? = null,
 ): RecordingPlayerState {
     val entry = observation.dvrEntry(target.recordingId)
+    val recordingInfo = info?.takeIf { entry?.id?.value?.toString() == it.item.id }
     val status = recordingStatus(entry, admission, playback, failure)
     val presented = status == LivePlayerStatus.Playing
     val range = (timeline as? RecordingTimelinePresentation.Seekable)?.range.takeIf { presented }
@@ -75,7 +86,6 @@ internal fun recordingPlayerState(
         channel = recordingChannel(entry, observation, now, artwork, noChannel),
         title = entry?.title?.takeIf(String::isNotBlank) ?: unknownTitle,
         episode = entry?.let(episodeLine),
-        summary = entry?.description?.takeIf(String::isNotBlank) ?: entry?.summary,
         artwork = null,
         artworkModel = entry?.let { artwork?.picture(recordingArtwork(it), observation) },
         recordedOn = entry?.start?.let(recordedDate).orEmpty(),
@@ -99,9 +109,30 @@ internal fun recordingPlayerState(
         brightness = brightness,
         tracks = tracks,
         options = options,
-        offered = recordingControls(presented, entry != null, markerRevision != null, tracks, allowPictureInPicture),
+        offered = recordingControls(
+            presented, recordingInfo != null, markerRevision != null, tracks, allowPictureInPicture,
+        ),
+        info = recordingInfo,
     )
 }
+
+/** The same single-entry projection as Browse; EPG enrichment is supplied by the caller. */
+internal fun recordingPlayerInfo(
+    entry: DvrEntry,
+    admission: RecordingPlaybackAdmission?,
+    clock: RecordingClock,
+    texts: RecordingsTexts,
+    program: ProgramDetails? = null,
+    airingDetails: Map<String, ProgramDetails> = emptyMap(),
+): RecordingPlayerInfo = RecordingPlayerInfo(
+    recordingItem(entry, admission, entry.channelName, texts, clock.now.epochSecond),
+    clock, program, airingDetails,
+)
+
+/** Finished recordings keep the archive row's date and duration (or remaining time). */
+internal fun recordingInfoWhen(item: RecordingItem, clock: RecordingClock): List<RecordingLinePart> =
+    recordingLine(item, RowContext(RowDates.None, oneChannel = true), clock)
+        .filterNot { it is RecordingLinePart.Episode }
 
 @OptIn(UnstableApi::class)
 private fun recordingStatus(
@@ -139,13 +170,13 @@ private fun recordingChannel(
 
 private fun recordingControls(
     presented: Boolean,
-    hasEntry: Boolean,
+    hasInfo: Boolean,
     ownsMarkers: Boolean,
     tracks: PlayerTracks,
     allowPictureInPicture: Boolean,
 ): Set<PlayerControl> = buildSet {
     add(PlayerControl.FullScreen)
-    if (hasEntry) add(PlayerControl.Info)
+    if (hasInfo) add(PlayerControl.Info)
     if (presented) {
         add(PlayerControl.Timeshift)
         add(PlayerControl.Settings)

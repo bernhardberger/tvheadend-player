@@ -11,7 +11,17 @@ import at.bernhardberger.tvhplayer.playback.RecordingSkipAction
 import at.bernhardberger.tvhplayer.settings.AdBreakMode
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.touch.channels.channelsFixture
+import at.bernhardberger.tvhplayer.touch.guide.CreditRole
+import at.bernhardberger.tvhplayer.touch.guide.FactKey
+import at.bernhardberger.tvhplayer.touch.guide.ProgramAiring
+import at.bernhardberger.tvhplayer.touch.guide.ProgramCredit
+import at.bernhardberger.tvhplayer.touch.guide.ProgramDetails
+import at.bernhardberger.tvhplayer.touch.guide.ProgramFact
+import at.bernhardberger.tvhplayer.touch.recordings.FixtureClock
+import at.bernhardberger.tvhplayer.touch.recordings.RecordingProgress
+import at.bernhardberger.tvhplayer.touch.recordings.kickoffPicked
 import at.bernhardberger.tvhplayer.touch.testutil.TouchFixtureArt
+import java.time.Instant
 
 internal const val RECORDING_LENGTH = 6_300_000L
 internal const val RECORDING_BEFORE_AD = 3_150_000L
@@ -29,7 +39,6 @@ internal fun recordingPlayerFixture(position: State<Long>) = RecordingPlayerStat
     channel = channelsFixture().rows.first { it.name == "Harbor Sport" },
     title = "Harbor Kickoff",
     episode = "Westvale – Ridge Town",
-    summary = "Sport",
     artwork = BitmapPainter(TouchFixtureArt.art("harbor-kickoff").asImageBitmap()),
     recordedOn = "Wed, Nov 11",
     endsAt = "9:40 PM",
@@ -54,3 +63,25 @@ internal fun recordingPlayerFixture(position: State<Long>) = RecordingPlayerStat
         subtitles = listOf(HumanTrackLabel("English", "English", null, "DVB")),
     ),
 )
+
+internal fun recordingInfoFixture(running: Boolean): RecordingPlayerInfo {
+    val item = kickoffPicked()
+    val next = ProgramDetails(
+        id = "kickoff-saturday", channelId = "harbor-sport", channel = "Harbor Sport",
+        title = item.title, episode = "Kingsbridge – Northport", timeRange = "Sat, Nov 14 • 8:15–10:00 PM",
+        length = "1h 45m", genre = item.details.genre,
+        synopsis = "Kingsbridge welcome Northport for the weekend’s late match.",
+    )
+    val program = next.copy(
+        id = item.id, episode = item.episode, timeRange = "Wed, Nov 11 • 8:30–10:15 PM",
+        otherAirings = listOf(ProgramAiring(next.id, time = "Sat, Nov 14 • 8:15 PM", line = listOf(next.channel))),
+        credits = listOf(ProgramCredit(CreditRole.Presenters, listOf("Alex Vale", "Morgan Reed"))),
+        facts = listOf(ProgramFact(FactKey.Broadcast, "New")),
+    )
+    val showing = if (running) item.copy(
+        state = RecordingProgress.Recording(Instant.parse("2026-11-11T21:40:00Z"), .6f),
+        details = item.details.copy(recorded = "Wed, Nov 11 • 8:30–9:23 PM"),
+    ) else item
+    val clock = if (running) FixtureClock.copy(now = Instant.parse("2026-11-11T21:23:00Z")) else FixtureClock
+    return RecordingPlayerInfo(showing, clock, program, mapOf(next.id to next))
+}

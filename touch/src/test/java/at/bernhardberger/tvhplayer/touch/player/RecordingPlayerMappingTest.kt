@@ -3,6 +3,8 @@ package at.bernhardberger.tvhplayer.touch.player
 import androidx.annotation.OptIn
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.media3.common.util.UnstableApi
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
 import at.bernhardberger.tvheadend.sdk.core.RecordingProgressCapability
 import at.bernhardberger.tvheadend.sdk.core.TvheadendTestResultFactory
@@ -19,6 +21,11 @@ import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import at.bernhardberger.tvhplayer.playback.RecordingSkipAction
 import at.bernhardberger.tvhplayer.settings.AdBreakMode
+import at.bernhardberger.tvhplayer.touch.recordings.FixtureClock
+import at.bernhardberger.tvhplayer.touch.recordings.FixtureRecordingsTexts
+import at.bernhardberger.tvhplayer.touch.recordings.RecordingDay
+import at.bernhardberger.tvhplayer.touch.recordings.RecordingLinePart
+import at.bernhardberger.tvhplayer.touch.recordings.RecordingProgress
 import at.bernhardberger.tvhplayer.touch.testutil.ServerGuide
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -26,7 +33,10 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.Duration
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
+import kotlin.time.toJavaInstant
 
 @OptIn(UnstableApi::class)
 @kotlin.OptIn(TvheadendTestingApi::class, ExperimentalTvheadendApi::class)
@@ -35,6 +45,8 @@ class RecordingPlayerMappingTest {
     private val server = ServerGuide(now)
     private val target = AppPlaybackTarget.Recording(server.recordingNow.id)
     private val token = RecordingSkipAction(fixtureAd, fixtureAd.endMs)
+    private val clock = FixtureClock.copy(now = now.toJavaInstant())
+    private val info = recordingPlayerInfo(server.recordingNow, null, clock, FixtureRecordingsTexts)
 
     @Test
     fun `runtime face owns metadata status offered controls and exact skip tokens`() {
@@ -53,6 +65,7 @@ class RecordingPlayerMappingTest {
             assertEquals(LivePlayerStatus.Playing, state.status)
             assertTrue(PlayerControl.Timeshift in state.offered)
             assertTrue(PlayerControl.Info in state.offered)
+            assertSame(info, state.info)
             assertFalse(PlayerControl.Audio in state.offered)
             assertFalse(PlayerControl.PictureInPicture in state.offered)
             assertFalse(PlayerControl.Record in state.offered || PlayerControl.Channels in state.offered)
@@ -61,6 +74,30 @@ class RecordingPlayerMappingTest {
             assertEquals(AdBreakMode.ASK, state.adBreakSetting)
             assertEquals(AdBreakMode.OFF, state.adBreakPick)
         }
+    }
+
+    @Test
+    fun `info projects a running recording to its padded stop and a finished one to the archive when and length`() {
+        val start = now - 30.minutes
+        val stop = now + 30.minutes
+        val running = DvrEntry.create(
+            id = server.recordingNow.id, start = start, stop = stop, stopExtraMinutes = 10.minutes,
+            state = DvrEntryState.RECORDING, title = server.recordingNow.title, description = "Match synopsis",
+        )
+        val playing = recordingPlayerInfo(running, null, clock, FixtureRecordingsTexts)
+        assertEquals((stop + 10.minutes).toJavaInstant(), (playing.item.state as RecordingProgress.Recording).until)
+        assertEquals(running.description, playing.item.details.synopsis)
+        assertFalse(playing.item.hasPicture)
+        assertNull(playing.item.remove)
+        assertTrue(playing.item.play.isEmpty())
+
+        val completed = recordingPlayerInfo(server.film, null, clock, FixtureRecordingsTexts)
+        val whenAndLength = recordingInfoWhen(completed.item, clock)
+        assertTrue((whenAndLength.first() as RecordingLinePart.Day).day is RecordingDay.On)
+        assertEquals(RecordingLinePart.Length(Duration.ofHours(1)), whenAndLength.last())
+        val other = map(AppPlaybackState.Playing, playWhenReady = true, info = completed)
+        assertNull(other.info)
+        assertFalse(PlayerControl.Info in other.offered)
     }
 
     @Test
@@ -131,11 +168,12 @@ class RecordingPlayerMappingTest {
         playWhenReady: Boolean,
         admission: RecordingPlaybackAdmission? =
             TvheadendTestResultFactory.growingRecordingAdmission(null, RecordingProgressCapability.SUPPORTED),
+        info: RecordingPlayerInfo? = this.info,
     ) = recordingPlayerState(
         target, server.connected(), playback, admission,
         recordingTimelinePresentation(RECORDING_INSIDE_AD, RECORDING_LENGTH, true),
         mutableLongStateOf(RECORDING_INSIDE_AD), listOf(fixtureAd), 7, token, token, AdBreakMode.ASK, AdBreakMode.OFF,
         playWhenReady, now, Instant::toString, Instant::toString, { "Episode" }, "Unknown channel", "Recording",
-        PlayerTracks(), PlaybackOptions(), .5f, allowPictureInPicture = false,
+        PlayerTracks(), PlaybackOptions(), .5f, allowPictureInPicture = false, info = info,
     )
 }

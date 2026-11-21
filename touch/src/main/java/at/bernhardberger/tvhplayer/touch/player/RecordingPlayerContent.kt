@@ -21,10 +21,8 @@ import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -194,19 +192,6 @@ internal fun RecordingMarkerRows(
                 colors = ListItemDefaults.segmentedColors(),
             ) { Text(name, maxLines = 1, overflow = TextOverflow.Ellipsis) }
         }
-    }
-}
-
-@Composable
-internal fun RecordingInfo(state: RecordingPlayerState) {
-    Column(
-        Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text(state.title, style = MaterialTheme.typography.titleLarge)
-        state.episode?.let { Text(it, style = MaterialTheme.typography.bodyLarge) }
-        Text(recordedDate(state), style = MaterialTheme.typography.bodyMedium)
-        state.summary?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
     }
 }
 

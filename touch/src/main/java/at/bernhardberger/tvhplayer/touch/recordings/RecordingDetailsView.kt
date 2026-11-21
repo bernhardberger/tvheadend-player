@@ -51,6 +51,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -179,20 +180,40 @@ private fun PhonePage(item: RecordingItem, clock: RecordingClock, actions: Recor
         ) {
             val picture = rememberStandalonePicture(item.picture, item.pictureModel)
             picture?.let { Picture(it, Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))) }
-            Text(
-                whenText(item, clock), if (picture != null) Modifier.padding(top = 16.dp) else Modifier,
-                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            RecordingDetailsBody(
+                item, whenText(item, clock),
+                whenModifier = if (picture != null) Modifier.padding(top = 16.dp) else Modifier,
+                beforeSynopsis = {
+                    Progress(item.state, clock, Modifier.padding(top = 16.dp))
+                    Row(Modifier.padding(top = 16.dp)) { PlayButtons(item, actions, equalWidth = true) }
+                },
             )
-            Title(item, Modifier.padding(top = 4.dp), MaterialTheme.typography.headlineMedium)
-            DetailsEpisode(item.episode)
-            Facts(item)
-            Progress(item.state, clock, Modifier.padding(top = 16.dp))
-            Row(Modifier.padding(top = 16.dp)) { PlayButtons(item, actions, equalWidth = true) }
-            DetailsSynopsis(item.details.synopsis, Modifier.padding(top = 20.dp))
-            Facts(item.details, columns = 1, keyWidth = 116.dp)
-            Spacer(Modifier.height(24.dp))
         }
     }
+}
+
+/** Single-column recording details; the surrounding page owns its artwork and controls. */
+@Composable
+internal fun RecordingDetailsBody(
+    item: RecordingItem,
+    whenLine: String,
+    whenModifier: Modifier = Modifier,
+    beforeSynopsis: (@Composable () -> Unit)? = null,
+    afterSynopsis: (@Composable () -> Unit)? = null,
+    programmeFacts: List<Pair<String, String>> = emptyList(),
+) {
+    Text(
+        whenLine, whenModifier,
+        style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Title(item, Modifier.padding(top = 4.dp), MaterialTheme.typography.headlineMedium)
+    DetailsEpisode(item.episode)
+    Facts(item)
+    beforeSynopsis?.invoke()
+    DetailsSynopsis(item.details.synopsis, Modifier.padding(top = 20.dp))
+    afterSynopsis?.invoke()
+    Facts(item.details, columns = 1, keyWidth = 116.dp, programmeFacts = programmeFacts)
+    Spacer(Modifier.height(24.dp))
 }
 
 /** The start in full for the pane and the page, "Wed, Nov 11 • 8:30 PM". */
@@ -233,7 +254,8 @@ private fun ChannelTile(item: RecordingItem, modifier: Modifier) {
 private fun Picture(picture: Painter, modifier: Modifier) {
     Image(
         picture, null,
-        modifier.aspectRatio(PICTURE_RATIO).background(MaterialTheme.colorScheme.surfaceContainerHighest),
+        modifier.aspectRatio(PICTURE_RATIO).background(MaterialTheme.colorScheme.surfaceContainerHighest)
+            .testTag("recording-details-picture"),
         contentScale = ContentScale.Crop,
     )
 }
@@ -359,8 +381,18 @@ private fun RecordingActionButton(control: RecordingRemoveControl, onClick: () -
 }
 
 @Composable
-private fun Facts(details: RecordingDetails, columns: Int, keyWidth: Dp) {
-    val facts = listOfNotNull(
+private fun Facts(
+    details: RecordingDetails,
+    columns: Int,
+    keyWidth: Dp,
+    programmeFacts: List<Pair<String, String>> = emptyList(),
+) = DetailsFacts(
+    stringResource(R.string.recordings_details), programmeFacts + recordingFactRows(details), columns, keyWidth,
+)
+
+@Composable
+private fun recordingFactRows(details: RecordingDetails): List<Pair<String, String>> =
+    listOfNotNull(
         details.genre?.let { SharedR.string.details_genre to it },
         details.size?.let { SharedR.string.details_size to it },
         details.picture?.let { SharedR.string.details_picture to it },
@@ -374,8 +406,6 @@ private fun Facts(details: RecordingDetails, columns: Int, keyWidth: Dp) {
         },
         details.retention?.let { SharedR.string.details_retention to it },
     ).map { (key, value) -> stringResource(key) to value }
-    DetailsFacts(stringResource(R.string.recordings_details), facts, columns, keyWidth)
-}
 
 private const val PICTURE_RATIO = 16f / 9f
 private val TEXT_WIDTH = 576.dp

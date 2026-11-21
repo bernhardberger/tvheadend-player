@@ -7,11 +7,16 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -24,6 +29,7 @@ import androidx.compose.ui.text.TextLayoutResult
 import at.bernhardberger.tvhplayer.notices.Notice
 import at.bernhardberger.tvhplayer.settings.AdBreakMode
 import at.bernhardberger.tvhplayer.touch.R
+import at.bernhardberger.tvhplayer.touch.recordings.RecordingProgress
 import at.bernhardberger.tvhplayer.touch.testutil.TouchCanvas
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouch
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouchWindows
@@ -55,6 +61,48 @@ class RecordingPlayerScreenTest {
     private val notice = mutableStateOf<Notice?>(null)
     private val seeks = mutableListOf<Long>()
     private val choices = mutableListOf<PlayerChoice>()
+
+    @Test
+    @Config(qualifiers = "en-rUS-w1280dp-h800dp-land-xhdpi")
+    fun recordingInfoOpensAnAiringAndBackReturnsBeforeClosing() {
+        show(info = recordingInfoFixture(running = false))
+        button(R.string.player_info).performClick()
+        val airing = compose.onNode(hasText("Sat, Nov 14 • 8:15 PM") and hasClickAction())
+        airing.assertIsDisplayed()
+        val inInfo = hasAnyAncestor(hasTestTag("recording-info"))
+        compose.onAllNodes(inInfo and hasClickAction()).assertCountEquals(1)
+        compose.onNode(inInfo and hasTestTag("recording-details-picture"), useUnmergedTree = true).assertDoesNotExist()
+        compose.onNode(inInfo and SemanticsMatcher.keyIsDefined(SemanticsProperties.ProgressBarRangeInfo))
+            .assertDoesNotExist()
+        captureWindows("tablet-recording-info", TouchCanvas.TABLET)
+        airing.performClick()
+        compose.runOnIdle { assertEquals(listOf(PlayerChoice.Details("kickoff-saturday")), choices) }
+        compose.onNodeWithText("Kingsbridge – Northport").assertIsDisplayed()
+        captureWindows("tablet-recording-info-airing", TouchCanvas.TABLET)
+        back()
+        airing.assertIsDisplayed()
+        back()
+        airing.assertDoesNotExist()
+        button(R.string.player_info).assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
+    fun uprightRecordingInfoIsInThePlayerBottomSheet() {
+        show(info = recordingInfoFixture(running = true))
+        button(R.string.player_info).performClick()
+        tag("recording-info").assertIsDisplayed()
+        captureWindows("phone-recording-info", TouchCanvas.PHONE)
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w892dp-h412dp-land-xhdpi")
+    fun sidewaysRecordingInfoIsInThePlayerSideSheet() {
+        show(info = recordingInfoFixture(running = false))
+        button(R.string.player_info).performClick()
+        tag("recording-info").assertIsDisplayed()
+        captureWindows("phone-recording-landscape-info", TouchCanvas.PHONE_LANDSCAPE)
+    }
 
     @Test
     @Config(qualifiers = "en-rUS-w1280dp-h800dp-land-xhdpi")
@@ -173,7 +221,7 @@ class RecordingPlayerScreenTest {
         captureWindows("phone-recording-options", canvas)
     }
 
-    private fun show() {
+    private fun show(info: RecordingPlayerInfo? = null) {
         val fixture = recordingPlayerFixture(position)
         compose.setContent {
             MaterialTheme(colorScheme = MobileDarkColors) {
@@ -184,6 +232,8 @@ class RecordingPlayerScreenTest {
                         adBreakPick = choice.value,
                         controlsSkip = offer,
                         skipPrompt = offer.takeIf { !dismissed.value && choice.value != AdBreakMode.AUTOMATIC },
+                        info = info,
+                        endsAt = fixture.endsAt.takeIf { info == null || info.item.state is RecordingProgress.Recording },
                     ),
                     onAction = {}, onSeek = { seeks += it }, onBrightness = {},
                     onChoice = {
