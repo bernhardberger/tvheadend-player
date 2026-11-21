@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.IntRect
 import at.bernhardberger.tvhplayer.touch.testutil.assertLogoFitsItsShare
 import at.bernhardberger.tvhplayer.touch.testutil.markedLogos
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
@@ -30,10 +31,13 @@ import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -49,6 +53,7 @@ import androidx.compose.runtime.setValue
 import at.bernhardberger.tvhplayer.ui.MobileDarkColors
 import java.io.File
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -77,8 +82,8 @@ class RecordingsScreenTest {
         show()
         compose.onNodeWithText("Pick a recording to see it here").assertIsDisplayed()
         // A wide row carries every part.
-        assertLine("Kingsbridge – Northport • 8:15 PM • 1h 45m • Harbor Sport")
-        assertLine("12:15 PM • 45m • Northline News")
+        assertLongEpisodeKeepsItsFacts()
+        assertLine("8:15 PM • 1h 45m • Kingsbridge – Northport • Harbor Sport")
         capture("tablet-recordings-root", TouchCanvas.TABLET)
 
         pickTheHalfWatchedMatch()
@@ -139,7 +144,9 @@ class RecordingsScreenTest {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         instrumentation.setInTouchMode(true)
         show()
-        compose.onNodeWithText("View options").assertIsDisplayed()
+        val options = compose.onNodeWithText("View options").assertIsDisplayed()
+        val pane = compose.onNodeWithTag("recordings-pane").fetchSemanticsNode().boundsInRoot
+        assertEquals("View options ends at the pane keyline", pane.right, options.fetchSemanticsNode().boundsInRoot.right)
         openViewOptions()
         val sheet = hasAnyAncestor(isDialog())
         compose.onNodeWithText("Group by").assert(sheet)
@@ -189,7 +196,7 @@ class RecordingsScreenTest {
 
         listOf("Sport", "Football", "Harbor Sport", "Week 46").forEach { compose.onNodeWithText(it).performClick() }
         compose.onNodeWithText("Recordings › Sport › Football › Harbor Sport").assertIsDisplayed()
-        assertLine("Kingsbridge – Northport • Sat, Nov 14 • 1h 45m • Harbor Sport")
+        assertLine("Sat, Nov 14 • 1h 45m • Kingsbridge – Northport • Harbor Sport")
         compose.onNodeWithText("Basketball").assertDoesNotExist()
         pickTheHalfWatchedMatch()
         resumeButton().assertIsDisplayed()
@@ -242,8 +249,7 @@ class RecordingsScreenTest {
     fun phoneListAndViewOptions() {
         state.value = flatFixture(harborLights = true)
         show()
-        // Too narrow for all four: the channel and then the length go, whole.
-        assertLine("Kingsbridge – Northport • 8:15 PM")
+        assertLongEpisodeKeepsItsFacts()
         capture("phone-recordings-all", TouchCanvas.PHONE)
 
         compose.onNodeWithContentDescription("View options").performClick()
@@ -366,6 +372,17 @@ class RecordingsScreenTest {
         compose.onNodeWithText("Westvale – Ridge Town", substring = true).performClick()
 
     private fun resumeButton() = compose.onNodeWithContentDescription("Resume from", substring = true)
+
+    private fun assertLongEpisodeKeepsItsFacts() {
+        val layouts = mutableListOf<TextLayoutResult>()
+        compose.onNodeWithText(FieldDeskEpisode.substringBefore(':'), substring = true, useUnmergedTree = true)
+            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        val layout = layouts.single()
+        val text = layout.layoutInput.text.text
+        val visible = text.take(layout.getLineEnd(0, visibleEnd = true)).replace('\u202f', ' ').replace('\u00a0', ' ')
+        assertTrue("Visible line must keep time and length: $visible", visible.startsWith("12:15 PM • 45m • E91"))
+        assertTrue("Only the episode may be ellipsized: $text", layout.isLineEllipsized(0) && !text.contains("Northline News"))
+    }
 
     // Times and lengths keep their parts together with (narrow) no-break spaces.
     private fun assertLine(line: String) {
