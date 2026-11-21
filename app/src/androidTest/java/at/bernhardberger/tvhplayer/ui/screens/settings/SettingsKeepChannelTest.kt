@@ -82,8 +82,8 @@ class SettingsKeepChannelTest(private val language: String) {
             }
         }
         press(Key.DirectionCenter)
-        // Autoplay and timeshift precede Keep paused TV tuned.
-        repeat(2) { press(Key.DirectionDown) }
+        // Autoplay, warm playback and timeshift precede Keep paused TV tuned.
+        repeat(3) { press(Key.DirectionDown) }
         val parent = composeRule.onNode(hasText(heading) and hasClickAction())
         parent.assertIsFocused()
         press(Key.DirectionCenter)
@@ -93,20 +93,22 @@ class SettingsKeepChannelTest(private val language: String) {
         composeRule.onNodeWithText(label(10)).assertIsFocused().assertIsDisplayed()
         press(Key.DirectionUp)
         composeRule.onNodeWithText(label(0)).assertIsFocused().assertIsDisplayed()
-        repeat(3) { press(Key.DirectionDown) }
-        composeRule.onNodeWithText(label(30)).assertIsFocused().assertIsDisplayed()
+        for (choice in listOf(10, 20, 30, 60)) {
+            press(Key.DirectionDown)
+            composeRule.onNodeWithText(label(choice)).assertIsFocused().assertIsDisplayed()
+        }
         press(Key.DirectionCenter)
         parent.assertIsFocused()
-        composeRule.runOnIdle { assertEquals(listOf(30), selections) }
+        composeRule.runOnIdle { assertEquals(listOf(60), selections) }
         press(Key.DirectionCenter)
-        composeRule.onNodeWithText(label(30)).assertIsFocused().assertIsSelected()
+        composeRule.onNodeWithText(label(60)).assertIsFocused().assertIsSelected()
         composeRule.runOnIdle { composeRule.activity.onBackPressedDispatcher.onBackPressed() }
         parent.assertIsFocused()
         press(Key.DirectionCenter)
-        composeRule.onNodeWithText(label(30)).assertIsFocused()
+        composeRule.onNodeWithText(label(60)).assertIsFocused()
         press(Key.DirectionLeft)
         parent.assertIsFocused()
-        composeRule.runOnIdle { assertEquals(listOf(30), selections) }
+        composeRule.runOnIdle { assertEquals(listOf(60), selections) }
     }
 
     private fun press(key: Key) {

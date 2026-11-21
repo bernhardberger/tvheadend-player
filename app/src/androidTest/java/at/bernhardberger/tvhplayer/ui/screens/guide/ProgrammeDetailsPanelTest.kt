@@ -2,7 +2,11 @@ package at.bernhardberger.tvhplayer.ui.screens.guide
 
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertHasNoClickAction
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.isFocusable
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
@@ -56,9 +60,10 @@ class ProgrammeDetailsPanelTest {
     @Test
     fun relatedCardKeepsFocusWhenPublicationReplacesRecordWithCancel() {
         showPanel(withDescription = true)
+        composeRule.onNodeWithTag("details-synopsis").assertIsDisplayed()
+            .assertHasNoClickAction().assert(isFocusable().not())
         composeRule.onNodeWithText(context.getString(R.string.record)).assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionDown) }
-        composeRule.onNodeWithTag("details-about").assertIsFocused().performKeyInput { pressKey(Key.DirectionDown) }
         composeRule.onNodeWithTag("details-card-22").assertIsFocused()
         publishScheduledRecording()
         composeRule.onNodeWithTag("details-card-22").assertIsFocused()

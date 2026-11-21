@@ -94,7 +94,12 @@ class StorageScreenshotTest(private val language: String, private val scale: Flo
             pressKey(Key.DirectionCenter)
         }
         composeRule.onNodeWithText(languageRow).assertIsFocused()
-        composeRule.onRoot().performKeyInput { repeat(2) { pressKey(Key.DirectionDown) } }
+        val clockRow = localizedContext.getString(R.string.settings_clock_format)
+        val numbersRow = localizedContext.getString(R.string.settings_channel_numbers)
+        for (row in listOf(clockRow, numbersRow, clear)) {
+            composeRule.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+            composeRule.onNodeWithText(row).assertIsFocused().assertIsDisplayed()
+        }
         composeRule.onNodeWithText(clear).assertIsFocused().assertIsDisplayed()
         composeRule.onNodeWithText(clear).performKeyInput { pressKey(Key.DirectionCenter) }
         composeRule.runOnIdle { assertEquals(if (state == CacheClearState.CLEARING) 0 else 1, clearCalls) }
@@ -108,9 +113,11 @@ class StorageScreenshotTest(private val language: String, private val scale: Flo
         File(directory, "$language-$scale-${state.name.lowercase()}.png").outputStream().use {
             assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
         }
-        composeRule.onRoot().performKeyInput { repeat(2) { pressKey(Key.DirectionUp) } }
-        composeRule.onNodeWithText(languageRow).assertIsFocused().assertIsDisplayed()
-        composeRule.onRoot().performKeyInput { repeat(2) { pressKey(Key.DirectionDown) } }
+        for (row in listOf(numbersRow, clockRow, languageRow)) {
+            composeRule.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
+            composeRule.onNodeWithText(row).assertIsFocused().assertIsDisplayed()
+        }
+        composeRule.onRoot().performKeyInput { repeat(3) { pressKey(Key.DirectionDown) } }
         composeRule.onNodeWithText(clear).assertIsFocused().assertIsDisplayed()
         composeRule.runOnIdle { composeRule.activity.onBackPressedDispatcher.onBackPressed() }
         composeRule.onNode(hasText(general) and hasClickAction()).assertIsFocused()

@@ -8,10 +8,12 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.isFocusable
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
@@ -89,8 +91,12 @@ class ArchiveDepthOwnershipTest {
             compose.mainClock.advanceTimeBy(96)
             compose.waitForIdle()
             compose.onNodeWithTag("recording-list-entry-2").assertIsFocused()
-            compose.onNodeWithTag("recording-metadata-pane", useUnmergedTree = true)
-                .assertHasNoClickAction().assert(isFocusable().not())
+            // Both previews are composed during the handoff, but neither accepts input.
+            val previews = compose.onAllNodesWithTag("recording-metadata-pane", useUnmergedTree = true)
+            previews.assertCountEquals(2)
+            for (index in 0..1) {
+                previews[index].assertHasNoClickAction().assert(isFocusable().not())
+            }
             compose.runOnIdle {
                 assertEquals(outgoingStack, navigation[0].stack)
                 assertEquals("recording:2", navigation[1].stack.active.focusedItemId)

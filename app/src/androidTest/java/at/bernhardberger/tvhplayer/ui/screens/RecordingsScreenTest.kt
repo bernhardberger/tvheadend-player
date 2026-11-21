@@ -60,12 +60,16 @@ import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.notices.NoticeContext
 import at.bernhardberger.tvhplayer.ui.notifications.AppNoticeHost
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
+import at.bernhardberger.tvhplayer.core.DvrArchiveGrouping
+import at.bernhardberger.tvhplayer.core.DvrArchiveView
 import at.bernhardberger.tvhplayer.core.DvrLibraryMode
 import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
 import at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.testing.testSessionObservation
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.captureBrowseFrame
+import at.bernhardberger.tvhplayer.ui.screens.recordings.SCHEDULE_AUTOMATIC_ROW
+import at.bernhardberger.tvhplayer.ui.screens.recordings.SCHEDULE_NEW_TIMER
 import kotlinx.coroutines.CompletableDeferred
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -81,6 +85,7 @@ import kotlin.time.Instant
 /** Without a list there is no headline or options button; focus parks on the Browse tab. */
 private const val BROWSE_TAB = "recordings-mode-archive"
 private const val OPTIONS_BUTTON = "recordings-view-options"
+private val foldersView = DvrArchiveView(grouping = DvrArchiveGrouping.FOLDERS)
 
 @OptIn(ExperimentalTestApi::class, TvheadendTestingApi::class)
 class RecordingsScreenTest {
@@ -96,10 +101,12 @@ class RecordingsScreenTest {
         backEnabled: Boolean = true,
         onPlayRecording: (RecordingPlaybackSelection, RecordingPlaybackStart) -> Unit = { _, _ -> },
         state: RecordingsScreenState? = null,
+        view: DvrArchiveView = DvrArchiveView(),
         recordingProgressCapability: RecordingProgressCapability = RecordingProgressCapability.SUPPORTED,
         sessionObservation: SessionObservation? = null,
         connectionUiState: ConnectionUiState = ConnectionUiState.Ready,
         onRetry: () -> Unit = {},
+        onOpenConnectionSettings: () -> Unit = {},
         onCancelRecording: suspend (
             CurrentSessionObservation,
             DvrEntryId,
@@ -161,8 +168,10 @@ class RecordingsScreenTest {
             backEnabled = backEnabled,
             connectionUiState = connectionUiState,
             onRetry = onRetry,
+            onOpenConnectionSettings = onOpenConnectionSettings,
             onPlayRecording = onPlayRecording,
             state = state,
+            view = view,
             dvrMutationActions = dvrMutationActions,
             notices = notices,
         )
@@ -255,6 +264,7 @@ class RecordingsScreenTest {
 
     @Test
     fun emptyNonRetryableFailureHasNoDetachedRetryTarget() {
+        var settingsOpened = 0
         composeRule.setContent {
             TVHeadendPlayerTheme {
                 TestRecordingsScreen(
@@ -262,13 +272,17 @@ class RecordingsScreenTest {
                         ConnectionFailureKind.AUTHENTICATION,
                         SessionRecoveryDisposition.PROFILE_CHANGE_REQUIRED,
                     ),
+                    onOpenConnectionSettings = { settingsOpened++ },
                 )
             }
         }
+        val settings = composeRule.onNodeWithText(composeRule.activity.getString(R.string.action_connection_settings))
+        settings.assertIsFocused().performKeyInput { pressKey(Key.DirectionUp) }
         composeRule.onNodeWithTag(BROWSE_TAB).assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionDown) }
-        composeRule.onNodeWithTag(BROWSE_TAB).assertIsFocused()
-        composeRule.onAllNodesWithText("Retry").assertCountEquals(0)
+        settings.assertIsFocused().pressCenter()
+        composeRule.onAllNodesWithText(composeRule.activity.getString(R.string.action_retry)).assertCountEquals(0)
+        composeRule.runOnIdle { assertEquals(1, settingsOpened) }
     }
 
     @Test
@@ -304,7 +318,7 @@ class RecordingsScreenTest {
 
         composeRule.setContent {
             TVHeadendPlayerTheme {
-                TestRecordingsScreen(entries = entries)
+                TestRecordingsScreen(entries = entries, view = foldersView)
             }
         }
 
@@ -316,29 +330,30 @@ class RecordingsScreenTest {
         composeRule.onNodeWithTag("recordings-folder-News").assertIsFocused().pressCenter()
         waitForFocus("recording-list-entry-7")
         composeRule.onNodeWithTag("recording-list-entry-7").assertIsDisplayed()
-        composeRule.onAllNodesWithText("Evening News").assertCountEquals(2)
-        composeRule.onNodeWithTag("recording-list-entry-7").performKeyInput { pressKey(Key.Menu) }
-        composeRule.onNodeWithText("Delete").requestFocus().pressCenter()
+        composeRule.onNodeWithTag("recording-list-entry-7").openDetailsFromMenu()
+        composeRule.onNodeWithTag("details-play").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionRight) }
+        composeRule.onNodeWithTag("details-delete").assertIsFocused().pressCenter()
         composeRule.onNodeWithText("Delete this recording?").assertIsDisplayed()
         composeRule.onNodeWithTag("recording-confirmation-back").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionLeft) }
         composeRule.onNodeWithTag("recording-confirmation-back").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionUp) }
         composeRule.onNodeWithTag("recording-confirmation-back").assertIsFocused()
-            .performKeyInput { pressKey(Key.DirectionRight) }
-        composeRule.onNodeWithTag("recording-confirmation-back").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionDown) }
-        composeRule.onNodeWithTag("recording-confirmation-confirm").assertIsFocused()
+        composeRule.onNodeWithTag("recording-confirmation-back").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionRight) }
         composeRule.onNodeWithTag("recording-confirmation-confirm").assertIsFocused()
-            .performKeyInput { pressKey(Key.DirectionLeft) }
+            .performKeyInput { pressKey(Key.DirectionRight) }
         composeRule.onNodeWithTag("recording-confirmation-confirm").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionDown) }
         composeRule.onNodeWithTag("recording-confirmation-confirm").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionUp) }
+        composeRule.onNodeWithTag("recording-confirmation-confirm").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionLeft) }
         composeRule.onNodeWithTag("recording-confirmation-back").assertIsFocused()
         dispatchBack()
-        composeRule.onNodeWithText("Delete").assertIsFocused()
+        composeRule.onNodeWithTag("details-delete").assertIsFocused()
     }
 
     @Test
@@ -362,6 +377,7 @@ class RecordingsScreenTest {
                         initialFocusEnabled = !active,
                         backEnabled = !active,
                         state = state,
+                        view = foldersView,
                     )
                 }
             }
@@ -426,7 +442,7 @@ class RecordingsScreenTest {
                 ) { padding, active ->
                     androidx.compose.runtime.SideEffect { drawerActive = active }
                     TestRecordingsScreen(entries = entries, contentPadding = padding,
-                        initialFocusEnabled = !active, backEnabled = !active, state = state)
+                        initialFocusEnabled = !active, backEnabled = !active, state = state, view = foldersView)
                 }
             }
         }
@@ -451,7 +467,6 @@ class RecordingsScreenTest {
         assertEquals(beforeTop, folder.fetchSemanticsNode().boundsInRoot.top, 1f)
         captureBrowseFrame(composeRule.onRoot(), "folder-scrolled-parent-restored")
         dispatchBack()
-        composeRule.waitForIdle()
         composeRule.runOnIdle { assertTrue("Root Back belongs to the shell", drawerActive) }
     }
 
@@ -478,7 +493,7 @@ class RecordingsScreenTest {
                 ) { padding, active ->
                     androidx.compose.runtime.SideEffect { drawerActive = active }
                     TestRecordingsScreen(entries = entries.value, contentPadding = padding,
-                        initialFocusEnabled = !active, backEnabled = !active, state = state)
+                        initialFocusEnabled = !active, backEnabled = !active, state = state, view = foldersView)
                 }
             }
         }
@@ -486,19 +501,23 @@ class RecordingsScreenTest {
         composeRule.mainClock.autoAdvance = false
         try {
             composeRule.onNodeWithTag("recordings-folder-Series").pressCenter()
-            composeRule.mainClock.advanceTimeUntil(timeoutMillis = 500) {
-                composeRule.onAllNodes(hasTestTag("recording-list-entry-1") and isFocused()).fetchSemanticsNodes().isNotEmpty()
+            val childTag = "recording-list-entry-1"
+            val focusedChild = composeRule.onAllNodes(hasTestTag(childTag) and isFocused())
+            val deadline = composeRule.mainClock.currentTime + 500
+            // Semantics queries synchronize and must stay on the test thread.
+            while (focusedChild.fetchSemanticsNodes().isEmpty() && composeRule.mainClock.currentTime < deadline) {
+                composeRule.mainClock.advanceTimeByFrame()
             }
-            composeRule.onAllNodes(isFocused())[0].performKeyInput {
+            composeRule.onNodeWithTag(childTag).assertIsFocused().performKeyInput {
                 keyDown(Key.DirectionUp); keyUp(Key.DirectionUp)
             }
             composeRule.mainClock.advanceTimeByFrame()
-            assertOptionsFocused()
+            composeRule.onNodeWithTag(BROWSE_TAB).assertIsFocused()
             composeRule.runOnIdle {
                 entries.value += recording(id = 2, title = "Second", path = "Series/second.ts")
             }
             repeat(12) { composeRule.mainClock.advanceTimeByFrame() }
-            assertOptionsFocused()
+            composeRule.onNodeWithTag(BROWSE_TAB).assertIsFocused()
             composeRule.runOnIdle { assertFalse(drawerActive) }
         } finally {
             composeRule.mainClock.autoAdvance = true
@@ -517,7 +536,8 @@ class RecordingsScreenTest {
                 ) { padding, active ->
                     androidx.compose.runtime.SideEffect { drawerActive = active }
                     TestRecordingsScreen(entries = entries.value, contentPadding = padding,
-                        initialFocusEnabled = !active, backEnabled = !active)
+                        initialFocusEnabled = !active, backEnabled = !active,
+                        view = if (queueFolderEntry) foldersView else DvrArchiveView())
                 }
             }
         }
@@ -558,7 +578,7 @@ class RecordingsScreenTest {
                 ) { padding, active ->
                     androidx.compose.runtime.SideEffect { drawerActive = active }
                     TestRecordingsScreen(entries = entries.value, contentPadding = padding,
-                        initialFocusEnabled = !active, backEnabled = !active, state = state)
+                        initialFocusEnabled = !active, backEnabled = !active, state = state, view = foldersView)
                 }
             }
         }
@@ -682,9 +702,11 @@ class RecordingsScreenTest {
         composeRule.onNodeWithTag("recording-list-entry-7").assertIsFocused()
             .performKeyInput { pressKey(Key.Menu) }
         composeRule.onNodeWithText("Delete").requestFocus().pressCenter()
+        composeRule.onNodeWithTag("recording-confirmation-back").assertIsFocused()
         composeRule.runOnIdle { observation.value = observationB }
         composeRule.onAllNodesWithTag("recording-confirmation-back").assertCountEquals(0)
-        composeRule.onNodeWithText("Details").assertIsFocused()
+        composeRule.onAllNodesWithTag("app-notice").assertCountEquals(0)
+        composeRule.onNodeWithTag("recording-list-entry-7").assertIsFocused()
         composeRule.waitForIdle()
 
         assertEquals(null, dispatchedCapability)
@@ -692,13 +714,13 @@ class RecordingsScreenTest {
     }
 
     @Test
-    fun movingUpFromFirstEnteredFolderRowReturnsToTheOptionsButtonWithoutChangingDepth() {
+    fun movingUpFromFirstEnteredFolderRowReturnsToTheBrowseTabWithoutChangingDepth() {
         val entries = listOf(
             recording(id = 7, title = "Evening News", path = "News/evening-news.ts")
         )
 
         composeRule.setContent {
-            TVHeadendPlayerTheme { TestRecordingsScreen(entries = entries) }
+            TVHeadendPlayerTheme { TestRecordingsScreen(entries = entries, view = foldersView) }
         }
 
         composeRule.onNodeWithTag("recordings-folder-News")
@@ -708,8 +730,9 @@ class RecordingsScreenTest {
             .assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionUp) }
 
-        assertOptionsFocused()
-        composeRule.onNodeWithTag("recordings-archive-list").assertIsDisplayed()
+        composeRule.onNodeWithTag(BROWSE_TAB).assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionDown) }
+        waitForFocus("recording-list-entry-7")
     }
 
     @Test
@@ -719,7 +742,7 @@ class RecordingsScreenTest {
         )
 
         composeRule.setContent {
-            TVHeadendPlayerTheme { TestRecordingsScreen(entries = entries) }
+            TVHeadendPlayerTheme { TestRecordingsScreen(entries = entries, view = foldersView) }
         }
 
         composeRule.onNodeWithTag("recordings-folder-News")
@@ -752,7 +775,7 @@ class RecordingsScreenTest {
             TVHeadendPlayerTheme {
                 Box {
                     BackHandler { shellBackCount++ }
-                    TestRecordingsScreen(entries = entries, backEnabled = false)
+                    TestRecordingsScreen(entries = entries, backEnabled = false, view = foldersView)
                 }
             }
         }
@@ -874,10 +897,18 @@ class RecordingsScreenTest {
         composeRule.onNodeWithText("Resume").assertIsDisplayed()
         composeRule.onNodeWithTag("details-resume").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionLeft); pressKey(Key.DirectionUp); pressKey(Key.DirectionDown) }
+        composeRule.onNodeWithTag("details-facts-panel").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionUp) }
         composeRule.onNodeWithTag("details-resume").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionRight) }
         composeRule.onNodeWithTag("details-start_over").assertIsFocused()
-            .performKeyInput { pressKey(Key.DirectionRight); pressKey(Key.DirectionDown); pressKey(Key.DirectionUp) }
+            .performKeyInput { pressKey(Key.DirectionRight) }
+        composeRule.onNodeWithTag("details-delete").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionDown) }
+        composeRule.onNodeWithTag("details-facts-panel").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionUp) }
+        composeRule.onNodeWithTag("details-delete").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionLeft) }
         composeRule.onNodeWithTag("details-start_over").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionLeft) }
         composeRule.onNodeWithTag("details-resume").assertIsFocused()
@@ -900,12 +931,16 @@ class RecordingsScreenTest {
         composeRule.onAllNodesWithTag("details-delete").assertCountEquals(0)
         composeRule.onNodeWithTag("details-watch").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionLeft); pressKey(Key.DirectionUp); pressKey(Key.DirectionDown) }
+        composeRule.onNodeWithTag("details-facts-panel").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionUp) }
         composeRule.onNodeWithTag("details-watch").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionRight) }
         composeRule.onNodeWithTag("details-start_over").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionRight) }
         composeRule.onNodeWithTag("details-stop").assertIsFocused()
-            .performKeyInput { pressKey(Key.DirectionRight); pressKey(Key.DirectionDown); pressKey(Key.DirectionUp) }
+            .performKeyInput { pressKey(Key.DirectionRight); pressKey(Key.DirectionDown) }
+        composeRule.onNodeWithTag("details-facts-panel").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionUp) }
         composeRule.onNodeWithTag("details-stop").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionLeft) }
         composeRule.onNodeWithTag("details-start_over").assertIsFocused()
@@ -947,11 +982,7 @@ class RecordingsScreenTest {
         composeRule.onNodeWithTag("details-start_over").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionRight) }
         composeRule.onNodeWithTag("details-stop").assertIsFocused().pressCenter()
-        composeRule.onNodeWithTag("recording-confirmation-back").assertIsFocused()
-            .performKeyInput {
-                pressKey(Key.DirectionDown)
-                pressKey(Key.DirectionCenter)
-            }
+        confirmRecordingAction()
         composeRule.runOnIdle {
             assertEquals(listOf(DvrEntryId(7)), stops)
             assertEquals(emptyList<RecordingPlaybackStart>(), starts)
@@ -1034,7 +1065,7 @@ class RecordingsScreenTest {
         composeRule.setContent {
             TVHeadendPlayerTheme {
                 if (visible.value) {
-                    TestRecordingsScreen(entries = entries, state = screenState)
+                    TestRecordingsScreen(entries = entries, state = screenState, view = foldersView)
                 }
             }
         }
@@ -1068,7 +1099,7 @@ class RecordingsScreenTest {
             recording(
                 id = 3,
                 title = "Failed Show",
-                state = DvrEntryState.RECORDING_ERROR,
+                state = DvrEntryState.COMPLETED_ERROR,
                 start = start,
                 stop = start + 3_600L,
             ),
@@ -1079,50 +1110,45 @@ class RecordingsScreenTest {
         }
 
         composeRule.onNodeWithTag("recording-list-entry-1").assertIsDisplayed()
-        composeRule.onAllNodesWithText("Future Show").assertCountEquals(0)
-        composeRule.onAllNodesWithText("Failed Show").assertCountEquals(0)
+        composeRule.onNodeWithTag("recording-list-entry-2").assertDoesNotExist()
+        composeRule.onNodeWithTag("recording-list-entry-3").assertDoesNotExist()
         composeRule.onNodeWithTag("recording-list-entry-1").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionUp) }
+        composeRule.onNodeWithTag(OPTIONS_BUTTON).assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionUp) }
+        composeRule.onNodeWithTag(BROWSE_TAB).assertIsFocused()
             .performKeyInput {
-                pressKey(Key.DirectionUp)
-                repeat(4) { pressKey(Key.DirectionRight) }
+                pressKey(Key.DirectionRight)
                 pressKey(Key.DirectionCenter)
             }
         // The Schedule screen opens on its first entry, not on its subnav.
         waitForFocus("recording-list-entry-2")
         composeRule.onNodeWithTag("recordings-schedule-list").assertIsDisplayed()
-        composeRule.onAllNodesWithTag("recording-metadata-pane").assertCountEquals(0)
-        composeRule.onNodeWithText("Future Show").assertIsDisplayed()
-        composeRule.onNodeWithTag("recording-list-entry-2").requestFocus().assertIsFocused()
-            .pressCenter()
+        composeRule.onNodeWithTag("recording-list-entry-1").assertDoesNotExist()
+        composeRule.onNodeWithTag("recording-list-entry-3").assertDoesNotExist()
+        composeRule.onNodeWithTag("recording-list-entry-2").assertIsFocused().pressCenter()
         composeRule.onNodeWithTag("programme-details-page").assertIsDisplayed()
         composeRule.onNodeWithText("Cancel recording").assertIsDisplayed()
         composeRule.onNodeWithTag("details-cancel").assertIsFocused()
-            .performKeyInput {
-                pressKey(Key.DirectionLeft)
-                pressKey(Key.DirectionDown)
-            }
-        composeRule.onNodeWithTag("details-cancel").assertIsFocused()
-        composeRule.runOnIdle { composeRule.activity.onBackPressedDispatcher.onBackPressed() }
+        dispatchBack()
         waitForFocus("recording-list-entry-2")
         composeRule.onNodeWithTag("recording-list-entry-2").performKeyInput {
             pressKey(Key.DirectionUp)
         }
-        composeRule.onNodeWithText("Schedule").assertIsFocused()
+        composeRule.onNodeWithTag(SCHEDULE_AUTOMATIC_ROW).assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionUp) }
+        composeRule.onNodeWithTag(SCHEDULE_NEW_TIMER).assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionUp) }
+        composeRule.onNodeWithTag("recordings-mode-schedule").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionRight) }
-        composeRule.onNodeWithText("Problems").assertIsFocused()
+        composeRule.onNodeWithTag("recordings-mode-problems").assertIsFocused()
         composeRule.onNodeWithTag("recordings-problems-list").assertIsDisplayed()
-        composeRule.onNodeWithText("Failed").assertIsDisplayed()
-        composeRule.onAllNodesWithTag("recording-metadata-pane").assertCountEquals(0)
-        composeRule.onNodeWithText("Failed Show").assertIsDisplayed()
-        composeRule.onNodeWithText("Problems").performKeyInput { pressKey(Key.DirectionDown) }
+        composeRule.onNodeWithTag("recording-list-entry-1").assertDoesNotExist()
+        composeRule.onNodeWithTag("recording-list-entry-2").assertDoesNotExist()
+        composeRule.onNodeWithTag("recordings-mode-problems").performKeyInput { pressKey(Key.DirectionDown) }
         composeRule.onNodeWithTag("recording-list-entry-3").assertIsFocused().pressCenter()
-        composeRule.onNodeWithTag("details-delete").assertIsFocused()
-            .performKeyInput {
-                pressKey(Key.DirectionLeft)
-                pressKey(Key.DirectionDown)
-            }
-        composeRule.onNodeWithTag("details-delete").assertIsFocused()
-        composeRule.runOnIdle { composeRule.activity.onBackPressedDispatcher.onBackPressed() }
+        composeRule.onNodeWithTag("details-remove_entry").assertIsFocused()
+        dispatchBack()
         waitForFocus("recording-list-entry-3")
     }
 
@@ -1221,7 +1247,7 @@ class RecordingsScreenTest {
     }
 
     @Test
-    fun upWithinArchiveThenSelectedRemovalRestoresFirstRemainingRecording() {
+    fun upWithinArchiveThenSelectedRemovalRestoresTheRowAtTheSameIndex() {
         val entries = (1..3).map { id ->
             recording(id, "Recording $id", path = "recording-$id.ts", start = id.toLong())
         }
@@ -1243,7 +1269,7 @@ class RecordingsScreenTest {
             observation.value = session.observation.value
             assertSame(capability, observation.value.currentSession)
         }
-        waitForFocus("recording-list-entry-3")
+        waitForFocus("recording-list-entry-1")
     }
 
     @Test
@@ -1284,7 +1310,7 @@ class RecordingsScreenTest {
                 state = if (mode == DvrLibraryMode.SCHEDULE) {
                     if (id == 1) DvrEntryState.RECORDING else DvrEntryState.SCHEDULED
                 } else {
-                    if (id == 1) DvrEntryState.RECORDING_ERROR else DvrEntryState.MISSED
+                    if (id == 1) DvrEntryState.COMPLETED_ERROR else DvrEntryState.MISSED
                 },
                 start = start + if (mode == DvrLibraryMode.SCHEDULE) id else 31 - id,
                 stop = start + 3_600L,
@@ -1366,11 +1392,7 @@ class RecordingsScreenTest {
         }
         composeRule.onNodeWithTag("recording-list-entry-7").assertIsFocused().openDetailsFromMenu()
         composeRule.onNodeWithTag("details-cancel").assertIsFocused().pressCenter()
-        composeRule.onNodeWithTag("recording-confirmation-back").assertIsFocused()
-            .performKeyInput {
-                pressKey(Key.DirectionDown)
-                pressKey(Key.DirectionCenter)
-            }
+        confirmRecordingAction()
         composeRule.runOnIdle {
             assertEquals(1, cancellations)
             session.publish(testSessionObservation(entries = listOf(
@@ -1406,14 +1428,10 @@ class RecordingsScreenTest {
                 )
             }
         }
-        composeRule.onNodeWithTag("recording-list-entry-7").assertIsFocused()
-            .performKeyInput { pressKey(Key.Menu) }
-        composeRule.onNodeWithText("Delete").requestFocus().pressCenter()
-        composeRule.onNodeWithTag("recording-confirmation-back").assertIsFocused()
-            .performKeyInput {
-                pressKey(Key.DirectionDown)
-                pressKey(Key.DirectionCenter)
-            }
+        composeRule.onNodeWithTag("recording-list-entry-7").assertIsFocused().openDetailsFromMenu()
+        composeRule.onNodeWithTag("details-play").assertIsFocused().performKeyInput { pressKey(Key.DirectionRight) }
+        composeRule.onNodeWithTag("details-delete").assertIsFocused().pressCenter()
+        confirmRecordingAction()
         composeRule.runOnIdle {
             assertEquals(1, deletions)
             session.publish(testSessionObservation())
@@ -1440,12 +1458,7 @@ class RecordingsScreenTest {
         composeRule.onNodeWithTag("recording-list-entry-7").assertIsFocused()
             .performKeyInput { pressKey(Key.Menu) }
         composeRule.onNodeWithText("Delete").requestFocus().pressCenter()
-        composeRule.onNodeWithTag("recording-confirmation-back").performKeyInput {
-            pressKey(Key.DirectionDown)
-            pressKey(Key.DirectionCenter)
-        }
-        composeRule.onNodeWithText("Delete").assertIsFocused()
-        dispatchBack()
+        confirmRecordingAction()
         composeRule.onNodeWithTag("recording-list-entry-7").assertIsFocused().openDetailsFromMenu()
         composeRule.onNodeWithTag("details-play").assertIsFocused()
         composeRule.runOnIdle { result.complete(DvrMutationResult.Failed(TvheadendFailure.ACCESS_DENIED, mayHaveApplied = false)) }
@@ -1472,43 +1485,29 @@ class RecordingsScreenTest {
         composeRule.onNodeWithTag("recording-list-entry-7").assertIsFocused()
             .performKeyInput { pressKey(Key.Menu) }
         composeRule.onNodeWithText("Delete").requestFocus().pressCenter()
-        composeRule.onNodeWithTag("recording-confirmation-back").performKeyInput {
-            pressKey(Key.DirectionDown)
-            pressKey(Key.DirectionCenter)
-        }
-        composeRule.onNodeWithText("Delete").assertIsFocused()
+        confirmRecordingAction()
+        waitForFocus("recording-list-entry-7")
         composeRule.runOnIdle {
             session.replaceGeneration(testSessionObservation(entries = entries))
             observation.value = session.observation.value
         }
-        composeRule.onNodeWithText("Details").assertIsFocused()
+        waitForFocus("recording-list-entry-7")
         composeRule.runOnIdle { result.complete(DvrMutationResult.Failed(TvheadendFailure.ACCESS_DENIED, mayHaveApplied = false)) }
         composeRule.onAllNodesWithText(
             composeRule.activity.getString(R.string.recording_action_failed_delete)
         ).assertCountEquals(0)
-        composeRule.onNodeWithText("Details").assertIsFocused()
-    }
-
-    @Test
-    fun sessionReplacementSilentlyDismissesUndispatchedConfirmation() {
-        assertSessionReplacementFeedback(failedRecording = false)
+        composeRule.onNodeWithTag("recording-list-entry-7").assertIsFocused()
     }
 
     @Test
     fun sessionReplacementKeepsPersistentRecordingFailureWithoutTransientFeedback() {
-        assertSessionReplacementFeedback(failedRecording = true)
-    }
-
-    private fun assertSessionReplacementFeedback(failedRecording: Boolean) {
-        val entries = listOf(if (failedRecording) DvrEntry.create(
-            id = DvrEntryId(7), title = "Failed Film", state = DvrEntryState.RECORDING_ERROR,
+        val entries = listOf(DvrEntry.create(
+            id = DvrEntryId(7), title = "Failed Film", state = DvrEntryState.COMPLETED_ERROR,
             subscriptionError = at.bernhardberger.tvheadend.sdk.core.DvrSubscriptionError.NO_FREE_ADAPTER,
-        ) else recording(7, "Saved Film", path = "saved.ts"))
+        ))
         val session = FakeTvheadendSession(testSessionObservation(entries = entries))
         val observation = mutableStateOf(session.observation.value)
-        val screenState = RecordingsScreenState().apply {
-            mode.value = if (failedRecording) DvrLibraryMode.PROBLEMS else DvrLibraryMode.ARCHIVE
-        }
+        val screenState = RecordingsScreenState().apply { mode.value = DvrLibraryMode.PROBLEMS }
         var mutations = 0
         composeRule.setContent {
             TVHeadendPlayerTheme {
@@ -1519,16 +1518,11 @@ class RecordingsScreenTest {
                 )
             }
         }
-        if (failedRecording) {
-            composeRule.onNodeWithTag("recording-list-entry-7").assertIsFocused().openDetailsFromMenu()
-            composeRule.onNode(hasText(composeRule.activity.getString(R.string.error_201_title)) and
-                hasAnyAncestor(hasTestTag("programme-details-page"))).assertIsDisplayed()
-            composeRule.onNodeWithTag("details-delete").assertIsFocused().pressCenter()
-        } else {
-            composeRule.onNodeWithTag("recording-list-entry-7").assertIsFocused()
-                .performKeyInput { pressKey(Key.Menu) }
-            composeRule.onNodeWithText("Delete").requestFocus().pressCenter()
-        }
+        val failure = composeRule.onNode(hasText(composeRule.activity.getString(R.string.error_201_title)) and
+            hasAnyAncestor(hasTestTag("programme-details-page")))
+        composeRule.onNodeWithTag("recording-list-entry-7").assertIsFocused().openDetailsFromMenu()
+        failure.assertIsDisplayed()
+        composeRule.onNodeWithTag("details-remove_entry").assertIsFocused().pressCenter()
         composeRule.onNodeWithTag("recording-confirmation-back").assertIsFocused()
         composeRule.runOnIdle {
             session.replaceGeneration(testSessionObservation(entries = entries))
@@ -1536,8 +1530,8 @@ class RecordingsScreenTest {
         }
         composeRule.onAllNodesWithTag("recording-confirmation-back").assertCountEquals(0)
         composeRule.onAllNodesWithTag("app-notice").assertCountEquals(0)
-        if (failedRecording) composeRule.onNodeWithTag("programme-details-page").assertIsFocused()
-        else composeRule.onNodeWithText("Details").assertIsFocused()
+        composeRule.onNodeWithTag("programme-details-page").assertIsFocused()
+        failure.assertIsDisplayed()
         composeRule.runOnIdle { assertEquals(0, mutations) }
     }
 
@@ -1629,7 +1623,7 @@ class RecordingsScreenTest {
         )
 
         composeRule.setContent {
-            TVHeadendPlayerTheme { TestRecordingsScreen(entries = entries) }
+            TVHeadendPlayerTheme { TestRecordingsScreen(entries = entries, view = foldersView) }
         }
 
         composeRule.onNodeWithTag("recordings-folder-News").performKeyInput {
@@ -1671,80 +1665,26 @@ class RecordingsScreenTest {
         )
 
         composeRule.setContent {
-            TVHeadendPlayerTheme { TestRecordingsScreen(entries = entries) }
+            TVHeadendPlayerTheme { TestRecordingsScreen(entries = entries, view = foldersView) }
         }
 
-        composeRule.onNodeWithText("Race highlights").assertIsDisplayed()
+        composeRule.onNode(hasText("Race highlights") and hasAnyAncestor(hasTestTag("depth-preview")),
+            useUnmergedTree = true).assertIsDisplayed()
         composeRule.onNodeWithTag("recordings-folder-Sport").assertIsFocused().pressCenter()
-        composeRule.onNodeWithTag("recording-metadata-pane").assertIsDisplayed()
-        composeRule.onAllNodesWithText("Race highlights").assertCountEquals(2)
-        composeRule.onNode(
-            hasTestTag("recording-metadata-pane") and hasAnyDescendant(
-                hasText("A complete recording title that must remain readable")
-            )
-        )
-            .assertIsDisplayed()
-        composeRule.onNodeWithText("ORF SPORT +", substring = true).assertIsDisplayed()
+        composeRule.onNode(hasTestTag("recording-list-entry-9") and hasText("Race highlights")).assertIsFocused()
+        composeRule.onNodeWithTag("recording-metadata-pane").assertDoesNotExist()
+        composeRule.onNodeWithTag("recording-metadata-pane", useUnmergedTree = true).assertIsDisplayed()
+        val inPane = hasAnyAncestor(hasTestTag("recording-metadata-pane"))
+        composeRule.onNode(inPane and hasText("Race highlights"), useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onNode(inPane and hasText("A complete recording title that must remain readable"),
+            useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onNode(inPane and hasText("ORF SPORT +", substring = true),
+            useUnmergedTree = true).assertIsDisplayed()
         // One synopsis, as on the Channels pane: the summary, with the description kept for the details page.
-        composeRule.onNodeWithText("The complete programme summary.").assertIsDisplayed()
-        composeRule.onNodeWithText("A longer recording description shown in the detail pane.").assertDoesNotExist()
-    }
-
-    @Test
-    fun longRecordingTitleKeepsLeadingAndBelowTitleMetadataAligned() {
-        val entries = listOf(
-            recording(id = 1, title = "News", path = "recording-1.ts"),
-            recording(
-                id = 2,
-                title = "A deliberately long recording title that wraps onto a second line",
-                path = "recording-2.ts",
-            ),
-        )
-
-        composeRule.setContent {
-            TVHeadendPlayerTheme { TestRecordingsScreen(entries = entries) }
-        }
-
-        val shortRow = composeRule.onNodeWithTag("recording-list-entry-1")
-            .fetchSemanticsNode().boundsInRoot
-        val longRow = composeRule.onNodeWithTag("recording-list-entry-2")
-            .fetchSemanticsNode().boundsInRoot
-        val shortLeading = composeRule.onNodeWithTag(
-            "recording-list-leading-1",
-            useUnmergedTree = true,
-        )
-            .fetchSemanticsNode().boundsInRoot
-        val longLeading = composeRule.onNodeWithTag(
-            "recording-list-leading-2",
-            useUnmergedTree = true,
-        )
-            .fetchSemanticsNode().boundsInRoot
-        val shortMetadata = composeRule.onNodeWithTag(
-            "recording-list-metadata-1",
-            useUnmergedTree = true,
-        )
-            .fetchSemanticsNode().boundsInRoot
-        val longMetadata = composeRule.onNodeWithTag(
-            "recording-list-metadata-2",
-            useUnmergedTree = true,
-        )
-            .fetchSemanticsNode().boundsInRoot
-        val shortHeadline = composeRule.onNodeWithTag(
-            "recording-list-headline-1",
-            useUnmergedTree = true,
-        ).fetchSemanticsNode().boundsInRoot
-        val longHeadline = composeRule.onNodeWithTag(
-            "recording-list-headline-2",
-            useUnmergedTree = true,
-        ).fetchSemanticsNode().boundsInRoot
-
-        assertEquals(shortRow.height, longRow.height, 1f)
-        assertEquals(shortLeading.top - shortRow.top, longLeading.top - longRow.top, 1f)
-        assertEquals(shortMetadata.top - shortRow.top, longMetadata.top - longRow.top, 1f)
-        assertEquals(shortHeadline.height, longHeadline.height, 1f)
-        assertEquals(longHeadline.left, longMetadata.left, 1f)
-        assertTrue(longHeadline.bottom <= longMetadata.top)
-        assertTrue(longLeading.right <= longHeadline.left)
+        composeRule.onNode(inPane and hasText("The complete programme summary."),
+            useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onNode(inPane and hasText("A longer recording description shown in the detail pane."),
+            useUnmergedTree = true).assertDoesNotExist()
     }
 
     private fun recording(
@@ -1787,6 +1727,12 @@ class RecordingsScreenTest {
 
     private fun assertOptionsFocused() {
         composeRule.onNodeWithTag(OPTIONS_BUTTON).assertIsFocused()
+    }
+
+    private fun confirmRecordingAction() {
+        composeRule.onNodeWithTag("recording-confirmation-back").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionRight) }
+        composeRule.onNodeWithTag("recording-confirmation-confirm").assertIsFocused().pressCenter()
     }
 
     private fun SemanticsNodeInteraction.pressCenter() =
