@@ -211,6 +211,39 @@ class PlayerScreenTest {
         captureStatuses("tablet", canvas, reconnecting = true)
     }
 
+    @Test
+    @Config(qualifiers = "en-rUS-w1280dp-h800dp-land-xhdpi")
+    fun brightnessDragFollowsTheFingerWhenThePlayerWritesBackEachStep() {
+        show()
+        val slider = tag("player-brightness")
+        // Allow a move to cross touch slop. Send the moves separately so the player can
+        // recompose with the reported values while the finger is still down.
+        slider.performTouchInput { down(Offset(center.x, height * .38f)) }
+        repeat(5) { slider.performTouchInput { moveBy(Offset(0f, height * .064f)) } }
+        slider.performTouchInput { up() }
+        compose.runOnIdle {
+            assertTrue(
+                "Brightness should keep reporting downward moves after touch slop: $brightnessChanges",
+                brightnessChanges.size >= 4 && brightnessChanges.zipWithNext().all { (a, b) -> b < a },
+            )
+            assertEquals("The first drag ends at 30% brightness", .30f, brightness.value, .07f)
+            brightnessChanges.clear()
+        }
+
+        slider.performTouchInput { down(Offset(center.x, height * .70f)) }
+        repeat(5) { slider.performTouchInput { moveBy(Offset(0f, -height * .096f)) } }
+        slider.performTouchInput { up() }
+        compose.runOnIdle {
+            assertTrue(
+                "Brightness should keep reporting upward moves after touch slop: $brightnessChanges",
+                brightnessChanges.size >= 4 && brightnessChanges.zipWithNext().all { (a, b) -> b > a },
+            )
+            assertEquals("The second drag ends at 78% brightness", .78f, brightness.value, .07f)
+            brightness.value = .4f
+        }
+        assertEquals(.4f, slider.fetchSemanticsNode().config[SemanticsProperties.ProgressBarRangeInfo].current, .01f)
+    }
+
     private fun dragToLiveWithNotice() {
         val behind = liveTimeline.value
         fun distance() = compose.onNodeWithText(compose.activity.getString(R.string.player_behind_live, "4:12"))
@@ -519,6 +552,8 @@ class PlayerScreenTest {
     private val scheduleAvailability = mutableStateOf<GuideAvailability>(GuideAvailability.Current)
 
     private val paused = mutableStateOf(false)
+    private val brightness = mutableStateOf(.62f)
+    private val brightnessChanges = mutableListOf<Float>()
     private val offered = mutableStateOf(PlayerControl.entries.toSet())
     private val fixtureRecord = LiveRecordOffer(
         EventId(1), ProgramRecordControl.Record,
@@ -580,6 +615,7 @@ class PlayerScreenTest {
                             .rows.firstOrNull { it.id == channelId.value } ?: fixture.channel,
                         channels = channelState.value ?: fixture.channels,
                         status = status.value, paused = paused.value, offered = offered.value,
+                        brightness = brightness.value,
                         schedule = fixture.schedule?.let { schedule ->
                             schedule.copy(
                                 programs = schedule.programs.takeIf { channelId.value == null && scheduleHasRows.value }
@@ -590,7 +626,8 @@ class PlayerScreenTest {
                             )
                         },
                     ),
-                    { actions += it }, { seeks += it }, {}, { played += it }, { choices += it },
+                    { actions += it }, { seeks += it },
+                    { brightness.value = it; brightnessChanges += it }, { played += it }, { choices += it },
                     inWindow = inWindow.value, hideAfterMs = hideAfterMs,
                 ) { modifier ->
                     val formatter = NoticeFormatter(LocalContext.current)

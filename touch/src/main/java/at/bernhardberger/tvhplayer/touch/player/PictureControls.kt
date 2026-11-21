@@ -34,6 +34,7 @@ import androidx.compose.material3.SliderState
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalSlider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -233,7 +234,9 @@ private fun Transport(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun Brightness(value: Float, onBrightness: (Float) -> Unit, modifier: Modifier, tablet: Boolean) {
-    val state = remember(value) { SliderState(value = value) }
+    val state = remember { SliderState(value = value) }
+    // Keep the slider's drag offset when the player echoes back a change.
+    if (!state.isDragging) SideEffect { state.value = value }
     val label = stringResource(R.string.player_brightness)
     val colors = SliderDefaults.colors(
         thumbColor = OnPicture, activeTrackColor = OnPicture, inactiveTrackColor = DarkControl,
