@@ -139,6 +139,7 @@ private fun kickoffPicked() =
         .copy(
             episode = "Westvale – Ridge Town",
             state = RecordingProgress.PartlyWatched(Duration.ofMinutes(52), 0.5f),
+            play = listOf(RecordingPlayAction.Resume(kotlin.time.Duration.parse("53m")), RecordingPlayAction.StartOver),
             details = RecordingDetails(
                 synopsis = "Westvale host Ridge Town under the lights with the league lead at stake. " +
                     "Full match with commentary from the Harbor Sport team.",

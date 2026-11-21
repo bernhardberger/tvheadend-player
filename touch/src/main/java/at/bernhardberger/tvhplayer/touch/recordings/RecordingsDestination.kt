@@ -10,13 +10,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.common.util.Util
 import at.bernhardberger.tvhplayer.core.DvrDateSection
+import at.bernhardberger.tvhplayer.core.humanLanguageName
 import at.bernhardberger.tvhplayer.core.programmeCategory
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import at.bernhardberger.tvhplayer.touch.ui.Destination
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.common.formatFileSize
 import at.bernhardberger.tvhplayer.ui.common.formatRecordingKeepUntil
+import at.bernhardberger.tvhplayer.ui.common.formatTimeInterval
 import at.bernhardberger.tvhplayer.ui.common.programmeCategoryLabelRes
 import at.bernhardberger.tvhplayer.ui.common.programmeEpisodeLine
 import at.bernhardberger.tvhplayer.ui.common.rememberCurrentEpochSeconds
@@ -70,6 +74,11 @@ internal fun RecordingsDestination(
     )
 }
 
+@androidx.annotation.OptIn(UnstableApi::class)
+/**
+ * Fact formatting follows
+ * `app/src/main/java/at/bernhardberger/tvhplayer/ui/components/ProgrammeDetailsPage.kt:1236-1260`.
+ */
 private fun recordingsTexts(context: android.content.Context, locale: Locale): RecordingsTexts {
     val resources: Resources = context.resources
     return RecordingsTexts(
@@ -85,6 +94,23 @@ private fun recordingsTexts(context: android.content.Context, locale: Locale): R
         section = { section -> sectionLabel(section, resources, locale) },
         size = { bytes -> formatFileSize(bytes, context) },
         keepUntil = { entry, nowSec -> formatRecordingKeepUntil(entry, nowSec, resources, locale) },
+        recorded = { start, stop, nowSec -> formatTimeInterval(start, stop, true, locale, nowSec) },
+        errors = { errors ->
+            if (errors == 0L) {
+                resources.getString(SharedR.string.details_no_errors)
+            } else {
+                val quantity = errors.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+                resources.getQuantityString(SharedR.plurals.details_error_count, quantity, errors)
+            }
+        },
+        language = { language ->
+            humanLanguageName(
+                language?.let(Util::normalizeLanguageCode),
+                resources.getString(SharedR.string.track_unknown_language),
+                resources.getString(SharedR.string.track_multiple_languages),
+                locale,
+            )
+        },
     )
 }
 

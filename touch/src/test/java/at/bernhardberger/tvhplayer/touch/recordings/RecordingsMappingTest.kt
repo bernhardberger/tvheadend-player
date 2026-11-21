@@ -2,11 +2,19 @@ package at.bernhardberger.tvhplayer.touch.recordings
 
 import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
+import at.bernhardberger.tvheadend.sdk.core.DvrRecordingFile
+import at.bernhardberger.tvheadend.sdk.core.DvrRecordingStream
 import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.DvrSnapshot
+import at.bernhardberger.tvheadend.sdk.core.RecordingProgressCapability
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition
+import at.bernhardberger.tvheadend.sdk.core.TvheadendTestResultFactory
 import at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi
+import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
+import at.bernhardberger.tvheadend.sdk.playback.SubscriptionStreamType
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.core.AppErrorCondition
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
@@ -18,7 +26,9 @@ import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
 import at.bernhardberger.tvhplayer.touch.testutil.ServerGuide
 import at.bernhardberger.tvhplayer.touch.ui.ArtworkModels
 import java.time.ZoneOffset
+import java.time.Duration
 import java.util.Locale
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import org.junit.Assert.assertEquals
@@ -34,6 +44,9 @@ class RecordingsMappingTest {
         noChannel = "No channel", noGenre = "No genre", recordingNow = "Recording now",
         genre = { null }, episode = { null }, section = { it.toString() }, size = { "$it B" },
         keepUntil = { _, _ -> null },
+        recorded = { start, stop, _ -> "$start to $stop" },
+        errors = { "$it errors" },
+        language = { if (it == "eng") "English" else null },
     )
     private val unreachable = ConnectionUiState.Error(
         ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.EXPLICIT_RETRY,
@@ -115,6 +128,119 @@ class RecordingsMappingTest {
         val running = now.recordings.single()
         assertEquals("Channel One", running.channel)
         assertEquals(true, running.state is RecordingProgress.Recording)
+    }
+
+    @Test
+    fun watchStateFollowsTheAdmittedResumePosition() {
+        val partiallyWatched = DvrArchiveView(show = DvrArchiveShow.PARTIALLY_WATCHED)
+        val entries = listOf(
+            watchEntry(),
+            watchEntry(position = 15),
+            watchEntry(count = 1),
+            watchEntry(state = DvrEntryState.RECORDING),
+        )
+        val expected = listOf(
+            RecordingProgress.Unwatched,
+            RecordingProgress.PartlyWatched(Duration.ofMinutes(45), 0.25f),
+            RecordingProgress.Watched,
+            RecordingProgress.Recording(java.time.Instant.ofEpochSecond(NOW + 30 * 60), 0.5f),
+        )
+        entries.zip(expected).forEach { (entry, progress) ->
+            val item = mapped(entry)
+            assertEquals(entry.state.toString(), progress, item.state)
+            val left = recordingLine(item, RowContext(RowDates.None), clock).filterIsInstance<RecordingLinePart.Left>()
+            assertEquals(listOfNotNull((progress as? RecordingProgress.PartlyWatched)?.let {
+                RecordingLinePart.Left(it.left)
+            }), left)
+            val filtered = recordingsState(
+                watchObservation(entry), partiallyWatched, ConnectionUiState.Ready, false, clock, texts,
+            )
+            assertEquals(
+                progress is RecordingProgress.PartlyWatched || progress is RecordingProgress.Recording,
+                filtered.root.recordings.isNotEmpty(),
+            )
+        }
+    }
+
+    @Test
+    @OptIn(ExperimentalTvheadendApi::class)
+    fun detailsOfferOnlyAdmittedPlaybackActions() {
+        val watch = listOf(RecordingPlayAction.Watch)
+        val resume = listOf(RecordingPlayAction.Resume(15.minutes), RecordingPlayAction.StartOver)
+        val cases = listOf(
+            watchEntry() to watch,
+            watchEntry(position = 15) to resume,
+            watchEntry(count = 1) to watch,
+            watchEntry(state = DvrEntryState.RECORDING) to watch,
+            watchEntry(state = DvrEntryState.RECORDING, position = 15) to
+                listOf(RecordingPlayAction.Watch, RecordingPlayAction.StartOver),
+            watchEntry(state = DvrEntryState.SCHEDULED) to emptyList(),
+            watchEntry(state = DvrEntryState.COMPLETED_ERROR) to emptyList(),
+            watchEntry(state = DvrEntryState.COMPLETED_ERROR, hasFile = false) to emptyList(),
+            watchEntry(hasFile = false) to emptyList(),
+        )
+        cases.forEach { (entry, expected) ->
+            val observation = watchObservation(entry)
+            assertEquals(entry.state.toString(), expected, recordingPlayActions(entry,
+                observation.recordingPlaybackAdmission(entry)))
+        }
+    }
+
+    @Test
+    fun detailsUseRecordedFileFactsAndCountBothKindsOfErrors() {
+        val item = mapped(watchEntry())
+        assertEquals(listOf(RecordingPlayAction.Watch), item.play)
+        assertEquals(Duration.ofMinutes(60), item.length)
+        assertEquals("${NOW - 3600} to $NOW", item.details.recorded)
+        assertEquals("64 B", item.details.size)
+        assertEquals("HD 1080", item.details.picture)
+        assertEquals("English", item.details.audio)
+        assertEquals("English", item.details.subtitles)
+        assertEquals("3 errors", item.details.errors)
+    }
+
+    private fun mapped(entry: DvrEntry): RecordingItem = recordingsState(
+        watchObservation(entry), DvrArchiveView(), ConnectionUiState.Ready, false, clock, texts,
+    ).root.recordings.single()
+
+    @OptIn(ExperimentalTvheadendApi::class)
+    private fun watchObservation(entry: DvrEntry): SessionObservation {
+        val connected = guide.connected(listOf(entry))
+        return SessionObservation.create(
+            sessionState = connected.sessionState,
+            channelState = connected.channelState,
+            epgState = connected.epgState,
+            dvrState = connected.dvrState,
+            recordingProgressCapability = RecordingProgressCapability.SUPPORTED,
+        )
+    }
+
+    @OptIn(ExperimentalTvheadendApi::class)
+    private fun watchEntry(
+        state: DvrEntryState = DvrEntryState.COMPLETED,
+        position: Int? = null,
+        count: Long = 0,
+        hasFile: Boolean = true,
+    ): DvrEntry {
+        val running = state == DvrEntryState.RECORDING
+        val start = guide.now - if (running) 30.minutes else 60.minutes
+        val file = if (running) {
+            TvheadendTestResultFactory.recordingFile(fileId = 1, serverPath = "synthetic.ts", start = start)
+        } else DvrRecordingFile.create(
+            fileId = 1, start = start, stop = guide.now.takeUnless { running }, sizeBytes = 64,
+            streams = listOf(
+                DvrRecordingStream(SubscriptionStreamType.H264, height = 1080),
+                DvrRecordingStream(SubscriptionStreamType.AAC, language = "eng"),
+                DvrRecordingStream(SubscriptionStreamType.AC3, language = "eng"),
+                DvrRecordingStream(SubscriptionStreamType.DVB_SUBTITLE, language = "eng"),
+            ),
+        )
+        return DvrEntry.create(
+            id = guide.film.id, state = state, start = if (running) start else start + 10.minutes,
+            stop = start + 60.minutes,
+            files = listOf(file).takeIf { hasFile }, playPosition = position?.minutes, playCount = count,
+            streamErrors = 1, dataErrors = 2,
+        )
     }
 
     @Test

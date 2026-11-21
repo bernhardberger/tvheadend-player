@@ -113,22 +113,6 @@
     <string name="recordings_back">Back</string>
     <!-- TV: details_important_information -->
     <string name="recordings_details">Details</string>
-    <!-- TV: details_genre -->
-    <string name="recordings_genre">Genre</string>
-    <!-- TV: details_recorded -->
-    <string name="recordings_recorded">Recorded</string>
-    <!-- TV: details_size -->
-    <string name="recordings_size">Size</string>
-    <!-- TV: details_picture -->
-    <string name="recordings_picture">Picture</string>
-    <!-- TV: details_audio -->
-    <string name="recordings_audio">Audio</string>
-    <!-- TV: recordings_subtitles is not a details row on TV; this label is new. -->
-    <string name="recordings_subtitles">Subtitles</string>
-    <!-- TV: details_errors -->
-    <string name="recordings_errors">Errors</string>
-    <!-- TV: details_retention -->
-    <string name="recordings_retention">Retention</string>
     <!-- The offline line above the saved list, as channels_offline / channels_saved say it for channels. -->
     <string name="recordings_offline">Can’t reach the server • Showing saved recordings</string>
     <string name="recordings_saved">Showing saved recordings</string>
