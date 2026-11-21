@@ -6,6 +6,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.core.AppErrorCondition
 import at.bernhardberger.tvhplayer.core.HumanTrackLabel
+import at.bernhardberger.tvhplayer.core.RecordingMark
+import at.bernhardberger.tvhplayer.settings.AdBreakMode
 import at.bernhardberger.tvhplayer.touch.channels.ChannelList
 import at.bernhardberger.tvhplayer.touch.channels.ChannelRow
 import at.bernhardberger.tvhplayer.touch.guide.GuideProgram
@@ -13,26 +15,29 @@ import at.bernhardberger.tvhplayer.touch.guide.ProgramDetails
 import java.time.LocalTime
 
 internal data class LivePlayerState(
-    val channel: ChannelRow,
+    override val channel: ChannelRow,
     val channels: ChannelList,
-    val frame: Painter?,
+    override val frame: Painter?,
     /** The bar's moving values, read only by what draws them so a sample redraws the bar, not the face. */
     val timeline: State<LiveTimeline?>,
-    val status: LivePlayerStatus = LivePlayerStatus.Playing,
-    val paused: Boolean = false,
-    val brightness: Float = 0.62f,
-    val tracks: PlayerTracks = PlayerTracks(),
-    val options: PlaybackOptions = PlaybackOptions(),
+    override val status: LivePlayerStatus = LivePlayerStatus.Playing,
+    override val paused: Boolean = false,
+    override val brightness: Float = 0.62f,
+    override val tracks: PlayerTracks = PlayerTracks(),
+    override val options: PlaybackOptions = PlaybackOptions(),
     val schedule: ChannelSchedule? = null,
-    val offered: Set<PlayerControl> = PlayerControl.entries.toSet(),
-)
+    override val offered: Set<PlayerControl> = PlayerControl.entries.toSet() - PlayerControl.Markers,
+) : PlayerFaceState {
+    override val key get() = channel.id
+    override val seekable get() = timeline.value?.seekable == true
+}
 
 /**
  * The face's controls that have something behind them; one not offered is left out, not dimmed.
  * [Timeshift] is pause, the skips, the drag and Go live; the timeline itself always shows the program.
  */
 internal enum class PlayerControl {
-    Timeshift, Record, Audio, Subtitles, Settings, Channels, Info, PictureInPicture, FullScreen,
+    Timeshift, Record, Audio, Subtitles, Settings, Channels, Info, PictureInPicture, FullScreen, Markers,
 }
 
 /**
@@ -115,6 +120,9 @@ internal sealed interface PlayerChoice {
     data class Day(val index: Int) : PlayerChoice
     data class Record(val programId: String) : PlayerChoice
     data class RecordOptions(val programId: String) : PlayerChoice
+    data class AdBreaks(val mode: AdBreakMode?) : PlayerChoice
+    data class SkipAdBreak(val mark: RecordingMark) : PlayerChoice
+    data class KeepWatching(val mark: RecordingMark) : PlayerChoice
 
     /** A Details page opened in the Info sheet, a program's or another airing's: its details may need loading. */
     data class Details(val programId: String) : PlayerChoice
@@ -123,13 +131,14 @@ internal sealed interface PlayerChoice {
 /** What the player shows over its face: a menu at a button, or a sheet and the page it is on. */
 internal enum class PlayerPanel(val menu: Boolean) {
     Record(true), Audio(true), Subtitles(true), Channels(false), Info(false), InfoDetails(false),
-    Options(false), DisplayMode(false), Profile(false), Stats(false),
+    Options(false), DisplayMode(false), Profile(false), Stats(false), Markers(false), AdBreaks(false),
     ;
 
     /** The button that opened this panel: Info's details page still belongs to Info. */
     val button: PlayerPanel get() = if (this == InfoDetails) Info else this
 
-    val optionsPage: Boolean get() = this == Options || this == DisplayMode || this == Profile || this == Stats
+    val optionsPage: Boolean get() = this == Options || this == DisplayMode || this == Profile || this == Stats ||
+        this == AdBreaks
 }
 
 /**

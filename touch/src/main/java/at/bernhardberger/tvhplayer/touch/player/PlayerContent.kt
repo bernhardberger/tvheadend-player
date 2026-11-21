@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "LongParameterList")
+@file:Suppress("MagicNumber", "LongParameterList", "TooManyFunctions")
 
 package at.bernhardberger.tvhplayer.touch.player
 
@@ -7,6 +7,7 @@ import androidx.annotation.StringRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -56,7 +57,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.channels.ChannelRow
 import at.bernhardberger.tvhplayer.touch.channels.ChannelRows
@@ -64,6 +67,7 @@ import at.bernhardberger.tvhplayer.touch.channels.ChannelsActions
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsLayout
 import at.bernhardberger.tvhplayer.touch.channels.TagFilter
 import kotlin.math.roundToInt
+import at.bernhardberger.tvhplayer.presentation.R as SharedR
 
 internal const val DRAG_ALPHA = .38f
 
@@ -76,13 +80,13 @@ internal class PanelHost(
 
 @Composable
 internal fun LandscapePlayerContent(
-    state: LivePlayerState,
+    state: PlayerFaceState,
     layout: PlayerLayout,
-    preview: Int?,
+    preview: Long?,
     onAction: (PlayerAction) -> Unit,
     panels: PanelHost,
-    onPreviewChange: (Int?) -> Unit,
-    onSeek: (Int) -> Unit,
+    onPreviewChange: (Long?) -> Unit,
+    onSeek: (Long) -> Unit,
     modifier: Modifier,
     notice: @Composable (Modifier) -> Unit,
 ) {
@@ -98,34 +102,57 @@ internal fun LandscapePlayerContent(
         // Keep the notice and its anchor in one layout so measuring the program never
         // asks Compose to place unrelated footer siblings (including the drag label).
         LandscapeProgramSlot(notice, tablet, programSlot.fillMaxWidth()) {
-            LandscapeProgram(state.channel, layout, Modifier.fillMaxWidth(.62f).alpha(if (dragging) DRAG_ALPHA else 1f))
+            val programModifier = Modifier.fillMaxWidth(.62f).alpha(if (dragging) DRAG_ALPHA else 1f)
+            LandscapeProgram(state, layout, programModifier)
         }
         if (state.status == LivePlayerStatus.Playing) {
-            LiveOffer(
-                state.timeline, state.offered, preview, onAction, layout,
-                modifier = Modifier.align(Alignment.BottomEnd)
-                    .padding(bottom = trackBottom + if (tablet) 26.dp else 16.dp),
-            )
+            val offer = Modifier.align(Alignment.BottomEnd)
+                .padding(bottom = trackBottom + if (tablet) 26.dp else 16.dp)
+            when (state) {
+                is LivePlayerState -> LiveOffer(
+                    state.timeline, state.offered, preview?.let { (it / 1_000).toInt() }, onAction, layout, offer,
+                )
+                is RecordingPlayerState -> RecordingAdAction(state, dragging, panels.onChoice, offer)
+            }
         }
-        // Without a program running there is no window to draw: the footer keeps its program and actions.
-        // The clocks follow the program only, so a position sample does not recompose the footer.
-        val program by remember(state.timeline) {
-            derivedStateOf { state.timeline.value?.let { it.programStart to it.duration } }
-        }
-        program?.let { (start, duration) ->
-            val clockModifier = Modifier.padding(bottom = trackBottom - 8.dp)
-            ClockText(playerClock(start, 0), clockModifier.align(Alignment.BottomStart))
-            ClockText(playerClock(start, duration), clockModifier.align(Alignment.BottomEnd))
-            PlayerTimeline(
-                state.timeline, state.status, layout, true, preview, onPreviewChange, onSeek,
-                Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = trackGutter)
-                    .padding(bottom = trackBottom - 24.dp).height(44.dp),
-            )
-        }
+        LandscapeTimeline(state, layout, preview, onPreviewChange, onSeek, trackBottom, trackGutter)
         PlayerActionRow(
             state, layout, dragging, onAction, panels,
             Modifier.align(Alignment.BottomCenter).padding(bottom = rowBottom),
         )
+    }
+}
+
+@Composable
+private fun BoxScope.LandscapeTimeline(
+    state: PlayerFaceState,
+    layout: PlayerLayout,
+    preview: Long?,
+    onPreviewChange: (Long?) -> Unit,
+    onSeek: (Long) -> Unit,
+    trackBottom: Dp,
+    trackGutter: Dp,
+) {
+    val clockModifier = Modifier.padding(bottom = trackBottom - 8.dp)
+    val track = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = trackGutter)
+        .padding(bottom = trackBottom - 24.dp).height(44.dp)
+    when (state) {
+        is LivePlayerState -> {
+            // Clocks follow the programme, not each position sample.
+            val program by remember(state.timeline) {
+                derivedStateOf { state.timeline.value?.let { it.programStart to it.duration } }
+            }
+            program?.let { (start, duration) ->
+                ClockText(playerClock(start, 0), clockModifier.align(Alignment.BottomStart))
+                ClockText(playerClock(start, duration), clockModifier.align(Alignment.BottomEnd))
+                FaceTimeline(state, layout, true, preview, onPreviewChange, onSeek, track)
+            }
+        }
+        is RecordingPlayerState -> if (state.durationMs > 0) {
+            RecordingClock(state, preview, clockModifier.align(Alignment.BottomStart))
+            ClockText(formatPlaybackDuration(state.durationMs), clockModifier.align(Alignment.BottomEnd))
+            FaceTimeline(state, layout, true, preview, onPreviewChange, onSeek, track)
+        }
     }
 }
 
@@ -165,52 +192,66 @@ private fun LandscapeProgramSlot(
 }
 
 @Composable
-private fun LandscapeProgram(channel: ChannelRow, layout: PlayerLayout, modifier: Modifier) {
+private fun LandscapeProgram(state: PlayerFaceState, layout: PlayerLayout, modifier: Modifier) {
+    val channel = state.channel
     val tablet = layout == PlayerLayout.Tablet
     Row(
         modifier.testTag("player-program"),
         horizontalArrangement = Arrangement.spacedBy(if (tablet) 20.dp else 14.dp),
     ) {
-        channel.details?.artwork?.let {
+        val artwork = if (state is RecordingPlayerState) state.artwork else channel.details?.artwork
+        artwork?.let {
             Image(
                 it, null, Modifier.size(if (tablet) 196.dp else 112.dp, if (tablet) 112.dp else 68.dp)
                     .clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop,
             )
         }
         Column {
-            val type = MaterialTheme.typography
-            val time = channel.now?.timeRange
-            val genre = channel.details?.metadata
-            val summary = if (time != null && genre != null) {
-                stringResource(R.string.player_time_and_genre, time, genre)
+            if (state is RecordingPlayerState) {
+                val type = MaterialTheme.typography
+                ProgramLine(recordedDate(state))
+                ProgramTitle(state.title, layout)
+                state.episode?.let { ProgramLine(it, style = if (tablet) type.bodyLarge else type.bodyMedium) }
             } else {
-                time ?: genre
-            }
-            summary?.let { ProgramLine(it) }
-            ProgramTitle(channel.now?.title, layout)
-            channel.details?.episode?.let {
-                ProgramLine(it, style = if (tablet) type.bodyLarge else type.bodyMedium)
-            }
-            if (tablet) {
-                // The line reads "<start> <title>"; without a known start it is left out.
-                val next = channel.next
-                val start = next?.start
-                if (next != null && start != null) {
-                    ProgramLine(stringResource(R.string.player_next_program, start, next.title))
-                }
+                LiveProgramLines(channel, layout)
             }
         }
     }
 }
 
 @Composable
+private fun LiveProgramLines(channel: ChannelRow, layout: PlayerLayout) {
+    val type = MaterialTheme.typography
+    val time = channel.now?.timeRange
+    val genre = channel.details?.metadata
+    val summary = if (time != null && genre != null) {
+        stringResource(R.string.player_time_and_genre, time, genre)
+    } else {
+        time ?: genre
+    }
+    summary?.let { ProgramLine(it) }
+    ProgramTitle(channel.now?.title, layout)
+    val tablet = layout == PlayerLayout.Tablet
+    channel.details?.episode?.let { ProgramLine(it, style = if (tablet) type.bodyLarge else type.bodyMedium) }
+    if (tablet) {
+        // The line reads "<start> <title>"; without a known start it is left out.
+        val next = channel.next
+        val start = next?.start
+        if (next != null && start != null) {
+            ProgramLine(stringResource(R.string.player_next_program, start, next.title))
+        }
+    }
+}
+
+@Composable
 internal fun UprightPlayerContent(
-    state: LivePlayerState,
+    state: PlayerFaceState,
     layout: PlayerLayout,
     dragging: Boolean,
     onAction: (PlayerAction) -> Unit,
     panels: PanelHost,
     onChannel: (String) -> Unit,
+    onSeek: (Long) -> Unit,
 ) {
     val inset = if (layout == PlayerLayout.Phone) 16.dp else 24.dp
     Column(Modifier.fillMaxSize()) {
@@ -226,17 +267,28 @@ internal fun UprightPlayerContent(
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
-                channel.now?.timeRange?.let { ProgramLine(it, MaterialTheme.colorScheme.onSurfaceVariant) }
+                val time = when (state) {
+                    is RecordingPlayerState -> stringResource(SharedR.string.player_recorded_on, state.recordedOn)
+                    is LivePlayerState -> channel.now?.timeRange
+                }
+                time?.let { ProgramLine(it, MaterialTheme.colorScheme.onSurfaceVariant) }
             }
             Spacer(Modifier.height(10.dp))
-            ProgramTitle(channel.now?.title, layout, MaterialTheme.colorScheme.onSurface)
-            channel.details?.episode?.let { ProgramLine(it, MaterialTheme.colorScheme.onSurfaceVariant) }
+            val title = if (state is RecordingPlayerState) state.title else channel.now?.title
+            val episode = if (state is RecordingPlayerState) state.episode else channel.details?.episode
+            ProgramTitle(title, layout, MaterialTheme.colorScheme.onSurface)
+            episode?.let { ProgramLine(it, MaterialTheme.colorScheme.onSurfaceVariant) }
         }
         PlayerActionRow(
             state, layout, dragging, onAction, panels,
             Modifier.padding(horizontal = inset - 8.dp).padding(top = 14.dp, bottom = 12.dp),
         )
-        PlayerChannelList(state, layout, panels.onChoice, onChannel, Modifier.weight(1f))
+        when (state) {
+            is LivePlayerState -> PlayerChannelList(state, layout, panels.onChoice, onChannel, Modifier.weight(1f))
+            is RecordingPlayerState -> if (state.hasMarkers) {
+                InlineRecordingMarkers(state, onSeek, Modifier.weight(1f))
+            }
+        }
     }
 }
 
@@ -290,7 +342,7 @@ private fun PlayerChannelList(
 
 @Composable
 private fun PlayerActionRow(
-    state: LivePlayerState,
+    state: PlayerFaceState,
     layout: PlayerLayout,
     dragging: Boolean,
     onAction: (PlayerAction) -> Unit,
@@ -316,13 +368,23 @@ private fun PlayerActionRow(
             PlayerPanel.Subtitles,
         )
         Spacer(Modifier.weight(1f))
-        MenuButton(
-            menu, R.drawable.channels_info, R.string.player_info, !dragging && state.schedule != null,
-            PlayerPanel.Info,
-        )
-        if (!layout.upright && PlayerControl.Channels in state.offered) {
+        val hasInfo = state is RecordingPlayerState || (state as? LivePlayerState)?.schedule != null
+        MenuButton(menu, R.drawable.channels_info, R.string.player_info, !dragging && hasInfo, PlayerPanel.Info)
+        if (!layout.upright) BrowseButton(state, dragging, colors, panels)
+    }
+}
+
+@Composable
+private fun BrowseButton(state: PlayerFaceState, dragging: Boolean, colors: ButtonColors, panels: PanelHost) {
+    when (state) {
+        is LivePlayerState -> if (PlayerControl.Channels in state.offered) {
             ActionButton(R.drawable.player_channels, R.string.player_channels, true, !dragging, colors, false, {
                 panels.onPanel(PlayerPanel.Channels)
+            })
+        }
+        is RecordingPlayerState -> if (state.hasMarkers) {
+            ActionButton(R.drawable.player_markers, R.string.player_markers, true, !dragging, colors, false, {
+                panels.onPanel(PlayerPanel.Markers)
             })
         }
     }
@@ -334,11 +396,12 @@ internal val PlayerPanel.control: PlayerControl?
         PlayerPanel.Audio -> PlayerControl.Audio
         PlayerPanel.Subtitles -> PlayerControl.Subtitles
         PlayerPanel.Info -> PlayerControl.Info
+        PlayerPanel.Markers -> PlayerControl.Markers
         else -> null
     }
 
 private class MenuButtonStyle(
-    val state: LivePlayerState,
+    val state: PlayerFaceState,
     val layout: PlayerLayout,
     val label: Boolean,
     val colors: ButtonColors,
@@ -428,7 +491,7 @@ private fun ProgramTitle(title: String?, layout: PlayerLayout, color: Color = Co
 }
 
 @Composable
-private fun ClockText(value: String, modifier: Modifier) {
+internal fun ClockText(value: String, modifier: Modifier) {
     Text(
         value, modifier, color = Color.White.copy(alpha = .8f), style = MaterialTheme.typography.bodyMedium,
         maxLines = 1,

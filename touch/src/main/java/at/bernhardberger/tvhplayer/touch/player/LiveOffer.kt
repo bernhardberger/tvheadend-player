@@ -54,9 +54,22 @@ internal fun LiveOffer(
 
 @Composable
 private fun GoLiveButton(dragging: Boolean, onAction: (PlayerAction) -> Unit) {
-    val buttonFill = Color(0xCC37393A)
+    PictureOfferButton(R.string.player_go_live, R.drawable.player_go_live, dragging, onClick = {
+        onAction(PlayerAction.GoLive)
+    })
+}
+
+@Composable
+internal fun PictureOfferButton(
+    label: Int,
+    icon: Int?,
+    dragging: Boolean,
+    onClick: () -> Unit,
+    bare: Boolean = false,
+) {
+    val buttonFill = if (bare) Color(0xB3000000) else Color(0xCC37393A)
     Button(
-        onClick = { onAction(PlayerAction.GoLive) }, enabled = !dragging,
+        onClick = onClick, enabled = !dragging,
         modifier = Modifier.alpha(if (dragging) DRAG_ALPHA else 1f),
         colors = ButtonDefaults.buttonColors(
             containerColor = buttonFill, contentColor = Color.White,
@@ -64,14 +77,16 @@ private fun GoLiveButton(dragging: Boolean, onAction: (PlayerAction) -> Unit) {
         ),
         contentPadding = PaddingValues(horizontal = 13.dp),
     ) {
-        Icon(painterResource(R.drawable.player_go_live), null, Modifier.size(18.dp))
-        Spacer(Modifier.width(6.dp))
-        Text(stringResource(R.string.player_go_live), maxLines = 1)
+        icon?.let {
+            Icon(painterResource(it), null, Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+        }
+        Text(stringResource(label), maxLines = 1)
     }
 }
 
 @Composable
-private fun FullScreenButton(offered: Set<PlayerControl>, onAction: (PlayerAction) -> Unit) {
+internal fun FullScreenButton(offered: Set<PlayerControl>, onAction: (PlayerAction) -> Unit) {
     if (PlayerControl.FullScreen !in offered) return
     PlayerIconButton(R.drawable.player_fullscreen, R.string.player_full_screen, { onAction(PlayerAction.FullScreen) })
 }

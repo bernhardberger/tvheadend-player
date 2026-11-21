@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="player_markers">Markers</string>
+    <string name="player_marker_number">Marker %1$d</string>
+    <string name="player_recording_position">%1$s / %2$s</string>
     <!-- TV: back -->
     <string name="player_back">Back</string>
     <!-- TV: playback_options -->

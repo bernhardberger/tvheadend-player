@@ -61,13 +61,14 @@ private val DarkControl = Color(0xA82C2E2E)
 
 @Composable
 internal fun BoxScope.PictureControls(
-    state: LivePlayerState,
+    state: PlayerFaceState,
     layout: PlayerLayout,
     visible: Boolean,
-    preview: Int?,
+    preview: Long?,
     onAction: (PlayerAction) -> Unit,
     onBrightness: (Float) -> Unit,
     onSettings: () -> Unit,
+    onChoice: (PlayerChoice) -> Unit = {},
 ) {
     if (!visible) return
     val status = state.status
@@ -82,17 +83,20 @@ internal fun BoxScope.PictureControls(
         }
     }
     if (layout.upright && (playing || tuning)) {
-        LiveOffer(
-            state.timeline, state.offered, preview, onAction, layout, live = playing,
-            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-                .padding(start = 16.dp, end = 10.dp, bottom = 22.dp),
-        )
+        val line = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+            .padding(start = 16.dp, end = 10.dp, bottom = 22.dp)
+        when (state) {
+            is LivePlayerState -> LiveOffer(
+                state.timeline, state.offered, preview?.let { (it / 1_000).toInt() }, onAction, layout, line, playing,
+            )
+            is RecordingPlayerState -> RecordingPositionLine(state, preview, layout, onAction, onChoice, line)
+        }
     }
 }
 
 @Composable
 private fun BoxScope.PictureCenter(
-    state: LivePlayerState,
+    state: PlayerFaceState,
     layout: PlayerLayout,
     onAction: (PlayerAction) -> Unit,
     onBrightness: (Float) -> Unit,
@@ -117,7 +121,7 @@ private fun BoxScope.PictureCenter(
 
 @Composable
 private fun PlayerTopBar(
-    state: LivePlayerState,
+    state: PlayerFaceState,
     layout: PlayerLayout,
     onAction: (PlayerAction) -> Unit,
     onSettings: () -> Unit,
@@ -161,7 +165,7 @@ private fun PlayerTopBar(
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun Transport(
-    state: LivePlayerState,
+    state: PlayerFaceState,
     layout: PlayerLayout,
     onAction: (PlayerAction) -> Unit,
     modifier: Modifier,
@@ -178,7 +182,7 @@ private fun Transport(
             .semantics { contentDescription = loading }, color = OnPicture)
         return
     }
-    val canSeek by remember(state.timeline) { derivedStateOf { state.timeline.value?.seekable == true } }
+    val canSeek by remember(state) { derivedStateOf { state.seekable } }
     val skipSize = if (layout == PlayerLayout.Tablet) 72.dp else 52.dp
     val skipColors = IconButtonDefaults.filledTonalIconButtonColors(
         containerColor = DarkControl, contentColor = OnPicture,

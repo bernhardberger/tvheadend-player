@@ -52,6 +52,7 @@ import at.bernhardberger.tvhplayer.touch.channels.ChannelsActions
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsLayout
 import at.bernhardberger.tvhplayer.touch.channels.TagFilter
 import at.bernhardberger.tvhplayer.touch.ui.TouchSideSheet
+import at.bernhardberger.tvhplayer.presentation.R as SharedR
 
 /** Menus open at their button except on the upright phone, which shows every list as a bottom sheet. */
 internal fun PlayerPanel.atButton(layout: PlayerLayout) = menu && layout != PlayerLayout.Phone
@@ -67,6 +68,8 @@ private val PlayerPanel.title: Int
         PlayerPanel.DisplayMode -> R.string.player_display_mode
         PlayerPanel.Profile -> R.string.player_stream_profile
         PlayerPanel.Stats -> R.string.player_stats
+        PlayerPanel.Markers -> R.string.player_markers
+        PlayerPanel.AdBreaks -> SharedR.string.ad_breaks_setting
     }
 
 /** The space between a menu and its button. */
@@ -135,7 +138,7 @@ private fun SelectableMenuItem(
 @Composable
 internal fun PlayerSheets(
     panel: PlayerPanel?,
-    state: LivePlayerState,
+    state: PlayerFaceState,
     layout: PlayerLayout,
     onPanel: (PlayerPanel?) -> Unit,
     onAction: (PlayerAction) -> Unit,
@@ -143,6 +146,7 @@ internal fun PlayerSheets(
     onChannel: (String) -> Unit,
     info: InfoPage,
     phoneSheetHeight: Dp,
+    onSeek: (Long) -> Unit,
 ) {
     if (panel == null || panel.atButton(layout)) return
     val close = { onPanel(null) }
@@ -153,7 +157,7 @@ internal fun PlayerSheets(
     }
     val done = if (panel.optionsPage) ({ onPanel(PlayerPanel.Options) }) else close
     val body: @Composable ColumnScope.() -> Unit = {
-        SheetBody(panel, state, onPanel, onAction, onChoice, onChannel, info, done)
+        SheetBody(panel, state, onPanel, onAction, onChoice, onChannel, info, done, onSeek)
     }
     if (layout == PlayerLayout.Phone) {
         PlayerBottomSheet(title, back, leading, close, phoneSheetHeight, body)
@@ -161,7 +165,7 @@ internal fun PlayerSheets(
         TouchSideSheet(
             onDismissRequest = close, title = title, onBack = back, scrim = false, leading = leading,
             actions = {
-                if (panel == PlayerPanel.Channels && state.channels.tags.isNotEmpty()) {
+                if (panel == PlayerPanel.Channels && state is LivePlayerState && state.channels.tags.isNotEmpty()) {
                     TagFilter(state.channels, { onChoice(PlayerChoice.ChannelTag(it)) })
                 }
             },
@@ -177,13 +181,14 @@ internal fun PlayerSheets(
 @Composable
 private fun sheetHead(
     panel: PlayerPanel,
-    state: LivePlayerState,
+    state: PlayerFaceState,
     info: InfoPage,
 ): Pair<String, (@Composable () -> Unit)?> {
-    val shown = state.schedule?.details?.get(info.stack.shown)?.takeIf { panel == PlayerPanel.InfoDetails }
+    val shown = (state as? LivePlayerState)?.schedule?.details?.get(info.stack.shown)
+        ?.takeIf { panel == PlayerPanel.InfoDetails }
     return when {
         shown != null -> shown.channel to { InfoLogo(shown.channelLogo, shown.logoTint, shown.channelLogoModel) }
-        panel.button == PlayerPanel.Info -> state.channel.name to {
+        panel.button == PlayerPanel.Info && state is LivePlayerState -> state.channel.name to {
             InfoLogo(state.channel.logo, state.channel.logoTint, state.channel.logoModel)
         }
         else -> stringResource(panel.title) to null
@@ -197,25 +202,30 @@ private val PlayerPanel.parent: PlayerPanel?
 @Composable
 private fun ColumnScope.SheetBody(
     panel: PlayerPanel,
-    state: LivePlayerState,
+    state: PlayerFaceState,
     onPanel: (PlayerPanel?) -> Unit,
     onAction: (PlayerAction) -> Unit,
     onChoice: (PlayerChoice) -> Unit,
     onChannel: (String) -> Unit,
     info: InfoPage,
     done: () -> Unit,
+    onSeek: (Long) -> Unit,
 ) {
     when (panel) {
-        PlayerPanel.Channels -> Box(Modifier.weight(1f).padding(horizontal = 16.dp)) {
+        PlayerPanel.Channels -> if (state is LivePlayerState) Box(Modifier.weight(1f).padding(horizontal = 16.dp)) {
             ChannelRows(
                 state.channels, ChannelsLayout.Phone,
                 ChannelsActions(onPlay = onChannel, onTag = {}, onRetry = {}, onOpenConnectionSettings = {}),
                 showColumnLabels = false,
             )
         }
-        PlayerPanel.Options -> OptionRows(state.options, onPanel)
-        PlayerPanel.Info, PlayerPanel.InfoDetails -> state.schedule?.let {
-            InfoBody(panel, it, info, onPanel, onChoice)
+        PlayerPanel.Options -> OptionRows(state, onPanel)
+        PlayerPanel.Info, PlayerPanel.InfoDetails -> when (state) {
+            is LivePlayerState -> state.schedule?.let { InfoBody(panel, it, info, onPanel, onChoice) }
+            is RecordingPlayerState -> RecordingInfo(state)
+        }
+        PlayerPanel.Markers -> if (state is RecordingPlayerState) {
+            RecordingMarkerRows(state, onSeek, Modifier.weight(1f))
         }
         else -> EntryRows(panelEntries(panel, state, onAction, onChoice, done))
     }
@@ -273,11 +283,15 @@ private fun PlayerBottomSheet(
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun OptionRows(options: PlaybackOptions, onPanel: (PlayerPanel?) -> Unit) {
+private fun OptionRows(state: PlayerFaceState, onPanel: (PlayerPanel?) -> Unit) {
+    val options = state.options
     val profile = options.profilePick?.let { options.profiles.getOrNull(it) }
     val rows = listOfNotNull(
         Triple(R.string.player_display_mode, stringResource(options.displayMode.label), PlayerPanel.DisplayMode),
-        options.profiles.takeIf { it.isNotEmpty() }?.let {
+        if (state is RecordingPlayerState) {
+            val selected = state.adBreakPick?.let { stringResource(it.label) } ?: adBreakDefault(state)
+            Triple(SharedR.string.ad_breaks_setting, selected, PlayerPanel.AdBreaks)
+        } else options.profiles.takeIf { it.isNotEmpty() }?.let {
             Triple(
                 R.string.player_stream_profile,
                 profile?.let { profileName(it) }
