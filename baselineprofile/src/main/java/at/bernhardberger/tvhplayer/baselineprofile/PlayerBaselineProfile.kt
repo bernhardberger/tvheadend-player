@@ -212,8 +212,13 @@ class PlayerBaselineProfile {
                 focusToward(play, KeyEvent.KEYCODE_DPAD_DOWN)
                 key(KeyEvent.KEYCODE_DPAD_CENTER)
                 awaitVideo()
-                key(KeyEvent.KEYCODE_BACK)
-                await(By.res("recordings-header"), "Back must return to Recordings")
+                // A skip offer in the recording's padding takes the first Back.
+                val header = By.res("recordings-header")
+                repeat(3) {
+                    key(KeyEvent.KEYCODE_BACK)
+                    if (device.wait({ has(header) }, 5_000L)) return
+                }
+                await(header, "Back must return to Recordings")
                 return
             }
             val focused = device.findObject(By.focused(true))
