@@ -65,6 +65,7 @@ internal fun PlayerScreen(
     inWindow: Boolean = false,
     hideAfterMs: Long? = null,
     progressing: Boolean = true,
+    confirmationOpen: Boolean = false,
     notices: @Composable (Modifier) -> Unit = {},
 ) {
     var visible by rememberSaveable(state.channel.id) { mutableStateOf(true) }
@@ -83,7 +84,7 @@ internal fun PlayerScreen(
     var preview by remember(state.channel.id, state.status) { mutableStateOf<Int?>(null) }
     val hideAfter = controlsHideAfter(
         visible, state.status, state.paused, progressing, dragging = preview != null, fingerDown = touching,
-        panelOpen = panel != null, inWindow = inWindow, timeoutMs = hideAfterMs,
+        panelOpen = panel != null || confirmationOpen, inWindow = inWindow, timeoutMs = hideAfterMs,
     )
     HideControlsAfter(hideAfter, touches) { visible = false }
     val face = modifier.fillMaxSize().background(Color.Black)

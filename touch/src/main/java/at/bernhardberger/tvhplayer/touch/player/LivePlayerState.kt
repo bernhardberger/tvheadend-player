@@ -12,6 +12,7 @@ import at.bernhardberger.tvhplayer.touch.channels.ChannelsState
 import at.bernhardberger.tvhplayer.touch.guide.GuideProgram
 import at.bernhardberger.tvhplayer.touch.guide.GuideAvailability
 import at.bernhardberger.tvhplayer.touch.guide.ProgramDetails
+import at.bernhardberger.tvhplayer.touch.ui.ProgramRecordControl
 import java.time.LocalDate
 import java.time.LocalTime
 
@@ -28,6 +29,7 @@ internal data class LivePlayerState(
     val options: PlaybackOptions = PlaybackOptions(),
     val schedule: ChannelSchedule? = null,
     val offered: Set<PlayerControl> = PlayerControl.entries.toSet(),
+    val liveRecord: LiveRecordOffer? = null,
 )
 
 internal val ChannelsState.displayedList: ChannelList?
@@ -130,8 +132,8 @@ internal sealed interface PlayerChoice {
     data class Stats(val level: StatsLevel) : PlayerChoice
     data class ChannelTag(val id: String?) : PlayerChoice
     data class Day(val index: Int) : PlayerChoice
-    data class Record(val programId: String) : PlayerChoice
-    data class RecordOptions(val programId: String) : PlayerChoice
+    data class Record(val programId: String, val control: ProgramRecordControl) : PlayerChoice
+    data class LiveRecord(val offer: LiveRecordOffer) : PlayerChoice
 
     /** A Details page opened in the Info sheet, a program's or another airing's: its details may need loading. */
     data class Details(val programId: String) : PlayerChoice
@@ -139,7 +141,7 @@ internal sealed interface PlayerChoice {
 
 /** What the player shows over its face: a menu at a button, or a sheet and the page it is on. */
 internal enum class PlayerPanel(val menu: Boolean) {
-    Record(true), Audio(true), Subtitles(true), Channels(false), Info(false), InfoDetails(false),
+    Audio(true), Subtitles(true), Channels(false), Info(false), InfoDetails(false),
     Options(false), DisplayMode(false), Profile(false), Stats(false),
     ;
 
@@ -194,7 +196,7 @@ internal sealed interface LivePlayerStatus {
 
 internal enum class PlayerAction {
     Back, PictureInPicture, FullScreen, BackTen, TogglePlay, ForwardThirty,
-    GoLive, RecordProgram, RecordSeries, RecordAll, WatchLive, RetryChannels,
+    GoLive, WatchLive, RetryChannels,
 }
 
 internal enum class PlayerLayout(val upright: Boolean, val trackThickness: Dp, val skipIconSize: Dp) {

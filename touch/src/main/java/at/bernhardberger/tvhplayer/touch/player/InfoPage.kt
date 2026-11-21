@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.touch.player
 
+import at.bernhardberger.tvhplayer.touch.ui.ProgramRecordControl
+
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -86,13 +88,15 @@ private fun ColumnScope.InfoSchedule(
 ) {
     val actions = GuideActions(
         onWatch = null,
-        onRecord = null,
+        onRecord = { onChoice(PlayerChoice.Record(it, ProgramRecordControl.Record)) },
         onRecordOptions = null,
         onDay = { onChoice(PlayerChoice.Day(it)) },
         onJump = {},
         onTag = {},
         onShowInGuide = null,
         onAiring = { info.openDetails(it, onPanel, onChoice) },
+        onCancel = { onChoice(PlayerChoice.Record(it, ProgramRecordControl.Cancel)) },
+        onStop = { onChoice(PlayerChoice.Record(it, ProgramRecordControl.Stop)) },
     )
     if (panel == PlayerPanel.InfoDetails) {
         val details = info.stack.shown?.let(schedule.details)
