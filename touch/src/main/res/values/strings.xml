@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Tvheadend Player Touch</string>
+    <!-- TV key: nav_channels -->
+    <string name="nav_channels">Channels</string>
+    <!-- TV key: nav_epg -->
+    <string name="nav_epg">Guide</string>
+    <!-- TV key: nav_recordings -->
+    <string name="nav_recordings">Recordings</string>
+</resources>
