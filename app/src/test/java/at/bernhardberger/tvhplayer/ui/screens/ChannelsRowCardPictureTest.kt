@@ -5,6 +5,8 @@ import android.graphics.Bitmap
 import android.graphics.Color
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -18,12 +20,14 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.ArtworkLoader
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
 import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
+import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
@@ -36,15 +40,19 @@ import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
+import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionObservation
+import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.images.ArtworkLogoCorner
 import at.bernhardberger.tvhplayer.images.ArtworkLogoGround
 import at.bernhardberger.tvhplayer.images.ArtworkLogoPlace
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
+import at.bernhardberger.tvhplayer.ui.components.ArtworkContext
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
 import at.bernhardberger.tvhplayer.ui.components.ArtworkCornerLogo
+import at.bernhardberger.tvhplayer.ui.components.LocalArtworkContext
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
@@ -135,14 +143,29 @@ class ChannelsRowCardPictureTest {
         val lightFirst = ArtworkId(22)
         val inkByLogo = mutableMapOf<ArtworkId, Int>()
         val darkLogo = Bitmap.createBitmap(32, 18, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.BLACK) }
+        val lightLogo = darkLogo.copy(Bitmap.Config.ARGB_8888, true).apply { eraseColor(Color.WHITE) }
+        val replaced = mutableStateOf(false)
+        var olderVariant = false
+        val fake = FakeTvheadendSession(readyObservation())
+        val session = object : TvheadendSession by fake {
+            override val artwork = object : ArtworkLoader by fake.artwork {
+                override fun cacheKey(currentSession: CurrentSessionObservation, artworkId: ArtworkId) =
+                    "tone-test:${artworkId.value}"
+            }
+        }
+        val artwork = ArtworkContext(
+            session, mutableStateOf(fake.captureCurrentSession()), mutableStateOf(fake.observation.value),
+        )
         images.install(ImageLoader.Builder(ApplicationProvider.getApplicationContext<Application>())
             .components {
                 add(Interceptor { chain ->
                     val request = chain.request
-                    val logo = request.transformations.fold(darkLogo) { bitmap, transform ->
+                    val id = (request.data as AppArtworkSource).id
+                    val source = if (id == lightFirst && replaced.value && !olderVariant) lightLogo else darkLogo
+                    val logo = request.transformations.fold(source) { bitmap, transform ->
                         transform.transform(bitmap, coil3.size.Size.ORIGINAL)
                     }
-                    inkByLogo[(request.data as AppArtworkSource).id] = logo.getPixel(logo.width / 2, logo.height / 2)
+                    inkByLogo[id] = logo.getPixel(logo.width / 2, logo.height / 2)
                     SuccessResult(logo.asImage(), request, DataSource.MEMORY_CACHE)
                 })
             }
@@ -151,11 +174,15 @@ class ChannelsRowCardPictureTest {
             .build())
         compose.setContent {
             TVHeadendPlayerTheme {
-                Box(Modifier.size(220.dp, 124.dp)) {
-                    ArtworkCornerLogo(ChannelIcon.ImageCache(darkFirst),
-                        ArtworkLogoPlace(ArtworkLogoCorner.BOTTOM_START, ArtworkLogoGround.SHADE), scale = 1f)
-                    ArtworkCornerLogo(ChannelIcon.ImageCache(lightFirst),
-                        ArtworkLogoPlace(ArtworkLogoCorner.TOP_END, lightFirstGround.value), scale = 1f)
+                CompositionLocalProvider(LocalArtworkContext provides artwork) {
+                    Box(Modifier.size(220.dp, 124.dp)) {
+                        ArtworkCornerLogo(ChannelIcon.ImageCache(darkFirst),
+                            ArtworkLogoPlace(ArtworkLogoCorner.BOTTOM_START, ArtworkLogoGround.SHADE), scale = 1f)
+                        key(replaced.value) {
+                            ArtworkCornerLogo(ChannelIcon.ImageCache(lightFirst),
+                                ArtworkLogoPlace(ArtworkLogoCorner.TOP_END, lightFirstGround.value), scale = 1f)
+                        }
+                    }
                 }
             }
         }
@@ -163,7 +190,19 @@ class ChannelsRowCardPictureTest {
         compose.runOnIdle {
             assertEquals("dark ground first", Color.BLACK, inkByLogo[darkFirst])
             assertEquals("white ground first", Color.BLACK, inkByLogo[lightFirst])
+            replaced.value = true
         }
+        compose.runOnIdle {
+            assertEquals("replaced logo keeps its white ink", Color.WHITE, inkByLogo[lightFirst])
+            // The other ground can still have an older revision of the logo in memory.
+            olderVariant = true
+            lightFirstGround.value = ArtworkLogoGround.LIGHT_PICTURE
+        }
+        compose.runOnIdle {
+            olderVariant = false
+            lightFirstGround.value = ArtworkLogoGround.SHADE
+        }
+        compose.runOnIdle { assertEquals("older variant does not change the shade", Color.WHITE, inkByLogo[lightFirst]) }
     }
 
     @Test fun aChannelOnlyRecordingUsesThePictureCornerWithoutAddingCardHeight() {
@@ -223,15 +262,17 @@ class ChannelsRowCardPictureTest {
             compose.onNodeWithTag("channel-recording-indicator", useUnmergedTree = true).assertDoesNotExist()
         }
 
+    private fun readyObservation() = SessionObservation.create(
+        sessionState = SessionState.Ready(ServerCapabilities.create(
+            streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED,
+        )),
+        channelState = ChannelRepositoryState.Current(ChannelCatalog.create()),
+        epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
+        dvrState = DvrRepositoryState.Current(DvrSnapshot.create()),
+    )
+
     private fun show(recording: Boolean = false, programmePicture: Boolean = true, logoFails: Boolean = false) {
-        val session = FakeSessionObservation(SessionObservation.create(
-            sessionState = SessionState.Ready(ServerCapabilities.create(
-                streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED,
-            )),
-            channelState = ChannelRepositoryState.Current(ChannelCatalog.create()),
-            epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
-            dvrState = DvrRepositoryState.Current(DvrSnapshot.create()),
-        )).captureCurrentSession()
+        val session = FakeSessionObservation(readyObservation()).captureCurrentSession()
         images.install(ImageLoader.Builder(ApplicationProvider.getApplicationContext<Application>())
             .components {
                 add(Interceptor { chain ->

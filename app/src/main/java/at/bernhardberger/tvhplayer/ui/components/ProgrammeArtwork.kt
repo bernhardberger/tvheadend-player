@@ -198,11 +198,13 @@ internal fun BoxScope.ArtworkCornerLogo(
     val atBottom = corner == ArtworkLogoCorner.BOTTOM_START || corner == ArtworkLogoCorner.BOTTOM_END
     val atStart = corner == ArtworkLogoCorner.BOTTOM_START || corner == ArtworkLogoCorner.TOP_START
     // A dark logo stands on a light shade, and takes one on a calm dark picture too; every other
-    // logo keeps the dark shade. Judged once per logo, and no shade shows before that.
+    // logo keeps the dark shade.
     val artwork = LocalArtworkContext.current
     val source = requireNotNull(rememberPiconSource(artwork, picon))
     val toneKey = remember(artwork, source) { artwork.logoToneKey(source) }
     var needsLight by remember(source, toneKey) { mutableStateOf(toneKey?.let(logoTones::get)) }
+    // The first load can correct the shade; later variants only refresh the hint so they cannot flip it back.
+    var hasMeasuredTone by remember(source, toneKey) { mutableStateOf(false) }
     val light = needsLight == true
     val shaded = when (place.ground) {
         ArtworkLogoGround.SHADE -> needsLight != null
@@ -220,7 +222,11 @@ internal fun BoxScope.ArtworkCornerLogo(
         ground = if (place.ground == ArtworkLogoGround.LIGHT_PICTURE || light) Color.White
             else MaterialTheme.colorScheme.background,
         onLogoTone = { tone ->
-            if (needsLight == null) needsLight = toneKey?.let { logoTones.getOrPut(it) { tone } } ?: tone
+            if (!hasMeasuredTone) {
+                hasMeasuredTone = true
+                if (needsLight != tone) needsLight = tone
+            }
+            artwork.logoToneKey(source)?.let { logoTones[it] = tone }
         })
 }
 
@@ -255,7 +261,7 @@ private fun ArtworkContext.logoToneKey(source: Any): String? = when (source) {
     else -> null
 }
 
-/** The first tone for each logo, with profile-stable keys that do not retain the source model. */
+/** The last measured tone for each logo, with profile-stable keys that do not retain the source model. */
 private val logoTones = mutableMapOf<String, Boolean>()
 
 /**
