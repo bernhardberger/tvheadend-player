@@ -9,7 +9,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.recordingSkipAction
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId

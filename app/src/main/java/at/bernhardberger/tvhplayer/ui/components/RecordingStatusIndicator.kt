@@ -19,7 +19,8 @@ import androidx.tv.material3.LocalTextStyle
 import androidx.tv.material3.MaterialTheme
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.AutomaticRecordingKind
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 import at.bernhardberger.tvhplayer.ui.TvRecordingFocusedColor
@@ -76,15 +77,16 @@ fun RecordingStatusIndicator(
     val content = LocalContentColor.current
     val (@DrawableRes icon, tint) = when (state) {
         DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR ->
-            (if (rule != null) R.drawable.ic_fiber_smart_record else R.drawable.ic_fiber_manual_record) to
+            (if (rule != null) AppR.drawable.ic_fiber_smart_record else AppR.drawable.ic_fiber_manual_record) to
                 recordingMarkColor(focused)
-        DvrEntryState.COMPLETED -> R.drawable.ic_video_library to content.copy(alpha = TvTextSecondaryAlpha)
-        DvrEntryState.COMPLETED_ERROR, DvrEntryState.MISSED -> R.drawable.ic_error_outlined to errorMarkColor(focused)
+        DvrEntryState.COMPLETED -> AppR.drawable.ic_video_library to content.copy(alpha = TvTextSecondaryAlpha)
+        DvrEntryState.COMPLETED_ERROR, DvrEntryState.MISSED ->
+            AppR.drawable.ic_error_outlined to errorMarkColor(focused)
         DvrEntryState.SCHEDULED ->
             (when {
-                skipped -> R.drawable.ic_event_busy
-                rule != null -> R.drawable.ic_schedule_rule
-                else -> R.drawable.ic_schedule
+                skipped -> AppR.drawable.ic_event_busy
+                rule != null -> AppR.drawable.ic_schedule_rule
+                else -> AppR.drawable.ic_schedule
             }) to content
         else -> return
     }
@@ -140,7 +142,7 @@ fun ScheduledIndicator(
     textStyle: TextStyle = LocalTextStyle.current,
 ) {
     Icon(
-        painter = painterResource(R.drawable.ic_schedule),
+        painter = painterResource(AppR.drawable.ic_schedule),
         contentDescription = contentDescription,
         modifier = modifier.size(recordingMarkSize(textStyle)),
         tint = tint,

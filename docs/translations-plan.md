@@ -104,7 +104,7 @@ Each language page records the final choice.
 
 ## Knowledge that stays in the repository
 
-- **String notes** in `app/src/main/res/values/strings.xml`: meaning, where the
+- **String notes** in `presentation/src/main/res/values/strings.xml`: meaning, where the
   string appears, maximum length. Only for tight or ambiguous strings.
 - **Glossary** as CSV (Weblate can import it): one row per term, such as
   Recording, Timeshift, Guide, Channel tag and Go live, with the chosen word per

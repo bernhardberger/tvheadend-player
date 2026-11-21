@@ -24,7 +24,8 @@ import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.AutomaticRecordingListItem
 import at.bernhardberger.tvhplayer.core.toDraft
 import at.bernhardberger.tvhplayer.core.AutomaticRecordingKind
@@ -288,13 +289,19 @@ private fun ScheduleRuleMenu(
     ) {
         TwoColumnDialogButton(stringResource(editLabel), onEdit,
             Modifier.focusRequester(first).testTag("automatic-recording-menu-edit"),
-            icon = { Icon(painterResource(R.drawable.ic_edit), null) })
+            icon = { Icon(painterResource(AppR.drawable.ic_edit), null) })
         TwoColumnDialogButton(stringResource(if (item.enabled) R.string.schedule_automatic_turn_off
             else R.string.schedule_automatic_turn_on), onToggle,
             Modifier.testTag("automatic-recording-menu-toggle"),
-            icon = { Icon(painterResource(if (item.enabled) R.drawable.ic_power_off else R.drawable.ic_power), null) })
+            icon = {
+                Icon(
+                    painterResource(if (item.enabled) AppR.drawable.ic_power_off else AppR.drawable.ic_power),
+                    contentDescription = null,
+                )
+            },
+        )
         TwoColumnDialogButton(stringResource(R.string.context_delete), onDelete,
             Modifier.testTag("automatic-recording-menu-delete"),
-            icon = { Icon(painterResource(R.drawable.ic_delete_outlined), null) })
+            icon = { Icon(painterResource(AppR.drawable.ic_delete_outlined), null) })
     }
 }

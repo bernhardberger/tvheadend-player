@@ -31,7 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Button
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.HomeInput
 import at.bernhardberger.tvhplayer.core.HomeSectionKind
 import at.bernhardberger.tvhplayer.ui.TvBrowseLeadingInset

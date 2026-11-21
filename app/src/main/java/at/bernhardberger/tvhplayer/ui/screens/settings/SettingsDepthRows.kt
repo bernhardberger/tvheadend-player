@@ -23,7 +23,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
 import kotlin.math.roundToInt
 import androidx.tv.material3.*
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.ui.TvSpacing4
 import at.bernhardberger.tvhplayer.ui.TvSpacing16
 import at.bernhardberger.tvhplayer.ui.TvBrowseHeaderHeight
@@ -149,7 +150,7 @@ internal fun settingsRow(
                                 contentColor = if (rowFocused) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onPrimaryContainer,
                             )
                         }
-                        val arrow = trailingIcon ?: if (child != null) R.drawable.ic_keyboard_arrow_right else null
+                        val arrow = trailingIcon ?: if (child != null) AppR.drawable.ic_keyboard_arrow_right else null
                         if (arrow != null) Icon(painterResource(arrow), null, Modifier.size(24.dp))
                     }
                 })

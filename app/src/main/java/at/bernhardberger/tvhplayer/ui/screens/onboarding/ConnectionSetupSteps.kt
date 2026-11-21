@@ -54,7 +54,8 @@ import at.bernhardberger.tvhplayer.ui.components.serverAddress
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.android.DiscoveredTvheadendServer
 import at.bernhardberger.tvheadend.sdk.core.DEFAULT_HTSP_PORT
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.settings.ConnectionFormFeedback
 import at.bernhardberger.tvhplayer.settings.ConnectionFormState
 import at.bernhardberger.tvhplayer.settings.compactServerName
@@ -151,7 +152,7 @@ private fun FindServerStep(state: ConnectionSetupState) {
     ) {
         GuidedStepAction(
             title = stringResource(if (state.searching) R.string.onboarding_find_searching else R.string.onboarding_search_again),
-            icon = R.drawable.ic_search,
+            icon = AppR.drawable.ic_search,
             // Stays enabled while it runs: it holds focus then, and a disabled action can't show it.
             leadingIcon = if (state.searching) {
                 { CircularProgressIndicator(Modifier.size(24.dp), color = LocalContentColor.current, strokeWidth = 3.dp) }
@@ -181,7 +182,7 @@ private fun FindServerStep(state: ConnectionSetupState) {
                 modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
             GuidedStepAction(
                 title = stringResource(R.string.onboarding_enter_address_manually),
-                icon = R.drawable.ic_edit,
+                icon = AppR.drawable.ic_edit,
                 onClick = state::enterAddressManually,
                 modifier = Modifier.testTag("setup-enter-manually"),
             )
@@ -198,7 +199,7 @@ private fun FoundServerRow(state: ConnectionSetupState, server: DiscoveredTvhead
     GuidedStepAction(
         title = server.name,
         subtitle = serverAddress(server.host, server.port.toString()),
-        icon = R.drawable.ic_dns,
+        icon = AppR.drawable.ic_dns,
         onClick = { state.chooseServer(server) },
         modifier = Modifier
             .focusRequester(requester)
@@ -233,7 +234,7 @@ private fun AddressStep(state: ConnectionSetupState) {
     ) {
         GuidedStepAction(
             title = stringResource(R.string.onboarding_find_server),
-            icon = R.drawable.ic_search,
+            icon = AppR.drawable.ic_search,
             onClick = state::openSearch,
             modifier = Modifier.focusRequester(search).testTag("setup-find-server"),
         )
@@ -347,7 +348,7 @@ private fun FieldHelp(text: String, isError: Boolean) {
         return
     }
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-        FieldIcon(painterResource(R.drawable.ic_error_outlined), contentDescription = null, Modifier.size(16.dp))
+        FieldIcon(painterResource(AppR.drawable.ic_error_outlined), contentDescription = null, Modifier.size(16.dp))
         FieldText(text)
     }
 }
@@ -428,7 +429,7 @@ private fun SignInStep(state: ConnectionSetupState, profileName: String?) {
         if (state.form.hasSavedPassword) {
             GuidedStepAction(
                 title = stringResource(R.string.clear_saved_password),
-                icon = R.drawable.ic_delete_outlined,
+                icon = AppR.drawable.ic_delete_outlined,
                 onClick = state::clearSavedPassword,
                 modifier = Modifier.testTag("setup-clear-password"),
             )
@@ -540,7 +541,7 @@ internal fun MainActionButton(
 ) {
     GuidedStepAction(
         title = stringResource(label),
-        icon = R.drawable.ic_arrow_forward,
+        icon = AppR.drawable.ic_arrow_forward,
         onClick = onClick,
         modifier = modifier,
     )

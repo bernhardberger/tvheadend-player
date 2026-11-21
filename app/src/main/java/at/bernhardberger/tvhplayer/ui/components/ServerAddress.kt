@@ -2,7 +2,7 @@ package at.bernhardberger.tvhplayer.ui.components
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 
 /** The address shown outside editable fields: HTSP's default port adds no useful information. */
 @Composable

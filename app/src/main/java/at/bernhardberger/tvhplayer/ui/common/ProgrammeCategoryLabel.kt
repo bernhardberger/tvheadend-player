@@ -3,7 +3,7 @@ package at.bernhardberger.tvhplayer.ui.common
 import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.ProgrammeCategory
 
 @Composable

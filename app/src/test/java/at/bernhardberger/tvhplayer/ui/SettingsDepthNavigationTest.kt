@@ -370,7 +370,7 @@ class SettingsDepthNavigationTest {
         if (rowId == "tunneling") {
             compose.runOnIdle { ui = ui.copy(tunnelingFallbackActive = true) }
             compose.onNodeWithTag(tag).assert(hasText(RuntimeEnvironment.getApplication()
-                .getString(at.bernhardberger.tvhplayer.R.string.tunneling_setting_fallback)))
+                .getString(at.bernhardberger.tvhplayer.presentation.R.string.tunneling_setting_fallback)))
             assertAccessibleSwitch(tag, checked = true)
         }
         press(Key.Back)

@@ -107,7 +107,7 @@ class ArtworkTest(unittest.TestCase):
             / "app/src/main/java/at/bernhardberger/tvhplayer/ui/startup/MainStartupScreen.kt"
         ).read_text()
         # The startup screen draws the static symbol straight from its vector.
-        self.assertIn("painterResource(R.drawable.startup_brand_symbol)", startup)
+        self.assertRegex(startup, r"\bpainterResource\((?:AppR|R)\.drawable\.startup_brand_symbol\)")
         symbol = ElementTree.parse(ROOT / "artwork/tvheadend-player-symbol.svg")
         startup_symbol = ElementTree.parse(ROOT / "app/src/main/res/drawable/startup_brand_symbol.xml")
         android = "{http://schemas.android.com/apk/res/android}"

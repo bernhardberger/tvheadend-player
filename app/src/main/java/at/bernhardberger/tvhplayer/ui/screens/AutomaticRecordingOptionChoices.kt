@@ -6,7 +6,8 @@ import androidx.compose.ui.res.stringResource
 import at.bernhardberger.tvheadend.sdk.core.BroadcastType
 import at.bernhardberger.tvheadend.sdk.core.DuplicateDetection
 import at.bernhardberger.tvheadend.sdk.core.DvrConfiguration
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.RecordingDraftField
 import at.bernhardberger.tvhplayer.core.offeredDuplicateDetection
 import at.bernhardberger.tvhplayer.ui.components.GuidedStepAction
@@ -47,7 +48,7 @@ private fun AutomaticRecordingMore(state: AutomaticRecordingEditorState, configu
             subtitleMaxLines = 2, subtitle = automaticRecordingOptionValue(state, field, configurations),
             modifier = editorRowModifier(state.navigation, level.name.lowercase()),
             onClick = { state.navigation.open(level, automaticRecordingOptionRowId(state, field)) },
-            trailingIcon = R.drawable.ic_keyboard_arrow_right,
+            trailingIcon = AppR.drawable.ic_keyboard_arrow_right,
             trailingContent = { AutomaticRecordingChanged(state, setOf(field)) },
         )
     }
@@ -64,7 +65,7 @@ private fun AutomaticRecordingMore(state: AutomaticRecordingEditorState, configu
         stringResource(R.string.context_delete),
         { state.navigation.confirmation = AutomaticRecordingEditorConfirmation.DELETE },
         editorRowModifier(state.navigation, "delete"),
-        icon = R.drawable.ic_delete_outlined,
+        icon = AppR.drawable.ic_delete_outlined,
     )
 }
 

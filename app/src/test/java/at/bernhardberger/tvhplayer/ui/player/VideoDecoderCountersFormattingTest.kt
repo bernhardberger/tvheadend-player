@@ -2,7 +2,7 @@ package at.bernhardberger.tvhplayer.ui.player
 
 import android.app.Application
 import androidx.test.core.app.ApplicationProvider
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.playback.AppVideoDecoderCounters
 import org.junit.Assert.assertEquals
 import org.junit.Test

@@ -30,7 +30,7 @@ import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.ui.components.backKeyCycleFocus
 import at.bernhardberger.tvhplayer.ui.components.rememberBackKeyCycle
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeDetailsFullDescription
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthLevel
 import at.bernhardberger.tvhplayer.ui.TvFullScreenPadding

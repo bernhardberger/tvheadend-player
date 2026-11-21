@@ -1,7 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens.recordings
 
 import at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.AppError
 import at.bernhardberger.tvhplayer.core.AppErrorAction
 import at.bernhardberger.tvhplayer.core.AppErrorCondition

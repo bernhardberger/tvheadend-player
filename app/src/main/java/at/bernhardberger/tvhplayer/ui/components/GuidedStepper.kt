@@ -22,7 +22,8 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.ui.TvTextSecondaryAlpha
 import at.bernhardberger.tvhplayer.ui.TvTextTertiaryAlpha
 
@@ -98,7 +99,7 @@ private fun GuidedStepMarker(number: Int, state: GuidedStepState) {
     Box(shape, contentAlignment = Alignment.Center) {
         when (state) {
             GuidedStepState.DONE -> Icon(
-                painterResource(R.drawable.ic_check),
+                painterResource(AppR.drawable.ic_check),
                 contentDescription = null,
                 tint = colors.onPrimary,
                 modifier = Modifier.size(12.dp),

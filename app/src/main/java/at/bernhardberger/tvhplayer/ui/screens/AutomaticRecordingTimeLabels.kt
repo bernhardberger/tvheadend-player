@@ -6,7 +6,7 @@ import androidx.compose.ui.res.stringResource
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.DvrRemoval
 import at.bernhardberger.tvheadend.sdk.core.RecordingRuleChannel
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.AutorecDraft
 import at.bernhardberger.tvhplayer.core.RecordingStartWindow
 import at.bernhardberger.tvhplayer.ui.common.formatClock

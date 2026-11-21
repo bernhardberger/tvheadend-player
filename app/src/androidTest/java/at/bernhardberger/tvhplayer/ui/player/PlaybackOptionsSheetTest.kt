@@ -114,7 +114,7 @@ class PlaybackOptionsSheetTest {
         composeRule.onNodeWithTag("playback-options-subtitles").assertIsNotEnabled()
         composeRule.onNodeWithText(
             androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
-                .getString(at.bernhardberger.tvhplayer.R.string.no_audio_tracks),
+                .getString(at.bernhardberger.tvhplayer.presentation.R.string.no_audio_tracks),
         ).assertIsDisplayed()
         composeRule.onNodeWithTag("playback-options-display").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionDown) }

@@ -12,7 +12,8 @@ import at.bernhardberger.tvheadend.sdk.core.ServerProfileAuthenticationMode
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileId
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileListResult
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileSummary
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.settings.compactServerName
 import at.bernhardberger.tvhplayer.settings.serverProfileAddress
 import at.bernhardberger.tvhplayer.settings.serverProfileDisplayName
@@ -81,13 +82,13 @@ internal fun settingsServerLevels(
     val stored = list?.profiles.orEmpty()
     val noneInUse = profiles.noServerInUse()
     val add = settingsRow(ADD_SERVER, stringResource(R.string.server_add),
-        supporting = stringResource(R.string.server_add_description), icon = R.drawable.ic_add,
+        supporting = stringResource(R.string.server_add_description), icon = AppR.drawable.ic_add,
         enabled = actionsEnabled, onClick = actions.onAdd)
     val retry = settingsRow(RETRY_CONNECTION, stringResource(R.string.connection_try_again),
         supporting = stringResource(
             if (connecting) R.string.connection_overview_connecting else R.string.connection_retry_description,
         ),
-        icon = R.drawable.ic_refresh, onClick = { if (!connecting) onRetry() })
+        icon = AppR.drawable.ic_refresh, onClick = { if (!connecting) onRetry() })
     val rows = buildList {
         stored.forEach { profile -> add(serverProfileRow(profile, profile.id == list?.activeId, status)) }
         if (profiles != null) add(add)
@@ -183,10 +184,10 @@ internal fun settingsServerLevel(
             enabled = actionsEnabled, onClick = { actions.onSetUp(profile) }))
         add(settingsRow(SERVER_NAME, stringResource(R.string.server_name),
             supporting = profile.label ?: stringResource(R.string.server_name_not_set),
-            trailingIcon = R.drawable.ic_edit, enabled = actionsEnabled, onClick = { actions.onName(profile) }))
+            trailingIcon = AppR.drawable.ic_edit, enabled = actionsEnabled, onClick = { actions.onName(profile) }))
         add(settingsRow(SERVER_REMOVE, stringResource(R.string.server_remove),
             supporting = stringResource(R.string.server_remove_description),
-            trailingIcon = R.drawable.ic_delete_outlined, enabled = actionsEnabled,
+            trailingIcon = AppR.drawable.ic_delete_outlined, enabled = actionsEnabled,
             onClick = { actions.onRemove(profile) }))
         add(settingsRow(SERVER_ADDRESS, stringResource(R.string.connection_overview_server),
             serverAddress(profile)))

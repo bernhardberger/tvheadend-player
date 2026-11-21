@@ -3,7 +3,8 @@ package at.bernhardberger.tvhplayer.ui.screens.settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.res.stringResource
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
@@ -61,8 +62,10 @@ internal fun SwitchServerDialog(
         sentence = stringResource(
             if (recording) R.string.server_switch_recording_body else R.string.server_switch_live_body,
         ),
-        safe = ConfirmationChoice(stringResource(R.string.server_keep_watching), R.drawable.ic_check, SWITCH_KEEP),
-        action = ConfirmationChoice(stringResource(R.string.server_switch), R.drawable.ic_swap_horiz, SWITCH_CONFIRM),
+        safe = ConfirmationChoice(stringResource(R.string.server_keep_watching), AppR.drawable.ic_check, SWITCH_KEEP),
+        action = ConfirmationChoice(
+            stringResource(R.string.server_switch), AppR.drawable.ic_swap_horiz, SWITCH_CONFIRM,
+        ),
         onConfirm = onSwitch,
         onDismiss = onKeep,
     )
@@ -82,9 +85,9 @@ internal fun RemoveServerDialog(
         question = stringResource(R.string.server_remove_question),
         subject = ConfirmationSubject.Server(look, name, detail),
         sentence = stringResource(if (active) R.string.server_remove_body_active else R.string.server_remove_body),
-        safe = ConfirmationChoice(stringResource(R.string.keep), R.drawable.ic_check, REMOVE_KEEP),
+        safe = ConfirmationChoice(stringResource(R.string.keep), AppR.drawable.ic_check, REMOVE_KEEP),
         action = ConfirmationChoice(
-            stringResource(R.string.server_remove), R.drawable.ic_delete_outlined, REMOVE_CONFIRM,
+            stringResource(R.string.server_remove), AppR.drawable.ic_delete_outlined, REMOVE_CONFIRM,
         ),
         onConfirm = onRemove,
         onDismiss = onKeep,

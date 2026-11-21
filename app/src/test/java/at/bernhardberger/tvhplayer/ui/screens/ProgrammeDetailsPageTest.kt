@@ -31,7 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import androidx.tv.material3.MaterialTheme
 import at.bernhardberger.tvheadend.sdk.core.*
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionObservation
 import at.bernhardberger.tvhplayer.core.*
@@ -940,7 +940,7 @@ class ProgrammeDetailsPageTest {
     @Test fun episodeHeaderUsesLocaleNumericPremiereInsteadOfCopyrightYear() {
         val resources = ApplicationProvider.getApplicationContext<Application>().resources
         val episode = EpgEpisode(null, null, 5, null, 10, null, null, null, null)
-        val facts = listOf(resources.getString(at.bernhardberger.tvhplayer.R.string.details_year) to "2005")
+        val facts = listOf(resources.getString(at.bernhardberger.tvhplayer.presentation.R.string.details_year) to "2005")
         val premiere = Instant.parse("2004-03-12T12:00:00Z")
         fun header(ep: EpgEpisode?, date: Instant?, values: List<Pair<String, String>> = facts,
             locale: Locale = Locale.US) =

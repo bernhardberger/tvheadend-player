@@ -57,7 +57,8 @@ directly. `:client` mirrors the app build types (`debug`, `release`, `profile`,
 
 ## What stays app-owned and why
 
-- Compose UI, screens, view models, notice formatting/presentation, theme and resources: UI.
+- Compose UI, screens, view models, notice formatting/presentation, theme and non-text resources: UI.
+  Shared player texts live in `:presentation`; the variant-specific launcher label stays in `:app`.
 - `di/AppModule` (Koin wiring) and `profiling/ProfileLayout` (Compose).
 - Key, focus, Back, navigation, appliance, accent, label, formatting and
   presentation policies: TV interaction and product UX.

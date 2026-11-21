@@ -4,7 +4,7 @@ import android.app.Application
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.view.View
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals

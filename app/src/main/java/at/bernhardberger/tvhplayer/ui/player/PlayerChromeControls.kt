@@ -53,7 +53,8 @@ import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvhplayer.core.programmeTimingDescribesPlayback
 import at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation
 import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.timeshiftSeekbarRange
 import at.bernhardberger.tvhplayer.playback.LivePauseAvailability
 
@@ -515,7 +516,7 @@ internal fun PlayerChromeControls(
 internal fun PlayerDownHint(text: String, modifier: Modifier = Modifier, up: Boolean = false, shadow: Shadow? = null) {
     val tint = MaterialTheme.colorScheme.onSurface.copy(alpha = TvTextTertiaryAlpha)
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        androidx.tv.material3.Icon(painterResource(R.drawable.ic_keyboard_arrow_right), contentDescription = null, tint = tint,
+        androidx.tv.material3.Icon(painterResource(AppR.drawable.ic_keyboard_arrow_right), contentDescription = null, tint = tint,
             modifier = Modifier.size(24.dp).rotate(if (up) -90f else 90f))
         Text(text, style = MaterialTheme.typography.labelLarge.copy(shadow = shadow), color = tint, maxLines = 1)
     }

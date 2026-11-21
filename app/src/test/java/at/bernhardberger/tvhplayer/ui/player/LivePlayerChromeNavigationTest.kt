@@ -213,7 +213,7 @@ class LivePlayerChromeNavigationTest : LivePlayerChromeFixture() {
         key(Key.DirectionCenter)
         // The Stats page opens on its selected Off row; Down moves to the Stream path row, which Center applies.
         key(Key.DirectionDown)
-        val streamPath = context.getString(at.bernhardberger.tvhplayer.R.string.stats_stream_path)
+        val streamPath = context.getString(at.bernhardberger.tvhplayer.presentation.R.string.stats_stream_path)
         compose.onNode(isFocused() and hasText(streamPath)).assertExists()
         key(Key.DirectionCenter)
         assertEquals(at.bernhardberger.tvhplayer.di.PlayerStatsLevel.STREAM_PATH, statsStore.level.value)

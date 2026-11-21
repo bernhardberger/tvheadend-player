@@ -13,7 +13,8 @@ import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Checkbox
 import at.bernhardberger.tvheadend.sdk.core.Channel
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.timerHourChoices
 import at.bernhardberger.tvhplayer.core.timerMinuteChoices
 import at.bernhardberger.tvhplayer.ui.common.formatClock
@@ -30,22 +31,22 @@ internal fun TimerRecordingChannelTime(state: TimerRecordingEditorState, channel
             "channel-${state.draft.channelId?.value ?: channels.firstOrNull()?.id?.value}") },
         editorRowModifier(state.navigation, "channel"),
         subtitleMaxLines = 2, subtitle = timerChannelLabel(state.draft, channels),
-        trailingIcon = R.drawable.ic_keyboard_arrow_right)
+        trailingIcon = AppR.drawable.ic_keyboard_arrow_right)
     GuidedStepAction(stringResource(R.string.timer_editor_repeat),
         { state.navigation.open(AutomaticRecordingEditorLevel.REPEAT, "done") },
         editorRowModifier(state.navigation, "repeat"), subtitleMaxLines = 2, subtitle = timerRepeatLabel(state),
-        trailingIcon = R.drawable.ic_keyboard_arrow_right)
+        trailingIcon = AppR.drawable.ic_keyboard_arrow_right)
     if (!state.draft.repeating) GuidedStepAction(stringResource(R.string.timer_editor_date),
         { state.navigation.open(AutomaticRecordingEditorLevel.DATE, "date-${state.draft.date}") },
         editorRowModifier(state.navigation, "date"),
         subtitleMaxLines = 2, subtitle = timerDateLabel(state, state.draft.date, relative = true),
-        trailingIcon = R.drawable.ic_keyboard_arrow_right)
+        trailingIcon = AppR.drawable.ic_keyboard_arrow_right)
     GuidedStepAction(stringResource(R.string.timer_editor_start), { state.openClock(false) },
         editorRowModifier(state.navigation, "start"), subtitleMaxLines = 2, subtitle = formatClock(state.draft.start),
-        trailingIcon = R.drawable.ic_keyboard_arrow_right)
+        trailingIcon = AppR.drawable.ic_keyboard_arrow_right)
     GuidedStepAction(stringResource(R.string.timer_editor_end), { state.openClock(true) },
         editorRowModifier(state.navigation, "end"), subtitleMaxLines = 2, subtitle = timerEndLabel(state),
-        trailingIcon = R.drawable.ic_keyboard_arrow_right)
+        trailingIcon = AppR.drawable.ic_keyboard_arrow_right)
 }
 
 @Composable

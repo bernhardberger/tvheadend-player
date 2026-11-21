@@ -138,7 +138,8 @@ import at.bernhardberger.tvheadend.sdk.core.DvrSnapshot
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.AppErrorAction
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.DvrLibraryMode
@@ -654,10 +655,18 @@ internal fun RecordingsScreenContent(
     LaunchedEffect(observedEntries, observedArchive, observedRecordingNow) {
         // Transfer locally before removing the actual focused node. Keeping only the
         // old key would recreate the node and leave the same focus vacancy.
-        if (removalHandoff && initialFocusEnabled &&
+        val pendingDestination = when (mode) {
+            DvrLibraryMode.ARCHIVE -> archiveNavigation.takeIf { archiveLevel == reconciledArchiveStack.active.levelId }
+            DvrLibraryMode.SCHEDULE -> scheduleNavigation
+            DvrLibraryMode.PROBLEMS -> null
+        }?.pendingPageDestination?.invoke()
+        val needsHeaderHandoff = removalHandoff && pendingDestination !in observedKeys
+        if (needsHeaderHandoff && initialFocusEnabled &&
             drawerState?.currentValue != androidx.tv.material3.DrawerValue.Open
         ) {
-            if (focusHeader()) {
+            // Park outside the depth strip: its options button deliberately blocks automatic
+            // row restoration while it owns focus.
+            if (modeFocus.requestFocus()) {
                 contentFocusOwned = false
                 requestContentFocus = observedKeys.isNotEmpty()
             }
@@ -835,12 +844,18 @@ internal fun RecordingsScreenContent(
             startPadding = startPadding,
             endPadding = endPadding,
             onFocused = {
+                // Actual tab focus ends paging even when a deleted origin already unseated the list.
+                when (mode) {
+                    DvrLibraryMode.ARCHIVE -> archiveNavigation.cancelPendingPage?.invoke()
+                    DvrLibraryMode.SCHEDULE -> scheduleNavigation.cancelPendingPage?.invoke()
+                    DvrLibraryMode.PROBLEMS -> Unit
+                }
                 modeMotion.select(it, DvrLibraryMode.entries)
                 if (mode != it) {
                     screenState.requestedScheduleEntryId.value = null
-                    contentFocusOwned = false
-                    requestContentFocus = false
                 }
+                contentFocusOwned = false
+                requestContentFocus = false
                 mode = it
             },
             onClick = {
@@ -929,13 +944,19 @@ internal fun RecordingsScreenContent(
                         overlays.detailsEntry == null && overlays.folderMenu == null && !overlays.optionsOpen &&
                         (contentFocusOwned || requestContentFocus),
                     backEnabled = backEnabled && overlays.detailsEntry == null && overlays.folderMenu == null &&
-                        !overlays.optionsOpen && contentFocusOwned,
+                        !overlays.optionsOpen && (contentFocusOwned || optionsHasFocus),
                     grouping = chosenGrouping,
                     sort = chosenView.sort,
                     fullRoot = if (owner.isCurrent) fullArchive else frame.fullArchive,
                     show = chosenView.show,
                     onFirstRowUp = {
                         if (owner.isCurrent && focusHeader()) contentFocusOwned = false
+                    },
+                    onRootBack = {
+                        if (owner.isCurrent && (modeFocus.requestFocus() || drawerFocus?.requestFocus() == true)) {
+                            contentFocusOwned = false
+                            requestContentFocus = false
+                        }
                     },
                     contentFocus = contentFocus,
                     onDrawerFocus = drawerFocus?.let { focus -> {
@@ -1656,7 +1677,11 @@ internal fun RecordingsScreenContent(
                         .background(TvSurfaceColors.containerLowest).testTag("browse-context-folder"),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(painterResource(R.drawable.ic_folder), contentDescription = null, modifier = Modifier.size(48.dp))
+                    Icon(
+                        painterResource(AppR.drawable.ic_folder),
+                        contentDescription = null,
+                        modifier = Modifier.size(48.dp),
+                    )
                 }
             },
         )
@@ -1674,9 +1699,9 @@ internal fun RecordingsScreenContent(
                     R.string.delete_folder_all_confirm_question else R.string.delete_folder_watched_confirm_question),
                 subject = ConfirmationSubject.Folder(delete.name, detail),
                 sentence = message,
-                safe = ConfirmationChoice(stringResource(R.string.keep), R.drawable.ic_check, "folder-delete-back"),
+                safe = ConfirmationChoice(stringResource(R.string.keep), AppR.drawable.ic_check, "folder-delete-back"),
                 action = ConfirmationChoice(stringResource(delete.action.label(watchChannel = false)),
-                    R.drawable.ic_delete_outlined, "folder-delete-confirm"),
+                    AppR.drawable.ic_delete_outlined, "folder-delete-confirm"),
                 onConfirm = {
                     closeFolderMenu()
                     runFolderAction(delete.action, session, delete.recordingIds)
@@ -1731,9 +1756,10 @@ internal fun RecordingsScreenContent(
                 if (fileless > 0) R.plurals.problems_clear_also_delete_partial
                 else R.plurals.problems_clear_delete_partial, partial, partial,
             ),
-            R.drawable.ic_delete_outlined, "problems-clear-partial",
+            AppR.drawable.ic_delete_outlined, "problems-clear-partial",
         )
-        val cancel = ConfirmationChoice(stringResource(R.string.cancel), R.drawable.ic_close, "problems-clear-cancel")
+        val cancel = ConfirmationChoice(stringResource(R.string.cancel),
+            AppR.drawable.ic_close, "problems-clear-cancel")
         ConfirmationDialog(
             question = stringResource(R.string.problems_clear_question),
             // The question names what is cleared; a subject box would only repeat the tab.
@@ -1742,8 +1768,8 @@ internal fun RecordingsScreenContent(
             // Clearing what has no file is the safe choice; without any, the safe choice keeps everything.
             safe = if (fileless > 0) ConfirmationChoice(
                 pluralStringResource(R.plurals.problems_clear_entries, fileless, fileless),
-                R.drawable.ic_cleaning_services, "problems-clear-fileless",
-            ) else ConfirmationChoice(stringResource(R.string.keep), R.drawable.ic_check, "problems-clear-keep"),
+                AppR.drawable.ic_cleaning_services, "problems-clear-fileless",
+            ) else ConfirmationChoice(stringResource(R.string.keep), AppR.drawable.ic_check, "problems-clear-keep"),
             action = if (partial > 0) deletePartial else cancel,
             cancel = cancel.takeIf { fileless > 0 && partial > 0 },
             onSafeConfirm = { if (fileless > 0) run(withPartial = false) else dismiss() },

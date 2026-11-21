@@ -215,7 +215,7 @@ class NavigationShellEvidenceTest {
     fun brandHeaderIsNotAFocusTargetAndEntryFocusesTheCurrentDestination() {
         settingsShell(1f)
         val appName = RuntimeEnvironment.getApplication().resources
-            .getString(at.bernhardberger.tvhplayer.R.string.app_name)
+            .getString(at.bernhardberger.tvhplayer.presentation.R.string.app_name)
 
         compose.onNodeWithTag("global-drawer-brand").assertExists()
         compose.onNodeWithTag("global-drawer-brand").assert(isNotFocusable())

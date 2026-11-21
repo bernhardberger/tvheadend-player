@@ -38,7 +38,8 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.TvTextColors
 import at.bernhardberger.tvhplayer.ui.components.CardPadding
@@ -140,13 +141,13 @@ internal fun RecordingEditorLeaveDialog(
                 style = MaterialTheme.typography.bodyLarge, color = TvTextColors.secondary)
             Spacer(Modifier.height(24.dp))
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                PlaybackChoiceButton(stringResource(R.string.autorec_editor_keep_editing), R.drawable.ic_edit,
+                PlaybackChoiceButton(stringResource(R.string.autorec_editor_keep_editing), AppR.drawable.ic_edit,
                     null, true, onBack, Modifier.testTag("${navigation.tagPrefix}-keep-editing")
                         .focusRequester(keep).focusProperties { up = FocusRequester.Cancel; down = main })
                 PlaybackChoiceButton(mainLabel, mainIcon, null, false, onSubmit,
                     Modifier.testTag("${navigation.tagPrefix}-leave-main").focusRequester(main)
                         .focusProperties { up = keep; down = discard })
-                PlaybackChoiceButton(stringResource(R.string.autorec_editor_discard), R.drawable.ic_close,
+                PlaybackChoiceButton(stringResource(R.string.autorec_editor_discard), AppR.drawable.ic_close,
                     null, false, onDiscard, Modifier.testTag("${navigation.tagPrefix}-discard")
                         .focusRequester(discard).focusProperties { up = main; down = FocusRequester.Cancel })
             }
