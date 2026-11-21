@@ -53,9 +53,13 @@ import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.time.Instant
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -559,6 +563,55 @@ class GuideScreenTest {
             } finally {
                 connection.close()
             }
+        }
+    }
+
+    @Test
+    fun anInFlightFirstGuideCanPublishWhileEpgUpdatesAreQueued() {
+        val connection = FakeConnection()
+        val noon = Instant.parse("2027-01-15T12:00:00Z")
+        val fixture = ServerGuide(noon)
+        val worker = StandardTestDispatcher()
+        val viewModel = GuideViewModel(connection.session, EmptyCoroutineContext, mappingDispatcher = worker)
+        val channels = connection.channels()
+        val context = compose.activity
+        val receiver = CoroutineScope(Dispatchers.Unconfined)
+        val shown = mutableListOf<String>()
+        try {
+            receiver.launch {
+                viewModel.mapped.collect {
+                    it?.state?.channels?.firstOrNull()?.programs?.firstOrNull()?.title?.let(shown::add)
+                }
+            }
+            compose.runOnIdle { connection.session.publish(fixture.connected()) }
+            val scope = channels.scope.value
+            fun input(title: String): GuideMappingInput {
+                connection.session.publish(fixture.connected(epg = fixture.refreshedEpg(title)))
+                return GuideMappingInput(
+                    scope, ConnectionUiState.Ready, false, connection.session.observation.value,
+                    GuideSelection(), GuideClock(noon.epochSeconds, ZoneOffset.UTC),
+                    Configuration(context.resources.configuration), true, null, null,
+                )
+            }
+            val first = input("First available guide")
+            val intermediate = input("Intermediate guide")
+            val latest = input("Latest guide")
+            assertEquals(listOf("epg"), intermediate.changesFrom(first))
+            assertEquals(listOf("epg"), latest.changesFrom(intermediate))
+            compose.runOnIdle { viewModel.map(context, first) }
+            compose.runOnIdle {
+                viewModel.map(context, intermediate)
+                viewModel.map(context, latest)
+            }
+            worker.scheduler.runCurrent()
+            compose.waitForIdle()
+            worker.scheduler.runCurrent()
+            compose.runOnIdle {
+                assertEquals(listOf("First available guide", "Latest guide"), shown)
+            }
+        } finally {
+            receiver.cancel()
+            connection.close()
         }
     }
 
