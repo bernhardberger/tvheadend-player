@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.ui.PartsLine
 import at.bernhardberger.tvhplayer.touch.ui.rememberStandalonePicture
+import at.bernhardberger.tvhplayer.touch.ui.scheduledIcon
 
 /**
  * The programs of one channel's day in start order, with a date heading where the night crosses
@@ -118,7 +119,7 @@ private fun DayRow(
         supportingContent = { PartsLine(program.rowLine()) },
         trailingContent = {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (program.scheduled) ScheduledIcon()
+                if (program.scheduled) ScheduledIcon(program.scheduledByRule)
                 rememberStandalonePicture(program.still, program.stillModel)?.let {
                     ProgramPicture(it, Modifier.size(if (wide) 96.dp else 72.dp, if (wide) 54.dp else 40.dp))
                 }
@@ -157,7 +158,7 @@ private fun OpenProgram(
                             OpenFacts(program, Modifier.padding(top = 4.dp))
                             ProgramActions(
                                 program.channelId, program.id, onNow, program.record, actions,
-                                Modifier.padding(top = 16.dp), onDetails,
+                                Modifier.padding(top = 16.dp), onDetails, program.scheduledByRule,
                             )
                         }
                     }
@@ -180,7 +181,7 @@ private fun OpenProgram(
                 if (!wide) {
                     ProgramActions(
                         program.channelId, program.id, onNow, program.record, actions, Modifier.padding(top = 16.dp),
-                        onDetails, compact = true,
+                        onDetails, program.scheduledByRule, compact = true,
                     )
                 }
             }
@@ -253,9 +254,9 @@ private fun OpenLine(program: GuideProgram, phone: Boolean, modifier: Modifier) 
 }
 
 @Composable
-internal fun ScheduledIcon() {
+internal fun ScheduledIcon(byRule: Boolean) {
     Icon(
-        painterResource(R.drawable.channels_schedule), stringResource(R.string.channels_scheduled),
+        painterResource(scheduledIcon(byRule)), stringResource(R.string.channels_scheduled),
         Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }

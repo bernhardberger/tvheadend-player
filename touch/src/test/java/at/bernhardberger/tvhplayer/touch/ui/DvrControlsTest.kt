@@ -10,6 +10,12 @@ import at.bernhardberger.tvhplayer.core.BrowseContextAction.RESUME
 import at.bernhardberger.tvhplayer.core.BrowseContextAction.SKIP
 import at.bernhardberger.tvhplayer.core.BrowseContextAction.STOP
 import at.bernhardberger.tvhplayer.core.BrowseContextAction.UNSKIP
+import at.bernhardberger.tvheadend.sdk.core.AutorecRuleId
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
+import at.bernhardberger.tvheadend.sdk.core.TimerecRuleId
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -34,4 +40,28 @@ class DvrControlsTest {
             emptyList<BrowseContextAction>() to null,
         ).forEach { (actions, control) -> assertEquals(actions.toString(), control, recordingRemoveControl(actions)) }
     }
+
+    @Test
+    fun onlyAnEnabledRuleScheduleShowsAsScheduledByRule() {
+        val series = AutorecRuleId("series")
+        val timer = TimerecRuleId("timer")
+        listOf(
+            entry(DvrEntryState.SCHEDULED, series) to true,
+            entry(DvrEntryState.SCHEDULED, timer = timer) to true,
+            entry(DvrEntryState.SCHEDULED) to false,
+            entry(DvrEntryState.SCHEDULED, series, enabled = false) to false,
+            entry(DvrEntryState.RECORDING, series) to false,
+            null to false,
+        ).forEach { (entry, byRule) -> assertEquals(entry.toString(), byRule, scheduledByRule(entry)) }
+    }
+
+    private fun entry(
+        state: DvrEntryState,
+        series: AutorecRuleId? = null,
+        timer: TimerecRuleId? = null,
+        enabled: Boolean? = null,
+    ) = DvrEntry.create(
+        DvrEntryId(1), channelId = ChannelId(1), state = state, autorecRuleId = series, timerecRuleId = timer,
+        enabled = enabled,
+    )
 }

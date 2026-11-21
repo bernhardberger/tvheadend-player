@@ -2,7 +2,14 @@ package at.bernhardberger.tvhplayer.touch.ui
 
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -12,8 +19,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
@@ -24,6 +35,8 @@ import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvhplayer.core.BrowseContextAction
+import at.bernhardberger.tvhplayer.core.isRuleRecording
+import at.bernhardberger.tvhplayer.core.linkedRecordingForEvent
 import at.bernhardberger.tvhplayer.core.programmeRecordingTarget
 import at.bernhardberger.tvhplayer.core.recordingContextActions
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
@@ -41,7 +54,40 @@ import kotlin.time.Instant
 /** The recording control a program offers; its icon and label are kept here so a swap is one line. */
 internal enum class ProgramRecordControl(@param:DrawableRes val icon: Int, @param:StringRes val label: Int) {
     Record(R.drawable.channels_record, R.string.channels_record),
-    Cancel(R.drawable.guide_event_busy, SharedR.string.cancel_recording),
+    Cancel(R.drawable.dvr_stop, SharedR.string.cancel_recording),
+}
+
+/**
+ * Whether [entry] is a schedule that an automatic recording or a repeating timer made and that still records:
+ * the TV's stacked-clocks mark (scheduled, from a rule, not skipped). Until Skip exists, such a program shows
+ * "Scheduled" in place of a control.
+ */
+internal fun scheduledByRule(entry: DvrEntry?): Boolean =
+    entry != null && entry.state == DvrEntryState.SCHEDULED && entry.isRuleRecording && entry.enabled != false
+
+/** [scheduledByRule] for the recording linked to [event], the one the shared `isScheduled` marks. */
+internal fun SessionObservation.scheduledByRule(event: EpgEvent): Boolean =
+    scheduledByRule(linkedRecordingForEvent(event))
+
+/** The stacked clocks of a rule's schedule, or the single clock of one made by hand. */
+@DrawableRes
+internal fun scheduledIcon(byRule: Boolean): Int =
+    if (byRule) R.drawable.dvr_schedule_rule else R.drawable.channels_schedule
+
+/** "Scheduled" with the stacked clocks, standing where Record would: a state, not a control. */
+@Composable
+internal fun RuleScheduledState(modifier: Modifier = Modifier) {
+    Row(modifier.heightIn(min = ButtonDefaults.MinHeight), verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            painterResource(scheduledIcon(byRule = true)), null, Modifier.size(ButtonDefaults.IconSize),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            stringResource(SharedR.string.recording_state_scheduled),
+            Modifier.padding(start = ButtonDefaults.IconSpacing),
+            style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
 }
 
 /** How a finished recording is removed: with its file, or only its entry when it never had one. */
@@ -60,7 +106,7 @@ internal enum class RecordingRemoveControl(
     RemoveEntry(
         R.drawable.connect_delete_outline, SharedR.string.remove_entry,
         SharedR.string.remove_entry_confirm_title, SharedR.string.remove_entry_confirm_body,
-        R.string.recordings_remove,
+        SharedR.string.remove_entry,
     ),
 }
 

@@ -209,7 +209,7 @@ private fun ColumnItem(
                         style = if (lead) type.bodyMedium else type.bodySmall, color = scheme.onSurfaceVariant,
                     )
                 }
-                if (program.scheduled) ScheduledIcon()
+                if (program.scheduled) ScheduledIcon(program.scheduledByRule)
             }
             program.progress?.takeIf { bare }?.let {
                 ProgramBar(
@@ -240,7 +240,7 @@ private fun OpenInColumn(program: GuideProgram, actions: GuideActions, phone: Bo
         // need the tighter padding for Details to share Record's line, and it wraps under Record where it cannot.
         ProgramActions(
             program.channelId, program.id, program.onNow, program.record, actions, Modifier.padding(top = 12.dp),
-            onDetails,
+            onDetails, program.scheduledByRule,
             detailsIcon = phone, compact = true,
         )
     }

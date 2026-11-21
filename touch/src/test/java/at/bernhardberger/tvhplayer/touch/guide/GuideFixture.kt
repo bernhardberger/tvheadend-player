@@ -180,6 +180,18 @@ internal fun GuideState.withRecordControls(records: Map<String, ProgramRecordCon
 )
 
 internal const val SNOWLINE_ID = "ridge-earth-10:00 PM-Snowline"
+internal const val TIDE_WATCH_ID = "ridge-earth-9:00 PM-Tide Watch"
+
+/** Programs [ids] are scheduled by an automatic recording: they show the state and offer no control. */
+internal fun GuideState.scheduledByRule(vararg ids: String): GuideState = copy(
+    channels = channels.map { channel ->
+        channel.copy(
+            programs = channel.programs.map {
+                if (it.id in ids) it.copy(scheduled = true, scheduledByRule = true, record = null) else it
+            },
+        )
+    },
+)
 
 /** The phone's overview: what is on now, one row per channel. */
 internal fun phoneOverviewFixture() = base(

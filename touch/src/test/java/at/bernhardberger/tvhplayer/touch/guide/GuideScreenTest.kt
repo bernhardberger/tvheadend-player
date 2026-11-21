@@ -80,7 +80,7 @@ class GuideScreenTest {
         show(
             overviewFixture().withRecordControls(
                 mapOf(SNOWLINE_ID to ProgramRecordControl.Cancel, COASTAL_MILES_ID to null),
-            ),
+            ).scheduledByRule(TIDE_WATCH_ID),
         ) {
             if (asking) {
                 DvrChangeDialog(
@@ -93,6 +93,12 @@ class GuideScreenTest {
         compose.onAllNodesWithText("Coastal Miles")[0].performClick()
         compose.onNodeWithText(COASTAL_MILES_SYNOPSIS_START, substring = true).assertIsDisplayed()
         listOf("Record", "Cancel recording").forEach { compose.onAllNodes(hasText(it)).assertCountEquals(0) }
+
+        // A program an automatic recording scheduled says so where Record would stand, and offers neither.
+        compose.onAllNodesWithText("Tide Watch")[0].performClick()
+        compose.onNodeWithText(compose.activity.getString(SharedR.string.recording_state_scheduled)).assertIsDisplayed()
+        listOf("Record", "Cancel recording").forEach { compose.onAllNodes(hasText(it)).assertCountEquals(0) }
+        capture("tablet-guide-scheduled-series", TouchCanvas.TABLET)
 
         compose.onNodeWithText("Snowline").performClick()
         compose.onAllNodes(hasText("Record")).assertCountEquals(0)

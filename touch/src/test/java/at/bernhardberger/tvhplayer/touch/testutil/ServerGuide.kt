@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.touch.testutil
 
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.AutorecRuleId
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
@@ -75,9 +76,10 @@ internal class ServerGuide(val now: Instant) {
     )
 
     /** The recording the server schedules for the program [event] on the first channel. */
-    fun scheduling(id: Long, event: Int) = recording(
+    /** A recording scheduled for program [event]; with [rule], one an automatic recording scheduled. */
+    fun scheduling(id: Long, event: Int, rule: AutorecRuleId? = null) = recording(
         id, programs[event - 1], first, snapshot.events.first { it.id == EventId(event.toLong()) }.start,
-        DvrEntryState.SCHEDULED, event = event.toLong(),
+        DvrEntryState.SCHEDULED, event = event.toLong(), rule = rule,
     )
 
     private fun recording(
@@ -90,10 +92,11 @@ internal class ServerGuide(val now: Instant) {
         playCount: Long = 0,
         event: Long? = null,
         image: ArtworkId? = null,
+        rule: AutorecRuleId? = null,
     ) = DvrEntry.create(
         id = DvrEntryId(id), channelId = channel.id, start = start, stop = start + 60.minutes, title = title,
         state = state, folder = folder?.let(::listOf), playCount = playCount, eventId = event?.let(::EventId),
-        image = image,
+        image = image, autorecRuleId = rule,
     )
 
     private companion object {

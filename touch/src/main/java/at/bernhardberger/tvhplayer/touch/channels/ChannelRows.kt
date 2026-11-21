@@ -68,6 +68,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.ui.ChannelLogoTile
+import at.bernhardberger.tvhplayer.touch.ui.scheduledIcon
 import at.bernhardberger.tvhplayer.ui.TvOnRecordingContainerColor
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 import at.bernhardberger.tvhplayer.ui.TvRecordingContainerColor
@@ -354,8 +355,9 @@ private fun NextProgram(program: ChannelProgram?, showMarks: Boolean, modifier: 
             )
             if (showMarks && program?.scheduled == true) {
                 Icon(
-                    painterResource(R.drawable.channels_schedule), stringResource(R.string.channels_scheduled),
-                    Modifier.size(16.dp), tint = MaterialTheme.colorScheme.outline,
+                    painterResource(scheduledIcon(program.scheduledByRule)),
+                    stringResource(R.string.channels_scheduled), Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.outline,
                 )
             }
         }
