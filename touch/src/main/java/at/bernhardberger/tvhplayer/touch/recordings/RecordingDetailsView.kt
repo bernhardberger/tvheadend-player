@@ -41,7 +41,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -49,11 +48,15 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.touch.R
+import at.bernhardberger.tvhplayer.touch.ui.DetailsBackButton
+import at.bernhardberger.tvhplayer.touch.ui.DetailsEpisode
+import at.bernhardberger.tvhplayer.touch.ui.DetailsFacts
+import at.bernhardberger.tvhplayer.touch.ui.DetailsPictureScrim
+import at.bernhardberger.tvhplayer.touch.ui.DetailsSynopsis
 
 /** The picked recording beside the tablet's list. */
 @Composable
@@ -72,7 +75,7 @@ internal fun RecordingPane(item: RecordingItem, actions: RecordingsActions) {
                     }
                 }
                 Title(item, Modifier.padding(top = 16.dp), MaterialTheme.typography.headlineSmall)
-                Episode(item)
+                DetailsEpisode(item.episode)
                 Facts(item)
             }
             Picture(item, Modifier.width(240.dp).clip(RoundedCornerShape(16.dp)))
@@ -83,7 +86,7 @@ internal fun RecordingPane(item: RecordingItem, actions: RecordingsActions) {
             Spacer(Modifier.weight(1f))
             ItemIcons(item, actions)
         }
-        Synopsis(item, Modifier.padding(top = 20.dp))
+        DetailsSynopsis(item.details.synopsis, Modifier.padding(top = 20.dp))
         Facts(item.details, columns = 1, keyWidth = 132.dp)
     }
 }
@@ -107,32 +110,24 @@ private fun UprightPage(item: RecordingItem, actions: RecordingsActions, onBack:
         Box(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
             Box(Modifier.fillMaxWidth().height(pictureHeight)) {
                 Picture(item, Modifier.fillMaxSize())
-                // A scrim keeps the bar and the text readable on any picture.
-                Box(
-                    Modifier.fillMaxSize().background(
-                        Brush.verticalGradient(
-                            0f to Color.Black.copy(alpha = 0.55f), 0.3f to Color.Transparent,
-                            0.5f to Color.Transparent, 1f to MaterialTheme.colorScheme.surface,
-                        ),
-                    ),
-                )
+                DetailsPictureScrim(Modifier.fillMaxSize())
             }
             // As drawn, the text starts over the lower quarter of the picture.
             Column(Modifier.padding(top = pictureHeight * TITLE_OVER_PICTURE).padding(horizontal = 24.dp)) {
                 Column(Modifier.widthIn(max = TEXT_WIDTH)) {
                     Title(item, Modifier, MaterialTheme.typography.displaySmall)
-                    Episode(item)
+                    DetailsEpisode(item.episode)
                     Facts(item)
                     Progress(item.state, Modifier.padding(top = 16.dp))
                     Row(Modifier.padding(top = 16.dp)) { PlayButtons(item, actions, equalWidth = false) }
-                    Synopsis(item, Modifier.padding(top = 20.dp))
+                    DetailsSynopsis(item.details.synopsis, Modifier.padding(top = 20.dp))
                 }
                 Facts(item.details, columns = 2, keyWidth = 132.dp)
                 Spacer(Modifier.height(24.dp))
             }
         }
         TopAppBar(
-            navigationIcon = { BackButton(onBack) },
+            navigationIcon = { DetailsBackButton(stringResource(R.string.recordings_back), onBack) },
             title = {
                 PageChannel(item, Modifier.size(64.dp, 36.dp), MaterialTheme.typography.titleLarge, withDate = true)
             },
@@ -147,7 +142,7 @@ private fun UprightPage(item: RecordingItem, actions: RecordingsActions, onBack:
 private fun PhonePage(item: RecordingItem, actions: RecordingsActions, onBack: () -> Unit) {
     Column(Modifier.fillMaxSize()) {
         TopAppBar(
-            navigationIcon = { BackButton(onBack) },
+            navigationIcon = { DetailsBackButton(stringResource(R.string.recordings_back), onBack) },
             title = {
                 PageChannel(item, Modifier.size(56.dp, 32.dp), MaterialTheme.typography.titleMedium, withDate = false)
             },
@@ -163,21 +158,14 @@ private fun PhonePage(item: RecordingItem, actions: RecordingsActions, onBack: (
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Title(item, Modifier.padding(top = 4.dp), MaterialTheme.typography.headlineMedium)
-            Episode(item)
+            DetailsEpisode(item.episode)
             Facts(item)
             Progress(item.state, Modifier.padding(top = 16.dp))
             Row(Modifier.padding(top = 16.dp)) { PlayButtons(item, actions, equalWidth = true) }
-            Synopsis(item, Modifier.padding(top = 20.dp))
+            DetailsSynopsis(item.details.synopsis, Modifier.padding(top = 20.dp))
             Facts(item.details, columns = 1, keyWidth = 116.dp)
             Spacer(Modifier.height(24.dp))
         }
-    }
-}
-
-@Composable
-private fun BackButton(onBack: () -> Unit) {
-    IconButton(onClick = onBack) {
-        Icon(painterResource(R.drawable.connect_back_outline), stringResource(R.string.recordings_back))
     }
 }
 
@@ -233,17 +221,6 @@ private fun Picture(item: RecordingItem, modifier: Modifier) {
 @Composable
 private fun Title(item: RecordingItem, modifier: Modifier, style: TextStyle) {
     Text(item.title, modifier.semantics { heading() }, style = style)
-}
-
-@Composable
-private fun Episode(item: RecordingItem) {
-    item.episode?.let {
-        Text(
-            it, Modifier.padding(top = 4.dp),
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Normal),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
 }
 
 @Composable
@@ -314,16 +291,6 @@ private fun ItemIcons(item: RecordingItem, actions: RecordingsActions) {
 }
 
 @Composable
-private fun Synopsis(item: RecordingItem, modifier: Modifier) {
-    item.details.synopsis?.let {
-        Text(
-            it, modifier, style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-@Composable
 private fun Facts(details: RecordingDetails, columns: Int, keyWidth: Dp) {
     val facts = listOfNotNull(
         details.genre?.let { R.string.recordings_genre to it },
@@ -334,33 +301,8 @@ private fun Facts(details: RecordingDetails, columns: Int, keyWidth: Dp) {
         details.subtitles?.let { R.string.recordings_subtitles to it },
         details.errors?.let { R.string.recordings_errors to it },
         details.retention?.let { R.string.recordings_retention to it },
-    )
-    if (facts.isEmpty()) return
-    Text(
-        stringResource(R.string.recordings_details),
-        Modifier.padding(top = 24.dp, bottom = 8.dp).semantics { heading() },
-        style = MaterialTheme.typography.titleMedium,
-    )
-    val rows = (facts.size + columns - 1) / columns
-    Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-        facts.chunked(rows).forEach { column ->
-            Column(Modifier.weight(1f)) {
-                column.forEach { (key, value) -> Fact(stringResource(key), value, keyWidth) }
-            }
-        }
-        repeat(columns - (facts.size + rows - 1) / rows) { Spacer(Modifier.weight(1f)) }
-    }
-}
-
-@Composable
-private fun Fact(key: String, value: String, keyWidth: Dp) {
-    Row(Modifier.heightIn(min = 28.dp).padding(vertical = 4.dp)) {
-        Text(
-            key, Modifier.width(keyWidth), style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.outline,
-        )
-        Text(value, style = MaterialTheme.typography.bodyMedium)
-    }
+    ).map { (key, value) -> stringResource(key) to value }
+    DetailsFacts(stringResource(R.string.recordings_details), facts, columns, keyWidth)
 }
 
 private const val PICTURE_RATIO = 16f / 9f
