@@ -1,9 +1,21 @@
 # Changelog
 
-## Unreleased
+## 0.5.3
+
+### Live TV
+
+- The live player's controls have a *Record* button after *Stop*. It records the program you're watching. While that program is scheduled or recording, the button is red and asks before canceling or stopping the recording. A recording that an automatic recording rule scheduled opens the program's details instead, where you can skip it.
+
+### Channels and Home
+
+- Program pictures carry their channel's logo in the picture's own corner, clear of titles drawn into the picture. A channel whose logo can't be loaded is named on its card, like a channel without a logo.
+- The Channels list starts on the same line as the Grid, and Channels and Recordings start closer to the buttons at the top. Once a list has scrolled, the focused row stays where Android TV keeps it, and rows above fade out instead of being cut off.
+- TalkBack no longer finds a loading indicator on the startup screen while the loader is hidden.
 
 ### Recordings
 
+- A recording that starts before its program offers *Skip to program start* while the padding plays. The offer counts down only while you can see it.
+- The skip button in a recording's controls has a skip icon and a see-through container.
 - The live player's info bar shows a red *REC* badge when the program you're watching is being recorded. Its *Next* line shows the red dot as soon as the recording of the next program has started (#47).
 - A recording mark on a program now means that this program is being recorded. Cards and progress bars in Channels, on Home and in the player's channel list no longer turn red because a recording of the program before or after is still running through its padding.
 - A timer that isn't tied to a program marks its channel, not a program, while it runs. Home's recent channels show *REC* on a channel that's recording.
