@@ -4,7 +4,7 @@
 
 ### Playback
 
-- On Android 12 and later, *Match content frame rate* offers On and Off. With On, Android's own *Match content frame rate* in its display settings decides whether the TV may go dark to switch, and Settings shows that choice next to it. With a *Display refresh rate* set, the TV keeps that rate during playback unless Android allows every switch. Android 9 to 11 keep Always, Only if seamless and Off.
+- On Android 12 and later, *Match content frame rate* offers Follow system (the default), Always, Only if seamless, and Off. Follow system follows the TV's choice and shows it when Android makes it available. Always switches to the video's frame rate even if the TV's own setting doesn't allow it, and the screen may briefly go dark. If you previously used Always without setting a display refresh rate, choose Follow system to keep the earlier behavior. Android 9 to 11 are unchanged.
 
 ## 0.5.3
 

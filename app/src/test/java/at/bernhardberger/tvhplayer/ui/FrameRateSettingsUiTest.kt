@@ -23,6 +23,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.junit4.createComposeRule
 import at.bernhardberger.tvhplayer.settings.FrameRateSwitching
+import at.bernhardberger.tvhplayer.settings.resolveFrameRateSwitching
 import at.bernhardberger.tvhplayer.ui.components.depth.rememberDepthNavigationState
 import at.bernhardberger.tvhplayer.ui.screens.SettingsScreenNavigation
 import at.bernhardberger.tvhplayer.ui.screens.settings.FRAME_RATE_LEVEL
@@ -61,11 +62,11 @@ class FrameRateSettingsUiTest {
 
     @Test
     @Config(sdk = [30, 31], shadows = [SeamlessDisplayPreference::class])
-    fun levelOpensOnTheStoredChoiceAndAPickStoresItAndReturns() {
+    fun levelOpensOnTheEffectiveChoiceAndAPickStoresItAndReturns() {
         val title = "Match content frame rate"
-        val androidCapsSwitching = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-        val storedChoice = if (androidCapsSwitching) "On" else "Only if seamless"
-        var ui by mutableStateOf(SettingsPlayerUiState(frameRateSwitching = FrameRateSwitching.SEAMLESS_ONLY))
+        val modern = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+        val choices = listOf("Always", "Only if seamless", "Off").let { if (modern) listOf("Follow system") + it else it }
+        var ui by mutableStateOf(SettingsPlayerUiState(frameRateSwitching = resolveFrameRateSwitching(null)))
         val picks = mutableListOf<FrameRateSwitching>()
         compose.setContent {
             TVHeadendPlayerTheme {
@@ -82,26 +83,37 @@ class FrameRateSettingsUiTest {
             }
         }
         val parentRow = isFocused() and hasText(title)
-        val systemSummary = hasText("Android", substring = true) and hasText("Only if seamless", substring = true)
-        compose.onNode(parentRow and if (androidCapsSwitching) systemSummary else hasText(storedChoice)).assertIsEnabled()
+        compose.onNode(parentRow).assertIsEnabled()
 
         compose.pressKey(Key.DirectionCenter)
         compose.onAllNodes(hasClickAction() and hasAnyAncestor(hasTestTag("depth-active")))
-            .assertCountEquals(if (androidCapsSwitching) 2 else 3)
-        compose.onNode(isFocused() and hasText(storedChoice)).assertIsSelected()
-        compose.onNode(hasText("Off")).assertIsNotSelected()
-        if (!androidCapsSwitching) compose.onNode(hasText("Always")).assertIsNotSelected()
+            .assertCountEquals(choices.size)
+        val firstChoice = isFocused() and hasText(choices.first())
+        compose.onNode(firstChoice).assertIsSelected()
+        if (modern) {
+            compose.onNode(firstChoice and hasText("Only if seamless", substring = true)).assertExists()
+        }
+        choices.drop(1).forEach { label ->
+            compose.pressKey(Key.DirectionDown)
+            compose.onNode(isFocused() and hasText(label)).assertIsNotSelected()
+        }
 
         // Back leaves without choosing.
         compose.pressKey(Key.Back)
-        compose.onNode(parentRow).assertExists()
+        compose.onNode(
+            parentRow and if (modern) {
+                hasText("Follow system", substring = true) and hasText("Only if seamless", substring = true)
+            } else {
+                hasText("Always")
+            },
+        ).assertExists()
         assertEquals(emptyList<FrameRateSwitching>(), picks)
 
         compose.pressKey(Key.DirectionCenter)
-        compose.pressKey(Key.DirectionDown)
+        repeat(choices.lastIndex) { compose.pressKey(Key.DirectionDown) }
         compose.pressKey(Key.DirectionCenter)
         assertEquals(listOf(FrameRateSwitching.OFF), picks)
-        compose.onNode(parentRow and hasText("Off", substring = androidCapsSwitching)).assertExists()
+        compose.onNode(parentRow and hasText("Off")).assertExists()
 
         compose.pressKey(Key.DirectionCenter)
         compose.onNode(isFocused() and hasText("Off")).assertIsSelected()

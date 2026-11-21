@@ -9,8 +9,8 @@ import at.bernhardberger.tvhplayer.playback.SurfaceFrameRateChange
 
 /**
  * The one writer of the window's preferred display mode. The app refresh rate from Settings is
- * the mode browse screens and stopped playback ask for. A legacy video mode replaces it; a
- * modern surface vote clears the window preference only if Android allows all switches. Main thread only.
+ * the mode browse screens and stopped playback ask for. An Always video mode replaces it;
+ * Follow system clears the window preference only if Android allows all switches. Main thread only.
  */
 internal class AppDisplayMode private constructor(private val window: Window) {
     var appRate: Float? = null
@@ -32,20 +32,23 @@ internal class AppDisplayMode private constructor(private val window: Window) {
     }
 
     private fun apply() {
-        if (appRate == null && (videoChange != SurfaceFrameRateChange.DISPLAY_MODE || videoRate == null)) {
+        val hasVideoWindowRequest = videoChange == SurfaceFrameRateChange.DISPLAY_MODE && videoRate != null
+        if (appRate == null && !hasVideoWindowRequest) {
             setDisplayModeId(0)
             return
         }
         val display = display ?: return
         val current = display.mode.toSpec()
-        val systemAllowsAnySwitch = videoChange == SurfaceFrameRateChange.ALWAYS && videoRate != null &&
+        val systemAllowsAnySwitch = videoChange == SurfaceFrameRateChange.FOLLOW_SYSTEM && videoRate != null &&
             readMatchFrameRatePreference(window.context.getSystemService(DisplayManager::class.java)) ==
             MatchFrameRatePreference.ALWAYS
         val selected = windowDisplayMode(
             videoChange, videoRate, appRate, current, display.supportedModes.map { it.toSpec() },
             systemAllowsAnySwitch,
         )
-        displayModeIdToRequest(selected, current, window.attributes.preferredDisplayModeId, pin = appRate != null)
+        // Keep an already-matching video mode when the Follow system surface vote is withdrawn.
+        val pin = appRate != null || (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && hasVideoWindowRequest)
+        displayModeIdToRequest(selected, current, window.attributes.preferredDisplayModeId, pin = pin)
             ?.let(::setDisplayModeId)
     }
 

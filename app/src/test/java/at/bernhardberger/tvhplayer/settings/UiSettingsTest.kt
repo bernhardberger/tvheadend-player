@@ -100,14 +100,4 @@ class UiSettingsTest {
         assertFalse(resolvePlaybackAutoStart(false))
         assertTrue(resolvePlaybackAutoStart(true))
     }
-
-    @Test
-    fun frameRateSwitching_isAlwaysByDefault() {
-        val settings = PlayerSettings(
-            audioLanguages = emptyList(),
-            subtitleLanguage = null,
-        )
-
-        assertEquals(FrameRateSwitching.ALWAYS, settings.frameRateSwitching)
-    }
 }

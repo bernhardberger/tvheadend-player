@@ -855,10 +855,12 @@
     <string name="frame_rate_switching_always">Her zaman</string>
     <string name="frame_rate_switching_seamless_only">Yalnızca kesintisiz</string>
     <string name="frame_rate_switching_off">Kapalı</string>
-    <string name="frame_rate_switching_on">Açık</string>
+    <string name="frame_rate_switching_follow_system">Sistemi izle</string>
     <string name="frame_rate_switching_never">Hiçbir zaman</string>
-    <string name="frame_rate_switching_system_summary">%1$s · Android: %2$s</string>
-    <string name="frame_rate_switching_on_help">Android ekran ayarlarındaki “%1$s” seçeneğini izler</string>
+    <string name="frame_rate_switching_follow_system_summary">%1$s · %2$s</string>
+    <string name="frame_rate_switching_follow_system_choice">Sistem: %1$s</string>
+    <string name="frame_rate_switching_follow_system_help">TV’nin kendi ayarını kullanır</string>
+    <string name="frame_rate_switching_force_help">TV ayarı izin vermese bile kare hızını değiştirir</string>
     <string name="frame_rate_switching_always_help">Ekran bir an kararsa bile TV ekranını videonun kare hızına geçirir</string>
     <string name="frame_rate_switching_seamless_help">Yalnızca TV ekranı kararmadan geçiş yapabiliyorsa değiştirir</string>
     <string name="frame_rate_switching_off_help">TV ekranının mevcut görüntü modunu korur</string>

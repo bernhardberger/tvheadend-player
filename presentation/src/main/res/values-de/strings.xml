@@ -832,10 +832,12 @@
     <string name="frame_rate_switching_always">Immer</string>
     <string name="frame_rate_switching_seamless_only">Nur wenn nahtlos</string>
     <string name="frame_rate_switching_off">Aus</string>
-    <string name="frame_rate_switching_on">Ein</string>
+    <string name="frame_rate_switching_follow_system">System folgen</string>
     <string name="frame_rate_switching_never">Nie</string>
-    <string name="frame_rate_switching_system_summary">%1$s · Android: %2$s</string>
-    <string name="frame_rate_switching_on_help">Folgt „%1$s“ in den Anzeigeeinstellungen von Android</string>
+    <string name="frame_rate_switching_follow_system_summary">%1$s · %2$s</string>
+    <string name="frame_rate_switching_follow_system_choice">System: %1$s</string>
+    <string name="frame_rate_switching_follow_system_help">Verwendet die Einstellung des Fernsehers</string>
+    <string name="frame_rate_switching_force_help">Schaltet auch um, wenn der Fernseher es nicht erlaubt</string>
     <string name="frame_rate_switching_always_help">Schaltet den Fernseher auf die Bildrate des Videos um, auch wenn das Bild dabei kurz schwarz wird</string>
     <string name="frame_rate_switching_seamless_help">Schaltet nur um, wenn der Fernseher das ohne schwarzes Bild kann</string>
     <string name="frame_rate_switching_off_help">Behält den aktuellen Anzeigemodus des Fernsehers bei</string>

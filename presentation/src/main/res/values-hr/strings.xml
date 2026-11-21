@@ -890,10 +890,12 @@
     <string name="frame_rate_switching_always">Uvijek</string>
     <string name="frame_rate_switching_seamless_only">Samo bez prekida</string>
     <string name="frame_rate_switching_off">Isključeno</string>
-    <string name="frame_rate_switching_on">Uključeno</string>
+    <string name="frame_rate_switching_follow_system">Prati sustav</string>
     <string name="frame_rate_switching_never">Nikad</string>
-    <string name="frame_rate_switching_system_summary">%1$s · Android: %2$s</string>
-    <string name="frame_rate_switching_on_help">Slijedi opciju „%1$s” u postavkama zaslona Androida</string>
+    <string name="frame_rate_switching_follow_system_summary">%1$s · %2$s</string>
+    <string name="frame_rate_switching_follow_system_choice">Sustav: %1$s</string>
+    <string name="frame_rate_switching_follow_system_help">Koristi postavku televizora</string>
+    <string name="frame_rate_switching_force_help">Prebacuje čak i ako to postavka televizora ne dopušta</string>
     <string name="frame_rate_switching_always_help">Prebacuje televizor na brzinu kadrova videozapisa, čak i ako se zaslon nakratko zacrni</string>
     <string name="frame_rate_switching_seamless_help">Prebacuje samo kada televizor to može bez zacrnjenja zaslona</string>
     <string name="frame_rate_switching_off_help">Zadržava trenutačni način prikaza televizora</string>

@@ -19,7 +19,7 @@ private const val SURFACE_RECREATION_GRACE_MILLIS = 2_000L
  * (Media3's change strategy is Off). Main thread only: [request] from composition, the holder
  * callbacks from the view. A recreated surface gets the request again; a destroyed one clears
  * its surface vote. Display-mode requests go to the window's [AppDisplayMode] instead and stay
- * through surface recreation during a mode switch. An installed Always surface vote can let
+ * through surface recreation during a mode switch. An installed Follow system surface vote can let
  * [AppDisplayMode] unpin the window. Browse retains non-seamless requests, comparing
  * against the app's baseline when supported, otherwise a latched clean observation, not a previously switched channel.
  * [release] clears both kinds of request, which returns the window to the app refresh rate, and
@@ -32,7 +32,7 @@ internal class VideoSurfaceFrameRate : SurfaceHolder.Callback {
     private var view: SurfaceView? = null
     private var displayMode: AppDisplayMode? = null
     private var target = SurfaceFrameRateRequest()
-    private var installedAlwaysRate: Float? = null
+    private var installedSystemRate: Float? = null
     private var restoreHandler: Handler? = null
     private val restoreAppRate = Runnable {
         restoreHandler = null
@@ -52,7 +52,7 @@ internal class VideoSurfaceFrameRate : SurfaceHolder.Callback {
         if (surfaceHolder.surface?.isValid == true) {
             cancelRestore()
             installVote(surfaceHolder, vote.surfaceCreated())
-            if (target.change == SurfaceFrameRateChange.ALWAYS) applyDisplayMode()
+            if (target.change == SurfaceFrameRateChange.FOLLOW_SYSTEM) applyDisplayMode()
         }
     }
 
@@ -79,12 +79,12 @@ internal class VideoSurfaceFrameRate : SurfaceHolder.Callback {
     }
 
     private fun applyTarget() {
-        val modern = target.change == SurfaceFrameRateChange.ALWAYS
-        if (!modern) applyDisplayMode()
+        val followsSystem = target.change == SurfaceFrameRateChange.FOLLOW_SYSTEM
+        if (!followsSystem) applyDisplayMode()
         val surfaceRequest = if (target.change == SurfaceFrameRateChange.DISPLAY_MODE) SurfaceFrameRateRequest() else target
         val pending = vote.request(surfaceRequest)
         holder?.let { installVote(it, pending) }
-        if (modern && restoreHandler == null) applyDisplayMode()
+        if (followsSystem && restoreHandler == null) applyDisplayMode()
     }
 
     fun release() {
@@ -93,7 +93,7 @@ internal class VideoSurfaceFrameRate : SurfaceHolder.Callback {
         displayMode = null
         view = null
         target = SurfaceFrameRateRequest()
-        installedAlwaysRate = null
+        installedSystemRate = null
         baseMode = null
         lastRequestedRate = null
         val pending = vote.release()
@@ -105,17 +105,17 @@ internal class VideoSurfaceFrameRate : SurfaceHolder.Callback {
 
     override fun surfaceCreated(holder: SurfaceHolder) {
         cancelRestore()
-        val modern = target.change == SurfaceFrameRateChange.ALWAYS
-        if (!modern) applyDisplayMode()
+        val followsSystem = target.change == SurfaceFrameRateChange.FOLLOW_SYSTEM
+        if (!followsSystem) applyDisplayMode()
         installVote(holder, vote.surfaceCreated())
-        if (modern) applyDisplayMode()
+        if (followsSystem) applyDisplayMode()
     }
 
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) = Unit
 
     override fun surfaceDestroyed(holder: SurfaceHolder) {
-        val hadInstalledVote = installedAlwaysRate != null
-        installedAlwaysRate = null
+        val hadInstalledVote = installedSystemRate != null
+        installedSystemRate = null
         if (hadInstalledVote) {
             val handler = view?.handler
             if (handler != null && handler.postDelayed(restoreAppRate, SURFACE_RECREATION_GRACE_MILLIS)) {
@@ -133,17 +133,19 @@ internal class VideoSurfaceFrameRate : SurfaceHolder.Callback {
     }
 
     private fun applyDisplayMode() {
-        val rate = if (target.change == SurfaceFrameRateChange.ALWAYS) installedAlwaysRate else target.rate
+        val rate = if (target.change == SurfaceFrameRateChange.FOLLOW_SYSTEM) installedSystemRate else target.rate
         displayMode?.setVideoRequest(target.change, rate)
     }
 
     private fun installVote(holder: SurfaceHolder, request: SurfaceFrameRateRequest?) {
         if (request == null) {
-            if (holder.surface?.isValid != true) installedAlwaysRate = null
+            if (holder.surface?.isValid != true) installedSystemRate = null
             return
         }
         val installed = apply(holder, request)
-        installedAlwaysRate = request.rate.takeIf { installed && request.change == SurfaceFrameRateChange.ALWAYS }
+        installedSystemRate = request.rate.takeIf {
+            installed && request.change == SurfaceFrameRateChange.FOLLOW_SYSTEM
+        }
         if (!modernVotes) return
         val clear = SurfaceFrameRateRequest()
         val applied = when {
@@ -162,11 +164,19 @@ internal class VideoSurfaceFrameRate : SurfaceHolder.Callback {
         return surface != null && try {
             when {
                 rate == null -> surface.setFrameRate(0f, Surface.FRAME_RATE_COMPATIBILITY_DEFAULT)
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && request.change == SurfaceFrameRateChange.ALWAYS ->
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                    request.change == SurfaceFrameRateChange.FOLLOW_SYSTEM ->
                     surface.setFrameRate(
                         rate,
                         Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE,
                         Surface.CHANGE_FRAME_RATE_ALWAYS,
+                    )
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                    request.change == SurfaceFrameRateChange.ONLY_IF_SEAMLESS ->
+                    surface.setFrameRate(
+                        rate,
+                        Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE,
+                        Surface.CHANGE_FRAME_RATE_ONLY_IF_SEAMLESS,
                     )
                 else -> surface.setFrameRate(rate, Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE)
             }

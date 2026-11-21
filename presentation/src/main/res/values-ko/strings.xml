@@ -820,10 +820,12 @@
     <string name="frame_rate_switching_always">항상</string>
     <string name="frame_rate_switching_seamless_only">끊김 없이 가능한 경우만</string>
     <string name="frame_rate_switching_off">꺼짐</string>
-    <string name="frame_rate_switching_on">켜짐</string>
+    <string name="frame_rate_switching_follow_system">시스템 설정 따르기</string>
     <string name="frame_rate_switching_never">전환 안 함</string>
-    <string name="frame_rate_switching_system_summary">%1$s · Android: %2$s</string>
-    <string name="frame_rate_switching_on_help">Android 디스플레이 설정의 ‘%1$s’ 옵션을 따릅니다</string>
+    <string name="frame_rate_switching_follow_system_summary">%1$s · %2$s</string>
+    <string name="frame_rate_switching_follow_system_choice">시스템: %1$s</string>
+    <string name="frame_rate_switching_follow_system_help">TV 자체 설정을 사용합니다</string>
+    <string name="frame_rate_switching_force_help">TV 설정에서 허용하지 않아도 전환합니다</string>
     <string name="frame_rate_switching_always_help">화면이 잠시 어두워지더라도 TV를 동영상의 프레임 속도에 맞춰 전환합니다</string>
     <string name="frame_rate_switching_seamless_help">화면이 어두워지지 않고 전환할 수 있을 때만 전환합니다</string>
     <string name="frame_rate_switching_off_help">TV의 현재 디스플레이 모드를 유지합니다</string>

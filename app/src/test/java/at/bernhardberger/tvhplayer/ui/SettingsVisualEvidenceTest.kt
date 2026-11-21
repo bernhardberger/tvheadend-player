@@ -296,7 +296,7 @@ class SettingsVisualEvidenceTest {
         compose.onNode(isFocused() and hasText("Match content frame rate")).assertExists()
         capture("en-font1.0-playback-frame-rate-summary")
         compose.pressKey(Key.DirectionCenter)
-        compose.onNode(isFocused() and hasText("On")).assertIsSelected()
+        compose.onNode(isFocused() and hasText("Follow system")).assertIsSelected()
         capture("en-font1.0-frame-rate")
         compose.pressKey(Key.Back)
         compose.pressKey(Key.Back)

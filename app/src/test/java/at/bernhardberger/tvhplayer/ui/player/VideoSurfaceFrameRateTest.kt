@@ -11,6 +11,7 @@ import android.view.SurfaceView
 import at.bernhardberger.tvhplayer.playback.SurfaceFrameRateChange
 import at.bernhardberger.tvhplayer.playback.SurfaceFrameRateRequest
 import java.time.Duration
+import java.util.function.Consumer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -18,6 +19,7 @@ import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
+import org.robolectric.android.internal.DisplayConfig
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.Implementation
 import org.robolectric.annotation.Implements
@@ -35,7 +37,43 @@ import org.robolectric.util.ReflectionHelpers.ClassParameter.from
     shadows = [VideoSurfaceFrameRateTest.VotingSurface::class, VideoSurfaceFrameRateTest.DisplayPreference::class],
 )
 class VideoSurfaceFrameRateTest {
-    private val film = SurfaceFrameRateRequest(24f, SurfaceFrameRateChange.ALWAYS)
+    private val film = SurfaceFrameRateRequest(24f, SurfaceFrameRateChange.FOLLOW_SYSTEM)
+
+    @Test
+    fun aWindowModeRequestPinsTheVideoModeEvenWhenAndroidNeverSwitches() = withPlayer { player ->
+        val (frameRate, holder, preference, appModeId, pinnedMode, filmModeId) = player
+        preference.value = DisplayManager.MATCH_CONTENT_FRAMERATE_NEVER
+        holder.create()
+        frameRate.request(SurfaceFrameRateRequest(24f, SurfaceFrameRateChange.DISPLAY_MODE), playerShown = true)
+        assertEquals(filmModeId, pinnedMode())
+        assertNull(holder.platform.rate)
+        holder.destroy()
+        assertEquals(filmModeId, pinnedMode())
+
+        frameRate.request(SurfaceFrameRateRequest(), playerShown = true)
+        assertEquals(appModeId, pinnedMode())
+        player.appMode.useAppRate(null)
+        val display = requireNotNull(player.appMode.display)
+        preference.value = DisplayManager.MATCH_CONTENT_FRAMERATE_ALWAYS
+        frameRate.request(film, playerShown = true)
+        holder.create()
+        assertEquals(film.rate, holder.platform.rate)
+        ReflectionHelpers.callStaticMethod<Unit>(
+            ShadowDisplayManager::class.java,
+            "changeDisplay",
+            from(Int::class.javaPrimitiveType, display.displayId),
+            from(Consumer::class.java, Consumer<DisplayConfig> { it.modeId = filmModeId }),
+        )
+        assertEquals(filmModeId, display.mode.modeId)
+        assertEquals(0, pinnedMode())
+        holder.platform.onVote = { assertEquals(filmModeId, pinnedMode()) }
+        frameRate.request(film.copy(change = SurfaceFrameRateChange.DISPLAY_MODE), playerShown = true)
+        holder.platform.onVote = {}
+        assertEquals(filmModeId, pinnedMode())
+        assertEquals(0f, holder.platform.rate)
+        frameRate.release()
+        assertEquals(0, pinnedMode())
+    }
 
     @Test
     fun onlyAnInstalledVoteWithAndroidAlwaysCanUnpinTheAppRate() = withPlayer { player ->
@@ -50,6 +88,11 @@ class VideoSurfaceFrameRateTest {
         platform.onVote = {}
         assertEquals(24f, platform.rate)
         assertEquals(Surface.CHANGE_FRAME_RATE_ALWAYS, platform.strategy)
+        assertEquals(appModeId, pinnedMode())
+
+        preference.value = DisplayManager.MATCH_CONTENT_FRAMERATE_ALWAYS
+        frameRate.request(film.copy(change = SurfaceFrameRateChange.ONLY_IF_SEAMLESS), playerShown = true)
+        assertEquals(Surface.CHANGE_FRAME_RATE_ONLY_IF_SEAMLESS, platform.strategy)
         assertEquals(appModeId, pinnedMode())
 
         preference.value = DisplayManager.MATCH_CONTENT_FRAMERATE_SEAMLESSS_ONLY
@@ -152,14 +195,15 @@ class VideoSurfaceFrameRateTest {
             val display = requireNotNull(appMode.display)
             val base = display.mode
             val appModeId = base.modeId + 1
-            val fifty = ReflectionHelpers.callConstructor(
+            val filmModeId = appModeId + 1
+            fun mode(id: Int, rate: Float): Display.Mode = ReflectionHelpers.callConstructor(
                 Display.Mode::class.java,
-                from(Int::class.javaPrimitiveType, appModeId),
+                from(Int::class.javaPrimitiveType, id),
                 from(Int::class.javaPrimitiveType, base.physicalWidth),
                 from(Int::class.javaPrimitiveType, base.physicalHeight),
-                from(Float::class.javaPrimitiveType, 50f),
+                from(Float::class.javaPrimitiveType, rate),
             )
-            ShadowDisplayManager.setSupportedModes(display.displayId, base, fifty)
+            ShadowDisplayManager.setSupportedModes(display.displayId, base, mode(appModeId, 50f), mode(filmModeId, 24f))
             appMode.useAppRate(50f)
             val preference = Shadow.extract<DisplayPreference>(activity.getSystemService(DisplayManager::class.java))
             fun pinnedMode() = window.attributes.preferredDisplayModeId
@@ -171,7 +215,7 @@ class VideoSurfaceFrameRateTest {
             val frameRate = VideoSurfaceFrameRate()
             frameRate.attach(view)
             try {
-                checks(TestPlayer(frameRate, holder, preference, appModeId, ::pinnedMode))
+                checks(TestPlayer(frameRate, holder, preference, appModeId, ::pinnedMode, filmModeId, appMode))
             } finally {
                 frameRate.release()
             }
@@ -184,6 +228,8 @@ class VideoSurfaceFrameRateTest {
         val preference: DisplayPreference,
         val appModeId: Int,
         val pinnedMode: () -> Int,
+        val filmModeId: Int,
+        val appMode: AppDisplayMode,
     )
 
     private class TestHolder : ShadowSurfaceView.FakeSurfaceHolder() {

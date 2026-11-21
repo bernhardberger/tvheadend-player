@@ -14,6 +14,7 @@ import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.settings.AudioFormatPreference
 import at.bernhardberger.tvhplayer.settings.FrameRateSwitching
+import at.bernhardberger.tvhplayer.settings.resolveFrameRateSwitching
 import at.bernhardberger.tvhplayer.settings.WarmPlaybackMode
 import at.bernhardberger.tvhplayer.settings.AdBreakMode
 import at.bernhardberger.tvhplayer.settings.SkipLanding
@@ -34,7 +35,7 @@ data class SettingsPlayerUiState(
     val profiles: StreamProfilesResult = StreamProfilesResult.Failed(TvheadendFailure.NOT_READY),
     val selectedProfileId: StreamProfileId? = null,
     val timeshiftEnabled: Boolean = true,
-    val frameRateSwitching: FrameRateSwitching = FrameRateSwitching.ALWAYS,
+    val frameRateSwitching: FrameRateSwitching = resolveFrameRateSwitching(null),
     val tunnelingEnabled: Boolean = false,
     val tunnelingFallbackActive: Boolean = false,
     val audioPassthroughEnabled: Boolean = true,

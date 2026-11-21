@@ -890,10 +890,12 @@
     <string name="frame_rate_switching_always">Sempre</string>
     <string name="frame_rate_switching_seamless_only">Solo senza interruzioni</string>
     <string name="frame_rate_switching_off">Disattivo</string>
-    <string name="frame_rate_switching_on">Attivo</string>
+    <string name="frame_rate_switching_follow_system">Segui il sistema</string>
     <string name="frame_rate_switching_never">Mai</string>
-    <string name="frame_rate_switching_system_summary">%1$s · Android: %2$s</string>
-    <string name="frame_rate_switching_on_help">Segue l’opzione «%1$s» nelle impostazioni dello schermo di Android</string>
+    <string name="frame_rate_switching_follow_system_summary">%1$s · %2$s</string>
+    <string name="frame_rate_switching_follow_system_choice">Sistema: %1$s</string>
+    <string name="frame_rate_switching_follow_system_help">Usa l’impostazione del televisore</string>
+    <string name="frame_rate_switching_force_help">Cambia frequenza anche se il televisore non lo consente</string>
     <string name="frame_rate_switching_always_help">Adatta il televisore alla frequenza dei fotogrammi del video, anche se lo schermo diventa nero per un istante</string>
     <string name="frame_rate_switching_seamless_help">Cambia solo se il televisore può farlo senza che lo schermo diventi nero</string>
     <string name="frame_rate_switching_off_help">Mantiene la modalità di visualizzazione attuale del televisore</string>

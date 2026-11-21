@@ -144,37 +144,45 @@ internal fun settingsFrameRateLevel(navigation: DepthNavigationState, vm: Settin
 @Composable
 internal fun settingsFrameRateLevel(switching: FrameRateSwitching, onSelect: (FrameRateSwitching) -> Unit): DepthLevel {
     val sdkInt = Build.VERSION.SDK_INT
-    val systemCapped = FrameRateSwitching.usesSystemPreference(sdkInt)
-    val choice = switching.choiceFor(sdkInt)
+    val supportsFollowSystem = FrameRateSwitching.supportsFollowSystem(sdkInt)
     val title = stringResource(R.string.refresh_rate_matching_setting)
     return settingsLevel(FRAME_RATE_LEVEL, title, FrameRateSwitching.choices(sdkInt).map { value ->
         val help = when (value) {
-            FrameRateSwitching.ALWAYS -> if (systemCapped) stringResource(R.string.frame_rate_switching_on_help, title)
-                else stringResource(R.string.frame_rate_switching_always_help)
+            FrameRateSwitching.FOLLOW_SYSTEM -> rememberFrameRateSystemChoice()?.let {
+                stringResource(R.string.frame_rate_switching_follow_system_choice, it)
+            } ?: stringResource(R.string.frame_rate_switching_follow_system_help)
+            FrameRateSwitching.ALWAYS -> stringResource(
+                if (supportsFollowSystem) R.string.frame_rate_switching_force_help
+                else R.string.frame_rate_switching_always_help,
+            )
             FrameRateSwitching.SEAMLESS_ONLY -> stringResource(R.string.frame_rate_switching_seamless_help)
             FrameRateSwitching.OFF -> stringResource(R.string.frame_rate_switching_off_help)
         }
-        settingsRow(value.name, frameRateSwitchingLabel(value, systemCapped), supporting = help,
-            selected = choice == value, onClick = { onSelect(value) })
-    }, initialItemId = choice.name)
+        settingsRow(value.name, frameRateSwitchingLabel(value), supporting = help,
+            selected = switching == value, onClick = { onSelect(value) })
+    }, initialItemId = switching.name)
 }
 
 @Composable
-private fun frameRateSwitchingLabel(switching: FrameRateSwitching, systemCapped: Boolean): String =
+private fun frameRateSwitchingLabel(switching: FrameRateSwitching): String =
     stringResource(when (switching) {
-        FrameRateSwitching.ALWAYS ->
-            if (systemCapped) R.string.frame_rate_switching_on else R.string.frame_rate_switching_always
+        FrameRateSwitching.FOLLOW_SYSTEM -> R.string.frame_rate_switching_follow_system
+        FrameRateSwitching.ALWAYS -> R.string.frame_rate_switching_always
         FrameRateSwitching.SEAMLESS_ONLY -> R.string.frame_rate_switching_seamless_only
         FrameRateSwitching.OFF -> R.string.frame_rate_switching_off
     })
 
 @Composable
 private fun frameRateSwitchingSummary(switching: FrameRateSwitching): String {
-    val sdkInt = Build.VERSION.SDK_INT
-    val systemCapped = FrameRateSwitching.usesSystemPreference(sdkInt)
-    val label = frameRateSwitchingLabel(switching.choiceFor(sdkInt), systemCapped)
-    if (!systemCapped) return label
+    val label = frameRateSwitchingLabel(switching)
+    if (switching != FrameRateSwitching.FOLLOW_SYSTEM) return label
+    val choice = rememberFrameRateSystemChoice()
+    return if (choice == null) label
+    else stringResource(R.string.frame_rate_switching_follow_system_summary, label, choice)
+}
 
+@Composable
+private fun rememberFrameRateSystemChoice(): String? {
     val context = LocalContext.current
     val manager = remember(context) { context.getSystemService(DisplayManager::class.java) }
     var preference by remember(manager) { mutableStateOf(readMatchFrameRatePreference(manager)) }
@@ -186,10 +194,9 @@ private fun frameRateSwitchingSummary(switching: FrameRateSwitching): String {
         MatchFrameRatePreference.NEVER -> R.string.frame_rate_switching_never
         MatchFrameRatePreference.SEAMLESS_ONLY -> R.string.frame_rate_switching_seamless_only
         MatchFrameRatePreference.ALWAYS -> R.string.frame_rate_switching_always
-        null -> null
+        null -> return null
     }
-    return if (choice == null) label
-    else stringResource(R.string.frame_rate_switching_system_summary, label, stringResource(choice))
+    return stringResource(choice)
 }
 
 internal const val STARTUP_BUFFER_LEVEL = "startup-buffer"

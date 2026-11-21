@@ -33,8 +33,8 @@ fun keepVideoFrameRateInBrowse(change: SurfaceFrameRateChange, rate: Float?, bas
     if (rate == null || !rate.isFinite() || rate <= 0f) return false
     return when (change) {
         SurfaceFrameRateChange.DISPLAY_MODE -> true
-        SurfaceFrameRateChange.SEAMLESS_DEFAULT -> false
-        SurfaceFrameRateChange.ALWAYS -> base == null ||
+        SurfaceFrameRateChange.SEAMLESS_DEFAULT, SurfaceFrameRateChange.ONLY_IF_SEAMLESS -> false
+        SurfaceFrameRateChange.FOLLOW_SYSTEM -> base == null ||
             (!matchesVideoRate(base.refreshRate, rate) && base.alternativeRefreshRates.none { matchesVideoRate(it, rate) })
     }
 }
@@ -67,7 +67,7 @@ fun displayRefreshRateChoices(current: DisplayModeSpec, supported: List<DisplayM
         .map { it.refreshRate }.filter { it.isFinite() && it > 0f }.sorted()
         .fold(emptyList()) { rates, rate -> if (rates.any { matchesVideoRate(it, rate) }) rates else rates + rate }
 
-/** Release the app's pin for an installed modern vote only if Android allows non-seamless switches. */
+/** Release the app's pin for an installed Follow system vote only if Android allows non-seamless switches. */
 fun windowDisplayMode(
     videoChange: SurfaceFrameRateChange?,
     videoRate: Float?,
@@ -76,7 +76,7 @@ fun windowDisplayMode(
     supported: List<DisplayModeSpec>,
     systemAllowsAnySwitch: Boolean,
 ): DisplayModeSpec? {
-    if (videoChange == SurfaceFrameRateChange.ALWAYS && videoRate != null && systemAllowsAnySwitch) return null
+    if (videoChange == SurfaceFrameRateChange.FOLLOW_SYSTEM && videoRate != null && systemAllowsAnySwitch) return null
     val requested = videoRate?.takeIf { videoChange == SurfaceFrameRateChange.DISPLAY_MODE }
     return requested?.let { videoDisplayMode(it, current, supported) }
         ?: appRate?.let { videoDisplayMode(it, current, supported) }

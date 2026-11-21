@@ -820,10 +820,12 @@
     <string name="frame_rate_switching_always">常に</string>
     <string name="frame_rate_switching_seamless_only">シームレスな場合のみ</string>
     <string name="frame_rate_switching_off">オフ</string>
-    <string name="frame_rate_switching_on">オン</string>
+    <string name="frame_rate_switching_follow_system">システムに従う</string>
     <string name="frame_rate_switching_never">切り替えない</string>
-    <string name="frame_rate_switching_system_summary">%1$s · Android：%2$s</string>
-    <string name="frame_rate_switching_on_help">Android のディスプレイ設定「%1$s」に従います</string>
+    <string name="frame_rate_switching_follow_system_summary">%1$s · %2$s</string>
+    <string name="frame_rate_switching_follow_system_choice">システム：%1$s</string>
+    <string name="frame_rate_switching_follow_system_help">テレビ本体の設定を使います</string>
+    <string name="frame_rate_switching_force_help">テレビの設定で許可されていなくても切り替えます</string>
     <string name="frame_rate_switching_always_help">画面が一瞬暗くなる場合でも、テレビを動画のフレームレートに切り替えます</string>
     <string name="frame_rate_switching_seamless_help">画面が暗くならずに切り替えられる場合のみ切り替えます</string>
     <string name="frame_rate_switching_off_help">テレビの現在の表示モードを維持します</string>

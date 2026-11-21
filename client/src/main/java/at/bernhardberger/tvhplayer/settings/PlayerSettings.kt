@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.settings
 
 import android.content.Context
+import android.os.Build
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -25,29 +26,27 @@ enum class SkipLanding(val beforeEndMs: Long) { END(0), TWO_SECONDS_BEFORE(2_000
 /** Presentation while browsing; AUDIO_ONLY keeps the same player and video decoding. */
 enum class WarmPlaybackMode { ON, AUDIO_ONLY, OFF }
 
-/** Whether the TV switches to the video's frame rate. Android 12+ sets the switching limit. */
+/** How the TV switches to the video's frame rate. */
 enum class FrameRateSwitching {
-    ALWAYS, SEAMLESS_ONLY, OFF;
-
-    /** Both enabled values mean On where Android sets the limit. The stored value is unchanged. */
-    fun choiceFor(sdkInt: Int): FrameRateSwitching =
-        if (usesSystemPreference(sdkInt) && this == SEAMLESS_ONLY) ALWAYS else this
+    FOLLOW_SYSTEM, ALWAYS, SEAMLESS_ONLY, OFF;
 
     companion object {
         private const val ANDROID_S = 31
-        private val systemCappedChoices = listOf(ALWAYS, OFF)
+        private val legacyChoices = listOf(ALWAYS, SEAMLESS_ONLY, OFF)
 
-        fun usesSystemPreference(sdkInt: Int): Boolean = sdkInt >= ANDROID_S
+        fun supportsFollowSystem(sdkInt: Int): Boolean = sdkInt >= ANDROID_S
 
         fun choices(sdkInt: Int): List<FrameRateSwitching> =
-            if (usesSystemPreference(sdkInt)) systemCappedChoices else entries
+            if (supportsFollowSystem(sdkInt)) entries else legacyChoices
     }
 }
 
 val keepChannelMinuteChoices = listOf(0, 10, 20, 30, 60)
 
-fun resolveFrameRateSwitching(storedValue: String?): FrameRateSwitching =
-    FrameRateSwitching.entries.firstOrNull { it.name == storedValue } ?: FrameRateSwitching.ALWAYS
+fun resolveFrameRateSwitching(storedValue: String?, sdkInt: Int = Build.VERSION.SDK_INT): FrameRateSwitching =
+    FrameRateSwitching.choices(sdkInt).let { choices ->
+        choices.firstOrNull { it.name == storedValue } ?: choices.first()
+    }
 
 /** Store language identities, not localized display names or duplicate preference slots. */
 fun normalizeAudioLanguages(languages: List<String>): List<String> = languages
@@ -103,7 +102,7 @@ data class PlayerSettings(
     val audioFormat: AudioFormatPreference = AudioFormatPreference.AUTOMATIC,
     val audioDescription: Boolean = false,
     val timeshiftEnabled: Boolean = true,
-    val frameRateSwitching: FrameRateSwitching = FrameRateSwitching.ALWAYS,
+    val frameRateSwitching: FrameRateSwitching = resolveFrameRateSwitching(null),
     /** Experimental: asks Media3 for tunnelled video when both selected renderers support it. */
     val tunnelingEnabled: Boolean = false,
     val audioPassthroughEnabled: Boolean = true,

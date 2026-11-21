@@ -834,10 +834,12 @@
     <string name="frame_rate_switching_always">Sempre</string>
     <string name="frame_rate_switching_seamless_only">Só sem interrupção</string>
     <string name="frame_rate_switching_off">Desativado</string>
-    <string name="frame_rate_switching_on">Ativado</string>
+    <string name="frame_rate_switching_follow_system">Seguir o sistema</string>
     <string name="frame_rate_switching_never">Nunca</string>
-    <string name="frame_rate_switching_system_summary">%1$s · Android: %2$s</string>
-    <string name="frame_rate_switching_on_help">Segue a opção “%1$s” nas configurações de tela do Android</string>
+    <string name="frame_rate_switching_follow_system_summary">%1$s · %2$s</string>
+    <string name="frame_rate_switching_follow_system_choice">Sistema: %1$s</string>
+    <string name="frame_rate_switching_follow_system_help">Usa a configuração da própria TV</string>
+    <string name="frame_rate_switching_force_help">Muda a taxa mesmo se a configuração da TV não permitir</string>
     <string name="frame_rate_switching_always_help">Ajusta a TV à taxa de quadros do vídeo, mesmo que a tela fique escura por um instante</string>
     <string name="frame_rate_switching_seamless_help">Só muda quando a TV pode fazer isso sem que a tela fique escura</string>
     <string name="frame_rate_switching_off_help">Mantém o modo de exibição atual da TV</string>

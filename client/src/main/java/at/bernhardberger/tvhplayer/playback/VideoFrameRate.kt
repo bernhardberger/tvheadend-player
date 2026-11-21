@@ -126,10 +126,12 @@ internal fun declaredDisplayRate(duration: Duration): Float? {
 
 /** How the app requests the display cadence: a surface vote or a window display mode. */
 enum class SurfaceFrameRateChange {
-    /** Before Android 12: preferredDisplayModeId permits non-seamless TV mode changes. */
+    /** preferredDisplayModeId permits non-seamless TV mode changes. */
     DISPLAY_MODE,
     /** Android 12 or later: CHANGE_FRAME_RATE_ALWAYS, subject to the Android preference. */
-    ALWAYS,
+    FOLLOW_SYSTEM,
+    /** Android 12 or later: CHANGE_FRAME_RATE_ONLY_IF_SEAMLESS. */
+    ONLY_IF_SEAMLESS,
     /** Android 11: the two-argument call, which switches only seamlessly. */
     SEAMLESS_DEFAULT,
 }
@@ -142,19 +144,26 @@ data class SurfaceFrameRateRequest(
 
 /**
  * The app's vote for [rate] under [switching]. Media3's own change strategy stays Off, so this is
- * the surface's only vote. Before Android 12, Always uses a window display mode instead;
- * seamless-only needs Android 11. Off or no rate clears an earlier request.
+ * the surface's only vote. Always uses a window display mode instead. Seamless-only needs
+ * Android 11, and Follow system falls back to Always before Android 12.
  */
-internal fun surfaceFrameRateRequest(switching: FrameRateSwitching, sdkInt: Int, rate: Float?): SurfaceFrameRateRequest =
-    when {
-        rate == null || switching == FrameRateSwitching.OFF -> SurfaceFrameRateRequest()
-        FrameRateSwitching.usesSystemPreference(sdkInt) ->
-            SurfaceFrameRateRequest(rate, SurfaceFrameRateChange.ALWAYS)
-        switching == FrameRateSwitching.ALWAYS ->
-            SurfaceFrameRateRequest(rate, SurfaceFrameRateChange.DISPLAY_MODE)
-        sdkInt < ANDROID_R -> SurfaceFrameRateRequest()
-        else -> SurfaceFrameRateRequest(rate, SurfaceFrameRateChange.SEAMLESS_DEFAULT)
+internal fun surfaceFrameRateRequest(switching: FrameRateSwitching, sdkInt: Int, rate: Float?): SurfaceFrameRateRequest {
+    if (rate == null) return SurfaceFrameRateRequest()
+    val supportsFollowSystem = FrameRateSwitching.supportsFollowSystem(sdkInt)
+    return when (switching) {
+        FrameRateSwitching.OFF -> SurfaceFrameRateRequest()
+        FrameRateSwitching.ALWAYS -> SurfaceFrameRateRequest(rate, SurfaceFrameRateChange.DISPLAY_MODE)
+        FrameRateSwitching.FOLLOW_SYSTEM -> SurfaceFrameRateRequest(
+            rate,
+            if (supportsFollowSystem) SurfaceFrameRateChange.FOLLOW_SYSTEM else SurfaceFrameRateChange.DISPLAY_MODE,
+        )
+        FrameRateSwitching.SEAMLESS_ONLY -> when {
+            supportsFollowSystem -> SurfaceFrameRateRequest(rate, SurfaceFrameRateChange.ONLY_IF_SEAMLESS)
+            sdkInt >= ANDROID_R -> SurfaceFrameRateRequest(rate, SurfaceFrameRateChange.SEAMLESS_DEFAULT)
+            else -> SurfaceFrameRateRequest()
+        }
     }
+}
 
 /** Surface.setFrameRate needs Android 11. */
 internal const val ANDROID_R = 30

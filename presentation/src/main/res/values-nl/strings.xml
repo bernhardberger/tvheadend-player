@@ -855,10 +855,12 @@
     <string name="frame_rate_switching_always">Altijd</string>
     <string name="frame_rate_switching_seamless_only">Alleen zonder onderbreking</string>
     <string name="frame_rate_switching_off">Uit</string>
-    <string name="frame_rate_switching_on">Aan</string>
+    <string name="frame_rate_switching_follow_system">Systeem volgen</string>
     <string name="frame_rate_switching_never">Nooit</string>
-    <string name="frame_rate_switching_system_summary">%1$s · Android: %2$s</string>
-    <string name="frame_rate_switching_on_help">Volgt de optie ‘%1$s’ in de scherminstellingen van Android</string>
+    <string name="frame_rate_switching_follow_system_summary">%1$s · %2$s</string>
+    <string name="frame_rate_switching_follow_system_choice">Systeem: %1$s</string>
+    <string name="frame_rate_switching_follow_system_help">Gebruikt de instelling van de tv</string>
+    <string name="frame_rate_switching_force_help">Schakelt ook als de tv-instelling dit niet toestaat</string>
     <string name="frame_rate_switching_always_help">Schakelt de tv naar de beeldsnelheid van de video, ook als het scherm even zwart wordt</string>
     <string name="frame_rate_switching_seamless_help">Schakelt alleen als de tv dit kan zonder dat het scherm zwart wordt</string>
     <string name="frame_rate_switching_off_help">Behoudt de huidige weergavemodus van de tv</string>
