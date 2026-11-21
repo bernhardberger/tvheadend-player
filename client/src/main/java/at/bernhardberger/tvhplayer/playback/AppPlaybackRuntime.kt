@@ -274,6 +274,7 @@ class AppPlaybackRuntime(
     val recordingMarks = recordingMarkers.marks
     val recordingChapters = recordingMarkers.recordingChapters
     val recordingSkipPrompt = recordingMarkers.skipPrompt
+    val recordingControlsSkip = recordingMarkers.controlsSkip
     @Volatile
     private var activeTargetEpoch: Long? = null
     @Volatile
@@ -578,6 +579,7 @@ class AppPlaybackRuntime(
         }
 
         override fun onTimelineChanged(timeline: Timeline, reason: Int) {
+            recordingMarkers.onPlaybackChanged()
             if (reason == Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED) {
                 val currentItem = player.currentMediaItem
                 if (currentItem != null && currentItem !== ownedMediaItem) playerSources++
@@ -590,6 +592,10 @@ class AppPlaybackRuntime(
             if (!holdsPlayerStateCallbacks() && !coordinator.playerCleanupPending.value && targetCommands.isOpen()) {
                 presentation.publishPlayerState()
             }
+        }
+
+        override fun onAvailableCommandsChanged(availableCommands: Player.Commands) {
+            recordingMarkers.onPlaybackChanged()
         }
 
         override fun onEvents(player: Player, events: Player.Events) {
@@ -2212,11 +2218,11 @@ class AppPlaybackRuntime(
         recordingMarkers.deliberateSeek(positionMs)
         player.seekTo(positionMs)
     } }
-    fun skipRecordingAdBreak(mark: at.bernhardberger.tvhplayer.core.RecordingMark, expectedRevision: Long, fromControls: Boolean = false) {
-        recordingMarkers.skipAdBreak(mark, expectedRevision, fromControls)
-    }
-    fun dismissRecordingSkipPrompt(mark: at.bernhardberger.tvhplayer.core.RecordingMark, expectedRevision: Long) {
-        recordingMarkers.dismissSkipPrompt(mark, expectedRevision)
+    fun skipRecordingAdBreak(action: RecordingSkipAction, fromControls: Boolean = false): Boolean =
+        recordingMarkers.skipAdBreak(action, fromControls)
+
+    fun dismissRecordingSkipPrompt(offer: RecordingSkipAction) {
+        recordingMarkers.dismissSkipPrompt(offer)
     }
     fun seekRecordingMarker(positionMs: Long, expectedRevision: Long, programMarks: List<at.bernhardberger.tvhplayer.core.RecordingMark> = emptyList()) {
         recordingMarkers.seekRecordingMarker(positionMs, expectedRevision, programMarks)

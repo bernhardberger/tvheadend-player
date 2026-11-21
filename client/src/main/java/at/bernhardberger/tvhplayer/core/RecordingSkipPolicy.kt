@@ -58,9 +58,13 @@ class RecordingSkipPolicy {
         deliberateMaximum = deliberateMaximum?.coerceAtLeast(positionMs)
         val inside = marks.filter { it.containsEntry(positionMs) }.toSet()
         currentAdBreak = inside.firstOrNull { it.skippableAt(positionMs, settings.skipLanding) }
-        offeredPrompt = offeredPrompt?.takeIf {
-            if (it.kind == RecordingMarkKind.PROGRAM_START) it in inside
-            else it.skippableAt(positionMs, settings.skipLanding) && settings.adBreakMode == AdBreakMode.ASK
+        offeredPrompt = offeredPrompt?.let { previous ->
+            if (previous.kind == RecordingMarkKind.PROGRAM_START) previous.takeIf { it in inside }
+            else currentAdBreak?.takeIf { current ->
+                // A cutpoint refresh can revise the same break without creating another entry.
+                settings.adBreakMode == AdBreakMode.ASK &&
+                    previous.startMs < current.endMs && current.startMs < previous.endMs
+            }
         }
         // Pausing does not forget entry history; a first resume inside a span still enters it.
         occupied = inside.filter { mark ->
@@ -76,11 +80,13 @@ class RecordingSkipPolicy {
             occupied = occupied + cut
             return RecordingSkipDecision(recordingSkipLanding(cut, settings.skipLanding))
         }
+        val previouslyOfferedAd = offeredPrompt?.takeIf { it.kind == RecordingMarkKind.AD_BREAK }
         entered.firstOrNull { it.kind == RecordingMarkKind.PROGRAM_START }?.let { offeredPrompt = it }
-        // A suppressed Ask entry remains eligible when the programme offer is dismissed.
+        // A suppressed or displaced Ask entry stays eligible until it leaves the break;
+        // a cutpoint refresh may move its landing ahead again while the programme prompt is up.
         occupied = inside.filterNot {
             it.kind == RecordingMarkKind.AD_BREAK && settings.adBreakMode == AdBreakMode.ASK &&
-                offeredPrompt?.kind == RecordingMarkKind.PROGRAM_START && it in entered
+                offeredPrompt?.kind == RecordingMarkKind.PROGRAM_START && (it in entered || it == previouslyOfferedAd)
         }.toSet()
         val ad = entered.firstOrNull { it.kind == RecordingMarkKind.AD_BREAK } ?: return RecordingSkipDecision()
         return when (settings.adBreakMode) {

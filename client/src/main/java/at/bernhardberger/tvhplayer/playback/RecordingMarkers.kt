@@ -23,6 +23,8 @@ import at.bernhardberger.tvhplayer.core.recordingMarkStops
 import at.bernhardberger.tvhplayer.core.recordingMarks
 import at.bernhardberger.tvhplayer.core.recordingMuted
 import at.bernhardberger.tvhplayer.core.recordingProgramMarks
+import at.bernhardberger.tvhplayer.core.recordingSkipAction
+import at.bernhardberger.tvhplayer.core.recordingSkipLanding
 import at.bernhardberger.tvhplayer.notices.Notice
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
@@ -42,6 +44,9 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.yield
 import kotlin.time.Duration
+
+/** Identity belongs to this action on this installed target, not to the metadata revision. */
+class RecordingSkipAction(val mark: RecordingMark, internal val landingMs: Long)
 
 internal fun recordingChapters(tracks: Tracks): List<RecordingChapter> = buildList {
     for (group in tracks.groups) {
@@ -75,6 +80,7 @@ internal class RecordingMarkers(
     private var positionEpoch = 0L
     private var recoveryJob: Job? = null
     private var mediaItem: MediaItem? = null
+    private var installation = 0L
     private var skipPolicy = RecordingSkipPolicy()
     private var settings = PlayerSettings()
     private var recordingId: DvrEntryId? = null
@@ -88,8 +94,10 @@ internal class RecordingMarkers(
     private var savedVolume: Float? = null
     private val _marks = MutableStateFlow<List<RecordingMark>>(emptyList())
     val marks = _marks.asStateFlow()
-    private val _skipPrompt = MutableStateFlow<RecordingMark?>(null)
+    private val _skipPrompt = MutableStateFlow<RecordingSkipAction?>(null)
     val skipPrompt = _skipPrompt.asStateFlow()
+    private val _controlsSkip = MutableStateFlow<RecordingSkipAction?>(null)
+    val controlsSkip = _controlsSkip.asStateFlow()
     private val _currentAdBreak = MutableStateFlow<RecordingMark?>(null)
     val currentAdBreak = _currentAdBreak.asStateFlow()
     val recordingCutpoints = markerQuery.cutpoints
@@ -113,7 +121,7 @@ internal class RecordingMarkers(
         settings = value
         if (value.adBreakMode != AdBreakMode.ASK &&
             skipPolicy.offeredPrompt?.kind == RecordingMarkKind.AD_BREAK) skipPolicy.dismissPrompt()
-        publishSkipState()
+        publishSkipState(if (boundaryPositions.isNotEmpty() && isCurrent()) player.currentPosition else null)
     }
 
     private fun isCurrent(): Boolean = !targetInstallationInProgress() && mediaItem != null &&
@@ -201,11 +209,15 @@ internal class RecordingMarkers(
 
     /** Player callbacks and message deliveries run on the application looper, then take the command lock. */
     fun onPlaybackChanged() {
-        if (isCurrent() && currentProgramMarks() != programMarks) {
-            metadataChanged()
-            return
+        if (mediaItem == null) return
+        val expectedInstallation = installation
+        scope.launch {
+            targetCommands.serialize(onClosed = {}, countsAsArrival = false) {
+                if (expectedInstallation != installation || !isCurrent()) return@serialize
+                if (currentProgramMarks() != programMarks) metadataChanged()
+                else if (boundaryPositions.isNotEmpty()) evaluatePlayback()
+            }
         }
-        if (boundaryMessages.isNotEmpty()) requestEvaluation(boundaryGeneration)
     }
 
     fun onPositionDiscontinuity() {
@@ -227,36 +239,51 @@ internal class RecordingMarkers(
         invalidatePosition()
         if (!isCurrent()) return
         skipPolicy.deliberateSeek(policyMarks(), positionMs, settings.skipLanding)
-        publishSkipState()
+        publishSkipState(positionMs)
     }
 
-    private fun publishSkipState() {
-        _skipPrompt.value = skipPolicy.offeredPrompt
+    private fun actionFor(mark: RecordingMark?, previous: RecordingSkipAction?): RecordingSkipAction? =
+        mark?.let {
+            val landing = if (it.kind == RecordingMarkKind.PROGRAM_START) it.startMs
+                else recordingSkipLanding(it, settings.skipLanding)
+            previous?.takeIf { action -> action.mark == it && action.landingMs == landing }
+                ?: RecordingSkipAction(it, landing)
+        }
+
+    private fun publishSkipState(positionMs: Long? = null) {
+        _skipPrompt.value = actionFor(skipPolicy.offeredPrompt, _skipPrompt.value)
         _currentAdBreak.value = skipPolicy.currentAdBreak.takeUnless { settings.adBreakMode == AdBreakMode.OFF }
+        val mark = positionMs?.takeIf { pendingRecordingRecoveryPosition.value == null && canSeek() }
+            ?.let { recordingSkipAction(policyMarks(), it, settings) }
+        _controlsSkip.value = actionFor(mark, _controlsSkip.value)
     }
 
-    fun dismissSkipPrompt(expected: RecordingMark, expectedRevision: Long) {
+    fun dismissSkipPrompt(expected: RecordingSkipAction) {
         targetCommands.runIfOpen {
-            if (!isCurrent() || recordingMarkerRevision.value != expectedRevision || skipPrompt.value != expected) return@runIfOpen
+            if (!isCurrent() || skipPrompt.value !== expected) return@runIfOpen
             skipPolicy.dismissPrompt()
-            publishSkipState()
+            _skipPrompt.value = null
+            if (expected.mark.kind == RecordingMarkKind.PROGRAM_START) requestEvaluation(boundaryGeneration)
         }
     }
 
-    fun skipAdBreak(expected: RecordingMark, expectedRevision: Long, fromControls: Boolean = false) {
-        targetCommands.runIfOpen {
+    fun skipAdBreak(expected: RecordingSkipAction, fromControls: Boolean = false): Boolean =
+        targetCommands.readIfOpen {
             if (!isCurrent() || pendingRecordingRecoveryPosition.value != null ||
-                expectedRevision != recordingMarkerRevision.value || !canSeek()) return@runIfOpen
-            skipPolicy.evaluate(policyMarks(), player.currentPosition, false, settings)
+                !canSeek() || (if (fromControls) controlsSkip.value else skipPrompt.value) !== expected) return@readIfOpen false
+            val actualPosition = player.currentPosition
+            val currentMarks = marks.value + currentProgramMarks()
+            if (expected.mark !in currentMarks) return@readIfOpen false
+            skipPolicy.evaluate(currentMarks, actualPosition, false, settings)
             val target = if (fromControls) {
-                skipPolicy.acceptAction(expected, policyMarks(), player.currentPosition, settings)
-            } else skipPolicy.acceptPrompt(expected, settings)
-            target?.let {
-                seekPlayer(it)
-            }
+                skipPolicy.acceptAction(expected.mark, currentMarks, actualPosition, settings)
+            } else skipPolicy.acceptPrompt(expected.mark, settings)
+            if (target == null) return@readIfOpen false
+            // Withdraw the accepted action before the discontinuity reports the new position.
             publishSkipState()
-        }
-    }
+            seekPlayer(target)
+            true
+        } ?: false
 
     private fun canSeek(): Boolean = player.isCurrentMediaItemSeekable &&
         player.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)
@@ -269,7 +296,10 @@ internal class RecordingMarkers(
         // Recovery can temporarily play from zero before its owed seek. That transport
         // position must not erase the continuing target's deliberate-entry history.
         // The SDK does not report ordinary saved-position resumes as recovery pending.
-        if (pendingRecordingRecoveryPosition.value != null) return
+        if (pendingRecordingRecoveryPosition.value != null) {
+            _controlsSkip.value = null
+            return
+        }
         val actualPosition = player.currentPosition
         // Only uninterrupted forward playback may use a delivered boundary in place
         // of a later sample. Backward movement never makes a future boundary current.
@@ -289,7 +319,7 @@ internal class RecordingMarkers(
                 noticeCenter.post(Notice.AutomaticAdBreakSkip(it.startMs), noticeCenter.context())
             }
         }
-        publishSkipState()
+        publishSkipState(seekTo ?: actualPosition)
         val muted = recordingMuted(recordingCutpoints.value,
             if (seekTo != null) player.currentPosition else actualPosition)
         if (muted) {
@@ -327,11 +357,13 @@ internal class RecordingMarkers(
     }
 
     fun clearRecordingMarkers(preserveHistory: Boolean = false) {
+        installation++
         restoreVolume()
         cancelBoundaries()
         if (!preserveHistory) skipPolicy = RecordingSkipPolicy()
         _marks.value = emptyList()
         _skipPrompt.value = null
+        _controlsSkip.value = null
         _currentAdBreak.value = null
         recordingId = null
         programMarks = emptyList()
@@ -373,6 +405,11 @@ internal class RecordingMarkers(
         markerQuery.updateChapters(recordingChapters(player.currentTracks))
         publishMarks()
         markerJob = scope.launch {
+            launch {
+                session.observation.map { observation ->
+                    observation.dvrEntry(recordingId)?.let { it.start to it.startExtraMinutes }
+                }.distinctUntilChanged().collect { onPlaybackChanged() }
+            }
             // Admission changes, not position samples: one bounded fetch cycle per phase.
             var completionFetched = false
             var initialFetched = false

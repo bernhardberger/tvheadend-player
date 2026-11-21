@@ -70,6 +70,7 @@
     <string name="appliance_companion_install_info">To set it up, scan the code or open github.com/bernhardberger/tvheadend-player on a phone or computer, then follow the steps under Appliance companion</string>
     <string name="appliance_companion_qr_description">QR code for the appliance companion setup steps</string>
     <string name="recording_mark_program_starts">Programme starts</string>
+    <string name="skip_to_program_start">Skip to programme start</string>
     <string name="recording_mark_program_ends">Programme ends</string>
     <plurals name="problems_count_canceled">
         <item quantity="one">%1$d cancelled</item>

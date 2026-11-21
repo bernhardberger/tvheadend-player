@@ -20,16 +20,23 @@ import androidx.media3.common.Timeline
 import androidx.media3.common.util.Clock
 import android.os.Looper
 import androidx.media3.extractor.metadata.Chapter
+import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrCutpoint
 import at.bernhardberger.tvheadend.sdk.core.DvrCutpointAction
 import at.bernhardberger.tvheadend.sdk.core.DvrCutpointsResult
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
+import at.bernhardberger.tvheadend.sdk.core.PlaybackBinding
 import at.bernhardberger.tvheadend.sdk.core.PlaybackBindingResult
+import at.bernhardberger.tvheadend.sdk.core.SessionGenerationTestAuthority
 import at.bernhardberger.tvheadend.sdk.core.TvheadendTestResultFactory
+import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
+import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
+import at.bernhardberger.tvheadend.sdk.playback.GrowingRecordingFileLease
+import at.bernhardberger.tvheadend.sdk.playback.SubscriptionInfrastructureApi
 import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import java.lang.reflect.Proxy
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -72,13 +79,100 @@ class RecordingMarkerChaptersTest {
             fixture.markers.observeRecordingMarkersLocked(fixture.binding, fixture.entry.id)
             runCurrent()
             val start = RecordingMark(RecordingMarkKind.PROGRAM_START, 60_000)
-            assertEquals(start, fixture.markers.skipPrompt.value)
+            val offer = requireNotNull(fixture.markers.skipPrompt.value)
+            assertEquals(start, offer.mark)
             assertTrue(fixture.markers.marks.value.isEmpty())
             assertTrue(fixture.seeks.isEmpty())
-            fixture.markers.skipAdBreak(start, fixture.markers.recordingMarkerRevision.value)
+            fixture.markers.dismissSkipPrompt(offer)
+            assertTrue(!fixture.markers.skipAdBreak(offer))
+            assertTrue(fixture.seeks.isEmpty())
+            val action = requireNotNull(fixture.markers.controlsSkip.value)
+            assertEquals(start, action.mark)
+            assertTrue(fixture.markers.skipAdBreak(action, fromControls = true))
             runCurrent()
             assertEquals(listOf(60_000L), fixture.seeks)
             assertEquals(null, fixture.markers.skipPrompt.value)
+        } finally { fixture.markers.clearRecordingMarkersAndJoin() }
+    }
+
+    @Test
+    @OptIn(TvheadendTestingApi::class, ExperimentalCoroutinesApi::class)
+    fun pausedControlsUseUpdatedPaddingWithoutAPlayerEvent() = runTest {
+        val fixture = MarkerFixture(backgroundScope, entry = paddedEntry(1), bindWhileGrowing = true)
+        try {
+            fixture.playing = false
+            fixture.response.complete(Unit)
+            fixture.markers.observeRecordingMarkersLocked(fixture.binding, fixture.entry.id)
+            fixture.markers.onPlaybackChanged()
+            runCurrent()
+            val oldAction = requireNotNull(fixture.markers.controlsSkip.value)
+            for (padding in listOf(null, 0, 2)) {
+                fixture.publishEntry(paddedEntry(padding))
+                runCurrent()
+                assertTrue(!fixture.markers.skipAdBreak(oldAction, fromControls = true))
+                assertTrue("old padding must not be actionable after update to $padding", fixture.seeks.isEmpty())
+                if (padding == 2) {
+                    val action = requireNotNull(fixture.markers.controlsSkip.value)
+                    assertTrue(fixture.markers.skipAdBreak(action, fromControls = true))
+                    assertEquals(listOf(120_000L), fixture.seeks)
+                } else assertEquals(null, fixture.markers.controlsSkip.value)
+            }
+        } finally { fixture.markers.clearRecordingMarkersAndJoin() }
+    }
+
+    @Test
+    @OptIn(TvheadendTestingApi::class, ExperimentalCoroutinesApi::class)
+    fun dismissingPaddingImmediatelyOffersAnOverlappingAdBreak() = runTest {
+        for (adAlreadyDismissed in listOf(false, true)) {
+            val fixture = MarkerFixture(backgroundScope, listOf(
+                DvrCutpoint(10_000.milliseconds, 90_000.milliseconds, DvrCutpointAction.COMMERCIAL_BREAK),
+            ), entry = paddedEntry(null), bindWhileGrowing = true)
+            try {
+                fixture.position = 20_000
+                fixture.response.complete(Unit)
+                fixture.markers.observeRecordingMarkersLocked(fixture.binding, fixture.entry.id)
+                runCurrent()
+                val ad = requireNotNull(fixture.markers.skipPrompt.value)
+                assertEquals(RecordingMarkKind.AD_BREAK, ad.mark.kind)
+                if (adAlreadyDismissed) fixture.markers.dismissSkipPrompt(ad)
+                fixture.publishEntry(paddedEntry(1))
+                runCurrent()
+                val offer = requireNotNull(fixture.markers.skipPrompt.value)
+                assertEquals(RecordingMarkKind.PROGRAM_START, offer.mark.kind)
+                fixture.markers.dismissSkipPrompt(offer)
+                runCurrent()
+                assertEquals(if (adAlreadyDismissed) null else ad.mark, fixture.markers.skipPrompt.value?.mark)
+            } finally { fixture.markers.clearRecordingMarkersAndJoin() }
+        }
+    }
+
+    @Test
+    @OptIn(TvheadendTestingApi::class, ExperimentalCoroutinesApi::class)
+    fun expirySurvivesARevisionChangeButCannotDismissAReplacementOffer() = runTest {
+        val fixture = MarkerFixture(backgroundScope, entry = paddedEntry(1))
+        try {
+            fixture.response.complete(Unit)
+            fixture.markers.observeRecordingMarkersLocked(fixture.binding, fixture.entry.id)
+            runCurrent()
+            val offer = requireNotNull(fixture.markers.skipPrompt.value)
+            val renderedRevision = fixture.markers.recordingMarkerRevision.value
+            fixture.tracks = Tracks(listOf(group("chapters", Format.Builder()
+                .setMetadata(Metadata(chapter(500))).build())))
+            fixture.markers.onTracksChanged()
+            assertTrue(fixture.markers.recordingMarkerRevision.value > renderedRevision)
+            fixture.markers.dismissSkipPrompt(offer)
+            assertEquals(null, fixture.markers.skipPrompt.value)
+            fixture.position = 60_000
+            fixture.markers.onPlaybackChanged()
+            runCurrent()
+            fixture.position = 0
+            fixture.markers.onPlaybackChanged()
+            runCurrent()
+            val replacement = requireNotNull(fixture.markers.skipPrompt.value)
+            assertEquals(offer.mark, replacement.mark)
+            assertNotSame(offer, replacement)
+            fixture.markers.dismissSkipPrompt(offer)
+            assertEquals(replacement, fixture.markers.skipPrompt.value)
         } finally { fixture.markers.clearRecordingMarkersAndJoin() }
     }
 
@@ -272,7 +366,7 @@ class RecordingMarkerChaptersTest {
                 fixture.markers.observeRecordingMarkersLocked(fixture.binding, fixture.entry.id)
                 runCurrent()
                 if (mode == AdBreakMode.ASK) fixture.markers.dismissSkipPrompt(
-                    requireNotNull(fixture.markers.skipPrompt.value), fixture.markers.recordingMarkerRevision.value)
+                    requireNotNull(fixture.markers.skipPrompt.value))
                 val loaded = fixture.markers.marks.value
                 val seeks = fixture.seeks.toList()
                 fixture.markers.setForeground(false)
@@ -332,7 +426,7 @@ class RecordingMarkerChaptersTest {
             fixture.position = 1_500
             fixture.markers.onPlaybackChanged()
             runCurrent()
-            assertEquals(RecordingMark(RecordingMarkKind.AD_BREAK, 1_000, 2_000), fixture.markers.skipPrompt.value)
+            assertEquals(RecordingMark(RecordingMarkKind.AD_BREAK, 1_000, 2_000), fixture.markers.skipPrompt.value?.mark)
             fixture.position = 3_000
             fixture.markers.onPlaybackChanged()
             runCurrent()
@@ -341,6 +435,40 @@ class RecordingMarkerChaptersTest {
             fixture.markers.onPlaybackChanged()
             runCurrent()
             assertEquals(0f, fixture.volume)
+        } finally {
+            releaseCommands.complete(Unit)
+            fixture.markers.clearRecordingMarkersAndJoin()
+        }
+    }
+
+    @Test
+    @OptIn(TvheadendTestingApi::class, ExperimentalCoroutinesApi::class)
+    fun paddingBoundaryUpdateWaitsForAHeldCommand() = runTest {
+        val fixture = MarkerFixture(backgroundScope, entry = paddedEntry(1), bindWhileGrowing = true)
+        val releaseCommands = CompletableDeferred<Unit>()
+        try {
+            fixture.markers.observeRecordingMarkersLocked(fixture.binding, fixture.entry.id)
+            fixture.markers.onPlaybackChanged()
+            runCurrent()
+            assertTrue(fixture.messages.any { !it.isCanceled && it.positionMs == 60_000L })
+            val armed = fixture.messages.size
+            val held = backgroundScope.launch {
+                fixture.commands.serialize(onClosed = {}) { releaseCommands.await() }
+            }
+            runCurrent()
+            val arrivals = fixture.commands.arrivalCount
+            fixture.position = 60_000
+            fixture.publishEntry(paddedEntry(2))
+            fixture.markers.onPlaybackChanged()
+            runCurrent()
+            assertEquals("no seek while the command is held", emptyList<Long>(), fixture.seeks)
+            assertEquals("no new boundary messages while the command is held", armed, fixture.messages.size)
+            assertEquals(arrivals, fixture.commands.arrivalCount)
+            releaseCommands.complete(Unit)
+            held.join()
+            runCurrent()
+            assertTrue(fixture.seeks.isEmpty())
+            assertTrue(fixture.messages.any { !it.isCanceled && it.positionMs == 120_000L })
         } finally {
             releaseCommands.complete(Unit)
             fixture.markers.clearRecordingMarkersAndJoin()
@@ -514,7 +642,7 @@ class RecordingMarkerChaptersTest {
                     fixture.markers.onPlaybackChanged()
                     runCurrent()
                     if (mode == AdBreakMode.ASK && action == DvrCutpointAction.COMMERCIAL_BREAK) {
-                        assertEquals(1_000L, fixture.markers.skipPrompt.value?.startMs)
+                        assertEquals(1_000L, fixture.markers.skipPrompt.value?.mark?.startMs)
                     } else assertEquals(listOf(2_000L), fixture.seeks)
                 } finally { fixture.markers.clearRecordingMarkersAndJoin() }
             }
@@ -728,21 +856,7 @@ class RecordingMarkerChaptersTest {
             fixture.markers.observeRecordingMarkersLocked(fixture.binding, fixture.entry.id)
             runCurrent()
             val offer = requireNotNull(fixture.markers.skipPrompt.value)
-            val oldRevision = fixture.markers.recordingMarkerRevision.value
             assertEquals(0f, fixture.volume)
-            fixture.markers.dismissSkipPrompt(offer, oldRevision - 1)
-            fixture.markers.skipAdBreak(offer, oldRevision - 1)
-            assertEquals(offer, fixture.markers.skipPrompt.value)
-            assertTrue(fixture.seeks.isEmpty())
-            fixture.tracks = Tracks(listOf(group("chapters", Format.Builder()
-                .setMetadata(Metadata(chapter(500, name = "Opening"))).build())))
-            fixture.markers.onTracksChanged()
-            val replacedRevision = fixture.markers.recordingMarkerRevision.value
-            assertTrue(replacedRevision > oldRevision)
-            fixture.markers.dismissSkipPrompt(offer, oldRevision)
-            fixture.markers.skipAdBreak(offer, oldRevision)
-            assertEquals(offer, fixture.markers.skipPrompt.value)
-            assertTrue(fixture.seeks.isEmpty())
             val oldMessages = fixture.messages.toList()
             fixture.position = 0
             fixture.currentItem = fixture.currentItem.buildUpon().setMediaId("other-recording").build()
@@ -753,16 +867,17 @@ class RecordingMarkerChaptersTest {
             fixture.position = 1_500
             fixture.markers.onPlaybackChanged()
             runCurrent()
-            assertEquals(offer, fixture.markers.skipPrompt.value)
-            fixture.markers.dismissSkipPrompt(offer, replacedRevision)
-            fixture.markers.skipAdBreak(offer, replacedRevision)
-            assertEquals(offer, fixture.markers.skipPrompt.value)
+            val replacement = requireNotNull(fixture.markers.skipPrompt.value)
+            assertEquals(offer.mark, replacement.mark)
+            fixture.markers.dismissSkipPrompt(offer)
+            assertTrue(!fixture.markers.skipAdBreak(offer))
+            assertEquals(replacement, fixture.markers.skipPrompt.value)
             assertTrue(fixture.seeks.isEmpty())
             oldMessages.first().let { it.target.handleMessage(it.type, it.payload) }
             runCurrent()
-            assertEquals(offer, fixture.markers.skipPrompt.value)
+            assertEquals(replacement, fixture.markers.skipPrompt.value)
             assertTrue(fixture.seeks.isEmpty())
-            fixture.markers.dismissSkipPrompt(offer, fixture.markers.recordingMarkerRevision.value)
+            fixture.markers.dismissSkipPrompt(replacement)
             assertEquals(null, fixture.markers.skipPrompt.value)
         } finally { fixture.markers.clearRecordingMarkersAndJoin() }
     }
@@ -836,50 +951,104 @@ class RecordingMarkerChaptersTest {
     @OptIn(TvheadendTestingApi::class, ExperimentalCoroutinesApi::class)
     fun overlappingAdBreaksEndAsCurrentAtTheMergedLandingPoint() = runTest {
         // [10, 14] and [13, 16] merge to [10, 16]; with 5 s the landing is 11 s, which neither raw cutpoint names.
-        val fixture = MarkerFixture(backgroundScope, listOf(
-            DvrCutpoint(10_000.milliseconds, 14_000.milliseconds, DvrCutpointAction.COMMERCIAL_BREAK),
-            DvrCutpoint(13_000.milliseconds, 16_000.milliseconds, DvrCutpointAction.COMMERCIAL_BREAK),
-        ))
-        try {
-            fixture.markers.applySettings(PlayerSettings(skipLanding = SkipLanding.FIVE_SECONDS_BEFORE))
-            fixture.markers.observeRecordingMarkersLocked(fixture.binding, fixture.entry.id)
-            fixture.response.complete(Unit)
-            runCurrent()
-            assertEquals(listOf(10_000L, 11_000L, 13_000L, 14_000L, 16_000L),
-                fixture.messages.filterNot { it.isCanceled }.map { it.positionMs })
-            fixture.position = 10_500
-            fixture.markers.onPlaybackChanged()
-            runCurrent()
-            val merged = RecordingMark(RecordingMarkKind.AD_BREAK, 10_000, 16_000)
-            assertEquals(merged, fixture.markers.currentAdBreak.value)
-            assertEquals(merged, fixture.markers.skipPrompt.value)
-            // Uninterrupted playback reaches the landing: Skip is no longer current or offered.
-            fixture.position = 11_000
-            fixture.messages.last { !it.isCanceled && it.positionMs == 11_000L }
-                .let { it.target.handleMessage(it.type, it.payload) }
-            runCurrent()
-            assertEquals(null, fixture.markers.currentAdBreak.value)
-            assertEquals(null, fixture.markers.skipPrompt.value)
-        } finally { fixture.markers.clearRecordingMarkersAndJoin() }
+        for (refreshAndAccept in listOf(false, true)) {
+            var points = listOf(
+                DvrCutpoint(10_000.milliseconds, 14_000.milliseconds, DvrCutpointAction.COMMERCIAL_BREAK),
+                DvrCutpoint(13_000.milliseconds, 16_000.milliseconds, DvrCutpointAction.COMMERCIAL_BREAK),
+            )
+            val fixture = MarkerFixture(backgroundScope, entry = paddedEntry(null, growing = true),
+                bindWhileGrowing = true, cutpoints = { DvrCutpointsResult.Available.create(points) })
+            try {
+                fixture.markers.applySettings(PlayerSettings(skipLanding = SkipLanding.FIVE_SECONDS_BEFORE))
+                fixture.markers.observeRecordingMarkersLocked(fixture.binding, fixture.entry.id)
+                fixture.response.complete(Unit)
+                runCurrent()
+                assertEquals(listOf(10_000L, 11_000L, 13_000L, 14_000L, 16_000L),
+                    fixture.messages.filterNot { it.isCanceled }.map { it.positionMs })
+                fixture.position = 10_500
+                fixture.markers.onPlaybackChanged()
+                runCurrent()
+                val merged = RecordingMark(RecordingMarkKind.AD_BREAK, 10_000, 16_000)
+                assertEquals(merged, fixture.markers.currentAdBreak.value)
+                val originalOffer = requireNotNull(fixture.markers.skipPrompt.value)
+                assertEquals(merged, originalOffer.mark)
+                val landing = if (refreshAndAccept) {
+                    points = points.dropLast(1) +
+                        DvrCutpoint(13_000.milliseconds, 18_000.milliseconds, DvrCutpointAction.COMMERCIAL_BREAK)
+                    fixture.publishEntry(paddedEntry(null))
+                    runCurrent()
+                    assertTrue(!fixture.markers.skipAdBreak(originalOffer))
+                    val updatedOffer = requireNotNull(fixture.markers.skipPrompt.value)
+                    assertEquals(RecordingMark(RecordingMarkKind.AD_BREAK, 10_000, 18_000), updatedOffer.mark)
+                    assertTrue(fixture.markers.skipAdBreak(updatedOffer))
+                    assertEquals(listOf(13_000L), fixture.seeks)
+                    13_000L
+                } else {
+                    // Reach the original landing through uninterrupted playback, not a seek.
+                    fixture.position = 11_000L
+                    11_000L
+                }
+                fixture.messages.last { !it.isCanceled && it.positionMs == landing }
+                    .let { it.target.handleMessage(it.type, it.payload) }
+                runCurrent()
+                assertEquals(null, fixture.markers.currentAdBreak.value)
+                assertEquals(null, fixture.markers.skipPrompt.value)
+                if (!refreshAndAccept) assertTrue(fixture.seeks.isEmpty())
+            } finally { fixture.markers.clearRecordingMarkersAndJoin() }
+        }
     }
 
     @OptIn(TvheadendTestingApi::class)
-    private class MarkerFixture(
+    private fun paddedEntry(padding: Int?, growing: Boolean = false) = DvrEntry.create(
+        id = DvrEntryId(4), state = if (growing) DvrEntryState.RECORDING else DvrEntryState.COMPLETED,
+        start = Instant.fromEpochSeconds(1_000), stop = Instant.fromEpochSeconds(1_600),
+        startExtraMinutes = padding?.minutes,
+        files = listOf(TvheadendTestResultFactory.recordingFile(fileId = 1, serverPath = "synthetic.ts",
+            start = Instant.fromEpochSeconds(940), stop = if (growing) null else Instant.fromEpochSeconds(1_600))),
+        folder = emptyList(),
+    )
+
+    @OptIn(TvheadendTestingApi::class, ExperimentalTvheadendApi::class, SubscriptionInfrastructureApi::class)
+    private inner class MarkerFixture(
         scope: kotlinx.coroutines.CoroutineScope,
         points: List<DvrCutpoint> = emptyList(),
         cutpoints: (suspend () -> DvrCutpointsResult)? = null,
         val entry: DvrEntry = DvrEntry.create(id = DvrEntryId(4), state = DvrEntryState.COMPLETED),
+        bindWhileGrowing: Boolean = false,
     ) {
         val session = FakeTvheadendSession(currentPlaybackObservation(recordings = listOf(entry)))
         val response = CompletableDeferred<Unit>()
-        val binding = (TvheadendTestResultFactory.boundCompletedRecordingPlayback(
+        // The SDK's completed-only test factory pins the exact entry instance, unlike a binding
+        // established while growing, which follows the same file across DVR updates.
+        private val authority = if (bindWhileGrowing) SessionGenerationTestAuthority(currentPlaybackObservation(
+            recordings = listOf(if (entry.state == DvrEntryState.RECORDING) entry else paddedEntry(1, growing = true)),
+        )) else null
+        private val markerSession = authority?.let { publisher ->
+            object : TvheadendSession by session {
+                override val observation = publisher.observation
+                override fun isCurrent(currentSession: CurrentSessionObservation) =
+                    currentSession === observation.value.currentSession
+            }
+        } ?: session
+        private val bindingResult: PlaybackBindingResult<PlaybackBinding.Recording> = if (authority != null) {
+            TvheadendTestResultFactory.boundGrowingRecordingPlayback(
+                markerSession, authority, requireNotNull(markerSession.observation.value.currentSession), entry.id,
+                lease = object : GrowingRecordingFileLease {
+                    override val isCurrent = true
+                    override suspend fun open(position: Long): Nothing = error("Marker queries never open the recording")
+                },
+                cutpoints = { response.await(); cutpoints?.invoke() ?: DvrCutpointsResult.Available.create(points) },
+            ).also { if (entry.state != DvrEntryState.RECORDING) publishEntry(entry) }
+        } else TvheadendTestResultFactory.boundCompletedRecordingPlayback(
             session, session.captureCurrentSession(), entry.id,
             cutpoints = { response.await(); cutpoints?.invoke() ?: DvrCutpointsResult.Available.create(points) },
-        ) as PlaybackBindingResult.Bound).binding
+        )
+        val binding = (bindingResult as PlaybackBindingResult.Bound).binding
         var currentItem = MediaItem.Builder().setMediaId("recording").build()
         var tracks = Tracks.EMPTY
         var position = 0L
         var playbackState = Player.STATE_READY
+        var playing = true
         var installing = false
         var positionReads = 0
         var volume = 0.65f
@@ -895,7 +1064,8 @@ class RecordingMarkerChaptersTest {
                 "getApplicationLooper" -> Looper.getMainLooper()
                 "createMessage" -> PlayerMessage({ messages.add(it) }, args!![0] as PlayerMessage.Target,
                     Timeline.EMPTY, 0, Clock.DEFAULT, Looper.getMainLooper())
-                "isPlaying", "isCurrentMediaItemSeekable" -> true
+                "isPlaying" -> playing
+                "isCurrentMediaItemSeekable" -> true
                 "isCommandAvailable" -> args!![0] == Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM
                 "getVolume" -> volume
                 "setVolume" -> { volume = args!![0] as Float; Unit }
@@ -906,7 +1076,12 @@ class RecordingMarkerChaptersTest {
         val notices = NoticeCenter({ 0L }) { NoticeContext(0, null) }
         val pendingRecoveryPosition = kotlinx.coroutines.flow.MutableStateFlow<kotlin.time.Duration?>(null)
         val commands = PlaybackTargetCommandSerialization()
-        val markers = RecordingMarkers(player, session, scope, commands, notices, pendingRecoveryPosition) { installing }
+        val markers = RecordingMarkers(player, markerSession, scope, commands, notices, pendingRecoveryPosition) { installing }
+
+        fun publishEntry(entry: DvrEntry) {
+            val observation = currentPlaybackObservation(recordings = listOf(entry))
+            if (authority != null) authority.publish(observation) else session.publish(observation)
+        }
     }
 
     @Test
@@ -1026,23 +1201,18 @@ class RecordingMarkerChaptersTest {
             assertEquals(0.65f, volume)
             assertEquals(seeksBeforeStaleDelivery, seeks)
             val offered = requireNotNull(markers.skipPrompt.value)
-            val revision = markers.recordingMarkerRevision.value
-            markers.skipAdBreak(offered, revision - 1)
-            assertEquals(listOf(2_000L, 3_050L), seeks)
-            markers.dismissSkipPrompt(offered, revision - 1)
-            assertEquals(offered, markers.skipPrompt.value)
             installing = true
-            markers.skipAdBreak(offered, revision)
+            markers.skipAdBreak(offered)
             assertEquals(listOf(2_000L, 3_050L), seeks)
             installing = false
             currentItem = item.buildUpon().build()
-            markers.skipAdBreak(offered, revision)
+            markers.skipAdBreak(offered)
             assertEquals(listOf(2_000L, 3_050L), seeks)
-            markers.dismissSkipPrompt(offered, revision)
+            markers.dismissSkipPrompt(offered)
             assertEquals(offered, markers.skipPrompt.value)
             currentItem = item
             playing = false
-            markers.skipAdBreak(offered, revision)
+            markers.skipAdBreak(offered)
             assertEquals(listOf(2_000L, 3_050L, 2_000L), seeks)
             assertEquals(noticeId, notices.state.value.pending.single().id)
         } finally {

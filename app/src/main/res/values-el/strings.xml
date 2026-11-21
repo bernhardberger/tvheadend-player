@@ -790,6 +790,7 @@
     <string name="recording_mark_program_starts">Αρχή εκπομπής</string>
     <string name="recording_mark_program_ends">Τέλος εκπομπής</string>
     <string name="skip_ad_break">Παράλειψη διαλείμματος</string>
+    <string name="skip_to_program_start">Παράλειψη έως την αρχή του προγράμματος</string>
     <string name="settings_section_recording_marks">Δείκτες εγγραφής</string>
     <string name="ad_breaks_setting">Διαφημιστικά διαλείμματα</string>
     <string name="ad_breaks_ask">Ερώτηση</string>

@@ -97,13 +97,25 @@ class RecordingSkipPolicyTest {
     @Test fun paddingOfferSuppressesAdOffersUntilDismissedButDoesNotChangeAutoSkip() {
         val start = RecordingMark(RecordingMarkKind.PROGRAM_START, 60_000)
         val both = marks + start
-        val policy = RecordingSkipPolicy()
-        policy.evaluate(both, 0, true, PlayerSettings())
-        policy.evaluate(both, ad.startMs, true, PlayerSettings())
-        assertEquals(start, policy.offeredPrompt)
-        policy.dismissPrompt()
-        policy.evaluate(both, ad.startMs + 1, true, PlayerSettings())
-        assertEquals(ad, policy.offeredPrompt)
+        val ask = PlayerSettings(skipLanding = SkipLanding.TWO_SECONDS_BEFORE)
+        for (refresh in listOf(false, true)) {
+            val policy = RecordingSkipPolicy()
+            policy.evaluate(both, 0, true, ask)
+            policy.evaluate(both, ad.startMs, true, ask)
+            assertEquals(start, policy.offeredPrompt)
+            val position = if (refresh) recordingSkipLanding(ad, ask.skipLanding) else ad.startMs + 1
+            val currentAd = if (refresh) ad.copy(endMs = 25_000) else ad
+            val currentMarks = both - ad + currentAd
+            if (refresh) {
+                policy.evaluate(both, position, true, ask)
+                assertNull(policy.currentAdBreak)
+                policy.evaluate(currentMarks, position, true, ask)
+                assertEquals(start, policy.offeredPrompt)
+            }
+            policy.dismissPrompt()
+            policy.evaluate(currentMarks, position, true, ask)
+            assertEquals(currentAd, policy.offeredPrompt)
+        }
         val auto = RecordingSkipPolicy()
         auto.evaluate(both, 0, true, automatic)
         assertEquals(RecordingSkipDecision(ad.endMs, ad), auto.evaluate(both, ad.startMs, true, automatic))

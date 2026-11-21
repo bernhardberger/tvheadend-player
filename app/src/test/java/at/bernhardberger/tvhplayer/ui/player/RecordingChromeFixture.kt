@@ -11,7 +11,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.recordingSkipAction
-import at.bernhardberger.tvhplayer.core.recordingSkipLanding
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
@@ -87,6 +86,7 @@ internal fun RecordingChromeFixture(
     markerNavigation: RecordingMarkerNavigation = remember { RecordingMarkerNavigation() },
     markerRevision: Long = 0L,
     onSeekMarker: (Long) -> Unit = {},
+    onSkip: (RecordingMark) -> Unit = {},
     onTogglePause: () -> Unit = {},
     onSeek: (Long) -> Unit = {},
     onStop: () -> Unit = {},
@@ -128,9 +128,9 @@ internal fun RecordingChromeFixture(
             active = active, paused = paused, restoreFocus = restoreFocus,
             skip = skip?.let { mark ->
                 PlayerSkipAction(
+                    mark,
                     stringResource(if (mark.kind == RecordingMarkKind.PROGRAM_START) R.string.skip_to_program_start else R.string.skip_ad_break),
-                    { onSeekMarker(if (mark.kind == RecordingMarkKind.PROGRAM_START) mark.startMs
-                        else recordingSkipLanding(mark, settings.skipLanding)) },
+                    { onSkip(mark) },
                 )
             },
         ),

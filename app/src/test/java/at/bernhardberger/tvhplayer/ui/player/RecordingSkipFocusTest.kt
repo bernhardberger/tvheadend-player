@@ -43,6 +43,7 @@ import at.bernhardberger.tvhplayer.R
 import androidx.test.core.app.ApplicationProvider
 import androidx.compose.ui.test.assertTextEquals
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
+import at.bernhardberger.tvhplayer.playback.RecordingSkipAction
 import androidx.tv.material3.MaterialTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -119,11 +120,15 @@ class RecordingSkipFocusTest {
     @Test fun aPressHeldFromBeforeThePromptCannotActivateIt() {
         val prompt = prompt()
         compose.onRoot().performKeyInput { keyDown(Key.DirectionCenter) }
-        prompt.offer(ad)
+        prompt.offer(RecordingMark(RecordingMarkKind.PROGRAM_START, 1_000_000L))
         assertEquals(listOf("recording-skip-prompt"), compose.focusedTags())
         compose.onRoot().performKeyInput { keyUp(Key.DirectionCenter) }
         compose.settleFrames(20)
         assertEquals(emptyList<RecordingMark>(), prompt.skips)
+        compose.onRoot().performKeyInput { keyDown(Key.DirectionCenter) }
+        prompt.offer(ad)
+        compose.onRoot().performKeyInput { keyUp(Key.DirectionCenter) }
+        assertEquals("release must not activate the replacement prompt", emptyList<RecordingMark>(), prompt.skips)
         compose.pressKey(Key.DirectionCenter, settleFrames = 20)
         assertEquals(listOf(ad), prompt.skips)
     }
@@ -214,7 +219,7 @@ class RecordingSkipFocusTest {
         state.offer(ad)
         compose.runOnIdle { state.prompt = null }
         advance(80L)
-        val bounds = compose.onNodeWithTag("recording-skip-prompt").fetchSemanticsNode().boundsInRoot
+        val bounds = compose.onNodeWithTag("recording-skip-prompt", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         val bitmap = Bitmap.createBitmap(state.view.width, state.view.height, Bitmap.Config.ARGB_8888)
         compose.runOnIdle { state.view.draw(Canvas(bitmap)) }
         try {
@@ -298,26 +303,23 @@ class RecordingSkipFocusTest {
     }
 
     @Test fun theOfferStandsBackWhilePausedBufferingOrUnseekable() {
-        // The screen reads player.isPlaying, which is false both paused and buffering.
         assertTrue(recordingSkipPromptShown(offered = true, playing = true, canSeek = true, bannerVisible = false))
-        assertFalse(recordingSkipPromptShown(offered = true, playing = false, canSeek = true, bannerVisible = false))
-        assertFalse(recordingSkipPromptShown(offered = true, playing = true, canSeek = false, bannerVisible = false))
+        for ((state, input) in mapOf(
+            "paused" to (false to true),
+            "buffering" to (false to true),
+            "unseekable" to (true to false),
+        )) {
+            assertFalse(state, recordingSkipPromptShown(true, input.first, input.second, bannerVisible = false))
+        }
         assertFalse(recordingSkipPromptShown(offered = true, playing = true, canSeek = true, bannerVisible = true))
         assertFalse(recordingSkipPromptShown(offered = false, playing = true, canSeek = true, bannerVisible = false))
-    }
-
-    @Test fun anOutstandingOfferStandsBackWhilePausedOrBuffering() =
-        outstandingOfferStandsBack(recordingSkipPromptShown(true, playing = false, canSeek = true, bannerVisible = false))
-
-    @Test fun anOutstandingOfferStandsBackWhenSeekingIsLost() =
-        outstandingOfferStandsBack(recordingSkipPromptShown(true, playing = true, canSeek = false, bannerVisible = false))
-
-    private fun outstandingOfferStandsBack(stopped: Boolean) {
-        assertFalse(stopped)
         val prompt = prompt()
         prompt.offer(ad)
         assertEquals(listOf("recording-skip-prompt"), compose.focusedTags())
-        compose.runOnIdle { prompt.shown = stopped }
+        compose.changeState { prompt.shown = false }
+        compose.settleFrames(2, frameMillis = 16)
+        compose.onNodeWithTag("recording-skip-countdown", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("recording-skip-prompt").assertDoesNotExist()
         compose.settleFrames(20)
         assertFalse(compose.tagExists("recording-skip-prompt"))
         assertFalse("recording-skip-prompt" in compose.focusedTags())
@@ -368,6 +370,29 @@ class RecordingSkipFocusTest {
         assertEquals("the accepting OK does not toggle Pause", 0, state.pauseToggles)
     }
 
+    @Test fun aHeldControlsPressCannotActivateTheReplacementOrTogglePause() {
+        val state = controls(breakPlaying = false, padding = true)
+        compose.pressKey(Key.DirectionRight, settleFrames = 20)
+        compose.pressKey(Key.DirectionRight, settleFrames = 20)
+        assertEquals(listOf("recording-skip"), compose.focusedTags())
+        compose.onRoot().performKeyInput { keyDown(Key.DirectionCenter) }
+        compose.changeState { state.position = ad.startMs + 1 }
+        compose.settleFrames(2, frameMillis = 16)
+        assertEquals(listOf("recording-skip"), compose.focusedTags())
+        compose.onNodeWithTag("recording-skip").assertTextEquals(
+            ApplicationProvider.getApplicationContext<Application>().getString(R.string.skip_ad_break))
+        compose.onRoot().performKeyInput { keyUp(Key.DirectionCenter) }
+        assertEquals("release must not activate the replacement action", emptyList<Long>(), state.seeks)
+        compose.onRoot().performKeyInput { keyDown(Key.DirectionCenter) }
+        compose.changeState { state.position = ad.endMs }
+        compose.settleFrames(2)
+        assertEquals(listOf("player-pause"), compose.focusedTags())
+        compose.onRoot().performKeyInput { keyUp(Key.DirectionCenter) }
+        assertEquals("release must not activate fallback Play/Pause", 0, state.pauseToggles)
+        compose.pressKey(Key.DirectionCenter)
+        assertEquals(1, state.pauseToggles)
+    }
+
     @Test fun marksKeepNearestEntryAndBothVerticalExitsReturnToTheSeekbarDuringABreak() {
         val state = controls(breakPlaying = true)
         compose.pressKey(Key.DirectionUp, settleFrames = 20)
@@ -410,7 +435,11 @@ class RecordingSkipFocusTest {
     }
 
     private class PromptState {
-        var prompt by mutableStateOf<RecordingMark?>(null)
+        var action by mutableStateOf<RecordingSkipAction?>(null)
+            private set
+        var prompt: RecordingMark?
+            get() = action?.mark
+            set(value) { action = value?.let { RecordingSkipAction(it, it.endMs) } }
         var shown by mutableStateOf(true)
         val skips = mutableListOf<RecordingMark>()
         val timeouts = mutableListOf<RecordingMark>()
@@ -431,10 +460,10 @@ class RecordingSkipFocusTest {
                 val root = remember { FocusRequester() }
                 Box(Modifier.fillMaxSize().background(background).focusRequester(root).focusable()) {
                     RecordingSkipPrompt(
-                        prompt = state.prompt,
+                        prompt = state.action,
                         shown = state.shown,
-                        onSkip = { state.skips += it },
-                        onTimeout = { state.timeouts += it; state.prompt = null },
+                        onSkip = { state.skips += it.mark },
+                        onTimeout = { state.timeouts += it.mark; state.prompt = null },
                         modifier = Modifier.align(Alignment.BottomEnd).padding(horizontal = 48.dp, vertical = 32.dp),
                     )
                 }
@@ -489,6 +518,11 @@ class RecordingSkipFocusTest {
                         if (padding) listOf(RecordingMark(RecordingMarkKind.PROGRAM_START, 1_000_000L)) else emptyList(),
                     markerNavigation = state.navigation,
                     onSeekMarker = { state.seeks += it; state.position = it },
+                    onSkip = {
+                        val destination = if (it.kind == RecordingMarkKind.PROGRAM_START) 1_000_000L else ad.endMs
+                        state.seeks += destination
+                        state.position = destination
+                    },
                     onTogglePause = { state.pauseToggles++ },
                 )
             }

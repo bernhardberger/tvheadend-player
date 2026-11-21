@@ -137,6 +137,7 @@ fun RecordingPlayerScreen(
     val adBreakOption = rememberRecordingAdBreakOption(recordingId, recordingMarks, koinInject())
     val markerRevision by session.recordingMarkerRevision.collectAsStateWithLifecycle()
     val skipPrompt by session.recordingSkipPrompt.collectAsStateWithLifecycle()
+    val controlsSkip by session.recordingControlsSkip.collectAsStateWithLifecycle()
     val observation by tvheadendSession.observation.collectAsStateWithLifecycle()
     val currentSession = observation.currentSession
     val routeSelection = currentRecordingPlaybackSelection(observation, recordingId)
@@ -220,9 +221,6 @@ fun RecordingPlayerScreen(
         if (!canSeekMarks) emptyList()
         else if (programMarks.isEmpty()) recordingMarks else recordingMarks + programMarks
     }
-    val controlsSkip = at.bernhardberger.tvhplayer.core.recordingSkipAction(
-        marks, positionMs, playerSettings.copy(adBreakMode = adBreakOption.choice ?: adBreakOption.setting),
-    )
     val markStops = remember(marks, durationMs) { at.bernhardberger.tvhplayer.core.recordingMarkStops(marks, durationMs) }
     val markers = remember(markStops) { markStops.map { it.positionMs } }
     val markerNavigation = remember { RecordingMarkerNavigation() }
@@ -230,12 +228,6 @@ fun RecordingPlayerScreen(
     fun seekMarker(targetMs: Long) {
         timelineState.cancelPendingSeek()
         session.seekRecordingMarker(targetMs, markerNavigation.ownerRevision, programMarks)
-    }
-    val skipAdBreak: (at.bernhardberger.tvhplayer.core.RecordingMark) -> Unit = remember(markerRevision) {
-        { mark ->
-            timelineState.cancelPendingSeek()
-            session.skipRecordingAdBreak(mark, markerRevision)
-        }
     }
     val nowSec = timelineState.nowEpochSec
     val isPlaying = timelineState.isPlaying
@@ -560,7 +552,7 @@ fun RecordingPlayerScreen(
             PlayerBackAction.DISMISS_SEEK_FEEDBACK ->
                 timelineState.dismissDispatchedFeedback()
             PlayerBackAction.DISMISS_SKIP_PROMPT ->
-                skipPrompt?.let { session.dismissRecordingSkipPrompt(it, markerRevision) }
+                skipPrompt?.let(session::dismissRecordingSkipPrompt)
             else -> Unit
         }
     }
@@ -768,13 +760,15 @@ fun RecordingPlayerScreen(
                         else -> null
                     },
                     tracks = trackButtons,
-                    skip = controlsSkip?.let { mark ->
+                    skip = controlsSkip?.takeIf { playbackAvailable && canSeekMarks }?.let { action ->
                         PlayerSkipAction(
-                            label = stringResource(if (mark.kind == at.bernhardberger.tvhplayer.core.RecordingMarkKind.PROGRAM_START)
+                            identity = action,
+                            label = stringResource(if (action.mark.kind == at.bernhardberger.tvhplayer.core.RecordingMarkKind.PROGRAM_START)
                                 R.string.skip_to_program_start else R.string.skip_ad_break),
                             onClick = {
-                                timelineState.cancelPendingSeek()
-                                session.skipRecordingAdBreak(mark, markerRevision, fromControls = true)
+                                if (session.skipRecordingAdBreak(action, fromControls = true)) {
+                                    timelineState.cancelPendingSeek()
+                                }
                             },
                         )
                     },
@@ -814,8 +808,8 @@ fun RecordingPlayerScreen(
             RecordingSkipPrompt(
                 prompt = skipPrompt,
                 shown = foregroundLayer == PlayerForegroundLayer.SKIP_PROMPT,
-                onSkip = skipAdBreak,
-                onTimeout = { session.dismissRecordingSkipPrompt(it, markerRevision) },
+                onSkip = { if (session.skipRecordingAdBreak(it)) timelineState.cancelPendingSeek() },
+                onTimeout = session::dismissRecordingSkipPrompt,
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(end = TvGridHorizontalMargin, bottom = TvGridVerticalMargin),

@@ -46,6 +46,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -56,8 +57,8 @@ import androidx.tv.material3.ButtonDefaults
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.layout.layout
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.core.RecordingMark
 import at.bernhardberger.tvhplayer.core.RecordingMarkKind
+import at.bernhardberger.tvhplayer.playback.RecordingSkipAction
 import kotlin.math.roundToInt
 
 /** Total time the Skip prompt can be shown, excluding time behind other layers. */
@@ -86,16 +87,18 @@ internal fun recordingSkipRemainingSweep(elapsedFraction: Float): Float =
 @Composable
 private fun RecordingSkipButton(
     onSkip: () -> Unit,
-    kind: RecordingMarkKind?,
+    action: RecordingSkipAction?,
+    visible: Boolean,
     elapsed: () -> Float,
     modifier: Modifier = Modifier,
 ) {
-    // Only a press it saw begin activates it, never one that started before it appeared or took focus.
-    val pressed = remember { mutableSetOf<Key>() }
+    // A key-up can only activate the same visible offer that received key-down.
+    val pressed = remember(action, visible) { mutableSetOf<Key>() }
     Button(
         onClick = onSkip,
         modifier = modifier.heightIn(min = 40.dp).semantics { role = Role.Button }.onPreviewKeyEvent { event ->
             if (event.key !in RecordingSkipActivationKeys) return@onPreviewKeyEvent false
+            if (!visible) return@onPreviewKeyEvent true
             when (event.type) {
                 KeyEventType.KeyDown -> {
                     if (event.nativeKeyEvent.repeatCount == 0) pressed.add(event.key)
@@ -109,7 +112,7 @@ private fun RecordingSkipButton(
     ) {
         SkipCountdown(LocalContentColor.current, elapsed)
         Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-        Text(stringResource(if (kind == RecordingMarkKind.PROGRAM_START) R.string.skip_to_program_start else R.string.skip_ad_break),
+        Text(stringResource(if (action?.mark?.kind == RecordingMarkKind.PROGRAM_START) R.string.skip_to_program_start else R.string.skip_ad_break),
             maxLines = 1, softWrap = false)
     }
 }
@@ -157,10 +160,10 @@ private fun SkipCountdown(color: Color, elapsed: () -> Float) {
  */
 @Composable
 internal fun RecordingSkipPrompt(
-    prompt: RecordingMark?,
+    prompt: RecordingSkipAction?,
     shown: Boolean,
-    onSkip: (RecordingMark) -> Unit,
-    onTimeout: (RecordingMark) -> Unit,
+    onSkip: (RecordingSkipAction) -> Unit,
+    onTimeout: (RecordingSkipAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var departing by remember { mutableStateOf(prompt) }
@@ -169,10 +172,6 @@ internal fun RecordingSkipPrompt(
     val presentation = prompt ?: departing
     var elapsedMs by remember(presentation) { mutableLongStateOf(0L) }
     val timeout by rememberUpdatedState(onTimeout)
-    LaunchedEffect(prompt) {
-        // An equal mark can be offered again before the old presentation finishes exiting.
-        if (prompt != null) elapsedMs = 0L
-    }
     LaunchedEffect(prompt, shown) {
         if (prompt == null || !shown) return@LaunchedEffect
         // Frame time, so the prompt's time does not follow the animator duration scale.
@@ -216,7 +215,7 @@ internal fun RecordingSkipPrompt(
             }
         }
         // The two extra pixels leave one antialiasing pixel per edge; the rise fits below it.
-        Box(Modifier
+        Box((if (visible) Modifier else Modifier.clearAndSetSemantics {})
             .graphicsLayer {
                 alpha = opacity.value
                 translationY = travel.value.roundToInt().toFloat()
@@ -229,8 +228,9 @@ internal fun RecordingSkipPrompt(
             },
         ) {
             RecordingSkipButton(
-                onSkip = { prompt?.let(onSkip) },
-                kind = presentation?.kind,
+                onSkip = { prompt?.takeIf { visible }?.let(onSkip) },
+                action = presentation,
+                visible = visible,
                 elapsed = { elapsedMs / SKIP_PROMPT_MS.toFloat() },
                 modifier = Modifier.testTag("recording-skip-prompt").focusRequester(focus)
                     .focusProperties { canFocus = visible }

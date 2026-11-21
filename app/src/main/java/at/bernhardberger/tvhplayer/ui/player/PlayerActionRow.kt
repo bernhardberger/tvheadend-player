@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -97,10 +98,30 @@ internal fun PlayerActionRow(
     )
     // Playback actions stand at the start; track lists, details and Settings at the end.
     val endStart = actions[2].tag
+    val skipPresses = remember { mutableMapOf<Key, Any>() }
+    val skipFocused = remember { mutableStateOf(false) }
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(TvIconButtonSize),
+            .height(TvIconButtonSize)
+            .onPreviewKeyEvent { event ->
+                if (event.key !in RecordingSkipActivationKeys) return@onPreviewKeyEvent false
+                // The row outlives Skip. Do not let its held OK activate the fallback Play/Pause.
+                when (event.type) {
+                    KeyEventType.KeyDown -> {
+                        if (event.nativeKeyEvent.repeatCount == 0) skipPresses.remove(event.key)
+                        false
+                    }
+                    KeyEventType.KeyUp -> {
+                        val pressed = skipPresses[event.key]
+                        if (pressed != null && (!skipFocused.value || pressed !== skip?.identity)) {
+                            skipPresses.remove(event.key)
+                            true
+                        } else false
+                    }
+                    else -> false
+                }
+            },
         horizontalArrangement = Arrangement.spacedBy(TvOverlayActionGap),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -122,7 +143,7 @@ internal fun PlayerActionRow(
                         } else Modifier)
                         .then(if (state != null) Modifier.semantics { stateDescription = state } else Modifier)
                     if (icon == null) {
-                        val pressed = remember { mutableSetOf<Key>() }
+                        val identity = requireNotNull(skip).identity
                         Button(
                             onClick = { onInteraction(); action() },
                             colors = ButtonDefaults.colors(
@@ -130,16 +151,18 @@ internal fun PlayerActionRow(
                                 contentColor = MaterialTheme.colorScheme.onSurface,
                             ),
                             contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
-                            modifier = actionModifier.height(TvIconButtonSize).onPreviewKeyEvent { event ->
-                                if (event.key !in RecordingSkipActivationKeys) false else when (event.type) {
-                                    KeyEventType.KeyDown -> {
-                                        if (event.nativeKeyEvent.repeatCount == 0) pressed.add(event.key)
-                                        event.key !in pressed
+                            modifier = actionModifier.height(TvIconButtonSize)
+                                .onFocusChanged { skipFocused.value = it.isFocused }
+                                .onPreviewKeyEvent { event ->
+                                    if (event.key !in RecordingSkipActivationKeys) false else when (event.type) {
+                                        KeyEventType.KeyDown -> {
+                                            if (event.nativeKeyEvent.repeatCount == 0) skipPresses[event.key] = identity
+                                            skipPresses[event.key] !== identity
+                                        }
+                                        KeyEventType.KeyUp -> skipPresses.remove(event.key) !== identity
+                                        else -> false
                                     }
-                                    KeyEventType.KeyUp -> !pressed.remove(event.key)
-                                    else -> false
-                                }
-                            },
+                                },
                         ) {
                             Icon(
                                 painterResource(R.drawable.ic_skip_next),

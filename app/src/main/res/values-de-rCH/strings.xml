@@ -17,4 +17,5 @@
     <string name="whats_new">Was ist neu?</string>
     <string name="whats_new_badge">Neu</string>
     <string name="return_to_full_screen">Zurück zum Vollbild</string>
+    <string name="skip_to_program_start">Zum Sendungsbeginn springen</string>
 </resources>

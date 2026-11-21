@@ -148,7 +148,7 @@ internal data class PlayerChromeActions(
     val skip: PlayerSkipAction? = null,
 )
 
-internal data class PlayerSkipAction(val label: String, val onClick: () -> Unit)
+internal data class PlayerSkipAction(val identity: Any, val label: String, val onClick: () -> Unit)
 
 /** The action row's Audio button, the playing track of its list; null leaves it out. */
 internal data class PlayerTrackButtons(val audio: String? = null)

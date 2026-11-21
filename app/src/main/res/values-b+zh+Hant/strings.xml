@@ -727,6 +727,7 @@
     <string name="recording_mark_program_starts">節目開始</string>
     <string name="recording_mark_program_ends">節目結束</string>
     <string name="skip_ad_break">略過廣告時段</string>
+    <string name="skip_to_program_start">略過至節目開頭</string>
     <string name="settings_section_recording_marks">錄影標記</string>
     <string name="ad_breaks_setting">廣告時段</string>
     <string name="ad_breaks_ask">詢問</string>

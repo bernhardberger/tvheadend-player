@@ -860,6 +860,7 @@
     <string name="recording_mark_program_starts">Початок передачі</string>
     <string name="recording_mark_program_ends">Кінець передачі</string>
     <string name="skip_ad_break">Пропустити рекламу</string>
+    <string name="skip_to_program_start">Пропустити до початку програми</string>
     <string name="settings_section_recording_marks">Мітки запису</string>
     <string name="ad_breaks_setting">Рекламні паузи</string>
     <string name="ad_breaks_ask">Запитувати</string>

@@ -1086,7 +1086,8 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
   controls it sits 8dp above the thumb and the info bar fades; in the Banner step
   there is no thumb, it rests on the bar row and the info bar stays.
 - There is no Go live control: stepping or scrubbing forward reaches live.
-- The action row is Play/Pause and Stop at the start, the centred `⌄ Channels`
+- The action row is Play/Pause and Stop at the start, followed by Skip when
+  available in a recording, the centered `⌄ Channels`
   hint, and Audio, Subtitles, Info and Settings at the end
   (`ui/player/PlayerActionRow.kt`). Audio shows only with more than one audio
   track and Subtitles only with a subtitle track to choose besides Off, as the
@@ -1102,8 +1103,13 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
   Above a recording's markers, Up from the seekbar opens the markers and Up again
   closes them. Recording markers include scene boundaries and both endpoints of
   commercial-break and cut intervals, plus chapters stored in the recording file
-  when Tvheadend supplies no commercial-break or cut intervals; they only navigate
-  and never skip content automatically.
+  when Tvheadend supplies no commercial-break or cut intervals. Selecting a marker
+  seeks to it. Automatic skipping follows the playback options, not the markers row.
+- In recording controls, Skip stays after Stop throughout the lead-in or until
+  an ad break's skip landing, even after the prompt is dismissed.
+  `Skip to program start` lands at the start of the program; `Skip ad break`
+  uses the configured ad-break landing. If Skip disappears while focused, focus
+  returns to Play/Pause without toggling playback.
 - The controls leave over 200 ms (standard accelerate), 100 ms when a modal
   layer replaces them.
 - Numeric entry is a state of the top identity's place: the identity's chip,
@@ -1345,6 +1351,18 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
   per recording and per connection. The row stays in the list for a recording
   without marked ad breaks, dimmed and out of the focus order, reading
   `None marked`; it opens once marks arrive.
+- For a finished recording with lead-in padding, `Skip to program start` is
+  offered when playback naturally enters the lead-in, including when opening
+  or resuming there. A deliberate seek into the lead-in does not offer it.
+  The lead-in is never skipped automatically, regardless of the Ad breaks
+  setting. When shown, the prompt takes focus: OK accepts it, and Back dismisses
+  it without seeking.
+  Each skip prompt has 10 seconds of shown time. The countdown pauses
+  behind the Banner or controls and while playback is paused, buffering, or
+  unseekable, then resumes with the time left. The program-start offer holds
+  back an overlapping Ask ad-break prompt. Dismissing it lets the ad-break
+  prompt appear; accepting it can land inside the break, which then gets its
+  own offer in Ask mode.
 - The Subtitles list of an item with subtitle tracks reads `Default (<the
   Subtitles setting>)`, Off, then the tracks, and checks exactly one row:
   Default until the viewer picks Off or a track, even when the setting itself

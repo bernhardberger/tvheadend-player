@@ -790,6 +790,7 @@
     <string name="recording_mark_program_starts">Begin programma</string>
     <string name="recording_mark_program_ends">Einde programma</string>
     <string name="skip_ad_break">Reclameblok overslaan</string>
+    <string name="skip_to_program_start">Overslaan tot het programmabegin</string>
     <string name="settings_section_recording_marks">Opnamemarkeringen</string>
     <string name="ad_breaks_setting">Reclameblokken</string>
     <string name="ad_breaks_ask">Vragen</string>
