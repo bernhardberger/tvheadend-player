@@ -125,6 +125,7 @@
     <ID>MagicNumber:ConnectionNoticeSource.kt:ConnectionNoticeSource$3_000</ID>
     <ID>MagicNumber:DvrChangeNoticeSource.kt:DvrChangeNoticeSource$2_000</ID>
     <ID>MagicNumber:DvrLibraryPolicy.kt:5</ID>
+    <ID>MagicNumber:LogoInk.kt:.05</ID>
     <ID>MagicNumber:LogoInk.kt:0.04045f</ID>
     <ID>MagicNumber:LogoInk.kt:0.055f</ID>
     <ID>MagicNumber:LogoInk.kt:0.05f</ID>
@@ -136,8 +137,10 @@
     <ID>MagicNumber:LogoInk.kt:12.92f</ID>
     <ID>MagicNumber:LogoInk.kt:127</ID>
     <ID>MagicNumber:LogoInk.kt:16</ID>
+    <ID>MagicNumber:LogoInk.kt:2.2</ID>
     <ID>MagicNumber:LogoInk.kt:2.4f</ID>
     <ID>MagicNumber:LogoInk.kt:24</ID>
+    <ID>MagicNumber:LogoInk.kt:255.0</ID>
     <ID>MagicNumber:LogoInk.kt:255f</ID>
     <ID>MagicNumber:LogoInk.kt:8</ID>
     <ID>MagicNumber:NoticeCenter.kt:NoticeCenter$8</ID>
