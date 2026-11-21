@@ -3,10 +3,15 @@
 
 package at.bernhardberger.tvhplayer.touch.recordings
 
+import android.icu.text.DateFormat
+import android.icu.text.MeasureFormat
+import android.icu.util.Measure
+import android.icu.util.MeasureUnit
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -26,6 +31,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -35,21 +41,28 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 import at.bernhardberger.tvhplayer.ui.TvRecordingContainerColor
+import java.time.Duration
+import java.time.ZoneId
+import java.util.Date
 
 /** One level: its head, the folders it holds, then its recordings under their date labels. */
 @Composable
 internal fun RecordingList(
     level: RecordingFolder,
+    clock: RecordingClock,
+    oneChannel: Boolean,
     pickedId: String?,
     head: @Composable () -> Unit,
     onOpen: (String) -> Unit,
@@ -66,21 +79,23 @@ internal fun RecordingList(
             }
             sections(level.recordings).forEach { section ->
                 section.label?.let { label ->
-                    item(key = "section:${section.items.first().id}") { SectionLabel(label) }
+                    item(key = "section:${section.items.first().id}") { SectionLabel(label.label) }
                 }
+                val context = RowContext(section.label?.dates ?: RowDates.None, oneChannel)
                 group(section.items, key = { it.id }) { item, index, count ->
-                    RecordingRow(item, item.id == pickedId, index, count) { onPick(item.id) }
+                    val line = recordingLine(item, context, clock)
+                    RecordingRow(item, line, item.id == pickedId, index, count) { onPick(item.id) }
                 }
             }
         }
     }
 }
 
-private class Section(val label: String?, val items: List<RecordingItem>)
+private class Section(val label: RecordingSection?, val items: List<RecordingItem>)
 
 private fun sections(recordings: List<RecordingItem>): List<Section> {
     val sections = mutableListOf<Section>()
-    var label: String? = null
+    var label: RecordingSection? = null
     var items = mutableListOf<RecordingItem>()
     recordings.forEach {
         if (it.section != null && items.isNotEmpty()) {
@@ -264,6 +279,7 @@ private fun FolderTile(recordingNow: Boolean) {
 @Composable
 private fun RecordingRow(
     item: RecordingItem,
+    line: List<RecordingLinePart>,
     selected: Boolean,
     index: Int,
     count: Int,
@@ -284,7 +300,7 @@ private fun RecordingRow(
             else -> null
         },
         supportingContent = {
-            Text(item.line, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            RecordingLineText(line)
         },
         shapes = ListItemDefaults.segmentedShapes(index, count),
         colors = rowColors(),
@@ -292,6 +308,61 @@ private fun RecordingRow(
     ) {
         Text(item.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
+}
+
+/**
+ * The line with as many whole parts as fit, longest first, so it never cuts inside a part; only a
+ * first part wider than the row is ellipsized.
+ */
+@Composable
+private fun RecordingLineText(parts: List<RecordingLinePart>) {
+    val texts = parts.map { partText(it) }
+    val pattern = stringResource(R.string.recordings_parts)
+    val measurer = rememberTextMeasurer()
+    val style = LocalTextStyle.current
+    BoxWithConstraints {
+        val candidates = (texts.size downTo 1).map { count ->
+            texts.take(count).reduce { line, part -> pattern.format(line, part) }
+        }
+        val line = candidates.firstOrNull {
+            measurer.measure(it, style, maxLines = 1, softWrap = false).size.width <= constraints.maxWidth
+        } ?: candidates.lastOrNull().orEmpty()
+        Text(line, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+@Composable
+private fun partText(part: RecordingLinePart): String = when (part) {
+    is RecordingLinePart.Episode -> part.name
+    is RecordingLinePart.Time -> part.time
+    is RecordingLinePart.Day -> dayText(part.day)
+    is RecordingLinePart.Length -> durationText(part.length)
+    is RecordingLinePart.Left -> stringResource(R.string.recordings_time_left, durationText(part.left))
+    is RecordingLinePart.Until -> stringResource(R.string.recordings_until, part.time)
+    is RecordingLinePart.Channel -> part.name
+}
+
+@Composable
+internal fun dayText(day: RecordingDay): String = when (day) {
+    RecordingDay.Today -> stringResource(R.string.recordings_today)
+    RecordingDay.Yesterday -> stringResource(R.string.recordings_yesterday)
+    is RecordingDay.On -> {
+        val locale = LocalConfiguration.current.locales[0]
+        val format = DateFormat.getInstanceForSkeleton(if (day.withYear) "yMMMEd" else "MMMEd", locale)
+        format.format(Date.from(day.date.atStartOfDay(ZoneId.systemDefault()).toInstant()))
+    }
+}
+
+/** Narrow hours and minutes kept together, "1h 45m", as the TV app's `formatNarrowDuration`. */
+@Composable
+internal fun durationText(duration: Duration): String {
+    val locale = LocalConfiguration.current.locales[0]
+    val minutes = duration.toMinutes().coerceAtLeast(0L)
+    val format = MeasureFormat.getInstance(locale, MeasureFormat.FormatWidth.NARROW)
+    return listOf(minutes / MINUTES_PER_HOUR to MeasureUnit.HOUR, minutes % MINUTES_PER_HOUR to MeasureUnit.MINUTE)
+        .filter { (amount, _) -> amount > 0L }
+        .ifEmpty { listOf(0L to MeasureUnit.MINUTE) }
+        .joinToString(NO_BREAK_SPACE) { (amount, unit) -> format.format(Measure(amount, unit)).replace(' ', '\u00a0') }
 }
 
 @Composable
@@ -357,6 +428,8 @@ internal fun RecPill() {
 internal fun rowColors(container: Color = MaterialTheme.colorScheme.surfaceContainer) =
     ListItemDefaults.segmentedColors(containerColor = container)
 
+private const val MINUTES_PER_HOUR = 60L
+private const val NO_BREAK_SPACE = "\u00a0"
 private val ThumbWidth = 88.dp
 private val ThumbHeight = 50.dp
 private val ThumbShape = RoundedCornerShape(8.dp)

@@ -87,7 +87,7 @@ internal fun RecordingsScreen(
             BackHandler(enabled = page) { picked = null }
             BackHandler(enabled = !page && levels.size > 1) { path = ArrayList(path.take(levels.size - 2)) }
             if (pageItem != null) {
-                RecordingPage(pageItem, layout, actions) { picked = null }
+                RecordingPage(pageItem, state.clock, layout, actions) { picked = null }
             } else {
                 Browse(
                     state = state,
@@ -194,6 +194,8 @@ private fun Browse(
         RecordingsLayout.Phone -> Modifier.padding(horizontal = 12.dp)
     }
     val head: @Composable () -> Unit = { LevelHead(state.view, levels, layout, onUp) }
+    // Inside a channel's folder every row is that channel's.
+    val oneChannel = state.view.grouping == RecordingsGrouping.Channels && levels.size > 1
     when {
         state.root.isEmpty && state.view.show == RecordingsShow.All -> RecordingsMessage(
             R.drawable.video_library_outline, R.string.recordings_none, R.string.recordings_none_reason,
@@ -203,17 +205,17 @@ private fun Browse(
             FilterEmpty(state.view, actions.onView)
         }
         layout == RecordingsLayout.Wide -> Row(margin.fillMaxSize()) {
-            RecordingList(level, picked?.id, head, onOpen, onPick, Modifier.weight(1f))
+            RecordingList(level, state.clock, oneChannel, picked?.id, head, onOpen, onPick, Modifier.weight(1f))
             Spacer(Modifier.width(24.dp))
             Surface(
                 Modifier.weight(1f).padding(top = 16.dp, bottom = 8.dp),
                 shape = MaterialTheme.shapes.extraLarge,
                 color = MaterialTheme.colorScheme.surfaceContainerLow,
             ) {
-                if (picked == null) Placeholder(level) else RecordingPane(picked, actions)
+                if (picked == null) Placeholder(level) else RecordingPane(picked, state.clock, actions)
             }
         }
-        else -> RecordingList(level, null, head, onOpen, onPick, margin)
+        else -> RecordingList(level, state.clock, oneChannel, null, head, onOpen, onPick, margin)
     }
 }
 
