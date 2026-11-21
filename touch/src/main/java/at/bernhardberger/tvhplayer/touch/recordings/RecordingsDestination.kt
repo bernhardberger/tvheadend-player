@@ -13,6 +13,7 @@ import at.bernhardberger.tvhplayer.core.DvrDateSection
 import at.bernhardberger.tvhplayer.core.programmeCategory
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import at.bernhardberger.tvhplayer.touch.ui.Destination
+import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.common.formatFileSize
 import at.bernhardberger.tvhplayer.ui.common.formatRecordingKeepUntil
 import at.bernhardberger.tvhplayer.ui.common.programmeCategoryLabelRes
@@ -46,7 +47,9 @@ internal fun RecordingsDestination(
     val texts = remember(context, locale) { recordingsTexts(context, locale) }
     val artwork = LocalArtworkModels.current
     val state = remember(observation, view, presentation, nowSec, texts, artwork) {
-        val clock = RecordingClock(Instant.ofEpochSecond(nowSec), ZoneId.systemDefault(), locale)
+        val clock = RecordingClock(Instant.ofEpochSecond(nowSec), ZoneId.systemDefault(), locale) {
+            formatClock(it, locale)
+        }
         recordingsState(observation, view, presentation.connection, presentation.degraded, clock, texts, artwork)
     }
     RecordingsScreen(

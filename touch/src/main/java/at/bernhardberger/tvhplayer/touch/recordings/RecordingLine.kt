@@ -4,8 +4,7 @@ import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
+import java.time.ZonedDateTime
 import java.util.Locale
 
 /** What the label above a row already says, or that the list has no date labels. */
@@ -14,8 +13,17 @@ internal enum class RowDates { DayLabel, MonthLabel, None }
 /** Where a row stands: the label above it, and whether the whole list is one channel's. */
 internal data class RowContext(val dates: RowDates, val oneChannel: Boolean = false)
 
-/** The clock and the reader's locale for the texts on rows and the pane. */
-internal data class RecordingClock(val now: Instant, val zone: ZoneId, val locale: Locale)
+/**
+ * The clock and the reader's locale for the texts on rows and the pane; [time] writes a clock time
+ * the way the rest of the app does (the shared `formatClock`, which follows the device's 12/24-hour
+ * setting).
+ */
+internal data class RecordingClock(
+    val now: Instant,
+    val zone: ZoneId,
+    val locale: Locale,
+    val time: (ZonedDateTime) -> String,
+)
 
 /** A recording's day: the two that read as words, else the date. */
 internal sealed interface RecordingDay {
@@ -67,9 +75,8 @@ internal fun recordingLine(item: RecordingItem, context: RowContext, clock: Reco
         item.channel?.takeIf { !context.oneChannel }?.let { add(RecordingLinePart.Channel(it)) }
     }
 
-/** The start's clock time in the locale's short style, "8:15 PM". */
-internal fun recordingTime(at: Instant, clock: RecordingClock): String =
-    DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).withLocale(clock.locale).format(at.atZone(clock.zone))
+/** A clock time, "8:15 PM" or "20:15". */
+internal fun recordingTime(at: Instant, clock: RecordingClock): String = clock.time(at.atZone(clock.zone))
 
 /** Today, Yesterday, else the date ("Sat, Nov 14"), with the year once it is not this year's. */
 internal fun recordingDay(at: Instant, clock: RecordingClock): RecordingDay {

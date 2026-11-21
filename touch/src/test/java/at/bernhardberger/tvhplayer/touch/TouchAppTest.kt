@@ -45,6 +45,9 @@ import at.bernhardberger.tvhplayer.touch.testutil.FakeConnection
 import at.bernhardberger.tvhplayer.touch.testutil.ImageLoaderRule
 import at.bernhardberger.tvhplayer.touch.testutil.ServerGuide
 import at.bernhardberger.tvhplayer.ui.MobileDarkColors
+import at.bernhardberger.tvhplayer.ui.common.AppClock
+import java.time.ZoneId
+import kotlin.time.toJavaInstant
 import kotlin.time.Clock
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
@@ -486,6 +489,21 @@ class TouchAppTest {
             .forEach { compose.onNodeWithText(label(it)).assertDoesNotExist() }
         listOf(R.string.recordings_delete, R.string.recordings_more)
             .forEach { compose.onNodeWithContentDescription(label(it)).assertDoesNotExist() }
+    }
+
+    @Test
+    fun recordingsWriteClockTimesByTheDevicesSetting() {
+        val uses24Hour = AppClock.systemUses24Hour
+        AppClock.systemUses24Hour = true
+        try {
+            val guide = savedConnectionWithGuide()
+            openRecordings()
+            val until = checkNotNull(guide.recordingNow.stop).toJavaInstant().atZone(ZoneId.systemDefault())
+            val expected = "%02d:%02d".format(until.hour, until.minute)
+            compose.onNodeWithText(compose.activity.getString(R.string.recordings_until, expected), substring = true).assertExists()
+        } finally {
+            AppClock.systemUses24Hour = uses24Hour
+        }
     }
 
     @Test
