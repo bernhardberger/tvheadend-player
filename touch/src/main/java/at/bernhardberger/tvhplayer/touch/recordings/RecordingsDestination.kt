@@ -14,6 +14,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.common.util.Util
+import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvhplayer.core.DvrDateSection
 import at.bernhardberger.tvhplayer.core.humanLanguageName
 import at.bernhardberger.tvhplayer.core.programmeCategory
@@ -55,7 +56,14 @@ internal fun RecordingsDestination(
     val nowSec = rememberCurrentEpochSeconds()()
     val texts = remember(context, locale) { recordingsTexts(context, locale) }
     val artwork = LocalArtworkModels.current
-    val state = remember(observation, view, presentation, nowSec, texts, artwork) {
+    val current = observation.currentSession
+    // Keep the whole offline observation for profile-bound saved artwork.
+    val state = remember(
+        observation.takeIf { current == null }, current, observation.dvrState, observation.dvrDiskSpaceState,
+        observation.channelCatalogForDisplay, observation.recordingProgressCapability,
+        (observation.sessionState as? SessionState.Ready)?.capabilities?.dvrWrite,
+        view, presentation.connection, presentation.degraded, nowSec, texts, artwork,
+    ) {
         val clock = RecordingClock(Instant.ofEpochSecond(nowSec), ZoneId.systemDefault(), locale) {
             formatClock(it, locale)
         }

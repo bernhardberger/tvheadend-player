@@ -5,13 +5,13 @@ import android.content.res.Configuration
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
-import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
-import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.core.SessionGenerationIdentity
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
+import at.bernhardberger.tvhplayer.touch.channels.sameProgrammeAuthority
 import at.bernhardberger.tvhplayer.touch.ui.ArtworkModels
+import at.bernhardberger.tvhplayer.touch.ui.epgChangeCounts
 import at.bernhardberger.tvhplayer.touch.ui.traceArtworkMapping
 import at.bernhardberger.tvhplayer.ui.screens.GuideCoverageRequestOwner
 import at.bernhardberger.tvhplayer.viewmodels.ChannelScopeState
@@ -79,9 +79,21 @@ internal class GuideViewModel(
         mappingInput = input
         mappingJob?.cancel()
         val app = context.applicationContext
+        val previous = mutableMapped.value
         mappingJob = viewModelScope.launch {
-            val state = withContext(mappingDispatcher) {
-                traceArtworkMapping(app, "Guide", changes.joinToString("+")) {
+            val result = withContext(mappingDispatcher) {
+                val sincePublished = input.changesFrom(previous?.input)
+                val epgOnly = sincePublished.singleOrNull() == "epg"
+                val projection = if (epgOnly) input.epgProjection() else null
+                if (epgOnly && previous != null &&
+                    projection == (previous.projection ?: previous.input.epgProjection())
+                ) {
+                    return@withContext GuideMappingResult(input, previous.state, projection)
+                }
+                val counts = if ("epg" in sincePublished) {
+                    app.epgChangeCounts(previous?.input?.observation, input.observation)
+                } else ""
+                val state = traceArtworkMapping(app, "Guide", sincePublished.joinToString("+") + counts) {
                     val localized = app.createConfigurationContext(input.configuration)
                     val texts = guideTexts(
                         localized, input.configuration.locales[0], input.clock.zone, input.uses24Hour,
@@ -91,8 +103,9 @@ internal class GuideViewModel(
                         input.clock, texts, input.artwork, input.playingId,
                     )
                 }
+                GuideMappingResult(input, state, projection)
             }
-            if (mappingInput === input) mutableMapped.value = GuideMappingResult(input, state)
+            if (mappingInput === input) mutableMapped.value = result
         }
     }
 
@@ -150,22 +163,18 @@ internal class GuideMappingInput(
 }
 
 private fun MutableList<String>.addObservationChanges(current: SessionObservation, previous: SessionObservation) {
-    // The SDK keeps this list when it only republishes coverage or historical events.
+    // Identity is a cheap trigger for the worker, not a claim that the visible window changed.
     if (current.epgSnapshotForDisplay?.events !== previous.epgSnapshotForDisplay?.events) add("epg")
     if (current.dvrSnapshotForDisplay !== previous.dvrSnapshotForDisplay) add("dvr")
     if (current.channelCatalogForDisplay !== previous.channelCatalogForDisplay) add("catalog")
-    if (!current.sameGuideAuthority(previous)) add("authority")
+    if (!current.sameProgrammeAuthority(previous)) add("authority")
 }
 
-private fun SessionObservation.sameGuideAuthority(previous: SessionObservation): Boolean {
-    if (currentSession !== previous.currentSession) return false
-    val write = (sessionState as? SessionState.Ready)?.capabilities?.dvrWrite
-    val previousWrite = (previous.sessionState as? SessionState.Ready)?.capabilities?.dvrWrite
-    return write == previousWrite && recordingProgressCapability == previous.recordingProgressCapability &&
-        (dvrState is DvrRepositoryState.Current) == (previous.dvrState is DvrRepositoryState.Current)
-}
-
-internal class GuideMappingResult(val input: GuideMappingInput, val state: GuideState)
+internal class GuideMappingResult(
+    val input: GuideMappingInput,
+    val state: GuideState,
+    val projection: GuideEpgProjection? = null,
+)
 
 /** The shown channels and the selected day's window a coverage request asks for. */
 internal data class GuideCoverage(val channelIds: List<ChannelId>, val startSec: Long, val throughSec: Long)

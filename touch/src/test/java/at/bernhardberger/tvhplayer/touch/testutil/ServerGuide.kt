@@ -27,6 +27,7 @@ import at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi
 import at.bernhardberger.tvhplayer.touch.guide.GuideTexts
 import java.time.LocalTime
 import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
@@ -94,14 +95,25 @@ internal class ServerGuide(val now: Instant) {
     )
 
     /** The server signed in with everything current, with [entries] as its recordings: it has a current session. */
-    fun connected(entries: List<DvrEntry> = dvr.entries) = SessionObservation.create(
+    fun connected(entries: List<DvrEntry> = dvr.entries, epg: EpgSnapshot = snapshot) = SessionObservation.create(
         sessionState = SessionState.Ready(
             ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED),
         ),
         channelState = ChannelRepositoryState.Current(catalog),
-        epgState = EpgRepositoryState.Current(snapshot),
-        dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = entries)),
+        epgState = EpgRepositoryState.Current(epg),
+        dvrState = DvrRepositoryState.Current(if (entries === dvr.entries) dvr else DvrSnapshot.create(entries = entries)),
     )
+
+    fun refreshedEpg(title: String? = null): EpgSnapshot {
+        val running = snapshot.events.first()
+        val changed = title?.let {
+            EpgEvent.create(running.id, first.id, running.start, running.stop, title = it)
+        } ?: running
+        val past = EpgEvent.create(
+            EventId(99), second.id, now - 3.hours, now - 2.hours, title = "Previous show",
+        )
+        return EpgSnapshot.create(listOf(changed) + snapshot.events.drop(1) + past)
+    }
 
     /** The recording the server schedules for the program [event] on the first channel. */
     /** A recording scheduled for program [event]; with [rule], one an automatic recording scheduled. */
