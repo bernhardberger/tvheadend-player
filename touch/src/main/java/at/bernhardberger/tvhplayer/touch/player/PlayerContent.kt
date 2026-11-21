@@ -59,9 +59,8 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.channels.ChannelRow
-import at.bernhardberger.tvhplayer.touch.channels.ChannelRows
-import at.bernhardberger.tvhplayer.touch.channels.ChannelsActions
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsLayout
+import at.bernhardberger.tvhplayer.touch.channels.ChannelsState
 import at.bernhardberger.tvhplayer.touch.channels.TagFilter
 import kotlin.math.roundToInt
 
@@ -236,17 +235,21 @@ internal fun UprightPlayerContent(
             state, layout, dragging, onAction, panels,
             Modifier.padding(horizontal = inset - 8.dp).padding(top = 14.dp, bottom = 12.dp),
         )
-        PlayerChannelList(state, layout, panels.onChoice, onChannel, Modifier.weight(1f))
+        PlayerChannelList(
+            state.channels, layout, panels.onChoice, onChannel, { onAction(PlayerAction.RetryChannels) },
+            Modifier.weight(1f),
+        )
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PlayerChannelList(
-    state: LivePlayerState,
+    state: ChannelsState,
     layout: PlayerLayout,
     onChoice: (PlayerChoice) -> Unit,
     onChannel: (String) -> Unit,
+    onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = MaterialTheme.colorScheme
@@ -273,16 +276,13 @@ private fun PlayerChannelList(
                     stringResource(R.string.player_channels), Modifier.semantics { heading() },
                     color = colors.onSurface, style = MaterialTheme.typography.titleMedium,
                 )
-                if (state.channels.tags.isNotEmpty()) {
-                    TagFilter(state.channels, { onChoice(PlayerChoice.ChannelTag(it)) })
+                state.displayedList?.takeIf { it.tags.isNotEmpty() }?.let { list ->
+                    TagFilter(list, { onChoice(PlayerChoice.ChannelTag(it)) })
                 }
             }
-            ChannelRows(
-                state.channels, if (layout == PlayerLayout.Phone) ChannelsLayout.Phone else ChannelsLayout.Upright,
-                ChannelsActions(
-                    onPlay = onChannel, onTag = {}, onRetry = {}, onOpenConnectionSettings = {},
-                ),
-                showColumnLabels = false,
+            PlayerChannelsContent(
+                state, if (layout == PlayerLayout.Phone) ChannelsLayout.Phone else ChannelsLayout.Upright,
+                onChannel, { onChoice(PlayerChoice.ChannelTag(it)) }, onRetry,
             )
         }
     }
@@ -333,6 +333,7 @@ internal val PlayerPanel.control: PlayerControl?
         PlayerPanel.Record -> PlayerControl.Record
         PlayerPanel.Audio -> PlayerControl.Audio
         PlayerPanel.Subtitles -> PlayerControl.Subtitles
+        PlayerPanel.Channels -> PlayerControl.Channels
         PlayerPanel.Info -> PlayerControl.Info
         else -> null
     }

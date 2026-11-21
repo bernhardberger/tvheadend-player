@@ -8,13 +8,14 @@ import at.bernhardberger.tvhplayer.core.AppErrorCondition
 import at.bernhardberger.tvhplayer.core.HumanTrackLabel
 import at.bernhardberger.tvhplayer.touch.channels.ChannelList
 import at.bernhardberger.tvhplayer.touch.channels.ChannelRow
+import at.bernhardberger.tvhplayer.touch.channels.ChannelsState
 import at.bernhardberger.tvhplayer.touch.guide.GuideProgram
 import at.bernhardberger.tvhplayer.touch.guide.ProgramDetails
 import java.time.LocalTime
 
 internal data class LivePlayerState(
     val channel: ChannelRow,
-    val channels: ChannelList,
+    val channels: ChannelsState,
     val frame: Painter?,
     /** The bar's moving values, read only by what draws them so a sample redraws the bar, not the face. */
     val timeline: State<LiveTimeline?>,
@@ -26,6 +27,13 @@ internal data class LivePlayerState(
     val schedule: ChannelSchedule? = null,
     val offered: Set<PlayerControl> = PlayerControl.entries.toSet(),
 )
+
+internal val ChannelsState.displayedList: ChannelList?
+    get() = when (this) {
+        is ChannelsState.Ready -> list
+        is ChannelsState.Offline -> list
+        else -> null
+    }
 
 /**
  * The face's controls that have something behind them; one not offered is left out, not dimmed.
@@ -177,7 +185,7 @@ internal sealed interface LivePlayerStatus {
 
 internal enum class PlayerAction {
     Back, PictureInPicture, FullScreen, BackTen, TogglePlay, ForwardThirty,
-    GoLive, RecordProgram, RecordSeries, RecordAll, WatchLive,
+    GoLive, RecordProgram, RecordSeries, RecordAll, WatchLive, RetryChannels,
 }
 
 internal enum class PlayerLayout(val upright: Boolean, val trackThickness: Dp, val skipIconSize: Dp) {

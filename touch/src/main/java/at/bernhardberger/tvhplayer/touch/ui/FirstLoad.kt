@@ -106,7 +106,7 @@ internal fun SkeletonBlock(width: Dp, height: Dp, shape: Shape = RoundedCornerSh
 internal fun OfflineBanner(
     compact: Boolean,
     texts: OfflineTexts,
-    onSettings: () -> Unit,
+    onSettings: (() -> Unit)?,
     modifier: Modifier = Modifier,
     retryIn: String? = null,
 ) {
@@ -123,11 +123,13 @@ internal fun OfflineBanner(
                 Text(stringResource(R.string.channels_unreachable), style = MaterialTheme.typography.bodyMedium)
                 Text(stringResource(texts.saved), style = MaterialTheme.typography.bodySmall)
             }
-            IconButton(onClick = onSettings) {
-                Icon(
-                    painterResource(R.drawable.channels_settings),
-                    stringResource(R.string.channels_connection_settings),
-                )
+            if (onSettings != null) {
+                IconButton(onClick = onSettings) {
+                    Icon(
+                        painterResource(R.drawable.channels_settings),
+                        stringResource(R.string.channels_connection_settings),
+                    )
+                }
             }
         } else {
             FlowRow(Modifier.weight(1f).padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -139,7 +141,9 @@ internal fun OfflineBanner(
                 }
                 Text(reconnect, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
             }
-            TextButton(onClick = onSettings) { Text(stringResource(R.string.channels_connection_settings)) }
+            if (onSettings != null) {
+                TextButton(onClick = onSettings) { Text(stringResource(R.string.channels_connection_settings)) }
+            }
         }
     }
 }

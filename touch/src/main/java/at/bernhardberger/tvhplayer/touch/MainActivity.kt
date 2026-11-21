@@ -35,7 +35,7 @@ class MainActivity : ComponentActivity() {
     private val sdk: SdkRuntimeOwner by inject()
     private val notices: NoticeCenter by inject()
     private val connection: AppConnectionViewModel by viewModel()
-    private val channels: ChannelsViewModel by viewModel()
+    private val channels: ChannelsViewModel by inject()
     private val recordings: RecordingsViewModel by viewModel()
     private val guide: GuideViewModel by viewModel()
 

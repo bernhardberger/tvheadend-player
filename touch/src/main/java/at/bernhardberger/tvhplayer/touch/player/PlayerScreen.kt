@@ -70,17 +70,12 @@ internal fun PlayerScreen(
     var touches by remember { mutableIntStateOf(0) }
     var touching by remember { mutableStateOf(false) }
     var panel by rememberSaveable { mutableStateOf<PlayerPanel?>(null) }
-    // Sheets and menus close on entering the picture-in-picture window (they don't come back), and
-    // when their control leaves (the tracks went away).
-    val panelGone = panelGone(panel, state.offered, inWindow)
-    LaunchedEffect(panelGone) { if (panelGone) panel = null }
     // Info opens on the program being watched each time; inside the sheet the viewer opens others.
     var infoStack by rememberSaveable(stateSaver = InfoStackSaver) { mutableStateOf(InfoStack()) }
     val showPanel: (PlayerPanel?) -> Unit = {
         if (it == PlayerPanel.Info && panel?.button != it) infoStack = InfoStack(state.schedule?.watchingId)
         panel = it
     }
-    val panels = PanelHost(panel, showPanel, onChoice)
     val openOptions = { panel = PlayerPanel.Options }
     var preview by remember(state.channel.id, state.status) { mutableStateOf<Int?>(null) }
     val hideAfter = controlsHideAfter(
@@ -95,9 +90,13 @@ internal fun PlayerScreen(
         val held = remember { HeldLayout(playerLayout(maxWidth, maxHeight)) }
         if (!inWindow) held.layout = playerLayout(maxWidth, maxHeight)
         val layout = held.layout
+        val panelGone = panelGone(panel, state.offered, inWindow, layout)
+        LaunchedEffect(panelGone) { if (panelGone) panel = null }
+        val activePanel = panel.takeUnless { panelGone }
+        val panels = PanelHost(activePanel, showPanel, onChoice)
         val playing = state.status == LivePlayerStatus.Playing
         // A sheet takes the controls off the picture; a menu keeps them, it belongs to a button.
-        val sheet = panel?.let { !it.atButton(layout) } == true
+        val sheet = activePanel?.let { !it.atButton(layout) } == true
         val controls = !inWindow && !sheet && (visible || !playing)
         val toggle = if (playing && !inWindow) ({ visible = !visible }) else null
         val latestShown by rememberUpdatedState(onControlsShown)
@@ -119,17 +118,16 @@ internal fun PlayerScreen(
         // On the upright phone a sheet rises only to the picture's foot, so the picture stays in view.
         val belowPicture = maxHeight - WindowInsets.statusBars.asPaddingValues().calculateTopPadding() -
             maxWidth * (9f / 16)
-        if (!inWindow) {
-            PlayerSheets(
-                panel, state, layout, showPanel, onAction, onChoice, onChannel,
-                InfoPage(infoStack) { infoStack = it }, belowPicture,
-            )
-        }
+        PlayerSheets(
+            activePanel, state, layout, showPanel, onAction, onChoice, onChannel,
+            InfoPage(infoStack) { infoStack = it }, belowPicture,
+        )
     }
 }
 
-private fun panelGone(panel: PlayerPanel?, offered: Set<PlayerControl>, inWindow: Boolean) =
-    inWindow || panel?.button?.control?.let { it !in offered } == true
+private fun panelGone(panel: PlayerPanel?, offered: Set<PlayerControl>, inWindow: Boolean, layout: PlayerLayout) =
+    inWindow || (layout.upright && panel == PlayerPanel.Channels) ||
+        panel?.button?.control?.let { it !in offered } == true
 
 /** The upright layout: the picture on top with its controls, the program and the channel list below. */
 @Composable

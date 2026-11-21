@@ -23,6 +23,9 @@ import at.bernhardberger.tvhplayer.notices.Notice
 import at.bernhardberger.tvhplayer.touch.ui.TouchNotice
 import at.bernhardberger.tvhplayer.ui.notifications.NoticeFormatter
 import at.bernhardberger.tvhplayer.core.HumanTrackLabel
+import at.bernhardberger.tvhplayer.core.AppError
+import at.bernhardberger.tvhplayer.core.AppErrorAction
+import at.bernhardberger.tvhplayer.core.AppErrorCondition
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
@@ -55,6 +58,8 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.SemanticsProperties
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.channels.ChannelDetails
+import at.bernhardberger.tvhplayer.touch.channels.ChannelPlayback
+import at.bernhardberger.tvhplayer.touch.channels.ChannelsState
 import at.bernhardberger.tvhplayer.touch.channels.channelsFixture
 import at.bernhardberger.tvhplayer.touch.guide.RIDGE_LIGHT_ID
 import at.bernhardberger.tvhplayer.touch.guide.RIDGE_LIGHT_REPEAT_ID
@@ -203,6 +208,7 @@ class PlayerScreenTest {
         assertInlineChannels()
         capture("tablet-upright-player", TouchCanvas.TABLET_UPRIGHT)
         infoSheet("tablet-upright-player", TouchCanvas.TABLET_UPRIGHT, details = false)
+        assertOfflineChannels(R.string.channels_offline)
     }
 
     @Test
@@ -303,6 +309,76 @@ class PlayerScreenTest {
         show()
         menusAndSheets("phone-player-landscape", TouchCanvas.PHONE_LANDSCAPE, subtitles = false, profile = false)
         infoSheet("phone-player-landscape", TouchCanvas.PHONE_LANDSCAPE, details = false)
+        button(R.string.player_channels).performClick()
+        assertOfflineChannels(R.string.channels_saved)
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w1280dp-h800dp-land-xhdpi")
+    fun channelsSheetSurvivesZapAndHoldsTheControls() {
+        show(hideAfterMs = hideMs)
+        button(R.string.player_channels).performClick()
+        val close = button(R.string.side_sheet_close)
+        close.assertIsDisplayed()
+        val switched = channelsFixture().let { list ->
+            list.copy(rows = list.rows.map { row ->
+                if (row.id == "harbor-sport") row.copy(playback = ChannelPlayback(null)) else row
+            })
+        }
+        compose.onNodeWithText("Harbor Sport").performClick()
+        compose.mainClock.autoAdvance = false
+        compose.runOnIdle {
+            assertEquals(listOf("harbor-sport"), played)
+            channelId.value = "harbor-sport"
+            channelState.value = ChannelsState.Ready(switched)
+        }
+        compose.mainClock.advanceTimeBy(hideMs + 32)
+        val playing = SemanticsMatcher.expectValue(
+            SemanticsProperties.StateDescription, compose.activity.getString(R.string.channels_playing),
+        )
+        compose.onNode(playing and hasText("Harbor Sport")).assertIsDisplayed()
+        tag("player-picture").assertIsDisplayed()
+        close.assertIsDisplayed()
+        compose.mainClock.autoAdvance = true
+        back()
+        close.assertDoesNotExist()
+        chromeIsVisible()
+
+        button(R.string.player_channels).performClick()
+        close.assertIsDisplayed()
+        offered.value -= PlayerControl.Channels
+        close.assertDoesNotExist()
+        button(R.string.player_channels).assertDoesNotExist()
+        chromeIsVisible()
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w892dp-h412dp-land-xhdpi")
+    fun channelsSheetUsesTheBrowseFormsWithoutSettings() {
+        channelState.value = ChannelsState.Loading
+        show()
+        button(R.string.player_channels).performClick()
+        text(R.string.channels_loading).assertIsDisplayed()
+
+        val channels = channelsFixture()
+        channelState.value = ChannelsState.Ready(channels.copy(rows = emptyList(), selectedTagId = "news"))
+        button(R.string.channels_all).performClick()
+        compose.runOnIdle { assertEquals(PlayerChoice.ChannelTag(null), choices.last()) }
+
+        channelState.value = ChannelsState.SignInNeeded
+        text(SharedR.string.error_106_title).assertIsDisplayed()
+        button(R.string.channels_connection_settings).assertDoesNotExist()
+
+        channelState.value = ChannelsState.Failed(
+            AppError(AppErrorCondition.AUTHENTICATION_REJECTED, listOf(AppErrorAction.CONNECTION_SETTINGS)),
+        )
+        text(R.string.channels_sign_in_failed).assertIsDisplayed()
+        button(R.string.channels_connection_settings).assertDoesNotExist()
+
+        channelState.value = ChannelsState.Unreachable
+        button(R.string.channels_retry).performClick()
+        compose.runOnIdle { assertEquals(PlayerAction.RetryChannels, actions.last()) }
+        button(R.string.channels_connection_settings).assertDoesNotExist()
     }
 
     @Test
@@ -344,6 +420,8 @@ class PlayerScreenTest {
     private val choices = mutableListOf<PlayerChoice>()
     private val played = mutableListOf<String>()
     private val status = mutableStateOf<LivePlayerStatus>(LivePlayerStatus.Playing)
+    private val channelId = mutableStateOf<String?>(null)
+    private val channelState = mutableStateOf<ChannelsState?>(null)
 
     private val paused = mutableStateOf(false)
     private val offered = mutableStateOf(PlayerControl.entries.toSet())
@@ -359,7 +437,7 @@ class PlayerScreenTest {
             ),
         )
         val fixture = LivePlayerState(
-            channel = channel, channels = channels,
+            channel = channel, channels = ChannelsState.Ready(channels),
             frame = BitmapPainter(TouchFixtureArt.art("still-ridge-light").asImageBitmap()),
             timeline = mutableStateOf(LiveTimeline(LocalTime.of(20, 0), 3600, 1510, 2568, 2820)),
             tracks = PlayerTracks(
@@ -394,7 +472,11 @@ class PlayerScreenTest {
         compose.setContent {
             MaterialTheme(colorScheme = MobileDarkColors) {
                 PlayerScreen(
-                    fixture.copy(status = status.value, paused = paused.value, offered = offered.value),
+                    fixture.copy(
+                        channel = channels.rows.firstOrNull { it.id == channelId.value } ?: fixture.channel,
+                        channels = channelState.value ?: fixture.channels,
+                        status = status.value, paused = paused.value, offered = offered.value,
+                    ),
                     { actions += it }, { seeks += it }, {}, { played += it }, { choices += it },
                     inWindow = inWindow.value, hideAfterMs = hideAfterMs,
                 ) { modifier ->
@@ -581,6 +663,13 @@ class PlayerScreenTest {
     private fun assertInlineChannels() {
         tag("player-channel-list").assertIsDisplayed()
         compose.onNode(hasClickAction() and hasText(compose.activity.getString(R.string.player_channels))).assertDoesNotExist()
+    }
+
+    private fun assertOfflineChannels(message: Int) {
+        channelState.value = ChannelsState.Offline(channelsFixture())
+        text(message).assertIsDisplayed()
+        compose.onNodeWithText("Harbor Sport").assertIsDisplayed()
+        button(R.string.channels_connection_settings).assertDoesNotExist()
     }
 
     private fun chromeIsVisible() {

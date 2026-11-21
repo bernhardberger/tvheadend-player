@@ -100,7 +100,7 @@ class PlayerActivity : ComponentActivity() {
     private val notices: NoticeCenter by inject()
     private val owner: AppProfileOwner by inject()
     private val connection: AppConnectionViewModel by viewModel()
-    private val channels: ChannelsViewModel by viewModel()
+    private val channels: ChannelsViewModel by inject()
     private val runtime get() = sdk.playbackRuntime
 
     private lateinit var requested: MutableStateFlow<Tune>
@@ -225,6 +225,7 @@ class PlayerActivity : ComponentActivity() {
             PlayerAction.BackTen -> timeshift.skip(-BACK_SKIP_MS)
             PlayerAction.ForwardThirty -> timeshift.skip(FORWARD_SKIP_MS)
             PlayerAction.GoLive -> timeshift.goLive()
+            PlayerAction.RetryChannels -> connection.reconnectNow()
             else -> Unit
         }
     }

@@ -14,6 +14,10 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.SystemClock
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.exoplayer.ExoPlayer
@@ -60,6 +64,7 @@ import org.koin.dsl.onClose
 
 private val Io = named("io")
 private val Application = named("application")
+private val Channels = named("channels")
 
 /**
  * The TV app's session, profile and playback graph (its AppModule), built the same way because
@@ -167,8 +172,17 @@ val touchModule = module {
     }
     viewModel { AppConnectionViewModel(session = get(), profileOwner = get(), connectionNotices = get()) }
     single { ChannelTagSettingsStore(androidContext()) }
-    viewModel {
-        ChannelsViewModel(session = get(), tagSettings = get(), liveProfile = get<AppProfileOwner>().liveProfile)
+    // Browsing and playback share a scope for the life of the application, not either activity.
+    single(Channels) { ViewModelStore() } onClose { it?.clear() }
+    single {
+        val factory = viewModelFactory {
+            initializer {
+                ChannelsViewModel(
+                    session = get(), tagSettings = get(), liveProfile = get<AppProfileOwner>().liveProfile,
+                )
+            }
+        }
+        ViewModelProvider.create(get<ViewModelStore>(Channels), factory)[ChannelsViewModel::class]
     }
     viewModel { RecordingsViewModel(session = get()) }
     viewModel { GuideViewModel(session = get()) }
