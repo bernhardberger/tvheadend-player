@@ -7,6 +7,7 @@ import at.bernhardberger.tvhplayer.touch.ui.RuleSchedule
 import androidx.compose.ui.graphics.painter.Painter
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvhplayer.core.AppError
+import at.bernhardberger.tvhplayer.touch.ui.hasChannelLogo
 
 internal sealed interface ChannelsState {
     data object Loading : ChannelsState
@@ -27,9 +28,9 @@ internal data class ChannelList(
     val rows: List<ChannelRow>,
     val tags: List<ChannelTag> = emptyList(),
     val selectedTagId: String? = null,
-    // Based on the full list, so filtering doesn't change the placement of channel names.
-    val hasLogos: Boolean = rows.any { it.logo != null },
-)
+) {
+    val hasLogos: Boolean = rows.any { hasChannelLogo(it.logo, it.logoModel) }
+}
 
 internal data class ChannelTag(val id: String, val label: String)
 

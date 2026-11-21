@@ -57,7 +57,7 @@ import at.bernhardberger.tvhplayer.ui.common.hintRes
 import at.bernhardberger.tvhplayer.ui.common.AppErrorText
 import at.bernhardberger.tvhplayer.ui.common.titleRes
 import at.bernhardberger.tvhplayer.touch.channels.ChannelRow
-import at.bernhardberger.tvhplayer.touch.ui.ChannelLogoTile
+import at.bernhardberger.tvhplayer.touch.ui.channelLogoSlot
 
 private val OnPicture = Color.White
 private val DarkControl = Color(0xA82C2E2E)
@@ -154,11 +154,13 @@ private fun PlayerTopBar(
         PlayerIconButton(R.drawable.connect_back_outline, R.string.player_back, { onAction(PlayerAction.Back) })
         if (!layout.upright) {
             val logoWidth = if (layout == PlayerLayout.Tablet) 86.dp else 64.dp
-            ChannelLogo(state.channel, Modifier.width(logoWidth).height(40.dp))
+            val logo = playerChannelLogo(state.channel, Modifier.width(logoWidth).height(40.dp))
+            logo?.invoke()
             val type = MaterialTheme.typography
             val channelType = if (layout == PlayerLayout.Tablet) type.titleLarge else type.titleMedium
             Text(
-                state.channel.name, Modifier.weight(1f).padding(horizontal = 12.dp), color = OnPicture,
+                state.channel.name, Modifier.weight(1f).padding(start = if (logo != null) 12.dp else 0.dp, end = 12.dp),
+                color = OnPicture,
                 style = channelType, maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
         } else {
@@ -328,11 +330,8 @@ private fun statusText(status: LivePlayerStatus): Triple<Int, Int, String?>? = w
     else -> null
 }
 
-@Composable
-internal fun ChannelLogo(channel: ChannelRow, modifier: Modifier) {
-    if (channel.logo == null && channel.logoModel == null) return
-    ChannelLogoTile(channel.logo, channel.logoTint, modifier, RoundedCornerShape(8.dp), channel.logoModel)
-}
+internal fun playerChannelLogo(channel: ChannelRow, modifier: Modifier): (@Composable () -> Unit)? =
+    channelLogoSlot(channel.logo, channel.logoTint, modifier, RoundedCornerShape(8.dp), channel.logoModel)
 
 @Composable
 internal fun PlayerIconButton(

@@ -59,7 +59,7 @@ import kotlinx.coroutines.launch
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.channels.ChannelRecording
 import at.bernhardberger.tvhplayer.touch.channels.RecordingBadge
-import at.bernhardberger.tvhplayer.touch.ui.ChannelLogoTile
+import at.bernhardberger.tvhplayer.touch.ui.channelLogoSlot
 import at.bernhardberger.tvhplayer.touch.ui.PartsLine
 import at.bernhardberger.tvhplayer.touch.ui.rememberStandalonePicture
 
@@ -149,11 +149,13 @@ private fun ColumnHead(channel: GuideChannel, onClick: () -> Unit) {
             .semantics { contentDescription = description }.padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ChannelLogoTile(
+        val logo = channelLogoSlot(
             channel.logo, channel.logoTint, Modifier.size(72.dp, 40.dp), RoundedCornerShape(10.dp), channel.logoModel,
         )
+        logo?.invoke()
         Text(
-            channel.name, Modifier.weight(1f).padding(start = 12.dp), style = MaterialTheme.typography.titleMedium,
+            channel.name, Modifier.weight(1f).padding(start = if (logo != null) 12.dp else 0.dp),
+            style = MaterialTheme.typography.titleMedium,
             maxLines = 1, overflow = TextOverflow.Ellipsis,
         )
         Icon(painterResource(R.drawable.connect_next_outline), null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -290,6 +292,7 @@ private fun segmentShape(index: Int, count: Int): RoundedCornerShape {
 @Composable
 internal fun OverviewRows(
     channels: List<GuideChannel>,
+    showLogoSlots: Boolean,
     openId: String?,
     onOpen: (String?) -> Unit,
     actions: GuideActions,
@@ -314,11 +317,10 @@ internal fun OverviewRows(
                     ListItem(
                         onClick = { onOpen(if (open) null else program.id) },
                         colors = ListItemDefaults.segmentedColors(containerColor = Color.Transparent),
-                        leadingContent = {
-                            ChannelLogoTile(
-                                channel.logo, channel.logoTint, Modifier.size(88.dp, 48.dp), model = channel.logoModel,
-                            )
-                        },
+                        leadingContent = channelLogoSlot(
+                            channel.logo, channel.logoTint, Modifier.size(88.dp, 48.dp),
+                            model = channel.logoModel, showSlot = showLogoSlots,
+                        ),
                         overlineContent = { PartsLine(listOf(channel.name, program.start)) },
                         supportingContent = {
                             Column {

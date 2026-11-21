@@ -66,8 +66,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import at.bernhardberger.tvhplayer.touch.R
-import at.bernhardberger.tvhplayer.touch.ui.ChannelLogoTile
 import at.bernhardberger.tvhplayer.touch.ui.PlayingBars
+import at.bernhardberger.tvhplayer.touch.ui.channelLogoSlot
 import at.bernhardberger.tvhplayer.touch.ui.playingContainerColor
 import at.bernhardberger.tvhplayer.touch.ui.watchedProgressColor
 import at.bernhardberger.tvhplayer.ui.TvOnRecordingContainerColor
@@ -184,7 +184,7 @@ private fun ChannelHeader(
                 if (onPlay != null) onClick(label = watch, action = null)
             },
         enabled = !offline,
-        leadingContent = if (listHasLogos) ({ ChannelLogo(row, layout) }) else null,
+        leadingContent = channelRowLogo(row, layout, listHasLogos),
         trailingContent = { ExpandButton(row, expanded, offline, toggle) },
         verticalAlignment = Alignment.CenterVertically,
         // A saved row while offline is dimmed as a whole, not recolored to the disabled palette.
@@ -292,13 +292,12 @@ private fun ChannelName(name: String, modifier: Modifier) {
     }
 }
 
-@Composable
-private fun ChannelLogo(row: ChannelRow, layout: ChannelsLayout) {
+private fun channelRowLogo(row: ChannelRow, layout: ChannelsLayout, showSlot: Boolean): (@Composable () -> Unit)? {
     val size = when (layout) {
         ChannelsLayout.Wide, ChannelsLayout.Upright -> Modifier.size(112.dp, 56.dp)
         ChannelsLayout.Phone -> Modifier.size(88.dp, 48.dp)
     }
-    ChannelLogoTile(row.logo, row.logoTint, size, model = row.logoModel)
+    return channelLogoSlot(row.logo, row.logoTint, size, model = row.logoModel, showSlot = showSlot)
 }
 
 // The logo sits in the list item's leading slot, so these weights split what remains after it; they keep the

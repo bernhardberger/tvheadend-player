@@ -53,7 +53,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.channels.ChannelActionLabel
-import at.bernhardberger.tvhplayer.touch.ui.ChannelLogoTile
+import at.bernhardberger.tvhplayer.touch.ui.channelLogoSlot
 import at.bernhardberger.tvhplayer.touch.ui.DetailsBackButton
 import at.bernhardberger.tvhplayer.touch.ui.DetailsEpisode
 import at.bernhardberger.tvhplayer.touch.ui.DetailsFacts
@@ -187,10 +187,10 @@ private fun PageBar(details: ProgramDetails, onBack: () -> Unit, transparent: Bo
         navigationIcon = { DetailsBackButton(stringResource(R.string.recordings_back), onBack) },
         title = {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                ChannelLogoTile(
+                channelLogoSlot(
                     details.channelLogo, details.logoTint, Modifier.size(56.dp, 32.dp), RoundedCornerShape(8.dp),
                     details.channelLogoModel,
-                )
+                )?.invoke()
                 Text(
                     details.channel, Modifier.weight(1f, fill = false), style = MaterialTheme.typography.titleMedium,
                     maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -330,12 +330,10 @@ private fun OtherAirings(details: ProgramDetails, actions: GuideActions) {
         details.otherAirings.forEachIndexed { index, airing ->
             val shapes = ListItemDefaults.segmentedShapes(index, details.otherAirings.size)
             val colors = ListItemDefaults.segmentedColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
-            val leading: @Composable () -> Unit = {
-                ChannelLogoTile(
-                    airing.logo, airing.logoTint, Modifier.size(64.dp, 36.dp), RoundedCornerShape(8.dp),
-                    airing.logoModel,
-                )
-            }
+            val leading = channelLogoSlot(
+                airing.logo, airing.logoTint, Modifier.size(64.dp, 36.dp), RoundedCornerShape(8.dp),
+                model = airing.logoModel, showSlot = details.airingsHaveLogos,
+            )
             val supporting: @Composable () -> Unit = { PartsLine(airing.line) }
             val trailing: (@Composable () -> Unit)? = if (airing.scheduled) {
                 { ScheduledIcon(airing.ruleSchedule) }

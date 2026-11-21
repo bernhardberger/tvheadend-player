@@ -44,6 +44,11 @@ internal fun channelsFixture(playing: Boolean = false): ChannelList = ChannelLis
     tags = listOf(ChannelTag("news", "News"), ChannelTag("sport", "Sport")),
 )
 
+internal fun ChannelList.withoutLogos(vararg ids: String): ChannelList = ChannelList(
+    rows.map { if (ids.isEmpty() || it.id in ids) it.copy(logo = null, logoModel = null) else it },
+    tags, selectedTagId,
+)
+
 private fun amberStage() = channel(
     "amber-stage", "Amber Stage", Color(0xFF483D1E),
     now("Glass Harbor", "7:50–9:17 PM", 0.66f, "30m"), next("The Kettle Hour", "9:17 PM"),

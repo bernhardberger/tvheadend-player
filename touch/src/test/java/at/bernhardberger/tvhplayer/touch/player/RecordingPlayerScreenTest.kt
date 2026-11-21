@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.touch.player
 
 import androidx.activity.ComponentActivity
+import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.os.Looper
 import android.view.WindowInsets
@@ -24,6 +25,7 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -41,15 +43,19 @@ import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.MergingMediaSource
 import androidx.media3.exoplayer.source.SilenceMediaSource
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrCutpoint
 import at.bernhardberger.tvheadend.sdk.core.DvrCutpointAction
 import at.bernhardberger.tvheadend.sdk.core.DvrCutpointsResult
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvheadend.sdk.core.PlaybackBindingResult
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvheadend.sdk.core.TvheadendTestResultFactory
 import at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi
 import at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendPlaybackCoordinator
+import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
+import at.bernhardberger.tvheadend.sdk.testing.FakePlaybackApi
 import at.bernhardberger.tvhplayer.di.SdkRuntimeOwner
 import at.bernhardberger.tvhplayer.images.ChannelAccents
 import at.bernhardberger.tvhplayer.notices.Notice
@@ -98,6 +104,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.android.controller.ActivityController
 import org.robolectric.util.ReflectionHelpers
 import java.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -235,14 +242,37 @@ class RecordingPlayerScreenTest {
         twoAudioTracks: Boolean = false,
         holdSettings: MutableStateFlow<Boolean>? = null,
         exercise: (PlayerActivity, AppPlaybackRuntime) -> Unit,
+    ) = withPlayerRoute(marked, twoAudioTracks, live = false, holdSettings = holdSettings) { controller, runtime, _, _ ->
+        exercise(controller.get(), runtime)
+    }
+
+    @OptIn(UnstableApi::class)
+    @kotlin.OptIn(TvheadendTestingApi::class, FakePlaybackApi::class)
+    private fun withPlayerRoute(
+        marked: Boolean = false,
+        twoAudioTracks: Boolean = false,
+        live: Boolean,
+        offerPictureInPicture: Boolean = false,
+        onRejectedBind: () -> Unit = {},
+        holdSettings: MutableStateFlow<Boolean>? = null,
+        exercise: (ActivityController<PlayerActivity>, AppPlaybackRuntime, ServerGuide, FakeTvheadendSession) -> Unit,
     ) {
         val context = compose.activity.applicationContext
         val connection = FakeConnection()
         val player = ExoPlayer.Builder(context).build()
         val server = ServerGuide(Instant.parse("2026-11-11T21:00:00Z"))
-        val session = if (marked) markedSession(connection, server) else connection.session
+        val session = when {
+            marked -> markedSession(connection, server)
+            live -> object : TvheadendSession by connection.session {
+                override fun bindLivePlayback(currentSession: CurrentSessionObservation, channelId: ChannelId) =
+                    connection.session.bindLivePlayback(currentSession, channelId).also {
+                        if (it == PlaybackBindingResult.TargetUnavailable) onRejectedBind()
+                    }
+            }
+            else -> connection.session
+        }
         val coordinator = createTvheadendPlaybackCoordinator(
-            if (marked) offlinePlayer(player, twoAudioTracks) else player,
+            if (marked || live) offlinePlayer(player, twoAudioTracks) else player,
             workDispatcher = Dispatchers.Main.immediate,
         )
         val settings = holdSettings?.let { PlayerSettingsStore(heldSettings(it)) } ?: PlayerSettingsStore(context)
@@ -270,12 +300,23 @@ class RecordingPlayerScreenTest {
         }
         try {
             val id = if (marked) server.film.id else DvrEntryId(1)
-            val intent = RecordingRoute(id, recordingStart(marked)).intent(context)
+            if (live) {
+                connection.session.scriptLivePlaybackSuccess()
+                connection.session.publish(server.connected())
+            }
+            if (offerPictureInPicture) {
+                shadowOf(context.packageManager).setSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE, true)
+            }
+            val intent = if (live) PlayerActivity.intent(context, server.first.id)
+                else RecordingRoute(id, recordingStart(marked)).intent(context)
             Robolectric.buildActivity(PlayerActivity::class.java, intent).setup().use { controller ->
-                settleRoute(player.takeIf { marked })
-                exercise(controller.get(), runtime)
+                settleRoute(player.takeIf { marked || live })
+                exercise(controller, runtime, server, connection.session)
             }
         } finally {
+            if (offerPictureInPicture) {
+                shadowOf(context.packageManager).setSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE, false)
+            }
             owner.requestClose()
             shadowOf(Looper.getMainLooper()).idle()
             stopKoin()
@@ -320,6 +361,68 @@ class RecordingPlayerScreenTest {
     }
 
     @Test
+    @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
+    fun dispatchedWatchDoesNotCreateAnotherPlaybackIntent() = withPlayerRoute(live = true) { activity, runtime, server, _ ->
+        val watch = runtime.notePlaybackIntent()
+        val next = PlayerActivity.intent(activity.get(), server.second.id).putExtra("watch_intent", watch)
+        activity.newIntent(next)
+        settleRoute()
+        assertEquals("Dispatch must serve the Watch already accepted", watch + 1, runtime.notePlaybackIntent())
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
+    fun aZapRemainsTheRequestedChannelAfterRecreation() = withPlayerRoute(live = true) { activity, _, server, _ ->
+        compose.onNode(
+            hasText(server.second.name.orEmpty()) and hasClickAction() and hasAnyAncestor(hasTestTag("player-channel-list")),
+        ).performClick()
+        settleRoute()
+        activity.recreate()
+        settleRoute()
+        assertEquals("Recreation must keep the in-player zap", server.second.id.value,
+            activity.get().intent.getLongExtra("channel", -1))
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
+    @kotlin.OptIn(FakePlaybackApi::class)
+    fun aRejectedZapStopsThePreviouslyPlayingChannel() = withPlayerRoute(live = true) { activity, runtime, server, fake ->
+        assertEquals(AppPlaybackTarget.Live(server.first.id), runtime.activeTarget.value)
+        assertTrue(runtime.player.isPlaying)
+        fake.scriptLivePlaybackFailure(PlaybackBindingResult.TargetUnavailable)
+        activity.newIntent(PlayerActivity.intent(activity.get(), server.second.id, runtime.notePlaybackIntent()))
+        settleRoute()
+        compose.onNodeWithText(activity.get().getString(SharedR.string.error_207_title)).assertIsDisplayed()
+        assertEquals("The rejected zap must not keep the previous channel playing", null, runtime.activeTarget.value)
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
+    @kotlin.OptIn(FakePlaybackApi::class)
+    fun aSupersededRejectedZapLeavesTheNewerTargetAlone() {
+        var supersede = {}
+        withPlayerRoute(live = true, onRejectedBind = { supersede() }) { activity, runtime, server, fake ->
+            val originalEpoch = runtime.videoPresentation.value.epoch
+            val original = AppPlaybackTarget.Live(server.first.id)
+            assertEquals(original, runtime.activeTarget.value)
+            var superseded = false
+            supersede = {
+                superseded = true
+                fake.scriptLivePlaybackSuccess()
+                activity.newIntent(PlayerActivity.intent(activity.get(), server.first.id, runtime.notePlaybackIntent()))
+            }
+            fake.scriptLivePlaybackFailure(PlaybackBindingResult.TargetUnavailable)
+            activity.newIntent(PlayerActivity.intent(activity.get(), server.second.id, runtime.notePlaybackIntent()))
+            settleRoute(runtime.player)
+            assertTrue("The newer Watch must arrive before the rejection returns", superseded)
+            assertEquals(original, runtime.activeTarget.value)
+            assertEquals("The newer Watch adopts the retained channel without a stop or reinstall",
+                originalEpoch, runtime.videoPresentation.value.epoch)
+            assertTrue(runtime.player.isPlaying)
+        }
+    }
+
+    @Test
     @OptIn(UnstableApi::class)
     fun recordingEofDoesNotStopAQueuedReplacement() {
         val hold = MutableStateFlow(false)
@@ -356,6 +459,21 @@ class RecordingPlayerScreenTest {
             settleRoute(runtime.player)
             assertTrue("Watch from beginning must restart playback", runtime.player.currentPosition in 0L..999L)
         }
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
+    fun aRefusedPictureInPictureButtonKeepsThePlayerOpen() = withPlayerRoute(
+        live = true,
+        offerPictureInPicture = true,
+    ) { activity, runtime, server, _ ->
+        val pip = compose.onNodeWithContentDescription(activity.get().getString(R.string.player_picture_in_picture))
+        pip.assertIsDisplayed()
+        shadowOf(activity.get().packageManager).setSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE, false)
+        pip.performSemanticsAction(SemanticsActions.OnClick)
+        settleRoute()
+        assertTrue("A refused window button must leave the player open", !activity.get().isFinishing)
+        assertEquals(AppPlaybackTarget.Live(server.first.id), runtime.activeTarget.value)
     }
 
     private fun assertRecordingRouteHidesSystemBars() = withRecordingRoute(marked = false) { activity, _ ->

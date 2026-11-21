@@ -55,7 +55,7 @@ internal fun TouchVideoSurface(
                 hasVideo = player.currentTracks.isTypeSelected(C.TRACK_TYPE_VIDEO),
                 failed = player.playerError != null,
             )
-            if (videoVisible) pictureAspect(player, mode)?.let { aspect = it }
+            if (videoVisible) aspect = pictureAspect(player, mode)
         }
         val listener = object : Player.Listener {
             override fun onEvents(player: Player, events: Player.Events) = update()
@@ -107,12 +107,15 @@ internal fun pictureAspect(player: ExoPlayer, mode: AspectRatioMode = AspectRati
     val format = player.videoFormat
     return when {
         size.width > 0 && size.height > 0 ->
-            surfaceFrameAspect(mode, size.width, size.height, size.pixelWidthHeightRatio)
+            displayAspect(mode, size.width, size.height, size.pixelWidthHeightRatio)
         format != null && format.width > 0 && format.height > 0 ->
-            surfaceFrameAspect(mode, format.width, format.height, format.pixelWidthHeightRatio)
+            displayAspect(mode, format.width, format.height, format.pixelWidthHeightRatio)
         else -> null
     }
 }
+
+private fun displayAspect(mode: AspectRatioMode, width: Int, height: Int, pixels: Float): Float =
+    surfaceFrameAspect(mode, width, height, pixels) ?: width * (pixels.takeIf { it > 0f } ?: 1f) / height
 
 /** The TV's rule: the screen stays on only while a visible picture plays without an error. */
 internal fun keepPlayerScreenOn(

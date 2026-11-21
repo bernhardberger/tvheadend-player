@@ -55,9 +55,10 @@ internal fun liveStatus(
 ): LivePlayerStatus {
     if (notice == BackgroundPlaybackNotice.LIMIT_EXPIRED) return LivePlayerStatus.PauseEnded
     val failed = state as? AppPlaybackState.Failed
+    val showingRequestedChannel = state.presented && playingId == shownId
     val condition = liveChannelCondition(
         issue = issue?.takeIf { playingId == shownId } ?: failed?.subscriptionIssue,
-        playbackFailed = requestFailed || failed != null,
+        playbackFailed = (requestFailed && !showingRequestedChannel) || failed != null,
         liveInterrupted = liveInterrupted(serverStopped, playingId, shownId),
         deviceFault = failed?.deviceFault == true,
     )
@@ -71,7 +72,7 @@ internal fun liveStatus(
     )
     return when (presentation) {
         PlaybackStatusPresentation.NONE ->
-            if (state.presented && playingId == shownId) LivePlayerStatus.Playing else LivePlayerStatus.Tuning
+            if (showingRequestedChannel) LivePlayerStatus.Playing else LivePlayerStatus.Tuning
         PlaybackStatusPresentation.COMPACT_TUNING -> LivePlayerStatus.Tuning
         PlaybackStatusPresentation.CHANNEL_UNAVAILABLE -> LivePlayerStatus.Unavailable(condition)
         PlaybackStatusPresentation.FULL_RECOVERY -> when {
@@ -110,6 +111,7 @@ internal fun liveTimeline(
     return LiveTimeline(
         programStart = localTime(window.start.epochSeconds, zone), duration = duration,
         bufferStart = bufferStart, position = position, live = live, behind = behind, liveEdge = liveEdge,
+        programmeStartSec = window.start.epochSeconds, segment = sample.timeline,
     )
 }
 
