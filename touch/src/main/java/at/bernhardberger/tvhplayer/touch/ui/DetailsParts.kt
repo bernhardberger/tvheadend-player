@@ -24,6 +24,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
@@ -54,12 +55,15 @@ internal fun ChannelLogoTile(
     model: Any? = null,
 ) {
     val scheme = MaterialTheme.colorScheme
+    val hasLogo = logo != null || model != null
     val accent = if (tint == null) rememberChannelAccent(model) else null
-    val ground = tint ?: accent?.animated?.value
-    val fill = if ((logo == null && model == null) || ground == null) {
+    val fill = if (!hasLogo || (tint == null && accent == null)) {
         Modifier.background(scheme.surfaceContainerHigh)
     } else {
-        Modifier.background(Brush.linearGradient(listOf(ground, lerp(ground, Color.Black, LOGO_SHADE))))
+        Modifier.drawBehind {
+            val ground = tint ?: accent?.animated?.value ?: scheme.surfaceContainerHigh
+            drawRect(Brush.linearGradient(listOf(ground, lerp(ground, Color.Black, LOGO_SHADE))))
+        }
     }
     Box(
         modifier.clip(shape).then(fill).border(1.dp, scheme.outlineVariant, shape),
