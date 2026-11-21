@@ -83,6 +83,8 @@ import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.components.ListBottomFadeHeight
 import at.bernhardberger.tvhplayer.ui.components.ListBottomReserve
 import at.bernhardberger.tvhplayer.ui.components.SideRail
+import at.bernhardberger.tvhplayer.ui.components.WallClockGap
+import at.bernhardberger.tvhplayer.ui.components.WALL_CLOCK_TAG
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
 import at.bernhardberger.tvhplayer.viewmodels.resolveChannelScopeState
@@ -244,7 +246,10 @@ class ChannelsListLayoutTest {
         assertEquals("header y", 28f, header.top, .5f)
         val group = tagsButton().bounds()
         val view = compose.onNodeWithTag("channels-view-button").bounds()
-        assertEquals("buttons end on the trailing inset", 902f, view.right, .5f)
+        val clock = compose.onNodeWithTag(WALL_CLOCK_TAG).bounds()
+        assertEquals("the clock ends on the trailing inset", 902f, clock.right, .5f)
+        assertEquals("buttons end the clock's gap before it", WallClockGap.value, clock.left - view.right, .5f)
+        assertEquals("the clock shares the header's axis", header.center.y, clock.center.y, 1f)
         assertEquals("kit medium icon button", 40f, view.width, .5f)
         assertEquals("button gap", 20f, view.left - group.right, .5f)
         assertEquals("buttons share the header's axis", header.center.y, view.center.y, 1f)

@@ -32,6 +32,7 @@ import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.ui.player.PlayerChrome
 import at.bernhardberger.tvhplayer.ui.player.PlayerChromeActions
 import at.bernhardberger.tvhplayer.ui.player.PlayerChromeContent
+import at.bernhardberger.tvhplayer.ui.player.PlayerChromeClockSec
 import at.bernhardberger.tvhplayer.ui.player.PlayerChromeMode
 import at.bernhardberger.tvhplayer.ui.player.PlayerChromeTimeline
 import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
@@ -124,7 +125,7 @@ class PlayerEntryMotionTest {
             val context = LocalContext.current
             PlayerChrome(
                 mode = PlayerChromeMode.BANNER,
-                content = PlayerChromeContent("20:15", liveInfoBarData(context.resources, 1, "One", null, null, false, 1_800, "Programme")),
+                content = PlayerChromeContent(PlayerChromeClockSec, liveInfoBarData(context.resources, 1, "One", null, null, false, 1_800, "Programme")),
                 timeline = PlayerChromeTimeline.Live(
                     AppTimeshiftState(available = true, bufferStartMs = -600_000, positionMs = 0, liveEdgeMs = 0),
                     nowSec = 1_800,

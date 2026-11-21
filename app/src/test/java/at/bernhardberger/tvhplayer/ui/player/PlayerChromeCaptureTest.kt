@@ -91,7 +91,6 @@ import at.bernhardberger.tvhplayer.playback.AppPlaybackSource
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
-import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.screens.guide.ConfirmProgrammeActionDialog
 import java.io.File
 import java.util.Locale
@@ -270,7 +269,7 @@ class PlayerChromeCaptureTest {
                                 liveEdgeMs = 0, timingKnown = true),
                             behind = false, paused = false,
                             content = PlayerChromeContent(
-                                clock = formatClock(now),
+                                clockSec = now,
                                 // Tide Watch is scheduled. The rail's Harbor Sport mark is an unlinked timer.
                                 info = liveInfoBarData(app.resources, playingIndex + 1L, names[playingIndex], programme, next, nextScheduled = !concert,
                                     nowSec = now, unavailableTitle = "No program information"),
@@ -585,7 +584,7 @@ class PlayerChromeCaptureTest {
                 fraction(NOW), fraction(NOW), true, slotStart, slotStop)
         }
         val content = PlayerChromeContent(
-            clock = formatClock(NOW),
+            clockSec = NOW,
             info = liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 101, "Ridge Earth HD", programme.takeUnless { noEpg }, next.takeUnless { noEpg }, nextScheduled = true, nowSec = NOW,
                 unavailableTitle = "No program information").let { info ->
                 when (scene) {
@@ -805,7 +804,7 @@ class PlayerChromeCaptureTest {
     private fun androidx.compose.foundation.layout.BoxScope.StepWithoutDirection(content: PlayerChromeContent) {
         val range = timeshiftSeekbarRange(projectedTimeshiftState(nearEnd, nearEndStep.targetMs))
         PlayerOverlayChrome(
-            headerContent = { PlayerChromeHeader(content.clock, it) },
+            headerContent = { PlayerChromeHeader(content.clockSec, it) },
             modifier = Modifier.align(Alignment.BottomCenter),
         ) {
             PlayerInfoBar(content.info) { Box(it.size(124.dp, 70.dp).background(TvSurfaceColors.containerLow)) }

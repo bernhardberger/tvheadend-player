@@ -70,7 +70,7 @@ class PlayerIdentityCardTest {
                 if (recording) RecordingChromeFixture(targetMs = 1_900_000L,
                     onInfo = { infos++ })
                 else PlayerChrome(mode = PlayerChromeMode.CONTROLS,
-                    content = PlayerChromeContent("20:15", PlayerInfoBarData("101", "Ridge Earth", "Programme", "20:00–21:00")),
+                    content = PlayerChromeContent(PlayerChromeClockSec, PlayerInfoBarData("101", "Ridge Earth", "Programme", "20:00–21:00")),
                     timeline = PlayerChromeTimeline.Live(AppTimeshiftState(available = seekable, timingKnown = true,
                         bufferStartMs = -600_000, positionMs = -60_000, liveEdgeMs = 0), nowSec = 1_800,
                         feedback = "Persistent seek feedback"),
@@ -166,7 +166,7 @@ class PlayerIdentityCardTest {
     private fun LiveChromeFixture(mode: PlayerChromeMode, info: PlayerInfoBarData) {
         PlayerChrome(
             mode = mode,
-            content = PlayerChromeContent("20:15", info),
+            content = PlayerChromeContent(PlayerChromeClockSec, info),
             timeline = PlayerChromeTimeline.Live(AppTimeshiftState(), nowSec = 1_800),
             actions = PlayerChromeActions(active = mode == PlayerChromeMode.CONTROLS, paused = false),
             onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {}, onInteraction = {},

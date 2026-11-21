@@ -67,7 +67,6 @@ import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.MainStartupPresentation
 import at.bernhardberger.tvhplayer.core.MainStartupPlaybackOutcome
 import at.bernhardberger.tvhplayer.core.mainStartupPlaybackOutcome
-import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.core.ChannelNumberEntryReadiness
 import at.bernhardberger.tvhplayer.profiling.profileTrace
@@ -1868,7 +1867,7 @@ fun VideoPlayerScreen(
     // During a quick step the Next line follows the step's target programme, so the block keeps its height.
     val controlsNext = infoNextEvent.takeUnless { channelUnavailable }
     return PlayerChromeContent(
-        clock = formatClock(nowSec),
+        clockSec = wallClockMinute(nowSec),
         state = chromeState,
         info = liveInfoBarData(
             resources = androidx.compose.ui.platform.LocalContext.current.resources,

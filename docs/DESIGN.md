@@ -343,6 +343,7 @@ Paths below are relative to `app/src/main/java/at/bernhardberger/tvhplayer/ui/`.
 | Shared pattern | Component |
 |---|---|
 | Row/section emphasis | `components/RowEmphasis.kt` — one 300 ms position clock, one 410 ms clock where the rows themselves travel (Home into On now, the zap rail), deferred header scale/alpha, content dimming and the muted card past a row's start |
+| Wall clock | `components/WallClock.kt` — the time (`titleLarge` Medium, primary; a 12-hour day period one step smaller in the secondary tone) over the date (`bodyMedium`, secondary), end-aligned in a width reserved for the locale's widest time and date; passive and read as one statement. The last item of every top-level browse header and the player header |
 | Progress bar | `components/ProgressStrip.kt` |
 | Channel title | `components/ChannelTitle.kt` — `channelTitleText` |
 | Picon | `components/PiconBox.kt` — dimmed TV icon while loading, normal-strength TV icon when there is no logo or it fails |
@@ -771,9 +772,18 @@ only.
   for TalkBack. List and Grid also draw "Channels" as a static one-line
   heading in the Settings heading's `headlineMedium` and `onSurface`, at the
   header start on the content's leading edge (trial 2026-11-21); Immersive and the Guide draw no title, as the drawer already
-  says where you are (accepted 2026-10-24). Its Tags and View options buttons end on the
-  trailing inset, 20dp apart, on the header row at y28 of the 960×540 reference
-  canvas. At larger text the header grows from its actual text measurements.
+  says where you are (accepted 2026-10-24). Its Tags and View options buttons sit
+  20dp apart on the header row at y28 of the 960×540 reference canvas, 24dp
+  before the wall clock, which ends on the trailing inset. At larger text the
+  header grows from its actual text measurements.
+- Home, Channels, Guide and Recordings end their header row with the shared
+  wall clock (owner 2026-11-21): time over date, centred on the row's centre
+  line. The block may be taller than the 40dp row; it overflows the row instead
+  of growing it, and never shrinks or wraps. Where the actions run out of room
+  (the Guide with long labels), the Tags and Filter values share the cut by
+  ellipsis; the date pill, View options and every icon keep their size, and no
+  button leaves the row. The clock
+  scrolls with its header and takes no focus.
   Header actions appear only when backed by working, authorized behavior.
 - Every browse header icon button rests on a 40dp disc of `surfaceVariant` at
   40%; the Guide's date pill shares that fill. Focus keeps TV Material's focused
@@ -1043,8 +1053,9 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
   layer at a time (the Banner too, also while paused) and then closes. Entering
   the player or a zap shows the Banner; it hides 5 s after the tune's first
   presented frame (a positively audio-only service lets its playing state stand in).
-- The wall clock stands alone at the top right over its scrim; there are no status
-  tags. The info bar holds the identity card and the programme block.
+- The shared wall clock stands alone at the top right over its scrim, where it
+  stands on the browse screens: its block is centred on the header band's centre
+  line, which the identity shares. There are no status tags. The info bar holds the identity card and the programme block.
 - The info bar's artwork tile is 196×110dp (three grid columns), 8dp corners, and
   takes no focus. It shows the programme's artwork with the channel's logo in
   the picture's own corner (section 2), so the channel reads beside the

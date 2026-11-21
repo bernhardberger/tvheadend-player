@@ -79,7 +79,7 @@ internal fun RecordingChromeFixture(
     PlayerChrome(
         mode = mode,
         content = PlayerChromeContent(
-            clock = "20:15",
+            clockSec = 1_791_144_900L, // 2026-10-04 20:15 UTC
             info = info ?: fixtureRecordingInfo(growing = growing, positionMs = positionMs,
                 durationMs = durationMs.takeIf { it != C.TIME_UNSET && it > 0L }),
             state = playerStateCell(paused),
