@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- TV: back -->
+    <string name="player_back">Back</string>
+    <!-- TV: playback_options -->
+    <string name="player_settings">Playback options</string>
+    <string name="player_picture_in_picture">Picture-in-picture</string>
+    <!-- TV: player_full_screen -->
+    <string name="player_full_screen">Full screen</string>
+    <string name="player_brightness">Brightness</string>
+    <string name="player_show_controls">Show playback controls</string>
+    <string name="player_hide_controls">Hide playback controls</string>
+    <string name="player_back_ten">Back 10 seconds</string>
+    <!-- TV: seek_forward_30 -->
+    <string name="player_forward_thirty">Forward 30 seconds</string>
+    <!-- TV: play -->
+    <string name="player_play">Play</string>
+    <!-- TV: pause -->
+    <string name="player_pause">Pause</string>
+    <!-- TV: player_tuning -->
+    <string name="player_tuning">Tuning</string>
+    <string name="player_go_live">Go live</string>
+    <!-- TV: timeshift_live -->
+    <string name="player_live">Live</string>
+    <!-- TV: timeshift_behind_live -->
+    <string name="player_behind_live">%1$s behind live</string>
+    <string name="player_timeline">Playback position</string>
+    <string name="player_next_program">Next • %1$s %2$s</string>
+    <string name="player_time_and_genre">%1$s • %2$s</string>
+    <!-- TV: context_record -->
+    <string name="player_record">Record</string>
+    <!-- TV: details_audio -->
+    <string name="player_audio">Audio</string>
+    <!-- TV: subtitles -->
+    <string name="player_subtitles">Subtitles</string>
+    <!-- TV: player_info -->
+    <string name="player_info">Info</string>
+    <!-- TV: nav_channels -->
+    <string name="player_channels">Channels</string>
+    <!-- TV: error_110_title -->
+    <string name="player_disconnected">Can’t reach the server</string>
+    <!-- TV: error_110_reason -->
+    <string name="player_reconnect_in">Reconnecting in %1$d s…</string>
+    <!-- TV: error_110_reason_pending -->
+    <string name="player_reconnecting">Reconnecting…</string>
+    <string name="player_pause_ended">The pause ended</string>
+    <string name="player_pause_expired">A paused channel stays tuned for 10 minutes</string>
+    <!-- TV: context_watch_live -->
+    <string name="player_watch_live">Watch live</string>
+    <!-- TV: error_201_title -->
+    <string name="player_no_tuner">No free tuner</string>
+    <!-- TV: error_201_reason (first sentence) -->
+    <string name="player_no_tuner_reason">Every tuner is in use right now. Try again later or choose another channel.</string>
+</resources>

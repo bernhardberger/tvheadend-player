@@ -20,6 +20,7 @@ enum class TouchCanvas(val qualifiers: String, val width: Int, val height: Int, 
     TABLET("en-rUS-w1280dp-h800dp-land-xhdpi", 2560, 1600, 32),
     TABLET_UPRIGHT("en-rUS-w800dp-h1280dp-port-xhdpi", 1600, 2560, 32),
     PHONE("en-rUS-w412dp-h892dp-port-xhdpi", 824, 1784, 40),
+    PHONE_LANDSCAPE("en-rUS-w892dp-h412dp-land-xhdpi", 1784, 824, 0),
 }
 
 /**

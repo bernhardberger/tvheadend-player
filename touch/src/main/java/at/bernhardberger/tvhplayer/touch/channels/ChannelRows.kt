@@ -77,11 +77,12 @@ internal fun ChannelRows(
     actions: ChannelsActions,
     offline: Boolean = false,
     initiallyOpenChannelId: String? = null,
+    showColumnLabels: Boolean = layout.tablet,
 ) {
     var openId by rememberSaveable(list.selectedTagId) { mutableStateOf(initiallyOpenChannelId) }
     BackHandler(enabled = !offline && list.rows.any { it.id == openId && it.details != null }) { openId = null }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        if (layout.tablet) item { ColumnLabels(layout) }
+        if (showColumnLabels) item { ColumnLabels(layout) }
         itemsIndexed(list.rows, key = { _, row -> row.id }) { index, row ->
             ChannelItem(
                 row = row,
