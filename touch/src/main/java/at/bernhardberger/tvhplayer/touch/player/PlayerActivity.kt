@@ -17,6 +17,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.annotation.OptIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
@@ -44,6 +45,7 @@ import at.bernhardberger.tvhplayer.data.ConnectionState
 import at.bernhardberger.tvhplayer.di.SdkRuntimeOwner
 import at.bernhardberger.tvhplayer.core.livePlayWhenReady
 import at.bernhardberger.tvhplayer.core.toConnectionState
+import at.bernhardberger.tvhplayer.images.ChannelAccents
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.BackgroundPlaybackNotice
@@ -74,9 +76,11 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.android.ext.android.inject
+import org.koin.android.ext.android.get
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.touch.ui.ArtworkModels
+import at.bernhardberger.tvhplayer.touch.ui.LocalChannelAccents
 import at.bernhardberger.tvhplayer.touch.ui.FrameNotices
 import at.bernhardberger.tvhplayer.touch.ui.LocalFrameNotices
 import org.koin.androidx.viewmodel.ext.android.viewModel
@@ -138,8 +142,10 @@ class PlayerActivity : ComponentActivity() {
         }
         setContent {
             MaterialTheme(colorScheme = MobileDarkColors) {
-                // The window's one notice host, for the connection in use, as browsing builds it.
-                FrameNotices(notices, owner, session) { Player() }
+                CompositionLocalProvider(LocalChannelAccents provides get<ChannelAccents>()) {
+                    // The window's one notice host, for the connection in use, as browsing builds it.
+                    FrameNotices(notices, owner, session) { Player() }
+                }
             }
         }
     }
