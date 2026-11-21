@@ -13,6 +13,7 @@ import at.bernhardberger.tvhplayer.notices.NoticeContext
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
+import at.bernhardberger.tvhplayer.touch.recordings.RecordingsViewModel
 import at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import kotlinx.coroutines.CoroutineScope
@@ -56,6 +57,9 @@ internal class FakeConnection(
 
     /** The Channels destination's state, as the composition root's view model gives it. */
     fun channels() = ChannelsViewModel(session, ChannelTagSettingsStore(MemoryPreferences()), owner.liveProfile)
+
+    /** The Recordings destination's state, as the composition root's view model gives it. */
+    fun recordings() = RecordingsViewModel(session)
 
     fun close() = scope.cancel()
 }

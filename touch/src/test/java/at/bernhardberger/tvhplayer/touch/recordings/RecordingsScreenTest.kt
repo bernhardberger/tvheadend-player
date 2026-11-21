@@ -37,6 +37,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
+import at.bernhardberger.tvhplayer.core.DvrArchiveShow
+import at.bernhardberger.tvhplayer.core.DvrArchiveGrouping
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -77,7 +79,7 @@ class RecordingsScreenTest {
         compose.onNodeWithText("Sort").assertIsDisplayed()
         compose.onNodeWithText("Group by").performClick()
         compose.onNodeWithText("Folders").performClick()
-        assertEquals(RecordingsGrouping.Folders, state.value.view.grouping)
+        assertEquals(DvrArchiveGrouping.FOLDERS, state.value.view.grouping)
         compose.onNodeWithText("Show").assertIsDisplayed()
 
         // A tap outside closes the sheet; so does system Back.
@@ -172,13 +174,13 @@ class RecordingsScreenTest {
         capture("phone-recordings-empty", TouchCanvas.PHONE)
 
         compose.onNodeWithText("Show all").performClick()
-        assertEquals(RecordingsShow.All, state.value.view.show)
+        assertEquals(DvrArchiveShow.ALL, state.value.view.show)
     }
 
     private fun show(initialPath: List<String> = emptyList()) {
         val actions = RecordingsActions(
             onView = { view ->
-                val regrouped = if (view.grouping == RecordingsGrouping.Folders) foldersFixture() else flatFixture()
+                val regrouped = if (view.grouping == DvrArchiveGrouping.FOLDERS) foldersFixture() else flatFixture()
                 state.value = regrouped.copy(view = view)
             },
             onPlay = { _, _ -> },

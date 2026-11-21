@@ -178,7 +178,7 @@ private fun PhonePage(item: RecordingItem, clock: RecordingClock, actions: Recor
 /** The start in full for the pane and the page, "Wed, Nov 11 • 8:30 PM". */
 @Composable
 private fun whenText(item: RecordingItem, clock: RecordingClock): String =
-    joinParts(listOf(dayText(recordingDay(item.start, clock)), recordingTime(item.start, clock)))
+    item.start?.let { joinParts(listOf(dayText(recordingDay(it, clock)), recordingTime(it, clock))) }.orEmpty()
 
 @Composable
 private fun PageChannel(
@@ -242,7 +242,7 @@ private fun Title(item: RecordingItem, modifier: Modifier, style: TextStyle) {
 
 @Composable
 private fun Facts(item: RecordingItem) {
-    val facts = listOfNotNull(item.details.genre, durationText(item.length), item.details.size)
+    val facts = listOfNotNull(item.details.genre, item.length?.let { durationText(it) }, item.details.size)
     Text(
         joinParts(facts), Modifier.padding(top = 8.dp), style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.outline,
@@ -273,19 +273,20 @@ private fun Progress(state: RecordingProgress, clock: RecordingClock, modifier: 
 
 @Composable
 private fun PlayButtons(item: RecordingItem, actions: RecordingsActions, equalWidth: Boolean) {
+    val onPlay = actions.onPlay ?: return
     val width = if (equalWidth) Modifier.fillMaxWidth() else Modifier
     val height = if (equalWidth) Modifier.heightIn(min = 48.dp) else Modifier
     Row(width, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         val share = if (equalWidth) Modifier.weight(1f).then(height) else Modifier
         val resume = item.state is RecordingProgress.PartlyWatched
-        Button(onClick = { actions.onPlay(item.id, false) }, modifier = share) {
+        Button(onClick = { onPlay(item.id, false) }, modifier = share) {
             Icon(painterResource(R.drawable.channels_play), null, Modifier.size(ButtonDefaults.IconSize))
             Spacer(Modifier.width(ButtonDefaults.IconSpacing))
             Text(stringResource(if (resume) R.string.recordings_resume else R.string.recordings_watch), maxLines = 1)
         }
         if (resume) {
             FilledTonalButton(
-                onClick = { actions.onPlay(item.id, true) }, modifier = share,
+                onClick = { onPlay(item.id, true) }, modifier = share,
                 contentPadding = if (equalWidth) ButtonDefaults.SmallContentPadding else ButtonDefaults.ContentPadding,
             ) {
                 Text(
@@ -299,11 +300,15 @@ private fun PlayButtons(item: RecordingItem, actions: RecordingsActions, equalWi
 
 @Composable
 private fun ItemIcons(item: RecordingItem, actions: RecordingsActions) {
-    IconButton(onClick = { actions.onDelete(item.id) }) {
-        Icon(painterResource(R.drawable.connect_delete_outline), stringResource(R.string.recordings_delete))
+    actions.onDelete?.let { onDelete ->
+        IconButton(onClick = { onDelete(item.id) }) {
+            Icon(painterResource(R.drawable.connect_delete_outline), stringResource(R.string.recordings_delete))
+        }
     }
-    IconButton(onClick = { actions.onMore(item.id) }) {
-        Icon(painterResource(R.drawable.recordings_more), stringResource(R.string.recordings_more))
+    actions.onMore?.let { onMore ->
+        IconButton(onClick = { onMore(item.id) }) {
+            Icon(painterResource(R.drawable.recordings_more), stringResource(R.string.recordings_more))
+        }
     }
 }
 

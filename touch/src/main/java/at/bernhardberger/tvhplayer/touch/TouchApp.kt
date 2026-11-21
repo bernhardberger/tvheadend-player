@@ -3,6 +3,7 @@ package at.bernhardberger.tvhplayer.touch
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -33,6 +34,9 @@ import at.bernhardberger.tvhplayer.touch.connect.EditConnectionFlow
 import at.bernhardberger.tvhplayer.touch.connect.FirstRunFlow
 import at.bernhardberger.tvhplayer.touch.connect.connectionStatus
 import at.bernhardberger.tvhplayer.touch.ui.Destination
+import at.bernhardberger.tvhplayer.touch.ui.LocalFrameSelection
+import at.bernhardberger.tvhplayer.touch.recordings.RecordingsDestination
+import at.bernhardberger.tvhplayer.touch.recordings.RecordingsViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.mapNotNull
@@ -46,12 +50,14 @@ private enum class Page { Frame, Connections, SignIn }
  * page over it. First run stays until its save has finished, so the save is not cut short when
  * the saved connection appears.
  */
+@Suppress("LongParameterList") // The app's owners and view models, handed in by the activity.
 @Composable
 internal fun TouchApp(
     session: TvheadendSession,
     owner: AppProfileOwner,
     connection: AppConnectionViewModel,
     channels: ChannelsViewModel,
+    recordings: RecordingsViewModel,
     discovery: () -> Flow<TvheadendDiscoveryState>,
 ) {
     val profile by owner.serverProfile.collectAsStateWithLifecycle()
@@ -94,8 +100,8 @@ internal fun TouchApp(
                 },
             )
         }
-        else -> AppFrame(
-            connection, channels,
+        else -> AppDestinations(
+            connection, channels, recordings,
             onOpenConnections = { page = Page.Connections },
             onSignIn = { page = Page.SignIn },
         )
@@ -146,8 +152,8 @@ private fun ServerProfileSummary.uiState(status: ConnectionStatus) = ActiveConne
 )
 
 /**
- * The frame with only Channels wired: the destinations without data are not offered yet, and the
- * row controls with nothing behind them (Watch, Record, Details, Show in Guide) are left out.
+ * The frame with Channels and Recordings wired: the destinations without data are not offered yet,
+ * and the row controls with nothing behind them (Watch, Record, Details, Show in Guide) are left out.
  */
 @Composable
 private fun AppFrame(
@@ -171,6 +177,27 @@ private fun AppFrame(
             onOpenConnectionSettings = onOpenConnections,
             onSignIn = onSignIn,
         ),
-        destinations = listOf(Destination.Channels),
+        destinations = AppDestinationList,
     )
 }
+
+/** Each destination's screen draws the frame, so the selection is kept here and picks the screen. */
+@Composable
+private fun AppDestinations(
+    connection: AppConnectionViewModel,
+    channels: ChannelsViewModel,
+    recordings: RecordingsViewModel,
+    onOpenConnections: () -> Unit,
+    onSignIn: () -> Unit,
+) {
+    val selection = rememberSaveable { mutableStateOf(Destination.Channels) }
+    CompositionLocalProvider(LocalFrameSelection provides selection) {
+        when (selection.value) {
+            Destination.Recordings ->
+                RecordingsDestination(recordings, connection, AppDestinationList, onOpenConnections, onSignIn)
+            else -> AppFrame(connection, channels, onOpenConnections, onSignIn)
+        }
+    }
+}
+
+private val AppDestinationList = listOf(Destination.Channels, Destination.Recordings)

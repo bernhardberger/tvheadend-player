@@ -49,20 +49,19 @@ internal fun recordingLine(item: RecordingItem, context: RowContext, clock: Reco
         when (val state = item.state) {
             is RecordingProgress.Recording -> add(RecordingLinePart.Until(recordingTime(state.until, clock)))
             else -> {
-                add(
-                    if (context.dates == RowDates.DayLabel) {
-                        RecordingLinePart.Time(recordingTime(item.start, clock))
-                    } else {
-                        RecordingLinePart.Day(recordingDay(item.start, clock))
-                    },
-                )
-                add(
-                    if (state is RecordingProgress.PartlyWatched) {
-                        RecordingLinePart.Left(state.left)
-                    } else {
-                        RecordingLinePart.Length(item.length)
-                    },
-                )
+                item.start?.let { start ->
+                    add(
+                        if (context.dates == RowDates.DayLabel) {
+                            RecordingLinePart.Time(recordingTime(start, clock))
+                        } else {
+                            RecordingLinePart.Day(recordingDay(start, clock))
+                        },
+                    )
+                }
+                when {
+                    state is RecordingProgress.PartlyWatched -> add(RecordingLinePart.Left(state.left))
+                    item.length != null -> add(RecordingLinePart.Length(item.length))
+                }
             }
         }
         item.channel?.takeIf { !context.oneChannel }?.let { add(RecordingLinePart.Channel(it)) }
