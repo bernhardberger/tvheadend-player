@@ -4,7 +4,6 @@ import android.app.PictureInPictureUiState
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
-import android.content.res.Resources
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
@@ -26,19 +25,18 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalResources
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel as lifecycleViewModel
 import androidx.media3.common.util.UnstableApi
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
-import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvheadend.sdk.media3.LivePlaybackObservation
 import at.bernhardberger.tvhplayer.data.ConnectionState
 import at.bernhardberger.tvhplayer.di.SdkRuntimeOwner
 import at.bernhardberger.tvhplayer.core.livePlayWhenReady
+import at.bernhardberger.tvhplayer.core.programmeArtwork
 import at.bernhardberger.tvhplayer.core.toConnectionState
 import at.bernhardberger.tvhplayer.images.ChannelAccents
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
@@ -49,11 +47,11 @@ import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.touch.channels.ChannelDetails
 import at.bernhardberger.tvhplayer.touch.channels.ChannelProgram
 import at.bernhardberger.tvhplayer.touch.channels.ChannelRow
+import at.bernhardberger.tvhplayer.touch.channels.ChannelsTexts
 import at.bernhardberger.tvhplayer.touch.channels.rememberChannelsTexts
 import at.bernhardberger.tvhplayer.ui.MobileDarkColors
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.common.formatTimeInterval
-import at.bernhardberger.tvhplayer.ui.common.programmeEpisodeLine
 import at.bernhardberger.tvhplayer.ui.common.progress
 import at.bernhardberger.tvhplayer.ui.common.rememberCurrentEpochSeconds
 import at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel
@@ -262,10 +260,10 @@ class PlayerActivity : ComponentActivity() {
         )
         val now = Instant.fromEpochSeconds(minute * SECONDS_PER_MINUTE)
         val programs = timeshift.programs.value
+        val texts = rememberChannelsTexts()
         val state = livePlayerState(
-            shown, scope, observation, presentation.connection, presentation.degraded, status,
-            timeshift.timeline, pause.availability, now, window = windowAvailable, artwork = artwork,
-            texts = rememberChannelsTexts(),
+            shown, scope, observation, presentation.connection, presentation.degraded, status, timeshift.timeline,
+            pause.availability, now, window = windowAvailable, artwork = artwork, texts = texts,
         )
         val info = rememberPlayerInfo(
             !inWindow && PlayerControl.Info in state.offered, guide, shown, scope.scope.allChannels, observation,
@@ -274,7 +272,7 @@ class PlayerActivity : ComponentActivity() {
         val dvr = lifecycleViewModel { DvrControls(session, notices) }
         PlayerScreen(
             state = state.withControls(
-                state.channel.withProgramTexts(programs, now, LocalResources.current), brightness, paused,
+                state.channel.withShownPrograms(programs, now, texts, artwork, observation), brightness, paused,
                 options, info.schedule, liveRecordOffer(shown, programs, observation, now.epochSeconds),
             ),
             onAction = { act(it, timeshift, paused) },
@@ -418,10 +416,15 @@ private fun currentStatus(
 }
 
 /**
- * The clock, episode and genre texts of the program the viewer is in and the one after it, by the
- * shared formatters.
+ * The player's program follows the watched position, not the channel's on-air row.
  */
-private fun ChannelRow.withProgramTexts(programs: ShownPrograms, now: Instant, resources: Resources): ChannelRow {
+internal fun ChannelRow.withShownPrograms(
+    programs: ShownPrograms,
+    now: Instant,
+    texts: ChannelsTexts,
+    artwork: ArtworkModels,
+    observation: SessionObservation,
+): ChannelRow {
     val running = programs.now
     val nowSec = now.epochSeconds
     return copy(
@@ -433,12 +436,10 @@ private fun ChannelRow.withProgramTexts(programs: ShownPrograms, now: Instant, r
             )
         },
         next = programs.next?.let { ChannelProgram(it.title.orEmpty(), start = formatClock(it.start.epochSeconds)) },
-        details = (details ?: ChannelDetails()).copy(
-            episode = running?.episodeLine(resources),
-            metadata = running?.genre?.takeIf(String::isNotBlank),
+        details = ChannelDetails(
+            episode = running?.let(texts.episode),
+            metadata = running?.let(texts.genre),
+            artworkModel = artwork.picture(running?.let(::programmeArtwork), observation),
         ),
     )
 }
-
-private fun EpgEvent.episodeLine(resources: Resources): String? =
-    programmeEpisodeLine(episode, subtitle, resources).ifEmpty { null }

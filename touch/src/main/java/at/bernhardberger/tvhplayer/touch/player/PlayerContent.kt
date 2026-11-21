@@ -59,6 +59,7 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.channels.ChannelRow
+import at.bernhardberger.tvhplayer.touch.ui.rememberStandalonePicture
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsLayout
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsState
 import at.bernhardberger.tvhplayer.touch.channels.TagFilter
@@ -170,7 +171,7 @@ private fun LandscapeProgram(channel: ChannelRow, layout: PlayerLayout, modifier
         modifier.testTag("player-program"),
         horizontalArrangement = Arrangement.spacedBy(if (tablet) 20.dp else 14.dp),
     ) {
-        channel.details?.artwork?.let {
+        rememberStandalonePicture(channel.details?.artwork, channel.details?.artworkModel)?.let {
             Image(
                 it, null, Modifier.size(if (tablet) 196.dp else 112.dp, if (tablet) 112.dp else 68.dp)
                     .clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop,
