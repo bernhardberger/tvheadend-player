@@ -121,7 +121,6 @@
     <ID>CyclomaticComplexMethod:PlayerChromeBarStatus.kt:internal fun PlayerChromeTimeline.Live.barPresentation: LiveBarPresentation</ID>
     <ID>CyclomaticComplexMethod:PlayerChromeControls.kt:@Composable internal fun PlayerChromeControls</ID>
     <ID>CyclomaticComplexMethod:PlayerErrorSurfaces.kt:@Composable internal fun LivePlayerAlertOverlay</ID>
-    <ID>CyclomaticComplexMethod:PlayerHelpers.kt:fun collectTracks: List&lt;UiTrack&gt;</ID>
     <ID>CyclomaticComplexMethod:PlayerInfoBar.kt:@Composable fun PlayerInfoBar</ID>
     <ID>CyclomaticComplexMethod:PlayerTimeline.kt:@Composable fun PlayerTimelineBar</ID>
     <ID>CyclomaticComplexMethod:PlayerTimeline.kt:@Composable fun PlayerTimelineBlock</ID>
@@ -159,7 +158,6 @@
     <ID>CyclomaticComplexMethod:SideRail.kt:@Composable private fun DrawerNowPlayingControls</ID>
     <ID>CyclomaticComplexMethod:SideRail.kt:@Composable private fun NavigationDrawerScope.DrawerNowPlaying</ID>
     <ID>CyclomaticComplexMethod:TimeshiftSeekPreview.kt:@Composable internal fun TimeshiftSeekPreviewTimeline</ID>
-    <ID>CyclomaticComplexMethod:TrackLabelPolicy.kt:fun humanCodecName: String?</ID>
     <ID>CyclomaticComplexMethod:TvOutlinedTextField.kt:@Composable fun TvOutlinedTextField</ID>
     <ID>CyclomaticComplexMethod:TvPasswordField.kt:@Composable fun TvPasswordField</ID>
     <ID>CyclomaticComplexMethod:TvRecoveryOverlay.kt:@Composable fun TvRecoveryOverlay</ID>
@@ -264,10 +262,8 @@
     <ID>LongMethod:VideoPlayerScreen.kt:@OptIn(UnstableApi::class) @kotlin.OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class) @Composable fun VideoPlayerScreen</ID>
     <ID>LoopWithTooManyJumpStatements:BackdropTransformation.kt:for</ID>
     <ID>LoopWithTooManyJumpStatements:ChannelAccents.kt:ChannelAccents$for</ID>
-    <ID>LoopWithTooManyJumpStatements:ChannelsViewModel.kt:ChannelsViewModel$while</ID>
     <ID>LoopWithTooManyJumpStatements:DetailsBackdropContrast.kt:for</ID>
     <ID>LoopWithTooManyJumpStatements:DvrMutationActions.kt:for</ID>
-    <ID>LoopWithTooManyJumpStatements:PlayerHelpers.kt:for</ID>
     <ID>LoopWithTooManyJumpStatements:PlayerTimelinePresentationState.kt:LiveTimelinePresentationState$while</ID>
     <ID>LoopWithTooManyJumpStatements:WatchingProgress.kt:while</ID>
     <ID>MagicNumber:ArtworkSample.kt:64</ID>
@@ -328,10 +324,6 @@
     <ID>MagicNumber:LogoHaloTransformation.kt:LogoHaloTransformation$24</ID>
     <ID>MagicNumber:LogoHaloTransformation.kt:LogoHaloTransformation$3</ID>
     <ID>MagicNumber:LogoInkTransformation.kt:24</ID>
-    <ID>MagicNumber:PlayerBarStatus.kt:1_000L</ID>
-    <ID>MagicNumber:PlayerBarStatus.kt:3_600_000L</ID>
-    <ID>MagicNumber:PlayerBarStatus.kt:5</ID>
-    <ID>MagicNumber:PlayerBarStatus.kt:999L</ID>
     <ID>MagicNumber:SessionArtworkLoader.kt:100</ID>
     <ID>MagicNumber:SessionArtworkLoader.kt:1024</ID>
     <ID>MagicNumber:SessionArtworkLoader.kt:256</ID>
@@ -343,8 +335,6 @@
     <ID>MagicNumber:SessionArtworkLoader.kt:90</ID>
     <ID>MagicNumber:SettingsStorageViewModel.kt:SettingsStorageViewModel$4_000</ID>
     <ID>MagicNumber:TestCredentialProvisioner.kt:65_535L</ID>
-    <ID>MagicNumber:TrackLabelPolicy.kt:6</ID>
-    <ID>MagicNumber:TrackLabelPolicy.kt:8</ID>
     <ID>MagicNumber:TvheadendArtworkLoader.kt:10</ID>
     <ID>MagicNumber:WhatsNewPolicy.kt:1000</ID>
     <ID>MagicNumber:WhatsNewPolicy.kt:14L</ID>
@@ -363,10 +353,8 @@
     <ID>MatchingDeclarationName:GuideTimelineBody.kt:GuideTabBody</ID>
     <ID>MatchingDeclarationName:LivePlayerServerWait.kt:LivePlayerServerWaitState</ID>
     <ID>MatchingDeclarationName:NavigationEdgeFade.kt:NavigationTabOverflowState</ID>
-    <ID>MatchingDeclarationName:PlaybackRecoveryPresentation.kt:PlaybackRetryCommand</ID>
     <ID>MatchingDeclarationName:PlayerAutoHidePolicy.kt:PlayerAutoHideContext</ID>
     <ID>MatchingDeclarationName:PlayerBackDispatcher.kt:PlayerModalBackOwner</ID>
-    <ID>MatchingDeclarationName:PlayerHelpers.kt:UiTrack</ID>
     <ID>MatchingDeclarationName:PlayerInfoBar.kt:PlayerInfoBarData</ID>
     <ID>MatchingDeclarationName:PlayerStop.kt:PlayerClose</ID>
     <ID>MatchingDeclarationName:ProgrammeArtwork.kt:PictureLoad</ID>
@@ -375,10 +363,8 @@
     <ID>MatchingDeclarationName:SessionArtworkLoader.kt:AppSessionArtworkLoader : SessionArtworkLoader</ID>
     <ID>MatchingDeclarationName:StatusBadge.kt:StatusBadgeTone</ID>
     <ID>MatchingDeclarationName:TimeConverter.kt:AppClock</ID>
-    <ID>MatchingDeclarationName:TrackLabelPolicy.kt:HumanTrackLabel</ID>
     <ID>MatchingDeclarationName:TvOutlinedTextField.kt:FieldOpenPress</ID>
     <ID>MatchingDeclarationName:TvRecoveryOverlay.kt:TvRecoveryAction</ID>
-    <ID>MatchingDeclarationName:VideoDisplayMode.kt:DisplayModeSpec</ID>
     <ID>MaxLineLength:AboutNoticeText.kt:if (line.takeWhile { it == '#' }.length == 2) ChangelogBlockKind.VERSION_HEADING else ChangelogBlockKind.GROUP_HEADING</ID>
     <ID>MaxLineLength:AppConnectionViewModel.kt:AppConnectionViewModel$allowAutomaticBackoff &amp;&amp; state.reason.recoveryDisposition == SessionRecoveryDisposition.AUTOMATIC_BACKOFF</ID>
     <ID>MaxLineLength:AppNoticeHost.kt:tint = if (icon == AppNoticeIcon.RECORDING) recordingMarkColor(focused = false) else LocalContentColor.current</ID>
@@ -483,8 +469,6 @@
     <ID>MaxLineLength:ChannelsScreen.kt:val playbackIndicator = if (playbackChannelId != null) LocalWatchingIndicator.current else ChannelPlaybackIndicator.NONE</ID>
     <ID>MaxLineLength:ChannelsView.kt:ChannelsView$/** The card layouts whose art switch is on: immersive cards show programme pictures by default, grid cards logos. */</ID>
     <ID>MaxLineLength:ChannelsView.kt:programArt = ChannelsLayout.entries.filterTo(mutableSetOf()) { it.hasArtSwitch &amp;&amp; programArt(it) ?: (it in DefaultProgramArt) }</ID>
-    <ID>MaxLineLength:ChannelsViewModel.kt:ChannelsViewModel$mutableScope.value = ChannelScopeState(resolved, current, visibility = effective.visibility, observation = source)</ID>
-    <ID>MaxLineLength:ChannelsViewModel.kt:ChannelsViewModel$setScopeVisible(tagId, if (tagId == null) !visibility.isAllChannelsVisible() else !visibility.isTagVisible(tagId))</ID>
     <ID>MaxLineLength:ColdStart.kt:coldStartPresentation(connectionState, currentChannelReadiness, failures.shown(connectionState), landingContentDrawn)</ID>
     <ID>MaxLineLength:CompactZapCard.kt:ChannelProgrammeSubtitle(programme, currentEvent.start.epochSeconds, subtitleModifier.testTag("$tag-now"))</ID>
     <ID>MaxLineLength:CompactZapCard.kt:MaterialTheme.typography.titleMedium.lineHeight.toDp() + MaterialTheme.typography.bodySmall.lineHeight.toDp() + CompactZapStripRoom</ID>
@@ -646,15 +630,10 @@
     <ID>MaxLineLength:PlaybackSeekbar.kt:val estimatedPrefix = stringResource(R.string.player_timing_estimated).takeIf { range.positionEstimated || range.displayEndMs &gt; range.endMs }</ID>
     <ID>MaxLineLength:PlaybackSeekbar.kt:val schedule = schedule?.takeIf { !previewing &amp;&amp; programmeWindow == null &amp;&amp; range.domain == SeekbarDomain.TIMESHIFT }</ID>
     <ID>MaxLineLength:PlaybackSeekbar.kt:val shownSchedule = schedule?.takeIf { !previewing &amp;&amp; programmeWindow == null &amp;&amp; range.domain == SeekbarDomain.TIMESHIFT }</ID>
-    <ID>MaxLineLength:PlaybackTimeFormat.kt:*</ID>
     <ID>MaxLineLength:PlayerActionRow.kt:Icon(painterResource(icon), contentDescription = label, modifier = glyphModifier.size(IconButtonDefaults.MediumIconSize))</ID>
     <ID>MaxLineLength:PlayerActionRow.kt:contentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = if (tag == "player-pause") 1f else 0.88f)</ID>
     <ID>MaxLineLength:PlayerActionRow.kt:onSchedule?.let { PlayerAction("player-schedule", stringResource(R.string.channel_schedule), R.drawable.ic_event_list, it, scheduleFocus) }</ID>
     <ID>MaxLineLength:PlayerActionRow.kt:val</ID>
-    <ID>MaxLineLength:PlayerBarStatus.kt:PlayerBarEnd$fun</ID>
-    <ID>MaxLineLength:PlayerBarStatus.kt:fun</ID>
-    <ID>MaxLineLength:PlayerBarStatus.kt:return</ID>
-    <ID>MaxLineLength:PlayerBarStatus.kt:return if (lengthMs != null &amp;&amp; lengthMs &gt;= 3_600_000L &amp;&amp; positionMs &lt; 3_600_000L) "0:${elapsed.padStart(5, '0')}" else elapsed</ID>
     <ID>MaxLineLength:PlayerBarStatusView.kt:PlayerStateCell.PLAYING -&gt; Icon(painterResource(R.drawable.ic_play_arrow), null, Modifier.size(size), tint = color)</ID>
     <ID>MaxLineLength:PlayerBarStatusView.kt:bottom = PlayerBannerBottomPadding + TimelineRowInset + (row - PlayerChromeTokens.chipHeight).coerceAtLeast(0.dp) / 2</ID>
     <ID>MaxLineLength:PlayerBarStatusView.kt:internal</ID>
@@ -980,8 +959,6 @@
     <ID>MaxLineLength:TwoColumnDialog.kt:Column</ID>
     <ID>MaxLineLength:TwoColumnDialog.kt:color = LocalContentColor.current.copy(alpha = 0.6f)</ID>
     <ID>MaxLineLength:TwoColumnDialog.kt:val activation = event.key == Key.DirectionCenter || event.key == Key.Enter || event.key == Key.NumPadEnter</ID>
-    <ID>MaxLineLength:VideoDisplayMode.kt:(!matchesVideoRate(base.refreshRate, rate) &amp;&amp; base.alternativeRefreshRates.none { matchesVideoRate(it, rate) })</ID>
-    <ID>MaxLineLength:VideoDisplayMode.kt:internal</ID>
     <ID>MaxLineLength:VideoPlayerScreen.kt:NowPlayingStrip</ID>
     <ID>MaxLineLength:VideoPlayerScreen.kt:PlayerForegroundLayer.OPTIONS_DETAIL, PlayerForegroundLayer.OPTIONS_QUICK_LIST -&gt; layerState.core.optionsPage</ID>
     <ID>MaxLineLength:VideoPlayerScreen.kt:active</ID>
@@ -1043,7 +1020,6 @@
     <ID>ReturnCount:PlaybackKeyPolicy.kt:fun playerKeyAction: PlayerKeyAction</ID>
     <ID>ReturnCount:PlaybackOptionsPolicy.kt:fun playbackTrackFocusTarget: PlaybackTrackFocusTarget</ID>
     <ID>ReturnCount:PlaybackStatsDisplay.kt:private fun readDisplayOutput: DisplayOutput?</ID>
-    <ID>ReturnCount:PlaybackStatusPresentation.kt:@OptIn(UnstableApi::class) fun recordingPlayerAlert: LivePlayerAlert?</ID>
     <ID>ReturnCount:PlayerBackDispatcher.kt:internal fun PlayerBackKeyCycle.intercept: Boolean</ID>
     <ID>ReturnCount:PlayerChromeBarStatus.kt:internal fun PlayerChromeTimeline.Live.scheduleProgress: ScheduleProgress?</ID>
     <ID>ReturnCount:PlayerLayerState.kt:PlayerLayerState$fun handleOverlayKey: Boolean?</ID>
@@ -1061,7 +1037,6 @@
     <ID>ReturnCount:SideRail.kt:@Composable internal fun Modifier.browseScreenBackdrop: Modifier</ID>
     <ID>ReturnCount:TestCredentialProvisioner.kt:TestCredentialProvisioner$private fun readPayload: TestCredentialPayload?</ID>
     <ID>ReturnCount:TestCredentialProvisioner.kt:internal fun validateTestCredentialPayload: TestCredentialPayload?</ID>
-    <ID>ReturnCount:VideoDisplayMode.kt:internal fun nextBaseMode: DisplayModeSpec?</ID>
     <ID>ReturnCount:VideoPlayerScreen.kt:fun tuneAdjacentChannel: Boolean</ID>
     <ID>ReturnCount:VideoPlayerScreen.kt:fun: Boolean</ID>
     <ID>ReturnCount:VideoPlayerScreen.kt:internal fun CoroutineScope.scheduleChannelZap: Job?</ID>

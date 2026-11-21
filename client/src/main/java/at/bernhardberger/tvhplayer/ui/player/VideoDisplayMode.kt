@@ -3,7 +3,7 @@ package at.bernhardberger.tvhplayer.ui.player
 import kotlin.math.abs
 import at.bernhardberger.tvhplayer.playback.SurfaceFrameRateChange
 
-internal data class DisplayModeSpec(
+data class DisplayModeSpec(
     val width: Int,
     val height: Int,
     val refreshRate: Float,
@@ -12,11 +12,11 @@ internal data class DisplayModeSpec(
 )
 
 // 0.05% accepts mode-reporting rounding, but separates NTSC rates from whole rates.
-internal fun matchesVideoRate(displayRate: Float, videoRate: Float): Boolean =
+fun matchesVideoRate(displayRate: Float, videoRate: Float): Boolean =
     abs(displayRate - videoRate) / videoRate <= 0.0005f
 
 /** Latch a clean unrequested observation until release; a cleared vote may still be switching back. */
-internal fun nextBaseMode(
+fun nextBaseMode(
     current: DisplayModeSpec?,
     observed: DisplayModeSpec?,
     unrequested: Boolean,
@@ -29,7 +29,7 @@ internal fun nextBaseMode(
 }
 
 /** Keep non-seamless requests over browse; compare with the unrequested base, never a switched mode. */
-internal fun keepVideoFrameRateInBrowse(change: SurfaceFrameRateChange, rate: Float?, base: DisplayModeSpec?): Boolean {
+fun keepVideoFrameRateInBrowse(change: SurfaceFrameRateChange, rate: Float?, base: DisplayModeSpec?): Boolean {
     if (rate == null || !rate.isFinite() || rate <= 0f) return false
     return when (change) {
         SurfaceFrameRateChange.DISPLAY_MODE -> true
@@ -40,7 +40,7 @@ internal fun keepVideoFrameRateInBrowse(change: SurfaceFrameRateChange, rate: Fl
 }
 
 /** Exact display cadence at the current resolution, preferring the current mode. No multiples. */
-internal fun videoDisplayMode(rate: Float, current: DisplayModeSpec, supported: List<DisplayModeSpec>): DisplayModeSpec? {
+fun videoDisplayMode(rate: Float, current: DisplayModeSpec, supported: List<DisplayModeSpec>): DisplayModeSpec? {
     if (!rate.isFinite() || rate <= 0f) return null
     fun matches(mode: DisplayModeSpec): Boolean =
         mode.width == current.width && mode.height == current.height && matchesVideoRate(mode.refreshRate, rate)
@@ -49,7 +49,7 @@ internal fun videoDisplayMode(rate: Float, current: DisplayModeSpec, supported: 
 }
 
 /** Window preference update, or null to leave it unchanged. No matching mode clears a preference. */
-internal fun displayModeIdToRequest(
+fun displayModeIdToRequest(
     selected: DisplayModeSpec?,
     current: DisplayModeSpec,
     preferred: Int,
@@ -62,7 +62,7 @@ internal fun displayModeIdToRequest(
 }
 
 /** Refresh rates the display offers at its current resolution, lowest first; near-equal reports count once. */
-internal fun displayRefreshRateChoices(current: DisplayModeSpec, supported: List<DisplayModeSpec>): List<Float> =
+fun displayRefreshRateChoices(current: DisplayModeSpec, supported: List<DisplayModeSpec>): List<Float> =
     (supported + current).filter { it.width == current.width && it.height == current.height }
         .map { it.refreshRate }.filter { it.isFinite() && it > 0f }.sorted()
         .fold(emptyList()) { rates, rate -> if (rates.any { matchesVideoRate(it, rate) }) rates else rates + rate }
@@ -72,14 +72,14 @@ internal fun displayRefreshRateChoices(current: DisplayModeSpec, supported: List
  * refresh rate set, an Always request does too: the window would otherwise hold the app's rate
  * against the surface vote. Seamless requests stay a surface vote.
  */
-internal fun windowVideoRate(change: SurfaceFrameRateChange, rate: Float?, appRate: Float?): Float? = when (change) {
+fun windowVideoRate(change: SurfaceFrameRateChange, rate: Float?, appRate: Float?): Float? = when (change) {
     SurfaceFrameRateChange.DISPLAY_MODE -> rate
     SurfaceFrameRateChange.ALWAYS -> rate.takeIf { appRate != null }
     SurfaceFrameRateChange.SEAMLESS_DEFAULT, SurfaceFrameRateChange.ONLY_IF_SEAMLESS -> null
 }
 
 /** The mode the window prefers: the video's while one is requested and offered, else the app's. */
-internal fun windowDisplayMode(
+fun windowDisplayMode(
     videoRate: Float?,
     appRate: Float?,
     current: DisplayModeSpec,

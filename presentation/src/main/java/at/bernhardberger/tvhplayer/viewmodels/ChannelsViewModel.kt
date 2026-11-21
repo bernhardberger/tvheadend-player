@@ -210,7 +210,7 @@ class ChannelsViewModel(
         session.observation.value.nextEvent(channelId, kotlin.time.Instant.fromEpochSeconds(nowSec))
 }
 
-internal fun resolveChannelScopeState(
+fun resolveChannelScopeState(
     channelState: ChannelRepositoryState,
     activeTagId: ChannelTagId?,
     visibility: ChannelScopeVisibility = ChannelScopeVisibility(),

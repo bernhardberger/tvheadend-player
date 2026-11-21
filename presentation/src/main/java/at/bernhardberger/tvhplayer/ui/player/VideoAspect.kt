@@ -37,7 +37,7 @@ internal fun broadcastNominalAspect(width: Int, height: Int, pixelWidthHeightRat
  * The aspect the video surface is laid out at, or null to fill the screen and let the picture fit
  * itself. Auto snaps SD broadcast pictures to their nominal shape; the forced modes always win.
  */
-internal fun surfaceFrameAspect(
+fun surfaceFrameAspect(
     mode: AspectRatioMode,
     width: Int,
     height: Int,
@@ -71,7 +71,7 @@ class TargetAspect(val mode: AspectRatioMode, val select: (AspectRatioMode) -> U
  * when either changes.
  */
 @Composable
-internal fun rememberTargetAspect(
+fun rememberTargetAspect(
     target: AppPlaybackTarget?,
     store: PlayerSettingsStore,
     recordingChannel: (DvrEntryId) -> ChannelId?,

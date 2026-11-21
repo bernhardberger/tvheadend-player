@@ -59,6 +59,7 @@
     <ID>CyclomaticComplexMethod:ForegroundPlaybackLifecycle.kt:ForegroundPlaybackLifecycle$fun onForegrounded: ForegroundPlaybackAction</ID>
     <ID>CyclomaticComplexMethod:LivePauseController.kt:LivePauseController$suspend fun resolvePendingLivePauseLocked: Boolean</ID>
     <ID>CyclomaticComplexMethod:LogoInk.kt:fun inkFadingLogoParts: IntArray?</ID>
+    <ID>CyclomaticComplexMethod:PlayerHelpers.kt:fun collectTracks: List&lt;UiTrack&gt;</ID>
     <ID>CyclomaticComplexMethod:PlayerSettings.kt:fun normalizePreferenceLanguage: String?</ID>
     <ID>CyclomaticComplexMethod:ProfilePlayback.kt:private fun avcCoding: String</ID>
     <ID>CyclomaticComplexMethod:ProgrammeActionPolicy.kt:fun programmeActions: List&lt;ProgrammeAction&gt;</ID>
@@ -70,6 +71,7 @@
     <ID>CyclomaticComplexMethod:TimelineEpgPolicy.kt:fun epgColumnDataState: EpgColumnDataState</ID>
     <ID>CyclomaticComplexMethod:TimelineEpgPolicy.kt:fun guidePendingNavigationAction: GuidePendingNavigationAction</ID>
     <ID>CyclomaticComplexMethod:TimelineEpgPolicy.kt:fun moveTimelineEpgFocus: TimelineEpgFocusMove</ID>
+    <ID>CyclomaticComplexMethod:TrackLabelPolicy.kt:fun humanCodecName: String?</ID>
     <ID>LargeClass:AppPlaybackRuntime.kt:AppPlaybackRuntime</ID>
     <ID>LongMethod:AppPlaybackRuntime.kt:AppPlaybackRuntime$@OptIn(ExperimentalTvheadendApi::class) private suspend fun playRecordingLocked: PlaybackTargetResult?</ID>
     <ID>LongMethod:AppPlaybackRuntime.kt:AppPlaybackRuntime$private suspend fun playLive: PlaybackTargetResult?</ID>
@@ -79,6 +81,7 @@
     <ID>LongMethod:SessionPlaybackPlayer.kt:private fun sessionMetadataSnapshot: SessionMetadataSnapshot</ID>
     <ID>LoopWithTooManyJumpStatements:AppPlaybackRuntime.kt:AppPlaybackRuntime$while</ID>
     <ID>LoopWithTooManyJumpStatements:PlaybackErrorClassification.kt:while</ID>
+    <ID>LoopWithTooManyJumpStatements:PlayerHelpers.kt:for</ID>
     <ID>LoopWithTooManyJumpStatements:ProfilePlayback.kt:for</ID>
     <ID>MagicNumber:AppError.kt:AppErrorCondition.AUTHENTICATION_REJECTED$103</ID>
     <ID>MagicNumber:AppError.kt:AppErrorCondition.CHANNEL_ACCESS_DENIED$205</ID>
@@ -132,6 +135,10 @@
     <ID>MagicNumber:PlaybackErrorClassification.kt:2999</ID>
     <ID>MagicNumber:PlaybackErrorClassification.kt:32</ID>
     <ID>MagicNumber:PlaybackErrorClassification.kt:80</ID>
+    <ID>MagicNumber:PlayerBarStatus.kt:1_000L</ID>
+    <ID>MagicNumber:PlayerBarStatus.kt:3_600_000L</ID>
+    <ID>MagicNumber:PlayerBarStatus.kt:5</ID>
+    <ID>MagicNumber:PlayerBarStatus.kt:999L</ID>
     <ID>MagicNumber:PlayerSettings.kt:3</ID>
     <ID>MagicNumber:PlayerSettings.kt:PlayerSettingsStore$10</ID>
     <ID>MagicNumber:PlayerSettings.kt:PlayerSettingsStore$20</ID>
@@ -157,6 +164,8 @@
     <ID>MagicNumber:SessionPlaybackPlayer.kt:SessionPlaybackPlayer$8</ID>
     <ID>MagicNumber:TimelineEpgPolicy.kt:30</ID>
     <ID>MagicNumber:TimeshiftPresentationPolicy.kt:1_000L</ID>
+    <ID>MagicNumber:TrackLabelPolicy.kt:6</ID>
+    <ID>MagicNumber:TrackLabelPolicy.kt:8</ID>
     <ID>MagicNumber:VideoFrameRate.kt:25f</ID>
     <ID>MagicNumber:VideoFrameRate.kt:29.97f</ID>
     <ID>MagicNumber:VideoFrameRate.kt:30f</ID>
@@ -165,10 +174,14 @@
     <ID>MagicNumber:VideoFrameRate.kt:60f</ID>
     <ID>MagicNumber:VideoFrameRate.kt:VideoFrameRateEstimator$1_000_000.0</ID>
     <ID>MatchingDeclarationName:BrowseContextActions.kt:BrowseContextAction</ID>
+    <ID>MatchingDeclarationName:PlaybackRecoveryPresentation.kt:PlaybackRetryCommand</ID>
+    <ID>MatchingDeclarationName:PlayerHelpers.kt:UiTrack</ID>
     <ID>MatchingDeclarationName:ProgrammeActionPolicy.kt:ProgrammeAction</ID>
     <ID>MatchingDeclarationName:ProgrammeRecordingTargetPolicy.kt:ProgrammeRecordingTarget</ID>
     <ID>MatchingDeclarationName:RecordingMarkHintPolicy.kt:RecordingMarkHint</ID>
     <ID>MatchingDeclarationName:RecordingOpenPolicy.kt:RecordingOpenAction</ID>
+    <ID>MatchingDeclarationName:TrackLabelPolicy.kt:HumanTrackLabel</ID>
+    <ID>MatchingDeclarationName:VideoDisplayMode.kt:DisplayModeSpec</ID>
     <ID>MaxLineLength:AppError.kt:AppErrorCondition.NOT_TVHEADEND$/** Something answered at the address, but not Tvheadend's HTSP service; told apart from 105 where a setup test can. */</ID>
     <ID>MaxLineLength:AppPlaybackRuntime.kt:AppPlaybackRuntime$/** The target whose reconnect retune failed: its recovery attempts retry until one starts or the budget runs out. */</ID>
     <ID>MaxLineLength:AppPlaybackRuntime.kt:AppPlaybackRuntime$_liveStartUndisturbed.value = retainedLive &amp;&amp; previousLiveStart &amp;&amp; !pendingLiveSelectionDisturbed</ID>
@@ -228,6 +241,11 @@
     <ID>MaxLineLength:PlaybackPresentationPublisher.kt:PlaybackPresentationPublisher$"videoSelected=$videoSelected size=${format?.width}x${format?.height} state=${player.playbackState} "</ID>
     <ID>MaxLineLength:PlaybackPresentationPublisher.kt:PlaybackPresentationPublisher.&lt;no name provided&gt;$override</ID>
     <ID>MaxLineLength:PlaybackStallWatch.kt:PlaybackStallWatch$val window = if (sample.pictureShown) PICTURE_STALL_MILLIS else PICTURE_STALL_MILLIS + PICTURE_COVER_GRACE_MILLIS</ID>
+    <ID>MaxLineLength:PlaybackTimeFormat.kt:*</ID>
+    <ID>MaxLineLength:PlayerBarStatus.kt:PlayerBarEnd$fun</ID>
+    <ID>MaxLineLength:PlayerBarStatus.kt:fun</ID>
+    <ID>MaxLineLength:PlayerBarStatus.kt:return if (lengthMs != null &amp;&amp; lengthMs &gt;= 3_600_000L &amp;&amp; positionMs &lt; 3_600_000L) "0:${elapsed.padStart(5, '0')}" else elapsed</ID>
+    <ID>MaxLineLength:PlayerBarStatus.kt:return</ID>
     <ID>MaxLineLength:PlayerSettings.kt:code == language || runCatching { java.util.Locale.forLanguageTag(code).isO3Language == language }.getOrDefault(false)</ID>
     <ID>MaxLineLength:ProfileTrace.kt:profileTrace("P48:key:${event.keyCode}:time:${event.eventTime}:age:${SystemClock.uptimeMillis() - event.eventTime}") { }</ID>
     <ID>MaxLineLength:ProgrammeActionPolicy.kt:recording != null &amp;&amp; recordingPlaybackOffered(recordingAdmission)</ID>
@@ -258,6 +276,7 @@
     <ID>MaxLineLength:TimelineEpgPolicy.kt:if</ID>
     <ID>MaxLineLength:TrackPreferences.kt:AudioFormatPreference.PREFER_DOLBY -&gt; arrayOf(MimeTypes.AUDIO_E_AC3_JOC, MimeTypes.AUDIO_E_AC3, MimeTypes.AUDIO_AC3)</ID>
     <ID>MaxLineLength:TrackPreferences.kt:AudioFormatPreference.PREFER_STEREO -&gt; arrayOf(MimeTypes.AUDIO_AAC, MimeTypes.AUDIO_MPEG_L2, MimeTypes.AUDIO_MPEG)</ID>
+    <ID>MaxLineLength:VideoDisplayMode.kt:(!matchesVideoRate(base.refreshRate, rate) &amp;&amp; base.alternativeRefreshRates.none { matchesVideoRate(it, rate) })</ID>
     <ID>MaxLineLength:VideoFrameRate.kt:internal</ID>
     <ID>ReturnCount:AppPlaybackError.kt:fun AppPlaybackState.deviceFaultDetail: String?</ID>
     <ID>ReturnCount:AppPlaybackModels.kt:fun currentLivePlaybackSelection: LivePlaybackSelection?</ID>
@@ -293,6 +312,7 @@
     <ID>ReturnCount:PlaybackPresentationPublisher.kt:PlaybackPresentationPublisher$private fun liftCoverOnReadyPicture</ID>
     <ID>ReturnCount:PlaybackPresentationPublisher.kt:PlaybackPresentationPublisher$private fun pictureAdvanced: Boolean</ID>
     <ID>ReturnCount:PlaybackPresentationPublisher.kt:PlaybackPresentationPublisher.&lt;no name provided&gt;$override fun onRenderedFirstFrame</ID>
+    <ID>ReturnCount:PlaybackStatusPresentation.kt:@OptIn(UnstableApi::class) fun recordingPlayerAlert: LivePlayerAlert?</ID>
     <ID>ReturnCount:PlayerBackKeyCycle.kt:PlayerBackKeyCycle$fun onKey: PlayerBackKeyResult</ID>
     <ID>ReturnCount:PlayerSettings.kt:PlayerSettingsStore.Companion$private fun decodeRecentVerdicts: List&lt;StartupBufferVerdict&gt;</ID>
     <ID>ReturnCount:RecordingMarkerQuery.kt:RecordingMarkerQuery$suspend fun refresh: Boolean</ID>
@@ -321,6 +341,7 @@
     <ID>ReturnCount:TimelineEpgPolicy.kt:fun timelinePageFocusTarget: EpgFocusTarget?</ID>
     <ID>ReturnCount:TimeshiftPresentationPolicy.kt:fun programmePositionWindow: ProgrammePositionWindow?</ID>
     <ID>ReturnCount:TrackPreferences.kt:internal fun TrackSelectionParameters.withTunneling: TrackSelectionParameters</ID>
+    <ID>ReturnCount:VideoDisplayMode.kt:fun nextBaseMode: DisplayModeSpec?</ID>
     <ID>ReturnCount:VideoFrameRate.kt:VideoFrameRateEstimator$@Synchronized fun estimate: Float?</ID>
     <ID>ReturnCount:VideoFrameRate.kt:VideoFrameRateEstimator$@Synchronized fun onFrame</ID>
     <ID>TooGenericExceptionCaught:AppProfileOwner.kt:AppProfileOwner$error: Exception</ID>

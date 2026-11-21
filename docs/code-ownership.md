@@ -18,7 +18,7 @@ entry points are exhausted; avoid asking them to rediscover this table.
 | Recording-player presentation | `app/src/main/java/at/bernhardberger/tvhplayer/ui/player/RecordingPlayerScreen.kt` |
 | Guide grid, programme details, filtering, and Guide-local DVR actions | `app/src/main/java/at/bernhardberger/tvhplayer/ui/screens/EpgGridScreen.kt` |
 | Channel browsing and focus restoration | `app/src/main/java/at/bernhardberger/tvhplayer/ui/screens/ChannelsScreen.kt` |
-| Shared channel-tag selection, scope visibility, hydration and ordered persistence | `app/src/main/java/at/bernhardberger/tvhplayer/viewmodels/ChannelsViewModel.kt`, created once above `NavDisplay` in `AppRoot.kt` and passed to Channels, Guide, Settings and live playback |
+| Shared channel-tag selection, scope visibility, hydration and ordered persistence | `presentation/src/main/java/at/bernhardberger/tvhplayer/viewmodels/ChannelsViewModel.kt`, created once above `NavDisplay` in `AppRoot.kt` and passed to Channels, Guide, Settings and live playback |
 | Recordings browsing and DVR actions | `app/src/main/java/at/bernhardberger/tvhplayer/ui/screens/RecordingsScreen.kt` |
 | Server profile persistence, credential edit lifetime, and stream-profile selection | `client/src/main/java/at/bernhardberger/tvhplayer/settings/AppProfileOwner.kt` |
 | Onboarding and connection editing | `:client` owns `ConnectionSetupPolicy`; `:presentation` owns `ConnectionSetupState`, `ConnectionFormState`, `AppConnectionViewModel` and `AppErrorText`. TV screens (`OnboardingScreen.kt`, `SettingsConnection.kt`), the profile-edit integration and DI stay in `:app`. |
