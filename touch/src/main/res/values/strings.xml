@@ -7,4 +7,8 @@
     <string name="nav_epg">Guide</string>
     <!-- TV key: nav_recordings -->
     <string name="nav_recordings">Recordings</string>
+    <!-- TV key: close -->
+    <string name="side_sheet_close">Close</string>
+    <!-- TV key: back -->
+    <string name="side_sheet_back">Back</string>
 </resources>

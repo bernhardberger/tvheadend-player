@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- TV: recording_space_value -->
+    <string name="recordings_space">%1$s free of %2$s</string>
+    <!-- TV: recording_space_description -->
+    <string name="recordings_space_description">%1$s free of %2$s, %3$d%% used</string>
+    <!-- TV: channels_view_options -->
+    <string name="recordings_view_options">View options</string>
+    <!-- TV: recordings_grouping_group_by -->
+    <string name="recordings_group_by">Group by</string>
+    <!-- TV: recordings_sort_title -->
+    <string name="recordings_sort">Sort</string>
+    <!-- TV: recordings_show_title -->
+    <string name="recordings_show">Show</string>
+    <!-- TV: recordings_grouping_flat -->
+    <string name="recordings_grouping_flat">Flat</string>
+    <!-- TV: recordings_grouping_folders -->
+    <string name="recordings_grouping_folders">Folders</string>
+    <!-- TV: recordings_grouping_channels -->
+    <string name="recordings_grouping_channels">Channels</string>
+    <!-- TV: recordings_grouping_genres -->
+    <string name="recordings_grouping_genres">Genres</string>
+    <!-- TV: recordings_grouping_none_detail -->
+    <string name="recordings_grouping_flat_detail">One list, no folders</string>
+    <!-- TV: recordings_grouping_folders_detail -->
+    <string name="recordings_grouping_folders_detail">The server’s folder tree</string>
+    <!-- TV: recordings_grouping_channels_detail -->
+    <string name="recordings_grouping_channels_detail">A folder per channel</string>
+    <!-- TV: recordings_grouping_genres_detail -->
+    <string name="recordings_grouping_genres_detail">A folder per genre</string>
+    <!-- TV: recordings_sort_newest -->
+    <string name="recordings_sort_newest">Newest first</string>
+    <!-- TV: recordings_sort_oldest -->
+    <string name="recordings_sort_oldest">Oldest first</string>
+    <!-- TV: recordings_sort_name -->
+    <string name="recordings_sort_name">Name A–Z</string>
+    <!-- TV: recordings_sort_name_descending -->
+    <string name="recordings_sort_name_descending">Name Z–A</string>
+    <!-- TV: recordings_sort_largest -->
+    <string name="recordings_sort_largest">Largest first</string>
+    <!-- TV: recordings_sort_smallest -->
+    <string name="recordings_sort_smallest">Smallest first</string>
+    <!-- TV: recordings_show_option_all -->
+    <string name="recordings_show_all">All</string>
+    <!-- TV: recordings_show_unwatched -->
+    <string name="recordings_show_unwatched">Unwatched</string>
+    <!-- TV: recordings_show_partially_watched -->
+    <string name="recordings_show_partially_watched">Partially watched</string>
+    <!-- TV: recordings_show_watched -->
+    <string name="recordings_show_watched">Watched</string>
+    <!-- TV: recordings_show_unwatched_detail -->
+    <string name="recordings_show_unwatched_detail">Not played to the end</string>
+    <!-- TV: recordings_show_partially_watched_detail -->
+    <string name="recordings_show_partially_watched_detail">Started but not finished</string>
+    <!-- TV: recordings_show_watched_detail -->
+    <string name="recordings_show_watched_detail">Played to the end</string>
+    <!-- TV: recordings_archive_all -->
+    <string name="recordings_all">All recordings</string>
+    <!-- TV: recordings_folder_recording_count -->
+    <plurals name="recordings_count">
+        <item quantity="one">%1$d recording</item>
+        <item quantity="other">%1$d recordings</item>
+    </plurals>
+    <plurals name="recordings_folder_count">
+        <item quantity="one">%1$d folder</item>
+        <item quantity="other">%1$d folders</item>
+    </plurals>
+    <!-- TV: recordings_in_progress_count -->
+    <plurals name="recordings_in_progress">
+        <item quantity="one">%1$d recording in progress</item>
+        <item quantity="other">%1$d recordings in progress</item>
+    </plurals>
+    <!-- The parts of a line, as in "Harbor Sport • 45m". -->
+    <string name="recordings_parts">%1$s • %2$s</string>
+    <!-- The count under the placeholder when the level holds folders: "116 recordings in 7 folders". -->
+    <string name="recordings_in_folders">%1$s in %2$s</string>
+    <!-- The way down to a folder, as in "Recordings › Sport › Football". -->
+    <string name="recordings_path">%1$s › %2$s</string>
+    <string name="recordings_up">Back to %1$s</string>
+    <!-- TV: recordings_until -->
+    <string name="recordings_until">until %1$s</string>
+    <!-- TV: player_minutes_left -->
+    <string name="recordings_time_left">%1$s left</string>
+    <!-- TV: player_status_rec -->
+    <string name="recordings_rec">REC</string>
+    <!-- TV: recordings_recording_now -->
+    <string name="recordings_recording_now">Recording now</string>
+    <!-- TV: recording_watched -->
+    <string name="recordings_watched">Watched</string>
+    <string name="recordings_pick">Pick a recording to see it here</string>
+    <string name="recordings_none">No recordings yet</string>
+    <!-- TV: recordings_empty is one sentence; this second line is new. -->
+    <string name="recordings_none_reason">Programs you record show up here</string>
+    <!-- TV: recordings_empty_not_watched_root -->
+    <string name="recordings_empty_unwatched">Everything here has been played</string>
+    <string name="recordings_empty_unwatched_reason">Only unwatched recordings are shown</string>
+    <!-- TV: recordings_empty_started -->
+    <string name="recordings_empty_partially_watched">Nothing started yet</string>
+    <string name="recordings_empty_partially_watched_reason">Only partially watched recordings are shown</string>
+    <!-- TV: recordings_empty_watched -->
+    <string name="recordings_empty_watched">Nothing has been watched to the end yet</string>
+    <string name="recordings_empty_watched_reason">Only watched recordings are shown</string>
+    <string name="recordings_show_everything">Show all</string>
+    <!-- TV: context_resume -->
+    <string name="recordings_resume">Resume</string>
+    <!-- TV: context_start_over -->
+    <string name="recordings_watch_from_beginning">Watch from beginning</string>
+    <!-- TV: context_watch -->
+    <string name="recordings_watch">Watch</string>
+    <!-- TV: context_delete -->
+    <string name="recordings_delete">Delete</string>
+    <!-- TV: details_more -->
+    <string name="recordings_more">More</string>
+    <!-- TV: back -->
+    <string name="recordings_back">Back</string>
+    <!-- TV: details_important_information -->
+    <string name="recordings_details">Details</string>
+    <!-- TV: details_genre -->
+    <string name="recordings_genre">Genre</string>
+    <!-- TV: details_recorded -->
+    <string name="recordings_recorded">Recorded</string>
+    <!-- TV: details_size -->
+    <string name="recordings_size">Size</string>
+    <!-- TV: details_picture -->
+    <string name="recordings_picture">Picture</string>
+    <!-- TV: details_audio -->
+    <string name="recordings_audio">Audio</string>
+    <!-- TV: recordings_subtitles is not a details row on TV; this label is new. -->
+    <string name="recordings_subtitles">Subtitles</string>
+    <!-- TV: details_errors -->
+    <string name="recordings_errors">Errors</string>
+    <!-- TV: details_retention -->
+    <string name="recordings_retention">Retention</string>
+</resources>

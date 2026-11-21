@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -21,6 +22,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationItemIconPosition
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.material3.ShortNavigationBar
 import androidx.compose.material3.ShortNavigationBarArrangement
 import androidx.compose.material3.ShortNavigationBarItem
@@ -58,11 +60,15 @@ internal enum class Destination(
 @Composable
 internal fun TouchFrame(
     modifier: Modifier = Modifier,
+    initialDestination: Destination = Destination.Channels,
+    // A destination's page can draw its own top bar, or take the whole window (then it handles the insets).
+    showTopBar: (Destination) -> Boolean = { true },
+    showNavigation: (Destination) -> Boolean = { true },
     actions: @Composable RowScope.(Destination) -> Unit = {},
     belowTopBar: @Composable (Destination) -> Unit = {},
     content: @Composable (Destination) -> Unit = {},
 ) {
-    var selected by rememberSaveable { mutableStateOf(Destination.Channels) }
+    var selected by rememberSaveable { mutableStateOf(initialDestination) }
     val select: (Destination) -> Unit = { selected = it }
     BackHandler(enabled = selected != Destination.Channels) {
         selected = Destination.Channels
@@ -72,19 +78,24 @@ internal fun TouchFrame(
     val expanded = window.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND)
     val mediumOrWider = window.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND)
 
+    val topBar = showTopBar(selected)
+    val navigation = showNavigation(selected)
     Row(modifier.fillMaxSize()) {
-        if (expanded) DestinationRail(selected, select)
+        if (expanded && navigation) DestinationRail(selected, select)
         Scaffold(
             modifier = Modifier.weight(1f),
             topBar = {
-                Column {
-                    DestinationTopBar(selected, mediumOrWider, expanded, actions)
-                    belowTopBar(selected)
+                if (topBar) {
+                    Column {
+                        DestinationTopBar(selected, mediumOrWider, expanded, actions)
+                        belowTopBar(selected)
+                    }
                 }
             },
             bottomBar = {
-                if (!expanded) DestinationBar(selected, mediumOrWider, select)
+                if (!expanded && navigation) DestinationBar(selected, mediumOrWider, select)
             },
+            contentWindowInsets = if (topBar) ScaffoldDefaults.contentWindowInsets else WindowInsets(0, 0, 0, 0),
         ) { innerPadding ->
             Box(Modifier.fillMaxSize().padding(innerPadding)) { content(selected) }
         }

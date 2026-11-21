@@ -1,0 +1,234 @@
+package at.bernhardberger.tvhplayer.touch.recordings
+
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.view.ViewGroup
+import androidx.activity.ComponentActivity
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.click
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.core.graphics.Insets
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import at.bernhardberger.tvhplayer.touch.testutil.TouchCanvas
+import at.bernhardberger.tvhplayer.touch.testutil.captureTouch
+import at.bernhardberger.tvhplayer.ui.MobileDarkColors
+import java.io.File
+import org.junit.Assert.assertEquals
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+import org.robolectric.shadows.ShadowDialog
+
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+class RecordingsScreenTest {
+    @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
+
+    private val state = mutableStateOf(flatFixture())
+
+    @Test
+    @Config(qualifiers = "en-rUS-w1280dp-h800dp-land-xhdpi")
+    fun tabletPickShowsDetailsBesideTheList() {
+        show()
+        compose.onNodeWithText("Pick a recording to see it here").assertIsDisplayed()
+        capture("tablet-recordings-root", TouchCanvas.TABLET)
+
+        pickTheHalfWatchedMatch()
+        compose.onNodeWithText("Resume").assertIsDisplayed()
+        compose.onNodeWithText("All recordings").assertIsDisplayed()
+        capture("tablet-recordings-picked", TouchCanvas.TABLET)
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w1280dp-h800dp-land-xhdpi")
+    fun tabletViewOptionsChangeTheGrouping() {
+        show()
+        openViewOptions()
+        capture("tablet-recordings-view", TouchCanvas.TABLET)
+        compose.onNodeWithText("Group by").performClick()
+        compose.onNodeWithText("The server’s folder tree").assertIsDisplayed()
+        capture("tablet-recordings-view-group", TouchCanvas.TABLET)
+
+        // Back inside the sheet returns to its rows; a choice applies and returns there too.
+        back()
+        compose.onNodeWithText("Sort").assertIsDisplayed()
+        compose.onNodeWithText("Group by").performClick()
+        compose.onNodeWithText("Folders").performClick()
+        assertEquals(RecordingsGrouping.Folders, state.value.view.grouping)
+        compose.onNodeWithText("Show").assertIsDisplayed()
+
+        // A tap outside closes the sheet; so does system Back.
+        compose.onRoot().performTouchInput { click(Offset(width * 0.3f, height * 0.5f)) }
+        assertSheetClosed()
+        compose.onNodeWithText("Recording now").assertIsDisplayed()
+        openViewOptions()
+        back()
+        assertSheetClosed()
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w1280dp-h800dp-land-xhdpi")
+    fun tabletFolderOpensOneLevelAndTheHeadShowsTheWay() {
+        state.value = foldersFixture()
+        show()
+        compose.onNodeWithText("116 recordings in 7 folders").assertIsDisplayed()
+        capture("tablet-recordings-folder", TouchCanvas.TABLET)
+
+        listOf("Sport", "Football", "Harbor Sport", "Week 46").forEach { compose.onNodeWithText(it).performClick() }
+        compose.onNodeWithText("Recordings › Sport › Football › Harbor Sport").assertIsDisplayed()
+        compose.onNodeWithText("Basketball").assertDoesNotExist()
+        pickTheHalfWatchedMatch()
+        compose.onNodeWithText("Resume").assertIsDisplayed()
+        capture("tablet-recordings", TouchCanvas.TABLET)
+
+        back()
+        compose.onNodeWithText("Recordings › Sport › Football").assertIsDisplayed()
+        compose.onNodeWithText("Week 46").assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w1280dp-h800dp-land-xhdpi")
+    fun tabletWithoutRecordings() {
+        state.value = noRecordingsFixture()
+        show()
+        compose.onNodeWithText("No recordings yet").assertIsDisplayed()
+        capture("tablet-recordings-empty", TouchCanvas.TABLET)
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w800dp-h1280dp-port-xhdpi")
+    fun uprightPickOpensAPage() {
+        state.value = flatFixture(friday = true, tuesday = true)
+        show()
+        capture("tablet-upright-recordings", TouchCanvas.TABLET_UPRIGHT)
+
+        pickTheHalfWatchedMatch()
+        compose.onNodeWithText("All recordings").assertDoesNotExist()
+        compose.onNodeWithText("Resume").assertIsDisplayed()
+        capture("tablet-upright-recording", TouchCanvas.TABLET_UPRIGHT)
+
+        back()
+        compose.onNodeWithText("All recordings").assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
+    fun phoneListAndViewOptions() {
+        state.value = flatFixture(friday = true, phone = true)
+        show()
+        capture("phone-recordings-all", TouchCanvas.PHONE)
+
+        compose.onNodeWithContentDescription("View options").performClick()
+        compose.onNodeWithText("Group by").assertIsDisplayed()
+        captureSheetOver("phone-recordings-view", TouchCanvas.PHONE)
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
+    fun phonePickOpensADetailsPage() {
+        state.value = foldersFixture(phone = true)
+        show(initialPath = WeekPath)
+        compose.onNodeWithText("Week 46").assertIsDisplayed()
+        capture("phone-recordings", TouchCanvas.PHONE)
+
+        pickTheHalfWatchedMatch()
+        compose.onNodeWithText("Week 46").assertDoesNotExist()
+        compose.onNodeWithText("Watch from beginning").assertIsDisplayed()
+        capture("phone-recording-details", TouchCanvas.PHONE)
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
+    fun phoneFilterEmptyOffersTheWayOut() {
+        state.value = unwatchedEmptyFixture()
+        show()
+        compose.onNodeWithText("Everything here has been played").assertIsDisplayed()
+        capture("phone-recordings-empty", TouchCanvas.PHONE)
+
+        compose.onNodeWithText("Show all").performClick()
+        assertEquals(RecordingsShow.All, state.value.view.show)
+    }
+
+    private fun show(initialPath: List<String> = emptyList()) {
+        val actions = RecordingsActions(
+            onView = { view ->
+                val regrouped = if (view.grouping == RecordingsGrouping.Folders) foldersFixture() else flatFixture()
+                state.value = regrouped.copy(view = view)
+            },
+            onPlay = { _, _ -> },
+            onDelete = {},
+            onMore = {},
+        )
+        compose.setContent {
+            MaterialTheme(colorScheme = MobileDarkColors) {
+                RecordingsScreen(state.value, actions, initialPath = initialPath)
+            }
+        }
+    }
+
+    private fun pickTheHalfWatchedMatch() =
+        compose.onNodeWithText("Westvale – Ridge Town", substring = true).performClick()
+
+    private fun openViewOptions() {
+        compose.onNodeWithText("View options").performClick()
+        compose.onNodeWithText("Group by").assertIsDisplayed()
+    }
+
+    private fun assertSheetClosed() = compose.onAllNodes(hasText("Group by")).assertCountEquals(0)
+
+    private fun back() = compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+
+    private fun capture(name: String, canvas: TouchCanvas) = compose.captureTouch(GROUP, name, canvas)
+
+    // The bottom sheet has its own window in Robolectric: draw it over captureTouch's full canvas.
+    private fun captureSheetOver(name: String, canvas: TouchCanvas) {
+        capture(name, canvas)
+        compose.waitForIdle()
+        val window = checkNotNull(ShadowDialog.getLatestDialog().window)
+        compose.runOnIdle {
+            val root = window.findViewById<ViewGroup>(android.R.id.content).getChildAt(0)
+            ViewCompat.dispatchApplyWindowInsets(
+                root,
+                WindowInsetsCompat.Builder()
+                    .setInsets(WindowInsetsCompat.Type.statusBars(), Insets.of(0, canvas.statusBarDp * 2, 0, 0))
+                    .setInsets(WindowInsetsCompat.Type.navigationBars(), Insets.of(0, 0, 0, NAVIGATION_PX))
+                    .setVisible(WindowInsetsCompat.Type.systemBars(), true)
+                    .build(),
+            )
+        }
+        compose.waitForIdle()
+        val output = File(checkNotNull(System.getProperty("touch.captureDir")), "$GROUP/$name.png")
+        val frame = BitmapFactory.decodeFile(output.path).copy(Bitmap.Config.ARGB_8888, true)
+        compose.runOnIdle {
+            val decor = window.decorView
+            Canvas(frame).apply {
+                translate(0f, (height - decor.height).toFloat())
+                decor.draw(this)
+            }
+        }
+        output.outputStream().use { check(frame.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+        frame.recycle()
+    }
+
+    private companion object {
+        const val GROUP = "slice3"
+        const val NAVIGATION_PX = 48
+    }
+}
