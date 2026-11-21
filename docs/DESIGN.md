@@ -665,7 +665,7 @@ Accepted 2026-09-15; static design in Penpot page
 ## 8. Global snackbar
 
 Transient feedback has one owner: typed `Notice` and `NoticeCenter` in `:client`;
-`NoticeFormatter` and `AppNoticeHost` in `:app` own copy, icons and presentation.
+`NoticeFormatter` in `:presentation` owns copy and icons; `AppNoticeHost` in `:app` owns presentation.
 Post notices, not Toasts, local snackbars or inline action-result labels. Persistent
 status stays on its owning surface; a blocking failure uses `TvRecoveryOverlay`.
 `TransientFeedback` static checks enforce the presentation/construction boundary
