@@ -44,6 +44,9 @@ import at.bernhardberger.tvhplayer.ui.MobileDarkColors
 import at.bernhardberger.tvhplayer.ui.screens.recordings.StopConfirmationTimes
 import at.bernhardberger.tvhplayer.ui.screens.recordings.stopConfirmationSentence
 import java.util.TimeZone
+import java.time.ZoneOffset
+import android.content.res.Configuration
+import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.time.Instant
 import kotlinx.coroutines.CompletableDeferred
@@ -463,6 +466,7 @@ class GuideScreenTest {
                     connection.session.publish(guide.connected(epg = guide.refreshedEpg("Updated News")))
                 }
                 compose.onNodeWithText("Updated News").assertIsDisplayed()
+                compose.runOnIdle { assertEquals("One mapping for one visible publication", 2, guideMappings()) }
                 assertTrue(SystemClock.setCurrentTimeMillis(before + 10_000))
                 compose.mainClock.advanceTimeBy(5_016)
                 compose.onNodeWithText("Weather").assertIsDisplayed()
@@ -506,6 +510,41 @@ class GuideScreenTest {
             test()
         } finally {
             info.flags = original
+        }
+    }
+
+    @Test
+    fun aNewGuideInputSupersedesARequestInTheSameUiTurn() {
+        val connection = FakeConnection()
+        val noon = Instant.parse("2027-01-15T12:00:00Z")
+        val fixture = ServerGuide(noon)
+        val viewModel = connection.guide()
+        val channels = connection.channels()
+        val context = compose.activity
+        withMappingTrace {
+            try {
+                compose.runOnIdle { connection.session.publish(fixture.connected()) }
+                compose.runOnIdle {
+                    fun request(observation: at.bernhardberger.tvheadend.sdk.core.SessionObservation) =
+                        viewModel.map(
+                            context,
+                            GuideMappingInput(
+                                channels.scope.value, ConnectionUiState.Ready, false, observation,
+                                GuideSelection(), GuideClock(noon.epochSeconds, ZoneOffset.UTC),
+                                Configuration(context.resources.configuration), true, null, null,
+                            ),
+                        )
+
+                    request(connection.session.observation.value)
+                    request(fixture.connected(epg = fixture.refreshedEpg("Updated News")))
+                }
+                compose.runOnIdle {
+                    assertEquals("Only the latest queued Guide input maps", 1, guideMappings())
+                    assertEquals("Updated News", viewModel.mapped.value?.state?.channels?.first()?.programs?.first()?.title)
+                }
+            } finally {
+                connection.close()
+            }
         }
     }
 

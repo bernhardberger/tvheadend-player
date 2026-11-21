@@ -18,12 +18,14 @@ import at.bernhardberger.tvhplayer.viewmodels.ChannelScopeState
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.yield
 import java.time.LocalDate
 import kotlin.coroutines.CoroutineContext
 import kotlin.time.Instant
@@ -79,8 +81,9 @@ internal class GuideViewModel(
         mappingInput = input
         mappingJob?.cancel()
         val app = context.applicationContext
-        val previous = mutableMapped.value
         mappingJob = viewModelScope.launch {
+            yield()
+            val previous = mutableMapped.value
             val result = withContext(mappingDispatcher) {
                 val sincePublished = input.changesFrom(previous?.input)
                 val epgOnly = sincePublished.singleOrNull() == "epg"
@@ -98,10 +101,12 @@ internal class GuideViewModel(
                     val texts = guideTexts(
                         localized, input.configuration.locales[0], input.clock.zone, input.uses24Hour,
                     )
-                    guideState(
+                    val state = guideState(
                         input.scope, input.connection, input.degraded, input.observation, input.selection, false,
-                        input.clock, texts, input.artwork, input.playingId,
+                        input.clock, texts, input.artwork, input.playingId, ::ensureActive,
                     )
+                    ensureActive()
+                    state
                 }
                 GuideMappingResult(input, state, projection)
             }
