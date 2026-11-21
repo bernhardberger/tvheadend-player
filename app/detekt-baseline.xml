@@ -63,7 +63,6 @@
     <ID>CyclomaticComplexMethod:BrowseContextMenu.kt:@Composable internal fun rememberBrowseContextMenuTrigger: BrowseContextMenuTrigger</ID>
     <ID>CyclomaticComplexMethod:BrowseContextMenu.kt:internal fun BrowseContextAction.label: Int</ID>
     <ID>CyclomaticComplexMethod:CentredDialogShell.kt:@Composable internal fun CentredDialogShell</ID>
-    <ID>CyclomaticComplexMethod:ChannelAccents.kt:ChannelAccents$suspend fun fillIn</ID>
     <ID>CyclomaticComplexMethod:ChannelDrawer.kt:@OptIn(ExperimentalFoundationApi::class) @Composable fun ChannelDrawer</ID>
     <ID>CyclomaticComplexMethod:ChannelNumberOverlay.kt:@Composable private fun ChannelNumberEntryRow</ID>
     <ID>CyclomaticComplexMethod:ChannelRow.kt:@Composable fun ChannelRow</ID>
@@ -257,28 +256,15 @@
     <ID>LongMethod:VideoPlayerScreen.kt:@Composable fun playerRootModifier: Modifier</ID>
     <ID>LongMethod:VideoPlayerScreen.kt:@OptIn(UnstableApi::class) @kotlin.OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class) @Composable fun VideoPlayerScreen</ID>
     <ID>LoopWithTooManyJumpStatements:BackdropTransformation.kt:for</ID>
-    <ID>LoopWithTooManyJumpStatements:ChannelAccents.kt:ChannelAccents$for</ID>
     <ID>LoopWithTooManyJumpStatements:DetailsBackdropContrast.kt:for</ID>
     <ID>LoopWithTooManyJumpStatements:PlayerTimelinePresentationState.kt:LiveTimelinePresentationState$while</ID>
     <ID>LoopWithTooManyJumpStatements:WatchingProgress.kt:while</ID>
-    <ID>MagicNumber:ArtworkSample.kt:64</ID>
     <ID>MagicNumber:BackdropTransformation.kt:0xff</ID>
     <ID>MagicNumber:BackdropTransformation.kt:16</ID>
     <ID>MagicNumber:BackdropTransformation.kt:24</ID>
     <ID>MagicNumber:BackdropTransformation.kt:8</ID>
     <ID>MagicNumber:BackdropTransformation.kt:BackdropTransformation$3</ID>
     <ID>MagicNumber:CacheStatisticsFormatting.kt:1_000_000</ID>
-    <ID>MagicNumber:ChannelAccentPolicy.kt:120f</ID>
-    <ID>MagicNumber:ChannelAccentPolicy.kt:16</ID>
-    <ID>MagicNumber:ChannelAccentPolicy.kt:180f</ID>
-    <ID>MagicNumber:ChannelAccentPolicy.kt:240f</ID>
-    <ID>MagicNumber:ChannelAccentPolicy.kt:255</ID>
-    <ID>MagicNumber:ChannelAccentPolicy.kt:255f</ID>
-    <ID>MagicNumber:ChannelAccentPolicy.kt:300f</ID>
-    <ID>MagicNumber:ChannelAccentPolicy.kt:360f</ID>
-    <ID>MagicNumber:ChannelAccentPolicy.kt:60f</ID>
-    <ID>MagicNumber:ChannelAccentPolicy.kt:8</ID>
-    <ID>MagicNumber:ChannelAccents.kt:0xFFFFFF</ID>
     <ID>MagicNumber:ChannelNavigation.kt:ChannelNavigation$9</ID>
     <ID>MagicNumber:CinematicScrimTransformation.kt:50.1f</ID>
     <ID>MagicNumber:CinematicScrimTransformation.kt:54f</ID>
@@ -399,8 +385,6 @@
     <ID>MaxLineLength:BrowseContextMenu.kt:color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)</ID>
     <ID>MaxLineLength:BrowsePanels.kt:val activation = event.key == Key.DirectionCenter || event.key == Key.Enter || event.key == Key.NumPadEnter</ID>
     <ID>MaxLineLength:ChannelAccent.kt:if</ID>
-    <ID>MaxLineLength:ChannelAccents.kt:ChannelAccents$.</ID>
-    <ID>MaxLineLength:ChannelAccents.kt:return@withContext if (failure == null || failure == TvheadendFailure.FILE_UNAVAILABLE) NEUTRAL_ACCENT_RGB else null</ID>
     <ID>MaxLineLength:ChannelContextMenu.kt:BrowseContextAction.WATCH</ID>
     <ID>MaxLineLength:ChannelDrawer.kt:.</ID>
     <ID>MaxLineLength:ChannelDrawer.kt:Text(stringResource(R.string.empty_channel_tag), Modifier.padding(horizontal = 58.dp), color = MaterialTheme.colorScheme.onSurface)</ID>
@@ -964,7 +948,6 @@
     <ID>MaxLineLength:WhatsNewPolicy.kt:)</ID>
     <ID>NestedBlockDepth:HomeScreen.kt:@Composable @OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class) internal fun HomeScreenContent</ID>
     <ID>ReturnCount:ApplianceLaunchRequests.kt:ApplianceLaunchRequests$@Synchronized fun resolve: ApplianceLaunchTarget?</ID>
-    <ID>ReturnCount:ChannelAccents.kt:ChannelAccents$suspend fun sample: Int?</ID>
     <ID>ReturnCount:ChannelNavigation.kt:ChannelNavigation$fun adjacentId: ChannelId?</ID>
     <ID>ReturnCount:ChannelNavigation.kt:ChannelNavigation$fun entryReadiness: ChannelNumberEntryReadiness</ID>
     <ID>ReturnCount:ChannelNavigation.kt:ChannelNavigation$fun idForNumber: ChannelId?</ID>

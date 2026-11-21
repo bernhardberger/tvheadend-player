@@ -45,6 +45,10 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core)
     // Channel logo and picture loading; brings coil-core and OkHttp at the catalog's Coil version.
     implementation(libs.coil.network.okhttp)
+    // Coil's singleton loader, which the picture-colour sampler decodes through.
+    implementation("io.coil-kt.coil3:coil:${libs.versions.coil.get()}")
+    // Channel and programme picture colours.
+    implementation(libs.androidx.palette)
 
     testImplementation(libs.junit)
     testImplementation(libs.androidx.test.ext.junit)

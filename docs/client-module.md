@@ -47,6 +47,9 @@ directly. `:client` mirrors the app build types (`debug`, `release`, `profile`,
 - `data/FrontendModels`.
 - `images/LogoInk`: darkens or lightens the logo parts that would vanish on a
   known solid ground, on plain ARGB pixels without Android graphics.
+- `core/ChannelAccentPolicy`: picks and normalizes a channel color from
+  sampled RGB candidates (`selectAccentRgb`, `normalizeAccentRgb`,
+  `NEUTRAL_ACCENT_RGB`, `rgbToHsv`, `hsvToRgb`).
 - `notices/`: typed `Notice`, the FIFO `NoticeCenter` and generation-fenced
   `NoticeContext`, plus SDK DVR-change and connection notice sources. These own
   transient-feedback policy without Android resources or presentation.
@@ -88,11 +91,14 @@ actions, with `currentDvrMutation` and `currentDvrConfigurations`; the caller
 passes the preferred recording profile), `ui/common/TimeConverter`,
 `ui/common/Epg`, `ui/common/RecordingExpiry`, `ui/common/NumberFormatting` and
 `programmeCategoryLabelRes` in `ui/common/ProgrammeCategoryLabelRes`.
+Picture colors: `images/ChannelAccents` (channel colors sampled from picons and
+kept in `ChannelAccentStore`), `images/DetailsArtColors` and `images/ArtworkSample`;
+`rememberChannelAccent` and the glows that draw stay in `:app`.
 Notice wording: `ui/notifications/NoticeFormatter` (`FormattedNotice`, `AppNoticeIcon`,
 `DvrSubscriptionError.label(context)`); `AppNoticeHost` and the `@Composable` label stay in `:app`.
 This library depends on `:client` and uses lifecycle ViewModel, lifecycle
 runtime Compose, Compose state and saveable APIs, and Coil with OkHttp at the
-catalog's Coil version. It holds no composables that draw, no TV widgets or
+catalog's Coil version, and Palette. It holds no composables that draw, no TV widgets or
 `androidx.tv` dependencies, and no Koin: callers pass what they inject. The variant-specific launcher
 label stays in `:app`.
 
