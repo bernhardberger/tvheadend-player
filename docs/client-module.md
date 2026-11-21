@@ -88,6 +88,8 @@ actions, with `currentDvrMutation` and `currentDvrConfigurations`; the caller
 passes the preferred recording profile), `ui/common/TimeConverter`,
 `ui/common/Epg`, `ui/common/RecordingExpiry`, `ui/common/NumberFormatting` and
 `programmeCategoryLabelRes` in `ui/common/ProgrammeCategoryLabelRes`.
+Notice wording: `ui/notifications/NoticeFormatter` (`FormattedNotice`, `AppNoticeIcon`,
+`DvrSubscriptionError.label(context)`); `AppNoticeHost` and the `@Composable` label stay in `:app`.
 This library depends on `:client` and uses lifecycle ViewModel, lifecycle
 runtime Compose, Compose state and saveable APIs, and Coil with OkHttp at the
 catalog's Coil version. It holds no composables that draw, no TV widgets or
@@ -96,7 +98,7 @@ label stays in `:app`.
 
 ## What stays app-owned and why
 
-- TV screens, TV-specific view models, notice formatting/presentation and app UI resources.
+- TV screens, TV-specific view models, notice presentation (`AppNoticeHost`) and app UI resources.
 - `di/AppModule` (Koin wiring) and `profiling/ProfileLayout` (Compose).
 - Key, focus, Back, navigation, appliance, accent, label, formatting and
   presentation policies: TV interaction and product UX.
