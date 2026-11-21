@@ -6,12 +6,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.Canvas
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.Paint
-import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
@@ -26,10 +20,11 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.touch.testutil.TouchCanvas
+import at.bernhardberger.tvhplayer.touch.testutil.assertLogoFitsItsShare
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouch
+import at.bernhardberger.tvhplayer.touch.testutil.markedLogos
 import at.bernhardberger.tvhplayer.touch.ui.ChannelLogoTile
 import at.bernhardberger.tvhplayer.ui.MobileDarkColors
-import kotlin.math.abs
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -39,10 +34,6 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-
-private val Mark = Color(0xFFFF00FF)
-private const val LOGO_WIDTH = 0.76f
-private const val LOGO_HEIGHT = 0.62f
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -163,38 +154,18 @@ class ChannelsScreenTest {
     @Test
     @Config(qualifiers = "en-rUS-w1280dp-h800dp-land-xhdpi")
     fun aLogoOfAnyShapeFitsItsShareOfTheTileCentered() {
-        // Opaque blocks, so the drawn logo can be told from the tile's ground pixel by pixel.
-        val logos = listOf(ImageBitmap(100, 100), ImageBitmap(400, 100)).onEach {
-            Canvas(it).drawRect(Rect(0f, 0f, it.width.toFloat(), it.height.toFloat()), Paint().apply { color = Mark })
-        }
+        val logos = markedLogos()
         compose.setContent {
             MaterialTheme(colorScheme = MobileDarkColors) {
                 Column {
                     logos.forEachIndexed { index, logo ->
-                        ChannelLogoTile(BitmapPainter(logo), null, Modifier.size(112.dp, 56.dp).testTag("tile-$index"))
+                        ChannelLogoTile(logo, null, Modifier.size(112.dp, 56.dp).testTag("tile-$index"))
                     }
                 }
             }
         }
         logos.indices.forEach { index ->
-            val tile = compose.onNodeWithTag("tile-$index").captureToImage().toPixelMap()
-            val drawn = (0 until tile.width).flatMap { x -> (0 until tile.height).map { y -> x to y } }
-                .filter { (x, y) -> tile[x, y] == Mark }
-            val left = drawn.minOf { it.first }
-            val right = tile.width - 1 - drawn.maxOf { it.first }
-            val top = drawn.minOf { it.second }
-            val bottom = tile.height - 1 - drawn.maxOf { it.second }
-            val width = tile.width - left - right
-            val height = tile.height - top - bottom
-            assertTrue("logo $index width $width of ${tile.width}", width <= tile.width * LOGO_WIDTH + 1)
-            assertTrue("logo $index height $height of ${tile.height}", height <= tile.height * LOGO_HEIGHT + 1)
-            // Contain: the logo reaches the box on one side.
-            assertTrue(
-                "logo $index $width×$height does not fill its box on either side",
-                width >= tile.width * LOGO_WIDTH - 2 || height >= tile.height * LOGO_HEIGHT - 2,
-            )
-            assertTrue("logo $index off center horizontally", abs(left - right) <= 1)
-            assertTrue("logo $index off center vertically", abs(top - bottom) <= 1)
+            compose.onNodeWithTag("tile-$index").captureToImage().toPixelMap().assertLogoFitsItsShare("logo $index")
         }
     }
 
