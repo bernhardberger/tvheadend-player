@@ -13,9 +13,12 @@ import androidx.activity.enableEdgeToEdge
 import androidx.annotation.OptIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalResources
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -29,7 +32,9 @@ import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvheadend.sdk.media3.LivePlaybackObservation
 import at.bernhardberger.tvhplayer.data.ConnectionState
 import at.bernhardberger.tvhplayer.di.SdkRuntimeOwner
+import at.bernhardberger.tvhplayer.core.livePlayWhenReady
 import at.bernhardberger.tvhplayer.core.toConnectionState
+import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.BackgroundPlaybackNotice
 import at.bernhardberger.tvhplayer.playback.currentLivePlaybackSelection
@@ -44,7 +49,6 @@ import at.bernhardberger.tvhplayer.ui.common.progress
 import at.bernhardberger.tvhplayer.ui.common.rememberCurrentEpochSeconds
 import at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
-import java.time.ZoneId
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
@@ -199,46 +203,48 @@ class PlayerActivity : ComponentActivity() {
         val presentation by connection.uiState.collectAsStateWithLifecycle()
         val scope by channels.scope.collectAsStateWithLifecycle()
         val observation by channels.observation.collectAsStateWithLifecycle()
-        val playback by runtime.state.collectAsStateWithLifecycle()
-        val target by runtime.activeTarget.collectAsStateWithLifecycle()
-        val live by runtime.livePlaybackObservation.collectAsStateWithLifecycle()
-        val notice by runtime.backgroundNotice.collectAsStateWithLifecycle()
         val video by runtime.videoPresentation.collectAsStateWithLifecycle()
         val tune by requested.collectAsStateWithLifecycle()
         val failed by requestFailed.collectAsStateWithLifecycle()
-        val nowSec = rememberCurrentEpochSeconds()()
+        // The texts and the channel list move on the minute, not on every tick of the clock.
+        val clock = rememberCurrentEpochSeconds()
+        val minute by remember { derivedStateOf { clock() / SECONDS_PER_MINUTE } }
+        val pause by runtime.livePause.collectAsStateWithLifecycle()
+        val playWhenReady by rememberPlayWhenReady(runtime.player)
+        val commands = rememberCoroutineScope()
+        val timeshift = remember { LiveTimeshift(runtime, commands) }
+        var controlsShown by remember { mutableStateOf(true) }
         var brightness by remember { mutableFloatStateOf(systemBrightness()) }
         val shown = tune.channelId
-        val active = live as? LivePlaybackObservation.Active
-        val status = liveStatus(
-            connected = observation.sessionState.toConnectionState() is ConnectionState.Connected,
-            state = playback,
-            issue = active?.subscriptionIssue,
-            serverStopped = active?.serverStopped == true,
-            playingId = playingChannelId(target, playback),
-            shownId = shown,
-            requestFailed = failed,
-            notice = notice,
-        )
-        val now = Instant.fromEpochSeconds(nowSec)
+        val status = currentStatus(runtime, observation, shown, failed)
+        val paused = !livePlayWhenReady(pause, playWhenReady)
+        FollowTimeshift(timeshift, shown, fast = controlsShown && !paused) {
+            session.observation.value.eventAt(shown, it)
+        }
+        ConsumePauseNotices(runtime)
+        val now = Instant.fromEpochSeconds(minute * SECONDS_PER_MINUTE)
         val state = livePlayerState(
-            shown, scope, observation, presentation.connection, presentation.degraded, status, now,
-            ZoneId.systemDefault(),
+            shown, scope, observation, presentation.connection, presentation.degraded, status,
+            timeshift.timeline, pause.availability, now,
         )
-        val resources = LocalResources.current
         PlayerScreen(
             state = state.copy(
-                channel = state.channel.withProgramTexts(observation, shown, now, resources),
+                channel = state.channel.withProgramTexts(observation, shown, now, LocalResources.current),
                 brightness = brightness,
+                paused = paused,
             ),
             onAction = { action ->
                 when (action) {
                     PlayerAction.Back -> leave()
                     PlayerAction.WatchLive -> watchLive()
+                    PlayerAction.TogglePlay -> timeshift.toggle(paused)
+                    PlayerAction.BackTen -> timeshift.skip(-BACK_SKIP_MS)
+                    PlayerAction.ForwardThirty -> timeshift.skip(FORWARD_SKIP_MS)
+                    PlayerAction.GoLive -> timeshift.goLive()
                     else -> Unit
                 }
             },
-            onSeek = {},
+            onSeek = timeshift::seek,
             onBrightness = { value ->
                 brightness = value
                 window.attributes = window.attributes.apply { screenBrightness = value.coerceIn(MIN_BRIGHTNESS, 1f) }
@@ -251,8 +257,10 @@ class PlayerActivity : ComponentActivity() {
                 if (choice is PlayerChoice.ChannelTag) channels.selectTag(choice.id?.let { ChannelTagId(it.toLong()) })
             },
             video = { modifier -> TouchVideoSurface(runtime.player, video.visible, modifier) },
+            onControlsShown = { controlsShown = it },
         )
     }
+
 
     private fun systemBrightness(): Float =
         Settings.System.getInt(contentResolver, Settings.System.SCREEN_BRIGHTNESS, DEFAULT_BRIGHTNESS) / MAX_BRIGHTNESS
@@ -263,6 +271,9 @@ class PlayerActivity : ComponentActivity() {
         private const val MAX_BRIGHTNESS = 255f
         // Zero would turn the backlight off on some devices.
         private const val MIN_BRIGHTNESS = 0.01f
+        private const val SECONDS_PER_MINUTE = 60L
+        private const val BACK_SKIP_MS = 10_000L
+        private const val FORWARD_SKIP_MS = 30_000L
 
         internal fun intent(context: Context, channelId: ChannelId): Intent =
             Intent(context, PlayerActivity::class.java).putExtra(EXTRA_CHANNEL, channelId.value)
@@ -270,6 +281,32 @@ class PlayerActivity : ComponentActivity() {
         private fun Intent.channelId(): ChannelId? =
             getLongExtra(EXTRA_CHANNEL, -1L).takeIf { it >= 0 }?.let(::ChannelId)
     }
+}
+
+/** The face's status from the runtime, the session and this activity's own failed request, as the TV derives it. */
+@OptIn(UnstableApi::class)
+@Composable
+private fun currentStatus(
+    runtime: AppPlaybackRuntime,
+    observation: SessionObservation,
+    shown: ChannelId,
+    failed: Boolean,
+): LivePlayerStatus {
+    val playback by runtime.state.collectAsStateWithLifecycle()
+    val target by runtime.activeTarget.collectAsStateWithLifecycle()
+    val live by runtime.livePlaybackObservation.collectAsStateWithLifecycle()
+    val notice by runtime.backgroundNotice.collectAsStateWithLifecycle()
+    val active = live as? LivePlaybackObservation.Active
+    return liveStatus(
+        connected = observation.sessionState.toConnectionState() is ConnectionState.Connected,
+        state = playback,
+        issue = active?.subscriptionIssue,
+        serverStopped = active?.serverStopped == true,
+        playingId = playingChannelId(target, playback),
+        shownId = shown,
+        requestFailed = failed,
+        notice = notice,
+    )
 }
 
 /** The running and next program's clock, episode and genre texts, by the shared formatters. */

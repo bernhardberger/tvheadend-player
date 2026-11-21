@@ -3,17 +3,26 @@
 package at.bernhardberger.tvhplayer.touch.player
 
 import androidx.annotation.OptIn
+import androidx.compose.runtime.State
 import androidx.media3.common.util.UnstableApi
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
+import at.bernhardberger.tvheadend.sdk.media3.TimeshiftTimeline
+import at.bernhardberger.tvheadend.sdk.media3.TimeshiftWallClockMapping
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssue
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.PlaybackStatusPresentation
+import at.bernhardberger.tvhplayer.core.TIMESHIFT_LIVE_EDGE_TOLERANCE_MS
 import at.bernhardberger.tvhplayer.core.liveChannelCondition
 import at.bernhardberger.tvhplayer.core.liveInterrupted
 import at.bernhardberger.tvhplayer.core.playbackStatusPresentation
+import at.bernhardberger.tvhplayer.core.programmePositionWindow
+import at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
+import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
+import at.bernhardberger.tvhplayer.playback.LivePauseAvailability
 import at.bernhardberger.tvhplayer.playback.BackgroundPlaybackNotice
 import at.bernhardberger.tvhplayer.touch.channels.ChannelList
 import at.bernhardberger.tvhplayer.touch.channels.ChannelRow
@@ -76,16 +85,93 @@ internal fun liveStatus(
 }
 
 /**
- * The running program's line with the viewer at the live edge: until timeshift is wired the
- * position is the on-air moment and nothing behind it is seekable. Null outside the program.
+ * The bar for one timeshift sample, by the TV's programme window (app ui/player/ProgrammeWindow.kt
+ * `programmeWindow`): the axis is the program the viewer is in, the buffer starts at the history's
+ * start (or the program's start, whichever is later), the live tick sits at the history's end when
+ * that falls inside the program, and the viewer within the live-edge tolerance of it sits on it.
+ * Without a window (no timeshift on this channel or server, no position yet) the bar is the
+ * program on air with the viewer at [nowSec] and nothing seekable; with no program on air, none.
  */
-internal fun liveTimeline(startSec: Long, stopSec: Long, nowSec: Long, zone: ZoneId): LiveTimeline? {
-    val duration = stopSec - startSec
-    if (duration <= 0 || nowSec !in startSec until stopSec) return null
-    val live = (nowSec - startSec).toInt()
-    val start = java.time.Instant.ofEpochSecond(startSec).atZone(zone).toLocalTime()
-    return LiveTimeline(start, duration.toInt(), bufferStart = null, position = live, live = live)
+internal fun liveTimeline(
+    sample: AppTimeshiftState,
+    nowSec: Long,
+    zone: ZoneId,
+    eventAt: (Instant) -> EpgEvent?,
+): LiveTimeline? {
+    val startMapping = sample.historyStartTimeline
+        ?.takeIf { sample.timeline?.describesSameSegment(it) == true }
+        ?.wallClockMapping as? TimeshiftWallClockMapping.Estimate
+    val window = programmePositionWindow(sample, historyStartMapping = startMapping, eventAt = eventAt)
+        ?.takeIf { it.stop > it.start }
+        ?: return eventAt(Instant.fromEpochSeconds(nowSec))?.let { onAir(it, nowSec, zone) }
+    val duration = (window.stop - window.start).inWholeSeconds.toInt()
+    fun offset(time: Instant) = (time - window.start).inWholeSeconds.toInt().coerceIn(0, duration)
+    val liveEdge = window.historyEnd in window.start..window.stop
+    val live = offset(window.historyEnd)
+    val bufferStart = offset(window.historyStart).coerceAtMost(live)
+    val atEdge = liveEdge &&
+        (window.historyEnd - window.estimatedPosition).inWholeMilliseconds <= TIMESHIFT_LIVE_EDGE_TOLERANCE_MS
+    val position = if (atEdge) live else offset(window.estimatedPosition).coerceIn(bufferStart, live)
+    val presentation = timeshiftPositionPresentation(sample)
+    val behind = if (presentation.atLiveEdge) 0 else (presentation.behindLiveMs / MS_PER_SECOND).toInt()
+    return LiveTimeline(
+        programStart = localTime(window.start.epochSeconds, zone), duration = duration,
+        bufferStart = bufferStart, position = position, live = live, behind = behind, liveEdge = liveEdge,
+    )
 }
+
+private fun onAir(event: EpgEvent, nowSec: Long, zone: ZoneId): LiveTimeline? {
+    val startSec = event.start.epochSeconds
+    val duration = event.stop.epochSeconds - startSec
+    if (duration <= 0 || nowSec !in startSec until event.stop.epochSeconds) return null
+    val live = (nowSec - startSec).toInt()
+    return LiveTimeline(localTime(startSec, zone), duration.toInt(), bufferStart = null, position = live, live = live)
+}
+
+private fun localTime(epochSec: Long, zone: ZoneId) =
+    java.time.Instant.ofEpochSecond(epochSec).atZone(zone).toLocalTime()
+
+internal const val MS_PER_SECOND = 1_000L
+
+/**
+ * The history snapshot that anchors the buffer's start for a segment, as the TV holds it
+ * (app ui/player/PlayerTimelinePresentationState.kt): kept while the segment lasts, replaced by a
+ * new segment's first snapshot that can place itself on the clock.
+ */
+internal fun heldHistoryStart(held: TimeshiftTimeline?, sample: AppTimeshiftState): TimeshiftTimeline? {
+    val timeline = sample.timeline?.takeIf { sample.available } ?: return null
+    return when {
+        held?.describesSameSegment(timeline) == true -> held
+        timeline.wallClockMapping is TimeshiftWallClockMapping.Estimate -> timeline
+        else -> null
+    }
+}
+
+/**
+ * A skip by the TV's rule (PlayerTimelinePresentationState.kt `seekRelative`): nothing without
+ * known timing, back at the buffer's start, or forward at the live edge. A forward skip that
+ * reaches the live edge goes live, so the viewer lands on live rather than just short of it.
+ */
+internal fun skipMove(sample: AppTimeshiftState, deltaMs: Long): TimeshiftMove = when {
+    !sample.timingKnown || sample.playbackTarget == null -> TimeshiftMove.None
+    deltaMs < 0 && sample.positionMs <= sample.bufferStartMs -> TimeshiftMove.None
+    deltaMs > 0 && sample.positionMs >= sample.liveEdgeMs -> TimeshiftMove.None
+    deltaMs > 0 && sample.liveEdgeMs - (sample.positionMs + deltaMs) <= TIMESHIFT_LIVE_EDGE_TOLERANCE_MS ->
+        TimeshiftMove.GoLive
+    else -> TimeshiftMove.By(deltaMs)
+}
+
+/** A drag let go at [target] seconds: onto the live tick goes live, anywhere else seeks by the distance. */
+internal fun dragMove(timeline: LiveTimeline, target: Int): TimeshiftMove = when {
+    timeline.liveEdge && target >= timeline.live -> TimeshiftMove.GoLive
+    target == timeline.position -> TimeshiftMove.None
+    else -> TimeshiftMove.By((target - timeline.position) * MS_PER_SECOND)
+}
+
+/** Pause, the skips, the drag and Go live are offered while the channel can pause, as on TV. */
+internal fun timeshiftOffered(availability: LivePauseAvailability, status: LivePlayerStatus): Boolean =
+    status == LivePlayerStatus.Playing &&
+        (availability == LivePauseAvailability.READY || availability == LivePauseAvailability.STARTING)
 
 /** The TV's rule: the screen stays on only while a visible picture plays without an error. */
 internal fun keepPlayerScreenOn(
@@ -100,7 +186,8 @@ internal fun keepPlayerScreenOn(
  * The face for [shownId] without its clock and episode texts, which need resources (see
  * [withProgramTexts]). The channel list below the picture marks [shownId] as playing. A channel
  * the scope does not know yet keeps an empty name so Back and the picture are there at once.
- * Nothing past the picture, Back and the channel list is wired yet, so no other control is offered.
+ * Past the picture, Back and the channel list only the timeshift controls are wired, and only those
+ * are offered.
  */
 internal fun livePlayerState(
     shownId: ChannelId,
@@ -109,8 +196,9 @@ internal fun livePlayerState(
     connection: ConnectionUiState,
     degraded: Boolean,
     status: LivePlayerStatus,
+    timeline: State<LiveTimeline?>,
+    pause: LivePauseAvailability,
     now: Instant,
-    zone: ZoneId,
 ): LivePlayerState {
     val id = shownId.value.toString()
     val channel = scope.scope.allChannels.firstOrNull { it.id == shownId }
@@ -119,13 +207,12 @@ internal fun livePlayerState(
         is ChannelsState.Offline -> channels.list
         else -> ChannelList(emptyList())
     }
-    val event = observation.eventAt(shownId, now)
     return LivePlayerState(
         channel = channel?.let { channelRow(it, observation, now) } ?: ChannelRow(id, ""),
         channels = list,
         frame = null,
-        timeline = event?.let { liveTimeline(it.start.epochSeconds, it.stop.epochSeconds, now.epochSeconds, zone) },
+        timeline = timeline,
         status = status,
-        offered = emptySet(),
+        offered = if (timeshiftOffered(pause, status)) setOf(PlayerControl.Timeshift) else emptySet(),
     )
 }

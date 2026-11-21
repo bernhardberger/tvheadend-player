@@ -36,6 +36,8 @@ import androidx.compose.material3.SliderState
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalSlider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -178,7 +180,7 @@ private fun Transport(
             .semantics { contentDescription = loading }, color = OnPicture)
         return
     }
-    val canSeek = state.timeline?.let { timeline -> timeline.bufferStart?.let { it < timeline.live } } == true
+    val canSeek by remember(state.timeline) { derivedStateOf { state.timeline.value?.seekable == true } }
     val skipSize = if (layout == PlayerLayout.Tablet) 72.dp else 52.dp
     val skipColors = IconButtonDefaults.filledTonalIconButtonColors(
         containerColor = DarkControl, contentColor = OnPicture,
