@@ -112,16 +112,21 @@ class RecordingSkipPolicy {
 
     fun acceptAction(expected: RecordingMark, marks: List<RecordingMark>, positionMs: Long, settings: PlayerSettings): Long? {
         if (expected != recordingSkipAction(marks, positionMs, settings)) return null
-        if (expected.kind != RecordingMarkKind.PROGRAM_START) return skipAdBreak(expected, settings)
-        offeredPrompt = null
-        return expected.startMs
+        return if (expected.kind == RecordingMarkKind.PROGRAM_START) {
+            offeredPrompt = null
+            expected.startMs
+        } else skipAdBreak(expected, settings)
     }
 
     fun acceptPrompt(expected: RecordingMark, settings: PlayerSettings): Long? {
-        if (expected.kind != RecordingMarkKind.PROGRAM_START) return skipAdBreak(expected, settings)
-        if (expected != offeredPrompt) return null
-        offeredPrompt = null
-        return expected.startMs
+        return when {
+            expected.kind != RecordingMarkKind.PROGRAM_START -> skipAdBreak(expected, settings)
+            expected != offeredPrompt -> null
+            else -> {
+                offeredPrompt = null
+                expected.startMs
+            }
+        }
     }
 
     fun skipAdBreak(expected: RecordingMark, settings: PlayerSettings): Long? {

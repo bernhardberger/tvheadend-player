@@ -269,8 +269,9 @@ internal class RecordingMarkers(
 
     fun skipAdBreak(expected: RecordingSkipAction, fromControls: Boolean = false): Boolean =
         targetCommands.readIfOpen {
-            if (!isCurrent() || pendingRecordingRecoveryPosition.value != null ||
-                !canSeek() || (if (fromControls) controlsSkip.value else skipPrompt.value) !== expected) return@readIfOpen false
+            if (!isCurrent() || pendingRecordingRecoveryPosition.value != null || !canSeek()) return@readIfOpen false
+            val activeAction = if (fromControls) controlsSkip.value else skipPrompt.value
+            if (activeAction !== expected) return@readIfOpen false
             val actualPosition = player.currentPosition
             val currentMarks = marks.value + currentProgramMarks()
             if (expected.mark !in currentMarks) return@readIfOpen false
@@ -396,7 +397,11 @@ internal class RecordingMarkers(
     }
 
     @OptIn(ExperimentalTvheadendApi::class)
-    fun observeRecordingMarkersLocked(binding: PlaybackBinding.Recording, recordingId: DvrEntryId, continuesTarget: Boolean = false) {
+    fun observeRecordingMarkersLocked(
+        binding: PlaybackBinding.Recording,
+        recordingId: DvrEntryId,
+        continuesTarget: Boolean = false,
+    ) {
         clearRecordingMarkers(preserveHistory = continuesTarget)
         this.recordingId = recordingId
         markerQuery.use(binding)

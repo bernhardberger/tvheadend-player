@@ -516,7 +516,13 @@ class AppPlaybackRuntime(
         }
     }
 
-    private val listener = object : Player.Listener {
+    private open inner class MarkerCommandsListener : Player.Listener {
+        override fun onAvailableCommandsChanged(availableCommands: Player.Commands) {
+            recordingMarkers.onPlaybackChanged()
+        }
+    }
+
+    private val listener = object : MarkerCommandsListener() {
         override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
             stallWatch.reset()
             watchForStall()
@@ -592,10 +598,6 @@ class AppPlaybackRuntime(
             if (!holdsPlayerStateCallbacks() && !coordinator.playerCleanupPending.value && targetCommands.isOpen()) {
                 presentation.publishPlayerState()
             }
-        }
-
-        override fun onAvailableCommandsChanged(availableCommands: Player.Commands) {
-            recordingMarkers.onPlaybackChanged()
         }
 
         override fun onEvents(player: Player, events: Player.Events) {
@@ -1387,7 +1389,11 @@ class AppPlaybackRuntime(
                     _recordingSelection.value = selection
                     _recordingAdmission.value = admission
                     recordingMarkers.applySettings(markSettings)
-                    recordingMarkers.observeRecordingMarkersLocked(requireNotNull(installedBinding), selection.recordingId, continuesTarget = preservesMarkerHistory)
+                    recordingMarkers.observeRecordingMarkersLocked(
+                        requireNotNull(installedBinding),
+                        selection.recordingId,
+                        continuesTarget = preservesMarkerHistory,
+                    )
                     presentation.publishStarting()
                     presentation.beginTargetPresentationLocked(epoch)
                     presentation.publishInstalledPlayerStateLocked()
