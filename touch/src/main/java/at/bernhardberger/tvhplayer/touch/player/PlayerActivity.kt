@@ -74,6 +74,11 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.android.ext.android.inject
+import at.bernhardberger.tvhplayer.notices.NoticeCenter
+import at.bernhardberger.tvhplayer.settings.AppProfileOwner
+import at.bernhardberger.tvhplayer.touch.ui.ArtworkModels
+import at.bernhardberger.tvhplayer.touch.ui.FrameNotices
+import at.bernhardberger.tvhplayer.touch.ui.LocalFrameNotices
 import org.koin.androidx.viewmodel.ext.android.viewModel
 import kotlin.time.Instant
 
@@ -86,7 +91,10 @@ import kotlin.time.Instant
 class PlayerActivity : ComponentActivity() {
     private val sdk: SdkRuntimeOwner by inject()
     private val session: TvheadendSession by inject()
+    private val artwork by lazy { ArtworkModels(session) }
     private val settings: PlayerSettingsStore by inject()
+    private val notices: NoticeCenter by inject()
+    private val owner: AppProfileOwner by inject()
     private val connection: AppConnectionViewModel by viewModel()
     private val channels: ChannelsViewModel by viewModel()
     private val runtime get() = sdk.playbackRuntime
@@ -129,7 +137,10 @@ class PlayerActivity : ComponentActivity() {
             finish()
         }
         setContent {
-            MaterialTheme(colorScheme = MobileDarkColors) { Player() }
+            MaterialTheme(colorScheme = MobileDarkColors) {
+                // The window's one notice host, for the connection in use, as browsing builds it.
+                FrameNotices(notices, owner, session) { Player() }
+            }
         }
     }
 
@@ -242,12 +253,12 @@ class PlayerActivity : ComponentActivity() {
             eventAt = { session.observation.value.eventAt(shown, it) },
             nextAt = { session.observation.value.nextEvent(shown, it) },
         )
-        ConsumePauseNotices(runtime)
+        ConsumePauseNotices(runtime, notices)
         SystemBarsForOrientation(window)
         val now = Instant.fromEpochSeconds(minute * SECONDS_PER_MINUTE)
         val state = livePlayerState(
             shown, scope, observation, presentation.connection, presentation.degraded, status,
-            timeshift.timeline, pause.availability, now, window = windowAvailable,
+            timeshift.timeline, pause.availability, now, window = windowAvailable, artwork = artwork,
         )
         PlayerScreen(
             state = state.copy(
@@ -264,7 +275,7 @@ class PlayerActivity : ComponentActivity() {
             onControlsShown = { controlsShown = it },
             inWindow = inWindow,
             hideAfterMs = rememberControlsTimeout(),
-            progressing = rememberPlayerProgressing(runtime.player).value,
+            progressing = rememberPlayerProgressing(runtime.player).value, notices = LocalFrameNotices.current,
         )
     }
 

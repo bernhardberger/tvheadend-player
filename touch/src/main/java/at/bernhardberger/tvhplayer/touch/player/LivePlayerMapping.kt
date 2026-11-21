@@ -31,6 +31,7 @@ import at.bernhardberger.tvhplayer.touch.channels.ChannelRow
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsState
 import at.bernhardberger.tvhplayer.touch.channels.channelRow
 import at.bernhardberger.tvhplayer.touch.channels.channelsState
+import at.bernhardberger.tvhplayer.touch.ui.ArtworkModels
 import at.bernhardberger.tvhplayer.viewmodels.ChannelScopeState
 import java.time.ZoneId
 import kotlin.time.Instant
@@ -218,16 +219,18 @@ internal fun livePlayerState(
     pause: LivePauseAvailability,
     now: Instant,
     window: Boolean = false,
+    artwork: ArtworkModels? = null,
 ): LivePlayerState {
     val id = shownId.value.toString()
     val channel = scope.scope.allChannels.firstOrNull { it.id == shownId }
-    val list = when (val channels = channelsState(scope, connection, degraded, observation, now, playingId = id)) {
+    val rows = channelsState(scope, connection, degraded, observation, now, playingId = id, artwork = artwork)
+    val list = when (val channels = rows) {
         is ChannelsState.Ready -> channels.list
         is ChannelsState.Offline -> channels.list
         else -> ChannelList(emptyList())
     }
     return LivePlayerState(
-        channel = channel?.let { channelRow(it, observation, now) } ?: ChannelRow(id, ""),
+        channel = channel?.let { channelRow(it, observation, now, artwork = artwork) } ?: ChannelRow(id, ""),
         channels = list,
         frame = null,
         timeline = timeline,

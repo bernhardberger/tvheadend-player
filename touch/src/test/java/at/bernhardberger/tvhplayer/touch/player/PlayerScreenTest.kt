@@ -16,6 +16,12 @@ import androidx.media3.common.Player
 import androidx.media3.common.SimpleBasePlayer
 import androidx.media3.common.util.UnstableApi
 import at.bernhardberger.tvhplayer.ui.common.AppClock
+import androidx.compose.ui.platform.LocalContext
+import at.bernhardberger.tvheadend.sdk.core.DvrMutationKind
+import at.bernhardberger.tvhplayer.notices.DvrMutationFeedback
+import at.bernhardberger.tvhplayer.notices.Notice
+import at.bernhardberger.tvhplayer.touch.ui.TouchNotice
+import at.bernhardberger.tvhplayer.ui.notifications.NoticeFormatter
 import at.bernhardberger.tvhplayer.core.HumanTrackLabel
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import com.google.common.util.concurrent.Futures
@@ -73,6 +79,8 @@ class PlayerScreenTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
 
     private val uses24Hour = AppClock.systemUses24Hour
+    private val notice = mutableStateOf<Notice?>(null)
+    private val inWindow = mutableStateOf(false)
 
     /** The drawings show a 12-hour clock. */
     @Before
@@ -140,6 +148,7 @@ class PlayerScreenTest {
         show()
         val canvas = TouchCanvas.TABLET
         capture("tablet-player", canvas)
+        noticeOnlyOutsideTheWindow("tablet-player-notice", canvas)
 
         timeline().performTouchInput { click(center) }
         compose.runOnIdle { assertTrue(seeks.isEmpty()) }
@@ -222,6 +231,7 @@ class PlayerScreenTest {
         val canvas = TouchCanvas.PHONE
         assertInlineChannels()
         capture("phone-player", canvas)
+        noticeOnlyOutsideTheWindow("phone-player-notice", canvas)
         val open = orangeProgressRows()
         tapPicture()
         tag("player-top").assertDoesNotExist()
@@ -360,13 +370,31 @@ class PlayerScreenTest {
             MaterialTheme(colorScheme = MobileDarkColors) {
                 PlayerScreen(
                     fixture.copy(status = status.value, paused = paused.value, offered = offered.value),
-                    { actions += it }, { seeks += it }, {}, { played += it }, { choices += it }, hideAfterMs = hideAfterMs,
-                )
+                    { actions += it }, { seeks += it }, {}, { played += it }, { choices += it },
+                    inWindow = inWindow.value, hideAfterMs = hideAfterMs,
+                ) { modifier ->
+                    val formatter = NoticeFormatter(LocalContext.current)
+                    notice.value?.let { formatter.format(it) }?.let { TouchNotice(it.headline, it.detail, modifier) }
+                }
             }
         }
     }
 
-    /** Each menu opens at its button with the controls kept; each sheet clears the picture and closes on it. */
+    /** A failure posted while playing shows in the face as the frame shows it, never in the window. */
+    private fun noticeOnlyOutsideTheWindow(name: String, canvas: TouchCanvas) {
+        val failure = Notice.DvrActionFailed(DvrMutationKind.CANCEL, DvrMutationFeedback.CONNECTION_LIMIT)
+        val headline = NoticeFormatter(compose.activity).format(failure).headline
+        notice.value = failure
+        compose.onNodeWithText(headline).assertIsDisplayed()
+        capture(name, canvas)
+        inWindow.value = true
+        compose.onNodeWithText(headline).assertDoesNotExist()
+        inWindow.value = false
+        notice.value = null
+        compose.waitForIdle()
+    }
+
+        /** Each menu opens at its button with the controls kept; each sheet clears the picture and closes on it. */
     private fun menusAndSheets(prefix: String, canvas: TouchCanvas, subtitles: Boolean, profile: Boolean) {
         button(R.string.player_record).performClick()
         text(R.string.player_record_all).assertIsDisplayed()

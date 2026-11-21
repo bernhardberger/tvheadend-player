@@ -182,9 +182,9 @@ private fun sheetHead(
 ): Pair<String, (@Composable () -> Unit)?> {
     val shown = state.schedule?.details?.get(info.stack.shown)?.takeIf { panel == PlayerPanel.InfoDetails }
     return when {
-        shown != null -> shown.channel to { InfoLogo(shown.channelLogo, shown.logoTint) }
+        shown != null -> shown.channel to { InfoLogo(shown.channelLogo, shown.logoTint, shown.channelLogoModel) }
         panel.button == PlayerPanel.Info -> state.channel.name to {
-            InfoLogo(state.channel.logo, state.channel.logoTint)
+            InfoLogo(state.channel.logo, state.channel.logoTint, state.channel.logoModel)
         }
         else -> stringResource(panel.title) to null
     }
