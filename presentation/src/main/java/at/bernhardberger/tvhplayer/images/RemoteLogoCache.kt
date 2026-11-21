@@ -16,8 +16,11 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okio.Path.Companion.toOkioPath
 
-/** Holds remote logos and remote programme pictures; the SDK owns its image-cache bytes separately. */
-class RemoteLogoCache(context: Context) : Interceptor {
+/**
+ * Holds remote logos and remote programme pictures; the SDK owns its image-cache bytes separately.
+ * [onClear] runs after every [clear], for caches the caller derives from these pictures.
+ */
+class RemoteLogoCache(context: Context, private val onClear: () -> Unit = {}) : Interceptor {
     private val directory = context.cacheDir.resolve("remote-channel-logos")
     private val generationFile = AtomicFile(directory.resolve("generation"))
     private val lock = Mutex()
@@ -78,7 +81,7 @@ class RemoteLogoCache(context: Context) : Interceptor {
                     diskCache.clear()
                 } finally {
                     memoryCache?.clear()
-                    DetailsArtColors.clear()
+                    onClear()
                 }
             }
         }
