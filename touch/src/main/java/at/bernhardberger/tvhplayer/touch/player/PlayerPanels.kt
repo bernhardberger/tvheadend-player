@@ -57,7 +57,6 @@ internal fun PlayerPanel.atButton(layout: PlayerLayout) = menu && layout != Play
 
 private val PlayerPanel.title: Int
     get() = when (this) {
-        PlayerPanel.Record -> R.string.player_record
         PlayerPanel.Audio -> R.string.player_audio
         PlayerPanel.Subtitles -> R.string.player_subtitles
         PlayerPanel.Channels -> R.string.player_channels
@@ -74,7 +73,7 @@ private val MenuGap = 8.dp
 // BottomSheetDefaults.DragHandle: a 4 dp handle with 22 dp above and below it.
 private val DragHandleHeight = 48.dp
 
-/** A Record, Audio or Subtitles menu, opening above the button it belongs to. */
+/** An Audio or Subtitles menu, opening above the button it belongs to. */
 @Composable
 internal fun PlayerMenu(expanded: Boolean, entries: List<PanelEntry>, onDismiss: () -> Unit) {
     val colors = MaterialTheme.colorScheme
@@ -218,7 +217,7 @@ private fun ColumnScope.SheetBody(
         PlayerPanel.Info, PlayerPanel.InfoDetails -> key(state.channel.id) {
             InfoBody(panel, state.schedule, info, onPanel, onChoice) { onAction(PlayerAction.RetryChannels) }
         }
-        else -> EntryRows(panelEntries(panel, state, onAction, onChoice, done))
+        else -> EntryRows(panelEntries(panel, state, onChoice, done))
     }
 }
 
