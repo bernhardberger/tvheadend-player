@@ -46,7 +46,8 @@ directly. `:client` mirrors the app build types (`debug`, `release`, `profile`,
 - `profiling/`: `ProfileTrace`, `ProfilePlayback`, `ProfilePlaybackTrace`.
 - `data/FrontendModels`.
 - `images/LogoInk`: darkens or lightens the logo parts that would vanish on a
-  known solid ground, on plain ARGB pixels without Android graphics.
+  known solid ground, and determines whether a logo needs a light ground
+  (`logoNeedsLightGround`), on plain ARGB pixels without Android graphics.
 - `core/ChannelAccentPolicy`: picks and normalizes a channel color from
   sampled RGB candidates (`selectAccentRgb`, `normalizeAccentRgb`,
   `NEUTRAL_ACCENT_RGB`, `rgbToHsv`, `hsvToRgb`).
@@ -85,6 +86,8 @@ its localized seconds formatter). Shared channel scope state:
 `images/TvheadendArtworkLoader` (`buildImageLoader`, `remoteLogoHttpClient`) and
 `images/RemoteLogoCache`; the caller passes its user agent, crossfade duration
 and what else to clear with the remote pictures.
+`images/LogoInkTransformation` adjusts logo ink for its ground and optionally
+trims transparent margins before fitting the logo to its slot.
 DVR actions and the formatters behind recordings and programme details:
 `ui/screens/DvrMutationActions` (record, stop, delete, series rules and folder
 actions, with `currentDvrMutation` and `currentDvrConfigurations`; the caller

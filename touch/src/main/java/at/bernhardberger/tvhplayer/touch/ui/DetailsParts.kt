@@ -21,20 +21,32 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import at.bernhardberger.tvhplayer.images.LogoInkTransformation
 import at.bernhardberger.tvhplayer.touch.R
+import coil3.request.ImageRequest
+import coil3.request.transformations
 
 @Composable
 internal fun DetailsBackButton(label: String, onBack: () -> Unit) {
@@ -50,22 +62,25 @@ internal fun ChannelLogoTile(
     tint: Color?,
     modifier: Modifier,
     shape: RoundedCornerShape = LogoShape,
-    /** The server logo's image model, drawn when [logo] is null; the no-logo icon stands in until it loads. */
+    /** The server logo's image model, drawn when [logo] is null; only a missing or failed logo shows an icon. */
     model: Any? = null,
 ) {
     val scheme = MaterialTheme.colorScheme
+    val hasLogo = logo != null || model != null
     val accent = if (tint == null) rememberChannelAccent(model) else null
-    val ground = tint ?: accent?.animated?.value
-    val fill = if ((logo == null && model == null) || ground == null) {
+    val fill = if (!hasLogo || (tint == null && accent == null)) {
         Modifier.background(scheme.surfaceContainerHigh)
     } else {
-        Modifier.background(Brush.linearGradient(listOf(ground, lerp(ground, Color.Black, LOGO_SHADE))))
+        Modifier.drawBehind {
+            val ground = tint ?: accent?.animated?.value ?: scheme.surfaceContainerHigh
+            drawRect(Brush.linearGradient(listOf(ground, lerp(ground, Color.Black, LOGO_SHADE))))
+        }
     }
     Box(
         modifier.clip(shape).then(fill).border(1.dp, scheme.outlineVariant, shape),
         contentAlignment = Alignment.Center,
     ) {
-        ChannelLogoImage(logo, model) {
+        ChannelLogoImage(logo, model, tint ?: accent?.settled ?: scheme.surfaceContainerHigh) {
             Icon(painterResource(R.drawable.play_tv_outline), null, tint = scheme.onSurfaceVariant)
         }
     }
@@ -73,13 +88,29 @@ internal fun ChannelLogoTile(
 
 /**
  * A channel's logo fitted, whatever its shape, into the same share of the slot it stands in, centered by the
- * caller's Box (section 13); [fallback] stands in while a server logo loads or when it fails.
+ * caller's Box (section 13); [fallback] stands in when a logo is missing or fails to load.
  */
 @Composable
-internal fun ChannelLogoImage(logo: Painter?, model: Any?, fallback: @Composable () -> Unit = {}) {
-    ArtworkImage(
-        logo, model, Modifier.fillMaxWidth(LOGO_WIDTH_SHARE).fillMaxHeight(LOGO_HEIGHT_SHARE), fallback = fallback,
-    )
+internal fun ChannelLogoImage(logo: Painter?, model: Any?, ground: Color, fallback: @Composable () -> Unit = {}) {
+    val bounds = Modifier.fillMaxWidth(LOGO_WIDTH_SHARE).fillMaxHeight(LOGO_HEIGHT_SHARE)
+    if (logo != null || model == null) {
+        ArtworkImage(logo, model, bounds, fallback = fallback)
+        return
+    }
+    var size by remember { mutableStateOf(IntSize.Zero) }
+    val measuredBounds = bounds.onSizeChanged { size = it }
+    if (size.width <= 0 || size.height <= 0) {
+        Spacer(measuredBounds)
+        return
+    }
+    val context = LocalContext.current
+    val request = remember(context, model, ground, size) {
+        // The shared ink rule reads a picon at 400×240 before trimming and fitting its visible shape.
+        ImageRequest.Builder(context).data(model).size(400, 240)
+            .transformations(LogoInkTransformation(ground.toArgb(), size.width, size.height, trim = true))
+            .build()
+    }
+    ArtworkImage(null, request, measuredBounds, fallback = fallback)
 }
 
 /** The scrim over a page's top picture: it keeps the bar readable and fades the picture into the page. */

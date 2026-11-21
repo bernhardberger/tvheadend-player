@@ -62,9 +62,11 @@ import at.bernhardberger.tvheadend.sdk.core.SessionFailure
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi
+import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStoreCall
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
+import at.bernhardberger.tvhplayer.touch.di.touchModule
 import at.bernhardberger.tvhplayer.touch.testutil.FakeConnection
 import at.bernhardberger.tvhplayer.touch.testutil.ImageLoaderRule
 import at.bernhardberger.tvhplayer.touch.testutil.ServerGuide
@@ -74,6 +76,7 @@ import at.bernhardberger.tvhplayer.touch.ui.ConfirmDvrChange
 import at.bernhardberger.tvhplayer.touch.ui.DvrControls
 import at.bernhardberger.tvhplayer.ui.MobileDarkColors
 import at.bernhardberger.tvhplayer.ui.common.AppClock
+import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import java.time.ZoneId
 import kotlin.time.toJavaInstant
 import kotlin.time.Clock
@@ -86,6 +89,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.koin.dsl.koinApplication
+import org.koin.dsl.module
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
@@ -104,6 +109,33 @@ class TouchAppTest {
     private val heading = SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading)
 
     @After fun close() = connection.close()
+
+    @Test
+    fun playerAndBrowseShareTheSelectedChannelScope() {
+        val guide = ServerGuide(Clock.System.now())
+        val dependencies = module {
+            single<TvheadendSession> { connection.session }
+            single { connection.owner }
+            single { connection.channelTagSettings() }
+        }
+        val graph = koinApplication(createEagerInstances = false) { modules(touchModule, dependencies) }
+        try {
+            runBlocking { connection.store.addAnonymous(server.host, server.port, "Home server", true) }
+            connection.start()
+            val browse = compose.runOnIdle { graph.koin.get<ChannelsViewModel>() }
+            val player = compose.runOnIdle { graph.koin.get<ChannelsViewModel>() }
+            compose.runOnIdle { connection.session.publish(guide.connected()) }
+            compose.runOnIdle { browse.selectTag(guide.news.id) }
+            compose.runOnIdle {
+                assertEquals(guide.news.id, player.scope.value.scope.activeTagId)
+                assertEquals(listOf(guide.first.id), player.scope.value.scope.visibleChannels.map { it.id })
+                player.selectTag(null)
+                assertEquals(null, browse.scope.value.scope.activeTagId)
+            }
+        } finally {
+            compose.runOnIdle { graph.close() }
+        }
+    }
 
     @Test
     fun firstRunSavesThePassedConnectionAndOpensChannels() {

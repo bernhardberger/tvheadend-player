@@ -37,6 +37,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
@@ -342,11 +343,13 @@ internal fun durationText(duration: Duration): String =
 private fun Thumbnail(item: RecordingItem) {
     val picture = rememberStandalonePicture(item.picture, item.pictureModel)
     val logo = picture == null && item.hasLogo
-    val tint = if (logo) item.logoTint ?: rememberChannelAccent(item.channelLogoModel)?.animated?.value else null
+    val tint = item.logoTint.takeIf { logo }
+    val accent = if (logo && tint == null) rememberChannelAccent(item.channelLogoModel) else null
+    val neutral = MaterialTheme.colorScheme.surfaceContainerHighest
     Box(
-        Modifier.size(ThumbWidth, ThumbHeight).clip(ThumbShape).background(
-            tint ?: MaterialTheme.colorScheme.surfaceContainerHighest,
-        ),
+        Modifier.size(ThumbWidth, ThumbHeight).clip(ThumbShape).drawBehind {
+            drawRect(tint ?: accent?.animated?.value ?: neutral)
+        },
         contentAlignment = Alignment.Center,
     ) {
         val icon = @Composable {
@@ -357,7 +360,7 @@ private fun Thumbnail(item: RecordingItem) {
         }
         when {
             picture != null -> Image(picture, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-            logo -> ChannelLogoImage(item.channelLogo, item.channelLogoModel, fallback = icon)
+            logo -> ChannelLogoImage(item.channelLogo, item.channelLogoModel, tint ?: accent?.settled ?: neutral, icon)
             else -> icon()
         }
         RecordingBar(item.state, Modifier.align(Alignment.BottomStart).fillMaxWidth().height(3.dp))

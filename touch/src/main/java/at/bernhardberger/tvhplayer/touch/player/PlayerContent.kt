@@ -44,6 +44,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -54,13 +55,14 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.channels.ChannelRow
-import at.bernhardberger.tvhplayer.touch.channels.ChannelRows
-import at.bernhardberger.tvhplayer.touch.channels.ChannelsActions
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsLayout
+import at.bernhardberger.tvhplayer.touch.channels.ChannelsState
 import at.bernhardberger.tvhplayer.touch.channels.TagFilter
+import kotlin.math.roundToInt
 
 internal const val DRAG_ALPHA = .38f
 
@@ -81,6 +83,7 @@ internal fun LandscapePlayerContent(
     onPreviewChange: (Int?) -> Unit,
     onSeek: (Int) -> Unit,
     modifier: Modifier,
+    notice: @Composable (Modifier) -> Unit,
 ) {
     val tablet = layout == PlayerLayout.Tablet
     val dragging = preview != null
@@ -89,11 +92,13 @@ internal fun LandscapePlayerContent(
     val trackBottom = if (tablet) 108.dp else 90.dp
     val rowBottom = if (tablet) 30.dp else 20.dp
     Box(modifier.fillMaxWidth().padding(horizontal = footerMargin).height(if (tablet) 270.dp else 190.dp)) {
-        LandscapeProgram(
-            state.channel, layout,
-            Modifier.align(Alignment.BottomStart).padding(bottom = trackBottom + if (tablet) 28.dp else 22.dp)
-                .fillMaxWidth(.62f).alpha(if (dragging) DRAG_ALPHA else 1f),
-        )
+        val programSlot = Modifier.align(Alignment.BottomStart)
+            .padding(bottom = trackBottom + if (tablet) 28.dp else 22.dp)
+        // Keep the notice and its anchor in one layout so measuring the program never
+        // asks Compose to place unrelated footer siblings (including the drag label).
+        LandscapeProgramSlot(notice, tablet, programSlot.fillMaxWidth()) {
+            LandscapeProgram(state.channel, layout, Modifier.fillMaxWidth(.62f).alpha(if (dragging) DRAG_ALPHA else 1f))
+        }
         if (state.status == LivePlayerStatus.Playing) {
             LiveOffer(
                 state.timeline, state.offered, preview, onAction, layout,
@@ -123,10 +128,48 @@ internal fun LandscapePlayerContent(
     }
 }
 
+/** On tablets the notice stands above the measured program; on phones it takes its place. */
+@Composable
+private fun LandscapeProgramSlot(
+    notice: @Composable (Modifier) -> Unit,
+    tablet: Boolean,
+    modifier: Modifier,
+    program: @Composable () -> Unit,
+) {
+    Layout(
+        modifier = modifier,
+        content = {
+            Box { program() }
+            Box { notice(Modifier) }
+        },
+    ) { (block, host), constraints ->
+        val side = 16.dp.roundToPx()
+        val bottom = 12.dp.roundToPx()
+        val width = constraints.maxWidth
+        val noticeWidth = if (tablet) width else (width * .62f).roundToInt()
+        val message = host.measure(Constraints(maxWidth = noticeWidth + 2 * side))
+        if (!tablet && message.height > 0) {
+            val height = (message.height - bottom).coerceAtMost(constraints.maxHeight)
+            layout(width, height) {
+                message.placeRelative(-side, height - message.height + bottom)
+            }
+        } else {
+            val programBlock = block.measure(constraints)
+            layout(width, programBlock.height) {
+                programBlock.placeRelative(0, 0)
+                if (message.height > 0) message.placeRelative(-side, bottom - message.height - 8.dp.roundToPx())
+            }
+        }
+    }
+}
+
 @Composable
 private fun LandscapeProgram(channel: ChannelRow, layout: PlayerLayout, modifier: Modifier) {
     val tablet = layout == PlayerLayout.Tablet
-    Row(modifier, horizontalArrangement = Arrangement.spacedBy(if (tablet) 20.dp else 14.dp)) {
+    Row(
+        modifier.testTag("player-program"),
+        horizontalArrangement = Arrangement.spacedBy(if (tablet) 20.dp else 14.dp),
+    ) {
         channel.details?.artwork?.let {
             Image(
                 it, null, Modifier.size(if (tablet) 196.dp else 112.dp, if (tablet) 112.dp else 68.dp)
@@ -192,17 +235,21 @@ internal fun UprightPlayerContent(
             state, layout, dragging, onAction, panels,
             Modifier.padding(horizontal = inset - 8.dp).padding(top = 14.dp, bottom = 12.dp),
         )
-        PlayerChannelList(state, layout, panels.onChoice, onChannel, Modifier.weight(1f))
+        PlayerChannelList(
+            state.channels, layout, panels.onChoice, onChannel, { onAction(PlayerAction.RetryChannels) },
+            Modifier.weight(1f),
+        )
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PlayerChannelList(
-    state: LivePlayerState,
+    state: ChannelsState,
     layout: PlayerLayout,
     onChoice: (PlayerChoice) -> Unit,
     onChannel: (String) -> Unit,
+    onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = MaterialTheme.colorScheme
@@ -229,16 +276,13 @@ private fun PlayerChannelList(
                     stringResource(R.string.player_channels), Modifier.semantics { heading() },
                     color = colors.onSurface, style = MaterialTheme.typography.titleMedium,
                 )
-                if (state.channels.tags.isNotEmpty()) {
-                    TagFilter(state.channels, { onChoice(PlayerChoice.ChannelTag(it)) })
+                state.displayedList?.takeIf { it.tags.isNotEmpty() }?.let { list ->
+                    TagFilter(list, { onChoice(PlayerChoice.ChannelTag(it)) })
                 }
             }
-            ChannelRows(
-                state.channels, if (layout == PlayerLayout.Phone) ChannelsLayout.Phone else ChannelsLayout.Upright,
-                ChannelsActions(
-                    onPlay = onChannel, onTag = {}, onRetry = {}, onOpenConnectionSettings = {},
-                ),
-                showColumnLabels = false,
+            PlayerChannelsContent(
+                state, if (layout == PlayerLayout.Phone) ChannelsLayout.Phone else ChannelsLayout.Upright,
+                onChannel, { onChoice(PlayerChoice.ChannelTag(it)) }, onRetry,
             )
         }
     }
@@ -289,6 +333,7 @@ internal val PlayerPanel.control: PlayerControl?
         PlayerPanel.Record -> PlayerControl.Record
         PlayerPanel.Audio -> PlayerControl.Audio
         PlayerPanel.Subtitles -> PlayerControl.Subtitles
+        PlayerPanel.Channels -> PlayerControl.Channels
         PlayerPanel.Info -> PlayerControl.Info
         else -> null
     }

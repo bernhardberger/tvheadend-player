@@ -12,6 +12,7 @@ import at.bernhardberger.tvhplayer.core.AppError
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.channels.ChannelTag
+import java.time.LocalDate
 
 /** The Guide's two views, as tabs under the top bar. */
 internal enum class GuideView(@param:StringRes val label: Int) {
@@ -52,7 +53,7 @@ internal enum class GuideLayout {
 /**
  * The Guide on supplied state. The producer picks the channels for the tag, the programs for the
  * selected day and jump time, and formats every text for the canvas it is shown on; the screen
- * keeps the view, the channel picked in By channel, the opened program and the opened Details.
+ * keeps the view, the channel picked in By channel and the opened program.
  */
 internal data class GuideState(
     val channels: List<GuideChannel>,
@@ -61,14 +62,16 @@ internal data class GuideState(
     /** The day tabs and menu: "Today", "Tomorrow", "Tue 17". */
     val days: List<String>,
     val selectedDay: Int = 0,
+    val dayDates: List<LocalDate> = emptyList(),
     /** The selected day written out, "Sunday, November 15". */
     val date: String,
     /** The overview's jump times after Now, "8:15 PM". */
     val jumps: List<String> = emptyList(),
     /** 0 is Now, then [jumps] by index plus one. */
     val selectedJump: Int = 0,
-    /** Details the producer has for a program, by program id. */
-    val details: Map<String, ProgramDetails> = emptyMap(),
+    val jumpTimes: List<Long> = emptyList(),
+    /** Details for the producer's current selection, if open and available. */
+    val details: ProgramDetails? = null,
     /** Whether there is a list yet, or saved content while offline. */
     val availability: GuideAvailability = GuideAvailability.Current,
     /** The picked day's or time's programs are still coming: a short wait inside the shown Guide. */
@@ -95,7 +98,7 @@ internal data class GuideChannel(
     val logoTint: Color? = null,
     /** From the jump time on in the overview; the selected day in By channel. Empty: no guide data. */
     val programs: List<GuideProgram> = emptyList(),
-    /** A gap after [programs] in the overview. */
+    /** A gap after [programs], or at the selected time if there is no lead program. */
     val gap: GuideGap? = null,
     /** The selected day in By channel when it differs from the overview's [programs]; null uses them. */
     val day: List<GuideProgram>? = null,
@@ -231,8 +234,8 @@ internal class GuideActions(
     val onRecord: ((programId: String) -> Unit)?,
     /** The Record split button's arrow: series and other ways to record. */
     val onRecordOptions: ((programId: String) -> Unit)?,
-    /** Details opened; the producer may load more for [GuideState.details]. */
-    val onDetails: (programId: String) -> Unit = {},
+    /** Open a program's Details, or close the page with null. */
+    val onDetails: (programId: String?) -> Unit = {},
     val onDay: (Int) -> Unit,
     val onJump: (Int) -> Unit,
     val onTag: (String?) -> Unit,

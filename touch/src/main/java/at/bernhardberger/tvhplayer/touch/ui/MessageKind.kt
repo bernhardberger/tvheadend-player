@@ -69,20 +69,22 @@ internal enum class MessageKind(
 @Composable
 internal fun ListMessage(
     kind: MessageKind,
-    onSettings: () -> Unit,
+    onSettings: (() -> Unit)?,
     onRetry: () -> Unit = {},
     onShowAll: () -> Unit = {},
 ) {
     val reason = stringResource(kind.reason)
     val hint = kind.hint?.let { stringResource(it) }
-    MessageLayout(kind.icon, stringResource(kind.title), if (hint == null) reason else "$reason $hint") {
-        MessageButtons(kind, onSettings, onRetry, onShowAll)
-    }
+    val hasButtons = onSettings != null || kind == MessageKind.Unreachable || kind == MessageKind.EmptyTag
+    MessageLayout(
+        kind.icon, stringResource(kind.title), if (hint == null) reason else "$reason $hint",
+        buttons = if (hasButtons) ({ MessageButtons(kind, onSettings, onRetry, onShowAll) }) else null,
+    )
 }
 
 /** A catalog failure in the same form, with the catalog's words and its actions in order. */
 @Composable
-internal fun ListFailure(error: AppError, onRetry: () -> Unit, onSettings: () -> Unit) {
+internal fun ListFailure(error: AppError, onRetry: () -> Unit, onSettings: (() -> Unit)?) {
     val condition = error.condition
     val text = AppErrorText(LocalContext.current)
     val hint = condition.touchHintRes()?.let { stringResource(it) }
@@ -92,19 +94,24 @@ internal fun ListFailure(error: AppError, onRetry: () -> Unit, onSettings: () ->
         -> R.drawable.channels_lock
         else -> R.drawable.channels_cloud_off
     }
-    MessageLayout(
-        icon, stringResource(condition.touchTitleRes()),
-        listOfNotNull(text.reason(condition), hint).joinToString(" "),
-    ) {
-        error.actions.filter { it != AppErrorAction.CLOSE }.forEachIndexed { index, action ->
+    val actions = error.actions.filter {
+        it == AppErrorAction.RETRY || it != AppErrorAction.CLOSE && onSettings != null
+    }
+    val buttons: (@Composable FlowRowScope.() -> Unit)? = if (actions.isEmpty() && onSettings == null) null else ({
+        actions.forEachIndexed { index, action ->
             val onClick = if (action == AppErrorAction.RETRY) onRetry else onSettings
+            onClick ?: return@forEachIndexed
             if (index == 0) {
                 Button(onClick = onClick) { Text(text.label(action)) }
             } else {
                 OutlinedButton(onClick = onClick) { Text(text.label(action)) }
             }
         }
-    }
+    })
+    MessageLayout(
+        icon, stringResource(condition.touchTitleRes()),
+        listOfNotNull(text.reason(condition), hint).joinToString(" "), buttons,
+    )
 }
 
 @Composable
@@ -112,7 +119,7 @@ private fun MessageLayout(
     @DrawableRes icon: Int,
     title: String,
     paragraph: String,
-    buttons: @Composable FlowRowScope.() -> Unit,
+    buttons: (@Composable FlowRowScope.() -> Unit)?,
 ) {
     Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
         Column(
@@ -129,11 +136,13 @@ private fun MessageLayout(
                 paragraph, style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center,
             )
-            FlowRow(
-                Modifier.padding(top = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-                content = buttons,
-            )
+            if (buttons != null) {
+                FlowRow(
+                    Modifier.padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                    content = buttons,
+                )
+            }
         }
     }
 }
@@ -141,7 +150,7 @@ private fun MessageLayout(
 @Composable
 private fun FlowRowScope.MessageButtons(
     kind: MessageKind,
-    onSettings: () -> Unit,
+    onSettings: (() -> Unit)?,
     onRetry: () -> Unit,
     onShowAll: () -> Unit,
 ) {
@@ -149,9 +158,11 @@ private fun FlowRowScope.MessageButtons(
     when (kind) {
         MessageKind.Unreachable -> {
             Button(onClick = onRetry) { Text(stringResource(R.string.channels_retry)) }
-            OutlinedButton(onClick = onSettings) { Text(settings) }
+            if (onSettings != null) OutlinedButton(onClick = onSettings) { Text(settings) }
         }
-        MessageKind.SignInFailed, MessageKind.SignInNeeded -> Button(onClick = onSettings) { Text(settings) }
+        MessageKind.SignInFailed, MessageKind.SignInNeeded -> {
+            if (onSettings != null) Button(onClick = onSettings) { Text(settings) }
+        }
         MessageKind.Empty -> Unit
         MessageKind.EmptyTag -> Button(onClick = onShowAll) { Text(stringResource(R.string.channels_all)) }
     }

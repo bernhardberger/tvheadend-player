@@ -68,7 +68,6 @@ internal fun GuideScreen(
     initialView: GuideView = GuideView.Overview,
     initialChannelId: String? = null,
     initiallyOpen: String? = null,
-    initialDetails: String? = null,
     destinations: List<Destination> = Destination.entries,
 ) {
     val layout = guideLayout()
@@ -76,13 +75,8 @@ internal fun GuideScreen(
     var view by rememberSaveable { mutableStateOf(initialView) }
     var channelId by rememberSaveable { mutableStateOf(initialChannelId) }
     var openId by rememberSaveable { mutableStateOf(initiallyOpen) }
-    var detailsId by rememberSaveable { mutableStateOf(initialDetails) }
-    val details = detailsId?.let(state.details::get)
+    val details = state.details
     val page = details != null
-    val openDetails: (String) -> Unit = {
-        detailsId = it
-        actions.onDetails(it)
-    }
 
     TouchFrame(
         modifier = modifier,
@@ -106,22 +100,22 @@ internal fun GuideScreen(
             return@TouchFrame
         }
         // Registered after the frame's own handler, so the page and an opened program take Back first.
-        BackHandler(enabled = page) { detailsId = null }
+        BackHandler(enabled = page) { actions.onDetails(null) }
         BackHandler(enabled = !page && openId != null) { openId = null }
         if (details != null) {
-            ProgramDetailsPage(details, layout, actions) { detailsId = null }
+            ProgramDetailsPage(details, layout, actions) { actions.onDetails(null) }
             return@TouchFrame
         }
         val onOpen: (String?) -> Unit = { openId = it }
         GuideList(state, layout, actions) {
             when (view) {
-                GuideView.Overview -> Overview(state, layout, openId, onOpen, actions, openDetails) {
+                GuideView.Overview -> Overview(state, layout, openId, onOpen, actions, actions.onDetails) {
                     channelId = it
                     openId = null
                     view = GuideView.ByChannel
                 }
                 GuideView.ByChannel -> ByChannel(
-                    state, layout, channelId ?: state.channels.firstOrNull()?.id, openId, onOpen, actions, openDetails,
+                    state, layout, channelId, openId, onOpen, actions, actions.onDetails,
                 ) {
                     channelId = it
                     openId = null
@@ -234,7 +228,7 @@ private fun ByChannel(
     onDetails: (String) -> Unit,
     onChannel: (String) -> Unit,
 ) {
-    val channel = state.channels.find { it.id == channelId } ?: return
+    val channel = state.channels.find { it.id == channelId } ?: state.channels.firstOrNull() ?: return
     if (layout.compact) {
         Column(Modifier.fillMaxSize()) {
             ChannelTabs(state.channels, channel.id, onChannel)

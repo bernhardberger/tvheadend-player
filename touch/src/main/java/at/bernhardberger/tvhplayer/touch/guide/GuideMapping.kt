@@ -28,11 +28,16 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 
-/** What the viewer picked in the Guide: the day (0 is today), the overview's jump time, opened Details. */
-internal data class GuideSelection(val day: Int = 0, val jump: Int = 0, val detailsId: String? = null)
+/** A null day follows today; a null jump follows Now. A jump belongs to one instant, not a tab. */
+internal data class GuideSelection(val day: LocalDate? = null, val jump: Long? = null, val detailsId: String? = null) {
+    fun dateIn(days: List<LocalDate>): LocalDate = day?.takeIf { it in days } ?: days.first()
+}
 
 /** The time the Guide is drawn at. */
-internal data class GuideClock(val nowSec: Long, val zone: ZoneId)
+internal data class GuideClock(val nowSec: Long, val zone: ZoneId) {
+    val today: LocalDate get() = dateAt(nowSec)
+    fun dateAt(seconds: Long): LocalDate = Instant.ofEpochSecond(seconds).atZone(zone).toLocalDate()
+}
 
 /**
  * The words the mapping needs from resources and the locale, so the mapping stays plain Kotlin:
@@ -87,7 +92,7 @@ internal fun guideState(
     val current = scope.channelCatalogCurrent
     val tags = browsing.tags.map { ChannelTag(it.id.value.toString(), it.name.orEmpty()) }
     val selectedTagId = browsing.activeTagId?.value?.toString()
-    val today = Instant.ofEpochSecond(clock.nowSec).atZone(clock.zone).toLocalDate()
+    val today = clock.today
     val empty = GuideState(emptyList(), tags, selectedTagId, days = emptyList(), date = texts.date(today))
     val snapshot = observation.epgSnapshotForDisplay
     val unavailable = { error: ConnectionUiState ->
@@ -124,11 +129,15 @@ internal val GUIDE_JUMP_TIMES: List<LocalTime> = listOf(LocalTime.of(20, 15), Lo
 
 /** The day tabs: today, then every later day the visible channels have programs on. */
 internal fun guideDays(events: List<EpgEvent>, clock: GuideClock): List<LocalDate> {
-    val today = Instant.ofEpochSecond(clock.nowSec).atZone(clock.zone).toLocalDate()
+    val today = clock.today
     val later = events.asSequence()
-        .filter { it.stop.epochSeconds > clock.nowSec }
-        .map { Instant.ofEpochSecond(it.start.epochSeconds).atZone(clock.zone).toLocalDate() }
-        .filter { it.isAfter(today) }
+        .filter { it.stop > it.start && it.stop.epochSeconds > clock.nowSec }
+        .flatMap {
+            val first = maxOf(clock.dateAt(it.start.epochSeconds), today.plusDays(1))
+            // Event stops are exclusive: an event ending exactly at midnight is not on the next day.
+            val last = clock.dateAt(it.stop.epochSeconds - 1)
+            generateSequence(first) { date -> date.plusDays(1) }.takeWhile { date -> date <= last }
+        }
     return (sequenceOf(today) + later).distinct().sorted().toList()
 }
 
@@ -143,7 +152,7 @@ internal fun guideCoverage(
     val shown = ids.toSet()
     val events = observation.epgSnapshotForDisplay?.events.orEmpty().filter { it.channelId in shown }
     val days = guideDays(events, clock)
-    val window = guideWindow(days[selection.day.coerceIn(days.indices)], null, clock)
+    val window = guideWindow(selection.dateIn(days), null, clock)
     return GuideCoverage(ids, window.daySec.first, window.daySec.last + 1)
 }
 
@@ -154,10 +163,10 @@ internal data class GuideWindow(val daySec: LongRange, val anchorSec: Long)
  * Today from now, another day from its start; a jump time moves the anchor to that time of the
  * selected day. The jumps already past today are not offered.
  */
-internal fun guideWindow(date: LocalDate, jump: LocalTime?, clock: GuideClock): GuideWindow {
+internal fun guideWindow(date: LocalDate, jump: Long?, clock: GuideClock): GuideWindow {
     val start = date.atStartOfDay(clock.zone).toEpochSecond()
     val end = date.plusDays(1).atStartOfDay(clock.zone).toEpochSecond()
-    val anchor = jump?.let { date.atTime(it).atZone(clock.zone).toEpochSecond() } ?: maxOf(start, clock.nowSec)
+    val anchor = jump ?: maxOf(start, clock.nowSec)
     return GuideWindow(start until end, anchor)
 }
 
@@ -182,10 +191,10 @@ private class GuideMapper(
 
     fun state(selection: GuideSelection, tags: List<ChannelTag>, selectedTagId: String?): GuideState {
         val days = guideDays(channels.flatMap { byChannel[it.id].orEmpty() }, clock)
-        val dayIndex = selection.day.coerceIn(days.indices)
-        val date = days[dayIndex]
-        val jumps = GUIDE_JUMP_TIMES.filter { date.atTime(it).atZone(clock.zone).toEpochSecond() > clock.nowSec }
-        val jumpIndex = selection.jump.coerceIn(0, jumps.size)
+        val date = selection.dateIn(days)
+        val jumps = GUIDE_JUMP_TIMES.map { date.atTime(it).atZone(clock.zone).toEpochSecond() }
+            .filter { it > clock.nowSec }
+        val jumpIndex = jumps.indexOf(selection.jump) + 1
         val window = guideWindow(date, jumps.getOrNull(jumpIndex - 1), clock)
         val guideChannels = channels.map { channel(it, window) }
         val details = selection.detailsId?.let { id -> events.find { it.id.value.toString() == id } }?.let(::details)
@@ -194,11 +203,13 @@ private class GuideMapper(
             tags = tags,
             selectedTagId = selectedTagId,
             days = days.map { texts.day(it, today) },
-            selectedDay = dayIndex,
+            selectedDay = days.indexOf(date),
+            dayDates = days,
             date = texts.date(date),
-            jumps = jumps.map { texts.clock(date.atTime(it).atZone(clock.zone).toEpochSecond()) },
+            jumps = jumps.map(texts.clock),
             selectedJump = jumpIndex,
-            details = details?.let { mapOf(it.id to it) }.orEmpty(),
+            jumpTimes = jumps,
+            details = details,
         )
     }
 
@@ -209,9 +220,9 @@ private class GuideMapper(
         var gap: GuideGap? = null
         val shown = schedule.filter { it.stop.epochSeconds > window.anchorSec && it.start.epochSeconds < overviewEnd }
         for (event in shown) {
-            val previous = overview.lastOrNull()
-            if (previous != null && event.start > previous.stop) {
-                gap = GuideGap(texts.clock(previous.stop.epochSeconds), texts.clock(event.start.epochSeconds))
+            val coveredThrough = overview.lastOrNull()?.stop?.epochSeconds ?: window.anchorSec
+            if (event.start.epochSeconds > coveredThrough) {
+                gap = GuideGap(texts.clock(coveredThrough), texts.clock(event.start.epochSeconds))
                 break
             }
             overview += event

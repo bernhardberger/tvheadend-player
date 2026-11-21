@@ -1,6 +1,8 @@
 package at.bernhardberger.tvhplayer.touch.channels
 
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.size
@@ -10,6 +12,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
@@ -29,8 +32,10 @@ import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.core.NEUTRAL_ACCENT_RGB
 import at.bernhardberger.tvhplayer.images.ChannelAccents
+import at.bernhardberger.tvhplayer.images.LogoInkTransformation
 import at.bernhardberger.tvhplayer.stores.ChannelAccentStore
 import at.bernhardberger.tvhplayer.touch.testutil.ImageLoaderRule
+import at.bernhardberger.tvhplayer.touch.testutil.LogoMark
 import at.bernhardberger.tvhplayer.touch.testutil.ServerGuide
 import at.bernhardberger.tvhplayer.touch.testutil.TouchCanvas
 import at.bernhardberger.tvhplayer.touch.testutil.assertLogoFitsItsShare
@@ -43,7 +48,11 @@ import at.bernhardberger.tvhplayer.ui.MobileDarkColors
 import coil3.asImage
 import coil3.decode.DataSource
 import coil3.intercept.Interceptor
+import coil3.request.ErrorResult
 import coil3.request.SuccessResult
+import coil3.request.transformations
+import coil3.size.Size
+import kotlin.math.roundToInt
 import kotlin.time.Instant
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -196,6 +205,87 @@ class ChannelsScreenTest {
     }
 
     @Test
+    fun serverLogoTilesShowTheirFallbackOnlyWhenTheLogoIsMissingOrFails() {
+        val failing = AppArtworkSource(null, ArtworkId(1))
+        val loading = AppArtworkSource(null, ArtworkId(2))
+        val loadedColor = Color.Magenta
+        val bitmap = Bitmap.createBitmap(30, 30, Bitmap.Config.ARGB_8888)
+            .apply { eraseColor(loadedColor.toArgb()) }
+        val release = CompletableDeferred<Unit>()
+        val images = ImageLoaderRule(Interceptor { chain ->
+            release.await()
+            if (chain.request.data == failing) ErrorResult(null, chain.request, IllegalStateException("Missing picon"))
+            else SuccessResult(bitmap.asImage(), chain.request, DataSource.MEMORY)
+        })
+        images.apply(object : Statement() {
+            override fun evaluate() {
+                compose.setContent {
+                    MaterialTheme(colorScheme = MobileDarkColors) {
+                        Column {
+                            listOf("missing" to null, "failing" to failing, "loading" to loading).forEach { (tag, model) ->
+                                ChannelLogoTile(null, null, Modifier.size(112.dp, 56.dp).testTag(tag), model = model)
+                            }
+                        }
+                    }
+                }
+                val ground = MobileDarkColors.surfaceContainerHigh
+                val missingCenter = tileCenter("missing")
+                assertNotEquals("an absent model shows the fallback icon", setOf(ground), missingCenter)
+                assertEquals(setOf(failing, loading), images.requested.toSet())
+                assertEquals("a pending logo shows only the ground", setOf(ground), tileCenter("loading"))
+                assertEquals("a pending failure shows only the ground", setOf(ground), tileCenter("failing"))
+
+                compose.runOnIdle { release.complete(Unit) }
+                assertEquals("a failed logo shows the same icon as an absent model", missingCenter, tileCenter("failing"))
+                assertEquals("a successful load shows the logo", setOf(loadedColor), tileCenter("loading"))
+            }
+        }, Description.EMPTY).evaluate()
+    }
+
+    private fun tileCenter(tag: String): Set<Color> {
+        val pixels = compose.onNodeWithTag(tag).captureToImage().toPixelMap()
+        return buildSet {
+            for (x in pixels.width / 2 - 4..pixels.width / 2 + 4) {
+                for (y in pixels.height / 2 - 4..pixels.height / 2 + 4) add(pixels[x, y])
+            }
+        }
+    }
+
+    @Test
+    fun serverLogoTilesFitTheVisibleShapeRatherThanThePiconCanvas() {
+        val wide = AppArtworkSource(null, ArtworkId(1))
+        val square = AppArtworkSource(null, ArtworkId(2))
+        val images = ImageLoaderRule(Interceptor { chain ->
+            val picon = Bitmap.createBitmap(400, 240, Bitmap.Config.ARGB_8888)
+            val paint = Paint().apply { color = LogoMark.toArgb() }
+            val canvas = Canvas(picon)
+            if (chain.request.data == wide) canvas.drawRect(0f, 70f, 400f, 170f, paint)
+            else canvas.drawRect(150f, 70f, 250f, 170f, paint)
+            val drawn = chain.request.transformations.fold(picon) { bitmap, transform ->
+                transform.transform(bitmap, Size(400, 240))
+            }
+            SuccessResult(drawn.asImage(), chain.request, DataSource.MEMORY)
+        })
+        images.apply(object : Statement() {
+            override fun evaluate() {
+                compose.setContent {
+                    MaterialTheme(colorScheme = MobileDarkColors) {
+                        Column {
+                            listOf("wide" to wide, "square" to square).forEach { (tag, model) ->
+                                ChannelLogoTile(null, null, Modifier.size(112.dp, 56.dp).testTag(tag), model = model)
+                            }
+                        }
+                    }
+                }
+                listOf("wide", "square").forEach { tag ->
+                    compose.onNodeWithTag(tag).captureToImage().toPixelMap()
+                        .assertLogoFitsItsShare(tag, fillsWidth = tag == "wide")
+                }
+            }
+        }, Description.EMPTY).evaluate()
+    }
+
+    @Test
     fun serverLogoTilesUseStoredThenSampledAccentsUnlessOverridden() {
         val guide = ServerGuide(Instant.fromEpochSeconds(0))
         val session = FakeTvheadendSession(guide.connected())
@@ -203,6 +293,7 @@ class ChannelsScreenTest {
         val artwork = ArtworkModels(session)
         val storedModel = artwork.logo(guide.logo, observation) as AppArtworkSource
         val freshModel = artwork.logo(ChannelIcon.ImageCache(ArtworkId(123)), observation) as AppArtworkSource
+        val referenceModel = artwork.logo(ChannelIcon.ImageCache(ArtworkId(124)), observation)
         val storedRgb = 0x317657
         val neutral = Color(0xFF000000.toInt() or NEUTRAL_ACCENT_RGB)
         val fixtureTint = Color(0xFF682A65)
@@ -213,8 +304,10 @@ class ChannelsScreenTest {
         }
         val releaseSample = CompletableDeferred<Unit>()
         val picon = Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888).apply { eraseColor(0xFFC81818.toInt()) }
+        val freshInkKeys = mutableListOf<String?>()
         val images = ImageLoaderRule(Interceptor { chain ->
             if (!chain.request.memoryCachePolicy.writeEnabled) releaseSample.await()
+            else if (chain.request.data == freshModel) freshInkKeys += chain.request.transformations.singleOrNull()?.cacheKey
             SuccessResult(picon.asImage(), chain.request, DataSource.MEMORY)
         })
         fun verifyTiles() {
@@ -231,7 +324,7 @@ class ChannelsScreenTest {
                             tile("stored", storedModel)
                             tile("stored-reference", storedModel, Color(0xFF000000.toInt() or storedRgb))
                             tile("fresh", freshModel)
-                            tile("fresh-reference", freshModel, expectedFresh.value)
+                            tile("fresh-reference", referenceModel, expectedFresh.value)
                             tile("no-logo", null, fixtureTint)
                             tile("override", storedModel, fixtureTint)
                             CompositionLocalProvider(LocalChannelAccents provides null) {
@@ -241,6 +334,11 @@ class ChannelsScreenTest {
                     }
                 }
             }
+            compose.mainClock.advanceTimeBy(48)
+            val slot = compose.onNodeWithTag("fresh").captureToImage()
+            fun inkKey(ground: Color): String = LogoInkTransformation(
+                ground.toArgb(), (slot.width * 0.76f).roundToInt(), (slot.height * 0.62f).roundToInt(), trim = true,
+            ).cacheKey
             fun ground(tag: String): Color {
                 val pixels = compose.onNodeWithTag(tag).captureToImage().toPixelMap()
                 return pixels[pixels.width / 8, pixels.height / 4]
@@ -249,6 +347,7 @@ class ChannelsScreenTest {
             assertEquals("pending sample uses neutral tint", ground("fresh-reference"), ground("fresh"))
             assertEquals("no logo leaves the neutral ground", MobileDarkColors.surfaceContainerHigh, ground("no-logo"))
             assertEquals("explicit tint overrides the stored accent", ground("override-reference"), ground("override"))
+            assertEquals("one request on the initial neutral ground", listOf(inkKey(neutral)), freshInkKeys)
 
             compose.runOnIdle { releaseSample.complete(Unit) }
             compose.runOnIdle {
@@ -256,7 +355,11 @@ class ChannelsScreenTest {
                 assertNotEquals(NEUTRAL_ACCENT_RGB, rgb)
                 expectedFresh.value = Color(0xFF000000.toInt() or rgb)
             }
-            compose.mainClock.advanceTimeBy(352)
+            compose.mainClock.advanceTimeBy(48)
+            val expectedKeys = listOf(inkKey(neutral), inkKey(expectedFresh.value))
+            assertEquals("ink uses the settled accent before the fade finishes", expectedKeys, freshInkKeys)
+            compose.mainClock.advanceTimeBy(304)
+            assertEquals("fade frames do not request new ink variants", expectedKeys, freshInkKeys)
             assertEquals("tile settles on the shared sampler's colour", ground("fresh-reference"), ground("fresh"))
         }
         images.apply(object : Statement() {
