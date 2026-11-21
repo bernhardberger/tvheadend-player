@@ -140,6 +140,7 @@ internal data class RecordingItem(
 
 internal sealed interface RecordingPlayAction {
     data object Watch : RecordingPlayAction
+    data object ContinueWatching : RecordingPlayAction
     data class Resume(val position: kotlin.time.Duration) : RecordingPlayAction
     data object StartOver : RecordingPlayAction
 }

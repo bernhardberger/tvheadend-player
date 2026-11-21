@@ -61,6 +61,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -83,7 +84,7 @@ internal fun RecordingPane(item: RecordingItem, clock: RecordingClock, actions: 
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     ChannelTile(item, Modifier.size(64.dp, 36.dp))
-                    Column(Modifier.padding(start = 12.dp)) {
+                    Column(Modifier.padding(start = if (item.hasLogo) 12.dp else 0.dp)) {
                         item.channel?.let { Text(it, style = MaterialTheme.typography.bodyLarge) }
                         Text(
                             whenText(item, clock), style = MaterialTheme.typography.bodyMedium,
@@ -234,11 +235,15 @@ private fun PageChannel(
     Row(verticalAlignment = Alignment.CenterVertically) {
         ChannelTile(item, tile)
         item.channel?.let {
-            Text(it, Modifier.padding(start = 12.dp), style = style, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                it, Modifier.padding(start = if (item.hasLogo) 12.dp else 0.dp),
+                style = style, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
         }
         if (withDate) {
             Text(
-                whenText(item, clock), Modifier.padding(start = 12.dp),
+                whenText(item, clock),
+                Modifier.padding(start = if (item.hasLogo || item.channel != null) 12.dp else 0.dp),
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
             )
@@ -248,7 +253,7 @@ private fun PageChannel(
 
 @Composable
 private fun ChannelTile(item: RecordingItem, modifier: Modifier) {
-    if (item.channelLogo == null && item.channelLogoModel == null) return
+    if (!item.hasLogo) return
     ChannelLogoTile(item.channelLogo, item.logoTint, modifier, RoundedCornerShape(8.dp), item.channelLogoModel)
 }
 
@@ -311,7 +316,7 @@ private fun Progress(state: RecordingProgress, clock: RecordingClock, modifier: 
 
 @Composable
 private fun PlayButtons(item: RecordingItem, actions: RecordingsActions, equalWidth: Boolean) {
-    if (item.remove == RecordingRemoveControl.RemoveEntry) {
+    if (!item.playing && item.remove == RecordingRemoveControl.RemoveEntry) {
         actions.onDelete?.let { RecordingActionButton(item.remove) { it(item.id) } }
         return
     }
@@ -332,27 +337,40 @@ private fun PlayButtons(item: RecordingItem, actions: RecordingsActions, equalWi
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                is RecordingPlayAction.Resume, RecordingPlayAction.Watch ->
-                    PrimaryPlayButton(action as? RecordingPlayAction.Resume, share) { onPlay(item.id, false) }
+                else -> PrimaryPlayButton(action, share, equalWidth) { onPlay(item.id, false) }
             }
         }
     }
 }
 
 @Composable
-private fun PrimaryPlayButton(resume: RecordingPlayAction.Resume?, modifier: Modifier, onClick: () -> Unit) {
-    Button(onClick = onClick, modifier = modifier) {
-        Icon(painterResource(R.drawable.channels_play), null, Modifier.size(ButtonDefaults.IconSize))
-        Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-        val label = if (resume == null) R.string.recordings_watch else R.string.recordings_resume
-        val spoken = resume?.let {
+private fun PrimaryPlayButton(
+    action: RecordingPlayAction,
+    modifier: Modifier,
+    equalWidth: Boolean,
+    onClick: () -> Unit,
+) {
+    val compactContinue = equalWidth && action == RecordingPlayAction.ContinueWatching
+    val padding = if (compactContinue) ButtonDefaults.SmallContentPadding else ButtonDefaults.ContentPadding
+    Button(onClick = onClick, modifier = modifier, contentPadding = padding) {
+        if (!compactContinue) {
+            Icon(painterResource(R.drawable.channels_play), null, Modifier.size(ButtonDefaults.IconSize))
+            Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+        }
+        val label = when (action) {
+            RecordingPlayAction.ContinueWatching -> SharedR.string.player_continue_watching
+            is RecordingPlayAction.Resume -> R.string.recordings_resume
+            else -> R.string.recordings_watch
+        }
+        val spoken = (action as? RecordingPlayAction.Resume)?.let {
             val duration = formatSpokenDuration(it.position.inWholeSeconds, LocalContext.current.resources)
             stringResource(SharedR.string.recording_resume_from, duration)
         }
         Text(
             stringResource(label),
             if (spoken == null) Modifier else Modifier.clearAndSetSemantics { contentDescription = spoken },
-            maxLines = 1,
+            maxLines = if (compactContinue) Int.MAX_VALUE else 1,
+            textAlign = if (compactContinue) TextAlign.Center else null,
         )
     }
 }

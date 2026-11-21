@@ -183,6 +183,18 @@ class RecordingsMappingTest {
             assertEquals(entry.state.toString(), expected, recordingPlayActions(entry,
                 observation.recordingPlaybackAdmission(entry)))
         }
+        for (position in listOf(null, 15)) {
+            val entry = watchEntry(position = position)
+            val item = recordingsState(
+                watchObservation(entry), DvrArchiveView(), ConnectionUiState.Ready, false, clock, texts,
+                playingRecordingId = entry.id,
+            ).root.recordings.single()
+            val expected = listOfNotNull(
+                RecordingPlayAction.ContinueWatching,
+                RecordingPlayAction.StartOver.takeIf { position != null },
+            )
+            assertEquals("Playing actions at saved position $position", expected, item.play)
+        }
     }
 
     @Test

@@ -46,6 +46,7 @@ import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.viewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 
@@ -100,6 +101,11 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onStop() {
+        super.onStop()
+        if (!isChangingConfigurations) watchRequests.pendingRecording?.cancel()
+    }
+
     private fun watch(channelId: String) {
         watchRequest++
         val id = ChannelId(channelId.toLong())
@@ -117,12 +123,13 @@ class MainActivity : ComponentActivity() {
         val route = RecordingRoute(id, recordingStart(startOver))
         val runtime = sdk.playbackRuntime
         val request = ++watchRequest
+        val requests = watchRequests
+        requests.pendingRecording?.cancel()
         if (startsRecording(route, runtime.activeTarget.value, runtime.state.value)) {
             val selection = currentRecordingPlaybackSelection(session.observation.value, id) ?: return
-            val requests = watchRequests
             // Register the fresh playback request before the player's Stop guard runs. The
-            // application owns the install even when this activity is covered by the player.
-            applicationScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            // install survives rotation, but a non-configuration stop withdraws an unfinished request.
+            requests.pendingRecording = applicationScope.launch(start = CoroutineStart.UNDISPATCHED) {
                 runtime.playRecording(selection, route.start)
                 // Keep the result for the current browse activity, including across rotation.
                 if (request == requests.latest) {
@@ -137,5 +144,6 @@ class MainActivity : ComponentActivity() {
 
 private class WatchRequests : ViewModel() {
     var latest = 0
+    var pendingRecording: Job? = null
     val completedRecording = MutableStateFlow<Pair<Int, RecordingRoute>?>(null)
 }
