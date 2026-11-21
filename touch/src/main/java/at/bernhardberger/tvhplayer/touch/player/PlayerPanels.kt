@@ -289,13 +289,13 @@ private fun PlayerBottomSheet(
 private fun OptionRows(state: PlayerFaceState, onPanel: (PlayerPanel?) -> Unit) {
     val options = state.options
     val profile = options.profilePick?.let { options.profiles.getOrNull(it) }
-    val adBreakOnly = (state as? RecordingPlayerState)?.adBreakOnlyOptions == true
     val rows = listOfNotNull(
-        if (adBreakOnly) null else
-            Triple(R.string.player_display_mode, stringResource(options.displayMode.label), PlayerPanel.DisplayMode),
+        Triple(R.string.player_display_mode, stringResource(options.displayMode.label), PlayerPanel.DisplayMode),
         if (state is RecordingPlayerState) {
-            val selected = state.adBreakPick?.let { stringResource(it.label) } ?: adBreakDefault(state)
-            Triple(SharedR.string.ad_breaks_setting, selected, PlayerPanel.AdBreaks)
+            if (state.hasAdBreakOptions) {
+                val selected = state.adBreakPick?.let { stringResource(it.label) } ?: adBreakDefault(state)
+                Triple(SharedR.string.ad_breaks_setting, selected, PlayerPanel.AdBreaks)
+            } else null
         } else options.profiles.takeIf { it.isNotEmpty() }?.let {
             Triple(
                 R.string.player_stream_profile,
@@ -304,8 +304,7 @@ private fun OptionRows(state: PlayerFaceState, onPanel: (PlayerPanel?) -> Unit) 
                 PlayerPanel.Profile,
             )
         },
-        options.stats?.takeUnless { adBreakOnly }
-            ?.let { Triple(R.string.player_stats, stringResource(it.label), PlayerPanel.Stats) },
+        options.stats?.let { Triple(R.string.player_stats, stringResource(it.label), PlayerPanel.Stats) },
     )
     Rows {
         rows.forEachIndexed { index, (label, value, target) ->
