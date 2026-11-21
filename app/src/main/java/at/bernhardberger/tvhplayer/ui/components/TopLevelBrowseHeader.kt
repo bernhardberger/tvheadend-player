@@ -57,8 +57,8 @@ fun TopLevelBrowseHeader(
         } else if (showTitle) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleLarge,
-                color = TvTextColors.primary,
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f).semantics { heading() },

@@ -92,6 +92,7 @@ import coil3.request.Options
 import kotlinx.coroutines.Dispatchers
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -414,6 +415,7 @@ class ChannelsListLayoutTest {
         compose.mainClock.autoAdvance = false
         channelsShell(fontScale)
         compose.mainClock.advanceTimeBy(1_000)
+        assertScreenTitleFitsBesideTheButtons()
         val originalFirst = row(1).bounds()
         val rowHeight = originalFirst.height
         val footer = headlineBottom()
@@ -442,8 +444,9 @@ class ChannelsListLayoutTest {
 
         move(Key.DirectionDown)
         val scrolledPosition = assertSettled(4)
+        assertRowsPeekAtBothEdges()
         val viewport = detail("channels-list").bounds()
-        assertEquals("scrolled focus uses the whole viewport", viewport.top + .3f * viewport.height, scrolledPosition.top, 2f)
+        assertEquals("scrolled focus keeps the pivot of a list reaching the screen's top", .3f * viewport.bottom, scrolledPosition.top, 2f)
         assertFocusedShapePixels(4, rowHeight, scrolled = true)
         move(Key.DirectionLeft)
         compose.onNodeWithTag("nav-channels").assertIsFocused()
@@ -616,8 +619,32 @@ class ChannelsListLayoutTest {
         }
     }
 
+    /** A scrolled list shows part of a row cut by each edge of its area, under that edge's fade. */
+    private fun assertRowsPeekAtBothEdges() {
+        val list = detail("channels-list").bounds()
+        val rows = (1..CHANNEL_COUNT).mapNotNull { channel ->
+            compose.onAllNodesWithTag("channel-row-$channel").fetchSemanticsNodes().firstOrNull()?.let {
+                row(channel).getUnclippedBoundsInRoot().let { r -> r.top.value to r.bottom.value }
+            }
+        }
+        val peek = 4f
+        assertTrue("a previous row peeks into the top fade: $rows / $list",
+            rows.any { (top, bottom) -> top < list.top - peek && bottom > list.top + peek })
+        assertTrue("a next row peeks into the bottom fade: $rows / $list",
+            rows.any { (top, bottom) -> top < list.bottom - peek && bottom > list.bottom + peek })
+    }
+
+    private fun assertScreenTitleFitsBesideTheButtons() {
+        val layouts = mutableListOf<TextLayoutResult>()
+        screenTitle().performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        val title = screenTitle().bounds()
+        assertFalse("the title is shown whole", layouts.single().isLineEllipsized(0))
+        assertTrue("the title ends before the buttons", title.right <= tagsButton().bounds().left)
+        assertEquals("the title is centred on the button row", tagsButton().bounds().center.y, title.center.y, 1f)
+    }
+
     // The platform pivot puts row 7's 5:3 logo inside the fade at this focus position.
-    private val topFadeFocusTarget = 9
+    private val topFadeFocusTarget = 8
 
     /**
      * The fixture's 5:3 picon has a uniform bright right-hand stripe through the fade; fitted 4dp
@@ -769,7 +796,7 @@ class ChannelsListLayoutTest {
         val viewport = detail("channels-list").bounds()
         val focusedTop = row(8).bounds().top
         val previousTitle = inRow(7, "channel-title").bounds()
-        assertEquals("scrolled focus uses the whole viewport", viewport.top + .3f * viewport.height, focusedTop, 2f)
+        assertEquals("scrolled focus keeps the pivot of a list reaching the screen's top", .3f * viewport.bottom, focusedTop, 2f)
         capture("$prefix-scrolled-bright-video",
             "pivotDp: viewportTop=${viewport.top}; viewportHeight=${viewport.height}; focusedTop=$focusedTop; " +
                 "previousTitle=${previousTitle.top}..${previousTitle.bottom}; fadeEnd=${viewport.top + ListBottomFadeHeight.value}")

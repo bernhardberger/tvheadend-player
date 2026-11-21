@@ -768,9 +768,9 @@ heading, "Immersive options" or "Grid options", since it applies to that layout
 only.
 
 - The destination's name ("Channels", "Guide") is the header row's pane title
-  for TalkBack. List and Grid also draw "Channels" as a static `titleLarge`
-  heading at the header start, on the content's leading edge (trial
-  2026-11-21); Immersive and the Guide draw no title, as the drawer already
+  for TalkBack. List and Grid also draw "Channels" as a static one-line
+  heading in the Settings heading's `headlineMedium` and `onSurface`, at the
+  header start on the content's leading edge (trial 2026-11-21); Immersive and the Guide draw no title, as the drawer already
   says where you are (accepted 2026-10-24). Its Tags and View options buttons end on the
   trailing inset, 20dp apart, on the header row at y28 of the 960×540 reference
   canvas. At larger text the header grows from its actual text measurements.
@@ -795,7 +795,8 @@ only.
   At rest the first row starts at y100, 32dp below the header controls as in
   the Grid. The list's viewport begins below the header band, so scrolled rows
   fade out under its top fade before they reach the title (2026-11-21). Scrolled
-  focus uses the platform TV pivot across that viewport to the screen bottom.
+  focus keeps the platform TV pivot measured from the screen top, so rows rest
+  where they did and a cut row peeks into each fade.
   The list follows the browse list edges in §9, and its header and headline pane
   are outside the masks. Returning to the first-row boundary removes the top fade.
 - Rows are the library's standard `ListItem`: native padding, height and growth
