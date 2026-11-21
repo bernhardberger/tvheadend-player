@@ -53,6 +53,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import org.junit.Assert.*
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -63,6 +64,11 @@ class AppPausedSeekRuntimeTest {
     fun selectedSeeksThroughAppRuntimePreservePausePlayingAndReferenceContinuation() = runBlocking {
         withTimeout(90.seconds) {
             val instrumentation = InstrumentationRegistry.getInstrumentation()
+            assumeTrue(
+                "Recorded mux fixture requires -Pplayer.offlineMediaAssets",
+                instrumentation.context.assets.list("")?.contains("recorded-mux") == true,
+            )
+            val (streams, packets) = capturedMedia()
             val context = instrumentation.targetContext
             val connection = ScriptedSubscriptionConnection()
             connection.scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 120)))
@@ -128,7 +134,6 @@ class AppPausedSeekRuntimeTest {
             try {
                 profiles.serverProfile.filterNotNull().first()
                 assertEquals(at.bernhardberger.tvheadend.sdk.core.ServerProfileReadResult.Missing, profiles.serverProfile.value)
-                val (streams, packets) = capturedMedia()
                 val origins = packets.groupBy { it.streamIndex }.mapValues { (_, values) ->
                     values.minOf { checkNotNull(it.presentationTimeUs) }
                 }

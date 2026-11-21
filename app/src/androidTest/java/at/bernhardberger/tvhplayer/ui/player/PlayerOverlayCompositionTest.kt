@@ -31,7 +31,6 @@ import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
-import at.bernhardberger.tvhplayer.ui.common.formatClock
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import at.bernhardberger.tvhplayer.testing.ImageLoaderRule
@@ -160,16 +159,17 @@ class PlayerOverlayCompositionTest {
             }
         }
         val progress = composeRule.onNodeWithTag("player-schedule-progress").fetchSemanticsNode().config
-        assertEquals(0.5f, progress[androidx.compose.ui.semantics.SemanticsProperties.ProgressBarRangeInfo].current)
-        assertEquals(listOf("Current broadcast. ${formatClock(0)} - ${formatClock(3600)}"),
-            progress[androidx.compose.ui.semantics.SemanticsProperties.ContentDescription])
+        assertTrue(!progress.contains(androidx.compose.ui.semantics.SemanticsProperties.ProgressBarRangeInfo))
+        assertEquals(listOf("Current broadcast"), progress[androidx.compose.ui.semantics.SemanticsProperties.ContentDescription])
+        fun width(tag: String) = composeRule.onNodeWithTag(tag, useUnmergedTree = true)
+            .fetchSemanticsNode().boundsInRoot.width
+        assertEquals(0.5f, width("player-timeline-fill") / width("player-timeline-track"), 0.01f)
         assertTrue(!progress.contains(androidx.compose.ui.semantics.SemanticsActions.CustomActions))
         assertTrue(!progress.contains(androidx.compose.ui.semantics.SemanticsActions.SetProgress))
         assertTrue(!progress.contains(androidx.compose.ui.semantics.SemanticsProperties.Focused))
         composeRule.onNodeWithTag("player-seekbar-thumb").assertDoesNotExist()
-        // Without a focusable timeline Up from the action row reaches the card, and Down returns to the entry.
+        // Schedule progress is informative; Up must not move focus into it.
         composeRule.onNodeWithTag("player-pause").assertIsFocused().performKeyInput { pressKey(Key.DirectionUp) }
-        composeRule.onNodeWithTag("player-identity-card").assertIsFocused().performKeyInput { pressKey(Key.DirectionDown) }
         composeRule.onNodeWithTag("player-pause").assertIsFocused()
         composeRule.runOnIdle {
             state.value = AppTimeshiftState(available = true, bufferStartMs = -600_000, positionMs = 0, liveEdgeMs = 0)
@@ -189,36 +189,6 @@ class PlayerOverlayCompositionTest {
             composeRule.runOnIdle { current.value = epg }
             composeRule.onNodeWithTag("player-schedule-progress").assertDoesNotExist()
             composeRule.onNodeWithTag("player-seekbar").assertDoesNotExist()
-        }
-    }
-
-    @Test
-    fun identityCardContentsStayCentredAtNormalAndLargeTextWithFocus() {
-        val fontScale = mutableStateOf(1f)
-        composeRule.setContent {
-            val density = androidx.compose.ui.platform.LocalDensity.current
-            androidx.compose.runtime.CompositionLocalProvider(
-                androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(density.density, fontScale.value),
-            ) {
-                TVHeadendPlayerTheme { ModernLiveFixture(AppTimeshiftState(available = true)) }
-            }
-        }
-        for (scale in listOf(1f, 1.5f)) {
-            composeRule.runOnIdle { fontScale.value = scale }
-            for (focus in listOf("player-pause", "player-identity-card", "player-settings")) {
-                composeRule.onNodeWithTag(focus).requestFocus()
-                val card = composeRule.onNodeWithTag("player-identity-card").fetchSemanticsNode().boundsInRoot
-                val mark = composeRule.onNodeWithTag("player-identity-name", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-                val pause = composeRule.onNodeWithTag("player-pause").fetchSemanticsNode().boundsInRoot
-                val settings = composeRule.onNodeWithTag("player-settings").fetchSemanticsNode().boundsInRoot
-                with(composeRule.density) {
-                    assertEquals(160.dp.toPx(), card.width, 1f)
-                    assertEquals(90.dp.toPx(), card.height, 1f)
-                }
-                assertEquals(card.center.x, mark.center.x, 1f)
-                assertEquals(card.center.y, mark.center.y, 1f)
-                assertEquals(settings.center.y, pause.center.y, 1f)
-            }
         }
     }
 
@@ -259,7 +229,7 @@ class PlayerOverlayCompositionTest {
                 composeRule.onNodeWithTag("player-state").assertDoesNotExist()
                 assertEquals(liveState.top, bounds("player-live-state").top, 1f)
                 assertEquals(liveState.bottom, bounds("player-live-state").bottom, 1f)
-                if (!seeking) composeRule.onNodeWithTag("player-timeline-status").assertDoesNotExist()
+                composeRule.onNodeWithTag("player-window-title").assertDoesNotExist()
                 if (candidate != null) assertEquals(endpoints, bounds("player-window-start"))
                 if (seeking) composeRule.onNodeWithTag("timeshift-preview-target", useUnmergedTree = true).assertExists()
             }
@@ -268,7 +238,6 @@ class PlayerOverlayCompositionTest {
         val target = bounds("timeshift-preview-target")
         // The readout is on the bar's own coordinates; with no thumb drawn (the bar is not focused) it
         // rests on the bar row's top. No feedback slot for it.
-        composeRule.onNodeWithTag("player-timeline-status").assertDoesNotExist()
         composeRule.onNodeWithTag("player-seekbar-thumb", useUnmergedTree = true).assertDoesNotExist()
         assertEquals(track.top, target.bottom, 1f)
         composeRule.onNodeWithTag("player-window-title").assertDoesNotExist()
@@ -282,13 +251,14 @@ class PlayerOverlayCompositionTest {
         assertEquals(track.top + drop, stepTrack.top, 1f)
         assertEquals(target.top + drop, bounds("timeshift-preview-target").top, 1f)
         composeRule.onNodeWithTag("timeshift-preview-programme").assertDoesNotExist()
-        composeRule.runOnIdle { hidden.value = false; feedback.value = "Target expired" }
+        composeRule.runOnIdle { hidden.value = false; preview.value = false; feedback.value = "Target expired" }
         assertEquals(track, bounds("player-timeline-track"))
         val slot = bounds("player-timeline-status")
+        composeRule.onNodeWithTag("player-window-title").assertTextEquals("Target expired")
         assertTrue("feedback paints above the bar row", slot.bottom <= track.top + 1f)
         composeRule.runOnIdle { feedback.value = null; preview.value = false }
         assertEquals(track, bounds("player-timeline-track"))
-        composeRule.onNodeWithTag("player-timeline-status").assertDoesNotExist()
+        composeRule.onNodeWithTag("player-window-title").assertDoesNotExist()
     }
 
     @Test
@@ -313,11 +283,11 @@ class PlayerOverlayCompositionTest {
     }
 
     @Test
-    fun capabilityUpdatesPreserveSurvivingCardAndSettingsFocus() {
+    fun capabilityUpdatesPreserveSurvivingDetailsAndSettingsFocus() {
         val buffered = AppTimeshiftState(available = true, bufferStartMs = -600_000, positionMs = -30_000, liveEdgeMs = 0)
         val state = mutableStateOf(buffered)
         composeRule.setContent { TVHeadendPlayerTheme { ModernLiveFixture(state.value) } }
-        for (tag in listOf("player-identity-card", "player-settings")) {
+        for (tag in listOf("player-info", "player-settings")) {
             composeRule.onNodeWithTag(tag).requestFocus().assertIsFocused()
             for (updated in listOf(buffered.copy(positionMs = 0), buffered.copy(timingKnown = false), AppTimeshiftState(), buffered)) {
                 composeRule.runOnIdle { state.value = updated }
@@ -331,7 +301,7 @@ class PlayerOverlayCompositionTest {
         composeRule.setContent { TVHeadendPlayerTheme { ModernLiveFixture(AppTimeshiftState()) } }
         composeRule.onNodeWithTag("player-pause").assertIsFocused()
         composeRule.onNodeWithTag("player-settings").assertExists()
-        composeRule.onNodeWithTag("player-info").assertDoesNotExist()
+        composeRule.onNodeWithTag("player-info").assertExists()
         composeRule.onNodeWithTag("player-seekbar").assertDoesNotExist()
         val track = composeRule.onNodeWithTag("player-timeline-track").fetchSemanticsNode().config
         assertTrue(!track.contains(androidx.compose.ui.semantics.SemanticsProperties.ProgressBarRangeInfo))
@@ -562,6 +532,7 @@ class PlayerOverlayCompositionTest {
                     onSeek = {},
 
                     onInfo = {},
+                    onRecord = {},
                 )
             }
         }
@@ -569,12 +540,14 @@ class PlayerOverlayCompositionTest {
         val actionsBefore = composeRule.onNodeWithTag("player-actions")
             .fetchSemanticsNode().boundsInRoot
         composeRule.onNodeWithTag("player-pause").assertIsFocused()
-        composeRule.onNodeWithTag("player-identity-card").assertContentDescriptionEquals("Info")
-        composeRule.onNodeWithTag("player-info").assertDoesNotExist()
+        composeRule.onNodeWithTag("player-info").assertContentDescriptionEquals("Program details")
         composeRule.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
         composeRule.onNodeWithTag("player-stop").assertIsFocused()
-        composeRule.onNodeWithTag("player-record").assertDoesNotExist()
         composeRule.onNodeWithTag("player-action-context-label").assertDoesNotExist()
+        composeRule.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
+        composeRule.onNodeWithTag("player-record").assertIsFocused()
+        composeRule.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
+        composeRule.onNodeWithTag("player-info").assertIsFocused()
         composeRule.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
         composeRule.onNodeWithTag("player-settings").assertIsFocused()
         composeRule.onNodeWithContentDescription("Settings").assertExists()
@@ -587,6 +560,10 @@ class PlayerOverlayCompositionTest {
         assertEquals(actionsBefore, actionsAfter)
         assertTrue(timeline.bottom <= actionsAfter.top)
 
+        composeRule.onRoot().performKeyInput { pressKey(Key.DirectionLeft) }
+        composeRule.onNodeWithTag("player-info").assertIsFocused()
+        composeRule.onRoot().performKeyInput { pressKey(Key.DirectionLeft) }
+        composeRule.onNodeWithTag("player-record").assertIsFocused()
         composeRule.onRoot().performKeyInput { pressKey(Key.DirectionLeft) }
         composeRule.onNodeWithTag("player-stop").assertIsFocused()
     }

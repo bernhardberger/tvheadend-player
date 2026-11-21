@@ -87,7 +87,10 @@ class ProgrammeWindowInputTest(private val scenario: String) {
                     Box(Modifier.fillMaxSize()) {
                         DebugVideoBackdrop(true, Modifier.fillMaxSize())
                         if (compactPreview && preview != null) {
-                            QuickStepBanner(state, preview.decision, Modifier.align(androidx.compose.ui.Alignment.BottomCenter), window)
+                            QuickStepBanner(
+                                state, preview.decision, Modifier.align(androidx.compose.ui.Alignment.BottomCenter),
+                                programmeWindow = window, settled = preview.dispatched,
+                            )
                         } else PlayerChrome(
                             mode = PlayerChromeMode.CONTROLS,
                             content = PlayerChromeContent("", liveInfoBarData(androidx.compose.ui.platform.LocalContext.current.resources, 1, "Fixture TV", null, null, false, 0, "")),
@@ -100,6 +103,11 @@ class ProgrammeWindowInputTest(private val scenario: String) {
                                 programmeWindow = window,
                                 previewing = preview != null,
                                 feedback = owner.feedback,
+                                feedbackIsError = owner.feedbackIsError,
+                                stepDeltaMs = preview?.decision?.deltaMs,
+                                stepSettled = preview?.dispatched == true,
+                                stepId = preview?.id,
+                                onStepAnnounced = { preview?.id?.let(owner::stepAnnounced) },
                             ),
                             actions = PlayerChromeActions(active = true, paused = paused),
                             onStop = {},
@@ -134,6 +142,8 @@ class ProgrammeWindowInputTest(private val scenario: String) {
             val trackCenter = rule.onNodeWithTag("player-timeline-track", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.center.y
             rule.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
             rule.onNodeWithTag("player-seekbar").assertIsFocused()
+            val committedSpeech = rule.onNodeWithTag("player-seekbar").fetchSemanticsNode()
+                .config[SemanticsProperties.ContentDescription].single()
             rule.onNodeWithTag("player-seekbar-thumb", useUnmergedTree = true).assertExists()
             assertEquals(trackCenter, rule.onNodeWithTag("player-timeline-track", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.center.y)
             capture("focused")
@@ -151,17 +161,17 @@ class ProgrammeWindowInputTest(private val scenario: String) {
             assertEquals((if (shallow) 89.5.minutes else if (scenario == "held") 55.minutes else 59.5.minutes), target.position)
             if (!missing && scenario != "late") {
                 rule.onNodeWithTag("player-seekbar").assertContentDescriptionContains(
-                    if (shallow) "Programme B" else "Programme A", substring = true)
+                    committedSpeech)
                 rule.onNodeWithTag("player-window-title").assertDoesNotExist()
                 if (!shallow && scenario != "midnight") {
-                    rule.onNodeWithTag("player-window-start").assertTextEquals("19:00")
+                    rule.onNodeWithTag("player-window-start", useUnmergedTree = true).assertTextEquals("19:00")
                     rule.onNodeWithTag("player-end-clock", useUnmergedTree = true).assertTextEquals("20:00")
                 }
             }
             if (scenario == "late") {
                 rule.runOnIdle { metadata = true }
                 rule.mainClock.advanceTimeByFrame()
-                rule.onNodeWithTag("player-seekbar").assertContentDescriptionContains("Programme A", substring = true)
+                rule.onNodeWithTag("player-seekbar").assertContentDescriptionContains(committedSpeech)
                 assertSame(target, owner.preview!!.target)
             }
             if (scenario == "evicted") {
@@ -174,9 +184,8 @@ class ProgrammeWindowInputTest(private val scenario: String) {
             }
             capture("preview")
             if (scenario == "evicted") {
-                rule.onNodeWithTag("player-seekbar").assertContentDescriptionContains(
-                    "That position is no longer in the buffer.", substring = true)
-                // The opaque target chip replaces feedback visually; the unavailable target is still spoken.
+                // During the burst the focused seekbar retains speech, even when the preview becomes unavailable.
+                rule.onNodeWithTag("player-seekbar").assertContentDescriptionContains(committedSpeech)
                 rule.onNodeWithTag("timeshift-preview-target", useUnmergedTree = true).assertExists()
             }
             if (shallow || scenario == "held") {
@@ -205,8 +214,10 @@ class ProgrammeWindowInputTest(private val scenario: String) {
                 rule.runOnIdle { compactPreview = true }
                 rule.mainClock.advanceTimeByFrame()
                 capture("compact-preview")
-                if (scenario == "evicted") rule.onNodeWithTag("timeshift-seek-preview").assertContentDescriptionContains(
-                    "That position is no longer in the buffer.", substring = true)
+                // The first pending step keeps the compact banner's live region silent until dispatch.
+                if (scenario == "evicted") {
+                    rule.onNodeWithTag("timeshift-seek-preview").assertContentDescriptionEquals("")
+                }
                 rule.runOnIdle { compactPreview = false }
                 rule.mainClock.advanceTimeBy(50)
                 rule.onNodeWithTag("player-seekbar").requestFocus()
@@ -218,7 +229,14 @@ class ProgrammeWindowInputTest(private val scenario: String) {
             rule.mainClock.advanceTimeBy(450)
             rule.waitForIdle()
             assertEquals(if (scenario == "evicted") emptyList<Long>() else listOf(target.position.inWholeMilliseconds), dispatches)
-            if (scenario == "evicted") assertEquals("That position is no longer in the buffer.", owner.feedback)
+            if (scenario == "evicted") {
+                assertEquals("That position is no longer in the buffer.", owner.feedback)
+                rule.onNodeWithTag("player-seekbar").assertContentDescriptionContains(
+                    "That position is no longer in the buffer.", substring = true)
+            } else if (!missing) {
+                rule.onNodeWithTag("player-seekbar").assertContentDescriptionContains(
+                    if (shallow) "Programme B" else "Programme A", substring = true)
+            }
             rule.mainClock.advanceTimeBy(1_000)
             rule.mainClock.autoAdvance = true
             capture("settled")

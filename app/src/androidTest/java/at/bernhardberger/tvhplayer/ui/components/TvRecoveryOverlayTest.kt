@@ -2,12 +2,14 @@ package at.bernhardberger.tvhplayer.ui.components
 
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -15,6 +17,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.pressKey
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import org.junit.Assert.assertEquals
@@ -121,7 +124,10 @@ class TvRecoveryOverlayTest {
 
         composeRule.onNodeWithTag("tv-recovery-overlay")
             .assertHasNoClickAction()
-            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Focused))
+            .performSemanticsAction(SemanticsActions.RequestFocus) { request ->
+                org.junit.Assert.assertFalse(request())
+            }
+            .assertIsNotFocused()
             .assert(
                 SemanticsMatcher.keyNotDefined(SemanticsProperties.IsDialog)
             )

@@ -9,6 +9,7 @@ import at.bernhardberger.tvhplayer.ui.components.PlaybackOptionsOverlayFrame
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import coil3.map.Mapper
 import coil3.request.Options
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
@@ -24,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.foundation.background
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performSemanticsAction
@@ -57,6 +59,7 @@ import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
+import at.bernhardberger.tvhplayer.core.PlayerBackKeyCycle
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvheadend.sdk.media3.testing.TimeshiftTestFixture
 import at.bernhardberger.tvhplayer.playback.toAppPresentation
@@ -107,6 +110,8 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
         composeRule.setContent {
             inputModeManager = LocalInputModeManager.current
             val context = LocalContext.current
+            val backCycle = remember { PlayerBackKeyCycle() }
+            val dispatcher = checkNotNull(LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
             val currentSession = remember { FakeSessionObservation(testSessionObservation()).captureCurrentSession() }
             val density = androidx.compose.ui.platform.LocalDensity.current
             val large = scenario in listOf("long", "shelf-long") || scenario.endsWith("-large")
@@ -119,7 +124,10 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
                 LocalContext provides context.createConfigurationContext(configuration),
             ) {
             TVHeadendPlayerTheme {
-                Box(Modifier.fillMaxSize()) {
+                Box(Modifier.fillMaxSize().onPreviewKeyEvent { event ->
+                    // The player forwards remote Back to the Details page's activity BackHandler.
+                    infoOpen && backCycle.intercept(event, false, dispatcher::onBackPressed, {})
+                }) {
                     if (scenario.startsWith("field-")) Box(Modifier.fillMaxSize().background(Color.White))
                     else DebugVideoBackdrop(visible = true, modifier = Modifier.fillMaxSize())
                     if (dark) Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.8f)))
@@ -239,7 +247,7 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
                                 feedback = "Reached the available buffer limit".takeIf { scenario == "timeline-clamped" },
                                 feedbackIsError = false,
                             ),
-                            actions = PlayerChromeActions(active = true, paused = scenario.startsWith("paused") || scenario == "timeline-clamped", restoreFocus = "player-identity-card".takeIf { restoreInfo }),
+                            actions = PlayerChromeActions(active = true, paused = scenario.startsWith("paused") || scenario == "timeline-clamped", restoreFocus = "player-info".takeIf { restoreInfo }),
                             onStop = {},
                             onInteraction = {},
                             onOptions = {},
@@ -260,21 +268,20 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
         if (scenario.endsWith("-focused")) composeRule.onNodeWithTag("player-seekbar").requestFocus().assertIsFocused()
         if (scenario == "shelf-empty") composeRule.onNodeWithTag("player-shelf-close").assertIsFocused()
         if (scenario == "return-info") {
-            composeRule.onNodeWithTag("player-identity-card").requestFocus().performKeyInput { pressKey(Key.Enter) }
-            composeRule.onNodeWithTag("live-info-record").assertIsFocused()
-                .performKeyInput { pressKey(Key.DirectionUp) }
-            composeRule.onNodeWithTag("player-info-reading").assertIsFocused()
-            composeRule.onNodeWithTag("live-info-close").requestFocus().performKeyInput { pressKey(Key.Enter) }
-            composeRule.onNodeWithTag("player-identity-card").assertIsFocused()
+            composeRule.onNodeWithTag("player-info").requestFocus().performKeyInput { pressKey(Key.Enter) }
+            composeRule.onNodeWithTag("details-continue_watching").assertIsFocused()
+                .performKeyInput { pressKey(Key.Back) }
+            composeRule.onNodeWithTag("details-continue_watching").assertDoesNotExist()
+            composeRule.onNodeWithTag("player-info").assertIsFocused()
         }
         if (scenario == "info-long-end") {
-            composeRule.onNodeWithTag("live-info-record").assertIsFocused()
+            composeRule.onNodeWithTag("details-continue_watching").assertIsFocused()
                 .performKeyInput { pressKey(Key.DirectionUp) }
+            composeRule.onNodeWithTag("details-about-description").assertIsFocused()
+                .performKeyInput { pressKey(Key.Enter) }
             composeRule.onNodeWithTag("player-info-reading").assertIsFocused()
-            repeat(80) { composeRule.onRoot().performKeyInput { pressKey(Key.DirectionDown) } }
-            composeRule.onNodeWithTag("live-info-stream-signal").assertIsFocused()
-                .performKeyInput { pressKey(Key.DirectionUp) }
-            composeRule.onNodeWithTag("live-info-record").assertIsFocused()
+            composeRule.onRoot().performKeyInput { repeat(6) { pressKey(Key.DirectionDown) } }
+            composeRule.onNodeWithTag("player-info-reading").assertIsFocused()
         }
         if (scenario == "shelf-browse") {
             composeRule.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
@@ -303,8 +310,7 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
             // The info bar speaks for its title in one description.
             composeRule.onNodeWithTag("player-info-bar")
                 .assert(androidx.compose.ui.test.hasContentDescription("A journey through the Alps", substring = true))
-            composeRule.onNodeWithTag("player-identity-card").requestFocus()
-            composeRule.onNodeWithTag("player-identity-card").assertIsFocused()
+            composeRule.onNodeWithTag("player-info").requestFocus().assertIsFocused()
         }
         composeRule.mainClock.advanceTimeBy(if (scenario in listOf("timing-unavailable", "timeline-unavailable-large", "timeline-unavailable-focused")) 1_600L else 500L)
         composeRule.waitForIdle()

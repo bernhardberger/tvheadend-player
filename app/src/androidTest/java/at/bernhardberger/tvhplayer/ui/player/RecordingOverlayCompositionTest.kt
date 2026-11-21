@@ -6,8 +6,6 @@ import androidx.compose.ui.test.performKeyPress
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.semantics.SemanticsActions
 
 import android.content.res.Configuration
@@ -39,7 +37,9 @@ import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.unit.Density
 import androidx.media3.common.C
+import at.bernhardberger.tvhplayer.core.PlayerBackKeyCycle
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
+import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
 import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -59,16 +59,21 @@ class RecordingOverlayCompositionTest {
         var ancestorBacks = 0
         composeRule.setContent {
             val density = LocalDensity.current
+            val backCycle = remember { PlayerBackKeyCycle() }
             CompositionLocalProvider(LocalDensity provides Density(density.density, 1.5f)) {
                 TVHeadendPlayerTheme {
                     // RecordingPlayerScreen owns Back before its children. Exercise that ordering.
                     androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.fillMaxSize()
                         .onPreviewKeyEvent { event ->
-                            if (navigation.handle(event, markers.value) { seeks += it }) true
-                            else if (event.key == Key.Back) {
-                                if (event.type == androidx.compose.ui.input.key.KeyEventType.KeyDown) ancestorBacks++
-                                true
-                            } else false
+                            backCycle.intercept(
+                                event,
+                                holdAllowed = !navigation.open,
+                                onBack = { if (navigation.open) navigation.dismiss() else ancestorBacks++ },
+                                stopAndClose = { error("Back with markers open must not stop playback") },
+                                backOwner = if (navigation.open) {
+                                    Triple(navigation, navigation.ownerRevision, navigation.restoration)
+                                } else Unit,
+                            ) || navigation.handle(event, markers.value) { seeks += it }
                         }) {
                         RecordingChromeFixture(
                             positionMs = markerPosition.value,
@@ -117,11 +122,12 @@ class RecordingOverlayCompositionTest {
         composeRule.onNodeWithText("1:00").assertIsDisplayed()
         val selectedLabel = bounds("recording-marker-target")
         assertTrue(kotlin.math.abs(selectedLabel.center.x - ordinaryTrack.center.x) < 2f)
-        assertTrue(selectedLabel.bottom < ordinaryTrack.top)
         val previewFill = bounds("player-timeline-fill")
         assertTrue(kotlin.math.abs(previewFill.width - ordinaryTrack.width / 4f) < 2f)
         val indicator = bounds("recording-selected-marker")
         assertTrue(kotlin.math.abs(indicator.center.x - ordinaryTrack.center.x) < 2f)
+        // The pill sits directly above its tick without covering it.
+        assertTrue(indicator.top - selectedLabel.bottom in 0f..indicator.height)
         composeRule.onNodeWithTag("player-seekbar-thumb", useUnmergedTree = true).assertDoesNotExist()
         assertTrue(seeks.isEmpty())
         val markerActions = composeRule.onNodeWithTag("recording-marker-target")
@@ -140,17 +146,21 @@ class RecordingOverlayCompositionTest {
         dispatch(enter, android.view.KeyEvent.ACTION_UP)
         assertEquals(listOf(60_000L), seeks)
         assertEquals(0, toggles)
-        for (close in listOf(android.view.KeyEvent.KEYCODE_BACK, android.view.KeyEvent.KEYCODE_DPAD_DOWN,
+        val back = android.view.KeyEvent.KEYCODE_BACK
+        for (close in listOf(back, android.view.KeyEvent.KEYCODE_DPAD_DOWN,
             android.view.KeyEvent.KEYCODE_DPAD_UP)) {
             composeRule.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
             composeRule.onNodeWithTag("recording-marker-target").assertIsFocused()
             composeRule.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
             dispatch(close, android.view.KeyEvent.ACTION_DOWN)
-            composeRule.onNodeWithTag("player-seekbar").assertIsFocused()
+            val focusedBeforeRelease = if (close == back) "recording-marker-target" else "player-seekbar"
+            composeRule.onNodeWithTag(focusedBeforeRelease).assertIsFocused()
             dispatch(close, android.view.KeyEvent.ACTION_DOWN, 1)
+            composeRule.onNodeWithTag(focusedBeforeRelease).assertIsFocused()
             dispatch(close, android.view.KeyEvent.ACTION_UP)
             composeRule.onNodeWithTag("player-seekbar").assertIsFocused()
-            composeRule.onNodeWithTag("recording-marker-overlay").assertDoesNotExist()
+            composeRule.onNodeWithTag("recording-marker-target").assertDoesNotExist()
+            composeRule.onNodeWithTag("recording-marker-overlay", useUnmergedTree = true).assertDoesNotExist()
             composeRule.onNodeWithTag("recording-skip").assertDoesNotExist()
         }
         assertEquals(listOf(60_000L), seeks)
@@ -176,9 +186,11 @@ class RecordingOverlayCompositionTest {
         composeRule.onRoot().performKeyInput { pressKey(Key.DirectionLeft) }
         composeRule.onNodeWithTag("recording-marker-target").assertIsFocused()
             .assert(androidx.compose.ui.test.hasText("0:00"))
-        assertTrue(bounds("recording-marker-target").left >= ordinaryTrack.left)
+        val safeMargin = with(composeRule.density) { TvGridHorizontalMargin.toPx() }
+        val screenRight = composeRule.onRoot().fetchSemanticsNode().boundsInRoot.right
+        assertTrue(bounds("recording-marker-target").left >= minOf(safeMargin, ordinaryTrack.left) - 1f)
         composeRule.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
-        assertTrue(bounds("recording-marker-target").right <= ordinaryTrack.right)
+        assertTrue(bounds("recording-marker-target").right <= maxOf(screenRight - safeMargin, ordinaryTrack.right) + 1f)
         composeRule.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
         composeRule.onRoot().performKeyInput { pressKey(Key.DirectionUp); pressKey(Key.DirectionLeft); pressKey(Key.Enter) }
         assertEquals(listOf(60_000L, 0L), seeks)
@@ -237,7 +249,7 @@ class RecordingOverlayCompositionTest {
         }
         composeRule.onRoot().performKeyInput { pressKey(Key.DirectionUp); pressKey(Key.DirectionUp) }
         composeRule.onNodeWithTag("recording-marker-target").assertIsFocused()
-        composeRule.onNodeWithText("1:00").assertIsDisplayed()
+            .assert(androidx.compose.ui.test.hasTextExactly("1:00")).assertIsDisplayed()
         val overlay = bounds("recording-marker-target")
         val root = composeRule.onRoot().fetchSemanticsNode().boundsInRoot
         assertTrue(overlay.left >= root.left && overlay.right <= root.right && overlay.top >= root.top)
@@ -374,13 +386,14 @@ class RecordingOverlayCompositionTest {
 
         val pause = bounds("player-pause")
         val stop = bounds("player-stop")
+        val info = bounds("player-info")
         val settings = bounds("player-settings")
-        // Play/Pause and Stop stand together at the start, Settings alone at the end.
+        // Play/Pause and Stop stand at the start; Details and Settings stand at the end.
         assertTrue(pause.right < stop.left)
         assertTrue(stop.left - pause.right < pause.width)
-        assertTrue(settings.left - stop.right > stop.width)
+        assertTrue(info.left - stop.right > stop.width)
+        assertTrue(info.right < settings.left && settings.left - info.right < info.width)
         assertEquals(bounds("player-actions").right, settings.right, 1f)
-        composeRule.onNodeWithTag("player-info").assertDoesNotExist()
         assertTrue(bounds("recording-duration-status").bottom <= bounds("player-actions").top)
         composeRule.onNodeWithTag("player-channels-cue").assertDoesNotExist()
         composeRule.onNodeWithTag("player-record").assertDoesNotExist()
@@ -397,6 +410,8 @@ class RecordingOverlayCompositionTest {
         composeRule.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
         composeRule.onNodeWithTag("player-stop").assertIsFocused()
         composeRule.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
+        composeRule.onNodeWithTag("player-info").assertIsFocused().assertContentDescriptionEquals("Program details")
+        composeRule.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
         composeRule.onNodeWithTag("player-settings").assertIsFocused()
         composeRule.onNodeWithTag("player-action-context-label").assertDoesNotExist()
         composeRule.onNodeWithTag("player-settings").assertContentDescriptionEquals("Settings")
@@ -406,12 +421,12 @@ class RecordingOverlayCompositionTest {
         assertTrue(timeline.bottom <= actionsAfter.top)
 
         composeRule.onRoot().performKeyInput { pressKey(Key.DirectionLeft) }
+        composeRule.onNodeWithTag("player-info").assertIsFocused()
+        composeRule.onRoot().performKeyInput { pressKey(Key.DirectionLeft) }
         composeRule.onNodeWithTag("player-stop").assertIsFocused()
-        // Info stays reachable: the passive timeline takes no focus, so Up reaches the card.
+        // The passive timeline takes no focus.
         composeRule.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
-        composeRule.onNodeWithTag("player-identity-card").assertIsFocused().assertContentDescriptionEquals("Info")
-        composeRule.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
-        composeRule.onNodeWithTag("player-pause").assertIsFocused()
+        composeRule.onNodeWithTag("player-stop").assertIsFocused()
     }
 
     @Test
@@ -424,9 +439,9 @@ class RecordingOverlayCompositionTest {
         )
 
         composeRule.onNodeWithTag("player-stop").requestFocus()
-        composeRule.onRoot().performKeyInput {
-            pressKey(Key.DirectionRight)
-        }
+        composeRule.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
+        composeRule.onNodeWithTag("player-info").assertIsFocused()
+        composeRule.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
 
         val options = composeRule.onNodeWithTag("player-settings")
         val contextLabel = composeRule.onNodeWithTag("player-action-context-label")
@@ -439,7 +454,7 @@ class RecordingOverlayCompositionTest {
     }
 
     @Test
-    fun returningFromInfoRestoresTheCardWithoutBouncingBackToTimeline() {
+    fun returningFromInfoRestoresTheActionWithoutBouncingBackToTimeline() {
         var restoreInfo by mutableStateOf(false)
         setRecordingOverlay(
             title = "Recording",
@@ -450,9 +465,9 @@ class RecordingOverlayCompositionTest {
         composeRule.onNodeWithTag("player-pause").assertIsFocused()
         composeRule.onNodeWithTag("player-seekbar").requestFocus()
         composeRule.runOnIdle { restoreInfo = true }
-        composeRule.onNodeWithTag("player-identity-card").assertIsFocused()
+        composeRule.onNodeWithTag("player-info").assertIsFocused()
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag("player-identity-card").assertIsFocused()
+        composeRule.onNodeWithTag("player-info").assertIsFocused()
     }
 
     @Test
@@ -465,7 +480,7 @@ class RecordingOverlayCompositionTest {
 
     @Test
     fun longRecordingElapsedMatchesTotalPrecision() {
-        setRecordingOverlay("Recording", durationMs = 5_400_000L)
+        setRecordingOverlay("Recording", durationMs = 5_400_000L, growing = false)
         composeRule.onNodeWithText("0:00:30").assertIsDisplayed()
         composeRule.onNodeWithTag("player-end-clock", useUnmergedTree = true)
             .assert(androidx.compose.ui.test.hasTextExactly("1:30:00")).assertIsDisplayed()
@@ -481,6 +496,7 @@ class RecordingOverlayCompositionTest {
         fontScale: Float = 1f,
         durationMs: Long = C.TIME_UNSET,
         canSeek: Boolean = true,
+        growing: Boolean = true,
         restoreInfoFocus: () -> Boolean = { false },
         onInfoFocusRestored: () -> Unit = {},
     ) {
@@ -506,13 +522,13 @@ class RecordingOverlayCompositionTest {
                     RecordingChromeFixture(
                         positionMs = 30_000L,
                         durationMs = durationMs,
-                        growing = true,
+                        growing = growing,
                         canSeek = canSeek,
                         onTogglePause = {},
                         onSeek = {},
                         onOptions = {},
                         onInfo = {},
-                        restoreFocus = "player-identity-card".takeIf { restoreInfoFocus() },
+                        restoreFocus = "player-info".takeIf { restoreInfoFocus() },
                         onFocusRestored = onInfoFocusRestored,
                     )
                 }

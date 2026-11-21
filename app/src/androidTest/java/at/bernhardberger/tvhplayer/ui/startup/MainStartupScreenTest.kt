@@ -28,6 +28,7 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertTextEquals
@@ -42,6 +43,10 @@ import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
+import androidx.test.platform.app.InstrumentationRegistry
+import at.bernhardberger.tvheadend.sdk.core.Channel
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.AppErrorAction
 import at.bernhardberger.tvhplayer.core.AppErrorCondition
 import at.bernhardberger.tvhplayer.core.MainStartupMessageKind
@@ -90,10 +95,11 @@ class MainStartupScreenTest {
     }
 
     @Test
-    fun passiveStatusIsPoliteHeadingAndHasNoDialogFocusOrAction() {
+    fun passiveStatusIsPoliteAndHasNoDialogFocusOrAction() {
         setStartupContent(MainStartupPresentation.Passive(MainStartupMessageKind.CONNECTING))
 
         composeRule.onNodeWithTag(ROOT_TAG)
+            .assertContentDescriptionEquals("Tvheadend Player")
             .assertHasNoClickAction()
             .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.LiveRegion))
             .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.IsDialog))
@@ -106,7 +112,7 @@ class MainStartupScreenTest {
                 ),
             )
         composeRule.onNodeWithText("Tvheadend Player")
-            .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading))
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Heading))
         composeRule.onNodeWithText("Connecting").assertIsDisplayed()
         composeRule.onNodeWithTag(PRIMARY_TAG).assertDoesNotExist()
         composeRule.onNodeWithTag(SECONDARY_TAG).assertDoesNotExist()
@@ -154,18 +160,21 @@ class MainStartupScreenTest {
             }
         }
         val mark = composeRule.onNodeWithTag(MARK_TAG).fetchSemanticsNode().boundsInRoot
-        assertEquals(156f, mark.top, 1f)
-        assertEquals(80f, mark.width, 1f)
-        assertEquals(80f, mark.height, 1f)
+        assertEquals(480f, mark.center.x, 1f)
+        assertEquals(172f, mark.center.y, 1f)
         composeRule.onNodeWithTag(STATUS_TAG).assertDoesNotExist()
-        composeRule.onNodeWithTag(LOADER_TAG).assertDoesNotExist()
+        val hidden = composeRule.onNodeWithTag(ROOT_TAG).captureToImage().toPixelMap()
+        assertTrue("The loading indicator must not paint during grace",
+            (306 until 350).all { y ->
+                (458 until 502).all { x -> hidden[x, y] == Color(0xFF0F1014) }
+            })
 
         composeRule.runOnIdle { feedback = MainStartupLoadingFeedback.WAITING }
         val loader = composeRule.onNodeWithTag(LOADER_TAG).assertIsDisplayed().fetchSemanticsNode()
         assertEquals(44, loader.layoutInfo.width)
         assertEquals(44, loader.layoutInfo.height)
         assertEquals(480f, loader.boundsInRoot.center.x, 1f)
-        assertEquals(340f, loader.boundsInRoot.center.y, 1f)
+        assertEquals(328f, loader.boundsInRoot.center.y, 1f)
         assertEquals(ProgressBarRangeInfo.Indeterminate, loader.config[SemanticsProperties.ProgressBarRangeInfo])
         composeRule.onNodeWithTag(STATUS_TAG).assertTextEquals("Syncing channels and guide")
         assertEquals(mark, composeRule.onNodeWithTag(MARK_TAG).fetchSemanticsNode().boundsInRoot)
@@ -173,18 +182,17 @@ class MainStartupScreenTest {
     }
 
     @Test
-    fun brandedStartupKeepsItsCompositionAndBrandFreeReturnKeepsThePlayerAnchor() {
-        var player by mutableStateOf(false)
+    fun brandedAndKnownChannelStartupShareFixedStatusAndIndicatorSlots() {
         var brandingVisible by mutableStateOf(true)
+        val channel = Channel.create(ChannelId(1), name = "Little Orbit")
         composeRule.setContent {
             CompositionLocalProvider(LocalDensity provides Density(1f, 1.3f)) {
                 TVHeadendPlayerTheme {
                     Box(Modifier.size(960.dp, 540.dp), contentAlignment = androidx.compose.ui.Alignment.Center) {
-                        if (player) at.bernhardberger.tvhplayer.ui.player.PlayerBusyIndicator(
-                            at.bernhardberger.tvhplayer.ui.player.PlayerBusyStatus.TUNING,
-                        ) else MainStartupScreen(
+                        MainStartupScreen(
                             MainStartupPresentation.Passive(MainStartupMessageKind.CONNECTING),
                             TvFullScreenPadding, motionEnabled = true, brandingVisible = brandingVisible,
+                            channel = channel,
                         )
                     }
                 }
@@ -192,15 +200,14 @@ class MainStartupScreenTest {
         }
         val startupRing = composeRule.onNodeWithTag(LOADER_TAG).fetchSemanticsNode().boundsInRoot
         val status = composeRule.onNodeWithTag(STATUS_TAG).fetchSemanticsNode().boundsInRoot
-        assertEquals(156f, composeRule.onNodeWithTag(MARK_TAG).fetchSemanticsNode().boundsInRoot.top, 1f)
-        assertEquals(340f, startupRing.center.y, 1f)
-        assertEquals(16f, status.top - startupRing.bottom, 1f)
+        assertEquals(172f, composeRule.onNodeWithTag(MARK_TAG).fetchSemanticsNode().boundsInRoot.center.y, 1f)
+        assertEquals(328f, startupRing.center.y, 1f)
+        assertTrue(status.top > startupRing.bottom)
         composeRule.runOnIdle { brandingVisible = false }
         composeRule.onNodeWithTag(MARK_TAG).assertDoesNotExist()
-        val returnRing = composeRule.onNodeWithTag(LOADER_TAG).fetchSemanticsNode().boundsInRoot
-        assertEquals(270f, returnRing.center.y, 1f)
-        composeRule.runOnIdle { player = true }
-        assertEquals(returnRing, composeRule.onNodeWithTag("player-busy-indicator").fetchSemanticsNode().boundsInRoot)
+        composeRule.onNodeWithTag("main-startup-title").assertTextEquals("Little Orbit")
+        assertEquals(startupRing, composeRule.onNodeWithTag(LOADER_TAG).fetchSemanticsNode().boundsInRoot)
+        assertEquals(status.top, composeRule.onNodeWithTag(STATUS_TAG).fetchSemanticsNode().boundsInRoot.top, 1f)
     }
 
     @Test
@@ -254,8 +261,9 @@ class MainStartupScreenTest {
             }
             return matches
         }
-        assertTrue("Full cyan ring", count(mark, Color(0xFF00BCFA)) > mark.width * mark.height / 10)
-        assertTrue("Full orange play", count(mark, Color(0xFFFA7F00)) > mark.width * mark.height / 40)
+        val symbolArea = minOf(mark.width, mark.height).let { it * it }
+        assertTrue("Opaque cyan diamond", count(mark, Color(0xFF00BCFA)) > symbolArea / 20)
+        assertTrue("Opaque orange play", count(mark, Color(0xFFFA7F00)) > symbolArea / 40)
         assertTrue("Opaque wordmark", count(wordmark, Color(0xFFE3E3E8)) > 0)
         assertTrue("Opaque wordmark accent", count(wordmark, Color(0xFFFA7F00)) > 0)
     }
@@ -310,7 +318,8 @@ class MainStartupScreenTest {
         composeRule.onNodeWithTag(MARK_TAG).assertDoesNotExist()
         composeRule.onNodeWithText("Can’t reach the server").assertIsDisplayed()
             .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading))
-        composeRule.onNodeWithText("It didn’t respond to the connection.", substring = true).assertIsDisplayed()
+        val reason = InstrumentationRegistry.getInstrumentation().targetContext.getString(R.string.error_101_reason)
+        composeRule.onNodeWithText(reason, substring = true).assertIsDisplayed()
         composeRule.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.ProgressBarRangeInfo)).assertCountEquals(0)
         composeRule.onNodeWithTag(PRIMARY_TAG).assertIsFocused().assertTextEquals("Retry")
         composeRule.onNodeWithTag(SECONDARY_TAG).assertIsDisplayed().assertTextEquals("Connection settings")

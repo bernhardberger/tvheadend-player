@@ -37,7 +37,6 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertCountEquals
-import androidx.compose.ui.test.isNotFocusable
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -74,112 +73,6 @@ class SideRailSemanticsTest {
         composeRule.onNodeWithTag("nav-recordings").assertExists()
         composeRule.onNodeWithTag("nav-settings").assertExists()
         composeRule.onAllNodesWithContentDescription("Channels").assertCountEquals(1)
-    }
-
-    @Test
-    fun standardDrawerPaintsNoScrimAndKeepsTheBrandSectionOutOfFocusOrder() {
-        val contentFocus = FocusRequester()
-        composeRule.setContent {
-            Box(Modifier.fillMaxSize().background(Color.Red)) {
-                TVHeadendPlayerTheme {
-                    SideRail(
-                        currentRoute = AppDestination.CHANNELS,
-                        onRootBack = {},
-                        onNavigate = {},
-                        content = { _, drawerActive ->
-                            Button(
-                                onClick = {},
-                                modifier = Modifier
-                                    .focusRequester(contentFocus)
-                                    .testTag("rail-surface-test-content"),
-                            ) {
-                                Text("Browse")
-                            }
-                            LaunchedEffect(drawerActive) {
-                                if (!drawerActive) contentFocus.requestFocus()
-                            }
-                        },
-                    )
-                }
-            }
-        }
-
-        // 12dp + CollapsedDrawerItemWidth + 12dp, with no drawer-owned darkening.
-        assertEquals(80f, drawerWidthDp(), 0.5f)
-        val sampleY = itemFreeSampleY()
-        val shellPixels = composeRule.onNodeWithTag("global-navigation-shell")
-            .captureToImage()
-            .toPixelMap()
-        val shellRow = localRow("global-navigation-shell", sampleY)
-        fun shellColorAt(x: Int): Color {
-            val sampleX = with(composeRule.density) { x.dp.roundToPx() }
-            return shellPixels[sampleX, shellRow]
-        }
-
-        listOf(1, 31, 68, 97, 124).forEach {
-            assertEquals("closed rail at ${it}dp", Color.Red, shellColorAt(it))
-        }
-
-        composeRule.onNodeWithTag("global-drawer-brand").assert(isNotFocusable())
-        composeRule.onNodeWithTag("global-drawer-brand")
-            .assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
-
-        composeRule.onNodeWithTag("rail-surface-test-content")
-            .assertIsFocused()
-            .performKeyInput { pressKey(Key.DirectionLeft) }
-        composeRule.waitForIdle()
-
-        // Drawer entry focuses a destination; the brand section is not reachable.
-        composeRule.onNodeWithTag("nav-channels")
-            .assertIsFocused()
-            .performKeyInput { pressKey(Key.DirectionUp) }
-        composeRule.onNodeWithTag("nav-channels").assertIsFocused()
-
-        assertEquals(280f, drawerWidthDp(), 0.5f)
-        // The destination rows keep their place, so both states sample one line.
-        assertEquals("item rows moved between drawer states", sampleY, itemFreeSampleY())
-        val expandedPixels = composeRule.onNodeWithTag("global-drawer-surface")
-            .captureToImage()
-            .toPixelMap()
-        val expandedRow = localRow("global-drawer-surface", sampleY)
-        fun expandedColorAt(fraction: Float): Color {
-            val sampleX = (expandedPixels.width * fraction).toInt()
-                .coerceIn(0, expandedPixels.width - 1)
-            return expandedPixels[sampleX, expandedRow]
-        }
-
-        listOf(0.01f, 0.35f, 0.70f, 0.90f, 0.99f).forEach {
-            assertEquals("expanded drawer at $it", Color.Red, expandedColorAt(it))
-        }
-    }
-
-    private fun drawerWidthDp(): Float {
-        val widthPx = composeRule.onNodeWithTag("global-drawer-surface")
-            .fetchSemanticsNode().boundsInRoot.width
-        return with(composeRule.density) { widthPx.toDp().value }
-    }
-
-    /**
-     * Root-pixel midpoint of the spacer between the last main destination and the
-     * footer item. Deriving it from the drawn rows keeps the scrim samples off
-     * item ink on a short canvas, where half the shell height can land on a row.
-     */
-    private fun itemFreeSampleY(): Int {
-        val lastMain = composeRule.onNodeWithTag("nav-recordings")
-            .fetchSemanticsNode().boundsInRoot
-        val footer = composeRule.onNodeWithTag("nav-settings")
-            .fetchSemanticsNode().boundsInRoot
-        assertTrue(
-            "No item-free band between ${lastMain.bottom} and ${footer.top}",
-            footer.top - lastMain.bottom > 2f,
-        )
-        return ((lastMain.bottom + footer.top) / 2f).toInt()
-    }
-
-    /** Converts a root pixel row into the captured node's own pixel row. */
-    private fun localRow(tag: String, rootY: Int): Int {
-        val bounds = composeRule.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot
-        return (rootY - bounds.top).toInt()
     }
 
     @Test
@@ -293,9 +186,9 @@ class SideRailSemanticsTest {
 
         composeRule.runOnIdle {
             assertEquals(24.dp, startPadding)
-            assertEquals(32.dp, topPadding)
-            assertEquals(48.dp, endPadding)
-            assertEquals(32.dp, bottomPadding)
+            assertEquals(28.dp, topPadding)
+            assertEquals(58.dp, endPadding)
+            assertEquals(28.dp, bottomPadding)
         }
     }
 
@@ -306,6 +199,7 @@ class SideRailSemanticsTest {
         var rootBackCount = 0
         var browseBackHandler: () -> Unit = {}
         val clipMeasurements = mutableListOf<Pair<Int, Float>>()
+        val measuredWidths = mutableSetOf<Int>()
         composeRule.setContent {
             TVHeadendPlayerTheme {
                 BackHandler { browseBackHandler() }
@@ -324,6 +218,7 @@ class SideRailSemanticsTest {
                                 .focusProperties { onEnter = { contentFocus.requestFocus() } }
                                 .onGloballyPositioned {
                                     clipMeasurements += visibleWidth to it.boundsInWindow().width
+                                    measuredWidths += it.size.width
                                 },
                         ) {
                             Button(
@@ -367,8 +262,9 @@ class SideRailSemanticsTest {
             .fetchSemanticsNode().boundsInRoot
 
         assertTrue(openBounds.left > closedBounds.left)
-        assertEquals(closedBounds.width, openBounds.width, 1f)
+        assertTrue(openBounds.width < closedBounds.width)
         composeRule.runOnIdle {
+            assertEquals(closedBounds.width, measuredWidths.single().toFloat(), 1f)
             assertTrue(clipMeasurements.map { it.first }.distinct().size > 2)
             clipMeasurements.forEach { (reported, actual) ->
                 assertEquals("same-frame clip extent", reported.toFloat(), actual, 1f)

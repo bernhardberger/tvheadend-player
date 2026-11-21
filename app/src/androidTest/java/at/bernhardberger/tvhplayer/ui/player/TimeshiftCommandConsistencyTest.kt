@@ -250,6 +250,9 @@ class TimeshiftCommandConsistencyTest {
                         })
                     }
                     scope.runCurrent()
+                    // Correlated playback alone does not cut off the settled accessibility readout.
+                    assertEquals(result.seek, owner.preview?.acceptedSeek)
+                    owner.stepAnnounced(requireNotNull(owner.preview).id)
                     org.junit.Assert.assertNull(owner.preview)
                     assertEquals(paused, sample.value.paused)
                 }
@@ -354,6 +357,8 @@ class TimeshiftCommandConsistencyTest {
                         })
                     }
                     scope.runCurrent()
+                    assertEquals(acceptedSeek, owner.preview?.acceptedSeek)
+                    owner.stepAnnounced(requireNotNull(owner.preview).id)
                     org.junit.Assert.assertNull(owner.preview)
                 }
                 rule.onNodeWithTag("player-seekbar").assertIsFocused()

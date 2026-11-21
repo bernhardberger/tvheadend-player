@@ -614,7 +614,7 @@ class MainStartupCompositionTest {
         }
         composeRule.mainClock.advanceTimeByFrame()
         composeRule.mainClock.advanceTimeByFrame()
-        composeRule.mainClock.advanceTimeBy(80L, ignoreFrameDuration = true)
+        composeRule.mainClock.advanceTimeBy(200L)
         val mid = composeRule.onRoot().captureToImage().toPixelMap()[8, 8]
         assertTrue("video exists below a partially faded cover", mid.blue > 20f / 255f && mid.blue < 109f / 255f)
         composeRule.runOnIdle {
@@ -623,7 +623,7 @@ class MainStartupCompositionTest {
             assertTrue(dispatchMainStartupKeyEvent(keyOwner, requireNotNull(contract),
                 KeyEvent(0L, 0L, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_CENTER, 1)))
         }
-        composeRule.mainClock.advanceTimeBy(240L)
+        composeRule.mainClock.advanceTimeBy(400L)
         composeRule.mainClock.advanceTimeByFrame()
         composeRule.onNodeWithTag("main-startup-root").assertDoesNotExist()
         composeRule.runOnIdle {
@@ -764,6 +764,7 @@ class MainStartupCompositionTest {
                         revealed++
                         state = state.copy(revealRequestId = null, contentAllowed = true)
                     },
+                    persistentSurface = { Box(Modifier.fillMaxSize().background(Color.Magenta)) },
                 )
             }
         }
@@ -772,9 +773,16 @@ class MainStartupCompositionTest {
         composeRule.runOnIdle {
             assertEquals(1, revealed)
             motion = true
-            state = state.copy(revealRequestId = 2L, contentAllowed = false)
+            state = state.copy(
+                presentation = MainStartupPresentation.Passive(MainStartupMessageKind.STARTING_TELEVISION),
+                contentAllowed = false,
+            )
         }
         composeRule.mainClock.advanceTimeByFrame()
+        composeRule.runOnIdle {
+            state = state.copy(presentation = MainStartupPresentation.Inactive, revealRequestId = 2L)
+        }
+        composeRule.mainClock.advanceTimeBy(200L)
         composeRule.runOnIdle {
             state = state.copy(revealRequestId = null, presentation = MainStartupPresentation.Actionable(
                 AppErrorCondition.UNREACHABLE.toAppError(),
@@ -782,11 +790,11 @@ class MainStartupCompositionTest {
         }
         composeRule.mainClock.advanceTimeByFrame()
         // The startup backdrop is opaque at once; the alert then fades in over it.
-        val recovery = composeRule.onRoot().captureToImage().toPixelMap()[8, 8]
-        assertEquals(Color(0xFF0F1014), recovery)
+        val recovery = composeRule.onNodeWithTag("main-startup-root").captureToImage().toPixelMap()[8, 8]
+        assertEquals(TvDarkColors.background, recovery)
         repeat(3) { composeRule.mainClock.advanceTimeByFrame() }
         composeRule.onNodeWithTag("tv-recovery-primary").assertIsFocused()
-        composeRule.mainClock.advanceTimeBy(400L)
+        composeRule.mainClock.advanceTimeBy(600L)
         composeRule.runOnIdle { assertEquals(1, revealed) }
     }
 
@@ -830,7 +838,7 @@ class MainStartupCompositionTest {
         composeRule.runOnIdle {
             state = state.copy(presentation = MainStartupPresentation.Passive(MainStartupMessageKind.STARTING_TELEVISION))
         }
-        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.mainClock.advanceTimeBy(180L)
         composeRule.onNodeWithTag("main-startup-status").assertTextEquals("Starting playback")
         composeRule.runOnIdle { state = state.copy(presentation = MainStartupPresentation.Inactive, revealRequestId = 1L) }
         composeRule.mainClock.advanceTimeByFrame()
@@ -863,29 +871,33 @@ class MainStartupCompositionTest {
     }
 
     @Test
-    fun existingPlaybackWaitHasNoBrandReplayAndFreshTuneIsNotResume() {
+    fun knownChannelWaitUsesChannelIdentityAndConnectionStageInsteadOfBrand() {
         var state by mutableStateOf(MainStartupCompositionState(
             MainStartupPresentation.Passive(MainStartupMessageKind.CONNECTING), null, false,
             hideBranding = true,
         ))
+        val channel = Channel.create(ChannelId(1), name = "Little Orbit")
+        var connected by mutableStateOf(false)
         val timing = MainStartupLoadingTiming().apply { observe(true, null, SystemClock.uptimeMillis() - 500L) }
         composeRule.setContent { TVHeadendPlayerTheme {
-            MainStartupComposition(state, {}, {}, { {} }, loadingTiming = timing, motionEnabled = true)
+            MainStartupComposition(
+                state, {}, {}, { {} }, loadingTiming = timing, motionEnabled = true,
+                startupChannel = channel, startupConnected = connected,
+            )
         } }
         composeRule.onNodeWithTag("main-startup-mark").assertDoesNotExist()
+        composeRule.onNodeWithTag("main-startup-title").assertTextEquals("Little Orbit")
         composeRule.onNodeWithTag("main-startup-status").assertTextEquals("Connecting")
-        composeRule.runOnIdle { state = state.copy(
-            presentation = MainStartupPresentation.Passive(MainStartupMessageKind.STARTING_TELEVISION),
-            returningToPlayback = true,
-        ) }
+        composeRule.runOnIdle {
+            connected = true
+            state = state.copy(
+                presentation = MainStartupPresentation.Passive(MainStartupMessageKind.STARTING_TELEVISION),
+                returningToPlayback = true,
+            )
+        }
         composeRule.onNodeWithTag("main-startup-mark").assertDoesNotExist()
-        composeRule.onNodeWithTag("main-startup-status").assertTextEquals("Resuming playback")
-        composeRule.runOnIdle { state = state.copy(returningToPlayback = false) }
-        composeRule.onNodeWithTag("main-startup-mark").assertDoesNotExist()
-        composeRule.onNodeWithTag("main-startup-status").assertTextEquals("Starting playback")
-        composeRule.runOnIdle { state = state.copy(hideBranding = false) }
-        composeRule.onNodeWithTag("main-startup-mark").assertExists()
-        composeRule.onNodeWithTag("main-startup-status").assertTextEquals("Starting playback")
+        composeRule.onNodeWithTag("main-startup-title").assertTextEquals("Little Orbit")
+        composeRule.onNodeWithTag("main-startup-status").assertTextEquals("Starting")
     }
 
     @Test

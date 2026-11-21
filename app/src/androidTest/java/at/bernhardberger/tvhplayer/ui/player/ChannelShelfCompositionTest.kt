@@ -25,11 +25,14 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import androidx.test.platform.app.InstrumentationRegistry
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.EventId
+import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
+import at.bernhardberger.tvhplayer.ui.components.channelTitleText
 import kotlin.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -136,14 +139,13 @@ class ChannelShelfCompositionTest {
             }
             rule.onRoot().performKeyInput { keyDown(closeKey) }
             if (rapid) rule.mainClock.advanceTimeBy(48)
-            val restored = if (invoker == "player-stop") "player-pause" else invoker
-            rule.onNodeWithTag(restored).assertIsFocused()
+            rule.onNodeWithTag(invoker).assertIsFocused()
             val keyCode = if (closeKey == Key.Back) android.view.KeyEvent.KEYCODE_BACK else android.view.KeyEvent.KEYCODE_DPAD_UP
             rule.onRoot().performKeyPress(androidx.compose.ui.input.key.KeyEvent(android.view.KeyEvent(
                 0, 0, android.view.KeyEvent.ACTION_DOWN, keyCode, 2,
             )))
             rule.onRoot().performKeyInput { keyUp(closeKey) }
-            rule.onNodeWithTag(restored).assertIsFocused()
+            rule.onNodeWithTag(invoker).assertIsFocused()
             assertTrue(layers.core.chrome.controlsVisible)
             if (pausedGuard) {
                 val trackAfter = rule.onNodeWithTag("player-timeline-track", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
@@ -162,7 +164,9 @@ class ChannelShelfCompositionTest {
     }
 
     @Test
-    fun largeTextShelfKeepsChannelIdentityPrimaryAndMissingCardsEqualWithRemoteFocus() {
+    fun largeTextShelfPrioritizesProgrammeWhenAvailableAndKeepsCardsEqualWithRemoteFocus() {
+        val channelName = "Dokumentation und Zeitgeschichte"
+        val programmeTitle = "A long programme about mountains and wildlife"
         var picks = 0
         var closes = 0
         rule.setContent {
@@ -170,11 +174,11 @@ class ChannelShelfCompositionTest {
             CompositionLocalProvider(LocalDensity provides Density(density.density, 1.5f)) {
                 TVHeadendPlayerTheme {
                     ChannelDrawer(
-                        channels = listOf(Channel.create(id = ChannelId(1), name = "Dokumentation und Zeitgeschichte"),
+                        channels = listOf(Channel.create(id = ChannelId(1), name = channelName),
                             Channel.create(id = ChannelId(2), name = "Culture")),
                         selectedId = ChannelId(2), playingChannelId = ChannelId(1),
                         recordingChannelIds = emptySet(),
-                        nowEvent = { if (it == ChannelId(1)) event("A long programme about mountains and wildlife") else null },
+                        nowEvent = { if (it == ChannelId(1)) event(programmeTitle) else null },
                         nowSec = 900,
                         onFocusChannel = {}, onPickChannel = { picks++ }, onCloseDrawer = { closes++ },
                     )
@@ -182,30 +186,31 @@ class ChannelShelfCompositionTest {
             }
         }
         val first = rule.onNodeWithTag("player-channel-card-1").assertIsFocused()
-        val now = rule.onNodeWithTag("player-channel-1-now", useUnmergedTree = true)
+        val now = rule.onNodeWithTag("player-channel-1-now", useUnmergedTree = true).assertTextEquals(programmeTitle)
+        val identity = rule.onNodeWithTag("player-channel-1-identity", useUnmergedTree = true)
+            .assertTextEquals(channelTitleText(1L, channelName))
         val firstBounds = first.fetchSemanticsNode().boundsInRoot
         val unfocusedBounds = rule.onNodeWithTag("player-channel-card-2").fetchSemanticsNode().boundsInRoot
         assertEquals(with(rule.density) { 196.dp.toPx() }, unfocusedBounds.width, 1f)
         assertTrue(firstBounds.height <= with(rule.density) { 140.dp.toPx() })
         val picon = rule.onNodeWithTag("player-channel-1-picon", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         val progress = rule.onNodeWithTag("player-channel-1-progress", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        // The card node reports layout bounds; its full-width strip includes the shared card focus scale.
-        val focusScale = progress.width / firstBounds.width
-        assertEquals(1.05f, focusScale, .01f)
+        // The strip spans the card; semantics bounds are not a measurement of the focus animation.
+        assertEquals(firstBounds.width, progress.width, 1f)
         // The logo fills the room above the text: at least as large as the rail's former 100x45.
-        assertTrue(picon.width >= with(rule.density) { 100.dp.toPx() } * focusScale - 1f)
-        assertTrue(picon.height >= with(rule.density) { 45.dp.toPx() } * focusScale - 1f)
+        assertTrue(picon.width >= with(rule.density) { 100.dp.toPx() } - 1f)
+        assertTrue(picon.height >= with(rule.density) { 45.dp.toPx() } - 1f)
         val identityLayouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
-        rule.onNodeWithTag("player-channel-1-identity", useUnmergedTree = true)
-            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(identityLayouts) }
+        identity.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(identityLayouts) }
         val nowLayouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
         now.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(nowLayouts) }
-        assertTrue(identityLayouts.single().layoutInput.style.fontSize > nowLayouts.single().layoutInput.style.fontSize)
-        val identityLayout = identityLayouts.single()
-        assertEquals(1, identityLayout.lineCount)
-        assertEquals(1, nowLayouts.single().lineCount)
-        assertTrue(identityLayout.getLineBottom(0) <= identityLayout.size.height)
-        assertTrue(now.fetchSemanticsNode().boundsInRoot.bottom <= firstBounds.bottom)
+        for (layout in listOf(identityLayouts.single(), nowLayouts.single())) {
+            assertEquals(1, layout.lineCount)
+            assertTrue(layout.getLineBottom(0) <= layout.size.height + 1f)
+        }
+        val identityBounds = identity.fetchSemanticsNode().boundsInRoot
+        assertTrue(now.fetchSemanticsNode().boundsInRoot.top < identityBounds.top)
+        assertTrue(identityBounds.bottom <= firstBounds.bottom)
         val shelf = rule.onNodeWithTag("player-channel-shelf").fetchSemanticsNode().boundsInRoot
         assertTrue(shelf.height - firstBounds.height <= with(rule.density) { 56.dp.toPx() } + 1f)
         first.performKeyInput { pressKey(Key.DirectionRight) }
@@ -213,7 +218,12 @@ class ChannelShelfCompositionTest {
         val secondBounds = second.fetchSemanticsNode().boundsInRoot
         assertEquals(firstBounds.height, secondBounds.height, 1f)
         assertEquals(firstBounds.width, secondBounds.width, 1f)
-        rule.onNodeWithTag("player-channel-2-now", useUnmergedTree = true).assertTextEquals("No program information")
+        val fallbackIdentity = rule.onNodeWithTag("player-channel-2-identity", useUnmergedTree = true)
+            .assertTextEquals(channelTitleText(2L, "Culture"))
+        val fallback = rule.onNodeWithTag("player-channel-2-now", useUnmergedTree = true).assertTextEquals(
+            InstrumentationRegistry.getInstrumentation().targetContext.getString(R.string.no_epg),
+        )
+        assertTrue(fallbackIdentity.fetchSemanticsNode().boundsInRoot.top < fallback.fetchSemanticsNode().boundsInRoot.top)
         assertEquals(0, picks)
         second.performKeyInput { pressKey(Key.DirectionLeft) }
         first.assertIsFocused().performKeyInput { pressKey(Key.Enter) }

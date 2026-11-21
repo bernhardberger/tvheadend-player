@@ -13,10 +13,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.asAndroidBitmap
-import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -35,6 +35,8 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
 import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvheadend.sdk.core.Channel
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.core.AppErrorCondition
 import at.bernhardberger.tvhplayer.core.MainStartupLoadingTiming
 import at.bernhardberger.tvhplayer.core.MainStartupMessageKind
@@ -45,6 +47,7 @@ import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.MainStartupComposition
 import at.bernhardberger.tvhplayer.ui.MainStartupCompositionState
 import at.bernhardberger.tvhplayer.ui.TvFullScreenPadding
+import at.bernhardberger.tvhplayer.ui.TvDarkColors
 import java.io.File
 import java.util.Locale
 import org.junit.Assert.assertTrue
@@ -62,6 +65,7 @@ class StartupBrandCaptureTest {
         val elapsedMillis = mutableLongStateOf(2_000L)
         val motionEnabled = mutableStateOf(true)
         val brandingVisible = mutableStateOf(true)
+        val returnChannel = Channel.create(ChannelId(1), name = "Little Orbit")
         val captureReveal = mutableStateOf(false)
         val revealRequestId = mutableStateOf<Long?>(null)
         val presentation = mutableStateOf<MainStartupPresentation>(
@@ -113,6 +117,8 @@ class StartupBrandCaptureTest {
                                 loadingFeedback = mainStartupLoadingFeedback(presentation.value, elapsedMillis.longValue),
                                 motionEnabled = motionEnabled.value,
                                 brandingVisible = brandingVisible.value,
+                                channel = returnChannel.takeUnless { brandingVisible.value },
+                                connected = !brandingVisible.value,
                             )
                         }
                     }
@@ -169,10 +175,11 @@ class StartupBrandCaptureTest {
             rule.mainClock.advanceTimeBy(512)
             val returnRing = rule.onNodeWithTag("main-startup-loader").fetchSemanticsNode().boundsInRoot
             assertEquals(480f, returnRing.center.x, 1f)
-            assertEquals(270f, returnRing.center.y, 1f)
+            assertEquals(328f, returnRing.center.y, 1f)
             assertEquals(44f, returnRing.width, 1f)
             rule.onNodeWithTag("main-startup-mark").assertDoesNotExist()
-            assertBackground()
+            rule.onNodeWithTag("main-startup-title").assertIsDisplayed()
+            assertBackground(enabled = false)
             capture("${language.language}-return")
             rule.runOnUiThread {
                 brandingVisible.value = true
@@ -196,7 +203,7 @@ class StartupBrandCaptureTest {
             rule.runOnUiThread { revealRequestId.value = 1L }
             rule.mainClock.advanceTimeByFrame()
             rule.mainClock.advanceTimeByFrame()
-            rule.mainClock.advanceTimeBy(100L, ignoreFrameDuration = true)
+            rule.mainClock.advanceTimeBy(200L)
             capture("${language.language}-reveal-midfade")
             rule.runOnUiThread {
                 captureReveal.value = false
@@ -207,8 +214,8 @@ class StartupBrandCaptureTest {
             }
             rule.mainClock.advanceTimeByFrame()
             capture("${language.language}-cold-pending399")
-            // The logo is already settled on the first frame, before any status text.
-            assertSettledMark()
+            // The layout is present but its feedback stays transparent through grace.
+            assertBackground(enabled = false)
             rule.onNodeWithTag("main-startup-status").assertDoesNotExist()
             rule.runOnUiThread {
                 elapsedMillis.longValue = 0L
@@ -216,11 +223,11 @@ class StartupBrandCaptureTest {
             }
             rule.mainClock.advanceTimeByFrame()
             rule.onNodeWithTag("main-startup-status").assertDoesNotExist()
-            assertSettledMark()
+            assertBackground(enabled = false)
             rule.runOnUiThread { revealRequestId.value = 2L }
             rule.mainClock.advanceTimeByFrame()
             rule.mainClock.advanceTimeByFrame()
-            rule.mainClock.advanceTimeBy(100L, ignoreFrameDuration = true)
+            rule.mainClock.advanceTimeBy(200L)
             capture("${language.language}-reveal-hidden-midfade")
             rule.onNodeWithTag("main-startup-status").assertDoesNotExist()
             rule.onNodeWithTag("main-startup-mark").assertExists()
@@ -242,7 +249,7 @@ class StartupBrandCaptureTest {
             rule.onNodeWithText("Action needed").assertDoesNotExist()
             rule.onNodeWithText("Aktion erforderlich").assertDoesNotExist()
             capture("${language.language}-recovery")
-            assertBackground(enabled = false)
+            assertBackground(enabled = false, flatColor = TvDarkColors.background.toArgb())
             rule.runOnUiThread {
                 presentation.value = MainStartupPresentation.Actionable(
                     AppErrorCondition.AUTHENTICATION_REJECTED.toAppError(),
@@ -278,12 +285,12 @@ class StartupBrandCaptureTest {
         }
     }
 
-    private fun assertBackground(enabled: Boolean = true) {
+    private fun assertBackground(enabled: Boolean = true, flatColor: Int = 0xFF0F1014.toInt()) {
         val captured = rule.onNodeWithTag("startup-capture-viewport").captureToImage().asAndroidBitmap()
         // Sample the original cyan sweep, clear of the centered logo and all status content.
         val actual = captured.getPixel(200, 100)
         if (!enabled) {
-            assertEquals(0xFF0F1014.toInt(), actual)
+            assertEquals(flatColor, actual)
         } else {
             val resources = InstrumentationRegistry.getInstrumentation().targetContext.resources
             val plateImage = BitmapFactory.decodeResource(resources, R.drawable.startup_background_plate,
@@ -307,18 +314,4 @@ class StartupBrandCaptureTest {
         }
     }
 
-    private fun assertSettledMark() {
-        val mark = rule.onNodeWithTag("main-startup-mark").captureToImage().toPixelMap()
-        listOf(Color(0xFF00BCFA), Color(0xFFFA7F00)).forEach { color ->
-            var matches = 0
-            for (y in 0 until mark.height) for (x in 0 until mark.width) {
-                val pixel = mark[x, y]
-                if (kotlin.math.abs(pixel.red - color.red) <= 2f / 255f &&
-                    kotlin.math.abs(pixel.green - color.green) <= 2f / 255f &&
-                    kotlin.math.abs(pixel.blue - color.blue) <= 2f / 255f
-                ) matches++
-            }
-            assertTrue("The settled logo is opaque: $color", matches > mark.width * mark.height / 40)
-        }
-    }
 }

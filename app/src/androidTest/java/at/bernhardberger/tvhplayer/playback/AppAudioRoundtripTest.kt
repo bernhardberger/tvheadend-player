@@ -13,6 +13,7 @@ import androidx.media3.common.Tracks
 import androidx.media3.common.VideoSize
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.MediaSource
+import androidx.media3.common.util.Clock
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import at.bernhardberger.tvheadend.sdk.android.TvheadendServerProfileStore
@@ -150,8 +151,10 @@ class AppAudioRoundtripTest {
                     // Editing preserves the stable profile identity and its channel choices.
                     profiles.saveServer("replacement.invalid", 9982)
                     assertEquals(profileIdentity, profiles.audioProfileId)
-                    tune(1)
-                    assertTrue(controlled.parameters.overrides.isEmpty())
+                    tune(1, audioTracks(reverse = true))
+                    val afterEdit = controlled.parameters.overrides.values.single()
+                    assertSame(controlled.tracks.groups.first().mediaTrackGroup, afterEdit.mediaTrackGroup)
+                    assertEquals("alternate", afterEdit.mediaTrackGroup.getFormat(afterEdit.trackIndices.single()).id)
                 } finally {
                     lifetime.shutdown(2.seconds)
                     lifetime.join()
@@ -182,6 +185,7 @@ internal class ControlledAudioPlayer {
             "hashCode" -> System.identityHashCode(proxy)
             "toString" -> "ControlledAudioPlayer"
             "getApplicationLooper" -> Looper.getMainLooper()
+            "getClock" -> Clock.DEFAULT
             "addListener" -> { listeners += args!![0] as Player.Listener; null }
             "removeListener" -> { listeners -= args!![0] as Player.Listener; null }
             "getTrackSelectionParameters" -> parameters

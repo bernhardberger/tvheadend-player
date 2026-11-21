@@ -14,6 +14,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -328,14 +329,25 @@ class StartupBrandBackgroundTest {
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun warmEntryHasNoGlowAndAnnouncesStatusChanges() {
         var status by mutableStateOf("Connecting")
+        var feedbackVisible by mutableStateOf(false)
         val longName = "A very long fictional channel name ".repeat(8)
         compose.setContent {
             TVHeadendPlayerTheme {
                 CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, 1.3f)) {
-                    ChannelStartupSurface(Channel.create(ChannelId(1), name = longName), status, freshStart = false)
+                    ChannelStartupSurface(
+                        Channel.create(ChannelId(1), name = longName), status, freshStart = false,
+                        feedbackVisible = feedbackVisible,
+                    )
                 }
             }
         }
+        val progress = compose.onNode(
+            SemanticsMatcher.keyIsDefined(SemanticsProperties.ProgressBarRangeInfo), useUnmergedTree = true,
+        )
+        progress.assertDoesNotExist()
+        compose.runOnIdle { feedbackVisible = true }
+        compose.settleFrames(2)
+        progress.assertExists()
         compose.onNodeWithTag("main-startup-loader", useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("startup-background-pending", useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithTag("startup-background-prepared", useUnmergedTree = true).assertDoesNotExist()

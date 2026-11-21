@@ -232,7 +232,7 @@ internal fun ChannelStartupSurface(
             }
             Box(Modifier.align(Alignment.TopCenter).padding(top = maxHeight * (328f / 540f) - 22.dp)
                 .size(44.dp).graphicsLayer { alpha = contentAlpha }, contentAlignment = Alignment.Center) {
-                if (motionEnabled) PlayerBusyRing(Modifier.testTag("main-startup-loader"))
+                if (motionEnabled && contentVisible) PlayerBusyRing(Modifier.testTag("main-startup-loader"))
             }
             // titleMedium's first baseline is anchored at 391dp; the reserved two-line slot
             // grows with font scale, well below the ring and inside the TV safe bounds.
