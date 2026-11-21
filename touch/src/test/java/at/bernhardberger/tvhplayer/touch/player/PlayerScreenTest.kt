@@ -31,6 +31,7 @@ import at.bernhardberger.tvhplayer.core.HumanTrackLabel
 import at.bernhardberger.tvhplayer.core.AppError
 import at.bernhardberger.tvhplayer.core.AppErrorAction
 import at.bernhardberger.tvhplayer.core.AppErrorCondition
+import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
@@ -51,6 +52,7 @@ import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasText
@@ -201,6 +203,10 @@ class PlayerScreenTest {
     }
 
     private fun dragToLiveWithNotice() {
+        val behind = liveTimeline.value
+        fun distance() = compose.onNodeWithText(compose.activity.getString(R.string.player_behind_live, "4:12"))
+        distance().assertIsDisplayed()
+        button(R.string.player_go_live).assertIsDisplayed()
         notice.value = Notice.CacheClear(success = true)
         val snackbar = compose.onNode(
             SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite),
@@ -216,6 +222,18 @@ class PlayerScreenTest {
         assertEquals("Live drag label follows the thumb while the notice shows", thumbX, label.center.x, 1f)
         timeline().performTouchInput { cancel() }
         notice.value = null
+
+        compose.runOnIdle { liveTimeline.value = behind.copy(position = behind.live, behind = 0) }
+        text(R.string.player_live).assertDoesNotExist()
+        distance().assertDoesNotExist()
+        button(R.string.player_go_live).assertDoesNotExist()
+        val boundary = compose.activity.getString(
+            SharedR.string.timeshift_buffer_start_description,
+            formatPlaybackDuration((behind.live - checkNotNull(behind.bufferStart)) * 1_000L),
+        )
+        val liveDescription = compose.activity.getString(SharedR.string.player_seekbar_timeshift_live_description, boundary)
+        timeline().assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, liveDescription))
+        compose.runOnIdle { liveTimeline.value = behind }
     }
 
     @Test
@@ -467,6 +485,7 @@ class PlayerScreenTest {
     private val choices = mutableListOf<PlayerChoice>()
     private val played = mutableListOf<String>()
     private val status = mutableStateOf<LivePlayerStatus>(LivePlayerStatus.Playing)
+    private val liveTimeline = mutableStateOf(LiveTimeline(LocalTime.of(20, 0), 3600, 1510, 2568, 2820))
     private val channelId = mutableStateOf<String?>(null)
     private val channelState = mutableStateOf<ChannelsState?>(null)
     private val scheduleDay = mutableStateOf(0)
@@ -496,7 +515,7 @@ class PlayerScreenTest {
             channel = channel, channels = ChannelsState.Ready(channels),
             liveRecord = fixtureRecord,
             frame = BitmapPainter(TouchFixtureArt.art("still-ridge-light").asImageBitmap()),
-            timeline = mutableStateOf(LiveTimeline(LocalTime.of(20, 0), 3600, 1510, 2568, 2820)),
+            timeline = liveTimeline,
             tracks = PlayerTracks(
                 audio = listOf(
                     HumanTrackLabel("English • Stereo", "English", null, "Stereo • MPEG-1 Layer II"),

@@ -37,17 +37,17 @@ internal fun LiveOffer(
     // The distance behind live and Go live belong to timeshift; without it the row keeps Full screen only.
     // Only this row reads the sampled distance, so a sample recomposes it and not the face around it.
     val timeline = source.value
-    val showLive = live && timeline != null && PlayerControl.Timeshift in offered
     val behind = timeline?.let { it.behindAt(preview ?: it.position) } ?: 0
+    val showBehind = live && behind > 0 && PlayerControl.Timeshift in offered
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-        if (showLive && (behind > 0 || preview == null)) {
+        if (showBehind) {
             Text(
                 behindLive(behind), color = MaterialTheme.colorScheme.tertiary,
                 style = MaterialTheme.typography.labelLarge,
             )
         }
         if (layout.upright) Spacer(Modifier.weight(1f))
-        if (showLive && behind > 0) GoLiveButton(dragging = preview != null, onAction)
+        if (showBehind) GoLiveButton(dragging = preview != null, onAction)
         if (layout == PlayerLayout.Phone && preview == null) FullScreenButton(offered, onAction)
     }
 }
