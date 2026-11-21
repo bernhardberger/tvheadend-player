@@ -41,19 +41,17 @@ internal sealed interface RecordingLinePart {
     data class Length(val length: Duration) : RecordingLinePart
     data class Left(val left: Duration) : RecordingLinePart
     data class Until(val time: String) : RecordingLinePart
+    /** The only part that may be omitted for width. */
     data class Channel(val name: String) : RecordingLinePart
 }
 
 /**
- * A recording row's second line (touch-design §8): the episode's name when it differs from the
- * title; when, as the start time under a day label or the day anywhere else; the length, or what
- * is left of a partly watched one; the channel, unless the list is one channel's. A recording still
- * running reads "until" its end in place of when and length. The row drops whole parts from the end.
+ * A recording row's second line (touch-design §8): when and length first, then the episode
+ * and the optional channel. A running recording replaces when and length with "until"; a partly
+ * watched recording shows what's left instead of length. Only the episode can be ellipsized.
  */
 internal fun recordingLine(item: RecordingItem, context: RowContext, clock: RecordingClock): List<RecordingLinePart> =
     buildList {
-        item.episode?.takeIf { it.isNotBlank() && !it.equals(item.title, ignoreCase = true) }
-            ?.let { add(RecordingLinePart.Episode(it)) }
         when (val state = item.state) {
             is RecordingProgress.Recording -> add(RecordingLinePart.Until(recordingTime(state.until, clock)))
             else -> {
@@ -72,6 +70,8 @@ internal fun recordingLine(item: RecordingItem, context: RowContext, clock: Reco
                 }
             }
         }
+        item.episode?.takeIf { it.isNotBlank() && !it.equals(item.title, ignoreCase = true) }
+            ?.let { add(RecordingLinePart.Episode(it)) }
         item.channel?.takeIf { !context.oneChannel }?.let { add(RecordingLinePart.Channel(it)) }
     }
 

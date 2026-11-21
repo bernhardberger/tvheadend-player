@@ -29,6 +29,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.painterResource
@@ -177,7 +178,8 @@ private fun TitleActions(
             restoreFocus = true
             openViewOptions()
         },
-        modifier = Modifier.padding(start = 16.dp, end = 12.dp)
+        // TopAppBar already reserves 4 dp at its end.
+        modifier = Modifier.padding(start = 16.dp, end = BrowseEndInset - 4.dp)
             .focusRequester(viewOptionsFocus),
         colors = ButtonDefaults.filledTonalButtonColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -204,11 +206,12 @@ private fun FreeSpace(space: RecordingSpace) {
         CircularProgressIndicator(
             progress = { used },
             modifier = Modifier.size(28.dp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
         )
         Text(
             stringResource(R.string.recordings_space, space.free, space.total),
-            style = MaterialTheme.typography.bodyLarge,
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
@@ -226,8 +229,8 @@ private fun Browse(
     onPick: (String) -> Unit,
 ) {
     val margin = when (layout) {
-        RecordingsLayout.Wide -> Modifier.padding(start = 8.dp, end = 24.dp)
-        RecordingsLayout.Upright -> Modifier.padding(horizontal = 24.dp)
+        RecordingsLayout.Wide -> Modifier.padding(start = 8.dp, end = BrowseEndInset)
+        RecordingsLayout.Upright -> Modifier.padding(horizontal = BrowseEndInset)
         RecordingsLayout.Phone -> Modifier.padding(horizontal = 12.dp)
     }
     if (state.availability != RecordingsAvailability.Offline) {
@@ -268,7 +271,7 @@ private fun BrowseLevel(
             RecordingList(level, state.clock, oneChannel, picked?.id, head, onOpen, onPick, Modifier.weight(1f))
             Spacer(Modifier.width(24.dp))
             Surface(
-                Modifier.weight(1f).padding(top = 16.dp, bottom = 8.dp),
+                Modifier.weight(1f).padding(top = 16.dp, bottom = 8.dp).testTag("recordings-pane"),
                 shape = MaterialTheme.shapes.extraLarge,
                 color = MaterialTheme.colorScheme.surfaceContainerLow,
             ) {
@@ -353,6 +356,7 @@ private fun Placeholder(level: RecordingFolder) {
     }
 }
 
+private val BrowseEndInset = 24.dp
 private const val PERCENT = 100
 
 /** The list shows while it is current or saved; otherwise a stand-in takes its place. */
