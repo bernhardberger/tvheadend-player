@@ -36,6 +36,7 @@ import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
@@ -171,8 +172,8 @@ internal fun PlayerSheets(
 }
 
 /**
- * The sheet head's title and leading logo. Info names the channel of what it shows, as the Guide's channel
- * head does: the watched channel's day, or the channel of the Details shown (an airing may be elsewhere).
+ * Info's title and leading logo follow the watched channel's day or the channel of the Details shown.
+ * An airing may be on another channel.
  */
 @Composable
 private fun sheetHead(
@@ -180,7 +181,8 @@ private fun sheetHead(
     state: LivePlayerState,
     info: InfoPage,
 ): Pair<String, (@Composable () -> Unit)?> {
-    val shown = state.schedule?.details?.get(info.stack.shown)?.takeIf { panel == PlayerPanel.InfoDetails }
+    val shown = info.stack.shown?.takeIf { panel == PlayerPanel.InfoDetails }
+        ?.let { state.schedule?.details?.invoke(it) }
     return when {
         shown != null -> shown.channel to { InfoLogo(shown.channelLogo, shown.logoTint, shown.channelLogoModel) }
         panel.button == PlayerPanel.Info -> state.channel.name to {
@@ -213,8 +215,8 @@ private fun ColumnScope.SheetBody(
             )
         }
         PlayerPanel.Options -> OptionRows(state.options, onPanel)
-        PlayerPanel.Info, PlayerPanel.InfoDetails -> state.schedule?.let {
-            InfoBody(panel, it, info, onPanel, onChoice)
+        PlayerPanel.Info, PlayerPanel.InfoDetails -> key(state.channel.id) {
+            InfoBody(panel, state.schedule, info, onPanel, onChoice) { onAction(PlayerAction.RetryChannels) }
         }
         else -> EntryRows(panelEntries(panel, state, onAction, onChoice, done))
     }

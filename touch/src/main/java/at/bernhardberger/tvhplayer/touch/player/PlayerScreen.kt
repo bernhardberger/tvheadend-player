@@ -61,6 +61,7 @@ internal fun PlayerScreen(
     modifier: Modifier = Modifier,
     video: (@Composable (Modifier) -> Unit)? = null,
     onControlsShown: (Boolean) -> Unit = {},
+    onInfoShown: (Boolean) -> Unit = {},
     inWindow: Boolean = false,
     hideAfterMs: Long? = null,
     progressing: Boolean = true,
@@ -71,9 +72,11 @@ internal fun PlayerScreen(
     var touching by remember { mutableStateOf(false) }
     var panel by rememberSaveable { mutableStateOf<PlayerPanel?>(null) }
     // Info opens on the program being watched each time; inside the sheet the viewer opens others.
-    var infoStack by rememberSaveable(stateSaver = InfoStackSaver) { mutableStateOf(InfoStack()) }
+    var infoStack by rememberSaveable(state.channel.id, stateSaver = InfoStackSaver) {
+        mutableStateOf(InfoStack(followWatching = true))
+    }
     val showPanel: (PlayerPanel?) -> Unit = {
-        if (it == PlayerPanel.Info && panel?.button != it) infoStack = InfoStack(state.schedule?.watchingId)
+        if (it == PlayerPanel.Info && panel?.button != it) infoStack = InfoStack(followWatching = true)
         panel = it
     }
     val openOptions = { panel = PlayerPanel.Options }
@@ -92,7 +95,10 @@ internal fun PlayerScreen(
         val layout = held.layout
         val panelGone = panelGone(panel, state.offered, inWindow, layout)
         LaunchedEffect(panelGone) { if (panelGone) panel = null }
-        val activePanel = panel.takeUnless { panelGone }
+        val activePanel = panel.takeUnless { panelGone }.infoPanel(infoStack)
+        val latestInfoShown by rememberUpdatedState(onInfoShown)
+        val infoShown = activePanel?.button == PlayerPanel.Info
+        LaunchedEffect(infoShown) { latestInfoShown(infoShown) }
         val panels = PanelHost(activePanel, showPanel, onChoice)
         val playing = state.status == LivePlayerStatus.Playing
         // A sheet takes the controls off the picture; a menu keeps them, it belongs to a button.
@@ -124,6 +130,9 @@ internal fun PlayerScreen(
         )
     }
 }
+
+private fun PlayerPanel?.infoPanel(stack: InfoStack): PlayerPanel? =
+    if (this == PlayerPanel.InfoDetails && stack.shown == null) PlayerPanel.Info else this
 
 private fun panelGone(panel: PlayerPanel?, offered: Set<PlayerControl>, inWindow: Boolean, layout: PlayerLayout) =
     inWindow || (layout.upright && panel == PlayerPanel.Channels) ||
@@ -302,8 +311,8 @@ private val LivePlayerStatus.hasTimeline: Boolean
     get() = this == LivePlayerStatus.Playing || this == LivePlayerStatus.Tuning
 
 private val InfoStackSaver = listSaver<InfoStack, String?>(
-    save = { listOf(it.open) + it.details },
-    restore = { InfoStack(it.first(), it.drop(1).filterNotNull()) },
+    save = { listOf(it.followWatching.toString(), it.open) + it.details },
+    restore = { InfoStack(it[1], it.drop(2).filterNotNull(), it.first().toBoolean()) },
 )
 
 /** Every touch, and the end of whatever held the controls, starts the count anew. */

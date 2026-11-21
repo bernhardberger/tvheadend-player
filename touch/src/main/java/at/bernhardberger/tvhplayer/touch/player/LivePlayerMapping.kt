@@ -27,6 +27,7 @@ import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.playback.LivePauseAvailability
 import at.bernhardberger.tvhplayer.playback.BackgroundPlaybackNotice
 import at.bernhardberger.tvhplayer.touch.channels.ChannelRow
+import at.bernhardberger.tvhplayer.touch.channels.ChannelsTexts
 import at.bernhardberger.tvhplayer.touch.channels.channelRow
 import at.bernhardberger.tvhplayer.touch.channels.channelsState
 import at.bernhardberger.tvhplayer.touch.ui.ArtworkModels
@@ -217,17 +218,21 @@ internal fun livePlayerState(
     now: Instant,
     window: Boolean = false,
     artwork: ArtworkModels? = null,
+    texts: ChannelsTexts = ChannelsTexts.TitlesOnly,
 ): LivePlayerState {
     val id = shownId.value.toString()
     val channel = scope.scope.allChannels.firstOrNull { it.id == shownId }
     return LivePlayerState(
         channel = channel?.let { channelRow(it, observation, now, artwork = artwork) } ?: ChannelRow(id, ""),
-        channels = channelsState(scope, connection, degraded, observation, now, playingId = id, artwork = artwork),
+        channels = channelsState(
+            scope, connection, degraded, observation, now, texts, playingId = id, artwork = artwork,
+        ),
         frame = null,
         timeline = timeline,
         status = status,
         offered = buildSet {
             add(PlayerControl.Channels)
+            if (channel != null) add(PlayerControl.Info)
             if (timeshiftOffered(pause, status)) add(PlayerControl.Timeshift)
             // Without the window (no feature, or switched off for the app) its button is absent.
             if (window) add(PlayerControl.PictureInPicture)
