@@ -36,7 +36,6 @@ import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.playback.RecordingSkipAction
 import at.bernhardberger.tvhplayer.settings.AdBreakMode
-import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.touch.recordings.RecordingClock
 import at.bernhardberger.tvhplayer.touch.recordings.RecordingsTexts
@@ -110,6 +109,7 @@ internal fun RecordingPlayback(
     }.orEmpty()
     val markers = recordingMarkerPresentation(runtime, installed)
     val adBreaks = recordingAdBreakChoice(settings, route.id)
+    val menus = rememberPlayerOptions(runtime, settings, target, installed) { observation.dvrEntry(it)?.channelId }
     val face = recordingPlayerState(
         target, observation, ownedPlayback, ownedAdmission, timeline, samples.position,
         marks = markers.marks, markerRevision = markers.revision,
@@ -119,16 +119,15 @@ internal fun RecordingPlayback(
         recordedDate = { recordedOn }, finishClock = { formatClock(it.toJavaInstant().atZone(zone), locale) },
         episodeLine = texts.episode, noChannel = texts.noChannel,
         unknownTitle = stringResource(SharedR.string.recordings_title),
-        tracks = PlayerTracks(), options = PlaybackOptions(), brightness = brightness,
+        tracks = menus.tracks, options = menus.options, menuControls = menus.offered, brightness = brightness,
         allowPictureInPicture = windowAvailable, artwork = artwork, failure = failure.takeIf { owned != null },
         info = info,
     )
     RecordingPlaybackFace(
-        face.copy(growing = growing, offered = recordingRuntimeControls(face.offered), adBreakOnlyOptions = true),
-        owned, runtime, session,
+        face.copy(growing = growing), menus, owned, runtime, session,
         pictureWindow, installed && video.visible, inWindow, timeline, back, { shown = it },
         onBrightness = { brightness = it; applyBrightness(window, it) },
-        onAdBreakMode = { if (PlayerControl.Settings in face.offered) adBreaks.set(it) },
+        onAdBreakMode = { if (face.hasAdBreakOptions) adBreaks.set(it) },
     )
 }
 
@@ -184,6 +183,7 @@ private fun recordingAdBreakChoice(settings: PlayerSettingsStore, id: DvrEntryId
 @Composable
 private fun RecordingPlaybackFace(
     face: RecordingPlayerState,
+    menus: PlayerOptions,
     owned: RecordingPlaybackSelection?,
     runtime: AppPlaybackRuntime,
     session: TvheadendSession,
@@ -197,7 +197,7 @@ private fun RecordingPlaybackFace(
     onAdBreakMode: (AdBreakMode?) -> Unit,
 ) {
     val picture = rememberStandalonePicture(face.artwork, face.artworkModel)
-    SideEffect { pictureWindow.mode = AspectRatioMode.FIT }
+    SideEffect { pictureWindow.mode = menus.aspect }
     fun ownsPlayback(): Boolean =
         owned != null && runtime.activeTarget.value == AppPlaybackTarget.Recording(owned.recordingId) &&
             runtime.recordingSelection.value == owned &&
@@ -214,8 +214,8 @@ private fun RecordingPlaybackFace(
         onSeek = { if (ownsPlayback()) recordingDragMove(timeline.at(0L), it)
             ?.let { move -> runtime.seekTo(move.positionMs) } },
         onBrightness = onBrightness,
-        onChoice = { if (ownsPlayback()) runtime.recordingChoice(it, onAdBreakMode) },
-        video = { TouchVideoSurface(runtime.player, videoVisible, it, pictureWindow::attach) },
+        onChoice = { if (ownsPlayback() && !menus.choose(it)) runtime.recordingChoice(it, onAdBreakMode) },
+        video = { TouchVideoSurface(runtime.player, videoVisible, it, pictureWindow::attach, menus.aspect) },
         onControlsShown = onControlsShown, inWindow = inWindow, hideAfterMs = rememberControlsTimeout(),
         progressing = rememberPlayerProgressing(runtime.player).value, notices = LocalFrameNotices.current,
     )

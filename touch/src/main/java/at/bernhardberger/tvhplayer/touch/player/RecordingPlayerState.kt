@@ -59,7 +59,7 @@ internal data class RecordingPlayerState(
     val artworkModel: Any? = null,
     val failureDetail: String? = null,
     val info: RecordingPlayerInfo? = null,
-    val adBreakOnlyOptions: Boolean = false,
+    val hasAdBreakOptions: Boolean = true,
 ) : PlayerFaceState {
     val stops = recordingMarkStops(marks, durationMs)
     val hasMarkers get() = PlayerControl.Markers in offered && stops.isNotEmpty()

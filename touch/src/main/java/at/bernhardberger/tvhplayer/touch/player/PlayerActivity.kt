@@ -40,6 +40,7 @@ import at.bernhardberger.tvhplayer.core.programmeArtwork
 import at.bernhardberger.tvhplayer.core.toConnectionState
 import at.bernhardberger.tvhplayer.images.ChannelAccents
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
+import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.BackgroundPlaybackNotice
 import at.bernhardberger.tvhplayer.playback.currentLivePlaybackSelection
@@ -280,7 +281,8 @@ class PlayerActivity : ComponentActivity() {
         val shown = tune.channelId
         val status = currentStatus(runtime, observation, shown, failed)
         val paused = !livePlayWhenReady(pause, playWhenReady)
-        val options = rememberPlayerOptions(runtime, settings, shown, status == LivePlayerStatus.Playing)
+        val options = rememberPlayerOptions(runtime, settings, AppPlaybackTarget.Live(shown),
+            status == LivePlayerStatus.Playing)
         SideEffect { pictureWindow.mode = options.aspect }
         PlayerEffects(
             timeshift, shown, controlsShown && !paused && !inWindow, liveStart && !paused,

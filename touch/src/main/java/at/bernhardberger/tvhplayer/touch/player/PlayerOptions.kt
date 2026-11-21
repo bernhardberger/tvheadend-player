@@ -18,6 +18,7 @@ import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.StreamProfileId
 import at.bernhardberger.tvheadend.sdk.core.StreamProfilesResult
 import at.bernhardberger.tvhplayer.core.HumanTrackLabel
@@ -67,7 +68,7 @@ internal data class TrackSettings(
 /**
  * Playback options always open (display mode, and a channel's profile is the way out of a bad
  * one). Audio opens with another track to choose (the TV's quick-list rule), Subtitles with a
- * track; both only while the shown channel's own picture plays ([targetCurrent]).
+ * track; both only while the shown target's own picture plays ([targetCurrent]).
  */
 internal fun optionControls(audioTracks: Int, subtitleTracks: Int, targetCurrent: Boolean): Set<PlayerControl> =
     buildSet {
@@ -76,21 +77,24 @@ internal fun optionControls(audioTracks: Int, subtitleTracks: Int, targetCurrent
         if (targetCurrent && subtitleTracks > 0) add(PlayerControl.Subtitles)
     }
 
-/** The options the runtime has for live: display mode and the profiles the server [listed] (none yet: no row). */
+/** Display mode for either target; only live has stream profiles. */
 internal fun playbackOptions(
+    target: AppPlaybackTarget,
     listed: List<ServerProfile>,
     setting: StreamProfileId?,
     choice: String?,
     mode: AspectRatioMode,
-): PlaybackOptions =
-    PlaybackOptions(
+): PlaybackOptions {
+    val profiles = listed.takeIf { target is AppPlaybackTarget.Live }.orEmpty()
+    return PlaybackOptions(
         displayMode = mode.displayMode,
-        profiles = listed.map { StreamProfile(it.name, direct = it.name.trim().equals(DIRECT_PROFILE, true)) },
-        defaultProfile = listed.indexOfFirst { it.id == setting }.takeIf { it >= 0 },
-        profilePick = listed.indexOfFirst { it.id.value == choice }.takeIf { it >= 0 },
+        profiles = profiles.map { StreamProfile(it.name, direct = it.name.trim().equals(DIRECT_PROFILE, true)) },
+        defaultProfile = profiles.indexOfFirst { it.id == setting }.takeIf { it >= 0 },
+        profilePick = profiles.indexOfFirst { it.id.value == choice }.takeIf { it >= 0 },
         // The TV's stream statistics overlay is its own; touch has none to switch.
         stats = null,
     )
+}
 
 internal val AspectRatioMode.displayMode: DisplayMode
     get() = when (this) {
@@ -125,15 +129,15 @@ internal class PlayerOptions(
 
 /**
  * The runtime's tracks and options for [shown]. Picks go through the runtime as the TV's quick
- * lists send them: tied to the picture's epoch, so a pick can't land on the next channel. The
- * display mode is the playing channel's stored one, as the TV keeps it.
+ * lists send them: tied to the picture's epoch, so a pick can't land on a different target.
  */
 @Composable
 internal fun rememberPlayerOptions(
     runtime: AppPlaybackRuntime,
     settings: PlayerSettingsStore,
-    shown: ChannelId,
+    shown: AppPlaybackTarget,
     playing: Boolean,
+    recordingChannel: (DvrEntryId) -> ChannelId? = { null },
 ): PlayerOptions {
     val (tracks, parameters) = rememberTrackState(runtime.player).value
     val audioAutomatic by runtime.audioAutomatic.collectAsStateWithLifecycle()
@@ -143,14 +147,14 @@ internal fun rememberPlayerOptions(
     val setting by runtime.selectedStreamProfileId.collectAsStateWithLifecycle()
     val choices by runtime.channelStreamProfiles.collectAsStateWithLifecycle()
     val target by runtime.activeTarget.collectAsStateWithLifecycle()
-    // Live only: no recording asks for its channel.
-    val aspect = rememberTargetAspect(target, settings) { null }
+    val aspect = rememberTargetAspect(target, settings, recordingChannel)
     val epoch = runtime.videoPresentation.collectAsStateWithLifecycle().value.epoch
     val (audio, subtitles) = trackLists(tracks)
     val locale = LocalConfiguration.current.locales[0]
     val subtitlesSetting = language?.let { Locale.forLanguageTag(it).getDisplayLanguage(locale) }
         ?: stringResource(SharedR.string.subtitle_follow_system_short)
-    val current = playing && target == AppPlaybackTarget.Live(shown) && runtime.isQuickListTargetCurrent(epoch)
+    val current = playing && target == shown && runtime.isQuickListTargetCurrent(epoch)
+    val live = shown as? AppPlaybackTarget.Live
     val listed = (profiles as? StreamProfilesResult.Available)?.profiles.orEmpty()
     val subtitleOverride = parameters.overrides.values.singleOrNull { it.type == C.TRACK_TYPE_TEXT }
     return PlayerOptions(
@@ -160,7 +164,7 @@ internal fun rememberPlayerOptions(
             TrackSettings(audioAutomatic, subtitlesDefault, C.TRACK_TYPE_TEXT in parameters.disabledTrackTypes),
             subtitlesSetting,
         ),
-        options = playbackOptions(listed, setting, choices?.get(shown.value), aspect.mode),
+        options = playbackOptions(shown, listed, setting, choices?.get(live?.channelId?.value), aspect.mode),
         offered = optionControls(audio.size, subtitles.size, current),
         aspect = aspect.mode,
     ) { choice ->
@@ -168,7 +172,11 @@ internal fun rememberPlayerOptions(
             is PlayerChoice.Audio -> runtime.selectQuickListAudio(epoch, audio.pickOverride(choice.pick))
             is PlayerChoice.Subtitles ->
                 runtime.selectSubtitles(subtitles.pickOverride(choice.pick), choice.pick == TrackPick.Off, epoch)
-            is PlayerChoice.Profile -> runtime.selectChannelStreamProfile(shown, choice.index?.let { listed[it].id })
+            is PlayerChoice.Profile -> if (live != null) {
+                runtime.selectChannelStreamProfile(live.channelId, choice.index?.let { listed[it].id })
+            } else {
+                return@PlayerOptions false
+            }
             is PlayerChoice.Display -> aspect.select(choice.mode.aspectMode)
             else -> return@PlayerOptions false
         }

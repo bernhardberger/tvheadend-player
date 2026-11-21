@@ -403,18 +403,25 @@ class LivePlayerMappingTest {
         val direct = SdkStreamProfile(StreamProfileId("1".repeat(32)), "htsp", "")
         val small = SdkStreamProfile(StreamProfileId("2".repeat(32)), "h264-720p", "")
         val listed = listOf(direct, small)
+        val live = AppPlaybackTarget.Live(ChannelId(1))
         assertEquals(
             PlaybackOptions(
                 DisplayMode.Fill4By3, listOf(StreamProfile("htsp", direct = true), StreamProfile("h264-720p")),
                 defaultProfile = 1, profilePick = 0, stats = null,
             ),
-            playbackOptions(listed, small.id, direct.id.value, AspectRatioMode.FORCE_4_3),
+            playbackOptions(live, listed, small.id, direct.id.value, AspectRatioMode.FORCE_4_3),
         )
         // A setting the server doesn't list is the server's default; no list leaves out the profile row.
-        assertEquals(null, playbackOptions(listed, null, null, AspectRatioMode.FIT).defaultProfile)
+        assertEquals(null, playbackOptions(live, listed, null, null, AspectRatioMode.FIT).defaultProfile)
         assertEquals(
             PlaybackOptions(DisplayMode.Auto, emptyList(), defaultProfile = null, stats = null),
-            playbackOptions(emptyList(), small.id, null, AspectRatioMode.FIT),
+            playbackOptions(live, emptyList(), small.id, null, AspectRatioMode.FIT),
+        )
+        assertEquals(
+            PlaybackOptions(DisplayMode.Fill4By3, defaultProfile = null, stats = null),
+            playbackOptions(
+                AppPlaybackTarget.Recording(DvrEntryId(1)), listed, small.id, direct.id.value, AspectRatioMode.FORCE_4_3,
+            ),
         )
         DisplayMode.entries.forEach { assertEquals(it, it.aspectMode.displayMode) }
     }

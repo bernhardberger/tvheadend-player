@@ -13,6 +13,7 @@ import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvhplayer.core.AppErrorCondition
 import at.bernhardberger.tvhplayer.core.GrowingTimelineDisplayEnd
+import at.bernhardberger.tvhplayer.core.HumanTrackLabel
 import at.bernhardberger.tvhplayer.core.RecordingMark
 import at.bernhardberger.tvhplayer.core.RecordingMarkKind
 import at.bernhardberger.tvhplayer.core.RecordingFinishedAction
@@ -61,16 +62,18 @@ class RecordingPlayerMappingTest {
     }
 
     @Test
-    fun `runtime exposes only wired recording actions`() {
-        val offered = map(AppPlaybackState.Playing, true).offered + PlayerControl.PictureInPicture
-        assertEquals(
-            setOf(
-                PlayerControl.FullScreen, PlayerControl.Info, PlayerControl.Timeshift, PlayerControl.PictureInPicture,
-                PlayerControl.Markers, PlayerControl.Settings,
-            ),
-            recordingRuntimeControls(offered),
-        )
-        assertEquals(emptySet<PlayerControl>(), recordingRuntimeControls(emptySet()))
+    fun `recording menus use the shared track thresholds and always offer display mode`() {
+        val label = HumanTrackLabel("English", "English", null, null)
+        for (current in listOf(false, true)) {
+            for (audio in 0..2) {
+                val tracks = PlayerTracks(audio = List(audio) { label }, subtitles = listOf(label))
+                val playback = if (current) AppPlaybackState.Playing else AppPlaybackState.Starting
+                val state = map(playback, true, tracks = tracks, trackTargetCurrent = current)
+                assertEquals(current && audio > 1, PlayerControl.Audio in state.offered)
+                assertEquals(current, PlayerControl.Subtitles in state.offered)
+                assertTrue(PlayerControl.Settings in state.offered)
+            }
+        }
     }
 
     @Test
@@ -199,9 +202,9 @@ class RecordingPlayerMappingTest {
         val selection = requireNotNull(currentRecordingPlaybackSelection(observation, target.recordingId))
         val chapter = RecordingMark(RecordingMarkKind.CHAPTER, fixtureAd.startMs, name = "Chapter")
         val cases = listOf(
-            MarkerCase(target, selection, listOf(fixtureAd), token, markers = true, settings = true),
-            MarkerCase(target, selection, listOf(chapter), null, markers = true, settings = false),
-            MarkerCase(target, selection, emptyList(), token, markers = false, settings = false),
+            MarkerCase(target, selection, listOf(fixtureAd), token, markers = true, adBreakOptions = true),
+            MarkerCase(target, selection, listOf(chapter), null, markers = true, adBreakOptions = false),
+            MarkerCase(target, selection, emptyList(), token, markers = false, adBreakOptions = false),
             MarkerCase(target, selection.copy(recordingId = server.film.id), listOf(fixtureAd), token, false, false),
             MarkerCase(target, selection.copy(currentSession = requireNotNull(server.connected().currentSession)),
                 listOf(fixtureAd), token, false, false),
@@ -214,7 +217,7 @@ class RecordingPlayerMappingTest {
             assertEquals(case.markers, state.hasMarkers)
             assertEquals(case.markers, state.stops.isNotEmpty())
             assertEquals(case.markers, recordingTrackMarks(state.marks, state.durationMs).isNotEmpty())
-            assertEquals(case.settings, PlayerControl.Settings in state.offered)
+            assertEquals(case.adBreakOptions, state.hasAdBreakOptions)
             assertSame(case.offer.takeIf { case.markers }, state.skipPrompt)
             assertSame(state.skipPrompt, state.controlsSkip)
         }
@@ -226,7 +229,7 @@ class RecordingPlayerMappingTest {
         val marks: List<RecordingMark>,
         val offer: RecordingSkipAction?,
         val markers: Boolean,
-        val settings: Boolean,
+        val adBreakOptions: Boolean,
     )
 
     @Test
@@ -251,11 +254,14 @@ class RecordingPlayerMappingTest {
         marks: List<RecordingMark> = listOf(fixtureAd),
         revision: Long? = 7L,
         offer: RecordingSkipAction? = token,
+        tracks: PlayerTracks = PlayerTracks(),
+        trackTargetCurrent: Boolean = playback.presented,
     ) = recordingPlayerState(
         target, server.connected(), playback, admission,
         recordingTimelinePresentation(RECORDING_INSIDE_AD, RECORDING_LENGTH, true),
         mutableLongStateOf(RECORDING_INSIDE_AD), marks, revision, offer, offer, AdBreakMode.ASK, AdBreakMode.OFF,
         playWhenReady, now, Instant::toString, Instant::toString, { "Episode" }, "Unknown channel", "Recording",
-        PlayerTracks(), PlaybackOptions(), .5f, allowPictureInPicture = false, info = info,
+        tracks, PlaybackOptions(), optionControls(tracks.audio.size, tracks.subtitles.size, trackTargetCurrent),
+        .5f, allowPictureInPicture = false, info = info,
     )
 }

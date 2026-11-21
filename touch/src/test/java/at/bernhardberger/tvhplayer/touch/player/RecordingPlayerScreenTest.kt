@@ -31,9 +31,11 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.media3.common.C
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.MediaSource
+import androidx.media3.exoplayer.source.MergingMediaSource
 import androidx.media3.exoplayer.source.SilenceMediaSource
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.DvrCutpoint
@@ -213,6 +215,7 @@ class RecordingPlayerScreenTest {
     @kotlin.OptIn(TvheadendTestingApi::class)
     private fun withRecordingRoute(
         marked: Boolean,
+        twoAudioTracks: Boolean = false,
         exercise: (PlayerActivity, AppPlaybackRuntime) -> Unit,
     ) {
         val context = compose.activity.applicationContext
@@ -221,7 +224,7 @@ class RecordingPlayerScreenTest {
         val server = ServerGuide(Instant.parse("2026-11-11T21:00:00Z"))
         val session = if (marked) markedSession(connection, server) else connection.session
         val coordinator = createTvheadendPlaybackCoordinator(
-            if (marked) offlinePlayer(player) else player,
+            if (marked) offlinePlayer(player, twoAudioTracks) else player,
             workDispatcher = Dispatchers.Main.immediate,
         )
         val settings = PlayerSettingsStore(context)
@@ -287,13 +290,13 @@ class RecordingPlayerScreenTest {
     }
 
     @OptIn(UnstableApi::class)
-    private fun offlinePlayer(player: ExoPlayer): ExoPlayer = object : ExoPlayer by player {
+    private fun offlinePlayer(player: ExoPlayer, twoAudioTracks: Boolean): ExoPlayer = object : ExoPlayer by player {
         // Preserve the installed recording identity; the SDK fake has no media bytes.
-        private fun silence(source: MediaSource) = SilenceMediaSource.Factory()
-            .setDurationUs(60.seconds.inWholeMicroseconds).createMediaSource().let { silence ->
-                silence.updateMediaItem(source.mediaItem)
-                silence
-            }
+        private fun silence(source: MediaSource): MediaSource {
+            fun track() = SilenceMediaSource.Factory().setDurationUs(60.seconds.inWholeMicroseconds)
+                .createMediaSource().apply { updateMediaItem(source.mediaItem) }
+            return if (twoAudioTracks) MergingMediaSource(track(), track()) else track()
+        }
 
         override fun setMediaSource(mediaSource: MediaSource) = player.setMediaSource(silence(mediaSource))
         override fun setMediaSource(mediaSource: MediaSource, startPositionMs: Long) =
@@ -329,6 +332,22 @@ class RecordingPlayerScreenTest {
         assertEquals(10_000L, runtime.player.currentPosition)
         assertTrue(!runtime.player.playWhenReady)
         tag("recording-markers").assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w1280dp-h800dp-land-xhdpi")
+    @OptIn(UnstableApi::class)
+    fun recordingRouteSelectsAudioThroughTheRuntime() = withRecordingRoute(
+        marked = true,
+        twoAudioTracks = true,
+    ) { activity, runtime ->
+        val second = runtime.player.currentTracks.groups.filter { it.type == C.TRACK_TYPE_AUDIO }.last().mediaTrackGroup
+        button(R.string.player_audio).performClick()
+        // The two synthetic audio tracks have identical labels; select the second listed track.
+        compose.onAllNodes(hasText(activity.getString(SharedR.string.track_stereo)) and hasClickAction())
+            .assertCountEquals(2)[1].performClick()
+        settleRoute(runtime.player)
+        assertEquals(listOf(0), runtime.player.trackSelectionParameters.overrides[second]?.trackIndices)
     }
 
     @Test

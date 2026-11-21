@@ -66,6 +66,7 @@ internal fun recordingPlayerState(
     unknownTitle: String,
     tracks: PlayerTracks,
     options: PlaybackOptions,
+    menuControls: Set<PlayerControl>,
     brightness: Float,
     allowPictureInPicture: Boolean,
     artwork: ArtworkModels? = null,
@@ -112,11 +113,10 @@ internal fun recordingPlayerState(
         brightness = brightness,
         tracks = tracks,
         options = options,
-        offered = recordingControls(
-            presented, recordingInfo != null, hasMarkers, displayedMarks.any {
-                it.kind == RecordingMarkKind.AD_BREAK && it.startMs in 0 until durationMs
-            }, tracks, allowPictureInPicture,
-        ),
+        offered = recordingControls(presented, recordingInfo != null, hasMarkers, allowPictureInPicture) + menuControls,
+        hasAdBreakOptions = displayedMarks.any {
+            it.kind == RecordingMarkKind.AD_BREAK && it.startMs in 0 until durationMs
+        },
         info = recordingInfo,
     )
 }
@@ -128,13 +128,6 @@ internal fun ownsRecordingPlayback(
     observation: SessionObservation,
 ): Boolean = active == target && selection?.recordingId == target.recordingId &&
     selection.currentSession === observation.currentSession
-
-internal fun recordingRuntimeControls(offered: Set<PlayerControl>): Set<PlayerControl> = offered.intersect(
-    setOf(
-        PlayerControl.FullScreen, PlayerControl.Info, PlayerControl.Timeshift, PlayerControl.PictureInPicture,
-        PlayerControl.Markers, PlayerControl.Settings,
-    ),
-)
 
 /** The same single-entry projection as Browse; EPG enrichment is supplied by the caller. */
 internal fun recordingPlayerInfo(
@@ -187,18 +180,13 @@ private fun recordingControls(
     presented: Boolean,
     hasInfo: Boolean,
     ownsMarkers: Boolean,
-    hasAdBreaks: Boolean,
-    tracks: PlayerTracks,
     allowPictureInPicture: Boolean,
 ): Set<PlayerControl> = buildSet {
     add(PlayerControl.FullScreen)
     if (hasInfo) add(PlayerControl.Info)
     if (presented) {
         add(PlayerControl.Timeshift)
-        if (hasAdBreaks) add(PlayerControl.Settings)
         if (ownsMarkers) add(PlayerControl.Markers)
-        if (tracks.audio.isNotEmpty()) add(PlayerControl.Audio)
-        if (tracks.subtitles.isNotEmpty()) add(PlayerControl.Subtitles)
         if (allowPictureInPicture) add(PlayerControl.PictureInPicture)
     }
 }
