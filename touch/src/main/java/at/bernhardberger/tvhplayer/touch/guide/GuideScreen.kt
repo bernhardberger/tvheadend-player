@@ -50,6 +50,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.channels.ChannelActionLabel
+import at.bernhardberger.tvhplayer.touch.channels.ChannelsMessage
+import at.bernhardberger.tvhplayer.touch.channels.MessageKind
 import at.bernhardberger.tvhplayer.touch.ui.ChannelLogoTile
 import at.bernhardberger.tvhplayer.touch.ui.Destination
 import at.bernhardberger.tvhplayer.touch.ui.TouchFrame
@@ -67,8 +69,10 @@ internal fun GuideScreen(
     initialChannelId: String? = null,
     initiallyOpen: String? = null,
     initialDetails: String? = null,
+    destinations: List<Destination> = Destination.entries,
 ) {
     val layout = guideLayout()
+    val listed = state.listed
     var view by rememberSaveable { mutableStateOf(initialView) }
     var channelId by rememberSaveable { mutableStateOf(initialChannelId) }
     var openId by rememberSaveable { mutableStateOf(initiallyOpen) }
@@ -83,12 +87,13 @@ internal fun GuideScreen(
     TouchFrame(
         modifier = modifier,
         initialDestination = Destination.Guide,
+        destinations = destinations,
         showTopBar = { !(it == Destination.Guide && page) },
         showNavigation = { !(it == Destination.Guide && page && layout.compact) },
-        actions = { destination -> if (destination == Destination.Guide) TagFilter(state, actions) },
+        actions = { destination -> if (destination == Destination.Guide && listed) TagFilter(state, actions) },
         belowTopBar = { destination ->
             if (destination == Destination.Guide) {
-                ViewTabs(view, layout) {
+                GuideBelowTopBar(state, view, layout) {
                     view = it
                     openId = null
                 }
@@ -96,6 +101,10 @@ internal fun GuideScreen(
         },
     ) { destination ->
         if (destination != Destination.Guide) return@TouchFrame
+        if (!listed) {
+            GuideStandIn(state.availability, layout, actions)
+            return@TouchFrame
+        }
         // Registered after the frame's own handler, so the page and an opened program take Back first.
         BackHandler(enabled = page) { detailsId = null }
         BackHandler(enabled = !page && openId != null) { openId = null }
@@ -104,19 +113,50 @@ internal fun GuideScreen(
             return@TouchFrame
         }
         val onOpen: (String?) -> Unit = { openId = it }
-        when (view) {
-            GuideView.Overview -> Overview(state, layout, openId, onOpen, actions, openDetails) {
-                channelId = it
-                openId = null
-                view = GuideView.ByChannel
-            }
-            GuideView.ByChannel -> ByChannel(
-                state, layout, channelId ?: state.channels.firstOrNull()?.id, openId, onOpen, actions, openDetails,
-            ) {
-                channelId = it
-                openId = null
+        GuideList(state, layout, actions) {
+            when (view) {
+                GuideView.Overview -> Overview(state, layout, openId, onOpen, actions, openDetails) {
+                    channelId = it
+                    openId = null
+                    view = GuideView.ByChannel
+                }
+                GuideView.ByChannel -> ByChannel(
+                    state, layout, channelId ?: state.channels.firstOrNull()?.id, openId, onOpen, actions, openDetails,
+                ) {
+                    channelId = it
+                    openId = null
+                }
             }
         }
+    }
+}
+
+/** The view switch under the top bar once there is a list; the first load's progress line before. */
+@Composable
+private fun GuideBelowTopBar(state: GuideState, view: GuideView, layout: GuideLayout, onView: (GuideView) -> Unit) {
+    if (state.listed) ViewTabs(view, layout, onView) else GuideLoadingLine(state.availability, layout)
+}
+
+/** The listed Guide: the offline line above saved content, and Channels' empty forms without channels. */
+@Composable
+private fun GuideList(state: GuideState, layout: GuideLayout, actions: GuideActions, content: @Composable () -> Unit) {
+    val body: @Composable () -> Unit = {
+        when {
+            state.channels.isNotEmpty() -> content()
+            state.selectedTagId != null -> ChannelsMessage(MessageKind.EmptyTag, actions.messageActions())
+            else -> ChannelsMessage(MessageKind.Empty, actions.messageActions())
+        }
+    }
+    if (state.availability != GuideAvailability.Offline) {
+        body()
+        return
+    }
+    Column(Modifier.fillMaxSize()) {
+        GuideOfflineBanner(
+            layout, actions.onOpenConnectionSettings,
+            Modifier.padding(start = margin(layout), end = margin(layout), top = 8.dp),
+        )
+        Box(Modifier.weight(1f)) { body() }
     }
 }
 
@@ -167,7 +207,9 @@ private fun Overview(
             state, actions, layout.compact,
             Modifier.padding(start = margin, end = margin, top = 12.dp, bottom = 12.dp),
         )
-        if (layout.compact) {
+        if (state.dayLoading && state.channels.all { it.programs.isEmpty() }) {
+            DayLoading()
+        } else if (layout.compact) {
             val padding = PaddingValues(start = margin, end = margin, bottom = 16.dp)
             OverviewRows(state.channels, openId, onOpen, actions, onDetails, padding)
         } else {
@@ -195,7 +237,10 @@ private fun ByChannel(
         Column(Modifier.fillMaxSize()) {
             ChannelTabs(state.channels, channel.id, onChannel)
             DayBar(state.days, state.selectedDay, state.date, actions.onDay)
-            Day(channel, layout, openId, onOpen, actions, onDetails, Modifier.padding(horizontal = 12.dp))
+            Day(
+                channel, state.dayLoading, layout, openId, onOpen, actions, onDetails,
+                Modifier.padding(horizontal = 12.dp),
+            )
         }
         return
     }
@@ -206,8 +251,9 @@ private fun ByChannel(
         )
         Spacer(Modifier.size(24.dp))
         Column(Modifier.weight(1f)) {
-            DayHead(channel, state.date.takeIf { channel.programs.isNotEmpty() })
-            if (channel.programs.isNotEmpty()) {
+            val hasDay = channel.dayPrograms.isNotEmpty() || state.dayLoading
+            DayHead(channel, state.date.takeIf { hasDay })
+            if (hasDay) {
                 SecondaryScrollableTabRow(selectedTabIndex = state.selectedDay, edgePadding = 0.dp) {
                     state.days.forEachIndexed { index, day ->
                         Tab(selected = index == state.selectedDay, onClick = { actions.onDay(index) }) {
@@ -216,7 +262,7 @@ private fun ByChannel(
                     }
                 }
             }
-            Day(channel, layout, openId, onOpen, actions, onDetails, Modifier.padding(top = 12.dp))
+            Day(channel, state.dayLoading, layout, openId, onOpen, actions, onDetails, Modifier.padding(top = 12.dp))
         }
     }
 }
@@ -224,6 +270,7 @@ private fun ByChannel(
 @Composable
 private fun Day(
     channel: GuideChannel,
+    loading: Boolean,
     layout: GuideLayout,
     openId: String?,
     onOpen: (String?) -> Unit,
@@ -231,12 +278,14 @@ private fun Day(
     onDetails: (String) -> Unit,
     modifier: Modifier,
 ) {
-    if (channel.programs.isEmpty()) {
-        NoSchedule { actions.onWatch(channel.id) }
+    val programs = channel.dayPrograms
+    if (programs.isEmpty()) {
+        val watch = actions.onWatch
+        if (loading) DayLoading() else NoSchedule(watch?.let { { it(channel.id) } })
         return
     }
     ChannelDay(
-        channel.programs, openId, onOpen, layout, actions, onDetails, modifier.fillMaxSize(),
+        programs, openId, onOpen, layout, actions, onDetails, modifier.fillMaxSize(),
         listState = rememberLazyListState(),
     )
 }
@@ -315,7 +364,7 @@ private fun ChannelTabs(channels: List<GuideChannel>, selectedId: String, onChan
 
 /** Section 12's empty list for a channel without guide data; Watch is the way on. */
 @Composable
-private fun NoSchedule(onWatch: () -> Unit) {
+private fun NoSchedule(onWatch: (() -> Unit)?) {
     Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
         Column(
             Modifier.widthIn(max = 400.dp),
@@ -334,11 +383,16 @@ private fun NoSchedule(onWatch: () -> Unit) {
                 stringResource(R.string.guide_no_schedule_reason), style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center,
             )
-            FilledTonalButton(onClick = onWatch, modifier = Modifier.padding(top = 16.dp)) {
-                ChannelActionLabel(R.drawable.channels_play, stringResource(R.string.channels_watch))
+            if (onWatch != null) {
+                FilledTonalButton(onClick = onWatch, modifier = Modifier.padding(top = 16.dp)) {
+                    ChannelActionLabel(R.drawable.channels_play, stringResource(R.string.channels_watch))
+                }
             }
         }
     }
 }
+
+/** By channel's list: the selected day, which the overview's programs stand in for when not given. */
+private val GuideChannel.dayPrograms: List<GuideProgram> get() = day ?: programs
 
 private const val VISIBLE_ABOVE = 2

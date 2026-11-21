@@ -55,4 +55,7 @@
     <string name="guide_year">Year</string>
     <!-- TV: details_categories -->
     <string name="guide_categories">Categories</string>
+    <!-- The offline line above the saved guide, as channels_offline / channels_saved say it for channels. -->
+    <string name="guide_offline">Can’t reach the server • Showing the saved guide</string>
+    <string name="guide_saved">Showing the saved guide</string>
 </resources>

@@ -394,7 +394,7 @@ internal fun RecPill() {
 internal fun rowColors(container: Color = MaterialTheme.colorScheme.surfaceContainer) =
     ListItemDefaults.segmentedColors(containerColor = container)
 
-private val ThumbWidth = 88.dp
-private val ThumbHeight = 50.dp
-private val ThumbShape = RoundedCornerShape(8.dp)
+internal val ThumbWidth = 88.dp
+internal val ThumbHeight = 50.dp
+internal val ThumbShape = RoundedCornerShape(8.dp)
 private val RowPadding = PaddingValues(start = 8.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)

@@ -18,6 +18,7 @@ import at.bernhardberger.tvhplayer.ui.MobileDarkColors
 import at.bernhardberger.tvhplayer.ui.screens.onboarding.discoverServers
 import at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
+import at.bernhardberger.tvhplayer.touch.guide.GuideViewModel
 import at.bernhardberger.tvhplayer.touch.recordings.RecordingsViewModel
 import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.viewModel
@@ -29,6 +30,7 @@ class MainActivity : ComponentActivity() {
     private val connection: AppConnectionViewModel by viewModel()
     private val channels: ChannelsViewModel by viewModel()
     private val recordings: RecordingsViewModel by viewModel()
+    private val guide: GuideViewModel by viewModel()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -41,7 +43,7 @@ class MainActivity : ComponentActivity() {
                 val target by sdk.playbackRuntime.activeTarget.collectAsStateWithLifecycle()
                 val playback by sdk.playbackRuntime.state.collectAsStateWithLifecycle()
                 TouchApp(
-                    session, owner, connection, channels, recordings,
+                    session, owner, connection, channels, recordings, guide,
                     playingId = playingChannelId(target, playback)?.value?.toString(),
                     onWatch = ::watch,
                     discovery = { discoverServers(applicationContext) },

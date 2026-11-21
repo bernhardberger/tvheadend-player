@@ -89,11 +89,15 @@ internal fun ProgramActions(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        if (onNow) WatchButton(contentPadding = padding) { actions.onWatch(channelId) }
-        RecordButton(
-            { actions.onRecord(programId) }, { actions.onRecordOptions(programId) },
-            contentPadding = padding, leads = !onNow,
-        )
+        val watch = actions.onWatch?.takeIf { onNow }
+        if (watch != null) WatchButton(contentPadding = padding) { watch(channelId) }
+        val record = actions.onRecord
+        val recordOptions = actions.onRecordOptions
+        if (record != null && recordOptions != null) {
+            RecordButton(
+                { record(programId) }, { recordOptions(programId) }, contentPadding = padding, leads = watch == null,
+            )
+        }
         if (onDetails != null) {
             TextButton(onClick = onDetails) {
                 if (detailsIcon) {
