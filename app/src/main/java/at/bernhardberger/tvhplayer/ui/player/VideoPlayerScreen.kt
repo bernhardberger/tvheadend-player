@@ -26,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.SideEffect
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
 import at.bernhardberger.tvheadend.sdk.core.EventId
@@ -443,9 +444,6 @@ fun VideoPlayerScreen(
 
     var connectionLost by remember { mutableStateOf(false) }
     var screenActive by remember { mutableStateOf(false) }
-    var channelNumberInput by remember { mutableStateOf("") }
-    // Whether the entry last cleared was committed to its channel, so it settles into the identity.
-    var channelNumberCommitted by remember { mutableStateOf(false) }
     var timeshiftCommandToken by remember { mutableLongStateOf(0L) }
     var restoreToLiveAfterReconnect by remember { mutableStateOf(false) }
     val remoteKeys = remember { LivePlayerRemoteKeyState() }
@@ -453,7 +451,9 @@ fun VideoPlayerScreen(
     val rootFocus = remember { FocusRequester() }
 
     var currentChannelId by remember { mutableStateOf(channelId) }
-    var infoPinnedEventId by remember(currentChannelId) { mutableStateOf<EventId?>(null) }
+    val programmeActions = remember { mutableStateOf<DvrMutationAction?>(null) }.let { inFlight ->
+        remember(currentChannelId) { LiveProgrammeActionState(inFlight) }
+    }
     var currentChannelName by remember { mutableStateOf(channelName) }
     val confirmedPlayingChannelId = playingLiveChannelId.takeIf {
         it == currentChannelId && playbackState.presented
@@ -616,7 +616,7 @@ fun VideoPlayerScreen(
                     if (timelineState.scrubSpeed != 0) timelineState.cancelPendingSeek()
                     screenActive = false
                     // Leaving drops a half-typed number: it never tunes on return.
-                    channelNumberInput = ""
+                    remoteKeys.channelNumberInput = ""
                     // Leaving cancels the settling and the running start now, before any
                     // recomposition: an admitted start never installs behind a stopped screen.
                     // Resume restarts the current request through the effect below.
@@ -814,7 +814,7 @@ fun VideoPlayerScreen(
     PersistConfirmedChannel(confirmedPlayingChannelId, channelScope, observation, lastPlayedChannelStore)
 
     fun openInfo(fromKey: Boolean = false, returnAction: String = "player-info") {
-        infoPinnedEventId = null
+        programmeActions.infoPinnedEventId = null
         remoteKeys.infoInitialAction = null
         remoteKeys.infoRailChannelId = null
         remoteKeys.infoReturnOrigin = returnAction
@@ -825,21 +825,19 @@ fun VideoPlayerScreen(
 
     fun prepareSchedule() {
         if (timelineState.seekPending) timelineState.commitPendingSeek()
-        channelNumberInput = ""
+        remoteKeys.channelNumberInput = ""
         // A zap can close the schedule past a covered Info; closeInfo() sets the target again on a real return.
         remoteKeys.infoReturnAction = null
     }
 
-    var recordConfirmation by remember(currentChannelId) { mutableStateOf<LiveRecordConfirmation?>(null) }
-    val recordInFlight = remember { mutableStateOf<DvrMutationAction?>(null) }
     fun dismissRecordingDialog() {
-        recordConfirmation = null
+        programmeActions.confirmation = null
         layerState.dismissRecordingConfirmation()
         layerState.core.restoreControl = "player-record"
     }
 
     fun closeInfo() {
-        infoPinnedEventId = null
+        programmeActions.infoPinnedEventId = null
         layerState.dismissRecordingConfirmation()
         val returnToRail = remoteKeys.infoRailChannelId != null
         layerState.closeInfo(returnToRail = returnToRail)
@@ -853,7 +851,7 @@ fun VideoPlayerScreen(
      */
     fun optionsOpenedFromKey() {
         if (timelineState.seekPending) timelineState.commitPendingSeek()
-        channelNumberInput = ""
+        remoteKeys.channelNumberInput = ""
     }
 
     // Confirmed watch history, newest first, restricted to the current channel scope.
@@ -983,7 +981,7 @@ fun VideoPlayerScreen(
     val tuneChannel = fun(channel: Channel, settleMs: Long): Boolean {
         profileTrace("P49:zap:tune-channel:settle:$settleMs:time:${SystemClock.uptimeMillis()}") { }
         val channelId = channel.id
-        channelNumberInput = ""
+        remoteKeys.channelNumberInput = ""
         selection.setSelected(channelId)
         selectedId = channelId
 
@@ -995,7 +993,7 @@ fun VideoPlayerScreen(
 
         val playbackSelection = currentLivePlaybackSelection(observation, channelId)
             ?: return true
-        if (recordConfirmation != null) dismissRecordingDialog()
+        if (programmeActions.confirmation != null) dismissRecordingDialog()
         timeshiftCommandToken += 1L
         timelineState.invalidateForSourceChange()
         liveRequestToken += 1L
@@ -1049,7 +1047,7 @@ fun VideoPlayerScreen(
         !playerClose.requested && activeTarget is AppPlaybackTarget.Live
     val latestSessionChannelStep by rememberUpdatedState<(Int) -> Unit> { direction ->
         if (sessionChannelStepEnabled) {
-            channelNumberInput = ""
+            remoteKeys.channelNumberInput = ""
             tuneAdjacentChannel(direction, SystemClock.uptimeMillis(), repeat = false)
         }
     }
@@ -1061,44 +1059,44 @@ fun VideoPlayerScreen(
     }
 
     fun tuneEnteredChannel(): Boolean {
-        if (channelNumberInput.isEmpty()) return false
+        if (remoteKeys.channelNumberInput.isEmpty()) return false
 
         val channelId = ChannelNavigation.idForNumber(
             orderedIds = orderedChannelIds,
             channelNumbers = channelNumbers,
-            enteredNumber = channelNumberInput,
+            enteredNumber = remoteKeys.channelNumberInput,
         )
         val channel = channels.firstOrNull { it.id == channelId }
-        channelNumberCommitted = channel != null
-        channelNumberInput = ""
+        remoteKeys.channelNumberCommitted = channel != null
+        remoteKeys.channelNumberInput = ""
 
         return channel?.let { tuneChannel(it, 0L) } ?: true
     }
 
     // The digit timer commits with the list, numbers and session current when it fires,
     // not the ones of the composition that started it.
-    // Set while an entry that named no channel is still shown, after its commit.
-    var channelNumberUnknown by remember { mutableStateOf(false) }
     @Composable
-    fun channelNumberTarget() = remember(channelNumberInput, channels, channelNumberDigits, channelNumberUnknown) {
-        val channel = ChannelNavigation.idForNumber(orderedChannelIds, channelNumbers, channelNumberInput)
-            ?.let { id -> channels.firstOrNull { it.id == id } }
-        when {
-            channel != null -> ChannelNumberTarget.Channel(channel.visibleChannelNumber?.toString().orEmpty(),
-                channel.name.orEmpty(), channel.icon)
-            channelNumberUnknown -> ChannelNumberTarget.None
-            orderedChannelIds.isEmpty() || ChannelNavigation.canExtendToNumber(
-                orderedChannelIds, channelNumbers, channelNumberInput, channelNumberDigits,
-            ) -> ChannelNumberTarget.Pending
-            else -> ChannelNumberTarget.None
+    fun channelNumberTarget(): ChannelNumberTarget {
+        val channelNumberInput = remoteKeys.channelNumberInput
+        val channelNumberUnknown = remoteKeys.channelNumberUnknown
+        return remember(channelNumberInput, channels, channelNumberDigits, channelNumberUnknown) {
+            val channel = ChannelNavigation.idForNumber(orderedChannelIds, channelNumbers, channelNumberInput)
+                ?.let { id -> channels.firstOrNull { it.id == id } }
+            when {
+                channel != null -> ChannelNumberTarget.Channel(channel.visibleChannelNumber?.toString().orEmpty(),
+                    channel.name.orEmpty(), channel.icon)
+                channelNumberUnknown -> ChannelNumberTarget.None
+                orderedChannelIds.isEmpty() || ChannelNavigation.canExtendToNumber(
+                    orderedChannelIds, channelNumbers, channelNumberInput, channelNumberDigits,
+                ) -> ChannelNumberTarget.Pending
+                else -> ChannelNumberTarget.None
+            }
         }
     }
-    // Uptime of the last digit or CH key not yet followed by a recomposition (0 when none).
-    val zapKeyUptime = remember { longArrayOf(0L) }
     val channelNumberEntryReadiness = ChannelNavigation.entryReadiness(
         orderedIds = orderedChannelIds,
         channelNumbers = channelNumbers,
-        enteredNumber = channelNumberInput,
+        enteredNumber = remoteKeys.channelNumberInput,
         playable = { currentLivePlaybackSelection(observation, it) != null },
     )
     @Composable
@@ -1107,16 +1105,16 @@ fun VideoPlayerScreen(
     val latestChannelNumberDigits by rememberUpdatedState(channelNumberDigits)
     val latestTuneEnteredChannel by rememberUpdatedState<() -> Unit> { tuneEnteredChannel() }
     SideEffect {
-        val keyUptime = zapKeyUptime[0]
+        val keyUptime = remoteKeys.zapKeyUptime
         if (keyUptime != 0L) {
-            zapKeyUptime[0] = 0L
+            remoteKeys.zapKeyUptime = 0L
             profileTrace("P49:zap:first-recomposition:age:${SystemClock.uptimeMillis() - keyUptime}") { }
         }
     }
-    LaunchedEffect(channelNumberInput) {
-        channelNumberUnknown = false
-        if (channelNumberInput.isEmpty()) return@LaunchedEffect
-        val entered = channelNumberInput
+    LaunchedEffect(remoteKeys.channelNumberInput) {
+        remoteKeys.channelNumberUnknown = false
+        val entered = remoteKeys.channelNumberInput
+        if (entered.isEmpty()) return@LaunchedEffect
         val enteredAt = SystemClock.uptimeMillis()
         commitChannelNumberEntry(
             entryDelayMs = if (ChannelNavigation.isCompleteEntry(entered, latestChannelNumberDigits)) {
@@ -1131,17 +1129,17 @@ fun VideoPlayerScreen(
             ) { }
             if (!screenActive) {
                 // Stopped before this effect was cancelled: leaving dropped the entry.
-                channelNumberInput = ""
+                remoteKeys.channelNumberInput = ""
             } else if (settled == ChannelNumberEntryReadiness.NOT_READY) {
                 // Still not playable at the bound: drop the entry, keep the selection.
                 profileTrace("P49:zap:digit-dropped:not-ready") { }
-                channelNumberInput = ""
+                remoteKeys.channelNumberInput = ""
             } else if (settled == ChannelNumberEntryReadiness.UNKNOWN) {
                 // The entry names no channel: say so long enough to read, then drop it. A further
                 // digit or Back replaces or clears it meanwhile.
-                channelNumberUnknown = true
+                remoteKeys.channelNumberUnknown = true
                 delay(NO_CHANNEL_HOLD_MS)
-                channelNumberInput = ""
+                remoteKeys.channelNumberInput = ""
             } else {
                 latestTuneEnteredChannel()
             }
@@ -1169,8 +1167,6 @@ fun VideoPlayerScreen(
     } else null
     val infoEvent = displayedProgrammeEvent(visibleSeekPreview != null, displayedWindow,
         committedWindow, effectiveTimeshiftState, nowEvent, liveStart)
-    val recordState = infoEvent?.let(observation::dvrEntryForEvent)?.takeUnless(::recordingWasRemoved)
-        ?.state?.takeIf { it in LiveRecordStates }
 
     fun recordActions(
         programme: EpgEventEntry,
@@ -1201,7 +1197,7 @@ fun VideoPlayerScreen(
     }
 
     fun recordProgramme(programme: EpgEventEntry?, fromControl: Boolean = false) {
-        if (recordInFlight.value != null || recordConfirmation != null) return
+        if (programmeActions.inFlight.value != null || programmeActions.confirmation != null) return
         val opening = observation
         val capability = opening.currentSession
         if (programme == null) {
@@ -1220,16 +1216,16 @@ fun VideoPlayerScreen(
             if (mutation == null) {
                 // Rule-created schedules, for example, offer Skip in Details instead of Cancel.
                 openInfo(returnAction = "player-record")
-                infoPinnedEventId = programme.id.takeIf { opening.event(it) != null }
+                programmeActions.infoPinnedEventId = programme.id.takeIf { opening.event(it) != null }
             } else {
-                recordConfirmation = LiveRecordConfirmation(programme, mutation, opening, currentChannelId)
+                programmeActions.confirmation = LiveRecordConfirmation(programme, mutation, opening, currentChannelId)
                 layerState.showRecordingConfirmation()
             }
         } else if (capability == null || BrowseContextAction.RECORD !in actions) {
             notices.postRecordUnavailable(programme, opening, nowSec)
         } else {
             val mutation = DvrMutationAction.CreateProgramme(programme.programmeRecordingTarget(capability), null)
-            recordInFlight.value = mutation
+            programmeActions.inFlight.value = mutation
             scope.launch {
                 try {
                     val preferred = uiSettingsStore.settings.first().recordingProfileId
@@ -1242,7 +1238,7 @@ fun VideoPlayerScreen(
                     val context = notices.context()
                     notices.postDvrFailure(configured, dvrMutationActions.execute(configured), context)
                 } finally {
-                    recordInFlight.value = null
+                    programmeActions.inFlight.value = null
                 }
             }
         }
@@ -1296,20 +1292,20 @@ fun VideoPlayerScreen(
     }
     fun currentPlayerForegroundContext() =
         layerState.foregroundContext(
-            numberEntryVisible = channelNumberInput.isNotEmpty(),
+            numberEntryVisible = remoteKeys.channelNumberInput.isNotEmpty(),
             recoveryVisible = recoveryVisible,
             terminalErrorVisible = false,
             seekPreviewPhase = timelineState.seekPreviewPhase(layerState.core.chrome.controlsVisible),
         )
     val foregroundContext = currentPlayerForegroundContext()
     val confirmationVisible = foregroundContext.confirmationVisible
-    val validRecordConfirmation = recordConfirmation?.takeIf { recordingConfirmationIsCurrent(it, observation) }
+    val validRecordConfirmation = programmeActions.confirmation
+        ?.takeIf { recordingConfirmationIsCurrent(it, observation) }
     LaunchedEffect(confirmationVisible, validRecordConfirmation) {
         if (confirmationVisible && validRecordConfirmation == null) dismissRecordingDialog()
-        else if (!confirmationVisible) recordConfirmation = null
+        else if (!confirmationVisible) programmeActions.confirmation = null
     }
     val infoVisible = foregroundContext.infoVisible
-    val showDrawer = foregroundContext.channelDrawerVisible
     val seekPreviewPhase = foregroundContext.seekPreviewPhase
     val foregroundLayer = playerForegroundLayer(foregroundContext)
     LaunchedEffect(guideEntryRequestId) {
@@ -1335,9 +1331,9 @@ fun VideoPlayerScreen(
             seekPending = timelineState.seekPending,
             modalVisible = layerState.core.optionsPage != null ||
                 layerState.core.infoOpen ||
-                confirmationVisible ||
-                showDrawer ||
-                channelNumberInput.isNotEmpty(),
+                foregroundContext.confirmationVisible ||
+                foregroundContext.channelDrawerVisible ||
+                remoteKeys.channelNumberInput.isNotEmpty(),
             recoveryVisible = recoveryVisible,
             actionableErrorVisible = connState is ConnectionState.Error ||
                 playbackState is AppPlaybackState.Failed,
@@ -1541,7 +1537,7 @@ fun VideoPlayerScreen(
             PlayerBackAction.CLOSE_INFO ->
                 closeInfo()
             PlayerBackAction.CLOSE_SCHEDULE -> layerState.closeSchedule()
-            PlayerBackAction.CLEAR_NUMBER_ENTRY -> channelNumberInput = ""
+            PlayerBackAction.CLEAR_NUMBER_ENTRY -> remoteKeys.channelNumberInput = ""
             PlayerBackAction.CLOSE_CHANNEL_DRAWER -> layerState.dismissChannelDrawer()
             PlayerBackAction.CLOSE_PLAYER -> playerClose.close()
             PlayerBackAction.CANCEL_PENDING_SEEK -> timelineState.cancelPendingSeek()
@@ -1586,7 +1582,7 @@ fun VideoPlayerScreen(
                 if (serverWait.consumesKey(event, layerState)) return@onPreviewKeyEvent true
                 val keyCode = event.nativeKeyEvent.keyCode
                 layerState.handleScheduleKey(event, foregroundLayer, ::prepareSchedule)?.let { return@onPreviewKeyEvent it }
-                if (layerState.core.infoOpen || confirmationVisible) {
+                if (layerState.core.infoOpen || foregroundContext.confirmationVisible) {
                     if (layerState.core.consumesRevealingKey(event)) return@onPreviewKeyEvent true
                     // Details owns navigation; no playback or options key
                     // (including Left-as-Back in the other panels) reaches the player underneath.
@@ -1613,7 +1609,7 @@ fun VideoPlayerScreen(
                     timeshiftAvailable = effectiveTimeshiftState.available,
                     optionsOpen = layerState.core.optionsPage != null,
                     infoOpen = layerState.core.infoOpen,
-                    drawerOpen = showDrawer,
+                    drawerOpen = foregroundContext.channelDrawerVisible,
                     confirmationOpen = foregroundLayer == PlayerForegroundLayer.CONFIRMATION,
                     livePause = livePauseAvailability,
                     scrubbing = timelineState.scrubSpeed != 0,
@@ -1700,19 +1696,19 @@ fun VideoPlayerScreen(
                 }
 
                 ChannelNavigation.digitForKeyCode(event.nativeKeyEvent.keyCode)?.let { digit ->
-                    zapKeyUptime[0] = profileZapKey(event.nativeKeyEvent)
+                    remoteKeys.zapKeyUptime = profileZapKey(event.nativeKeyEvent)
                     if (event.nativeKeyEvent.repeatCount == 0) {
-                        channelNumberCommitted = false
-                        channelNumberInput = ChannelNavigation.appendDigit(
-                            channelNumberInput, digit, channelNumberDigits,
+                        remoteKeys.channelNumberCommitted = false
+                        remoteKeys.channelNumberInput = ChannelNavigation.appendDigit(
+                            remoteKeys.channelNumberInput, digit, channelNumberDigits,
                         )
                     }
                     return@onPreviewKeyEvent true
                 }
 
                 ChannelNavigation.directionForKeyCode(event.nativeKeyEvent.keyCode)?.let { direction ->
-                    zapKeyUptime[0] = profileZapKey(event.nativeKeyEvent)
-                    channelNumberInput = ""
+                    remoteKeys.zapKeyUptime = profileZapKey(event.nativeKeyEvent)
+                    remoteKeys.channelNumberInput = ""
                     when (playbackChannelKeyAction(
                         railBrowsesChannelKeys = foregroundLayer == PlayerForegroundLayer.CHANNEL_DRAWER,
                     )) {
@@ -1723,7 +1719,7 @@ fun VideoPlayerScreen(
                     }
                 }
 
-                if (channelNumberInput.isNotEmpty()) {
+                if (remoteKeys.channelNumberInput.isNotEmpty()) {
                     return@onPreviewKeyEvent when (event.key) {
                         Key.Enter,
                         Key.NumPadEnter,
@@ -1737,7 +1733,7 @@ fun VideoPlayerScreen(
                     }
                 }
 
-                if (showDrawer) {
+                if (foregroundContext.channelDrawerVisible) {
                     return@onPreviewKeyEvent false
                 }
 
@@ -1765,7 +1761,7 @@ fun VideoPlayerScreen(
                             BrowseContextAction.CANCEL else BrowseContextAction.STOP
                         if (wasScrubbing) commitScrub()
                         openInfo(fromKey = true)
-                        infoPinnedEventId = programme?.id.takeIf { wasScrubbing }
+                        programmeActions.infoPinnedEventId = programme?.id.takeIf { wasScrubbing }
                         remoteKeys.infoInitialAction = initialAction
                         return@onPreviewKeyEvent true
                     }
@@ -1847,7 +1843,8 @@ fun VideoPlayerScreen(
     val onRecoveryRetry: (PlaybackRetryCommand) -> Unit = { dispatchRecoveryRetry(it) }
     val chromeLayer = playerChromeLayer(foregroundContext)
     // The digits shown in the top identity's place; empty while another layer covers the entry.
-    val numberEntry = channelNumberInput.takeIf { foregroundLayer == PlayerForegroundLayer.NUMBER_ENTRY }.orEmpty()
+    val numberEntry = remoteKeys.channelNumberInput
+        .takeIf { foregroundLayer == PlayerForegroundLayer.NUMBER_ENTRY }.orEmpty()
     val compactTuning = busyStatus == PlayerBusyStatus.TUNING && statusPresentation == PlaybackStatusPresentation.COMPACT_TUNING
     val dvrEntries = observation.dvrEntries()
     val recordingChannelIds = remember(dvrEntries, nowSec) { activeRecordingChannelIds(dvrEntries, nowSec) }
@@ -1906,7 +1903,7 @@ fun VideoPlayerScreen(
         // The channel drawer opens with the controls; the page's own Info never holds them here (no details).
         val controlsLayerShown = chromeLayer == PlayerForegroundLayer.CONTROLS || channelRailOpen
         val chromePanelOpen = layerState.core.optionsPage != null || layerState.core.infoOpen ||
-            layerState.scheduleOpen || confirmationVisible
+            layerState.scheduleOpen || foregroundContext.confirmationVisible
         // The lower chrome's mode, for the chrome itself and for the Stats card under it.
         fun lowerChromeMode(keepControls: Boolean) = playerChromeMode(
             controls = controlsLayerShown || keepControls,
@@ -1986,7 +1983,7 @@ fun VideoPlayerScreen(
             actions = PlayerChromeActions(
                 // Under number entry the controls stay up, but the root takes the keys.
                 active = layerState.core.chrome.controlsVisible && layerState.core.optionsPage == null && !layerState.core.infoOpen &&
-                    !numberEntryUp && !confirmationVisible,
+                    foregroundLayer != PlayerForegroundLayer.NUMBER_ENTRY && !foregroundContext.confirmationVisible,
                 paused = !livePlayWhenReady(livePauseState, playWhenReady),
                 livePause = livePauseAvailability,
                 restoreFocus = when {
@@ -2008,7 +2005,8 @@ fun VideoPlayerScreen(
             onCommitSeek = timelineState::commitPendingSeek,
             onStop = stopAndClose,
             onRecord = { recordProgramme(infoEvent, fromControl = true) },
-            recordState = recordState,
+            recordState = infoEvent?.let(observation::dvrEntryForEvent)?.takeUnless(::recordingWasRemoved)
+                ?.state?.takeIf { it in LiveRecordStates },
             onInfo = {
                 openInfo()
             },
@@ -2121,7 +2119,8 @@ fun VideoPlayerScreen(
         val detailsChannelId = remoteKeys.infoRailChannelId ?: currentChannelId
         val detailsChannel = channels.firstOrNull { it.id == detailsChannelId }
         val detailsBaseEvent = if (remoteKeys.infoRailChannelId == null) {
-            infoPinnedEventId?.let(observation::event) ?: infoEvent.takeIf { infoPinnedEventId == null }
+            programmeActions.infoPinnedEventId?.let(observation::event)
+                ?: infoEvent.takeIf { programmeActions.infoPinnedEventId == null }
         } else channelsVm.nowEvent(detailsChannelId, nowSec)
         if (layerState.scheduleOpen) PlayerChannelSchedule(
             layerState, currentChannelId, currentChannel, observation, { session.observation.value }, nowSec, effectiveTimeshiftState,
@@ -2142,7 +2141,7 @@ fun VideoPlayerScreen(
                 onPlayRecording = onPlayRecording,
             )
         }
-        if (confirmationVisible && validRecordConfirmation != null) {
+        if (foregroundContext.confirmationVisible && validRecordConfirmation != null) {
             val (programme, mutation, opening) = validRecordConfirmation
             ConfirmProgrammeActionDialog(
                 action = if (mutation is DvrMutationAction.Stop) {
@@ -2159,14 +2158,14 @@ fun VideoPlayerScreen(
                     .value.activeProfile()?.accountName(),
                 onDismiss = ::dismissRecordingDialog,
                 onConfirm = confirm@{
-                    if (recordConfirmation !== validRecordConfirmation) return@confirm
+                    if (programmeActions.confirmation !== validRecordConfirmation) return@confirm
                     val stillCurrent = recordingConfirmationIsCurrent(
                         validRecordConfirmation, session.observation.value,
                     )
                     dismissRecordingDialog()
                     if (stillCurrent) dvrMutationActions.launchMutation(
                         mutation, opening, { session.observation.value }, { nowSec },
-                        uiSettingsStore, notices, scope, recordInFlight,
+                        uiSettingsStore, notices, scope, programmeActions.inFlight,
                     )
                 },
             )
@@ -2223,7 +2222,7 @@ fun VideoPlayerScreen(
                 number = numberEntry,
                 target = channelNumberTarget(),
                 maxDigits = channelNumberDigits,
-                settles = channelNumberCommitted,
+                settles = remoteKeys.channelNumberCommitted,
             )
         }
 
@@ -2257,6 +2256,11 @@ fun VideoPlayerScreen(
 
 private val LiveRecordStates = setOf(DvrEntryState.SCHEDULED, DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR)
 
+private class LiveProgrammeActionState(val inFlight: MutableState<DvrMutationAction?>) {
+    var infoPinnedEventId by mutableStateOf<EventId?>(null)
+    var confirmation by mutableStateOf<LiveRecordConfirmation?>(null)
+}
+
 private data class LiveRecordConfirmation(
     val programme: EpgEventEntry,
     val mutation: DvrMutationAction,
@@ -2265,6 +2269,13 @@ private data class LiveRecordConfirmation(
 )
 
 private class LivePlayerRemoteKeyState {
+    var channelNumberInput by mutableStateOf("")
+    // Whether the entry last cleared was committed to its channel, so it settles into the identity.
+    var channelNumberCommitted by mutableStateOf(false)
+    // Set while an entry that named no channel is still shown, after its commit.
+    var channelNumberUnknown by mutableStateOf(false)
+    // Uptime of the last digit or CH key not yet followed by a recomposition (0 when none).
+    var zapKeyUptime = 0L
     var infoRailChannelId by mutableStateOf<ChannelId?>(null)
     var infoReturnOrigin = "player-info"
     var infoReturnAction by mutableStateOf<String?>(null)
