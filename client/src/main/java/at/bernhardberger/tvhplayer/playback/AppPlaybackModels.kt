@@ -216,6 +216,8 @@ data class AppVideoPresentation(
     val soundSinceMillis: Long? = null,
     /** An app-initiated live entry/resume without its picture yet; the runtime's monotonic clock. */
     val channelStartAtMillis: Long? = null,
+    /** This epoch reinstalled a released recording whose previous play intent was to play. */
+    val resumesReleasedRecording: Boolean = false,
 )
 
 /** One installed live target's presentation evidence, read together under the target access lock. */
@@ -226,8 +228,12 @@ data class AppLiveTargetPresentation(
     val audioOnly: Boolean,
 )
 
-internal fun AppVideoPresentation.beginTarget(epoch: Long) =
-    AppVideoPresentation(epoch = epoch, channelStartAtMillis = channelStartAtMillis)
+internal fun AppVideoPresentation.beginTarget(epoch: Long, resumesReleasedRecording: Boolean = false) =
+    AppVideoPresentation(
+        epoch = epoch,
+        channelStartAtMillis = channelStartAtMillis,
+        resumesReleasedRecording = resumesReleasedRecording,
+    )
 
 internal fun AppVideoPresentation.onFirstFrame(
     frameEpoch: Long,

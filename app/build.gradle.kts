@@ -120,6 +120,11 @@ fun resourceLocaleFilters(tags: List<String>) = tags.flatMap { tag ->
     }
 }.distinct()
 
+composeCompiler {
+    // Immutable player-bar types that :client compiles without the Compose compiler.
+    stabilityConfigurationFiles.add(layout.projectDirectory.file("compose-stability.conf"))
+}
+
 android {
     lint {
         // Check shared texts with their consumers, including resource usage across modules.

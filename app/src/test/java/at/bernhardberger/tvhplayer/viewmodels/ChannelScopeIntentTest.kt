@@ -281,7 +281,7 @@ class ChannelScopeIntentTest {
         val latest = session.observation.value
         assertEquals(before.observation!!.channelState, latest.channelState)
         assertNotNull(latest.currentSession)
-        assertNotSame(before.observation.currentSession, latest.currentSession)
+        assertNotSame(before.observation!!.currentSession, latest.currentSession)
         assertSame("Equal channels must not retain the previous session's scope authority", latest, model.scope.value.observation)
         assertNotNull(at.bernhardberger.tvhplayer.ui.screens.home.homeInput(
             model.scope.value, latest, emptyList(), null, 0L))

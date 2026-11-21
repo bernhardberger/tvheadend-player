@@ -1395,7 +1395,10 @@ class AppPlaybackRuntime(
                         continuesTarget = preservesMarkerHistory,
                     )
                     presentation.publishStarting()
-                    presentation.beginTargetPresentationLocked(epoch)
+                    presentation.beginTargetPresentationLocked(
+                        epoch,
+                        resumesReleasedRecording = continueReleased && playWhenReady,
+                    )
                     presentation.publishInstalledPlayerStateLocked()
                     livePauseController.publishLivePause()
                 }

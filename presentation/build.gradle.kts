@@ -41,6 +41,7 @@ dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation("androidx.compose.runtime:runtime-saveable")
     implementation("androidx.lifecycle:lifecycle-viewmodel:${libs.versions.lifecycle.get()}")
+    implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.kotlinx.coroutines.core)
 
     testImplementation(libs.junit)

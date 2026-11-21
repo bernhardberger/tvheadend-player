@@ -303,7 +303,7 @@ internal class PlaybackPresentationPublisher(
         }
     }
 
-    fun beginTargetPresentationLocked(epoch: Long) {
+    fun beginTargetPresentationLocked(epoch: Long, resumesReleasedRecording: Boolean = false) {
         targetCommands.runIfOpen {
             channelStartAudioEpoch = epoch
             targetFrameListener?.let(player::removeListener)
@@ -311,7 +311,7 @@ internal class PlaybackPresentationPublisher(
             pendingSoundMillis = null
             stopMotionWatch()
             stopTunneledCoverWatch()
-            _videoPresentation.value = _videoPresentation.value.beginTarget(epoch)
+            _videoPresentation.value = _videoPresentation.value.beginTarget(epoch, resumesReleasedRecording)
             val staleFormat = staleVideoFormat
             presentationBeforeInstall = null
             staleVideoFormat = null

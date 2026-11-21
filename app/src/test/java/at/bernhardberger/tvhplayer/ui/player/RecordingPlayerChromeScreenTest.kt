@@ -29,6 +29,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isFocusable
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.assertContentDescriptionEquals
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.onNodeWithTag
@@ -64,6 +65,7 @@ import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import java.util.concurrent.CountDownLatch
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.MediaSource
+import androidx.media3.test.utils.robolectric.TestPlayerRunHelper
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
@@ -240,8 +242,10 @@ class RecordingPlayerChromeScreenTest {
 
     @Test fun loadingRingKeepsControlsUsableUntilFirstFrame() {
         screen()
+        val resumeCaption = context.getString(R.string.main_startup_message_resuming_playback)
         assertTrue(startingRingShown())
         assertFalse(loadingShown())
+        assertFalse("a fresh start is not a wake continuation", texts(resumeCaption))
         key(Key.DirectionDown)
         assertTrue(exists("player-actions"))
         compose.onNodeWithTag("player-pause").assertIsFocused()
@@ -254,7 +258,32 @@ class RecordingPlayerChromeScreenTest {
         presentFirstFrame()
         settle()
         assertFalse("the first video frame dismisses loading", exists("player-busy-indicator"))
+
+        val previousEpoch = runtime.videoPresentation.value.epoch
+        compose.runOnIdle {
+            forcedReady = false
+            runtime.onAppBackgrounded()
+        }
+        TestPlayerRunHelper.advance(player).untilPendingCommandsAreFullyHandled()
+        compose.runOnIdle {
+            assertEquals(null, player.currentMediaItem)
+            runtime.onAppForegrounded()
+        }
+        TestPlayerRunHelper.advance(player).untilPendingCommandsAreFullyHandled()
+        compose.settleFrames(2)
+        assertTrue("wake reinstalls the recording", runtime.videoPresentation.value.epoch != previousEpoch)
+        assertFalse("a fast wake must not flash the caption", texts(resumeCaption))
+        compose.mainClock.advanceTimeBy(800)
+        compose.onAllNodes(hasText(resumeCaption), useUnmergedTree = true)[0].assertIsDisplayed()
+        assertFalse("wake draws only one busy status", exists("player-busy-indicator"))
         key(Key.DirectionDown)
+        compose.onNodeWithTag("player-pause").assertIsFocused()
+        playingWithoutFrame()
+        assertTrue("READY alone does not dismiss wake feedback", texts(resumeCaption))
+        presentFirstFrame()
+        compose.settleFrames(2)
+        assertFalse("first picture dismisses wake feedback", texts(resumeCaption))
+
         assertTrue(exists("player-actions"))
         compose.runOnIdle {
             forcedReady = false
@@ -263,6 +292,7 @@ class RecordingPlayerChromeScreenTest {
         compose.mainClock.advanceTimeBy(1_200)
         compose.waitForIdle()
         assertTrue("buffering feedback stays visible over open controls after presentation", exists("player-busy-indicator"))
+        assertFalse("ordinary buffering does not bring the wake caption back", texts(resumeCaption))
     }
 
     @Test fun loadingYieldsToPauseAndBackStillLeavesBeforeTheFirstFrame() {

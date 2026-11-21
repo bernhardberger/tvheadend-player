@@ -490,6 +490,7 @@ fun RecordingPlayerScreen(
     val startingVisible by rememberBusyVisible(
         busyKey, !recordingResolving && startingEligible, PlayerBusyStatus.RECORDING_STARTING,
     )
+    val resumingVisible = startingVisible && videoPresentation.resumesReleasedRecording
     // Startup owns feedback until a frame; later seeks use the ordinary buffering ring.
     val bufferingEligible = bufferingStatusEligible(
         playbackState, playWhenReady, activeTarget, busyTarget,
@@ -694,6 +695,14 @@ fun RecordingPlayerScreen(
             .playerRootSemantics(stringResource(R.string.player_recording_surface))
             .focusable(),
     ) {
+        // Keep the passive wake scrim below the chrome so it does not dim the focused control.
+        if (resumingVisible) {
+            TvRecoveryOverlay(
+                visible = true,
+                message = stringResource(R.string.main_startup_message_resuming_playback),
+                opaque = false,
+            )
+        }
         val chromePanelOpen = layers.optionsPage != null || layers.infoOpen
         // Passive diagnostics remain below every foreground layer, including recovery.
         PlaybackStatsVisibility(
@@ -817,7 +826,7 @@ fun RecordingPlayerScreen(
             )
 
         }
-        if (!busyBlocked) {
+        if (!busyBlocked && !resumingVisible) {
             PlayerBusyIndicator(busyStatus, Modifier.align(Alignment.Center))
         }
         PlayerHiddenStatusChip(

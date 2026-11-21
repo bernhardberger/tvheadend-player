@@ -54,6 +54,11 @@ directly. `:client` mirrors the app build types (`debug`, `release`, `profile`,
   growing timeline end, last-played channel, live-info recording, metadata
   cache, programme actions and recording targets, recording markers, seekbar,
   timeline EPG, timeshift presentation and channel scope visibility.
+- `core/` player status: `PlayerBarStatus`, `PlaybackStatusPresentation`,
+  `PlaybackRecoveryPresentation`, `PlaybackTimeFormat` and `TrackLabelPolicy`.
+- `ui/player/PlayerHelpers` (track listing and selection) and
+  `ui/player/VideoDisplayMode` (display mode and refresh-rate policy); both
+  keep their existing package.
 - `ui/screens/onboarding/ConnectionSetupPolicy`: resource- and Compose-free
   setup steps, transitions and failure actions; retains its existing package.
 
@@ -61,9 +66,12 @@ directly. `:client` mirrors the app build types (`debug`, `release`, `profile`,
 
 Shared player texts and the connection setup presentation: `ConnectionSetupState`,
 `ConnectionFormState`, `AppConnectionViewModel` and `AppErrorText` (including
-its localized seconds formatter).
-This library depends on `:client` and uses lifecycle ViewModel and Compose state
-and saveable APIs, not TV widgets or dependencies. The variant-specific launcher
+its localized seconds formatter). Shared channel scope state:
+`viewmodels/ChannelsViewModel` with `ChannelScopeState`. Video aspect state:
+`ui/player/VideoAspect`.
+This library depends on `:client` and uses lifecycle ViewModel, lifecycle
+runtime Compose, and Compose state and saveable APIs, not TV widgets or
+dependencies. The variant-specific launcher
 label stays in `:app`.
 
 ## What stays app-owned and why
@@ -83,6 +91,9 @@ New UI-free runtime, persistence or domain code goes to `:client`.
 Tvheadend-generic protocol, catalog, EPG, DVR or playback knowledge goes to the
 SDK. Shared connection setup state and text formatting go to `:presentation`;
 TV interaction, screens and dependency injection stay in `:app`.
+`:client` builds without the Compose compiler, so its classes count as unstable
+in composables. An immutable `:client` type passed to a composable that relies on
+skipping is listed in `app/compose-stability.conf`.
 
 ## Tooling
 

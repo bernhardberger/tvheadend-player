@@ -93,20 +93,42 @@ class BackgroundPlaybackRuntimeTest {
 
     @Test fun recordingsReleaseTheirSourceInBackground() = exercise {
         runtime.enterPlayerScreen(livePlayerOwner = this)
+        val selection = requireNotNull(currentRecordingPlaybackSelection(session.observation.value, RECORDING))
         val install = scope.async {
-            runtime.playRecording(requireNotNull(currentRecordingPlaybackSelection(session.observation.value, RECORDING)),
-                RecordingPlaybackStart.START_OVER)
+            runtime.playRecording(selection, RecordingPlaybackStart.START_OVER)
         }
         await { install.isCompleted }
+        val initial = runtime.videoPresentation.value
+        assertFalse(initial.resumesReleasedRecording)
         runtime.onAppBackgrounded()
         settle()
         assertNull("background recording must release its source", player.currentMediaItem)
         assertEquals(Player.STATE_IDLE, player.playbackState)
         assertNull(runtime.videoPresentation.value.channelStartAtMillis)
         runtime.onAppForegrounded()
-        await { player.currentMediaItem != null }
+        await { player.currentMediaItem != null && runtime.videoPresentation.value.epoch != initial.epoch }
         assertEquals(AppPlaybackTarget.Recording(RECORDING), runtime.activeTarget.value)
+        assertTrue(player.playWhenReady)
+        assertTrue("the new epoch identifies the released recording's playing continuation",
+            runtime.videoPresentation.value.resumesReleasedRecording)
         assertNull(runtime.videoPresentation.value.channelStartAtMillis)
+
+        val resumedEpoch = runtime.videoPresentation.value.epoch
+        val restart = scope.async { runtime.playRecording(selection, RecordingPlaybackStart.RESUME) }
+        await { restart.isCompleted }
+        val restarted = runtime.videoPresentation.value
+        assertNotEquals(resumedEpoch, restarted.epoch)
+        assertFalse("a viewer-chosen Resume is a fresh presentation", restarted.resumesReleasedRecording)
+        runtime.pause()
+        await { !player.playWhenReady }
+        runtime.onAppBackgrounded()
+        settle()
+        assertNull(player.currentMediaItem)
+        runtime.onAppForegrounded()
+        await { player.currentMediaItem != null && runtime.videoPresentation.value.epoch != restarted.epoch }
+        assertFalse(player.playWhenReady)
+        assertFalse("a released recording that was paused does not represent a playing continuation",
+            runtime.videoPresentation.value.resumesReleasedRecording)
     }
 
     @Test fun keepingDoesNotEnableAnotherOwnersAudioDisable() = exercise {

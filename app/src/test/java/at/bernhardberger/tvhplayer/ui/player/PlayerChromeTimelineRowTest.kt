@@ -21,7 +21,9 @@ import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvheadend.sdk.media3.TimeshiftSeekToken
 import at.bernhardberger.tvheadend.sdk.media3.testing.TimeshiftTestFixture
 import at.bernhardberger.tvhplayer.core.PlayerStateCell
+import at.bernhardberger.tvhplayer.core.StepDirection
 import at.bernhardberger.tvhplayer.core.liveBarEnd
+import at.bernhardberger.tvhplayer.core.stepDirection
 import at.bernhardberger.tvhplayer.core.timeshiftSeekbarRange
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.playback.toAppPresentation
@@ -650,4 +652,26 @@ class PlayerChromeTimelineRowTest {
 
     private fun androidx.compose.ui.test.junit4.ComposeContentTestRule.onNodeWithTagUnmerged(tag: String) =
         onNode(androidx.compose.ui.test.hasTestTag(tag), useUnmergedTree = true).fetchSemanticsNode()
+
+    @Test fun stepDirectionIgnoresThePlaybackPositionOvertakingTheTargetWhileLanding() {
+        val timeline = PlayerChromeTimeline.Recording(positionMs = 100_000L, durationMs = 600_000L, targetMs = 70_000L, originMs = 100_000L)
+        assertEquals(-30_000L, timeline.stepDeltaMs)
+        // The seek lands and playback moves past the target: the step is still backwards.
+        for (position in listOf(100_000L, 70_000L, 70_500L, 72_000L, 100_500L, 200_000L)) {
+            assertEquals(StepDirection.BEHIND, stepDirection(requireNotNull(timeline.copy(positionMs = position).stepDeltaMs)))
+        }
+        val forward = timeline.copy(targetMs = 130_000L)
+        for (position in listOf(100_000L, 130_000L, 131_000L, 90_000L)) {
+            assertEquals(StepDirection.AHEAD, stepDirection(requireNotNull(forward.copy(positionMs = position).stepDeltaMs)))
+        }
+        assertNull(timeline.copy(targetMs = 100_000L).stepDeltaMs?.let(::stepDirection))
+        assertNull(timeline.copy(targetMs = null).stepDeltaMs)
+    }
+
+    @Test
+    fun fallbackTimeshiftEndpointsAreNumericAndDoNotShowNegativeZero() {
+        assertEquals("0:00", timeshiftEndpointLabel(true, 800))
+        assertEquals("0:00", timeshiftEndpointLabel(false, 999))
+        assertEquals("−0:30", timeshiftEndpointLabel(false, 30_000))
+    }
 }

@@ -1,8 +1,6 @@
 package at.bernhardberger.tvhplayer.core
 
 import at.bernhardberger.tvhplayer.playback.TimeshiftSeekDecision
-import at.bernhardberger.tvhplayer.ui.player.PlayerChromeTimeline
-import at.bernhardberger.tvhplayer.ui.player.stepDeltaMs
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -164,21 +162,6 @@ class PlayerBarStatusTest {
         // start rolling forward or the seek landing does not turn it into a forward step.
         val decision = TimeshiftSeekDecision(targetMs = -50_000L, deltaMs = -10_000L, clamped = true)
         assertEquals(StepDirection.BEHIND, stepDirection(decision.deltaMs))
-    }
-
-    @Test fun stepDirectionIgnoresThePlaybackPositionOvertakingTheTargetWhileLanding() {
-        val timeline = PlayerChromeTimeline.Recording(positionMs = 100_000L, durationMs = 600_000L, targetMs = 70_000L, originMs = 100_000L)
-        assertEquals(-30_000L, timeline.stepDeltaMs)
-        // The seek lands and playback moves past the target: the step is still backwards.
-        for (position in listOf(100_000L, 70_000L, 70_500L, 72_000L, 100_500L, 200_000L)) {
-            assertEquals(StepDirection.BEHIND, stepDirection(requireNotNull(timeline.copy(positionMs = position).stepDeltaMs)))
-        }
-        val forward = timeline.copy(targetMs = 130_000L)
-        for (position in listOf(100_000L, 130_000L, 131_000L, 90_000L)) {
-            assertEquals(StepDirection.AHEAD, stepDirection(requireNotNull(forward.copy(positionMs = position).stepDeltaMs)))
-        }
-        assertNull(timeline.copy(targetMs = 100_000L).stepDeltaMs?.let(::stepDirection))
-        assertNull(timeline.copy(targetMs = null).stepDeltaMs)
     }
 
     @Test fun recordingEndsAtNowPlusTheRemainingPlayback() {
