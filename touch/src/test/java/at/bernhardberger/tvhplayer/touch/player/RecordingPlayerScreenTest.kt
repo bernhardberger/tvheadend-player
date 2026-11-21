@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.click
@@ -17,7 +18,9 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.text.TextLayoutResult
 import at.bernhardberger.tvhplayer.notices.Notice
 import at.bernhardberger.tvhplayer.settings.AdBreakMode
 import at.bernhardberger.tvhplayer.touch.R
@@ -136,12 +139,14 @@ class RecordingPlayerScreenTest {
         show()
         val canvas = TouchCanvas.PHONE_LANDSCAPE
         assertAboveMarkers(tag("player-program"), "landscape phone program")
+        assertLandscapeProgramIntact()
         capture("phone-recording-landscape", canvas)
         button(R.string.player_markers).performClick()
         captureWindows("phone-recording-landscape-markers", canvas)
         back()
         compose.runOnIdle { position.longValue = RECORDING_INSIDE_AD }
         assertAboveMarkers(tag("player-program"), "landscape phone program during ads")
+        assertLandscapeProgramIntact()
         assertAboveMarkers(button(SharedR.string.skip_ad_break), "landscape phone Skip ad break", clearanceDp = 8)
         capture("phone-recording-landscape-ad", canvas)
         tapPicture()
@@ -180,6 +185,23 @@ class RecordingPlayerScreenTest {
     }
 
     private fun tapPicture() = tag("player-picture").performTouchInput { click(Offset(width * .25f, height * .28f)) }
+
+    private fun assertLandscapeProgramIntact() {
+        val episode = compose.onNodeWithText("Westvale – Ridge Town")
+        val layouts = mutableListOf<TextLayoutResult>()
+        episode.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        val line = layouts.single()
+        val visibleHeight = episode.fetchSemanticsNode().boundsInRoot.height
+        assertTrue(
+            "Episode line is clipped (visible=$visibleHeight px, line bottom=${line.getLineBottom(0)} px)",
+            !line.didOverflowHeight && visibleHeight + .5f >= line.getLineBottom(0),
+        )
+        val artwork = tag("player-program-artwork").fetchSemanticsNode().boundsInRoot
+        assertEquals("Thumbnail keeps its full aspect ratio", 68f / 112f, artwork.height / artwork.width, .005f)
+        val program = tag("player-program").fetchSemanticsNode().boundsInRoot
+        val transport = tag("player-transport").fetchSemanticsNode().boundsInRoot
+        assertTrue("Program must sit below transport (gap=${program.top - transport.bottom} px)", program.top > transport.bottom)
+    }
 
     private fun assertAboveMarkers(node: SemanticsNodeInteraction, label: String, clearanceDp: Int = 0) {
         val end = node.fetchSemanticsNode().boundsInRoot.bottom

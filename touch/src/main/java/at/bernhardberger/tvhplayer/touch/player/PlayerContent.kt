@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -101,7 +102,8 @@ internal fun LandscapePlayerContent(
     } else 0.dp
     val programGap = maxOf(if (tablet) 28.dp else 22.dp, hintInset + 4.dp)
     val offerGap = maxOf(if (tablet) 26.dp else 16.dp, hintInset + 8.dp)
-    Box(modifier.fillMaxWidth().padding(horizontal = footerMargin).height(if (tablet) 270.dp else 190.dp)) {
+    val footerHeight = landscapeFooterHeight(tablet, state)
+    Box(modifier.fillMaxWidth().padding(horizontal = footerMargin).then(footerHeight)) {
         val programSlot = Modifier.align(Alignment.BottomStart)
             .padding(bottom = trackBottom + programGap)
         // Keep the notice and its anchor in one layout so measuring the program never
@@ -126,6 +128,13 @@ internal fun LandscapePlayerContent(
             Modifier.align(Alignment.BottomCenter).padding(bottom = rowBottom),
         )
     }
+}
+
+private fun landscapeFooterHeight(tablet: Boolean, state: PlayerFaceState): Modifier = when {
+    tablet -> Modifier.height(270.dp)
+    // Grow upward from the same bottom anchor rather than compressing the program slot.
+    state is RecordingPlayerState -> Modifier.heightIn(min = 190.dp)
+    else -> Modifier.height(190.dp)
 }
 
 @Composable
@@ -208,6 +217,7 @@ private fun LandscapeProgram(state: PlayerFaceState, layout: PlayerLayout, modif
         artwork?.let {
             Image(
                 it, null, Modifier.size(if (tablet) 196.dp else 112.dp, if (tablet) 112.dp else 68.dp)
+                    .testTag("player-program-artwork")
                     .clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop,
             )
         }
