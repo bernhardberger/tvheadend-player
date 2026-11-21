@@ -5,6 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import org.robolectric.shadows.ShadowLog
 
 import android.os.Looper
+import android.os.SystemClock
 import android.view.ViewGroup
 import android.view.WindowInsets
 import android.view.inspector.WindowInspector
@@ -556,6 +557,48 @@ class TouchAppTest {
                 connection.session.publish(guide.connected(epg = guide.refreshedEpg("Updated News")))
             }
             compose.onNodeWithText("Updated News", substring = true).assertIsDisplayed()
+            compose.runOnIdle { assertEquals("One mapping for one visible publication", initial + 1, mappings()) }
+        } finally {
+            info.flags = oldFlags
+        }
+    }
+
+    @Test
+    @Config(instrumentedPackages = [
+        "at.bernhardberger.tvhplayer.touch.TouchAppKt",
+        "at.bernhardberger.tvhplayer.ui.common.TimeConverterKt",
+    ])
+    fun channelsMapAtAMinuteAndAProgrammeBoundaryButNotBetween() {
+        val info = compose.activity.applicationInfo
+        val oldFlags = info.flags
+        info.flags = oldFlags or ApplicationInfo.FLAG_DEBUGGABLE
+        ShadowLog.clear()
+        fun mappings() = ShadowLog.getLogsForTag("TouchArtwork").filter { it.msg.startsWith("mapped Channels ") }
+        val now = Instant.parse("2027-01-16T12:00:50Z")
+        try {
+            assertTrue(SystemClock.setCurrentTimeMillis(now.toEpochMilliseconds()))
+            // Evening News ends at 12:01:07, not on the minute.
+            val guide = savedConnectionWithGuide(Instant.parse("2027-01-16T11:31:07Z"))
+            compose.onNodeWithText(guide.programs[0], substring = true).assertIsDisplayed()
+            val initial = mappings().size
+            fun advance(seconds: Long, framesMs: Long) {
+                assertTrue(SystemClock.setCurrentTimeMillis(now.toEpochMilliseconds() + seconds * 1000))
+                compose.mainClock.advanceTimeBy(framesMs)
+            }
+            advance(5, 5_016)
+            compose.runOnIdle { assertEquals("A progress tick is not a mapping", initial, mappings().size) }
+            advance(10, 5_016)
+            compose.runOnIdle {
+                assertEquals("The minute maps once", initial + 1, mappings().size)
+                assertTrue(mappings().last().msg.contains("reason=minute"))
+            }
+            advance(17, 7_016)
+            compose.onNodeWithText(guide.programs[0], substring = true).assertDoesNotExist()
+            compose.onNodeWithText(guide.programs[1], substring = true).assertIsDisplayed()
+            compose.runOnIdle {
+                assertEquals("The off-minute boundary maps once", initial + 2, mappings().size)
+                assertTrue(mappings().last().msg.contains("reason=boundary"))
+            }
         } finally {
             info.flags = oldFlags
         }
@@ -1238,10 +1281,10 @@ class TouchAppTest {
         compose.waitForIdle()
     }
 
-    private fun savedConnectionWithGuide(): ServerGuide {
+    private fun savedConnectionWithGuide(now: Instant? = null): ServerGuide {
         runBlocking { connection.store.addAnonymous(server.host, server.port, "Home server", true) }
         show()
-        val guide = ServerGuide(Clock.System.now())
+        val guide = ServerGuide(now ?: Clock.System.now())
         connection.session.publish(guide.connected())
         compose.waitForIdle()
         return guide

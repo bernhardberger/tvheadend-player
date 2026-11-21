@@ -31,6 +31,7 @@ import at.bernhardberger.tvhplayer.core.HumanTrackLabel
 import at.bernhardberger.tvhplayer.core.AppError
 import at.bernhardberger.tvhplayer.core.AppErrorAction
 import at.bernhardberger.tvhplayer.core.AppErrorCondition
+import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
@@ -40,6 +41,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.toPixelMap
@@ -50,6 +52,7 @@ import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasText
@@ -59,11 +62,14 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.semantics.SemanticsProperties
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.channels.ChannelDetails
@@ -91,12 +97,14 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
+import kotlin.math.roundToInt
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class PlayerScreenTest {
-    @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
+    private val motionScale = object : MotionDurationScale { override var scaleFactor = 1f }
+    @get:Rule val compose = createAndroidComposeRule<ComponentActivity>(effectContext = motionScale)
 
     private val uses24Hour = AppClock.systemUses24Hour
     private val notice = mutableStateOf<Notice?>(null)
@@ -195,6 +203,10 @@ class PlayerScreenTest {
     }
 
     private fun dragToLiveWithNotice() {
+        val behind = liveTimeline.value
+        fun distance() = compose.onNodeWithText(compose.activity.getString(R.string.player_behind_live, "4:12"))
+        distance().assertIsDisplayed()
+        button(R.string.player_go_live).assertIsDisplayed()
         notice.value = Notice.CacheClear(success = true)
         val snackbar = compose.onNode(
             SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite),
@@ -210,6 +222,18 @@ class PlayerScreenTest {
         assertEquals("Live drag label follows the thumb while the notice shows", thumbX, label.center.x, 1f)
         timeline().performTouchInput { cancel() }
         notice.value = null
+
+        compose.runOnIdle { liveTimeline.value = behind.copy(position = behind.live, behind = 0) }
+        text(R.string.player_live).assertDoesNotExist()
+        distance().assertDoesNotExist()
+        button(R.string.player_go_live).assertDoesNotExist()
+        val boundary = compose.activity.getString(
+            SharedR.string.timeshift_buffer_start_description,
+            formatPlaybackDuration((behind.live - checkNotNull(behind.bufferStart)) * 1_000L),
+        )
+        val liveDescription = compose.activity.getString(SharedR.string.player_seekbar_timeshift_live_description, boundary)
+        timeline().assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, liveDescription))
+        compose.runOnIdle { liveTimeline.value = behind }
     }
 
     @Test
@@ -262,7 +286,40 @@ class PlayerScreenTest {
         text(SharedR.string.audio_description).assertDoesNotExist()
         compose.mainClock.advanceTimeBy(hideMs * 2)
         tag("player-transport").assertDoesNotExist()
+        assertPictureChromeMotion()
         compose.mainClock.autoAdvance = true
+    }
+
+    private fun assertPictureChromeMotion() {
+        val picture = tag("player-picture")
+        val hidden = picture.redAt(Offset(40f, 50f))
+        tapPicture()
+        compose.mainClock.advanceTimeBy(80)
+        val top = tag("player-top").fetchSemanticsNode().boundsInRoot
+        val partial = picture.redAt(Offset(40f, 50f))
+        compose.mainClock.advanceTimeBy(350)
+        val shown = picture.redAt(Offset(40f, 50f))
+        assertTrue("The controls are partly drawn during entry: $hidden, $partial, $shown", partial in shown..hidden &&
+            partial != hidden && partial != shown)
+        assertEquals(top, tag("player-top").fetchSemanticsNode().boundsInRoot)
+
+        tapPicture()
+        compose.mainClock.advanceTimeBy(80)
+        tag("player-top").assertDoesNotExist()
+        val leaving = picture.redAt(Offset(40f, 50f))
+        tapPicture()
+        compose.mainClock.advanceTimeByFrame()
+        assertEquals("A touch reverses the fade without jumping", leaving, picture.redAt(Offset(40f, 50f)), .08f)
+
+        compose.runOnUiThread { motionScale.scaleFactor = 0f }
+        togglePicture()
+        compose.mainClock.advanceTimeByFrame()
+        tag("player-top").assertDoesNotExist()
+        assertEquals(hidden, picture.redAt(Offset(40f, 50f)), .01f)
+        togglePicture()
+        compose.mainClock.advanceTimeByFrame()
+        tag("player-top").assertIsDisplayed()
+        assertEquals(shown, picture.redAt(Offset(40f, 50f)), .01f)
     }
 
     @Test
@@ -428,6 +485,7 @@ class PlayerScreenTest {
     private val choices = mutableListOf<PlayerChoice>()
     private val played = mutableListOf<String>()
     private val status = mutableStateOf<LivePlayerStatus>(LivePlayerStatus.Playing)
+    private val liveTimeline = mutableStateOf(LiveTimeline(LocalTime.of(20, 0), 3600, 1510, 2568, 2820))
     private val channelId = mutableStateOf<String?>(null)
     private val channelState = mutableStateOf<ChannelsState?>(null)
     private val scheduleDay = mutableStateOf(0)
@@ -457,7 +515,7 @@ class PlayerScreenTest {
             channel = channel, channels = ChannelsState.Ready(channels),
             liveRecord = fixtureRecord,
             frame = BitmapPainter(TouchFixtureArt.art("still-ridge-light").asImageBitmap()),
-            timeline = mutableStateOf(LiveTimeline(LocalTime.of(20, 0), 3600, 1510, 2568, 2820)),
+            timeline = liveTimeline,
             tracks = PlayerTracks(
                 audio = listOf(
                     HumanTrackLabel("English • Stereo", "English", null, "Stereo • MPEG-1 Layer II"),
@@ -563,9 +621,17 @@ class PlayerScreenTest {
         assertTrue("Notice overlaps the top row, a timeline or a button", obstacles.none {
             oneLine.overlaps(it) || twoLine.overlaps(it)
         })
-        tapPicture()
+        compose.mainClock.autoAdvance = false
+        togglePicture()
+        compose.mainClock.advanceTimeByFrame()
+        compose.waitForIdle()
+        compose.mainClock.advanceTimeBy(80)
+        val moving = snackbar.fetchSemanticsNode().boundsInRoot.bottom
+        compose.mainClock.autoAdvance = true
         timeline().assertDoesNotExist()
         val hidden = snackbar.fetchSemanticsNode().boundsInRoot
+        assertTrue("Notice travels between ${oneLine.bottom} and ${hidden.bottom}: $moving",
+            moving > oneLine.bottom && moving < hidden.bottom)
         assertEquals("Hidden notice uses the bottom margin", twoLine.left - picture.left, picture.bottom - hidden.bottom, 1f)
         tapPicture()
         val restored = snackbar.fetchSemanticsNode().boundsInRoot
@@ -575,6 +641,21 @@ class PlayerScreenTest {
         } else {
             assertTrue("Notice returns above the program", restored.bottom < program.top)
         }
+        compose.mainClock.autoAdvance = false
+        compose.runOnUiThread { motionScale.scaleFactor = 0f }
+        togglePicture()
+        compose.mainClock.advanceTimeByFrame()
+        assertEquals(hidden.bottom, snackbar.fetchSemanticsNode().boundsInRoot.bottom, 1f)
+        togglePicture()
+        compose.mainClock.advanceTimeByFrame()
+        assertEquals(restored.bottom, snackbar.fetchSemanticsNode().boundsInRoot.bottom, 1f)
+        compose.runOnUiThread { motionScale.scaleFactor = 1f }
+        compose.mainClock.autoAdvance = true
+    }
+
+    private fun togglePicture() = tag("player-picture").performSemanticsAction(SemanticsActions.OnClick) {
+        it()
+        Snapshot.sendApplyNotifications()
     }
 
         /** Each menu opens at its button with the controls kept; each sheet clears the picture and closes on it. */
@@ -797,6 +878,9 @@ class PlayerScreenTest {
 
     private fun capture(name: String, canvas: TouchCanvas) = compose.captureTouch("slice2-player", name, canvas)
 }
+
+internal fun androidx.compose.ui.test.SemanticsNodeInteraction.redAt(point: Offset): Float =
+    captureToImage().toPixelMap()[point.x.roundToInt(), point.y.roundToInt()].red
 
 @OptIn(UnstableApi::class)
 /** Like the system after a dismissal: parameters for a stopped activity have no token to land on. */

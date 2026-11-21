@@ -87,6 +87,7 @@ internal fun guideState(
     texts: GuideTexts,
     artwork: ArtworkModels? = null,
     playing: String? = null,
+    checkpoint: () -> Unit = {},
 ): GuideState {
     val browsing = scope.scope
     val current = scope.channelCatalogCurrent
@@ -116,7 +117,7 @@ internal fun guideState(
         else -> GuideMapper(
             browsing.visibleChannels, observation, snapshot.events, clock, today, texts, artwork, playing,
         )
-            .state(selection, tags, selectedTagId)
+            .state(selection, tags, selectedTagId, checkpoint)
             .copy(
                 dayLoading = dayLoading,
                 availability = if (degraded) GuideAvailability.Offline else GuideAvailability.Current,
@@ -228,14 +229,23 @@ internal class GuideMapper(
     private val names by lazy { channels.associate { it.id to it.name.orEmpty() } }
     private val logos by lazy { channels.associate { it.id to artwork?.logo(it.icon, observation) } }
 
-    fun state(selection: GuideSelection, tags: List<ChannelTag>, selectedTagId: String?): GuideState {
+    fun state(
+        selection: GuideSelection,
+        tags: List<ChannelTag>,
+        selectedTagId: String?,
+        checkpoint: () -> Unit,
+    ): GuideState {
+        checkpoint()
         val days = guideDays(channels.flatMap { byChannel[it.id].orEmpty() }, clock)
         val date = selection.dateIn(days)
         val jumps = GUIDE_JUMP_TIMES.map { date.atTime(it).atZone(clock.zone).toEpochSecond() }
             .filter { it > clock.nowSec }
         val jumpIndex = jumps.indexOf(selection.jump) + 1
         val window = guideWindow(date, jumps.getOrNull(jumpIndex - 1), clock)
-        val guideChannels = channels.map { channel(it, window) }
+        val guideChannels = channels.map {
+            checkpoint()
+            channel(it, window)
+        }
         val details = selection.detailsId?.let { details(it) }
         return GuideState(
             channels = guideChannels,

@@ -26,6 +26,7 @@ import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
@@ -97,6 +98,7 @@ class RecordingPlayerScreenTest {
 
     private val position = mutableLongStateOf(RECORDING_BEFORE_AD)
     private val hasMarks = mutableStateOf(true)
+    private val markerRevision = mutableStateOf<Long?>(null)
     private val choice = mutableStateOf<AdBreakMode?>(null)
     private val dismissed = mutableStateOf(false)
     private val notice = mutableStateOf<Notice?>(null)
@@ -176,6 +178,32 @@ class RecordingPlayerScreenTest {
         bar.performTouchInput { up() }
         compose.runOnIdle { assertEquals(listOf(fixtureAd.endMs), seeks) }
 
+        compose.runOnIdle { markerRevision.value = 1L }
+        val markerCenter = compose.onNode(
+            hasTestTag("recording-marker-symbol") and hasContentDescription("Final whistle and interviews") and
+                hasClickAction(),
+        )
+            .fetchSemanticsNode().boundsInRoot.center
+        val picture = tag("player-picture")
+        val point = Offset(58f, 95f)
+        val shown = picture.redAt(point)
+        compose.runOnIdle { seeks.clear() }
+        compose.mainClock.autoAdvance = false
+        picture.performSemanticsAction(SemanticsActions.OnClick) { it() }
+        compose.mainClock.advanceTimeByFrame()
+        compose.waitForIdle()
+        compose.mainClock.advanceTimeBy(80)
+        val fading = picture.redAt(point)
+        tag("player-top").assertDoesNotExist()
+        compose.onRoot().performTouchInput { click(markerCenter) }
+        compose.mainClock.advanceTimeByFrame()
+        compose.runOnIdle { assertTrue("A fading marker must not seek", choices.isEmpty() && seeks.isEmpty()) }
+        picture.performSemanticsAction(SemanticsActions.OnClick) { it() }
+        compose.mainClock.autoAdvance = true
+        val hidden = picture.redAt(point)
+        assertTrue("Recording controls fade: $shown, $fading, $hidden", fading > minOf(shown, hidden) &&
+            fading < maxOf(shown, hidden))
+        picture.performSemanticsAction(SemanticsActions.OnClick) { it() }
         compose.runOnIdle { hasMarks.value = false }
         button(R.string.player_markers).assertDoesNotExist()
         button(R.string.player_channels).assertDoesNotExist()
@@ -291,8 +319,15 @@ class RecordingPlayerScreenTest {
     fun recordingRouteMarkerSeeksWithoutResumingOrClosingTheSheet() = withRecordingRoute(marked = true) { _, runtime ->
         runtime.pause()
         settleRoute(runtime.player)
+        val symbol = compose.onNode(hasTestTag("recording-marker-symbol") and hasClickAction())
+        symbol.performTouchInput { click() }
+        settleRoute(runtime.player)
+        assertEquals(10_000L, runtime.player.currentPosition)
+        assertTrue(!runtime.player.playWhenReady)
+        runtime.player.seekTo(0)
+        settleRoute(runtime.player)
         button(R.string.player_markers).performClick()
-        tag("recording-marker-10000").performClick()
+        tag("recording-marker-10000").performTouchInput { click() }
         settleRoute(runtime.player)
         assertEquals(10_000L, runtime.player.currentPosition)
         assertTrue(!runtime.player.playWhenReady)
@@ -427,6 +462,7 @@ class RecordingPlayerScreenTest {
                 PlayerScreen(
                     fixture.copy(
                         marks = fixture.marks.takeIf { hasMarks.value }.orEmpty(),
+                        markerRevision = markerRevision.value,
                         adBreakPick = choice.value,
                         controlsSkip = offer,
                         skipPrompt = offer.takeIf { !dismissed.value && choice.value != AdBreakMode.AUTOMATIC },

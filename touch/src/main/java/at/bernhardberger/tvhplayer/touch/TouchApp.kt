@@ -37,6 +37,7 @@ import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.touch.channels.ChannelRowPrograms
+import at.bernhardberger.tvhplayer.touch.channels.LocalChannelProgressClock
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsActions
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsScreen
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsState
@@ -67,9 +68,14 @@ import at.bernhardberger.tvhplayer.touch.guide.GuideViewModel
 import at.bernhardberger.tvhplayer.touch.recordings.RecordingsDestination
 import at.bernhardberger.tvhplayer.touch.recordings.RecordingsViewModel
 import at.bernhardberger.tvhplayer.touch.ui.epgChangeCounts
+import at.bernhardberger.tvhplayer.touch.ui.artworkMappingStart
+import android.os.SystemClock
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.yield
 import kotlinx.coroutines.flow.Flow
 
 /** [SignIn] is the Connections page opened on the editor, for a password that can't be read. */
@@ -94,7 +100,7 @@ internal fun TouchApp(
     playingRecordingId: DvrEntryId? = null,
     onWatch: ((String) -> Unit)? = null,
     onPlayRecording: ((String, Boolean) -> Unit)? = null,
-    channelsDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    channelsDispatcher: CoroutineDispatcher = ChannelsMappingDispatcher,
     discovery: () -> Flow<TvheadendDiscoveryState>,
 ) {
     val profile by owner.serverProfile.collectAsStateWithLifecycle()
@@ -230,52 +236,42 @@ private fun AppFrame(
     val scope = channels.scope.collectAsStateWithLifecycle().value
     // The scope is republished for channel changes only; the guide comes with every observation.
     val observation = channels.observation.collectAsStateWithLifecycle().value
-    val nowSec = rememberCurrentEpochSeconds()
-    val now = Instant.fromEpochSeconds(nowSec())
     val texts = rememberChannelsTexts()
     val artwork = LocalArtworkModels.current
     val context = LocalContext.current.applicationContext
-    val key = ChannelsMappingKey(scope, presentation.connection, presentation.degraded, now, texts, playingId, artwork)
+    val key = ChannelsMappingKey(scope, presentation.connection, presentation.degraded, texts, playingId, artwork)
     val mapped by produceState<ChannelsMappingResult?>(null, key, observation) {
-        val previous = value
-        value = withContext(mappingDispatcher) {
-            val programs = scope.scope.visibleChannels.map { observation.channelRowPrograms(it.id, now) }
-            val sameRows = previous?.key == key && previous.programs == programs &&
-                observation.sameProgrammeAuthority(previous.observation) &&
-                observation.dvrSnapshotForDisplay === previous.observation.dvrSnapshotForDisplay
-            val state = if (sameRows) previous.state else {
-                val counts = context.epgChangeCounts(previous?.observation, observation)
-                traceArtworkMapping(context, "Channels", if (counts.isEmpty()) null else "epg$counts") {
-                    channelsState(
-                        scope, presentation.connection, presentation.degraded, observation, now, texts,
-                        playingId, artwork, programs,
-                    )
-                }
-            }
-            ChannelsMappingResult(key, observation, programs, state)
+        while (true) {
+            // A clock wake and a data update in the same UI turn need only the newest inputs.
+            yield()
+            val previous = value
+            val result = withContext(mappingDispatcher) { key.map(context, observation, previous) }
+            value = result
+            delay((result.nextWakeSec * MILLIS_PER_SECOND - System.currentTimeMillis()).coerceAtLeast(1L))
         }
     }
     val state = mapped?.takeIf { it.key.scope.profileId == scope.profileId }?.state ?: ChannelsState.Loading
-    ChannelsScreen(
-        state = state,
-        actions = ChannelsActions(
-            onPlay = onWatch,
-            onTag = { id -> channels.selectTag(id?.let { ChannelTagId(it.toLong()) }) },
-            onRetry = { connection.reconnectNow() },
-            // Until Home exists, connection settings open from the end of the Channels top bar.
-            onOpenConnectionSettings = onOpenConnections,
-            onSignIn = onSignIn,
-            onRecordControl = dvr::channelRecordControl,
-        ),
-        destinations = AppDestinationList,
-    )
+    CompositionLocalProvider(LocalChannelProgressClock provides rememberCurrentEpochSeconds()) {
+        ChannelsScreen(
+            state = state,
+            actions = ChannelsActions(
+                onPlay = onWatch,
+                onTag = { id -> channels.selectTag(id?.let { ChannelTagId(it.toLong()) }) },
+                onRetry = { connection.reconnectNow() },
+                // Until Home exists, connection settings open from the end of the Channels top bar.
+                onOpenConnectionSettings = onOpenConnections,
+                onSignIn = onSignIn,
+                onRecordControl = dvr::channelRecordControl,
+            ),
+            destinations = AppDestinationList,
+        )
+    }
 }
 
 private data class ChannelsMappingKey(
     val scope: ChannelScopeState,
     val connection: ConnectionUiState,
     val degraded: Boolean,
-    val now: Instant,
     val texts: ChannelsTexts,
     val playingId: String?,
     val artwork: ArtworkModels?,
@@ -286,7 +282,65 @@ private class ChannelsMappingResult(
     val observation: SessionObservation,
     val programs: List<ChannelRowPrograms>,
     val state: ChannelsState,
-)
+    val atSec: Long,
+    val nextBoundarySec: Long,
+) {
+    val nextWakeSec: Long get() = minOf(nextBoundarySec, nextChannelMinute(atSec))
+}
+
+private const val MILLIS_PER_SECOND = 1_000L
+private const val SECONDS_PER_MINUTE = 60L
+private val ChannelsMappingDispatcher = Dispatchers.Default.limitedParallelism(1)
+
+private fun nextChannelMinute(second: Long): Long =
+    second + (SECONDS_PER_MINUTE - Math.floorMod(second, SECONDS_PER_MINUTE))
+
+private suspend fun ChannelsMappingKey.map(
+    context: android.content.Context,
+    observation: SessionObservation,
+    previous: ChannelsMappingResult?,
+): ChannelsMappingResult {
+    val job = kotlin.coroutines.coroutineContext
+    val now = Instant.fromEpochSeconds(System.currentTimeMillis() / MILLIS_PER_SECOND)
+    val nowSec = now.epochSeconds
+    val started = context.artworkMappingStart()
+    val programs = scope.scope.visibleChannels.map {
+        job.ensureActive()
+        observation.channelRowPrograms(it.id, now)
+    }
+    val boundary = programs.minOfOrNull { it.nextBoundary(now) } ?: Long.MAX_VALUE
+    val projectionMs = started?.let { SystemClock.elapsedRealtime() - it }
+    val reasons = mappingReasons(previous, observation, nowSec)
+    val sameRows = previous != null && reasons.all { it == "epg" } && previous.programs == programs
+    val state = if (sameRows) previous.state else {
+        val counts = if ("epg" in reasons) context.epgChangeCounts(previous?.observation, observation) else ""
+        traceArtworkMapping(context, "Channels", reasons.joinToString("+") + counts, projectionMs) {
+            val mapped = channelsState(
+                scope, connection, degraded, observation, now, texts, playingId, artwork, programs, job::ensureActive,
+            )
+            job.ensureActive()
+            mapped
+        }
+    }
+    return ChannelsMappingResult(this, observation, programs, state, nowSec, boundary)
+}
+
+private fun ChannelsMappingKey.mappingReasons(
+    previous: ChannelsMappingResult?,
+    observation: SessionObservation,
+    nowSec: Long,
+): List<String> {
+    if (previous == null) return listOf("initial")
+    return buildList {
+        if (this@mappingReasons != previous.key) add("input")
+        if (nowSec >= previous.nextBoundarySec) add("boundary")
+        if (nowSec >= nextChannelMinute(previous.atSec) || nowSec < previous.atSec) add("minute")
+        if (observation.epgSnapshotForDisplay?.events !== previous.observation.epgSnapshotForDisplay?.events) add("epg")
+        if (observation.dvrSnapshotForDisplay !== previous.observation.dvrSnapshotForDisplay ||
+            !observation.sameProgrammeAuthority(previous.observation)
+        ) add("dvr")
+    }
+}
 
 /** Each destination's screen draws the frame, so the selection is kept here and picks the screen. */
 @Suppress("LongParameterList") // One view model per destination.

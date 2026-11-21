@@ -42,14 +42,26 @@ internal fun ArtworkScreenShown(screen: String) {
     }
 }
 
-internal fun <T> traceArtworkMapping(context: Context, screen: String, reason: String? = null, map: () -> T): T {
+internal fun <T> traceArtworkMapping(
+    context: Context,
+    screen: String,
+    reason: String? = null,
+    projectionMs: Long? = null,
+    map: () -> T,
+): T {
     if (!context.isDebuggable) return map()
     val startMs = SystemClock.elapsedRealtime()
     return map().also {
         val trigger = reason?.let { " reason=$it" }.orEmpty()
-        Log.d(ARTWORK_LOG_TAG, "mapped $screen ms=${SystemClock.elapsedRealtime() - startMs} startMs=$startMs$trigger")
+        val projection = projectionMs?.let { " projectionMs=$it" }.orEmpty()
+        Log.d(
+            ARTWORK_LOG_TAG,
+            "mapped $screen ms=${SystemClock.elapsedRealtime() - startMs} startMs=$startMs$trigger$projection",
+        )
     }
 }
+
+internal fun Context.artworkMappingStart(): Long? = if (isDebuggable) SystemClock.elapsedRealtime() else null
 
 /** Positional identity differences, including appended/removed entries, for debug traces only. */
 internal fun Context.epgChangeCounts(previous: SessionObservation?, current: SessionObservation): String {
