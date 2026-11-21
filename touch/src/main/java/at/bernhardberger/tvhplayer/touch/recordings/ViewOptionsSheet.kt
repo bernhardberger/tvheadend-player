@@ -37,6 +37,10 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.ui.TouchSideSheet
+import at.bernhardberger.tvhplayer.core.DvrArchiveView
+import at.bernhardberger.tvhplayer.core.DvrArchiveSort
+import at.bernhardberger.tvhplayer.core.DvrArchiveShow
+import at.bernhardberger.tvhplayer.core.DvrArchiveGrouping
 
 /** Where the view options sheet stands: its three rows, or the list one of them opened. */
 internal enum class SheetPage { Main, GroupBy, Sort, Show }
@@ -49,13 +53,13 @@ internal enum class SheetPage { Main, GroupBy, Sort, Show }
 @Composable
 internal fun ViewOptionsSheet(
     page: SheetPage,
-    view: RecordingsView,
+    view: DvrArchiveView,
     side: Boolean,
     onPage: (SheetPage) -> Unit,
-    onView: (RecordingsView) -> Unit,
+    onView: (DvrArchiveView) -> Unit,
     onClose: () -> Unit,
 ) {
-    val choose: (RecordingsView) -> Unit = {
+    val choose: (DvrArchiveView) -> Unit = {
         onView(it)
         onPage(SheetPage.Main)
     }
@@ -104,9 +108,9 @@ internal fun ViewOptionsSheet(
 @Composable
 private fun SheetBody(
     page: SheetPage,
-    view: RecordingsView,
+    view: DvrArchiveView,
     onPage: (SheetPage) -> Unit,
-    choose: (RecordingsView) -> Unit,
+    choose: (DvrArchiveView) -> Unit,
     modifier: Modifier,
 ) {
     Column(modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = 16.dp)) {
@@ -129,13 +133,13 @@ private fun SheetBody(
                     }
                 }
             }
-            SheetPage.GroupBy -> Choices(RecordingsGrouping.entries, view.grouping, { it.label }, { it.detail }) {
+            SheetPage.GroupBy -> Choices(DvrArchiveGrouping.entries, view.grouping, { it.label }, { it.detail }) {
                 choose(view.copy(grouping = it))
             }
-            SheetPage.Sort -> Choices(RecordingsSort.entries, view.sort, { it.label }, { null }) {
+            SheetPage.Sort -> Choices(DvrArchiveSort.entries, view.sort, { it.label }, { null }) {
                 choose(view.copy(sort = it))
             }
-            SheetPage.Show -> Choices(RecordingsShow.entries, view.show, { it.label }, { it.detail }) {
+            SheetPage.Show -> Choices(DvrArchiveShow.entries, view.show, { it.label }, { it.detail }) {
                 choose(view.copy(show = it))
             }
         }

@@ -4,9 +4,6 @@
 package at.bernhardberger.tvhplayer.touch.recordings
 
 import android.icu.text.DateFormat
-import android.icu.text.MeasureFormat
-import android.icu.util.Measure
-import android.icu.util.MeasureUnit
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -48,6 +45,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.touch.R
+import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import at.bernhardberger.tvhplayer.touch.ui.PartsLine
 import at.bernhardberger.tvhplayer.touch.ui.joinParts
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
@@ -55,6 +53,11 @@ import at.bernhardberger.tvhplayer.ui.TvRecordingContainerColor
 import java.time.Duration
 import java.time.ZoneId
 import java.util.Date
+import at.bernhardberger.tvhplayer.core.DvrArchiveView
+import at.bernhardberger.tvhplayer.core.DvrArchiveShow
+import at.bernhardberger.tvhplayer.core.DvrArchiveGrouping
+import at.bernhardberger.tvhplayer.ui.common.formatNarrowDuration
+import androidx.compose.ui.platform.LocalResources
 
 /** One level: its head, the folders it holds, then its recordings under their date labels. */
 @Composable
@@ -136,7 +139,7 @@ private fun SectionLabel(label: String) {
 /** The list head: the level's name and counts, and on a folder level the way back up. */
 @Composable
 internal fun LevelHead(
-    view: RecordingsView,
+    view: DvrArchiveView,
     levels: List<RecordingFolder>,
     layout: RecordingsLayout,
     onUp: () -> Unit,
@@ -150,7 +153,7 @@ internal fun LevelHead(
         ) {
             Text(
                 stringResource(
-                    if (view.grouping == RecordingsGrouping.Flat) R.string.recordings_all else view.grouping.label,
+                    if (view.grouping == DvrArchiveGrouping.FLAT) R.string.recordings_all else view.grouping.label,
                 ),
                 Modifier.weight(1f).semantics { heading() },
                 style = MaterialTheme.typography.run { if (layout.compact) titleMedium else titleLarge },
@@ -197,12 +200,12 @@ private fun Counts(text: String) {
 }
 
 @Composable
-private fun levelCounts(view: RecordingsView, level: RecordingFolder, root: Boolean, compact: Boolean): List<String> {
+private fun levelCounts(view: DvrArchiveView, level: RecordingFolder, root: Boolean, compact: Boolean): List<String> {
     val folders = level.folderCount
     val recordings = level.recordingCount
-    val show = view.show.takeIf { it != RecordingsShow.All }?.let { stringResource(it.label) }
+    val show = view.show.takeIf { it != DvrArchiveShow.ALL }?.let { stringResource(it.label) }
     return when {
-        root && view.grouping == RecordingsGrouping.Flat -> listOfNotNull(
+        root && view.grouping == DvrArchiveGrouping.FLAT -> listOfNotNull(
             recordings.takeIf { it > 0 }?.let { pluralStringResource(R.plurals.recordings_count, it, it) },
             show,
             stringResource(view.sort.label),
@@ -314,8 +317,8 @@ private fun partText(part: RecordingLinePart): String = when (part) {
 
 @Composable
 internal fun dayText(day: RecordingDay): String = when (day) {
-    RecordingDay.Today -> stringResource(R.string.recordings_today)
-    RecordingDay.Yesterday -> stringResource(R.string.recordings_yesterday)
+    RecordingDay.Today -> stringResource(SharedR.string.recordings_date_today)
+    RecordingDay.Yesterday -> stringResource(SharedR.string.recordings_date_yesterday)
     is RecordingDay.On -> {
         val locale = LocalConfiguration.current.locales[0]
         val format = DateFormat.getInstanceForSkeleton(if (day.withYear) "yMMMEd" else "MMMEd", locale)
@@ -323,17 +326,10 @@ internal fun dayText(day: RecordingDay): String = when (day) {
     }
 }
 
-/** Narrow hours and minutes kept together, "1h 45m", as the TV app's `formatNarrowDuration`. */
+/** Narrow hours and minutes kept together, "1h 45m", by the shared `formatNarrowDuration`. */
 @Composable
-internal fun durationText(duration: Duration): String {
-    val locale = LocalConfiguration.current.locales[0]
-    val minutes = duration.toMinutes().coerceAtLeast(0L)
-    val format = MeasureFormat.getInstance(locale, MeasureFormat.FormatWidth.NARROW)
-    return listOf(minutes / MINUTES_PER_HOUR to MeasureUnit.HOUR, minutes % MINUTES_PER_HOUR to MeasureUnit.MINUTE)
-        .filter { (amount, _) -> amount > 0L }
-        .ifEmpty { listOf(0L to MeasureUnit.MINUTE) }
-        .joinToString(NO_BREAK_SPACE) { (amount, unit) -> format.format(Measure(amount, unit)).replace(' ', '\u00a0') }
-}
+internal fun durationText(duration: Duration): String =
+    formatNarrowDuration(duration.seconds, LocalResources.current)
 
 @Composable
 private fun Thumbnail(item: RecordingItem) {
@@ -398,8 +394,6 @@ internal fun RecPill() {
 internal fun rowColors(container: Color = MaterialTheme.colorScheme.surfaceContainer) =
     ListItemDefaults.segmentedColors(containerColor = container)
 
-private const val MINUTES_PER_HOUR = 60L
-private const val NO_BREAK_SPACE = "\u00a0"
 private val ThumbWidth = 88.dp
 private val ThumbHeight = 50.dp
 private val ThumbShape = RoundedCornerShape(8.dp)

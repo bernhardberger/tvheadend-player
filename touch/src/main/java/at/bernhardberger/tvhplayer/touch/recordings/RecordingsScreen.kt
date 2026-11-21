@@ -44,6 +44,9 @@ import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.ui.Destination
 import at.bernhardberger.tvhplayer.touch.ui.TouchFrame
 import kotlin.math.roundToInt
+import at.bernhardberger.tvhplayer.core.DvrArchiveView
+import at.bernhardberger.tvhplayer.core.DvrArchiveShow
+import at.bernhardberger.tvhplayer.core.DvrArchiveGrouping
 
 /**
  * Recordings > Browse. The tablet keeps one list column and a pane for the picked recording; the
@@ -56,6 +59,7 @@ internal fun RecordingsScreen(
     modifier: Modifier = Modifier,
     initialPath: List<String> = emptyList(),
     initiallyPicked: String? = null,
+    destinations: List<Destination> = Destination.entries,
 ) {
     val window = currentWindowAdaptiveInfoV2().windowSizeClass
     val layout = when {
@@ -72,21 +76,27 @@ internal fun RecordingsScreen(
     val pickedItem = picked?.let(state.root::find)
     val pageItem = pickedItem?.takeIf { layout != RecordingsLayout.Wide }
     val page = pageItem != null
+    val listed = state.listed
 
     Box(modifier.fillMaxSize()) {
         TouchFrame(
             initialDestination = Destination.Recordings,
+            destinations = destinations,
             showTopBar = { !(it == Destination.Recordings && page) },
             showNavigation = { !(it == Destination.Recordings && page && layout == RecordingsLayout.Phone) },
             actions = { destination ->
-                if (destination == Destination.Recordings) TitleActions(state.space, layout) { sheet = SheetPage.Main }
+                if (destination == Destination.Recordings && listed) {
+                    TitleActions(state.space, layout) { sheet = SheetPage.Main }
+                }
             },
         ) { destination ->
             if (destination != Destination.Recordings) return@TouchFrame
             // Registered after the frame's own handler, so a page or a folder level takes Back first.
             BackHandler(enabled = page) { picked = null }
             BackHandler(enabled = !page && levels.size > 1) { path = ArrayList(path.take(levels.size - 2)) }
-            if (pageItem != null) {
+            if (!listed) {
+                RecordingsStandIn(state.availability, actions)
+            } else if (pageItem != null) {
                 RecordingPage(pageItem, state.clock, layout, actions) { picked = null }
             } else {
                 Browse(
@@ -187,17 +197,39 @@ private fun Browse(
     onUp: () -> Unit,
     onPick: (String) -> Unit,
 ) {
-    val level = levels.last()
     val margin = when (layout) {
         RecordingsLayout.Wide -> Modifier.padding(start = 8.dp, end = 24.dp)
         RecordingsLayout.Upright -> Modifier.padding(horizontal = 24.dp)
         RecordingsLayout.Phone -> Modifier.padding(horizontal = 12.dp)
     }
+    if (state.availability != RecordingsAvailability.Offline) {
+        BrowseLevel(state, levels, layout, margin, picked, actions, onOpen, onUp, onPick)
+        return
+    }
+    Column(Modifier.fillMaxSize()) {
+        RecordingsOfflineBanner(layout, actions.onOpenConnectionSettings, margin.padding(top = 8.dp))
+        Box(Modifier.weight(1f)) { BrowseLevel(state, levels, layout, margin, picked, actions, onOpen, onUp, onPick) }
+    }
+}
+
+@Composable
+private fun BrowseLevel(
+    state: RecordingsState,
+    levels: List<RecordingFolder>,
+    layout: RecordingsLayout,
+    margin: Modifier,
+    picked: RecordingItem?,
+    actions: RecordingsActions,
+    onOpen: (String) -> Unit,
+    onUp: () -> Unit,
+    onPick: (String) -> Unit,
+) {
+    val level = levels.last()
     val head: @Composable () -> Unit = { LevelHead(state.view, levels, layout, onUp) }
     // Inside a channel's folder every row is that channel's.
-    val oneChannel = state.view.grouping == RecordingsGrouping.Channels && levels.size > 1
+    val oneChannel = state.view.grouping == DvrArchiveGrouping.CHANNELS && levels.size > 1
     when {
-        state.root.isEmpty && state.view.show == RecordingsShow.All -> RecordingsMessage(
+        state.root.isEmpty && state.view.show == DvrArchiveShow.ALL -> RecordingsMessage(
             R.drawable.video_library_outline, R.string.recordings_none, R.string.recordings_none_reason,
         )
         level.isEmpty -> Column(margin.fillMaxSize()) {
@@ -222,23 +254,23 @@ private fun Browse(
 private val RecordingFolder.isEmpty: Boolean get() = folders.isEmpty() && recordings.isEmpty()
 
 @Composable
-private fun FilterEmpty(view: RecordingsView, onView: (RecordingsView) -> Unit) {
+private fun FilterEmpty(view: DvrArchiveView, onView: (DvrArchiveView) -> Unit) {
     val (icon, title, reason) = when (view.show) {
-        RecordingsShow.Unwatched -> Triple(
+        DvrArchiveShow.UNWATCHED -> Triple(
             R.drawable.recordings_done_all, R.string.recordings_empty_unwatched,
             R.string.recordings_empty_unwatched_reason,
         )
-        RecordingsShow.PartiallyWatched -> Triple(
+        DvrArchiveShow.PARTIALLY_WATCHED -> Triple(
             R.drawable.video_library_outline, R.string.recordings_empty_partially_watched,
             R.string.recordings_empty_partially_watched_reason,
         )
-        RecordingsShow.Watched, RecordingsShow.All -> Triple(
+        DvrArchiveShow.WATCHED, DvrArchiveShow.ALL -> Triple(
             R.drawable.video_library_outline, R.string.recordings_empty_watched,
             R.string.recordings_empty_watched_reason,
         )
     }
     RecordingsMessage(icon, title, reason) {
-        FilledTonalButton(onClick = { onView(view.copy(show = RecordingsShow.All)) }) {
+        FilledTonalButton(onClick = { onView(view.copy(show = DvrArchiveShow.ALL)) }) {
             Text(stringResource(R.string.recordings_show_everything))
         }
     }
@@ -294,3 +326,7 @@ private fun Placeholder(level: RecordingFolder) {
 }
 
 private const val PERCENT = 100
+
+/** The list shows while it is current or saved; otherwise a stand-in takes its place. */
+private val RecordingsState.listed: Boolean
+    get() = availability == RecordingsAvailability.Current || availability == RecordingsAvailability.Offline

@@ -10,7 +10,6 @@ import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import at.bernhardberger.tvheadend.sdk.android.TvheadendDiscoveryState
-import at.bernhardberger.tvheadend.sdk.core.ServerProfileReadResult
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.ui.screens.onboarding.ConnectionSetupState
@@ -18,6 +17,7 @@ import at.bernhardberger.tvhplayer.ui.screens.onboarding.SetupFailure
 import at.bernhardberger.tvhplayer.ui.screens.onboarding.SetupMode
 import at.bernhardberger.tvhplayer.ui.screens.onboarding.SetupStep
 import at.bernhardberger.tvhplayer.ui.screens.onboarding.rememberConnectionSetupState
+import at.bernhardberger.tvhplayer.ui.screens.settings.rememberSavedConnectionRestore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 
@@ -91,11 +91,7 @@ internal fun EditConnectionFlow(
         profiles = owner,
         discovery = { emptyFlow() },
         mode = SetupMode.EDIT,
-        restoreSaved = {
-            val active = owner.serverProfile.value as? ServerProfileReadResult.Available
-            if (active != null) session.connect(active.profile) else session.disconnect()
-            owner.setSetupTrialConnection(false)
-        },
+        restoreSaved = rememberSavedConnectionRestore(session, owner),
         onSaved = { onSaved(draftName) },
         beforeTest = { owner.setSetupTrialConnection(true) },
         sessionLock = owner.connectionChanges,

@@ -9,6 +9,9 @@ import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.util.Locale
+import at.bernhardberger.tvhplayer.core.DvrArchiveView
+import at.bernhardberger.tvhplayer.core.DvrArchiveShow
+import at.bernhardberger.tvhplayer.core.DvrArchiveGrouping
 
 // The round-37 drawings' recordings (mockups html27 flat/folders, html13 week rows, html33 upright list).
 
@@ -24,7 +27,7 @@ internal const val PickedId = "kickoff-nov-11"
 internal fun flatFixture(
     harborLights: Boolean = false,
     glassHarbor: Boolean = false,
-    view: RecordingsView = RecordingsView(),
+    view: DvrArchiveView = DvrArchiveView(),
 ) = RecordingsState(
         view = view,
         clock = FixtureClock,
@@ -52,7 +55,7 @@ internal fun flatFixture(
 
 /** Grouped by folders, from the root down to Sport › Football › Harbor Sport › Week 46. */
 internal fun foldersFixture() = RecordingsState(
-    view = RecordingsView(grouping = RecordingsGrouping.Folders),
+    view = DvrArchiveView(grouping = DvrArchiveGrouping.FOLDERS),
     clock = FixtureClock,
     space = FixtureSpace,
     root = RecordingFolder(
@@ -97,7 +100,7 @@ internal val WeekPath = listOf("sport", "football", "harbor-sport", "week-46")
 
 /** Nothing left under Show: Unwatched. */
 internal fun unwatchedEmptyFixture() = RecordingsState(
-    view = RecordingsView(show = RecordingsShow.Unwatched),
+    view = DvrArchiveView(show = DvrArchiveShow.UNWATCHED),
     clock = FixtureClock,
     space = FixtureSpace,
     root = RecordingFolder("root", "Recordings"),
@@ -105,7 +108,7 @@ internal fun unwatchedEmptyFixture() = RecordingsState(
 
 /** No recordings on the server. */
 internal fun noRecordingsFixture() = RecordingsState(
-    view = RecordingsView(),
+    view = DvrArchiveView(),
     clock = FixtureClock,
     space = RecordingSpace("4.0 TB", "4.0 TB", usedFraction = 0f),
     root = RecordingFolder("root", "Recordings"),

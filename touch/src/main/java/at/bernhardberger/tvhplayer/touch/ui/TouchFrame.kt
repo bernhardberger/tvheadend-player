@@ -32,6 +32,8 @@ import androidx.compose.material3.WideNavigationRail
 import androidx.compose.material3.WideNavigationRailItem
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -56,6 +58,12 @@ internal enum class Destination(
     Recordings(R.string.nav_recordings, R.drawable.video_library_outline, R.drawable.video_library_filled),
 }
 
+/**
+ * The selected destination when the app owns it: each destination's screen draws its own frame,
+ * so the app keeps the selection above them and swaps the screen when it changes.
+ */
+internal val LocalFrameSelection = staticCompositionLocalOf<MutableState<Destination>?> { null }
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun TouchFrame(
@@ -73,7 +81,8 @@ internal fun TouchFrame(
     belowTopBar: @Composable (Destination) -> Unit = {},
     content: @Composable (Destination) -> Unit = {},
 ) {
-    var selected by rememberSaveable { mutableStateOf(initialDestination) }
+    val own = rememberSaveable { mutableStateOf(initialDestination) }
+    var selected by LocalFrameSelection.current ?: own
     val select: (Destination) -> Unit = { selected = it }
     BackHandler(enabled = selected != Destination.Channels) {
         selected = Destination.Channels

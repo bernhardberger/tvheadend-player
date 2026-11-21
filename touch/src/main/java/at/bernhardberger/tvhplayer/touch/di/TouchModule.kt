@@ -44,6 +44,7 @@ import kotlinx.coroutines.launch
 import at.bernhardberger.tvhplayer.notices.ConnectionNoticeSource
 import at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
+import at.bernhardberger.tvhplayer.touch.recordings.RecordingsViewModel
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.dsl.viewModel
 import org.koin.core.qualifier.named
@@ -162,4 +163,5 @@ val touchModule = module {
     viewModel {
         ChannelsViewModel(session = get(), tagSettings = get(), liveProfile = get<AppProfileOwner>().liveProfile)
     }
+    viewModel { RecordingsViewModel(session = get()) }
 }

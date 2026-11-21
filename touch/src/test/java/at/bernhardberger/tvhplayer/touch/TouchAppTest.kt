@@ -21,6 +21,7 @@ import at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult
 import at.bernhardberger.tvheadend.sdk.android.TvheadendDiscoveryTestFactory
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
+import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileListResult
@@ -176,9 +177,9 @@ class TouchAppTest {
         compose.onNodeWithText(guide.second.name!!).assertIsDisplayed()
         compose.onNodeWithText(guide.programs[0]).assertIsDisplayed()
 
-        // Only Channels is wired: the phone has no bar, and the open row offers nothing to play or record.
+        // Guide is not wired yet, and the open row offers nothing to play or record.
         compose.onNodeWithText(label(R.string.nav_epg)).assertDoesNotExist()
-        compose.onNodeWithText(label(R.string.nav_recordings)).assertDoesNotExist()
+        compose.onNodeWithText(label(R.string.nav_recordings)).assertIsDisplayed()
         compose.onNodeWithContentDescription(compose.activity.getString(R.string.channels_expand, guide.first.name))
             .performClick()
         compose.onNodeWithText(guide.programs[2]).assertIsDisplayed()
@@ -211,6 +212,40 @@ class TouchAppTest {
         compose.onNodeWithText(guide.second.name!!).assertIsDisplayed()
     }
 
+    @Test
+    fun recordingsShowTheServersRecordingsWithoutUnwiredControls() {
+        val guide = savedConnectionWithGuide()
+        openRecordings()
+        listOf(guide.recordingNow, guide.diary, guide.film).forEach {
+            compose.onNodeWithText(it.title!!).assertIsDisplayed()
+        }
+        compose.onNodeWithText(guide.scheduled.title!!).assertDoesNotExist()
+
+        // A picked recording shows its details but nothing to play, delete or change yet.
+        compose.onNodeWithText(guide.film.title!!).performClick()
+        listOf(R.string.recordings_watch, R.string.recordings_resume, R.string.recordings_watch_from_beginning)
+            .forEach { compose.onNodeWithText(label(it)).assertDoesNotExist() }
+        listOf(R.string.recordings_delete, R.string.recordings_more)
+            .forEach { compose.onNodeWithContentDescription(label(it)).assertDoesNotExist() }
+    }
+
+    @Test
+    fun aViewOptionChangesTheRecordings() {
+        val guide = savedConnectionWithGuide()
+        openRecordings()
+        compose.onNodeWithContentDescription(label(R.string.recordings_view_options)).performClick()
+        compose.onNodeWithText(label(R.string.recordings_show)).performClick()
+        compose.onNodeWithText(label(R.string.recordings_show_unwatched)).performClick()
+
+        compose.onNodeWithText(guide.diary.title!!).assertDoesNotExist()
+        compose.onNodeWithText(guide.film.title!!).assertExists()
+    }
+
+    private fun openRecordings() {
+        compose.onNode(hasClickAction() and hasText(label(R.string.nav_recordings))).performClick()
+        compose.waitForIdle()
+    }
+
     private fun savedConnectionWithGuide(): ServerGuide {
         runBlocking { connection.store.addAnonymous(server.host, server.port, "Home server", true) }
         show()
@@ -220,6 +255,7 @@ class TouchAppTest {
                 sessionState = ready().sessionState,
                 channelState = ChannelRepositoryState.Current(guide.catalog),
                 epgState = EpgRepositoryState.Current(guide.snapshot),
+                dvrState = DvrRepositoryState.Current(guide.dvr),
             ),
         )
         compose.waitForIdle()
@@ -237,9 +273,10 @@ class TouchAppTest {
         connection.start()
         val presentation = connection.presentation()
         val channels = connection.channels()
+        val recordings = connection.recordings()
         compose.setContent {
             MaterialTheme(colorScheme = MobileDarkColors) {
-                TouchApp(connection.session, connection.owner, presentation, channels) {
+                TouchApp(connection.session, connection.owner, presentation, channels, recordings) {
                     flowOf(TvheadendDiscoveryTestFactory.discovering(listOf(server)))
                 }
             }

@@ -77,10 +77,6 @@
     <!-- The way down to a folder, as in "Recordings › Sport › Football". -->
     <string name="recordings_path">%1$s › %2$s</string>
     <string name="recordings_up">Back to %1$s</string>
-    <!-- TV: recordings_date_today -->
-    <string name="recordings_today">Today</string>
-    <!-- TV: recordings_date_yesterday -->
-    <string name="recordings_yesterday">Yesterday</string>
     <!-- TV: recordings_until -->
     <string name="recordings_until">until %1$s</string>
     <!-- TV: player_minutes_left -->
@@ -135,4 +131,7 @@
     <string name="recordings_errors">Errors</string>
     <!-- TV: details_retention -->
     <string name="recordings_retention">Retention</string>
+    <!-- The offline line above the saved list, as channels_offline / channels_saved say it for channels. -->
+    <string name="recordings_offline">Can’t reach the server • Showing saved recordings</string>
+    <string name="recordings_saved">Showing saved recordings</string>
 </resources>
