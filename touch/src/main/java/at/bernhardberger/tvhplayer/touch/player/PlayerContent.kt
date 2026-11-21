@@ -12,22 +12,16 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.BottomSheetDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.IconToggleButton
@@ -35,7 +29,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.ButtonColors
-import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -51,9 +44,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.TextStyle
@@ -63,9 +54,6 @@ import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.channels.ChannelRow
 import at.bernhardberger.tvhplayer.touch.ui.rememberStandalonePicture
-import at.bernhardberger.tvhplayer.touch.channels.ChannelsLayout
-import at.bernhardberger.tvhplayer.touch.channels.ChannelsState
-import at.bernhardberger.tvhplayer.touch.channels.TagFilter
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
 
 internal const val DRAG_ALPHA = .38f
@@ -242,8 +230,39 @@ internal fun UprightPlayerContent(
     onChannel: (String) -> Unit,
     onSeek: (Long) -> Unit,
 ) {
-    val inset = if (layout == PlayerLayout.Phone) 16.dp else 24.dp
+    if (state is LivePlayerState && layout == PlayerLayout.Phone) {
+        PhoneChannelSheet(
+            state.channels, panels.onChoice, onChannel, { onAction(PlayerAction.RetryChannels) },
+            Modifier.fillMaxSize(),
+        ) { modifier ->
+            UprightProgramActions(state, layout, dragging, panels, modifier)
+        }
+        return
+    }
     Column(Modifier.fillMaxSize()) {
+        UprightProgramActions(state, layout, dragging, panels)
+        when (state) {
+            is LivePlayerState -> UprightChannelList(
+                state.channels, panels.onChoice, onChannel, { onAction(PlayerAction.RetryChannels) },
+                Modifier.weight(1f),
+            )
+            is RecordingPlayerState -> if (state.hasMarkers) {
+                InlineRecordingMarkers(state, recordingMarkerTap(state, onSeek, panels.onChoice), Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun UprightProgramActions(
+    state: PlayerFaceState,
+    layout: PlayerLayout,
+    dragging: Boolean,
+    panels: PanelHost,
+    modifier: Modifier = Modifier,
+) {
+    val inset = if (layout == PlayerLayout.Phone) 16.dp else 24.dp
+    Column(modifier.fillMaxWidth()) {
         Column(
             Modifier.fillMaxWidth().padding(horizontal = inset).padding(top = 16.dp)
                 .alpha(if (dragging) DRAG_ALPHA else 1f),
@@ -273,61 +292,6 @@ internal fun UprightPlayerContent(
             state, layout, dragging, panels,
             Modifier.padding(horizontal = inset - 8.dp).padding(top = 14.dp, bottom = 12.dp),
         )
-        when (state) {
-            is LivePlayerState -> PlayerChannelList(
-                state.channels, layout, panels.onChoice, onChannel, { onAction(PlayerAction.RetryChannels) },
-                Modifier.weight(1f),
-            )
-            is RecordingPlayerState -> if (state.hasMarkers) {
-                InlineRecordingMarkers(state, recordingMarkerTap(state, onSeek, panels.onChoice), Modifier.weight(1f))
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun PlayerChannelList(
-    state: ChannelsState,
-    layout: PlayerLayout,
-    onChoice: (PlayerChoice) -> Unit,
-    onChannel: (String) -> Unit,
-    onRetry: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val colors = MaterialTheme.colorScheme
-    val inset = if (layout == PlayerLayout.Phone) 12.dp else 24.dp
-    Surface(
-        modifier = modifier.fillMaxWidth().testTag("player-channel-list"),
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-        color = colors.surfaceContainer,
-        contentColor = colors.onSurface,
-    ) {
-        Column(Modifier.windowInsetsPadding(WindowInsets.navigationBars).padding(horizontal = inset)) {
-            // A static list in this slice, so don't expose the drawn grip as a drag affordance.
-            BottomSheetDefaults.DragHandle(
-                Modifier.align(Alignment.CenterHorizontally).height(16.dp)
-                    .wrapContentHeight(unbounded = true).clearAndSetSemantics {},
-                color = colors.onSurfaceVariant.copy(alpha = .55f),
-            )
-            Row(
-                Modifier.fillMaxWidth().height(50.dp).padding(horizontal = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text(
-                    stringResource(R.string.player_channels), Modifier.semantics { heading() },
-                    color = colors.onSurface, style = MaterialTheme.typography.titleMedium,
-                )
-                state.displayedList?.takeIf { it.tags.isNotEmpty() }?.let { list ->
-                    TagFilter(list, { onChoice(PlayerChoice.ChannelTag(it)) })
-                }
-            }
-            PlayerChannelsContent(
-                state, if (layout == PlayerLayout.Phone) ChannelsLayout.Phone else ChannelsLayout.Upright,
-                onChannel, { onChoice(PlayerChoice.ChannelTag(it)) }, onRetry,
-            )
-        }
     }
 }
 
