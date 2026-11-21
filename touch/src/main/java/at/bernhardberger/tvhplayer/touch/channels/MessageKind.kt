@@ -39,15 +39,26 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import at.bernhardberger.tvhplayer.touch.R
 
 internal enum class MessageKind(
     @param:DrawableRes val icon: Int,
     @param:StringRes val title: Int,
     @param:StringRes val reason: Int,
+    /** Follows the reason in the same paragraph, as the catalog's alerts and messages join them. */
+    @param:StringRes val hint: Int? = null,
 ) {
     Unreachable(R.drawable.channels_cloud_off, R.string.channels_unreachable, R.string.channels_unreachable_reason),
     SignInFailed(R.drawable.channels_lock, R.string.channels_sign_in_failed, R.string.channels_sign_in_reason),
+
+    /** The saved password can't be read: the catalog's credential-unavailable message. */
+    SignInNeeded(
+        R.drawable.channels_lock,
+        SharedR.string.error_106_title,
+        SharedR.string.error_106_reason,
+        SharedR.string.error_hint_enter_sign_in_again,
+    ),
     Empty(R.drawable.play_tv_outline, R.string.channels_empty, R.string.channels_empty_reason),
     EmptyTag(R.drawable.channels_tag, R.string.channels_empty, R.string.channels_empty_tag),
 }
@@ -68,8 +79,10 @@ internal fun ChannelsMessage(kind: MessageKind, actions: ChannelsActions) {
                 stringResource(kind.title), Modifier.semantics { heading() },
                 style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center,
             )
+            val reason = stringResource(kind.reason)
+            val hint = kind.hint?.let { stringResource(it) }
             Text(
-                stringResource(kind.reason), style = MaterialTheme.typography.bodyMedium,
+                if (hint == null) reason else "$reason $hint", style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center,
             )
             MessageActions(kind, actions)
@@ -89,7 +102,8 @@ private fun MessageActions(kind: MessageKind, actions: ChannelsActions) {
                 Button(onClick = actions.onRetry) { Text(stringResource(R.string.channels_retry)) }
                 OutlinedButton(onClick = actions.onOpenConnectionSettings) { Text(settings) }
             }
-            MessageKind.SignInFailed -> Button(onClick = actions.onOpenConnectionSettings) { Text(settings) }
+            MessageKind.SignInFailed, MessageKind.SignInNeeded ->
+                Button(onClick = actions.onOpenConnectionSettings) { Text(settings) }
             MessageKind.Empty -> Unit
             MessageKind.EmptyTag -> Button(onClick = { actions.onTag(null) }) {
                 Text(stringResource(R.string.channels_all))

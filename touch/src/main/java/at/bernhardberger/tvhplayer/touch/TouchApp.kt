@@ -25,18 +25,27 @@ import at.bernhardberger.tvheadend.sdk.core.ServerProfileSummary
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.serverProfileDisplayName
+import at.bernhardberger.tvhplayer.core.ConnectionUiState
+import at.bernhardberger.tvhplayer.touch.channels.ChannelsActions
+import at.bernhardberger.tvhplayer.touch.channels.ChannelsMessage
+import at.bernhardberger.tvhplayer.touch.channels.MessageKind
 import at.bernhardberger.tvhplayer.touch.connect.ActiveConnectionUiState
+import at.bernhardberger.tvhplayer.touch.connect.ConnectionStatus
 import at.bernhardberger.tvhplayer.touch.connect.ConnectionsScreen
 import at.bernhardberger.tvhplayer.touch.connect.EditConnectionFlow
 import at.bernhardberger.tvhplayer.touch.connect.FirstRunFlow
+import at.bernhardberger.tvhplayer.touch.connect.connectionStatus
 import at.bernhardberger.tvhplayer.touch.ui.Destination
 import at.bernhardberger.tvhplayer.touch.ui.TouchFrame
+import at.bernhardberger.tvhplayer.viewmodels.AppConnectionPresentation
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.launch
 
-private enum class Page { Frame, Connections }
+/** [SignIn] is the Connections page opened on the editor, for a password that can't be read. */
+private enum class Page { Frame, Connections, SignIn }
 
 /**
  * The app's pages: first run while no connection is saved, else the frame with the Connections
@@ -47,10 +56,12 @@ private enum class Page { Frame, Connections }
 internal fun TouchApp(
     session: TvheadendSession,
     owner: AppProfileOwner,
+    connection: StateFlow<AppConnectionPresentation>,
     discovery: () -> Flow<TvheadendDiscoveryState>,
 ) {
     val profile by owner.serverProfile.collectAsStateWithLifecycle()
     val profiles by owner.profiles.collectAsStateWithLifecycle()
+    val presentation by connection.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     var firstRun by rememberSaveable { mutableStateOf(false) }
     var page by rememberSaveable { mutableStateOf(Page.Frame) }
@@ -74,59 +85,93 @@ internal fun TouchApp(
             page = Page.Frame
             rename(null, name)
         }
-        page == Page.Connections -> {
+        page != Page.Frame -> {
             val active = (profiles as? ServerProfileListResult.Available)?.let { list ->
                 list.profiles.firstOrNull { it.id == list.activeId }
             }
-            ConnectionsPage(session, owner, active, onBack = { page = Page.Frame }, rename = rename)
+            ConnectionsPage(
+                session, owner, active?.uiState(connectionStatus(profile, presentation)), active,
+                signIn = page == Page.SignIn,
+                onBack = { page = Page.Frame },
+                onSaved = { name ->
+                    page = Page.Connections
+                    rename(active?.label, name)
+                },
+            )
         }
-        else -> TouchFrame(
-            actions = { destination ->
-                // Until Home exists, connection settings open from the end of the Channels top bar.
-                if (destination == Destination.Channels) {
-                    IconButton(onClick = { page = Page.Connections }, modifier = Modifier.padding(end = 4.dp)) {
-                        Icon(
-                            painterResource(R.drawable.channels_settings),
-                            stringResource(R.string.channels_connection_settings),
-                        )
-                    }
-                }
-            },
+        else -> AppFrame(
+            signInNeeded = presentation.connection == ConnectionUiState.CredentialUnavailable,
+            onOpenConnections = { page = Page.Connections },
+            onSignIn = { page = Page.SignIn },
         )
     }
 }
 
+/**
+ * The Connections page. With [signIn] the editor of the connection in use is open at once on
+ * Password, and its Cancel leaves the page.
+ */
 @Composable
 private fun ConnectionsPage(
     session: TvheadendSession,
     owner: AppProfileOwner,
+    card: ActiveConnectionUiState?,
     active: ServerProfileSummary?,
+    signIn: Boolean,
     onBack: () -> Unit,
-    rename: (String?, String) -> Unit,
+    onSaved: (name: String) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     var editing by rememberSaveable { mutableStateOf(false) }
     ConnectionsScreen(
-        active = active?.uiState(),
+        active = card,
         onBack = onBack,
         onEdit = { editing = true },
         onRemove = { scope.launch { if (active != null) owner.remove(active.id) } },
     )
-    if (editing && active != null) {
+    if ((editing || signIn) && active != null) {
         EditConnectionFlow(
             session, owner, name = active.label.orEmpty(),
-            onClose = { editing = false },
+            onClose = { if (signIn) onBack() else editing = false },
             onSaved = { name ->
                 editing = false
-                rename(active.label, name)
+                onSaved(name)
             },
+            focusPassword = signIn,
         )
     }
 }
 
-private fun ServerProfileSummary.uiState() = ActiveConnectionUiState(
+private fun ServerProfileSummary.uiState(status: ConnectionStatus) = ActiveConnectionUiState(
     name = serverProfileDisplayName(this),
     address = host,
     port = port,
     username = username.takeIf { authenticationMode == ServerProfileAuthenticationMode.PASSWORD }.orEmpty(),
+    status = status,
 )
+
+@Composable
+private fun AppFrame(signInNeeded: Boolean, onOpenConnections: () -> Unit, onSignIn: () -> Unit) {
+    TouchFrame(
+        actions = { destination ->
+            // Until Home exists, connection settings open from the end of the Channels top bar.
+            if (destination == Destination.Channels) {
+                IconButton(onClick = onOpenConnections, modifier = Modifier.padding(end = 4.dp)) {
+                    Icon(
+                        painterResource(R.drawable.channels_settings),
+                        stringResource(R.string.channels_connection_settings),
+                    )
+                }
+            }
+        },
+        content = {
+            // The content's place; until the destinations are wired they show nothing else.
+            if (signInNeeded) {
+                ChannelsMessage(
+                    MessageKind.SignInNeeded,
+                    ChannelsActions(onPlay = {}, onTag = {}, onRetry = {}, onOpenConnectionSettings = onSignIn),
+                )
+            }
+        },
+    )
+}

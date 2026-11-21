@@ -12,4 +12,10 @@
     <!-- TV key: server_remove_body_active (this device instead of this TV) -->
     <string name="connect_remove_body_active">Playback stops, and no connection is in use until you choose one. This connection’s recent channels, audio choices, and saved pictures are deleted from this device. Recordings stay on the server.</string>
     <string name="connect_remove">Remove</string>
+    <!-- TV key: error_111_reason (without the trailing period for supporting text) -->
+    <string name="connect_not_tvheadend">Something answered, but it isn’t Tvheadend’s HTSP service</string>
+    <!-- TV key: error_112_title (this device instead of this TV) -->
+    <string name="connect_network_title">This device isn’t connected to a network</string>
+    <!-- TV key: error_hint_check_tv_network (the device instead of the TV) -->
+    <string name="connect_network_hint">Check the device’s network settings.</string>
 </resources>

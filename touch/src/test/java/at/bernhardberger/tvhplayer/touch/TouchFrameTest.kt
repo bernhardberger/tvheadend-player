@@ -22,6 +22,7 @@ import org.junit.rules.ExternalResource
 import org.junit.runner.RunWith
 import org.koin.core.context.startKoin
 import org.koin.core.context.stopKoin
+import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -44,6 +45,7 @@ class TouchFrameTest {
                     module {
                         single<TvheadendSession> { connection.session }
                         single { connection.owner }
+                        viewModel { connection.presentation() }
                     },
                 )
             }

@@ -7,17 +7,22 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import at.bernhardberger.tvheadend.sdk.android.DiscoveredTvheadendServer
+import at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult
 import at.bernhardberger.tvheadend.sdk.android.TvheadendDiscoveryTestFactory
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileListResult
+import at.bernhardberger.tvheadend.sdk.core.ServerProfileWriteResult
 import at.bernhardberger.tvheadend.sdk.core.SessionFailure
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
@@ -43,7 +48,7 @@ import org.robolectric.annotation.Config
 class TouchAppTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
 
-    private val connection = FakeConnection()
+    private var connection = FakeConnection()
     private val server = DiscoveredTvheadendServer("Tvheadend", "192.168.1.20", 9982)
     private val heading = SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading)
 
@@ -91,6 +96,75 @@ class TouchAppTest {
         assertTrue(compose.activity.isFinishing)
     }
 
+    @Test
+    fun dialogFailureRunsTheTestAgain() {
+        signInToFoundServer()
+        unavailable(SessionFailure.NETWORK_UNAVAILABLE)
+        compose.onNode(isDialog() and hasAnyDescendant(hasText(label(R.string.connect_network_title)))).assertExists()
+
+        compose.onNodeWithText(label(SharedR.string.connection_try_again)).performClick()
+        compose.onNode(isDialog()).assertDoesNotExist()
+        compose.onNodeWithText(compose.activity.getString(SharedR.string.onboarding_connecting_title, server.host))
+            .assertExists()
+    }
+
+    @Test
+    fun unreachableContinueAnywaySavesTheUntestedConnection() {
+        signInToFoundServer()
+        unavailable(SessionFailure.SERVER_UNREACHABLE)
+        compose.onNodeWithText(label(SharedR.string.onboarding_continue_anyway)).performClick()
+
+        compose.onNode(heading and hasText(label(R.string.nav_channels))).assertIsDisplayed()
+        val saved = runBlocking { connection.store.profiles() } as ServerProfileListResult.Available
+        assertEquals(listOf(server.host), saved.profiles.map { it.host })
+    }
+
+    @Test
+    fun notTvheadendMarksTheAddressPair() {
+        signInToFoundServer()
+        unavailable(SessionFailure.INCOMPATIBLE_SERVER)
+
+        val error = SemanticsMatcher.expectValue(SemanticsProperties.Error, label(R.string.connect_not_tvheadend))
+        field(SharedR.string.onboarding_server_address).assert(error)
+        field(R.string.connect_port).assert(error)
+        compose.onNode(isDialog()).assertDoesNotExist()
+    }
+
+    @Test
+    fun connectionsCardFollowsTheConnection() {
+        runBlocking { connection.store.addAnonymous(server.host, server.port, "Home server", true) }
+        show()
+        compose.onNodeWithContentDescription(label(R.string.channels_connection_settings)).performClick()
+        compose.onNodeWithText(label(SharedR.string.connection_overview_connecting)).assertExists()
+
+        unavailable(SessionFailure.SERVER_UNREACHABLE)
+        compose.onNodeWithText(label(SharedR.string.error_101_title)).assertExists()
+        compose.onNodeWithText(label(SharedR.string.connection_overview_connecting)).assertDoesNotExist()
+    }
+
+    @Test
+    fun signInNeededOpensTheEditorWithThePasswordRequired() {
+        connection = FakeConnection(readForEditing = ServerProfileEditReadResult.Unavailable)
+        runBlocking {
+            val id = (connection.store.addPassword(server.host, server.port, "alex", "•", "Home server", true)
+                as ServerProfileWriteResult.Applied).id
+            connection.store.scriptCredentialsUnavailable(id, false)
+        }
+        show()
+        compose.onNode(heading and hasText(label(SharedR.string.error_106_title))).assertIsDisplayed()
+        compose.onNode(hasClickAction() and hasText(label(R.string.channels_connection_settings))).performClick()
+
+        field(SharedR.string.password).assertIsFocused()
+        field(SharedR.string.username).assert(hasText("alex"))
+        compose.onNodeWithText(label(SharedR.string.onboarding_password_saved)).assertDoesNotExist()
+        compose.onNodeWithText(label(SharedR.string.server_name_save)).performClick()
+        val required = SemanticsMatcher.expectValue(SemanticsProperties.Error, label(SharedR.string.onboarding_sign_in_pair))
+        field(SharedR.string.password).assert(required)
+        // Cancel leaves the Connections page with the editor.
+        compose.onNodeWithContentDescription(label(SharedR.string.close)).performClick()
+        compose.onNode(heading and hasText(label(R.string.nav_channels))).assertIsDisplayed()
+    }
+
     private fun signInToFoundServer() {
         show()
         compose.onNode(hasClickAction() and hasText(server.name)).performClick()
@@ -100,9 +174,10 @@ class TouchAppTest {
 
     private fun show() {
         connection.start()
+        val presentation = connection.presentation().uiState
         compose.setContent {
             MaterialTheme(colorScheme = MobileDarkColors) {
-                TouchApp(connection.session, connection.owner) {
+                TouchApp(connection.session, connection.owner, presentation) {
                     flowOf(TvheadendDiscoveryTestFactory.discovering(listOf(server)))
                 }
             }
@@ -115,6 +190,11 @@ class TouchAppTest {
         compose.onNode(SemanticsMatcher.keyIsDefined(SemanticsProperties.EditableText) and hasText(label(id)))
 
     private fun label(@StringRes id: Int): String = compose.activity.getString(id)
+
+    private fun unavailable(failure: SessionFailure) {
+        connection.session.publish(SessionObservation.create(sessionState = SessionState.Unavailable(failure)))
+        compose.waitForIdle()
+    }
 
     private fun ready() = SessionObservation.create(
         sessionState = SessionState.Ready(

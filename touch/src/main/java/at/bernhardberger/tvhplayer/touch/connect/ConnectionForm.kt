@@ -13,11 +13,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.autofill.ContentType
 import androidx.compose.ui.res.painterResource
@@ -42,42 +45,54 @@ internal fun ConnectionForm(
     compact: Boolean,
     showSignInHelp: Boolean,
     modifier: Modifier = Modifier,
+    focusPassword: Boolean = false,
 ) {
     val fields = state.fields
     val enabled = state.phase !is ConnectionPhase.Connecting
     val addressError = state.addressError
     val portError = state.portError
+    // The address pair's own errors come first; "not Tvheadend" belongs to both fields at once.
+    val pairError = stringResource(R.string.connect_not_tvheadend)
+        .takeIf { state.phase == ConnectionPhase.NotTvheadend && !addressError && !portError }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            ConnectionField(
-                label = SharedR.string.onboarding_server_address,
-                value = fields.address,
-                onChange = { onFieldsChange(fields.copy(address = it)) },
-                enabled = enabled,
-                modifier = Modifier.weight(1f),
-                support = stringResource(
-                    if (addressError) {
-                        SharedR.string.onboarding_server_address_missing
-                    } else {
-                        SharedR.string.onboarding_server_address_support
+        Column {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                ConnectionField(
+                    label = SharedR.string.onboarding_server_address,
+                    value = fields.address,
+                    onChange = { onFieldsChange(fields.copy(address = it)) },
+                    enabled = enabled,
+                    modifier = Modifier.weight(1f),
+                    support = when {
+                        pairError != null -> null
+                        addressError -> stringResource(SharedR.string.onboarding_server_address_missing)
+                        else -> stringResource(SharedR.string.onboarding_server_address_support)
                     },
-                ),
-                error = stringResource(SharedR.string.onboarding_server_address_missing).takeIf { addressError },
-                keyboardType = KeyboardType.Uri,
-            )
-            ConnectionField(
-                label = R.string.connect_port,
-                value = fields.port,
-                onChange = { onFieldsChange(fields.copy(port = it)) },
-                enabled = enabled,
-                modifier = Modifier.width(if (compact) 124.dp else 140.dp),
-                support = if (portError) stringResource(SharedR.string.onboarding_port_invalid)
-                else stringResource(SharedR.string.onboarding_port_support, USUAL_PORT),
-                error = stringResource(SharedR.string.onboarding_port_invalid).takeIf { portError },
-                keyboardType = KeyboardType.Number,
-            )
+                    error = pairError
+                        ?: stringResource(SharedR.string.onboarding_server_address_missing).takeIf { addressError },
+                    keyboardType = KeyboardType.Uri,
+                )
+                ConnectionField(
+                    label = R.string.connect_port,
+                    value = fields.port,
+                    onChange = { onFieldsChange(fields.copy(port = it)) },
+                    enabled = enabled,
+                    modifier = Modifier.width(if (compact) 124.dp else 140.dp),
+                    support = when {
+                        pairError != null -> null
+                        portError -> stringResource(SharedR.string.onboarding_port_invalid)
+                        else -> stringResource(SharedR.string.onboarding_port_support, USUAL_PORT)
+                    },
+                    error = pairError ?: stringResource(SharedR.string.onboarding_port_invalid).takeIf { portError },
+                    keyboardType = KeyboardType.Number,
+                )
+            }
+            // Both fields carry the sentence as their error, so the shared line is not read again.
+            if (pairError != null) {
+                PairLine(pairError, MaterialTheme.colorScheme.error, Modifier.semantics { hideFromAccessibility() })
+            }
         }
-        SignInFields(state, onFieldsChange, compact, showSignInHelp)
+        SignInFields(state, onFieldsChange, compact, showSignInHelp, focusPassword)
         ConnectionField(
             label = SharedR.string.server_name_field,
             value = fields.name,
@@ -97,6 +112,7 @@ private fun SignInFields(
     onFieldsChange: (ConnectionFields) -> Unit,
     compact: Boolean,
     showHelp: Boolean,
+    focusPassword: Boolean,
 ) {
     val fields = state.fields
     val enabled = state.phase !is ConnectionPhase.Connecting
@@ -105,6 +121,9 @@ private fun SignInFields(
         state.signInError -> stringResource(SharedR.string.onboarding_sign_in_pair)
         else -> null
     }
+    // Left empty, Password keeps the saved one; typing replaces it, and the note leaves.
+    val saved = stringResource(SharedR.string.onboarding_password_saved)
+        .takeIf { state.passwordSaved && fields.password.isEmpty() && errorMessage == null }
     val username: @Composable (Modifier) -> Unit = { modifier ->
         ConnectionField(
             label = SharedR.string.username,
@@ -125,12 +144,13 @@ private fun SignInFields(
             enabled = enabled,
             // The sentence is shown once for the pair: under Password when stacked, under both fields side by side.
             support = if (compact) {
-                errorMessage ?: stringResource(SharedR.string.onboarding_sign_in_body).takeIf { showHelp }
+                errorMessage ?: saved ?: stringResource(SharedR.string.onboarding_sign_in_body).takeIf { showHelp }
             } else {
-                null
+                saved
             },
             error = errorMessage,
             modifier = modifier,
+            focus = focusPassword,
         )
     }
     if (compact) {
@@ -174,14 +194,17 @@ private fun PasswordField(
     support: String?,
     error: String?,
     modifier: Modifier,
+    focus: Boolean,
 ) {
     var visible by remember(enabled) { mutableStateOf(false) }
+    val requester = remember { FocusRequester() }
+    if (focus) LaunchedEffect(Unit) { requester.requestFocus() }
     ConnectionField(
         label = SharedR.string.password,
         value = value,
         onChange = onChange,
         enabled = enabled,
-        modifier = modifier.semantics {
+        modifier = modifier.focusRequester(requester).semantics {
             password()
             contentType = ContentType.Password
         },

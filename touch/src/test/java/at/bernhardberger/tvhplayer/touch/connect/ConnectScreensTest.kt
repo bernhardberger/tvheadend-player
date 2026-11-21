@@ -37,8 +37,15 @@ import androidx.core.view.WindowInsetsCompat
 import at.bernhardberger.tvheadend.sdk.android.DiscoveredTvheadendServer
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import at.bernhardberger.tvhplayer.touch.R
+import at.bernhardberger.tvhplayer.touch.channels.ChannelsActions
+import at.bernhardberger.tvhplayer.touch.channels.ChannelsMessage
+import at.bernhardberger.tvhplayer.touch.channels.MessageKind
 import at.bernhardberger.tvhplayer.touch.testutil.TouchCanvas
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouch
+import at.bernhardberger.tvhplayer.touch.ui.TouchFrame
+import at.bernhardberger.tvhplayer.ui.screens.onboarding.SetupAction
+import at.bernhardberger.tvhplayer.ui.screens.onboarding.SetupFailure
+import at.bernhardberger.tvhplayer.ui.screens.onboarding.SetupMode
 import at.bernhardberger.tvhplayer.ui.MobileDarkColors
 import java.io.File
 import org.junit.Assert.assertEquals
@@ -172,6 +179,82 @@ class ConnectScreensTest {
         compose.runOnIdle { assertEquals(active, removed) }
     }
 
+    @Test
+    @Config(qualifiers = Tablet)
+    fun tabletFailedDialog() = failureDialog("tablet-setup-failed-dialog", TouchCanvas.TABLET, SetupFailure.TIMEOUT)
+
+    @Test
+    @Config(qualifiers = Phone)
+    fun phoneFailedDialogTriesAgain() {
+        var chosen: SetupAction? = null
+        failureDialog("phone-setup-failed-dialog", TouchCanvas.PHONE, SetupFailure.TIMEOUT) { chosen = it }
+        compose.onNodeWithText(label(SharedR.string.connection_try_again)).performClick()
+        compose.runOnIdle { assertEquals(SetupAction.TRY_AGAIN, chosen) }
+    }
+
+    @Test
+    @Config(qualifiers = Tablet)
+    fun tabletUnreachableDialogContinuesAnyway() {
+        var chosen: SetupAction? = null
+        failureDialog("tablet-setup-unreachable-dialog", TouchCanvas.TABLET, SetupFailure.UNREACHABLE) { chosen = it }
+        compose.onNodeWithText(label(SharedR.string.connection_try_again)).assertDoesNotExist()
+        compose.onNodeWithText(label(SharedR.string.onboarding_continue_anyway)).performClick()
+        compose.runOnIdle { assertEquals(SetupAction.CONTINUE_ANYWAY, chosen) }
+    }
+
+    @Test
+    @Config(qualifiers = Tablet)
+    fun tabletNotTvheadendMarksTheAddressPair() {
+        account("tablet-setup-not-tvheadend", TouchCanvas.TABLET, ConnectionPhase.NotTvheadend)
+        assertPairError(R.string.connect_not_tvheadend, SharedR.string.onboarding_server_address, R.string.connect_port)
+    }
+
+    @Test
+    @Config(qualifiers = Phone)
+    fun phoneNotTvheadend() = account("phone-setup-not-tvheadend", TouchCanvas.PHONE, ConnectionPhase.NotTvheadend)
+
+    @Test
+    @Config(qualifiers = Tablet)
+    fun tabletConnectionStateConnecting() {
+        val status = ConnectionStatus(ConnectionStatus.Kind.Working, SharedR.string.connection_overview_connecting)
+        connections("tablet-connection-state-connecting", TouchCanvas.TABLET, active.copy(status = status))
+        compose.onNodeWithText(label(SharedR.string.connection_overview_connecting)).assertExists()
+    }
+
+    @Test
+    @Config(qualifiers = Tablet)
+    fun tabletConnectionStateFailed() {
+        val status = ConnectionStatus(ConnectionStatus.Kind.Failed, SharedR.string.error_101_title)
+        connections("tablet-connection-state-failed", TouchCanvas.TABLET, active.copy(status = status))
+        compose.onNodeWithText(label(SharedR.string.error_101_title)).assertExists()
+        compose.onNodeWithText(label(SharedR.string.connection_overview_connected)).assertDoesNotExist()
+    }
+
+    @Test
+    @Config(qualifiers = Tablet)
+    fun tabletEditorSavedPassword() =
+        editor("tablet-connection-editor-saved-password", TouchCanvas.TABLET, passwordSaved = true)
+
+    @Test
+    @Config(qualifiers = Phone)
+    fun phoneEditorSavedPasswordLeavesWhenTyping() {
+        editor("phone-connection-editor-saved-password", TouchCanvas.PHONE, passwordSaved = true)
+        val saved = label(SharedR.string.onboarding_password_saved)
+        compose.onNodeWithText(saved).assertExists()
+        compose.onNodeWithContentDescription(label(SharedR.string.show_password)).assertDoesNotExist()
+        field(SharedR.string.password).performTextReplacement("•".repeat(4)) // Mask-only fixture.
+        compose.onNodeWithText(saved).assertDoesNotExist()
+        compose.onNodeWithContentDescription(label(SharedR.string.show_password)).assertExists()
+    }
+
+    @Test
+    @Config(qualifiers = Tablet)
+    fun tabletSignInNeeded() = signInNeeded("tablet-sign-in-needed", TouchCanvas.TABLET)
+
+    @Test
+    @Config(qualifiers = Phone)
+    fun phoneSignInNeeded() = signInNeeded("phone-sign-in-needed", TouchCanvas.PHONE)
+
     private fun findServer(name: String, canvas: TouchCanvas, onPick: (DiscoveredTvheadendServer) -> Unit = {}) {
         show { FindServerScreen(ServerSearchUiState(servers), onPick, {}, {}) }
         capture(name, canvas)
@@ -197,14 +280,17 @@ class ConnectScreensTest {
         canvas: TouchCanvas,
         phase: ConnectionPhase = ConnectionPhase.Editing,
         onSave: (ConnectionFields) -> Unit = {},
+        passwordSaved: Boolean = false,
     ) {
         var open by mutableStateOf(false)
+        val loaded = if (passwordSaved) editorFields.copy(password = "") else editorFields
         show {
-            var current by remember { mutableStateOf(editorFields) }
+            var current by remember { mutableStateOf(loaded) }
             ConnectionsScreen(active, {}, {}, {})
             if (open) {
                 ConnectionEditor(
-                    ConnectionUiState(current, phase), editorFields, { current = it }, onSave, { open = false },
+                    ConnectionUiState(current, phase, passwordSaved = passwordSaved), loaded, { current = it }, onSave,
+                    { open = false },
                 )
             }
         }
@@ -216,16 +302,38 @@ class ConnectScreensTest {
     private fun connections(
         name: String,
         canvas: TouchCanvas,
+        shown: ActiveConnectionUiState = active,
         openRemove: Boolean = false,
         onEdit: (ActiveConnectionUiState) -> Unit = {},
         onRemove: (ActiveConnectionUiState) -> Unit = {},
     ) {
-        show { ConnectionsScreen(active, {}, onEdit, onRemove) }
+        show { ConnectionsScreen(shown, {}, onEdit, onRemove) }
         capture(name, canvas)
         if (openRemove) {
             openRemove()
             captureDialogOver(name, canvas)
         }
+    }
+
+    private fun failureDialog(
+        name: String,
+        canvas: TouchCanvas,
+        failure: SetupFailure,
+        onAction: (SetupAction) -> Unit = {},
+    ) {
+        show {
+            ConnectionAccountScreen(ConnectionUiState(signedInFields), {}, {}, {})
+            ConnectionFailureDialog(failure, SetupMode.FIRST_RUN, onCancel = {}, onAction = onAction)
+        }
+        capture(name, canvas)
+        captureDialogOver(name, canvas)
+    }
+
+    private fun signInNeeded(name: String, canvas: TouchCanvas) {
+        show {
+            TouchFrame(content = { ChannelsMessage(MessageKind.SignInNeeded, ChannelsActions({}, {}, {}, {})) })
+        }
+        capture(name, canvas)
     }
 
     private fun show(content: @Composable () -> Unit) {
@@ -269,13 +377,15 @@ class ConnectScreensTest {
     private fun openRemove() =
         compose.onNodeWithContentDescription(label(SharedR.string.server_remove)).performClick()
 
-    private fun assertRefused() {
-        val message = label(R.string.connect_refused)
-        val error = SemanticsMatcher.expectValue(SemanticsProperties.Error, message)
-        field(SharedR.string.username).assert(error)
-        field(SharedR.string.password).assert(error)
-        // Both fields carry the sentence as their error; it is written out once for the pair.
-        compose.onAllNodes(hasText(message), useUnmergedTree = true).assertCountEquals(1)
+    // Both fields carry the sentence as their error; it is written out once for the pair.
+    private fun assertRefused() =
+        assertPairError(R.string.connect_refused, SharedR.string.username, SharedR.string.password)
+
+    private fun assertPairError(@StringRes message: Int, @StringRes vararg fields: Int) {
+        val text = label(message)
+        val error = SemanticsMatcher.expectValue(SemanticsProperties.Error, text)
+        fields.forEach { field(it).assert(error) }
+        compose.onAllNodes(hasText(text), useUnmergedTree = true).assertCountEquals(1)
     }
 
     private fun capture(name: String, canvas: TouchCanvas) = compose.captureTouch("slice1", name, canvas)

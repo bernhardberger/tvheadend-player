@@ -7,8 +7,12 @@ import at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult
 import at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi
 import at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
+import at.bernhardberger.tvhplayer.notices.ConnectionNoticeSource
+import at.bernhardberger.tvhplayer.notices.NoticeCenter
+import at.bernhardberger.tvhplayer.notices.NoticeContext
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
+import at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -19,19 +23,34 @@ import kotlinx.coroutines.launch
 /**
  * The app's session and profile owner on the SDK's fakes, as the composition root builds them.
  * Everything runs on the main looper, so Robolectric idling settles it; [close] after each test.
+ * [readForEditing] is what the editor reads for the connection in use (the fake store has no
+ * editing read of its own).
  */
 @OptIn(TvheadendTestingApi::class)
-internal class FakeConnection {
+internal class FakeConnection(
+    readForEditing: ServerProfileEditReadResult = ServerProfileEditReadResult.Missing,
+) {
     val session = FakeTvheadendSession()
     val store = FakeServerProfileStore()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     val owner = AppProfileOwner(
         session, store, PlayerSettingsStore(MemoryPreferences()), Dispatchers.Main,
-        { ServerProfileEditReadResult.Missing },
+        { readForEditing },
+    )
+    private val notices = ConnectionNoticeSource(
+        session.observation, owner.configurationGeneration,
+        NoticeCenter({ 0L }) { NoticeContext(owner.configurationGeneration.value, null) },
+        owner.switchInProgress,
     )
 
     /** Starts the owner, which reads the saved connection as the app does at start. */
-    fun start() = apply { scope.launch { owner.run() } }
+    fun start() = apply {
+        scope.launch { owner.run() }
+        scope.launch { notices.run() }
+    }
+
+    /** The connection state the app shows, as the composition root's view model gives it. */
+    fun presentation() = AppConnectionViewModel(session, owner, notices)
 
     fun close() = scope.cancel()
 }

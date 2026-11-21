@@ -40,7 +40,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
+import at.bernhardberger.tvhplayer.notices.ConnectionNoticeSource
+import at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel
 import org.koin.android.ext.koin.androidContext
+import org.koin.core.module.dsl.viewModel
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
 import org.koin.dsl.onClose
@@ -146,4 +149,11 @@ val touchModule = module {
 
     single { get<SdkRuntimeOwner>().session }
     single { get<SdkRuntimeOwner>().appProfileOwner }
+    single(createdAtStart = true) {
+        ConnectionNoticeSource(
+            get<SdkRuntimeOwner>().session.observation, get<AppProfileOwner>().configurationGeneration, get(),
+            get<AppProfileOwner>().switchInProgress,
+        ).also { source -> get<CoroutineScope>(qualifier = Application).launch { source.run() } }
+    }
+    viewModel { AppConnectionViewModel(session = get(), profileOwner = get(), connectionNotices = get()) }
 }

@@ -47,6 +47,7 @@ internal fun ConnectionEditor(
     onFieldsChange: (ConnectionFields) -> Unit,
     onSave: (ConnectionFields) -> Unit,
     onCancel: () -> Unit,
+    focusPassword: Boolean = false,
 ) {
     val compact = !currentWindowAdaptiveInfoV2().windowSizeClass
         .isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND)
@@ -62,7 +63,7 @@ internal fun ConnectionEditor(
             dismissOnClickOutside = false,
         ),
     ) {
-        ConnectionEditorContent(state, compact, onFieldsChange, onSave, close)
+        ConnectionEditorContent(state, compact, onFieldsChange, onSave, close, focusPassword)
     }
     if (confirmDiscard) {
         AlertDialog(
@@ -89,6 +90,7 @@ private fun ConnectionEditorContent(
     onFieldsChange: (ConnectionFields) -> Unit,
     onSave: (ConnectionFields) -> Unit,
     onClose: () -> Unit,
+    focusPassword: Boolean,
 ) {
     val focus = LocalFocusManager.current
     val save = {
@@ -121,6 +123,7 @@ private fun ConnectionEditorContent(
                 onFieldsChange,
                 compact,
                 showSignInHelp = true,
+                focusPassword = focusPassword,
                 modifier = Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())
                     .padding(horizontal = if (compact) 24.dp else 0.dp, vertical = if (compact) 12.dp else 8.dp),
             )

@@ -18,7 +18,9 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -51,7 +53,8 @@ internal fun ConnectionsScreen(
     onEdit: (ActiveConnectionUiState) -> Unit,
     onRemove: (ActiveConnectionUiState) -> Unit,
 ) {
-    var confirmRemove by rememberSaveable(active) { mutableStateOf(false) }
+    // A changing state line keeps the question open; another connection closes it.
+    var confirmRemove by rememberSaveable(active?.copy(status = ConnectionStatus.Connected)) { mutableStateOf(false) }
     BackHandler(enabled = !confirmRemove, onBack = onBack)
     Surface(Modifier.fillMaxSize()) {
         Column(Modifier.windowInsetsPadding(WindowInsets.safeDrawing)) {
@@ -114,22 +117,7 @@ private fun ActiveConnectionCard(active: ActiveConnectionUiState, onEdit: () -> 
                     stringResource(R.string.connect_port_detail, active.port),
                     active.username.ifBlank { stringResource(SharedR.string.server_no_sign_in) },
                 )
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        painterResource(R.drawable.connect_check_outline),
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
-                    Text(
-                        stringResource(SharedR.string.connection_overview_connected),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                }
+                StatusLine(active.status)
             }
         }
         Row(
@@ -145,6 +133,32 @@ private fun ActiveConnectionCard(active: ActiveConnectionUiState, onEdit: () -> 
                 R.drawable.connect_delete_outline, SharedR.string.server_remove, onClick = onRemove,
             )
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun StatusLine(status: ConnectionStatus) {
+    val color = when (status.kind) {
+        ConnectionStatus.Kind.Connected -> MaterialTheme.colorScheme.primary
+        ConnectionStatus.Kind.Working -> MaterialTheme.colorScheme.onSurfaceVariant
+        ConnectionStatus.Kind.Failed -> MaterialTheme.colorScheme.error
+    }
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        val mark = Modifier.size(18.dp)
+        when (status.kind) {
+            ConnectionStatus.Kind.Connected -> Icon(
+                painterResource(R.drawable.connect_check_outline), contentDescription = null, mark, tint = color,
+            )
+            ConnectionStatus.Kind.Working -> LoadingIndicator(mark, color = color)
+            ConnectionStatus.Kind.Failed -> Icon(
+                painterResource(R.drawable.connect_error_outline), contentDescription = null, mark, tint = color,
+            )
+        }
+        Text(stringResource(status.text), style = MaterialTheme.typography.labelLarge, color = color)
     }
 }
 
