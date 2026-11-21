@@ -293,7 +293,7 @@ class ChannelsScreenTest {
         onTag = {},
         onRetry = {},
         onOpenConnectionSettings = {},
-        onRecord = if (optional) ({}) else null,
+        onRecordControl = if (optional) ({ _, _, _ -> }) else null,
         onDetails = if (optional) ({}) else null,
         onShowInGuide = if (optional) ({}) else null,
     )

@@ -7,6 +7,7 @@ import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import at.bernhardberger.tvheadend.sdk.core.DvrMutationKind
 import at.bernhardberger.tvhplayer.notices.DvrMutationFeedback
 import at.bernhardberger.tvhplayer.notices.Notice
@@ -16,10 +17,12 @@ import androidx.activity.compose.setContent
 import androidx.annotation.StringRes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
@@ -31,6 +34,9 @@ import androidx.compose.ui.test.hasContentDescription
 import at.bernhardberger.tvheadend.sdk.core.AutorecRuleId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrMutationResult
+import at.bernhardberger.tvheadend.sdk.core.DvrSchedule
+import at.bernhardberger.tvheadend.sdk.core.DvrScheduleRequest
+import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionCall
 import androidx.compose.ui.test.hasText
@@ -64,11 +70,14 @@ import at.bernhardberger.tvhplayer.touch.testutil.ImageLoaderRule
 import at.bernhardberger.tvhplayer.touch.testutil.ServerGuide
 import at.bernhardberger.tvhplayer.touch.testutil.TouchCanvas
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouch
+import at.bernhardberger.tvhplayer.touch.ui.ConfirmDvrChange
+import at.bernhardberger.tvhplayer.touch.ui.DvrControls
 import at.bernhardberger.tvhplayer.ui.MobileDarkColors
 import at.bernhardberger.tvhplayer.ui.common.AppClock
 import java.time.ZoneId
 import kotlin.time.toJavaInstant
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.hours
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -533,6 +542,81 @@ class TouchAppTest {
     }
 
     @Test
+    fun removeEntryDismissesWhenTheRecordingGainsAFile() {
+        // Failed entries without files are not in the Archive destination. Drive its actual confirmation host.
+        val guide = ServerGuide(Clock.System.now())
+        val withoutFile = guide.connected(listOf(guide.filmWithErrors(hasFile = false)))
+        val withFile = guide.connected(listOf(guide.filmWithErrors(hasFile = true)))
+        lateinit var dvr: DvrControls
+        connection.session.publish(withoutFile)
+        compose.setContent {
+            val controls = viewModel { DvrControls(connection.browseSession, connection.noticeCenter) }
+            SideEffect { dvr = controls }
+            ConfirmDvrChange(controls)
+        }
+        compose.runOnIdle { dvr.delete(guide.film.id.value.toString()) }
+        compose.onNodeWithText(label(SharedR.string.remove_entry_confirm_title)).assertIsDisplayed()
+        connection.session.publish(withFile)
+        compose.onNode(isDialog()).assertDoesNotExist()
+
+        connection.session.publish(withoutFile)
+        compose.runOnIdle { dvr.delete(guide.film.id.value.toString()) }
+        val confirm = inDialog(SharedR.string.remove_entry).fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
+
+        // Even a tap arriving before Compose sees the update must not delete the newly reported file.
+        compose.runOnIdle {
+            connection.session.publish(withFile)
+            confirm()
+        }
+        compose.onNode(isDialog()).assertDoesNotExist()
+        assertTrue(FakeSessionCall.DVR_DELETE_ENTRY !in connection.session.calls)
+    }
+
+    @Test
+    fun aConfirmedDeleteFailureStillShowsAfterRecreation() {
+        val guide = savedConnectionWithGuide()
+        connection.session.dvrRepository.scriptDeleteEntry(
+            DvrMutationResult.Failed(TvheadendFailure.ACCESS_DENIED, mayHaveApplied = false),
+        )
+        connection.dvrRepliesHeld.value = true
+        openRecordings()
+        compose.onNodeWithText(guide.film.title!!).performClick()
+        compose.onNodeWithContentDescription(label(SharedR.string.context_delete)).performClick()
+        recreate()
+        inDialog(SharedR.string.context_delete).performClick()
+        compose.waitForIdle()
+        assertTrue(FakeSessionCall.DVR_DELETE_ENTRY in connection.session.calls)
+        recreate()
+        connection.dvrRepliesHeld.value = false
+        compose.waitForIdle()
+
+        val failed = Notice.DvrActionFailed(DvrMutationKind.DELETE, DvrMutationFeedback.PERMISSION_DENIED)
+        notice(NoticeFormatter(compose.activity).format(failed).headline).assertIsDisplayed()
+    }
+
+    @Test
+    fun aPendingConfirmationWaitsForTheInFlightCommand() {
+        val guide = savedConnectionWithGuide()
+        connection.dvrRepliesHeld.value = true
+        connection.session.dvrRepository.scriptScheduleEntry(DvrMutationResult.Confirmed(DvrEntryId(WEATHER_ENTRY)))
+        connection.session.publish(guide.connected(guide.dvr.entries - guide.recordingNow))
+        expandedChannelRecord(guide).performClick()
+        compose.waitForIdle()
+        assertTrue(FakeSessionCall.DVR_SCHEDULE_ENTRY in connection.session.calls)
+        openRecordings()
+        compose.onNodeWithText(guide.film.title!!).performClick()
+        compose.onNodeWithContentDescription(label(SharedR.string.context_delete)).performClick()
+        inDialog(SharedR.string.context_delete).assertIsNotEnabled()
+        assertTrue(FakeSessionCall.DVR_DELETE_ENTRY !in connection.session.calls)
+        connection.dvrRepliesHeld.value = false
+        compose.waitForIdle()
+        assertTrue(FakeSessionCall.DVR_DELETE_ENTRY !in connection.session.calls)
+        inDialog(SharedR.string.context_delete).performClick()
+        compose.waitForIdle()
+        assertTrue(FakeSessionCall.DVR_DELETE_ENTRY in connection.session.calls)
+    }
+
+    @Test
     @Config(qualifiers = TABLET)
     fun recordOnALaterProgramSchedulesItAtOnce() {
         val guide = savedConnectionWithGuide()
@@ -544,6 +628,7 @@ class TouchAppTest {
         assertTrue(FakeSessionCall.DVR_SCHEDULE_ENTRY in connection.session.calls)
 
         // No dialog and no notice: the program's scheduled mark is the answer.
+        assertEquals(null, connection.noticeCenter.state.value.active)
         connection.session.publish(guide.connected(guide.dvr.entries + guide.scheduling(WEATHER_ENTRY, event = 2)))
         compose.waitForIdle()
         compose.onNode(isDialog()).assertDoesNotExist()
@@ -628,11 +713,29 @@ class TouchAppTest {
         val guide = savedConnectionWithGuide()
         connection.session.dvrRepository.scriptScheduleEntry(DvrMutationResult.Confirmed(DvrEntryId(WEATHER_ENTRY)))
         connection.session.publish(guide.connected(guide.dvr.entries - guide.recordingNow))
+        expandedChannelRecord(guide).performClick()
+        compose.waitForIdle()
+        assertEquals(DvrSchedule.Programme(EventId(1)), connection.scheduleRequests.single().schedule)
+    }
+
+    @Test
+    fun aStaleChannelsRecordTapDoesNotRecordTheNextProgramme() {
+        val guide = savedConnectionWithGuide()
+        connection.session.publish(guide.connected(guide.dvr.entries - guide.recordingNow))
+        val tap = expandedChannelRecord(guide).fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
+        val advanced = ServerGuide(guide.now - 1.hours)
+        compose.runOnIdle {
+            connection.session.publish(advanced.connected(emptyList()))
+            tap()
+        }
+        compose.waitForIdle()
+        assertEquals(emptyList<DvrScheduleRequest>(), connection.scheduleRequests)
+    }
+
+    private fun expandedChannelRecord(guide: ServerGuide): SemanticsNodeInteraction {
         compose.onNodeWithContentDescription(compose.activity.getString(R.string.channels_expand, guide.first.name))
             .performClick()
-        compose.onNode(hasClickAction() and hasText(label(R.string.channels_record))).performClick()
-        compose.waitForIdle()
-        assertTrue(FakeSessionCall.DVR_SCHEDULE_ENTRY in connection.session.calls)
+        return compose.onNode(hasClickAction() and hasText(label(R.string.channels_record)))
     }
 
     @Test
@@ -911,7 +1014,7 @@ class TouchAppTest {
         content = {
             MaterialTheme(colorScheme = MobileDarkColors) {
                 TouchApp(
-                    connection.session, connection.owner, presentation, channels, recordings, guide,
+                    connection.browseSession, connection.owner, presentation, channels, recordings, guide,
                     connection.noticeCenter,
                 ) {
                     flowOf(TvheadendDiscoveryTestFactory.discovering(listOf(server)))

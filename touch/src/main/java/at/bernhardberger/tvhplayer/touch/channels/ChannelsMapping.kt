@@ -140,6 +140,7 @@ private class RowMapper(
             scheduled = !running && observation.isScheduled(this),
             ruleSchedule = observation.ruleSchedule(this),
             record = programRecordControl(programmeRecordKeyAction(this, observation, nowSec)),
+            eventId = id,
         )
     }
 

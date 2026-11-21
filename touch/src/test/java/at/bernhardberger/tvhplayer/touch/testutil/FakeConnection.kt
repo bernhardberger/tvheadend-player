@@ -8,6 +8,11 @@ import at.bernhardberger.tvheadend.sdk.core.ServerProfileId
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileListResult
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileStore
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileWriteResult
+import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvheadend.sdk.core.DvrRepository
+import at.bernhardberger.tvheadend.sdk.core.DvrScheduleRequest
+import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi
 import at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
@@ -42,6 +47,21 @@ internal class FakeConnection(
     readForEditing: ServerProfileEditReadResult = ServerProfileEditReadResult.Missing,
 ) {
     val session = FakeTvheadendSession()
+    val dvrRepliesHeld = MutableStateFlow(false)
+    val scheduleRequests = mutableListOf<DvrScheduleRequest>()
+    private val sdkDvr = session.dvrRepository
+    val browseSession = object : TvheadendSession by session {
+        override val dvrRepository = object : DvrRepository by sdkDvr {
+            override suspend fun scheduleEntry(currentSession: CurrentSessionObservation, request: DvrScheduleRequest) =
+                sdkDvr.scheduleEntry(currentSession, request).also {
+                    scheduleRequests += request
+                    dvrRepliesHeld.first { !it }
+                }
+
+            override suspend fun deleteEntry(currentSession: CurrentSessionObservation, id: DvrEntryId) =
+                sdkDvr.deleteEntry(currentSession, id).also { dvrRepliesHeld.first { !it } }
+        }
+    }
     val store = FakeServerProfileStore()
     val writesHeld = MutableStateFlow(false)
     private val writes = HeldWrites(store, writesHeld)

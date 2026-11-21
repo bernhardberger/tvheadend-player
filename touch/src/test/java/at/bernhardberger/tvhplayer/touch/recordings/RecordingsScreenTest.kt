@@ -79,8 +79,7 @@ class RecordingsScreenTest {
         compose.onNodeWithText("All recordings").assertIsDisplayed()
         capture("tablet-recordings-picked", TouchCanvas.TABLET)
 
-        askToDelete()
-        compose.captureTouchWindows(GROUP, "tablet-recordings-delete-confirm", TouchCanvas.TABLET)
+        captureDeleteConfirmation("tablet-recordings-delete-confirm", TouchCanvas.TABLET)
     }
 
     @Test
@@ -236,8 +235,7 @@ class RecordingsScreenTest {
         compose.onNodeWithText("Watch from beginning").assertIsDisplayed()
         capture("phone-recording-details", TouchCanvas.PHONE)
 
-        askToDelete()
-        compose.captureTouchWindows(GROUP, "phone-recordings-delete-confirm", TouchCanvas.PHONE)
+        captureDeleteConfirmation("phone-recordings-delete-confirm", TouchCanvas.PHONE)
     }
 
     @Test
@@ -320,12 +318,10 @@ class RecordingsScreenTest {
         }
     }
 
-    /** Delete on the picked recording, and the app's question over the screen. */
-    private fun askToDelete() {
-        compose.onNodeWithContentDescription("Delete").performClick()
-        assertEquals(listOf(PickedId), deleted)
+    /** Paint the shared dialog for capture only; TouchAppTest covers the Delete action and confirmation. */
+    private fun captureDeleteConfirmation(name: String, canvas: TouchCanvas) {
         asking = true
-        compose.onNodeWithText("Delete this recording?").assertIsDisplayed()
+        compose.captureTouchWindows(GROUP, name, canvas)
     }
 
     /** The picked recording offering [remove], as the shared rule decides it. */
