@@ -4,9 +4,7 @@ import android.content.Context
 import at.bernhardberger.tvheadend.sdk.android.TvheadendArtwork
 import at.bernhardberger.tvheadend.sdk.android.addTvheadendArtwork
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
-import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
-import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
 import coil3.ImageLoader
 import coil3.map.Mapper
 import coil3.request.Options
@@ -23,14 +21,11 @@ private class AppArtworkMapper(private val session: TvheadendSession) : Mapper<A
         data.currentSession?.let { TvheadendArtwork.create(session, it, data.id) } ?: data.saved
 }
 
-internal fun remoteLogoHttpClient(): OkHttpClient = OkHttpClient.Builder()
+fun remoteLogoHttpClient(userAgent: String): OkHttpClient = OkHttpClient.Builder()
     .retryOnConnectionFailure(false)
     .callTimeout(10, TimeUnit.SECONDS)
     .addNetworkInterceptor { chain ->
-        chain.proceed(chain.request().newBuilder().header(
-            "User-Agent",
-            "TvheadendPlayer/${BuildConfig.VERSION_NAME} (+https://github.com/bernhardberger/tvheadend-player)",
-        ).build())
+        chain.proceed(chain.request().newBuilder().header("User-Agent", userAgent).build())
     }
     .build()
 
@@ -38,6 +33,9 @@ fun buildImageLoader(
     context: Context,
     session: TvheadendSession,
     remoteLogos: RemoteLogoCache = RemoteLogoCache(context),
+    /** The only header remote logo hosts see; the caller names its app and version. */
+    userAgent: String,
+    crossfadeMillis: Int,
 ): ImageLoader =
     ImageLoader.Builder(context)
         .components {
@@ -45,11 +43,11 @@ fun buildImageLoader(
             addTvheadendArtwork()
             add(remoteLogos)
             // Dedicated client: no Tvheadend credentials or cookies; only the app User-Agent.
-            add(OkHttpNetworkFetcherFactory(callFactory = ::remoteLogoHttpClient))
+            add(OkHttpNetworkFetcherFactory(callFactory = { remoteLogoHttpClient(userAgent) }))
         }
         .diskCache(remoteLogos.diskCache)
         // Every logo and programme picture fades in over its placeholder when it is actually
         // loaded; Coil shows memory-cache hits and failures at once, so scrolling never fades.
-        .crossfade(PlayerMotion.MediumMs)
+        .crossfade(crossfadeMillis)
         .build()
         .also { remoteLogos.memoryCache = it.memoryCache }

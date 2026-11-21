@@ -2165,7 +2165,8 @@ fun VideoPlayerScreen(
                     dismissRecordingDialog()
                     if (stillCurrent) dvrMutationActions.launchMutation(
                         mutation, opening, { session.observation.value }, { nowSec },
-                        uiSettingsStore, notices, scope, programmeActions.inFlight,
+                        { uiSettingsStore.settings.first().recordingProfileId },
+                        notices, scope, programmeActions.inFlight,
                     )
                 },
             )

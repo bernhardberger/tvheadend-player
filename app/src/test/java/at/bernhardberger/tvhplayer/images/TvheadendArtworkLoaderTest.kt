@@ -26,6 +26,7 @@ import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.ui.components.ArtworkContext
+import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
 import coil3.decode.DataSource
 import coil3.network.NetworkFetcher
 import coil3.request.Options
@@ -72,7 +73,8 @@ import org.robolectric.annotation.GraphicsMode
 class TvheadendArtworkLoaderTest {
     private val app = ApplicationProvider.getApplicationContext<Application>()
     private val session = FakeTvheadendSession()
-    private val loader = buildImageLoader(app, session)
+    private val loader = buildImageLoader(app, session,
+        userAgent = RemoteLogoUserAgent, crossfadeMillis = PlayerMotion.MediumMs)
     private val first = ServerProfile("first.tvheadend.test")
     private val second = ServerProfile("second.tvheadend.test")
 
@@ -177,7 +179,7 @@ class TvheadendArtworkLoaderTest {
     }
 
     @Test fun productionRemoteClientIsBoundedCredentialFreeAndIdentifiesTheApp() {
-        val client = remoteLogoHttpClient()
+        val client = remoteLogoHttpClient(RemoteLogoUserAgent)
         assertFalse(client.retryOnConnectionFailure)
         assertEquals(10_000, client.callTimeoutMillis)
         assertSame(CookieJar.NO_COOKIES, client.cookieJar)

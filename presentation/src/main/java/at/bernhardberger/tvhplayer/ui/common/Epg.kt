@@ -5,7 +5,7 @@ import at.bernhardberger.tvheadend.sdk.core.EpgEpisode
 import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
 
-internal fun EpgEventEntry.isRunning(nowSec: Long): Boolean =
+fun EpgEventEntry.isRunning(nowSec: Long): Boolean =
     start.epochSeconds <= nowSec && nowSec < stop.epochSeconds
 
 fun List<EpgEventEntry>.nowEvent(nowSec: Long): EpgEventEntry? =
@@ -41,7 +41,7 @@ fun programmeMetadata(event: EpgEventEntry, resources: Resources): String? = bui
     episodeLabel(event.episode, resources, onscreenFallback = false)?.let(::add)
 }.takeIf { it.isNotEmpty() }?.joinToString(" • ")
 
-internal fun programmeEpisodeLine(episode: EpgEpisode?, subtitle: String?, resources: Resources): String =
+fun programmeEpisodeLine(episode: EpgEpisode?, subtitle: String?, resources: Resources): String =
     listOfNotNull(episodeLabel(episode, resources), subtitle?.takeIf(String::isNotBlank))
         .distinct().joinToString(" • ")
 

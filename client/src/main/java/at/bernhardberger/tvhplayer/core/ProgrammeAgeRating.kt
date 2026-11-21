@@ -5,7 +5,7 @@ package at.bernhardberger.tvhplayer.core
  * unconfigured XMLTV rating through as "XMLTV:<system>:<value>" or "XMLTV:<value>"; guide sources
  * often put the authority's full name into the system, so only a short code is kept.
  */
-internal fun programmeAgeRating(label: String?, age: Long?): String? {
+fun programmeAgeRating(label: String?, age: Long?): String? {
     var text = label?.trim()?.takeIf(String::isNotEmpty)
     val xmltv = text?.takeIf { it.startsWith("XMLTV:") }?.split(':', limit = 3)
     if (xmltv != null) {

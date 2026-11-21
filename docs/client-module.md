@@ -59,8 +59,17 @@ directly. `:client` mirrors the app build types (`debug`, `release`, `profile`,
 - `ui/player/PlayerHelpers` (track listing and selection) and
   `ui/player/VideoDisplayMode` (display mode and refresh-rate policy); both
   keep their existing package.
+- `core/AppArtworkSource`: the Coil model for a Tvheadend image-cache entry and
+  the logo and programme-picture model selection (`channelLogoModel`,
+  `programmeArtworkModel`, `programmeArtwork`, `recordingArtwork`).
 - `ui/screens/onboarding/ConnectionSetupPolicy`: resource- and Compose-free
   setup steps, transitions and failure actions; retains its existing package.
+- Recordings and Guide policy, each in its existing package:
+  `core/ChannelNowStatusPolicy` (with `linkedRecordingForEvent`),
+  `ui/screens/RecordingScheduledMark` (`isScheduled`), `core/GlanceBadges`,
+  `core/ProgrammeAgeRating`, `core/RecordingPlaybackPresentation`,
+  `settings/ClockFormat`, `ui/player/ChannelSchedulePolicy` and
+  `ui/screens/GuideCoverageRequestOwner`.
 
 ## What lives in `:presentation`
 
@@ -68,10 +77,21 @@ Shared player texts and the connection setup presentation: `ConnectionSetupState
 `ConnectionFormState`, `AppConnectionViewModel` and `AppErrorText` (including
 its localized seconds formatter). Shared channel scope state:
 `viewmodels/ChannelsViewModel` with `ChannelScopeState`. Video aspect state:
-`ui/player/VideoAspect`.
+`ui/player/VideoAspect`. The saved-connection restore after a connection test:
+`ui/screens/settings/SavedConnectionRestore`. Logo and picture loading:
+`images/TvheadendArtworkLoader` (`buildImageLoader`, `remoteLogoHttpClient`) and
+`images/RemoteLogoCache`; the caller passes its user agent, crossfade duration
+and what else to clear with the remote pictures.
+DVR actions and the formatters behind recordings and programme details:
+`ui/screens/DvrMutationActions` (record, stop, delete, series rules and folder
+actions, with `currentDvrMutation` and `currentDvrConfigurations`; the caller
+passes the preferred recording profile), `ui/common/TimeConverter`,
+`ui/common/Epg`, `ui/common/RecordingExpiry`, `ui/common/NumberFormatting` and
+`programmeCategoryLabelRes` in `ui/common/ProgrammeCategoryLabelRes`.
 This library depends on `:client` and uses lifecycle ViewModel, lifecycle
-runtime Compose, and Compose state and saveable APIs, not TV widgets or
-dependencies. The variant-specific launcher
+runtime Compose, Compose state and saveable APIs, and Coil with OkHttp at the
+catalog's Coil version. It holds no composables that draw, no TV widgets or
+`androidx.tv` dependencies, and no Koin: callers pass what they inject. The variant-specific launcher
 label stays in `:app`.
 
 ## What stays app-owned and why

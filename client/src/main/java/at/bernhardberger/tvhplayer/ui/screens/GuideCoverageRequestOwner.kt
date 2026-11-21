@@ -8,11 +8,11 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 
-internal data class GuideCoverageRequestToken(
+data class GuideCoverageRequestToken(
     val generations: Map<ChannelId, Long>,
 )
 
-internal class GuideCoverageRequestOwner(
+class GuideCoverageRequestOwner(
     private val scope: CoroutineScope,
     private val timeoutMillis: Long,
     private val onPendingChanged: () -> Unit = {},

@@ -55,7 +55,7 @@ class GuideRenderingCostContractTest {
     fun guideUsesOneWindowBoundedPerChannelEventIndex() {
         val guide = screenSource.section(
             "fun EpgGridScreen(",
-            "internal fun currentDvrMutation(",
+            "internal fun genreEntryProgramme(",
         )
 
         assertEquals(1, (guide + movedGuideSource).count("indexTimelineEventsByChannel("))
@@ -150,7 +150,7 @@ class GuideRenderingCostContractTest {
     fun guideFocusUsesCompositionTimingAndBoundsRequesterRetention() {
         val guide = screenSource.section(
             "fun EpgGridScreen(",
-            "internal fun currentDvrMutation(",
+            "internal fun genreEntryProgramme(",
         )
         val selectedTargetFocus = guide.section(
             "LaunchedEffect(\n        selectedTarget,",
@@ -193,7 +193,7 @@ class GuideRenderingCostContractTest {
     fun guideClockUpdatesAreReadThroughAConsumerProvider() {
         val guide = screenSource.section(
             "fun EpgGridScreen(",
-            "internal fun currentDvrMutation(",
+            "internal fun genreEntryProgramme(",
         )
         val ruler = contentSource.section(
             "internal fun TimelineTimeRuler(",
@@ -206,8 +206,8 @@ class GuideRenderingCostContractTest {
         val details = File(repositoryRoot,
             "app/src/main/java/at/bernhardberger/tvhplayer/ui/screens/ProgrammeDetailsHost.kt").readText()
         val clock = File(repositoryRoot,
-            "app/src/main/java/at/bernhardberger/tvhplayer/ui/common/TimeConverter.kt").readText()
-            .section("internal fun rememberCurrentEpochSeconds()", "/** Details refresh")
+            "presentation/src/main/java/at/bernhardberger/tvhplayer/ui/common/TimeConverter.kt").readText()
+            .section("fun rememberCurrentEpochSeconds()", "/** Details refresh")
         val channels = File(repositoryRoot,
             "app/src/main/java/at/bernhardberger/tvhplayer/ui/screens/ChannelsScreen.kt").readText()
 

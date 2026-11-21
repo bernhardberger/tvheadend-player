@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvheadend.sdk.core.DvrConfiguration
+import at.bernhardberger.tvheadend.sdk.core.DvrConfigurationsState
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.DvrConfigId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
@@ -68,7 +70,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 import at.bernhardberger.tvhplayer.core.chooseDvrConfig
-import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import androidx.compose.runtime.MutableState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -77,7 +78,7 @@ import kotlinx.coroutines.launch
 internal val AutorecEpisodeWaitTimeout = 10.seconds
 
 @OptIn(ExperimentalTvheadendApi::class)
-internal fun SessionObservation.keepUntilEntry(
+fun SessionObservation.keepUntilEntry(
     id: DvrEntryId,
     openingSession: CurrentSessionObservation?,
 ): DvrEntry? {
@@ -87,7 +88,7 @@ internal fun SessionObservation.keepUntilEntry(
 }
 
 /** True closes the level, including obsolete targets and choices already published by the server. */
-internal suspend fun DvrMutationActions.chooseRecordingRemoval(
+suspend fun DvrMutationActions.chooseRecordingRemoval(
     id: DvrEntryId,
     openingSession: CurrentSessionObservation?,
     observation: SessionObservation,
@@ -114,7 +115,7 @@ internal suspend fun DvrMutationActions.chooseRecordingRemoval(
     }
 }
 
-internal suspend fun DvrMutationActions.changeScheduledRecordingEnabled(
+suspend fun DvrMutationActions.changeScheduledRecordingEnabled(
     id: DvrEntryId,
     openingSession: CurrentSessionObservation,
     observation: () -> SessionObservation,
@@ -137,13 +138,13 @@ internal suspend fun DvrMutationActions.changeScheduledRecordingEnabled(
 }
 
 /** Failed retains SDK mayHaveApplied: an ambiguous rule failure never means "nothing was created". */
-internal sealed interface AutorecSaveOutcome {
+sealed interface AutorecSaveOutcome {
     data class RuleFailed(val result: DvrMutationResult.Failed) : AutorecSaveOutcome
     data class Applied(val ruleId: AutorecRuleId) : AutorecSaveOutcome
     data class PartiallyApplied(val ruleId: AutorecRuleId, val unappliedEventIds: Set<EventId>) : AutorecSaveOutcome
 }
 
-internal class AutorecPreviewLoader(
+class AutorecPreviewLoader(
     private val search: suspend (CurrentSessionObservation, EpgSearchRequest) -> EpgSearchResult,
 ) {
     constructor(repository: EpgRepository) : this(repository::search)
@@ -172,7 +173,7 @@ internal class AutorecPreviewLoader(
 }
 /** The same eligibility as the programme's action row; Record never acts on a retained event. */
 @OptIn(ExperimentalTvheadendApi::class)
-internal fun programmeRecordKeyAction(event: EpgEvent, observation: SessionObservation, nowSec: Long): BrowseContextAction? {
+fun programmeRecordKeyAction(event: EpgEvent, observation: SessionObservation, nowSec: Long): BrowseContextAction? {
     val current = observation.event(event.id) ?: return null
     val recording = observation.dvrEntryForEvent(current)?.takeUnless(::recordingWasRemoved)
     val canModify = observation.currentSession != null && observation.dvrState is DvrRepositoryState.Current &&
@@ -186,7 +187,7 @@ internal fun programmeRecordKeyAction(event: EpgEvent, observation: SessionObser
 
 /** Shared by the action row and dedicated Record key, with the screen's existing lifetime/lock. */
 @OptIn(ExperimentalTvheadendApi::class)
-internal fun NoticeCenter.postRecordUnavailable(event: EpgEvent?, observation: SessionObservation, nowSec: Long) {
+fun NoticeCenter.postRecordUnavailable(event: EpgEvent?, observation: SessionObservation, nowSec: Long) {
     val access = (observation.sessionState as? SessionState.Ready)?.capabilities?.dvrWrite
     val canModify = when {
         access == CapabilityAccess.DENIED -> false
@@ -199,11 +200,11 @@ internal fun NoticeCenter.postRecordUnavailable(event: EpgEvent?, observation: S
 
 /** Schedules the channel's current programme, or returns the details action to focus. */
 @OptIn(ExperimentalTvheadendApi::class)
-internal fun DvrMutationActions.recordChannelProgramme(
+fun DvrMutationActions.recordChannelProgramme(
     channelId: ChannelId,
     currentObservation: () -> SessionObservation,
     nowSecProvider: () -> Long,
-    settingsStore: UiSettingsStore,
+    preferredProfile: suspend () -> DvrConfigId?,
     notices: NoticeCenter,
     scope: CoroutineScope,
     inFlight: MutableState<DvrMutationAction?>,
@@ -215,7 +216,7 @@ internal fun DvrMutationActions.recordChannelProgramme(
             current.currentSession?.let { capability ->
                 launchMutation(DvrMutationAction.CreateProgramme(
                     requireNotNull(event).programmeRecordingTarget(capability), null),
-                    current, currentObservation, nowSecProvider, settingsStore, notices, scope, inFlight)
+                    current, currentObservation, nowSecProvider, preferredProfile, notices, scope, inFlight)
             }
             null
         }
@@ -227,12 +228,12 @@ internal fun DvrMutationActions.recordChannelProgramme(
 
 /** Shared by the action row and dedicated Record key, with the screen's existing lifetime/lock. */
 @OptIn(ExperimentalTvheadendApi::class)
-internal fun DvrMutationActions.launchMutation(
+fun DvrMutationActions.launchMutation(
     mutation: DvrMutationAction,
     sourceObservation: SessionObservation,
     currentObservation: () -> SessionObservation,
     nowSecProvider: () -> Long,
-    settingsStore: UiSettingsStore,
+    preferredProfile: suspend () -> DvrConfigId?,
     notices: NoticeCenter,
     scope: CoroutineScope,
     inFlight: MutableState<DvrMutationAction?>,
@@ -242,7 +243,7 @@ internal fun DvrMutationActions.launchMutation(
     scope.launch(Dispatchers.Main) {
         try {
             val preferred = if (mutation is DvrMutationAction.CreateProgramme)
-                settingsStore.settings.first().recordingProfileId else null
+                preferredProfile() else null
             val current = currentObservation()
             val request = currentDvrMutation(mutation, sourceObservation, current) ?: return@launch
             if (request is DvrMutationAction.CreateProgramme &&
@@ -260,7 +261,7 @@ internal fun DvrMutationActions.launchMutation(
     }
 }
 
-internal sealed interface DvrMutationAction {
+sealed interface DvrMutationAction {
     data class CreateAutorec(
         val currentSession: CurrentSessionObservation,
         val request: AutorecRuleCreate,
@@ -334,7 +335,7 @@ private fun SessionObservation.hasCurrentChannel(
     channelId: ChannelId?,
 ): Boolean = currentSession === capturedSession && (channelId == null || channel(channelId) != null)
 
-internal fun DvrMutationAction.recordingStateIsCurrent(observation: SessionObservation): Boolean = when (this) {
+fun DvrMutationAction.recordingStateIsCurrent(observation: SessionObservation): Boolean = when (this) {
     is DvrMutationAction.CreateAutorec -> observation.hasCurrentChannel(
         currentSession, (request.channel as? RecordingRuleChannel.SpecificChannel)?.channelId,
     )
@@ -365,7 +366,7 @@ internal fun DvrMutationAction.recordingStateIsCurrent(observation: SessionObser
 }
 
 @OptIn(ExperimentalTvheadendApi::class)
-internal class DvrMutationActions(
+class DvrMutationActions(
     private val scheduleEntry: suspend (
         CurrentSessionObservation,
         DvrScheduleRequest,
@@ -629,7 +630,7 @@ internal class DvrMutationActions(
 }
 
 @OptIn(ExperimentalTvheadendApi::class)
-internal fun NoticeCenter.postDvrFailure(action: DvrMutationAction, result: DvrMutationResult<*>, context: NoticeContext) {
+fun NoticeCenter.postDvrFailure(action: DvrMutationAction, result: DvrMutationResult<*>, context: NoticeContext) {
     val feedback = result.toDvrMutationFeedback()
     if (!feedback.isFailure) return
     val kind = when (action) {
@@ -664,7 +665,7 @@ internal fun NoticeCenter.postDvrFailure(action: DvrMutationAction, result: DvrM
  * post when any request failed.
  */
 @OptIn(ExperimentalTvheadendApi::class)
-internal suspend fun DvrMutationActions.runFolderAction(
+suspend fun DvrMutationActions.runFolderAction(
     action: BrowseContextAction,
     openingSession: CurrentSessionObservation,
     recordingIds: List<DvrEntryId>,
@@ -712,3 +713,28 @@ internal suspend fun DvrMutationActions.runFolderAction(
     val kind = if (watched == null) DvrMutationKind.DELETE else DvrMutationKind.UPDATE
     return failure?.let { Notice.DvrFolderActionFailed(kind, failed, attempted, it) }
 }
+
+fun currentDvrMutation(
+    mutation: DvrMutationAction?,
+    sourceObservation: SessionObservation?,
+    currentObservation: SessionObservation,
+): DvrMutationAction? = mutation?.takeIf {
+    currentObservation.currentSession != null && sourceObservation?.currentSession === currentObservation.currentSession &&
+        it.recordingStateIsCurrent(currentObservation) &&
+        (it !is DvrMutationAction.CreateProgramme || currentGuideRecordingTarget(it.target, currentObservation) != null)
+}
+
+fun currentGuideRecordingTarget(target: ProgrammeRecordingTarget?, observation: SessionObservation): ProgrammeRecordingTarget? =
+    target?.takeIf { selected ->
+        observation.currentSession === selected.currentSession &&
+            observation.event(selected.eventId)?.programmeRecordingTarget(selected.currentSession) == selected
+    }
+
+fun SessionObservation.currentDvrConfigurations(): List<DvrConfiguration> =
+    when (val state = dvrConfigurationsState) {
+        is DvrConfigurationsState.Current -> state.configurations
+        is DvrConfigurationsState.Stale,
+        is DvrConfigurationsState.Synchronizing,
+        DvrConfigurationsState.Denied,
+        DvrConfigurationsState.Unknown -> emptyList()
+    }

@@ -11,7 +11,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.platform.LocalContext
-import at.bernhardberger.tvheadend.sdk.core.ServerProfileReadResult
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvhplayer.ui.components.backKeyCycleFocus
 import at.bernhardberger.tvhplayer.ui.components.rememberBackKeyCycle
@@ -30,7 +29,7 @@ import org.koin.compose.koinInject
 internal fun SettingsConnection(
     settingsStore: ConnectionProfileEditor = koinInject<AppProfileOwner>(),
     session: TvheadendSession = koinInject(),
-    restoreSaved: suspend () -> Unit = rememberSavedConnectionRestore(session),
+    restoreSaved: suspend () -> Unit = rememberSavedConnectionRestore(session, koinInject()),
     form: ConnectionFormState = rememberConnectionFormState(),
     onSaved: () -> Unit = {},
     mode: SetupMode = SetupMode.EDIT,
@@ -94,21 +93,5 @@ internal fun SettingsSetupFrame(content: @Composable () -> Unit) {
             },
     ) {
         content()
-    }
-}
-
-/**
- * Reconnects the saved connection after the editor's test interrupted it; with no server in use the
- * test's connection is closed instead.
- */
-@Composable
-internal fun rememberSavedConnectionRestore(
-    session: TvheadendSession,
-    owner: AppProfileOwner = koinInject(),
-): suspend () -> Unit = remember(session, owner) {
-    {
-        val active = owner.serverProfile.value as? ServerProfileReadResult.Available
-        if (active != null) session.connect(active.profile) else session.disconnect()
-        owner.setSetupTrialConnection(false)
     }
 }

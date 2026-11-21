@@ -43,6 +43,8 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel:${libs.versions.lifecycle.get()}")
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.kotlinx.coroutines.core)
+    // Channel logo and picture loading; brings coil-core and OkHttp at the catalog's Coil version.
+    implementation(libs.coil.network.okhttp)
 
     testImplementation(libs.junit)
     testImplementation(libs.androidx.test.ext.junit)

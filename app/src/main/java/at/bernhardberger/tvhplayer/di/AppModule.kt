@@ -19,6 +19,9 @@ import at.bernhardberger.tvhplayer.core.appMetadataCachePolicy
 import at.bernhardberger.tvhplayer.images.ChannelAccents
 import at.bernhardberger.tvhplayer.images.buildImageLoader
 import at.bernhardberger.tvhplayer.images.RemoteLogoCache
+import at.bernhardberger.tvhplayer.images.DetailsArtColors
+import at.bernhardberger.tvhplayer.images.RemoteLogoUserAgent
+import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.AndroidPlaybackAudioFocus
 import at.bernhardberger.tvhplayer.playback.AndroidPlaybackAudioOutputs
@@ -172,8 +175,11 @@ val appModule = module {
     single { LastPlayedChannelStore(androidContext()) }
     single { GuidePositionStore() }
 
-    single { RemoteLogoCache(androidContext()) }
-    single<ImageLoader> { buildImageLoader(androidContext(), get<SdkRuntimeOwner>().session, get()) }
+    single { RemoteLogoCache(androidContext(), onClear = DetailsArtColors::clear) }
+    single<ImageLoader> {
+        buildImageLoader(androidContext(), get<SdkRuntimeOwner>().session, get(),
+            userAgent = RemoteLogoUserAgent, crossfadeMillis = PlayerMotion.MediumMs)
+    }
 
     single { ChannelAccentStore(androidContext()) }
     single {

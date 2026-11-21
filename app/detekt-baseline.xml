@@ -22,7 +22,6 @@
     <ID>ComplexCondition:EpgGridScreen.kt:mayFocusProgramme &amp;&amp; frontierRequest == null &amp;&amp; pendingFrontierOrigin == null &amp;&amp; channelFocusRequest == null &amp;&amp; windowFocusRequest == null &amp;&amp; (initialPositionDone || channels.isEmpty())</ID>
     <ID>ComplexCondition:EpgGridScreen.kt:realizedTarget != selectedTarget || frontierRequest != null || channelFocusRequest != null || windowFocusRequest != null</ID>
     <ID>ComplexCondition:EpgGridScreen.kt:target != null &amp;&amp; event != null &amp;&amp; nowSec in windowStartSec until windowEndSec &amp;&amp; nowSec in event.start.epochSeconds until event.stop.epochSeconds</ID>
-    <ID>ComplexCondition:GuideCoverageRequestOwner.kt:GuideCoverageRequestOwner$existing != null &amp;&amp; existing.windowStartSec == windowStartSec &amp;&amp; existing.job.isActive &amp;&amp; orderedChannelIds.all { requests[it] === existing }</ID>
     <ID>ComplexCondition:GuideViewport.kt:nowSec != null &amp;&amp; nowSec in eventStartSec until eventEndSec &amp;&amp; nowSec in windowStartSec + leftReserve until windowStartSec + rightLimit &amp;&amp; minOf(eventEndSec, windowStartSec + rightLimit) - maxOf(eventStartSec, windowStartSec + leftReserve) &gt;= GuideOnAirReadableSec</ID>
     <ID>ComplexCondition:HomeContent.kt:entryFocusApplied &amp;&amp; !emptyHasFocus &amp;&amp; !restoreHeader &amp;&amp; !followInitialFocus &amp;&amp; (hasHomeFocus || (sections.isNotEmpty() &amp;&amp; !regainingOwnership))</ID>
     <ID>ComplexCondition:HomeRecordingActions.kt:owner?.isCurrent != false &amp;&amp; capability != null &amp;&amp; current.currentSession === capability &amp;&amp; current.dvrEntry(opened.id)?.let(current::recordingPlaybackAdmission)?.let { recordingOpenAction(it) != RecordingOpenAction.DETAILS } == true</ID>
@@ -82,7 +81,6 @@
     <ID>CyclomaticComplexMethod:DepthNavigation.kt:@Composable fun DepthNavigation</ID>
     <ID>CyclomaticComplexMethod:DetailsBackdropContrast.kt:internal fun measuredDetailsDim: Float</ID>
     <ID>CyclomaticComplexMethod:DetailsTint.kt:@Composable internal fun rememberDetailsTint: State&lt;Color&gt;</ID>
-    <ID>CyclomaticComplexMethod:DvrMutationActions.kt:@OptIn(ExperimentalTvheadendApi::class) internal suspend fun DvrMutationActions.runFolderAction: Notice.DvrFolderActionFailed?</ID>
     <ID>CyclomaticComplexMethod:EmbeddedProgressCardBorder.kt:@Composable internal fun rememberCardFocusRing: CardFocusRing</ID>
     <ID>CyclomaticComplexMethod:EpgGridContent.kt:@Composable internal fun TimelineChannelRow</ID>
     <ID>CyclomaticComplexMethod:EpgGridContent.kt:@Composable internal fun TimelineProgrammeCell</ID>
@@ -263,7 +261,6 @@
     <ID>LoopWithTooManyJumpStatements:BackdropTransformation.kt:for</ID>
     <ID>LoopWithTooManyJumpStatements:ChannelAccents.kt:ChannelAccents$for</ID>
     <ID>LoopWithTooManyJumpStatements:DetailsBackdropContrast.kt:for</ID>
-    <ID>LoopWithTooManyJumpStatements:DvrMutationActions.kt:for</ID>
     <ID>LoopWithTooManyJumpStatements:PlayerTimelinePresentationState.kt:LiveTimelinePresentationState$while</ID>
     <ID>LoopWithTooManyJumpStatements:WatchingProgress.kt:while</ID>
     <ID>MagicNumber:ArtworkSample.kt:64</ID>
@@ -344,7 +341,6 @@
     <ID>MatchingDeclarationName:BrowseContextMenu.kt:BrowseContextMenuTrigger</ID>
     <ID>MatchingDeclarationName:BrowsePanels.kt:BrowsePanelEntry</ID>
     <ID>MatchingDeclarationName:BrowsePreparation.kt:PreparedBrowseData&lt;I, T&gt;</ID>
-    <ID>MatchingDeclarationName:ChannelNowStatusPolicy.kt:ChannelNowStatus</ID>
     <ID>MatchingDeclarationName:ChannelTitle.kt:AppChannelNumbers</ID>
     <ID>MatchingDeclarationName:ChannelsGroups.kt:ChannelsGroup</ID>
     <ID>MatchingDeclarationName:ChannelsHeader.kt:ChannelsHeaderFocus</ID>
@@ -359,10 +355,8 @@
     <ID>MatchingDeclarationName:PlayerStop.kt:PlayerClose</ID>
     <ID>MatchingDeclarationName:ProgrammeArtwork.kt:PictureLoad</ID>
     <ID>MatchingDeclarationName:ProgrammeCategoryPolicy.kt:ProgrammeCategory</ID>
-    <ID>MatchingDeclarationName:RecordingPlaybackPresentation.kt:RecordingFinishedAction</ID>
     <ID>MatchingDeclarationName:SessionArtworkLoader.kt:AppSessionArtworkLoader : SessionArtworkLoader</ID>
     <ID>MatchingDeclarationName:StatusBadge.kt:StatusBadgeTone</ID>
-    <ID>MatchingDeclarationName:TimeConverter.kt:AppClock</ID>
     <ID>MatchingDeclarationName:TvOutlinedTextField.kt:FieldOpenPress</ID>
     <ID>MatchingDeclarationName:TvRecoveryOverlay.kt:TvRecoveryAction</ID>
     <ID>MaxLineLength:AboutNoticeText.kt:if (line.takeWhile { it == '#' }.length == 2) ChangelogBlockKind.VERSION_HEADING else ChangelogBlockKind.GROUP_HEADING</ID>
@@ -498,12 +492,7 @@
     <ID>MaxLineLength:DepthStack.kt:DepthPreviewKey</ID>
     <ID>MaxLineLength:DepthStack.kt:DepthStack$active.copy(firstVisibleItemId = itemId, firstVisibleIndex = index.coerceAtLeast(0), scrollOffset = offset.coerceAtLeast(0))</ID>
     <ID>MaxLineLength:DetailsTint.kt:/** Preserve the seed's hue, with HSL saturation capped at 35% and lightness fixed at 7.5%, the theme background's lightness. */</ID>
-    <ID>MaxLineLength:DvrMutationActions.kt:internal</ID>
-    <ID>MaxLineLength:DvrMutationActions.kt:val canModify = (current.sessionState as? SessionState.Ready)?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED</ID>
     <ID>MaxLineLength:EmbeddedProgressCardBorder.kt:scaling = launch { ring.scale.animateTo(target, tween(cardFocusScaleMillis(interaction), easing = ScaleEasing)) }</ID>
-    <ID>MaxLineLength:Epg.kt:episode.episodeNumber?.let { add(resources.getString(if (spoken) R.string.episode_number_spoken else R.string.episode_number_compact, it)) }</ID>
-    <ID>MaxLineLength:Epg.kt:episode.seasonNumber?.let { add(resources.getString(if (spoken) R.string.episode_season_spoken else R.string.episode_season_compact, it)) }</ID>
-    <ID>MaxLineLength:Epg.kt:formatShortDate(java.time.Instant.ofEpochSecond(firstAired.epochSeconds).atZone(java.time.ZoneId.systemDefault()), locale)</ID>
     <ID>MaxLineLength:EpgGridContent.kt:(guideTimelineRowHeight(rows) - guideCellTextHeight(rows)) / 2 + MaterialTheme.typography.titleSmall.lineHeight.toDp()</ID>
     <ID>MaxLineLength:EpgGridContent.kt:(if (layoutDirection == LayoutDirection.Rtl) trackWidth - start - width else start).roundToPx()</ID>
     <ID>MaxLineLength:EpgGridContent.kt:.</ID>
@@ -942,10 +931,6 @@
     <ID>MaxLineLength:StatusBadge.kt:fun</ID>
     <ID>MaxLineLength:StatusBadge.kt:if (state == DvrEntryState.RECORDING) R.string.player_recording else R.string.recording_state_recording_errors</ID>
     <ID>MaxLineLength:StepOffsetDescription.kt:R.string.timeshift_seek_preview_short_description</ID>
-    <ID>MaxLineLength:TimeConverter.kt:/** A length as read aloud, in the configured app locale; zero units are left out, so whole minutes read without "0 seconds". */</ID>
-    <ID>MaxLineLength:TimeConverter.kt:/** The spoken form of [formatTimeInterval] for the clock times alone: built from the instants, never from display text. */</ID>
-    <ID>MaxLineLength:TimeConverter.kt:if</ID>
-    <ID>MaxLineLength:TimeConverter.kt:return</ID>
     <ID>MaxLineLength:TimeshiftSeekPreview.kt:"${it.event?.title?.let { title -&gt; "$title. " }.orEmpty()}${clockLabels?.first} - ${clockLabels?.second}. $description"</ID>
     <ID>MaxLineLength:TimeshiftSeekPreview.kt:/** The wall-clock second now; with [barStatus] the buffer's start clock is the leading label without programme clocks. */</ID>
     <ID>MaxLineLength:TimeshiftSeekPreview.kt:feedback = feedback ?: programmeWindow?.let { if (!it.targetAvailable) unavailableTarget else it.event?.title?.takeIf { titleAsFeedback } }</ID>
@@ -987,7 +972,6 @@
     <ID>ReturnCount:ChannelNavigation.kt:ChannelNavigation$fun adjacentId: ChannelId?</ID>
     <ID>ReturnCount:ChannelNavigation.kt:ChannelNavigation$fun entryReadiness: ChannelNumberEntryReadiness</ID>
     <ID>ReturnCount:ChannelNavigation.kt:ChannelNavigation$fun idForNumber: ChannelId?</ID>
-    <ID>ReturnCount:ChannelSchedulePolicy.kt:internal fun scheduleHistoryStart: Long?</ID>
     <ID>ReturnCount:ChannelsScreen.kt:fun focusBrowseContent: Boolean</ID>
     <ID>ReturnCount:ChannelsScreen.kt:fun pageChannels: Boolean</ID>
     <ID>ReturnCount:ChannelsScreen.kt:fun requestChannelFocus: Boolean</ID>
@@ -1003,7 +987,6 @@
     <ID>ReturnCount:EpgGridScreen.kt:fun pageCoverageSettled: Boolean</ID>
     <ID>ReturnCount:EpgGridScreen.kt:fun requestChannelFocus</ID>
     <ID>ReturnCount:EpgGridScreen.kt:fun requestVisibleWindow: GuideCoverageRequestToken?</ID>
-    <ID>ReturnCount:GuideCoverageRequestOwner.kt:GuideCoverageRequestOwner$fun request: GuideCoverageRequestToken</ID>
     <ID>ReturnCount:GuideHeadline.kt:internal fun guideHeadlineProgramme: GuideHeadlineProgramme?</ID>
     <ID>ReturnCount:GuideViewport.kt:internal fun guideFocusWindowStart: Long</ID>
     <ID>ReturnCount:HomeActivityCard.kt:@Composable private fun activityTimesLine: String</ID>
@@ -1028,7 +1011,6 @@
     <ID>ReturnCount:PlayerTimelinePresentationState.kt:LiveTimelinePresentationState$fun updateTimeline</ID>
     <ID>ReturnCount:PlayerTimelinePresentationState.kt:LiveTimelinePresentationState$suspend fun sampleTimeshiftPresentation: AppTimeshiftState?</ID>
     <ID>ReturnCount:PlayerTimelinePresentationState.kt:RecordingTimelinePresentationState$fun commitPendingSeek</ID>
-    <ID>ReturnCount:ProgrammeAgeRating.kt:internal fun programmeAgeRating: String?</ID>
     <ID>ReturnCount:RailNowPlaying.kt:internal fun railNowPlaying: RailNowPlaying?</ID>
     <ID>ReturnCount:RecordingMarkerOverlay.kt:RecordingMarkerNavigation$fun handle: Boolean</ID>
     <ID>ReturnCount:RemoteLogoCache.kt:RemoteLogoCache$private fun initializedGeneration: Long</ID>
@@ -1067,7 +1049,6 @@
     <ID>TooManyFunctions:SettingsPlayer.kt:at.bernhardberger.tvhplayer.ui.screens.settings.SettingsPlayer.kt</ID>
     <ID>TooManyFunctions:SettingsPlayerViewModel.kt:SettingsPlayerViewModel : ViewModel</ID>
     <ID>TooManyFunctions:SideRail.kt:at.bernhardberger.tvhplayer.ui.components.SideRail.kt</ID>
-    <ID>TooManyFunctions:TimeConverter.kt:at.bernhardberger.tvhplayer.ui.common.TimeConverter.kt</ID>
     <ID>TooManyFunctions:VideoPlayerViewModel.kt:VideoPlayerViewModel : ViewModel</ID>
     <ID>TooManyFunctions:WatchingProgress.kt:at.bernhardberger.tvhplayer.ui.components.WatchingProgress.kt</ID>
     <ID>TopLevelPropertyNaming:AppRoot.kt:/** * Autoplay handoff: the full-screen startup screen fades into the first video frames over the * M3 long2 duration with M3 standard easing, after the first picture's [PlayerMotion.PictureHoldMs]. */ internal const val StartupRevealMs = 500</ID>
@@ -1127,7 +1108,6 @@
     <ID>TopLevelPropertyNaming:PlayerTopIdentity.kt:/** The identity's share of the strip's chip: 48dp of 64dp. */ private const val IdentityMorphShrink = 0.25f</ID>
     <ID>TopLevelPropertyNaming:PlayerTopIdentity.kt:/** The live top identity's test tag. */ internal const val PlayerTopIdentityTag = "player-top-identity"</ID>
     <ID>TopLevelPropertyNaming:PlayerTopIdentity.kt:private const val ArrowAlpha = TvPassiveAlpha</ID>
-    <ID>TopLevelPropertyNaming:ProgrammeAgeRating.kt:// Long enough for FSK, FSF, PEGI, BBFC, MPAA and similar codes. private const val MaxRatingCodeLength = 6</ID>
     <ID>TopLevelPropertyNaming:ProgrammeDetailsPage.kt:/** Google TV's scrolled details page measured about 0.6 of the sharp art's brightness. */ private const val DetailsScrolledDimAlpha = .4f</ID>
     <ID>TopLevelPropertyNaming:ProgrammeDetailsPage.kt:/** The reader keeps at least its original dim, or the measured readable dim when that is stronger. */ private const val DetailsReadingDimAlpha = .6f</ID>
     <ID>TopLevelPropertyNaming:ProgrammeDetailsPage.kt:/** The scrim's reach from the top-right corner, as shares of the width and the height. */ private const val DetailsScrimReachX = 1f</ID>
