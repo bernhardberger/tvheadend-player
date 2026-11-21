@@ -32,7 +32,15 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.MediaSource
+import androidx.media3.exoplayer.source.SilenceMediaSource
+import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
+import at.bernhardberger.tvheadend.sdk.core.DvrCutpoint
+import at.bernhardberger.tvheadend.sdk.core.DvrCutpointAction
+import at.bernhardberger.tvheadend.sdk.core.DvrCutpointsResult
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
+import at.bernhardberger.tvheadend.sdk.core.TvheadendTestResultFactory
 import at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi
 import at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendPlaybackCoordinator
@@ -48,6 +56,7 @@ import at.bernhardberger.tvhplayer.stores.ChannelAccentStore
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.recordings.RecordingProgress
 import at.bernhardberger.tvhplayer.touch.testutil.FakeConnection
+import at.bernhardberger.tvhplayer.touch.testutil.ServerGuide
 import at.bernhardberger.tvhplayer.touch.testutil.TouchCanvas
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouch
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouchWindows
@@ -73,6 +82,8 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.util.ReflectionHelpers
 import java.time.Duration
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
 
 @RunWith(RobolectricTestRunner::class)
@@ -172,22 +183,31 @@ class RecordingPlayerScreenTest {
 
     @OptIn(UnstableApi::class)
     @kotlin.OptIn(TvheadendTestingApi::class)
-    private fun assertRecordingRouteHidesSystemBars() {
+    private fun withRecordingRoute(
+        marked: Boolean,
+        exercise: (PlayerActivity, AppPlaybackRuntime) -> Unit,
+    ) {
         val context = compose.activity.applicationContext
         val connection = FakeConnection()
         val player = ExoPlayer.Builder(context).build()
-        val coordinator = createTvheadendPlaybackCoordinator(player)
+        val server = ServerGuide(Instant.parse("2026-11-11T21:00:00Z"))
+        val session = if (marked) markedSession(connection, server) else connection.session
+        val coordinator = createTvheadendPlaybackCoordinator(
+            if (marked) offlinePlayer(player) else player,
+            workDispatcher = Dispatchers.Main.immediate,
+        )
         val settings = PlayerSettingsStore(context)
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
         val runtime = AppPlaybackRuntime(
-            player, connection.session, coordinator, settings, connection.owner, scope,
+            player, session, coordinator, settings, connection.owner, scope,
             TvheadendAudioOutputProvider(context), PlaybackAudioFocus.None, PlaybackRuntimePolicy.fromPlayerSettings(),
             connection.noticeCenter,
         )
-        val owner = SdkRuntimeOwner.create(connection.session, runtime, connection.owner, coordinator, player, scope)
+        val owner = SdkRuntimeOwner.create(session, runtime, connection.owner, coordinator, player, scope)
         startKoin {
             modules(module {
                 single { owner }
+                single { settings }
                 single { connection.owner }
                 single { connection.noticeCenter }
                 single { connection.browseSession }
@@ -195,27 +215,11 @@ class RecordingPlayerScreenTest {
             })
         }
         try {
-            val intent = RecordingRoute(DvrEntryId(1), recordingStart(false)).intent(context)
+            val id = if (marked) server.film.id else DvrEntryId(1)
+            val intent = RecordingRoute(id, recordingStart(marked)).intent(context)
             Robolectric.buildActivity(PlayerActivity::class.java, intent).setup().use { controller ->
-                val main = shadowOf(Looper.getMainLooper())
-                main.idleFor(Duration.ofMillis(32))
-                compose.waitForIdle()
-                val activity = controller.get()
-                assertEquals(Configuration.ORIENTATION_LANDSCAPE, activity.resources.configuration.orientation)
-                val insets = checkNotNull(activity.window.decorView.windowInsetsController)
-                val bars = WindowInsets.Type.systemBars()
-                fun requestedBars() = ReflectionHelpers.callInstanceMethod<Int>(insets, "getRequestedVisibleTypes") and bars
-                assertEquals("The landscape recording route should request hidden system bars", 0, requestedBars())
-
-                val configuration = activity.resources.configuration
-                activity.onPictureInPictureModeChanged(true, configuration)
-                main.idleFor(Duration.ofMillis(32))
-                compose.waitForIdle()
-                insets.show(bars)
-                activity.onPictureInPictureModeChanged(false, configuration)
-                main.idleFor(Duration.ofMillis(32))
-                compose.waitForIdle()
-                assertEquals("Expanding the recording should request hidden system bars again", 0, requestedBars())
+                settleRoute(player.takeIf { marked })
+                exercise(controller.get(), runtime)
             }
         } finally {
             owner.requestClose()
@@ -223,6 +227,93 @@ class RecordingPlayerScreenTest {
             stopKoin()
             connection.close()
         }
+    }
+
+    private fun assertRecordingRouteHidesSystemBars() = withRecordingRoute(marked = false) { activity, _ ->
+        val configuration = activity.resources.configuration
+        assertEquals(Configuration.ORIENTATION_LANDSCAPE, configuration.orientation)
+        val insets = checkNotNull(activity.window.decorView.windowInsetsController)
+        val bars = WindowInsets.Type.systemBars()
+        fun requestedBars() = ReflectionHelpers.callInstanceMethod<Int>(insets, "getRequestedVisibleTypes") and bars
+        assertEquals("The landscape recording route should request hidden system bars", 0, requestedBars())
+        activity.onPictureInPictureModeChanged(true, configuration)
+        settleRoute()
+        insets.show(bars)
+        activity.onPictureInPictureModeChanged(false, configuration)
+        settleRoute()
+        assertEquals("Expanding the recording should request hidden system bars again", 0, requestedBars())
+    }
+
+    @kotlin.OptIn(TvheadendTestingApi::class)
+    private fun markedSession(connection: FakeConnection, server: ServerGuide): TvheadendSession {
+        val sdk = connection.session
+        sdk.publish(server.connected())
+        return object : TvheadendSession by sdk {
+            override fun bindRecordingPlayback(currentSession: CurrentSessionObservation, recordingId: DvrEntryId) =
+                TvheadendTestResultFactory.boundCompletedRecordingPlayback(sdk, currentSession, recordingId, cutpoints = {
+                    DvrCutpointsResult.Available.create(
+                        listOf(DvrCutpoint(10.seconds, 20.seconds, DvrCutpointAction.COMMERCIAL_BREAK)),
+                    )
+                })
+        }
+    }
+
+    @OptIn(UnstableApi::class)
+    private fun offlinePlayer(player: ExoPlayer): ExoPlayer = object : ExoPlayer by player {
+        // Preserve the installed recording identity; the SDK fake has no media bytes.
+        private fun silence(source: MediaSource) = SilenceMediaSource.Factory()
+            .setDurationUs(60.seconds.inWholeMicroseconds).createMediaSource().let { silence ->
+                silence.updateMediaItem(source.mediaItem)
+                silence
+            }
+
+        override fun setMediaSource(mediaSource: MediaSource) = player.setMediaSource(silence(mediaSource))
+        override fun setMediaSource(mediaSource: MediaSource, startPositionMs: Long) =
+            player.setMediaSource(silence(mediaSource), startPositionMs)
+        override fun setMediaSource(mediaSource: MediaSource, resetPosition: Boolean) =
+            player.setMediaSource(silence(mediaSource), resetPosition)
+    }
+
+    @OptIn(UnstableApi::class)
+    private fun settleRoute(player: ExoPlayer? = null) {
+        shadowOf(Looper.getMainLooper()).idle()
+        player?.let { shadowOf(it.playbackLooper).idle() }
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(32))
+        compose.waitForIdle()
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w1280dp-h800dp-land-xhdpi")
+    @OptIn(UnstableApi::class)
+    fun recordingRouteMarkerSeeksWithoutResumingOrClosingTheSheet() = withRecordingRoute(marked = true) { _, runtime ->
+        runtime.pause()
+        settleRoute(runtime.player)
+        button(R.string.player_markers).performClick()
+        tag("recording-marker-10000").performClick()
+        settleRoute(runtime.player)
+        assertEquals(10_000L, runtime.player.currentPosition)
+        assertTrue(!runtime.player.playWhenReady)
+        tag("recording-markers").assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w1280dp-h800dp-land-xhdpi")
+    @OptIn(UnstableApi::class)
+    fun recordingRouteDismissAndAcceptActOnTheRuntimeOffers() = withRecordingRoute(marked = true) { _, runtime ->
+        // Enter an ad as ordinary playback (not a deliberate runtime seek).
+        runtime.player.seekTo(12_000L)
+        settleRoute(runtime.player)
+        tapPicture()
+        tag("recording-ad-prompt").assertIsDisplayed()
+        button(SharedR.string.server_keep_watching).performClick()
+        settleRoute(runtime.player)
+        assertEquals(null, runtime.recordingSkipPrompt.value)
+        tag("recording-ad-prompt").assertDoesNotExist()
+        tapPicture()
+        assertTrue(runtime.recordingControlsSkip.value != null)
+        button(SharedR.string.skip_ad_break).performClick()
+        settleRoute(runtime.player)
+        assertTrue(runtime.player.currentPosition >= 20_000L)
     }
 
     @Test

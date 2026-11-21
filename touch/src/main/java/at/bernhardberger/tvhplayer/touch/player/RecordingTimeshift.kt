@@ -17,7 +17,7 @@ internal sealed interface RecordingMove {
         val positionMs: Long,
         val expectedRevision: Long,
         val programMarks: List<RecordingMark>,
-    ) : RecordingMove
+    ) : RecordingMove, PlayerChoice
 }
 
 internal sealed interface RecordingSkipChoice : PlayerChoice {
@@ -52,6 +52,15 @@ internal fun recordingMarkerMove(
     val revision = state.markerRevision ?: return null
     return RecordingMove.Marker(positionMs, revision, state.programMarks)
         .takeIf { state.seekable && state.hasMarkers && state.stops.any { it.positionMs == positionMs } }
+}
+
+internal fun recordingMarkerTap(
+    state: RecordingPlayerState,
+    onSeek: (Long) -> Unit,
+    onChoice: (PlayerChoice) -> Unit,
+): (Long) -> Unit = { position ->
+    if (state.markerRevision == null) onSeek(position)
+    else recordingMarkerMove(state, position)?.let(onChoice)
 }
 
 internal fun RecordingMove.Seek.stepReadout(

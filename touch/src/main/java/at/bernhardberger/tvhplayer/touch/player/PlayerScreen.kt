@@ -179,6 +179,8 @@ private fun panelGone(panel: PlayerPanel?, state: PlayerFaceState, inWindow: Boo
     inWindow -> true
     panel == PlayerPanel.Channels && layout.upright -> true
     panel == PlayerPanel.Markers -> layout.upright || (state as? RecordingPlayerState)?.hasMarkers != true
+    panel == PlayerPanel.AdBreaks && state is RecordingPlayerState && state.adBreakOnlyOptions ->
+        PlayerControl.Settings !in state.offered
     else -> panel?.button?.control?.let { it !in state.offered } == true
 }
 

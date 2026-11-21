@@ -123,7 +123,7 @@ internal fun LandscapePlayerContent(
                 is RecordingPlayerState -> RecordingAdAction(state, dragging, panels.onChoice, offer)
             }
         }
-        LandscapeTimeline(state, layout, preview, onPreviewChange, onSeek, trackBottom, trackGutter)
+        LandscapeTimeline(state, layout, preview, onPreviewChange, onSeek, trackBottom, trackGutter, panels.onChoice)
         PlayerActionRow(
             state, layout, dragging, panels,
             Modifier.align(Alignment.BottomCenter).padding(bottom = rowBottom),
@@ -147,6 +147,7 @@ private fun BoxScope.LandscapeTimeline(
     onSeek: (Long) -> Unit,
     trackBottom: Dp,
     trackGutter: Dp,
+    onChoice: (PlayerChoice) -> Unit,
 ) {
     val clockModifier = Modifier.padding(bottom = trackBottom - 8.dp)
     val track = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = trackGutter)
@@ -166,7 +167,7 @@ private fun BoxScope.LandscapeTimeline(
         is RecordingPlayerState -> if (state.durationMs > 0) {
             RecordingClock(state, preview, clockModifier.align(Alignment.BottomStart))
             ClockText(formatPlaybackDuration(state.durationMs), clockModifier.align(Alignment.BottomEnd))
-            FaceTimeline(state, layout, true, preview, onPreviewChange, onSeek, track)
+            FaceTimeline(state, layout, true, preview, onPreviewChange, onSeek, track, onChoice)
         }
     }
 }
@@ -308,7 +309,7 @@ internal fun UprightPlayerContent(
                 Modifier.weight(1f),
             )
             is RecordingPlayerState -> if (state.hasMarkers) {
-                InlineRecordingMarkers(state, onSeek, Modifier.weight(1f))
+                InlineRecordingMarkers(state, recordingMarkerTap(state, onSeek, panels.onChoice), Modifier.weight(1f))
             }
         }
     }

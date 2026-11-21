@@ -162,7 +162,7 @@ class PlayerActivity : ComponentActivity() {
                         when (val shown = requested.collectAsStateWithLifecycle().value) {
                             is Tune -> Player(shown)
                             is RecordingRoute -> RecordingPlayback(
-                                shown, runtime, session, artwork, pictureWindow, window, ::back,
+                                shown, runtime, session, settings, artwork, pictureWindow, window, ::back,
                             )
                         }
                     }
