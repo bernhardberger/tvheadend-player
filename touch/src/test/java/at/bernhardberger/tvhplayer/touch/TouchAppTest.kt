@@ -1,13 +1,18 @@
 package at.bernhardberger.tvhplayer.touch
 
+import android.os.Looper
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
 import androidx.annotation.StringRes
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
@@ -16,22 +21,28 @@ import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import at.bernhardberger.tvheadend.sdk.android.DiscoveredTvheadendServer
 import at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult
 import at.bernhardberger.tvheadend.sdk.android.TvheadendDiscoveryTestFactory
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
-import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
-import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
+import at.bernhardberger.tvheadend.sdk.core.ServerProfileAuthenticationMode
+import at.bernhardberger.tvheadend.sdk.core.ServerProfileId
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileListResult
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileWriteResult
 import at.bernhardberger.tvheadend.sdk.core.SessionFailure
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi
+import at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStoreCall
+import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import at.bernhardberger.tvhplayer.touch.testutil.FakeConnection
+import at.bernhardberger.tvhplayer.touch.testutil.ImageLoaderRule
 import at.bernhardberger.tvhplayer.touch.testutil.ServerGuide
 import at.bernhardberger.tvhplayer.ui.MobileDarkColors
 import kotlin.time.Clock
@@ -44,6 +55,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 /** The app's pages on the SDK's fake session and profile store: first run, the frame and Connections. */
@@ -52,6 +64,7 @@ import org.robolectric.annotation.Config
 @OptIn(TvheadendTestingApi::class)
 class TouchAppTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
+    @get:Rule val images = ImageLoaderRule()
 
     private var connection = FakeConnection()
     private val server = DiscoveredTvheadendServer("Tvheadend", "192.168.1.20", 9982)
@@ -102,6 +115,24 @@ class TouchAppTest {
     }
 
     @Test
+    fun aFailedRemovalKeepsTheConnection() {
+        runBlocking { connection.store.addAnonymous(server.host, server.port, "Home server", true) }
+        show()
+        compose.onNodeWithContentDescription(label(R.string.channels_connection_settings)).performClick()
+        connection.store.scriptMutationUnavailable()
+        connection.writesHeld.value = true
+        compose.onNodeWithContentDescription(label(SharedR.string.server_remove)).performClick()
+        compose.onNodeWithText(label(R.string.connect_remove)).performClick()
+        compose.waitForIdle()
+        connection.writesHeld.value = false
+
+        compose.onNode(heading and hasText(label(SharedR.string.server_list_title))).assertIsDisplayed()
+        compose.onNodeWithText("Home server").assertIsDisplayed()
+        val stored = runBlocking { connection.store.profiles() } as ServerProfileListResult.Available
+        assertEquals(listOf(server.host), stored.profiles.map { it.host })
+    }
+
+    @Test
     fun dialogFailureRunsTheTestAgain() {
         signInToFoundServer()
         unavailable(SessionFailure.NETWORK_UNAVAILABLE)
@@ -109,15 +140,128 @@ class TouchAppTest {
 
         compose.onNodeWithText(label(SharedR.string.connection_try_again)).performClick()
         compose.onNode(isDialog()).assertDoesNotExist()
-        compose.onNodeWithText(compose.activity.getString(SharedR.string.onboarding_connecting_title, server.host))
-            .assertExists()
+        // The retry's own attempt: the earlier outcome is not counted again.
+        connection.session.publish(SessionObservation.create(sessionState = SessionState.Connecting))
+        connection.session.publish(ready())
+
+        compose.onNode(heading and hasText(label(R.string.nav_channels))).assertIsDisplayed()
+        val saved = runBlocking { connection.store.profiles() } as ServerProfileListResult.Available
+        assertEquals(listOf(server.host), saved.profiles.map { it.host })
+    }
+
+    @Test
+    fun aFailedSaveSaysSoAndConnectTriesAgain() {
+        connection.store.scriptMutationUnavailable()
+        show()
+        compose.onNode(hasClickAction() and hasText(server.name)).performClick()
+        field(SharedR.string.server_name_field).performTextInput("Living room")
+        compose.onNodeWithText(label(SharedR.string.onboarding_connect)).performClick()
+        connection.session.publish(ready())
+
+        compose.onNodeWithText(label(SharedR.string.connection_save_failed)).assertIsDisplayed()
+        // Nothing of the failed save is kept, neither the connection nor its name.
+        connection.store.scriptMutationSuccess()
+        val failed = runBlocking { connection.store.profiles() } as ServerProfileListResult.Available
+        assertTrue(failed.profiles.isEmpty())
+        val retried = connection.store.calls.size
+        compose.onNodeWithText(label(SharedR.string.onboarding_connect)).performClick()
+
+        compose.onNode(heading and hasText(label(R.string.nav_channels))).assertIsDisplayed()
+        val saved = runBlocking { connection.store.profiles() } as ServerProfileListResult.Available
+        assertEquals(listOf(server.host to "Living room"), saved.profiles.map { it.host to it.label })
+        // The retry writes the connection with its name at once: one mutation, no rename after it.
+        assertEquals(
+            listOf(FakeServerProfileStoreCall.ADD_ANONYMOUS),
+            connection.store.calls.drop(retried).filter { it in writes },
+        )
+    }
+
+    @Test
+    fun recreationDuringTheFirstSaveStillAppliesTheName() {
+        show()
+        compose.onNode(hasClickAction() and hasText(server.name)).performClick()
+        field(SharedR.string.server_name_field).performTextInput("Living room")
+        connection.writesHeld.value = true
+        compose.onNodeWithText(label(SharedR.string.onboarding_connect)).performClick()
+        connection.session.publish(ready())
+        compose.waitForIdle()
+
+        recreate()
+        connection.writesHeld.value = false
+
+        compose.onNode(heading and hasText(label(R.string.nav_channels))).assertIsDisplayed()
+        val saved = runBlocking { connection.store.profiles() } as ServerProfileListResult.Available
+        assertEquals(listOf("Living room"), saved.profiles.map { it.label })
+        // The name goes with the connection in its one write.
+        assertEquals(listOf(FakeServerProfileStoreCall.ADD_ANONYMOUS), connection.store.calls.filter { it in writes })
+    }
+
+    @Test
+    fun anUnreadListAfterTheEditorsWriteKeepsTheEditorForTheRetry() {
+        runBlocking { connection.store.addAnonymous(server.host, server.port, "Home server", true) }
+        val id = (runBlocking { connection.store.profiles() } as ServerProfileListResult.Available).activeId
+        show()
+        openEditor()
+        field(SharedR.string.onboarding_server_address).performTextReplacement("192.168.1.21")
+        connection.failReadAfterNextWrite()
+        compose.onNodeWithText(label(SharedR.string.server_name_save)).performClick()
+        connection.session.publish(SessionObservation.create(sessionState = SessionState.Connecting))
+        connection.session.publish(ready())
+
+        compose.onNodeWithText(label(SharedR.string.connection_save_failed)).assertIsDisplayed()
+        val retried = connection.store.calls.size
+        compose.onNodeWithText(label(SharedR.string.server_name_save)).performClick()
+
+        compose.onNode(heading and hasText(label(SharedR.string.server_list_title))).assertIsDisplayed()
+        compose.onNodeWithText("192.168.1.21").assertIsDisplayed()
+        assertEquals(
+            listOf(FakeServerProfileStoreCall.UPDATE_ANONYMOUS),
+            connection.store.calls.drop(retried).filter { it in writes },
+        )
+        val saved = runBlocking { connection.store.profiles() } as ServerProfileListResult.Available
+        assertEquals(listOf(id to "192.168.1.21"), saved.profiles.map { it.id to it.host })
+    }
+
+    @Test
+    fun firstRunInANewActivityCompletesAConnectionStoredButNotReadBack() {
+        show()
+        compose.onNode(hasClickAction() and hasText(server.name)).performClick()
+        connection.failReadAfterNextWrite()
+        compose.onNodeWithText(label(SharedR.string.onboarding_connect)).performClick()
+        connection.session.publish(ready())
+        compose.onNodeWithText(label(SharedR.string.connection_save_failed)).assertIsDisplayed()
+
+        // The activity finishes and opens again while the process lives: a new first run, nothing it knew.
+        compose.activityRule.scenario.onActivity { it.viewModelStore.clear() }
+        recreate()
+        val replaced = connection.store.calls.size
+        compose.onNode(hasClickAction() and hasText(server.name)).performClick()
+        compose.onNodeWithText(label(SharedR.string.onboarding_connect)).performClick()
+        connection.session.publish(SessionObservation.create(sessionState = SessionState.Connecting))
+        connection.session.publish(ready())
+
+        compose.onNode(heading and hasText(label(R.string.nav_channels))).assertIsDisplayed()
+        val saved = runBlocking { connection.store.profiles() } as ServerProfileListResult.Available
+        assertEquals(listOf(server.host), saved.profiles.map { it.host })
+        assertEquals(
+            listOf(FakeServerProfileStoreCall.UPDATE_ANONYMOUS),
+            connection.store.calls.drop(replaced).filter { it in writes },
+        )
     }
 
     @Test
     fun unreachableContinueAnywaySavesTheUntestedConnection() {
         signInToFoundServer()
         unavailable(SessionFailure.SERVER_UNREACHABLE)
+        connection.store.scriptMutationUnavailable()
         compose.onNodeWithText(label(SharedR.string.onboarding_continue_anyway)).performClick()
+
+        // A failed write says so on the form, without the network question again.
+        compose.onNodeWithText(label(SharedR.string.connection_save_failed)).assertIsDisplayed()
+        compose.onNode(isDialog()).assertDoesNotExist()
+        connection.store.scriptMutationSuccess()
+        // Connect writes again; a new test would wait for the server, which says nothing more here.
+        compose.onNodeWithText(label(SharedR.string.onboarding_connect)).performClick()
 
         compose.onNode(heading and hasText(label(R.string.nav_channels))).assertIsDisplayed()
         val saved = runBlocking { connection.store.profiles() } as ServerProfileListResult.Available
@@ -149,15 +293,7 @@ class TouchAppTest {
 
     @Test
     fun signInNeededOpensTheEditorWithThePasswordRequired() {
-        connection = FakeConnection(readForEditing = ServerProfileEditReadResult.Unavailable)
-        runBlocking {
-            val id = (connection.store.addPassword(server.host, server.port, "alex", "•", "Home server", true)
-                as ServerProfileWriteResult.Applied).id
-            connection.store.scriptCredentialsUnavailable(id, false)
-        }
-        show()
-        compose.onNode(heading and hasText(label(SharedR.string.error_106_title))).assertIsDisplayed()
-        compose.onNode(hasClickAction() and hasText(label(R.string.channels_connection_settings))).performClick()
+        openSignInNeeded(forgetUsername = false)
 
         field(SharedR.string.password).assertIsFocused()
         field(SharedR.string.username).assert(hasText("alex"))
@@ -168,6 +304,123 @@ class TouchAppTest {
         // Cancel leaves the Connections page with the editor.
         compose.onNodeWithContentDescription(label(SharedR.string.close)).performClick()
         compose.onNode(heading and hasText(label(R.string.nav_channels))).assertIsDisplayed()
+    }
+
+    @Test
+    fun signInNeededWithoutTheUsernameDoesNotSaveWithoutSignIn() {
+        // Every way into the editor: Edit on the Connections page, then the sign-in action.
+        val id = unreadableSignIn(forgetUsername = true)
+        openEditor()
+        refusesToSaveWithoutSignIn(id)
+        compose.onNodeWithContentDescription(label(SharedR.string.close)).performClick()
+        back()
+        compose.onNode(hasClickAction() and hasText(label(R.string.channels_connection_settings))).performClick()
+        refusesToSaveWithoutSignIn(id)
+    }
+
+    private fun refusesToSaveWithoutSignIn(id: ServerProfileId) {
+        field(SharedR.string.username).assert(hasText(""))
+        compose.onNodeWithText(label(SharedR.string.server_name_save)).performClick()
+
+        val required = SemanticsMatcher.expectValue(SemanticsProperties.Error, label(SharedR.string.onboarding_sign_in_pair))
+        field(SharedR.string.username).assert(required)
+        compose.onNodeWithText(compose.activity.getString(SharedR.string.onboarding_connecting_title, server.host))
+            .assertDoesNotExist()
+        val stored = runBlocking { connection.store.profiles() } as ServerProfileListResult.Available
+        assertEquals(ServerProfileAuthenticationMode.PASSWORD, stored.profiles.single { it.id == id }.authenticationMode)
+    }
+
+    @Test
+    fun aDiscardedSignInIsGoneWhenTheEditorOpensAgain() {
+        openSignInNeeded(forgetUsername = false)
+        field(SharedR.string.password).performTextInput("draft")
+        discard()
+
+        compose.onNode(hasClickAction() and hasText(label(R.string.channels_connection_settings))).performClick()
+        field(SharedR.string.username).assert(hasText("alex"))
+        compose.onNodeWithContentDescription(label(SharedR.string.show_password)).assertDoesNotExist()
+    }
+
+    @Test
+    fun aTestRunningWhenTheEditorIsDiscardedSavesNothing() {
+        openSignInNeeded(forgetUsername = false)
+        val seeded = connection.store.calls.size
+        field(SharedR.string.password).performTextInput("secret")
+        compose.onNodeWithText(label(SharedR.string.server_name_save)).performClick()
+        discard()
+
+        connection.session.publish(SessionObservation.create(sessionState = SessionState.Connecting))
+        connection.session.publish(ready())
+        compose.waitForIdle()
+        assertTrue(connection.store.calls.drop(seeded).none { it in writes })
+    }
+
+    @Test
+    fun theEditorKeepsATypedSignInThroughRecreation() {
+        // The fake's editing read gives the saved username but never a saved password.
+        connection = FakeConnection(readForEditing = ServerProfileEditReadResult.Unavailable)
+        runBlocking { connection.store.addPassword(server.host, server.port, "alex", "old", "Home server", true) }
+        show()
+        openEditor()
+        field(SharedR.string.username).performTextReplacement("sam")
+        field(SharedR.string.password).performTextInput("new")
+
+        recreate()
+        compose.onNodeWithText(label(SharedR.string.server_name_save)).performClick()
+        connection.session.publish(SessionObservation.create(sessionState = SessionState.Connecting))
+        connection.session.publish(ready())
+
+        compose.onNode(heading and hasText(label(SharedR.string.server_list_title))).assertIsDisplayed()
+        assertTrue("The typed sign-in was not the one saved", connection.savedSignIn("sam", "new"))
+    }
+
+    @Test
+    fun aRunningSaveCannotBeDiscarded() {
+        runBlocking { connection.store.addAnonymous(server.host, server.port, "Home server", true) }
+        show()
+        openEditor()
+        field(SharedR.string.onboarding_server_address).performTextReplacement("192.168.1.21")
+        connection.writesHeld.value = true
+        compose.onNodeWithText(label(SharedR.string.server_name_save)).performClick()
+        connection.session.publish(ready())
+        compose.waitForIdle()
+
+        compose.onNodeWithContentDescription(label(SharedR.string.close)).assertIsNotEnabled().performClick()
+        compose.onNodeWithText(label(SharedR.string.autorec_editor_discard)).assertDoesNotExist()
+        connection.writesHeld.value = false
+
+        compose.onNode(heading and hasText(label(SharedR.string.server_list_title))).assertIsDisplayed()
+        compose.onNodeWithText("192.168.1.21").assertIsDisplayed()
+    }
+
+    @Test
+    fun aSaveThatStartsUnderTheDiscardPromptKeepsTheEditor() {
+        runBlocking { connection.store.addAnonymous(server.host, server.port, "Home server", true) }
+        show()
+        openEditor()
+        field(SharedR.string.onboarding_server_address).performTextReplacement("192.168.1.21")
+        compose.onNodeWithText(label(SharedR.string.server_name_save)).performClick()
+        compose.onNodeWithContentDescription(label(SharedR.string.close)).performClick()
+        val confirm = compose.onNode(hasClickAction() and hasText(label(SharedR.string.autorec_editor_discard)))
+            .fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
+        connection.writesHeld.value = true
+
+        // The test passes and its save starts; a tap on the prompt lands before the next frame removes it.
+        connection.session.publish(SessionObservation.create(sessionState = SessionState.Connecting))
+        compose.mainClock.autoAdvance = false
+        connection.session.publish(ready())
+        compose.runOnUiThread {
+            shadowOf(Looper.getMainLooper()).idle()
+            confirm()
+        }
+        compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+
+        // The editor stays, with the change being written, until the save ends.
+        field(SharedR.string.onboarding_server_address).assertExists()
+        connection.writesHeld.value = false
+        compose.onNode(heading and hasText(label(SharedR.string.server_list_title))).assertIsDisplayed()
+        compose.onNodeWithText("192.168.1.21").assertIsDisplayed()
     }
 
     @Test
@@ -186,6 +439,11 @@ class TouchAppTest {
         compose.onNodeWithText(guide.programs[2]).assertIsDisplayed()
         listOf(R.string.channels_watch, R.string.channels_record, R.string.channels_details, R.string.channels_show_in_guide)
             .forEach { compose.onNodeWithText(label(it)).assertDoesNotExist() }
+        // The logo and the open program's picture come from the server through the image loader.
+        val session = connection.session.observation.value.currentSession
+        val logo = AppArtworkSource(session, (guide.logo as ChannelIcon.ImageCache).artworkId)
+        assertTrue(images.requested.toString(), logo in images.requested)
+        assertTrue(images.requested.toString(), AppArtworkSource(session, guide.picture) in images.requested)
     }
 
     @Test
@@ -242,6 +500,36 @@ class TouchAppTest {
         compose.onNodeWithText(guide.film.title!!).assertExists()
     }
 
+    /** A password connection whose saved sign-in can no longer be read; the frame asks for it. */
+    private fun unreadableSignIn(forgetUsername: Boolean): ServerProfileId {
+        connection = FakeConnection(readForEditing = ServerProfileEditReadResult.Unavailable)
+        val id = runBlocking {
+            val id = (connection.store.addPassword(server.host, server.port, "alex", "•", "Home server", true)
+                as ServerProfileWriteResult.Applied).id
+            connection.store.scriptCredentialsUnavailable(id, forgetUsername)
+            id
+        }
+        show()
+        compose.onNode(heading and hasText(label(SharedR.string.error_106_title))).assertIsDisplayed()
+        return id
+    }
+
+    private fun openSignInNeeded(forgetUsername: Boolean): ServerProfileId = unreadableSignIn(forgetUsername).also {
+        compose.onNode(hasClickAction() and hasText(label(R.string.channels_connection_settings))).performClick()
+    }
+
+    private fun discard() {
+        compose.onNodeWithContentDescription(label(SharedR.string.close)).performClick()
+        compose.onNode(hasClickAction() and hasText(label(SharedR.string.autorec_editor_discard))).performClick()
+        compose.waitForIdle()
+    }
+
+    private fun openEditor() {
+        compose.onNodeWithContentDescription(label(R.string.channels_connection_settings)).performClick()
+        compose.onNode(hasClickAction() and hasText(label(SharedR.string.setup_connection))).performClick()
+        compose.waitForIdle()
+    }
+
     @Test
     fun guideShowsTheServersProgramsWithoutUnwiredControls() {
         val guide = savedConnectionWithGuide()
@@ -289,14 +577,7 @@ class TouchAppTest {
         runBlocking { connection.store.addAnonymous(server.host, server.port, "Home server", true) }
         show()
         val guide = ServerGuide(Clock.System.now())
-        connection.session.publish(
-            SessionObservation.create(
-                sessionState = ready().sessionState,
-                channelState = ChannelRepositoryState.Current(guide.catalog),
-                epgState = EpgRepositoryState.Current(guide.snapshot),
-                dvrState = DvrRepositoryState.Current(guide.dvr),
-            ),
-        )
+        connection.session.publish(guide.connected())
         compose.waitForIdle()
         return guide
     }
@@ -308,22 +589,35 @@ class TouchAppTest {
         compose.waitForIdle()
     }
 
+    private var content: @Composable () -> Unit = {}
+
     private fun show() {
         connection.start()
         val presentation = connection.presentation()
         val channels = connection.channels()
         val recordings = connection.recordings()
         val guide = connection.guide()
-        compose.setContent {
+        content = {
             MaterialTheme(colorScheme = MobileDarkColors) {
                 TouchApp(connection.session, connection.owner, presentation, channels, recordings, guide) {
                     flowOf(TvheadendDiscoveryTestFactory.discovering(listOf(server)))
                 }
             }
         }
+        compose.setContent(content)
     }
 
-    private fun back() = compose.runOnIdle { compose.activity.onBackPressedDispatcher.onBackPressed() }
+    /** A configuration change: the activity is rebuilt, and its view models stay. */
+    private fun recreate() {
+        compose.activityRule.scenario.recreate()
+        compose.activityRule.scenario.onActivity { it.setContent(content = content) }
+        compose.waitForIdle()
+    }
+
+    private fun back() {
+        compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        compose.waitForIdle()
+    }
 
     private fun field(@StringRes id: Int) =
         compose.onNode(SemanticsMatcher.keyIsDefined(SemanticsProperties.EditableText) and hasText(label(id)))
@@ -334,6 +628,13 @@ class TouchAppTest {
         connection.session.publish(SessionObservation.create(sessionState = SessionState.Unavailable(failure)))
         compose.waitForIdle()
     }
+
+    private val writes = setOf(
+        FakeServerProfileStoreCall.ADD_ANONYMOUS, FakeServerProfileStoreCall.ADD_PASSWORD,
+        FakeServerProfileStoreCall.UPDATE_ANONYMOUS, FakeServerProfileStoreCall.UPDATE_PASSWORD,
+        FakeServerProfileStoreCall.UPDATE_LABEL, FakeServerProfileStoreCall.SET_ACTIVE,
+        FakeServerProfileStoreCall.REMOVE,
+    )
 
     private fun ready() = SessionObservation.create(
         sessionState = SessionState.Ready(

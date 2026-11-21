@@ -7,6 +7,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.res.stringResource
 import at.bernhardberger.tvhplayer.core.AppError
+import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.channels.ChannelTag
 
@@ -96,6 +97,8 @@ internal data class GuideChannel(
     val gap: GuideGap? = null,
     /** The selected day in By channel when it differs from the overview's [programs]; null uses them. */
     val day: List<GuideProgram>? = null,
+    /** The server image's model for the touch-level image composable; the fixture painter wins. */
+    val logoModel: Any? = null,
 )
 
 /** No programs until [until] ("6:00 AM"), from [start]. */
@@ -129,8 +132,11 @@ internal data class GuideProgram(
     val section: String? = null,
     /** The item playing in the player: its bar is orange wherever it shows (section 13). */
     val watching: Boolean = false,
+    /** The server image's model for the touch-level image composable; the fixture painter wins. */
+    val stillModel: Any? = null,
 ) {
     val onNow: Boolean get() = progress != null
+    val hasStill: Boolean get() = still != null || stillModel != null
 }
 
 /** Section 9's details of one program; a missing part is left out. */
@@ -161,6 +167,10 @@ internal data class ProgramDetails(
     val facts: List<ProgramFact> = emptyList(),
     /** The item playing in the player: its bar is orange (section 13). */
     val watching: Boolean = false,
+    /** The server image's model for the touch-level image composable; the fixture painter wins. */
+    val channelLogoModel: Any? = null,
+    /** The server image's model for the touch-level image composable; the fixture painter wins. */
+    val pictureModel: Any? = null,
 ) {
     val onNow: Boolean get() = progress != null
 }
@@ -174,12 +184,16 @@ internal data class ProgramAiring(
     /** As parts: "Amber Stage", "S2 E5", "Low Water". */
     val line: List<String>,
     val scheduled: Boolean = false,
+    /** The server image's model for the touch-level image composable; the fixture painter wins. */
+    val logoModel: Any? = null,
 )
 
 internal data class ProgramCredit(val role: CreditRole, val names: List<String>)
 
 internal enum class CreditRole(@param:PluralsRes val label: Int) {
     Cast(R.plurals.guide_cast),
+    Guests(SharedR.plurals.details_guests),
+    Presenters(SharedR.plurals.details_presenters),
     Director(R.plurals.guide_directors),
     Writer(R.plurals.guide_writers),
 }
@@ -190,11 +204,14 @@ internal enum class FactKey(@param:StringRes val label: Int) {
     Genre(R.string.guide_genre),
     Season(R.string.guide_season),
     Episode(R.string.guide_episode),
+    Part(SharedR.string.details_part),
     Year(R.string.guide_year),
     AgeRating(R.string.guide_age_rating),
+    Stars(SharedR.string.details_stars),
     FirstAired(R.string.guide_first_aired),
     Broadcast(R.string.guide_broadcast),
     Categories(R.string.guide_categories),
+    Keywords(SharedR.string.details_keywords),
 }
 
 /** A null action leaves its control out: the app offers only what has something behind it. */

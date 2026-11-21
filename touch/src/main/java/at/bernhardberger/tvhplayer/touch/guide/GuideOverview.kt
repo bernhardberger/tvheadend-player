@@ -138,7 +138,9 @@ private fun ColumnHead(channel: GuideChannel, onClick: () -> Unit) {
             .semantics { contentDescription = description }.padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ChannelLogoTile(channel.logo, channel.logoTint, Modifier.size(72.dp, 40.dp), RoundedCornerShape(10.dp))
+        ChannelLogoTile(
+            channel.logo, channel.logoTint, Modifier.size(72.dp, 40.dp), RoundedCornerShape(10.dp), channel.logoModel,
+        )
         Text(
             channel.name, Modifier.weight(1f).padding(start = 12.dp), style = MaterialTheme.typography.titleMedium,
             maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -167,7 +169,7 @@ private fun ColumnItem(
             if (lead && program.onNow) {
                 ProgramPicture(
                     program.still, Modifier.padding(start = 10.dp, top = 10.dp, end = 10.dp).fillMaxWidth(),
-                    program.progress, program.recording,
+                    program.progress, program.recording, model = program.stillModel, watching = program.watching,
                 )
             }
             Row(Modifier.padding(start = 12.dp, top = 8.dp, end = 10.dp, bottom = 8.dp)) {
@@ -275,14 +277,23 @@ internal fun OverviewRows(
                         onClick = { onOpen(if (open) null else program.id) },
                         colors = ListItemDefaults.segmentedColors(containerColor = Color.Transparent),
                         leadingContent = {
-                            ChannelLogoTile(channel.logo, channel.logoTint, Modifier.size(88.dp, 48.dp))
+                            ChannelLogoTile(
+                                channel.logo, channel.logoTint, Modifier.size(88.dp, 48.dp), model = channel.logoModel,
+                            )
                         },
                         overlineContent = { PartsLine(listOf(channel.name, program.start)) },
                         supportingContent = {
                             PartsLine(program.rowLine(), style = MaterialTheme.typography.bodyMedium)
                         },
-                        trailingContent = program.still?.let {
-                            { ProgramPicture(it, Modifier.width(96.dp), program.progress, program.recording) }
+                        trailingContent = if (program.hasStill) {
+                            {
+                                ProgramPicture(
+                                    program.still, Modifier.width(96.dp), program.progress, program.recording,
+                                    model = program.stillModel, watching = program.watching,
+                                )
+                            }
+                        } else {
+                            null
                         },
                     ) {
                         Text(

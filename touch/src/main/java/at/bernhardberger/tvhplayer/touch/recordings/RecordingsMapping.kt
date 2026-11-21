@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.touch.recordings
 
+import at.bernhardberger.tvhplayer.core.recordingArtwork
+import at.bernhardberger.tvhplayer.touch.ui.ArtworkModels
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvhplayer.core.DvrArchiveFolder
@@ -37,6 +39,7 @@ import java.time.Instant
  * degraded is the saved one; otherwise the current one. Watched progress is left out until the
  * recording player reads resume points, so the Show filter knows watched and unwatched only.
  */
+@Suppress("LongParameterList")
 internal fun recordingsState(
     observation: SessionObservation,
     view: DvrArchiveView,
@@ -44,6 +47,7 @@ internal fun recordingsState(
     degraded: Boolean,
     clock: RecordingClock,
     texts: RecordingsTexts,
+    artwork: ArtworkModels? = null,
 ): RecordingsState {
     val empty = RecordingFolder(ROOT_ID, "")
     val space = observation.dvrDiskSpaceState.recordingSpaceIndicator()?.let {
@@ -62,7 +66,9 @@ internal fun recordingsState(
         return RecordingsState(view, empty, clock, space, availability)
     }
     val nowSec = clock.now.epochSecond
-    val channelNames = observation.channelCatalogForDisplay?.channels.orEmpty().associate { it.id to it.name }
+    val catalog = observation.channelCatalogForDisplay?.channels.orEmpty()
+    val channelNames = catalog.associate { it.id to it.name }
+    val icons = catalog.associate { it.id to it.icon }
     val naming = DvrArchiveNaming(
         channelName = { entry -> entry.channelId?.let(channelNames::get) ?: entry.channelName },
         genreName = texts.genre,
@@ -73,7 +79,10 @@ internal fun recordingsState(
     val folder = buildDvrArchive(archive.distinctBy { it.id }, view.grouping, naming, view.sort, view.show) {
         recordingWatchState(it, null, nowSec)
     }
-    val rows = RowMapper(naming, texts, clock)
+    val rows = RowMapper(naming, texts, clock) { entry ->
+        val logo = entry.channelId?.let(icons::get)
+        RowArtwork(artwork?.logo(logo, observation), artwork?.picture(recordingArtwork(entry), observation))
+    }
     val recordingNow = folder.recordingNowEntries(view).takeIf { it.isNotEmpty() }?.let { running ->
         RecordingFolder(
             RECORDING_NOW_ID, texts.recordingNow, recordings = running.map { rows.item(it, null) },
@@ -91,7 +100,15 @@ private fun datesLabelled(view: DvrArchiveView): Boolean =
     view.grouping == DvrArchiveGrouping.FLAT &&
         (view.sort == DvrArchiveSort.NEWEST || view.sort == DvrArchiveSort.OLDEST)
 
-private class RowMapper(val naming: DvrArchiveNaming, val texts: RecordingsTexts, val clock: RecordingClock) {
+/** A recording row's image models: its channel's logo and its own picture. */
+private class RowArtwork(val logo: Any?, val picture: Any?)
+
+private class RowMapper(
+    val naming: DvrArchiveNaming,
+    val texts: RecordingsTexts,
+    val clock: RecordingClock,
+    val artwork: (DvrEntry) -> RowArtwork,
+) {
     private val nowSec = clock.now.epochSecond
 
     fun folder(folder: DvrArchiveFolder, sections: Boolean): RecordingFolder {
@@ -110,8 +127,12 @@ private class RowMapper(val naming: DvrArchiveNaming, val texts: RecordingsTexts
         )
     }
 
-    fun item(entry: DvrEntry, section: DvrDateSection?): RecordingItem = RecordingItem(
+    fun item(entry: DvrEntry, section: DvrDateSection?): RecordingItem = item(entry, section, artwork(entry))
+
+    private fun item(entry: DvrEntry, section: DvrDateSection?, art: RowArtwork) = RecordingItem(
         id = entry.id.value.toString(),
+        channelLogoModel = art.logo,
+        pictureModel = art.picture,
         title = entry.title.orEmpty(),
         episode = texts.episode(entry),
         channel = naming.channelName(entry)?.takeIf { it.isNotBlank() },

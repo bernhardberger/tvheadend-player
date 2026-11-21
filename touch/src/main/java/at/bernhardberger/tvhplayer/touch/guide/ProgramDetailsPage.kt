@@ -4,6 +4,7 @@
 
 package at.bernhardberger.tvhplayer.touch.guide
 
+import at.bernhardberger.tvhplayer.touch.ui.ArtworkImage
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -78,9 +79,9 @@ internal fun ProgramDetailsPage(
 @Composable
 private fun WidePage(details: ProgramDetails, actions: GuideActions, onBack: () -> Unit) {
     Box(Modifier.fillMaxSize()) {
-        details.picture?.let {
+        if (details.picture != null || details.pictureModel != null) {
             Box(Modifier.align(Alignment.TopEnd).size(720.dp, 405.dp)) {
-                Image(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                ArtworkImage(details.picture, details.pictureModel, Modifier.fillMaxSize(), ContentScale.Crop)
                 DetailsPictureScrim(Modifier.fillMaxSize())
                 // As drawn, the picture also fades into the page on its start side.
                 Box(
@@ -111,7 +112,7 @@ private fun UprightPage(details: ProgramDetails, actions: GuideActions, onBack: 
         val pictureHeight = maxWidth / PICTURE_RATIO
         Box(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
             Box(Modifier.fillMaxWidth().height(pictureHeight)) {
-                details.picture?.let { Image(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
+                ArtworkImage(details.picture, details.pictureModel, Modifier.fillMaxSize(), ContentScale.Crop)
                 DetailsPictureScrim(Modifier.fillMaxSize())
             }
             // As drawn, the title sits over the lower half of the picture.
@@ -152,7 +153,9 @@ internal fun ProgramDetailsColumn(
     inPlayer: Boolean = false,
 ) {
     Column(modifier) {
-        ProgramPicture(details.art ?: details.picture, Modifier.fillMaxWidth(), strip = false)
+        ProgramPicture(
+            details.art ?: details.picture, Modifier.fillMaxWidth(), strip = false, model = details.pictureModel,
+        )
         Lead(details, MaterialTheme.typography.headlineMedium, Modifier.padding(top = 16.dp))
         Timing(details, Modifier.padding(top = 16.dp))
         val record = actions.onRecord
@@ -182,6 +185,7 @@ private fun PageBar(details: ProgramDetails, onBack: () -> Unit, transparent: Bo
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 ChannelLogoTile(
                     details.channelLogo, details.logoTint, Modifier.size(56.dp, 32.dp), RoundedCornerShape(8.dp),
+                    details.channelLogoModel,
                 )
                 Text(
                     details.channel, Modifier.weight(1f, fill = false), style = MaterialTheme.typography.titleMedium,
@@ -318,7 +322,10 @@ private fun OtherAirings(details: ProgramDetails, actions: GuideActions) {
             val shapes = ListItemDefaults.segmentedShapes(index, details.otherAirings.size)
             val colors = ListItemDefaults.segmentedColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
             val leading: @Composable () -> Unit = {
-                ChannelLogoTile(airing.logo, airing.logoTint, Modifier.size(64.dp, 36.dp), RoundedCornerShape(8.dp))
+                ChannelLogoTile(
+                    airing.logo, airing.logoTint, Modifier.size(64.dp, 36.dp), RoundedCornerShape(8.dp),
+                    airing.logoModel,
+                )
             }
             val supporting: @Composable () -> Unit = { PartsLine(airing.line) }
             val trailing: (@Composable () -> Unit)? = if (airing.scheduled) {

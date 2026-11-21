@@ -1,17 +1,26 @@
 package at.bernhardberger.tvhplayer.touch.testutil
 
+import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
+import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.ChannelTag
 import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
+import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.DvrSnapshot
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
+import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.EpgSnapshot
 import at.bernhardberger.tvheadend.sdk.core.EventId
+import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
+import at.bernhardberger.tvheadend.sdk.core.SessionObservation
+import at.bernhardberger.tvheadend.sdk.core.SessionState
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
@@ -19,11 +28,14 @@ import kotlin.time.Instant
 /**
  * A server's channels and guide as the SDK hands them over: two channels, News tagging only the
  * first, and on the first four programs in a row around [now] (on now, next and two after); the one on now has a
- * description. The running recording and the scheduled one are linked to their programs.
+ * description. The running recording and the scheduled one are linked to their programs. The first
+ * channel has a logo in the server's image cache, the program on now and the finished film a picture.
  */
 internal class ServerGuide(val now: Instant) {
     val news = ChannelTag.create(ChannelTagId(NEWS_TAG), name = "News")
-    val first = Channel.create(ChannelId(FIRST), name = "Channel One", tagIds = listOf(news.id))
+    val logo = checkNotNull(ChannelIcon.parse("imagecache/$LOGO"))
+    val picture = checkNotNull(ArtworkId.parse("imagecache/$PICTURE"))
+    val first = Channel.create(ChannelId(FIRST), name = "Channel One", icon = logo, tagIds = listOf(news.id))
     val second = Channel.create(ChannelId(SECOND), name = "Channel Two")
     val catalog = ChannelCatalog.create(listOf(first, second), listOf(news))
     val programs = listOf("Evening News", "Weather", "Late Film", "Night Talk")
@@ -33,7 +45,7 @@ internal class ServerGuide(val now: Instant) {
             val start = now - 30.minutes + (index * 60).minutes
             EpgEvent.create(
                 EventId(index + 1L), first.id, start, start + 60.minutes, title = title,
-                description = "About $title".takeIf { index == 0 },
+                description = "About $title".takeIf { index == 0 }, image = picture.takeIf { index == 0 },
             )
         },
     )
@@ -45,10 +57,22 @@ internal class ServerGuide(val now: Instant) {
      */
     val recordingNow =
         recording(RECORDING_NOW, "Evening News", first, now - 30.minutes, DvrEntryState.RECORDING, event = 1)
-    val film = recording(FILM, "Harbor Lights", first, now - 2.days, DvrEntryState.COMPLETED, folder = "Films")
+    val film = recording(
+        FILM, "Harbor Lights", first, now - 2.days, DvrEntryState.COMPLETED, folder = "Films", image = picture,
+    )
     val diary = recording(DIARY, "Mountain Diary", second, now - 1.days, DvrEntryState.COMPLETED, "Docs", 1)
     val scheduled = recording(SCHEDULED, "Late Film", first, now + 90.minutes, DvrEntryState.SCHEDULED, event = 3)
     val dvr = DvrSnapshot.create(entries = listOf(recordingNow, film, diary, scheduled))
+
+    /** The server signed in with everything current: the observation has a current session. */
+    fun connected() = SessionObservation.create(
+        sessionState = SessionState.Ready(
+            ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED),
+        ),
+        channelState = ChannelRepositoryState.Current(catalog),
+        epgState = EpgRepositoryState.Current(snapshot),
+        dvrState = DvrRepositoryState.Current(dvr),
+    )
 
     private fun recording(
         id: Long,
@@ -59,9 +83,11 @@ internal class ServerGuide(val now: Instant) {
         folder: String? = null,
         playCount: Long = 0,
         event: Long? = null,
+        image: ArtworkId? = null,
     ) = DvrEntry.create(
         id = DvrEntryId(id), channelId = channel.id, start = start, stop = start + 60.minutes, title = title,
         state = state, folder = folder?.let(::listOf), playCount = playCount, eventId = event?.let(::EventId),
+        image = image,
     )
 
     private companion object {
@@ -72,5 +98,7 @@ internal class ServerGuide(val now: Instant) {
         const val NEWS_TAG = 7L
         const val FIRST = 1L
         const val SECOND = 2L
+        const val LOGO = 21L
+        const val PICTURE = 31L
     }
 }

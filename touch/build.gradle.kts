@@ -48,6 +48,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.koin.android)
     implementation(libs.koin.androidx.compose)
+    implementation(libs.coil.compose)
     implementation("androidx.compose.material3:material3:1.5.0-rc01")
     implementation("androidx.compose.material3.adaptive:adaptive:1.3.0")
     implementation(libs.androidx.activity.compose)

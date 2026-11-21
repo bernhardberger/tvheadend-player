@@ -41,6 +41,8 @@ internal data class ChannelRow(
     val playback: ChannelPlayback? = null,
     val recording: ChannelRecording? = null,
     val details: ChannelDetails? = null,
+    /** The server image's model for the touch-level image composable; the fixture painter wins. */
+    val logoModel: Any? = null,
 )
 
 /** The producer supplies the viewer's position, not the on-air position. */
@@ -65,6 +67,8 @@ internal data class ChannelDetails(
     val metadata: String? = null,
     val synopsis: String? = null,
     val following: List<ChannelProgram> = emptyList(),
+    /** The server image's model for the touch-level image composable; the fixture painter wins. */
+    val artworkModel: Any? = null,
 )
 
 /**

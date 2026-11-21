@@ -1,19 +1,27 @@
 package at.bernhardberger.tvhplayer.touch.guide
 
 import at.bernhardberger.tvheadend.sdk.core.Channel
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
+import at.bernhardberger.tvheadend.sdk.core.EpgCredit
+import at.bernhardberger.tvheadend.sdk.core.EpgCreditRole
+import at.bernhardberger.tvheadend.sdk.core.EpgEpisode
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
+import at.bernhardberger.tvheadend.sdk.core.EpgRating
 import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.EpgSnapshot
 import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition
 import at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi
+import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
+import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.core.AppErrorCondition
 import at.bernhardberger.tvhplayer.core.ChannelBrowsingScope
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
 import at.bernhardberger.tvhplayer.touch.testutil.ServerGuide
+import at.bernhardberger.tvhplayer.touch.ui.ArtworkModels
 import at.bernhardberger.tvhplayer.viewmodels.ChannelScopeState
 import java.time.LocalTime
 import java.time.ZoneOffset
@@ -38,6 +46,8 @@ class GuideMappingTest {
         episode = { null },
         genre = { it.genre },
         firstAired = { it.toString() },
+        count = { number, of -> if (of == null) "$number" else "$number of $of" },
+        broadcast = { if (it) "New" else "Repeat" },
     )
     private val unreachable = ConnectionUiState.Error(
         ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.EXPLICIT_RETRY,
@@ -138,6 +148,72 @@ class GuideMappingTest {
         assertEquals("About ${guide.programs[0]}", details.synopsis)
         assertEquals("07:30–08:30", details.timeRange)
         assertEquals(true, details.recording)
+    }
+
+    @Test
+    fun theServersImagesReachChannelsProgramsAndDetails() {
+        val all = listOf(guide.first, guide.second)
+        val connected = guide.connected()
+        val state = guideState(
+            scope(all, all, tagged = false, loaded = true), ConnectionUiState.Ready, false, connected,
+            GuideSelection(detailsId = "1"), false, clock, texts, ArtworkModels(tvheadend = null),
+        )
+        val logo = AppArtworkSource(connected.currentSession, (guide.logo as ChannelIcon.ImageCache).artworkId)
+        val picture = AppArtworkSource(connected.currentSession, guide.picture)
+        val (first, second) = state.channels
+        assertEquals(logo, first.logoModel)
+        assertEquals(null, second.logoModel)
+        assertEquals(listOf(picture, null, null, null), first.programs.map { it.stillModel })
+        val details = state.details.getValue("1")
+        assertEquals(logo, details.channelLogoModel)
+        assertEquals(picture, details.pictureModel)
+    }
+
+    @OptIn(ExperimentalTvheadendApi::class)
+    @Test
+    fun detailsCarryTheTvsFactsAndCreditsAndTheWatchedProgram() {
+        val running = guide.snapshot.events.first()
+        val full = EpgEvent.create(
+            running.id, running.channelId, running.start, running.stop, title = running.title,
+            genre = "News", categories = listOf(" Talk ", "Talk", ""), keywords = listOf("Politics"),
+            rating = EpgRating(age = null, label = "12", icon = null, authority = null, country = null, stars = 4),
+            copyrightYear = 2026, isNew = false,
+            episode = EpgEpisode(
+                id = null, seriesLinkId = null, seasonNumber = 2, seasonCount = 3, episodeNumber = 7,
+                episodeCount = 5, partNumber = null, partCount = null, onscreen = "Episode seven",
+            ),
+            credits = listOf(
+                EpgCredit("Ada", EpgCreditRole.PRESENTER), EpgCredit(" Ada ", EpgCreditRole.PRESENTER),
+                EpgCredit("Ben", EpgCreditRole.GUEST), EpgCredit("Cleo", EpgCreditRole.ACTOR),
+            ),
+        )
+        val events = listOf(full) + guide.snapshot.events.drop(1)
+        val all = listOf(guide.first, guide.second)
+        fun shown(playing: String?) = guideState(
+            scope(all, all, tagged = false, loaded = true), ConnectionUiState.Ready, false,
+            observation(EpgSnapshot.create(events)), GuideSelection(detailsId = "1"), false, clock, texts,
+            playing = playing,
+        )
+        val details = shown(playing = guide.first.id.value.toString()).details.getValue("1")
+        assertEquals(
+            listOf(
+                FactKey.Genre to "News", FactKey.Season to "2 of 3", FactKey.Episode to "7",
+                FactKey.AgeRating to "12+", FactKey.Stars to "4", FactKey.Broadcast to "Repeat",
+                FactKey.Categories to "Talk", FactKey.Keywords to "Politics",
+            ),
+            details.facts.filter { it.key != FactKey.Year }.map { it.key to it.value },
+        )
+        assertEquals(
+            listOf(
+                CreditRole.Cast to listOf("Cleo"), CreditRole.Guests to listOf("Ben"),
+                CreditRole.Presenters to listOf("Ada"),
+            ),
+            details.credits.map { it.role to it.names },
+        )
+        assertEquals(true, details.watching)
+        val overview = shown(playing = guide.first.id.value.toString()).channels.first().programs
+        assertEquals(listOf(true, false, false, false), overview.map { it.watching })
+        assertEquals(false, shown(playing = guide.second.id.value.toString()).details.getValue("1").watching)
     }
 
     private fun state(selection: GuideSelection, events: List<EpgEvent> = guide.snapshot.events): GuideState {

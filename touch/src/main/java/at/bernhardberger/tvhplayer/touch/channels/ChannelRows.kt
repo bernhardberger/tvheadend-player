@@ -296,7 +296,7 @@ private fun ChannelLogo(row: ChannelRow, layout: ChannelsLayout) {
         ChannelsLayout.Wide, ChannelsLayout.Upright -> Modifier.size(112.dp, 56.dp)
         ChannelsLayout.Phone -> Modifier.size(88.dp, 48.dp)
     }
-    ChannelLogoTile(row.logo, row.logoTint, size)
+    ChannelLogoTile(row.logo, row.logoTint, size, model = row.logoModel)
 }
 
 // The logo sits in the list item's leading slot, so these weights split what remains after it; they keep the

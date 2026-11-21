@@ -295,7 +295,9 @@ private fun Day(
 @Composable
 private fun DayHead(channel: GuideChannel, date: String?) {
     Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
-        ChannelLogoTile(channel.logo, channel.logoTint, Modifier.size(64.dp, 36.dp), RoundedCornerShape(8.dp))
+        ChannelLogoTile(
+            channel.logo, channel.logoTint, Modifier.size(64.dp, 36.dp), RoundedCornerShape(8.dp), channel.logoModel,
+        )
         Text(
             channel.name, Modifier.weight(1f).padding(start = 12.dp).semantics { heading() },
             style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -335,7 +337,11 @@ private fun ChannelList(
                     selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
                     selectedContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
                 ),
-                leadingContent = { ChannelLogoTile(channel.logo, channel.logoTint, Modifier.size(112.dp, 56.dp)) },
+                leadingContent = {
+                    ChannelLogoTile(
+                        channel.logo, channel.logoTint, Modifier.size(112.dp, 56.dp), model = channel.logoModel,
+                    )
+                },
             ) {
                 Text(channel.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
@@ -356,6 +362,7 @@ private fun ChannelTabs(channels: List<GuideChannel>, selectedId: String, onChan
                 icon = {
                     ChannelLogoTile(
                         channel.logo, channel.logoTint, Modifier.size(52.dp, 30.dp), RoundedCornerShape(7.dp),
+                        channel.logoModel,
                     )
                 },
                 text = { Text(channel.name, maxLines = 1) },

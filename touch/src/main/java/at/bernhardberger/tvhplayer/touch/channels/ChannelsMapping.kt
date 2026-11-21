@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.touch.channels
 
+import at.bernhardberger.tvhplayer.core.programmeArtwork
+import at.bernhardberger.tvhplayer.touch.ui.ArtworkModels
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
@@ -23,8 +25,10 @@ import kotlin.time.Instant
  * Every row on now carries its time range, time left and on-air progress; the row of [playingId]
  * is the channel the player plays, whose progress marks the viewer. Marks follow the TV: the
  * running program's own recording, else the channel's running recording; scheduled on the
- * programs ahead. Rows carry no logo; [ChannelList.hasLogos] keeps the no-logo tile in its place.
+ * programs ahead. With [artwork] rows carry the logo's and the running program's image models;
+ * [ChannelList.hasLogos] keeps the tile in its place, the no-logo tile where a channel has none.
  */
+@Suppress("LongParameterList")
 internal fun channelsState(
     scope: ChannelScopeState,
     connection: ConnectionUiState,
@@ -33,6 +37,7 @@ internal fun channelsState(
     now: Instant,
     texts: ChannelsTexts = ChannelsTexts.TitlesOnly,
     playingId: String? = null,
+    artwork: ArtworkModels? = null,
 ): ChannelsState {
     val browsing = scope.scope
     val current = scope.channelCatalogCurrent
@@ -54,7 +59,7 @@ internal fun channelsState(
             else -> connection.browseAppError()?.let(ChannelsState::Failed) ?: ChannelsState.Loading
         }
         else -> {
-            val mapper = RowMapper(observation, now, texts)
+            val mapper = RowMapper(observation, now, texts, artwork)
             val rows = browsing.visibleChannels.map { mapper.row(it, playing = it.id.value.toString() == playingId) }
             val list = ChannelList(rows, tags, selectedTagId, hasLogos = true)
             if (degraded) ChannelsState.Offline(list) else ChannelsState.Ready(list)
@@ -72,12 +77,14 @@ internal fun channelRow(
     now: Instant,
     playing: Boolean = false,
     texts: ChannelsTexts = ChannelsTexts.TitlesOnly,
-): ChannelRow = RowMapper(observation, now, texts).row(channel, playing)
+    artwork: ArtworkModels? = null,
+): ChannelRow = RowMapper(observation, now, texts, artwork).row(channel, playing)
 
 private class RowMapper(
     private val observation: SessionObservation,
     private val now: Instant,
     private val texts: ChannelsTexts,
+    private val artwork: ArtworkModels?,
 ) {
     private val recordingChannels by lazy {
         val entries = observation.dvrSnapshotForDisplay?.entries.orEmpty().filterNot(::recordingWasRemoved)
@@ -94,6 +101,7 @@ private class RowMapper(
             .map { it.program() }
             .toList()
         val details = ChannelDetails(
+            artworkModel = running?.let { artwork?.picture(programmeArtwork(it), observation) },
             episode = running?.let { texts.episode(it) },
             metadata = running?.metadata(),
             synopsis = running?.synopsis(),
@@ -103,6 +111,7 @@ private class RowMapper(
         return ChannelRow(
             id = channel.id.value.toString(),
             name = channel.name.orEmpty(),
+            logoModel = artwork?.logo(channel.icon, observation),
             now = running?.program(),
             next = next?.program(),
             playback = if (playing) ChannelPlayback(running?.progress(now.epochSeconds)) else null,
