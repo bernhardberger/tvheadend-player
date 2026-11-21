@@ -44,6 +44,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -54,6 +55,10 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -64,6 +69,8 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import at.bernhardberger.tvhplayer.touch.R
@@ -71,6 +78,7 @@ import at.bernhardberger.tvhplayer.touch.ui.ChannelLogoTile
 import at.bernhardberger.tvhplayer.ui.TvOnRecordingContainerColor
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 import at.bernhardberger.tvhplayer.ui.TvRecordingContainerColor
+import at.bernhardberger.tvhplayer.ui.common.formatNarrowDuration
 
 @Composable
 internal fun ChannelRows(
@@ -337,11 +345,36 @@ private fun TabletNow(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             program?.timeRange?.let { SupportingLine(it, Modifier.widthIn(min = 110.dp)) }
+            val timeLeft = program?.timeLeft
+            val track = Modifier.weight(1f, fill = false)
             ChannelProgress(
-                program, playback, recording, Modifier.weight(1f, fill = false).widthIn(max = 136.dp).fillMaxWidth(),
+                program, playback, recording,
+                (if (timeLeft == null) track.widthIn(max = 136.dp) else track).fillMaxWidth(),
             )
-            program?.timeLeft?.let { SupportingLine(stringResource(R.string.channels_time_left, it)) }
+            if (timeLeft != null) {
+                SupportingLine(
+                    stringResource(R.string.channels_time_left, timeLeft),
+                    Modifier.widthIn(min = timeLeftSlotWidth()),
+                    maxLines = Int.MAX_VALUE,
+                )
+            }
         }
+    }
+}
+
+@Composable
+private fun timeLeftSlotWidth(): Dp {
+    val resources = LocalResources.current
+    val locale = LocalConfiguration.current.locales[0]
+    val sample = remember(resources, locale) { formatNarrowDuration(2 * 3_600 + 46 * 60L, resources) }
+    val text = stringResource(R.string.channels_time_left, sample)
+    val style = MaterialTheme.typography.bodySmall
+    val density = LocalDensity.current
+    val direction = LocalLayoutDirection.current
+    val measurer = rememberTextMeasurer()
+    return remember(text, style, density, direction, measurer, locale) {
+        // A space of headroom absorbs small glyph-width differences among ordinary durations.
+        with(density) { measurer.measure("$text\u00a0", style, maxLines = 1).size.width.toDp() }
     }
 }
 
@@ -431,10 +464,10 @@ private fun PlayingBars() {
 }
 
 @Composable
-private fun SupportingLine(text: String, modifier: Modifier = Modifier) {
+private fun SupportingLine(text: String, modifier: Modifier = Modifier, maxLines: Int = 1) {
     Text(
         text, modifier, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-        maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+        maxLines = maxLines, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
     )
 }
 

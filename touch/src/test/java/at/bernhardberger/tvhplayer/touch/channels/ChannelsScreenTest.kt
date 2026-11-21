@@ -6,6 +6,7 @@ import android.graphics.Paint
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -15,9 +16,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.hasProgressBarRangeInfo
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -116,9 +119,26 @@ class ChannelsScreenTest {
     @Test
     @Config(qualifiers = "en-rUS-w800dp-h1280dp-port-xhdpi")
     fun uprightChannels() {
-        show(ChannelsState.Ready(channelsFixture(playing = true)), open = "amber-stage")
+        val state = ChannelsState.Ready(channelsFixture(playing = true))
+        val width = mutableStateOf(800.dp)
+        compose.setContent {
+            MaterialTheme(colorScheme = MobileDarkColors) {
+                ChannelsScreen(state, fixtureActions(), Modifier.width(width.value), initiallyOpenChannelId = "amber-stage")
+            }
+        }
         assertCompactFollowing()
         capture("tablet-upright-channels", TouchCanvas.TABLET_UPRIGHT)
+
+        // The wide canvas can hit the old track's upper cap for both labels and hide the defect.
+        compose.runOnIdle { width.value = 700.dp }
+        val shortTimeLeft = compose.onNode(
+            hasProgressBarRangeInfo(ProgressBarRangeInfo(0.66f, 0f..1f)), useUnmergedTree = true,
+        ).fetchSemanticsNode().boundsInRoot
+        val longTimeLeft = compose.onNode(
+            hasProgressBarRangeInfo(ProgressBarRangeInfo(0.16f, 0f..1f)), useUnmergedTree = true,
+        ).fetchSemanticsNode().boundsInRoot
+        assertEquals("Progress starts align for 30m and 1h 28m left", shortTimeLeft.left, longTimeLeft.left, 0f)
+        assertEquals("Progress ends align for 30m and 1h 28m left", shortTimeLeft.right, longTimeLeft.right, 0f)
     }
 
     @Test
