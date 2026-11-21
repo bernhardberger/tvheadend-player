@@ -47,8 +47,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.core.os.ConfigurationCompat
+import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.ui.common.formatClock
+import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import java.time.LocalTime
 import kotlin.math.abs
 import kotlin.math.max
@@ -100,7 +102,17 @@ private fun timelineDrag(
 ): Modifier {
     val first = checkNotNull(timeline.bufferStart)
     val label = stringResource(R.string.player_timeline)
-    val positionLabel = behindLive(timeline.behindAt(position))
+    val positionLabel = if (timeline.liveEdge && position == timeline.live) {
+        stringResource(
+            SharedR.string.player_seekbar_timeshift_live_description,
+            stringResource(
+                SharedR.string.timeshift_buffer_start_description,
+                formatPlaybackDuration((timeline.live - first) * 1_000L),
+            ),
+        )
+    } else {
+        behindLive(timeline.behindAt(position))
+    }
     val latestTimeline by rememberUpdatedState(timeline)
     val latestSeek by rememberUpdatedState(onSeek)
     val latestPreview by rememberUpdatedState(onPreviewChange)
