@@ -5,13 +5,14 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import at.bernhardberger.tvheadend.sdk.android.TvheadendDiscoveryState
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileAuthenticationMode
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileListResult
@@ -20,6 +21,7 @@ import at.bernhardberger.tvheadend.sdk.core.ServerProfileSummary
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.serverProfileDisplayName
+import at.bernhardberger.tvhplayer.ui.screens.settings.rememberSavedConnectionRestore
 import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsActions
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsScreen
@@ -28,6 +30,7 @@ import at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import kotlin.time.Clock
 import at.bernhardberger.tvhplayer.touch.connect.ActiveConnectionUiState
+import at.bernhardberger.tvhplayer.touch.connect.ConnectViewModel
 import at.bernhardberger.tvhplayer.touch.connect.ConnectionStatus
 import at.bernhardberger.tvhplayer.touch.connect.ConnectionsScreen
 import at.bernhardberger.tvhplayer.touch.connect.EditConnectionFlow
@@ -38,9 +41,6 @@ import at.bernhardberger.tvhplayer.touch.ui.LocalFrameSelection
 import at.bernhardberger.tvhplayer.touch.recordings.RecordingsDestination
 import at.bernhardberger.tvhplayer.touch.recordings.RecordingsViewModel
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.mapNotNull
-import kotlinx.coroutines.launch
 
 /** [SignIn] is the Connections page opened on the editor, for a password that can't be read. */
 private enum class Page { Frame, Connections, SignIn }
@@ -63,41 +63,28 @@ internal fun TouchApp(
     val profile by owner.serverProfile.collectAsStateWithLifecycle()
     val profiles by owner.profiles.collectAsStateWithLifecycle()
     val presentation by connection.uiState.collectAsStateWithLifecycle()
-    val scope = rememberCoroutineScope()
-    var firstRun by rememberSaveable { mutableStateOf(false) }
+    val connect = viewModel { ConnectViewModel(session, owner) }
+    SideEffect { connect.discovery = discovery }
     var page by rememberSaveable { mutableStateOf(Page.Frame) }
-    LaunchedEffect(profile) {
-        if (profile == ServerProfileReadResult.Missing) {
-            firstRun = true
-            // Whatever was open belonged to the removed connection; nothing stays behind first run.
-            page = Page.Frame
-        }
-    }
-    val rename: (String?, String) -> Unit = { previous, name ->
-        if (name.trim() != previous.orEmpty().trim()) scope.launch {
-            val id = owner.profiles.mapNotNull { (it as? ServerProfileListResult.Available)?.activeId }.first()
-            owner.rename(id, name)
-        }
+    // First run follows the settled profile: a removal's passing "no connection" does not open it,
+    // and it stays until its own save and naming have finished.
+    val firstRun = (profile == ServerProfileReadResult.Missing && !connect.removing) || connect.firstRunSettling
+    LaunchedEffect(firstRun) {
+        // Whatever was open belonged to the removed connection; nothing stays behind first run.
+        if (firstRun) page = Page.Frame else connect.releaseFirstRun()
     }
     when {
         profile == null -> Surface(Modifier.fillMaxSize()) {}
-        profile == ServerProfileReadResult.Missing || firstRun -> FirstRunFlow(session, owner, discovery) { name ->
-            firstRun = false
-            page = Page.Frame
-            rename(null, name)
-        }
+        firstRun -> FirstRunFlow(connect.firstRun())
         page != Page.Frame -> {
             val active = (profiles as? ServerProfileListResult.Available)?.let { list ->
                 list.profiles.firstOrNull { it.id == list.activeId }
             }
             ConnectionsPage(
-                session, owner, active?.uiState(connectionStatus(profile, presentation)), active,
+                session, owner, connect, active?.uiState(connectionStatus(profile, presentation)), active,
                 signIn = page == Page.SignIn,
                 onBack = { page = Page.Frame },
-                onSaved = { name ->
-                    page = Page.Connections
-                    rename(active?.label, name)
-                },
+                onSaved = { page = Page.Connections },
             )
         }
         else -> AppDestinations(
@@ -116,28 +103,35 @@ internal fun TouchApp(
 private fun ConnectionsPage(
     session: TvheadendSession,
     owner: AppProfileOwner,
+    connect: ConnectViewModel,
     card: ActiveConnectionUiState?,
     active: ServerProfileSummary?,
     signIn: Boolean,
     onBack: () -> Unit,
-    onSaved: (name: String) -> Unit,
+    onSaved: () -> Unit,
 ) {
-    val scope = rememberCoroutineScope()
     var editing by rememberSaveable { mutableStateOf(false) }
     ConnectionsScreen(
         active = card,
         onBack = onBack,
         onEdit = { editing = true },
-        onRemove = { scope.launch { if (active != null) owner.remove(active.id) } },
+        onRemove = { if (active != null) connect.remove(active.id) },
     )
-    if ((editing || signIn) && active != null) {
-        EditConnectionFlow(
-            session, owner, name = active.label.orEmpty(),
-            onClose = { if (signIn) onBack() else editing = false },
-            onSaved = { name ->
+    val editorShown = (editing || signIn) && active != null
+    LaunchedEffect(editorShown) { if (!editorShown) connect.releaseEditor() }
+    if (editorShown && active != null) {
+        val restoreSaved = rememberSavedConnectionRestore(session, owner)
+        val setup = connect.editor(active.label.orEmpty(), requireSignIn = signIn, restoreSaved)
+        // The editor closes once the change and its name are saved.
+        LaunchedEffect(setup, setup.finished) {
+            if (setup.finished) {
                 editing = false
-                onSaved(name)
-            },
+                onSaved()
+            }
+        }
+        EditConnectionFlow(
+            setup,
+            onClose = { if (signIn) onBack() else editing = false },
             focusPassword = signIn,
         )
     }
