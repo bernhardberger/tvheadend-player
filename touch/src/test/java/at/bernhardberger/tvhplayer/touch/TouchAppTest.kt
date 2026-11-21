@@ -62,6 +62,8 @@ import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import at.bernhardberger.tvhplayer.touch.testutil.FakeConnection
 import at.bernhardberger.tvhplayer.touch.testutil.ImageLoaderRule
 import at.bernhardberger.tvhplayer.touch.testutil.ServerGuide
+import at.bernhardberger.tvhplayer.touch.testutil.TouchCanvas
+import at.bernhardberger.tvhplayer.touch.testutil.captureTouch
 import at.bernhardberger.tvhplayer.ui.MobileDarkColors
 import at.bernhardberger.tvhplayer.ui.common.AppClock
 import java.time.ZoneId
@@ -78,6 +80,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 /** The app's pages on the SDK's fake session and profile store: first run, the frame and Connections. */
 @RunWith(RobolectricTestRunner::class)
@@ -764,6 +767,47 @@ class TouchAppTest {
         notice(second).assertIsDisplayed()
         advance(INFO_MILLIS + 100)
         notice(second).assertDoesNotExist()
+    }
+
+    @Test
+    fun postedNoticeShowsOnFirstRun() {
+        connection.noticeClock = { compose.mainClock.currentTime }
+        show()
+        compose.onNode(heading and hasText(label(SharedR.string.onboarding_find_title))).assertIsDisplayed()
+        compose.mainClock.autoAdvance = false
+
+        val failed = Notice.DvrActionFailed(DvrMutationKind.DELETE, DvrMutationFeedback.REJECTED)
+        post(failed)
+        advance(16)
+        notice(NoticeFormatter(compose.activity).format(failed).headline).assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = TABLET)
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun postedNoticeShowsOnConnectionsAndContinuesInTheFrame() {
+        showSavedConnectionForNotices()
+        compose.onNodeWithContentDescription(label(R.string.channels_connection_settings)).performClick()
+        advance(16)
+        compose.onNode(heading and hasText(label(SharedR.string.server_list_title))).assertIsDisplayed()
+
+        val failed = Notice.DvrActionFailed(DvrMutationKind.DELETE, DvrMutationFeedback.REJECTED)
+        val next = Notice.RecordUnavailable(null)
+        post(failed)
+        post(next)
+        val headline = NoticeFormatter(compose.activity).format(failed).headline
+        notice(headline).assertIsDisplayed()
+        compose.captureTouch("slice1", "tablet-connections-notice", TouchCanvas.TABLET)
+
+        val active = connection.noticeCenter.state.value.active
+        back()
+        advance(16)
+        compose.onNode(heading and hasText(label(R.string.nav_channels))).assertIsDisplayed()
+        notice(headline).assertIsDisplayed() // A single visible live region, with the original display time.
+        assertEquals(active, connection.noticeCenter.state.value.active)
+        advance(connection.noticeCenter.remaining(checkNotNull(active).expiresAt) + 32)
+        notice(headline).assertDoesNotExist()
+        notice(NoticeFormatter(compose.activity).format(next).headline).assertIsDisplayed()
     }
 
     @Test

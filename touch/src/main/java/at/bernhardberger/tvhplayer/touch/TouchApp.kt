@@ -6,6 +6,7 @@ import at.bernhardberger.tvhplayer.touch.ui.rememberDvrControls
 import androidx.compose.runtime.remember
 import at.bernhardberger.tvhplayer.touch.ui.LocalArtworkModels
 import at.bernhardberger.tvhplayer.touch.ui.ArtworkModels
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -46,6 +47,7 @@ import at.bernhardberger.tvhplayer.touch.connect.FirstRunFlow
 import at.bernhardberger.tvhplayer.touch.connect.connectionStatus
 import at.bernhardberger.tvhplayer.touch.ui.Destination
 import at.bernhardberger.tvhplayer.touch.ui.FrameNotices
+import at.bernhardberger.tvhplayer.touch.ui.BottomWindowNotices
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.touch.ui.LocalFrameSelection
 import at.bernhardberger.tvhplayer.touch.guide.GuideDestination
@@ -89,23 +91,26 @@ internal fun TouchApp(
         // Whatever was open belonged to the removed connection; nothing stays behind first run.
         if (firstRun) page = Page.Frame else connect.releaseFirstRun()
     }
-    when {
-        profile == null -> Surface(Modifier.fillMaxSize()) {}
-        firstRun -> FirstRunFlow(connect.firstRun())
-        page != Page.Frame -> {
-            val active = (profiles as? ServerProfileListResult.Available)?.let { list ->
-                list.profiles.firstOrNull { it.id == list.activeId }
+    FrameNotices(notices, owner, session) {
+        when {
+            profile == null -> Surface(Modifier.fillMaxSize()) {}
+            firstRun -> Box(Modifier.fillMaxSize()) {
+                FirstRunFlow(connect.firstRun())
+                BottomWindowNotices()
             }
-            ConnectionsPage(
-                session, owner, connect, active?.uiState(connectionStatus(profile, presentation)), active,
-                listed = profiles is ServerProfileListResult.Available,
-                signIn = page == Page.SignIn,
-                onBack = { page = Page.Frame },
-                onSaved = { page = Page.Connections },
-            )
-        }
-        else -> FrameNotices(notices, owner, session) {
-            AppDestinations(
+            page != Page.Frame -> {
+                val active = (profiles as? ServerProfileListResult.Available)?.let { list ->
+                    list.profiles.firstOrNull { it.id == list.activeId }
+                }
+                ConnectionsPage(
+                    session, owner, connect, active?.uiState(connectionStatus(profile, presentation)), active,
+                    listed = profiles is ServerProfileListResult.Available,
+                    signIn = page == Page.SignIn,
+                    onBack = { page = Page.Frame },
+                    onSaved = { page = Page.Connections },
+                )
+            }
+            else -> AppDestinations(
                 session, notices, connection, channels, recordings, guide, playingId, onWatch,
                 onOpenConnections = { page = Page.Connections },
                 onSignIn = { page = Page.SignIn },
@@ -130,7 +135,7 @@ private fun ConnectionsPage(
     signIn: Boolean,
     onBack: () -> Unit,
     onSaved: () -> Unit,
-) {
+) = Box(Modifier.fillMaxSize()) {
     var editing by rememberSaveable { mutableStateOf(false) }
     ConnectionsScreen(
         active = card,
@@ -143,13 +148,10 @@ private fun ConnectionsPage(
     val kept = connect.openEditor.takeIf { active == null && !listed }
     val editorShown = (editing || signIn) && (active != null || kept != null) && !connect.removing
     LaunchedEffect(editorShown) { if (!editorShown) connect.releaseEditor() }
-    if (editorShown) {
+    val editorLoaded = if (editorShown) {
         val restoreSaved = rememberSavedConnectionRestore(session, owner)
         val setup = if (active != null) {
-            // An unreadable saved sign-in keeps a password connection one, whichever way the editor opened.
-            val requireSignIn = active.authenticationMode == ServerProfileAuthenticationMode.PASSWORD &&
-                !active.credentialsAvailable
-            connect.editor(active.id, active.label.orEmpty(), requireSignIn, restoreSaved)
+            connect.editor(active.id, active.label.orEmpty(), active.requiresSignIn, restoreSaved)
         } else checkNotNull(kept)
         // The editor closes once the change and its name are saved.
         LaunchedEffect(setup, setup.finished) {
@@ -167,8 +169,15 @@ private fun ConnectionsPage(
             },
             focusPassword = signIn,
         )
-    }
+        setup.loaded
+    } else false
+    // The editor is a separate window. Once it is open, only that window consumes notices.
+    if (!editorLoaded) BottomWindowNotices()
 }
+
+// An unreadable saved sign-in keeps a password connection one, whichever way the editor opened.
+private val ServerProfileSummary.requiresSignIn: Boolean
+    get() = authenticationMode == ServerProfileAuthenticationMode.PASSWORD && !credentialsAvailable
 
 private fun ServerProfileSummary.uiState(status: ConnectionStatus) = ActiveConnectionUiState(
     name = serverProfileDisplayName(this),

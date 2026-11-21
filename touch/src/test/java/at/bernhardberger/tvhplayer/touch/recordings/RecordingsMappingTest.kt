@@ -175,9 +175,9 @@ class RecordingsMappingTest {
             watchEntry(state = DvrEntryState.RECORDING, position = 15) to
                 listOf(RecordingPlayAction.Watch, RecordingPlayAction.StartOver),
             watchEntry(state = DvrEntryState.SCHEDULED) to emptyList(),
-            watchEntry(state = DvrEntryState.COMPLETED_ERROR) to emptyList(),
+            watchEntry(state = DvrEntryState.COMPLETED_ERROR) to watch,
             watchEntry(state = DvrEntryState.COMPLETED_ERROR, hasFile = false) to emptyList(),
-            watchEntry(hasFile = false) to emptyList(),
+            watchEntry(hasFile = false) to watch,
         )
         cases.forEach { (entry, expected) ->
             val observation = watchObservation(entry)

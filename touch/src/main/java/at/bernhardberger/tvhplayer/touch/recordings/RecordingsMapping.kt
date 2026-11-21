@@ -21,6 +21,7 @@ import at.bernhardberger.tvhplayer.core.RecordingWatchState
 import at.bernhardberger.tvhplayer.core.allRecordings
 import at.bernhardberger.tvhplayer.core.browseAppError
 import at.bernhardberger.tvhplayer.core.buildDvrArchive
+import at.bernhardberger.tvhplayer.core.deleteRemovesEntryOnly
 import at.bernhardberger.tvhplayer.core.dvrDateSectionStarts
 import at.bernhardberger.tvhplayer.core.offeredResumePosition
 import at.bernhardberger.tvhplayer.core.partitionDvrLibrary
@@ -47,8 +48,8 @@ internal fun recordingPlayActions(
     entry: DvrEntry,
     admission: RecordingPlaybackAdmission?,
 ): List<RecordingPlayAction> {
-    // The SDK may admit failed entries and completed entries without files. Touch offers neither.
-    if (entry.state == DvrEntryState.COMPLETED_ERROR || entry.files.isNullOrEmpty()) return emptyList()
+    // A Remove entry action stands alone; all other play actions follow shared admission.
+    if (deleteRemovesEntryOnly(entry)) return emptyList()
     return recordingContextActions(entry, admission, canModifyRecordings = false).mapNotNull { action ->
         when (action) {
             BrowseContextAction.PLAY, BrowseContextAction.WATCH -> RecordingPlayAction.Watch
