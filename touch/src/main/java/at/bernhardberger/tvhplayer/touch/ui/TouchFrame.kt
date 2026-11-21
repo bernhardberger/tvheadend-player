@@ -12,6 +12,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -94,6 +99,8 @@ internal fun TouchFrame(
 
     val topBar = showTopBar(selected)
     val navigation = showNavigation(selected)
+    val bottomBar = !expanded && navigation && destinations.size > 1
+    val notices = LocalFrameNotices.current
     Row(modifier.fillMaxSize()) {
         if (expanded && navigation) DestinationRail(destinations, selected, select)
         Scaffold(
@@ -107,8 +114,23 @@ internal fun TouchFrame(
                 }
             },
             bottomBar = {
-                if (!expanded && navigation && destinations.size > 1) {
+                if (bottomBar) {
                     DestinationBar(destinations, selected, mediumOrWider, select)
+                }
+            },
+            snackbarHost = {
+                // Above the bar, or above the system bar when a page takes the whole window; at the
+                // start beside the rail on wider windows, across on the phone.
+                val insets = if (!topBar && !bottomBar) {
+                    Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
+                } else {
+                    Modifier
+                }
+                Box(
+                    Modifier.fillMaxWidth().then(insets),
+                    contentAlignment = if (mediumOrWider) Alignment.BottomStart else Alignment.BottomCenter,
+                ) {
+                    notices(if (mediumOrWider) Modifier else Modifier.fillMaxWidth())
                 }
             },
             contentWindowInsets = if (topBar) ScaffoldDefaults.contentWindowInsets else WindowInsets(0, 0, 0, 0),
