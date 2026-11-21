@@ -27,6 +27,8 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -329,10 +331,29 @@ private fun MenuButton(
 ) {
     val panels = style.panels
     val open = panels.panel == target
-    ActionButton(icon, name, style.label, enabled, style.colors, open, { panels.onPanel(if (open) null else target) }) {
+    val toggle = { panels.onPanel(if (open) null else target) }
+    val menu: @Composable () -> Unit = {
         if (target.atButton(style.layout)) {
             val close = { panels.onPanel(null) }
             PlayerMenu(open, panelEntries(target, style.state, style.onAction, panels.onChoice, close), close)
+        }
+    }
+    if (style.label) {
+        ActionButton(icon, name, true, enabled, style.colors, open, toggle, menu)
+    } else {
+        Box {
+            val colors = style.colors
+            IconToggleButton(
+                checked = open, onCheckedChange = { toggle() }, enabled = enabled,
+                colors = IconButtonDefaults.iconToggleButtonColors(
+                    contentColor = colors.contentColor, disabledContentColor = colors.disabledContentColor,
+                    checkedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    checkedContentColor = colors.contentColor,
+                ),
+            ) {
+                Icon(painterResource(icon), stringResource(name), Modifier.size(20.dp))
+            }
+            menu()
         }
     }
 }

@@ -36,7 +36,7 @@ internal fun channelsFixture(playing: Boolean = false): ChannelList = ChannelLis
             "lantern-hour", "Lantern Hour", Color(0xFF47321D),
             now("Stories by Lamplight", "8:00–9:30 PM", 0.52f, "43m"), next("The Reading Room", "9:30 PM"),
         ),
-        channel("little-orbit", "Little Orbit", Color(0xFF1D4747)),
+        channel("little-orbit", "Little Orbit", Color(0xFF1D4747), now("Little Orbit", "8:35–9:00 PM", 0.48f, "13m")),
         channel("glass-drama", "Glass Drama", Color(0xFF2C3438)),
     ),
     tags = listOf(ChannelTag("news", "News"), ChannelTag("sport", "Sport")),
