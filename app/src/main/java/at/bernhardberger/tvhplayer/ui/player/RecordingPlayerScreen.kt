@@ -79,6 +79,7 @@ import at.bernhardberger.tvhplayer.core.playerBackAction
 import at.bernhardberger.tvhplayer.core.playerControlsAutoHideEligible
 import at.bernhardberger.tvhplayer.core.playerForegroundLayer
 import at.bernhardberger.tvhplayer.core.recordingRetryCommand
+import at.bernhardberger.tvhplayer.core.RecordingMarkKind
 import at.bernhardberger.tvhplayer.core.recordingPlayerAlert
 import at.bernhardberger.tvhplayer.core.recordingFailureDetail
 import at.bernhardberger.tvhplayer.playback.AppPlaybackFailureReason
@@ -763,7 +764,7 @@ fun RecordingPlayerScreen(
                     skip = controlsSkip?.takeIf { playbackAvailable && canSeekMarks }?.let { action ->
                         PlayerSkipAction(
                             identity = action,
-                            label = stringResource(if (action.mark.kind == at.bernhardberger.tvhplayer.core.RecordingMarkKind.PROGRAM_START)
+                            label = stringResource(if (action.mark.kind == RecordingMarkKind.PROGRAM_START)
                                 R.string.skip_to_program_start else R.string.skip_ad_break),
                             onClick = {
                                 if (session.skipRecordingAdBreak(action, fromControls = true)) {

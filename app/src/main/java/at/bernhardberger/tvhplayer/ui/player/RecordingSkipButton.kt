@@ -1,9 +1,11 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.TweenSpec
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
@@ -112,8 +114,10 @@ private fun RecordingSkipButton(
     ) {
         SkipCountdown(LocalContentColor.current, elapsed)
         Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-        Text(stringResource(if (action?.mark?.kind == RecordingMarkKind.PROGRAM_START) R.string.skip_to_program_start else R.string.skip_ad_break),
-            maxLines = 1, softWrap = false)
+        val label = if (action?.mark?.kind == RecordingMarkKind.PROGRAM_START) {
+            R.string.skip_to_program_start
+        } else R.string.skip_ad_break
+        Text(stringResource(label), maxLines = 1, softWrap = false)
     }
 }
 
@@ -203,10 +207,7 @@ internal fun RecordingSkipPrompt(
         val enter = tween<Float>(PlayerMotion.MediumMs, easing = PlayerMotion.EmphasizedDecelerate)
         val exit = tween<Float>(PlayerMotion.ShortMs, easing = PlayerMotion.EmphasizedAccelerate)
         val opacity = animateShown(enter, exit, "skip prompt opacity")
-        val travel = transition.animateFloat(
-            transitionSpec = { if (targetState == EnterExitState.Visible) enter else exit },
-            label = "skip prompt rise",
-        ) { if (it == EnterExitState.PreEnter) rise.toFloat() else 0f }
+        val travel = animateSkipPromptRise(enter, exit, rise)
         val focus = remember { FocusRequester() }
         LaunchedEffect(visible) {
             if (visible) {
@@ -239,3 +240,13 @@ internal fun RecordingSkipPrompt(
         }
     }
 }
+
+@Composable
+private fun AnimatedVisibilityScope.animateSkipPromptRise(
+    enter: TweenSpec<Float>,
+    exit: TweenSpec<Float>,
+    rise: Int,
+) = transition.animateFloat(
+    transitionSpec = { if (targetState == EnterExitState.Visible) enter else exit },
+    label = "skip prompt rise",
+) { if (it == EnterExitState.PreEnter) rise.toFloat() else 0f }

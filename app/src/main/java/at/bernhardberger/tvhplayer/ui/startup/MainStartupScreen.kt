@@ -238,8 +238,8 @@ internal fun ChannelStartupSurface(
             // grows with font scale, well below the ring and inside the TV safe bounds.
             Box(safeWidth.align(Alignment.TopCenter).padding(top = maxHeight * (359f / 540f))
                 .height(104.dp).graphicsLayer { alpha = contentAlpha }) {
-                if (feedbackVisible) {
-                    StartupStatus(status, motionEnabled, contentVisible && announceStatus, tuningChannel, channelName)
+                StartupStatus(status, motionEnabled, feedbackVisible, tuningChannel, channelName) {
+                    contentVisible && announceStatus
                 }
             }
         }
@@ -268,9 +268,12 @@ private fun StartupIdentity(title: String?, channelId: ChannelId?, motionEnabled
 
 @Composable
 private fun StartupStatus(
-    status: String, motionEnabled: Boolean, announce: Boolean,
+    status: String, motionEnabled: Boolean, feedbackVisible: Boolean,
     tuningChannel: Channel? = null, channelName: String? = null,
+    announceStatus: () -> Boolean,
 ) {
+    if (!feedbackVisible) return
+    val announce = announceStatus()
     StartupSlot(Triple(status, tuningChannel, channelName), motionEnabled, identity = tuningChannel?.id ?: status) {
         (message, channel, name), visible ->
         if (channel != null) TuningStatus(channel, name ?: channel.name.orEmpty(), motionEnabled, visible && announce)

@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -137,70 +138,125 @@ internal fun PlayerActionRow(
         val rowActions = if (skip == null) actions else actions.toMutableList().apply {
             add(playbackEnd, PlayerAction("recording-skip", skip.label, null, skip.onClick, skipFocus))
         }
-        rowActions.forEach { (tag, label, icon, action, focus, state) ->
-            key(tag) {
-                if (tag == endStart) Spacer(Modifier.weight(1f))
-                if (action != null) {
-                    val recording = tag == "player-record" && recordState != null
-                    val actionModifier = Modifier
-                        .testTag(tag)
-                        .then(focus?.let { Modifier.focusRequester(it) } ?: Modifier)
-                        .onFocusChanged { if (it.isFocused) { onActionFocused(tag); onInteraction() } }
-                        .then(if (tag == "player-pause" && pauseUnavailableReason != null) {
-                            Modifier.semantics {
-                                stateDescription = pauseUnavailableReason
-                            }
-                        } else Modifier)
-                        .then(if (state != null) Modifier.semantics { stateDescription = state } else Modifier)
-                    if (icon == null) {
-                        val identity = requireNotNull(skip).identity
-                        Button(
-                            onClick = { onInteraction(); action() },
-                            colors = ButtonDefaults.colors(
-                                containerColor = PlayerChromeTokens.chipScrim,
-                                contentColor = MaterialTheme.colorScheme.onSurface,
-                            ),
-                            contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
-                            modifier = actionModifier.height(TvIconButtonSize)
-                                .onFocusChanged { skipFocused.value = it.isFocused }
-                                .onPreviewKeyEvent { event ->
-                                    if (event.key !in RecordingSkipActivationKeys) false else when (event.type) {
-                                        KeyEventType.KeyDown -> {
-                                            if (event.nativeKeyEvent.repeatCount == 0) skipPresses[event.key] = identity
-                                            skipPresses[event.key] !== identity
-                                        }
-                                        KeyEventType.KeyUp -> skipPresses.remove(event.key) !== identity
-                                        else -> false
-                                    }
-                                },
-                        ) {
-                            Icon(
-                                painterResource(R.drawable.ic_skip_next),
-                                contentDescription = null,
-                                modifier = Modifier.size(IconButtonDefaults.MediumIconSize),
-                            )
-                            Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-                            Text(label, maxLines = 1, softWrap = false)
-                        }
-                    } else IconButton(
-                        onClick = { onInteraction(); action() },
-                        colors = if (recording) IconButtonDefaults.colors(
-                            containerColor = Color.Transparent,
-                            contentColor = recordingMarkColor(focused = false),
-                            focusedContentColor = recordingMarkColor(focused = true),
-                        ) else IconButtonDefaults.colors(
-                            containerColor = Color.Transparent,
-                            contentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = if (tag == "player-pause") 1f else 0.88f),
-                        ),
-                        modifier = actionModifier.size(TvIconButtonSize),
-                    ) {
-                        val glyphModifier = if (tag == "player-pause" && pauseUnavailableReason != null || tag == "player-schedule" && !scheduleAvailable) {
-                            Modifier.graphicsLayer { alpha = PauseUnavailableIconAlpha }
-                        } else Modifier
-                        Icon(painterResource(icon), contentDescription = label, modifier = glyphModifier.size(IconButtonDefaults.MediumIconSize))
-                    }
-                }
+        rowActions.forEach { action ->
+            key(action.tag) {
+                if (action.tag == endStart) Spacer(Modifier.weight(1f))
+                PlayerActionButton(
+                    action, recordState, pauseUnavailableReason, scheduleAvailable,
+                    onActionFocused, onInteraction, skip, skipPresses, skipFocused,
+                )
             }
         }
+    }
+}
+
+@Composable
+private fun PlayerActionButton(
+    playerAction: PlayerAction,
+    recordState: DvrEntryState?,
+    pauseUnavailableReason: String?,
+    scheduleAvailable: Boolean,
+    onActionFocused: (String) -> Unit,
+    onInteraction: () -> Unit,
+    skip: PlayerSkipAction?,
+    skipPresses: MutableMap<Key, Any>,
+    skipFocused: MutableState<Boolean>,
+) {
+    val action = playerAction.onClick ?: return
+    val tag = playerAction.tag
+    val state = playerAction.state
+    val actionModifier = Modifier
+        .testTag(tag)
+        .then(playerAction.focus?.let { Modifier.focusRequester(it) } ?: Modifier)
+        .onFocusChanged { if (it.isFocused) { onActionFocused(tag); onInteraction() } }
+        .then(if (tag == "player-pause" && pauseUnavailableReason != null) {
+            Modifier.semantics { stateDescription = pauseUnavailableReason }
+        } else Modifier)
+        .then(if (state != null) Modifier.semantics { stateDescription = state } else Modifier)
+    val onClick = { onInteraction(); action() }
+    val icon = playerAction.icon
+    if (icon == null) {
+        PlayerRowSkipButton(
+            playerAction.label, requireNotNull(skip).identity, onClick, actionModifier, skipPresses, skipFocused,
+        )
+    } else {
+        PlayerRowIconButton(
+            tag, playerAction.label, icon, onClick, actionModifier,
+            recordState, pauseUnavailableReason, scheduleAvailable,
+        )
+    }
+}
+
+@Composable
+private fun PlayerRowIconButton(
+    tag: String,
+    label: String,
+    @DrawableRes icon: Int,
+    onClick: () -> Unit,
+    modifier: Modifier,
+    recordState: DvrEntryState?,
+    pauseUnavailableReason: String?,
+    scheduleAvailable: Boolean,
+) {
+    val recording = tag == "player-record" && recordState != null
+    IconButton(
+        onClick = onClick,
+        colors = if (recording) IconButtonDefaults.colors(
+            containerColor = Color.Transparent,
+            contentColor = recordingMarkColor(focused = false),
+            focusedContentColor = recordingMarkColor(focused = true),
+        ) else IconButtonDefaults.colors(
+            containerColor = Color.Transparent,
+            contentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = if (tag == "player-pause") 1f else 0.88f),
+        ),
+        modifier = modifier.size(TvIconButtonSize),
+    ) {
+        val dimmed = tag == "player-pause" && pauseUnavailableReason != null ||
+            tag == "player-schedule" && !scheduleAvailable
+        val glyphModifier = if (dimmed) Modifier.graphicsLayer { alpha = PauseUnavailableIconAlpha } else Modifier
+        Icon(
+            painterResource(icon),
+            contentDescription = label,
+            modifier = glyphModifier.size(IconButtonDefaults.MediumIconSize),
+        )
+    }
+}
+
+@Composable
+private fun PlayerRowSkipButton(
+    label: String,
+    identity: Any,
+    onClick: () -> Unit,
+    modifier: Modifier,
+    skipPresses: MutableMap<Key, Any>,
+    skipFocused: MutableState<Boolean>,
+) {
+    Button(
+        onClick = onClick,
+        colors = ButtonDefaults.colors(
+            containerColor = PlayerChromeTokens.chipScrim,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ),
+        contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
+        modifier = modifier.height(TvIconButtonSize)
+            .onFocusChanged { skipFocused.value = it.isFocused }
+            .onPreviewKeyEvent { event ->
+                if (event.key !in RecordingSkipActivationKeys) false else when (event.type) {
+                    KeyEventType.KeyDown -> {
+                        if (event.nativeKeyEvent.repeatCount == 0) skipPresses[event.key] = identity
+                        skipPresses[event.key] !== identity
+                    }
+                    KeyEventType.KeyUp -> skipPresses.remove(event.key) !== identity
+                    else -> false
+                }
+            },
+    ) {
+        Icon(
+            painterResource(R.drawable.ic_skip_next),
+            contentDescription = null,
+            modifier = Modifier.size(IconButtonDefaults.MediumIconSize),
+        )
+        Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+        Text(label, maxLines = 1, softWrap = false)
     }
 }

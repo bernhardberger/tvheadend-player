@@ -1172,25 +1172,32 @@ fun VideoPlayerScreen(
     val recordState = infoEvent?.let(observation::dvrEntryForEvent)?.takeUnless(::recordingWasRemoved)
         ?.state?.takeIf { it in LiveRecordStates }
 
-    fun recordActions(programme: EpgEventEntry, recording: DvrEntry?, observation: SessionObservation): List<BrowseContextAction> {
+    fun recordActions(
+        programme: EpgEventEntry,
+        recording: DvrEntry?,
+        observation: SessionObservation,
+    ): List<BrowseContextAction> {
         val canModify = observation.dvrState is DvrRepositoryState.Current &&
             (observation.sessionState as? SessionState.Ready)?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
         return programmeDetailsActions(programme, nowSec, recording,
             recording?.let(observation::recordingPlaybackAdmission), canModify,
-            programme.channelId?.let(observation::channel) != null, liveProgramme = observation.event(programme.id) != null)
+            programme.channelId?.let(observation::channel) != null,
+            liveProgramme = observation.event(programme.id) != null)
     }
 
     fun recordingConfirmationIsCurrent(confirmation: LiveRecordConfirmation, current: SessionObservation): Boolean {
         if (confirmation.channelId != currentChannelId ||
             currentDvrMutation(confirmation.mutation, confirmation.opening, current) == null) return false
-        val (recordingId, action) = when (val mutation = confirmation.mutation) {
+        val target = when (val mutation = confirmation.mutation) {
             is DvrMutationAction.Stop -> mutation.recordingId to BrowseContextAction.STOP
             is DvrMutationAction.Cancel -> mutation.recordingId to BrowseContextAction.CANCEL
-            else -> return false
+            else -> null
         }
-        val programme = current.event(confirmation.programme.id) ?: confirmation.programme
-        val recording = current.dvrEntryForEvent(programme)?.takeUnless(::recordingWasRemoved)
-        return recording?.id == recordingId && action in recordActions(programme, recording, current)
+        return target?.let { (recordingId, action) ->
+            val programme = current.event(confirmation.programme.id) ?: confirmation.programme
+            val recording = current.dvrEntryForEvent(programme)?.takeUnless(::recordingWasRemoved)
+            recording?.id == recordingId && action in recordActions(programme, recording, current)
+        } ?: false
     }
 
     fun recordProgramme(programme: EpgEventEntry?, fromControl: Boolean = false) {
@@ -1218,9 +1225,7 @@ fun VideoPlayerScreen(
                 recordConfirmation = LiveRecordConfirmation(programme, mutation, opening, currentChannelId)
                 layerState.showRecordingConfirmation()
             }
-            return
-        }
-        if (capability == null || BrowseContextAction.RECORD !in actions) {
+        } else if (capability == null || BrowseContextAction.RECORD !in actions) {
             notices.postRecordUnavailable(programme, opening, nowSec)
         } else {
             val mutation = DvrMutationAction.CreateProgramme(programme.programmeRecordingTarget(capability), null)
@@ -1900,7 +1905,8 @@ fun VideoPlayerScreen(
         val channelRailOpen = foregroundLayer == PlayerForegroundLayer.CHANNEL_DRAWER
         // The channel drawer opens with the controls; the page's own Info never holds them here (no details).
         val controlsLayerShown = chromeLayer == PlayerForegroundLayer.CONTROLS || channelRailOpen
-        val chromePanelOpen = layerState.core.optionsPage != null || layerState.core.infoOpen || layerState.scheduleOpen || confirmationVisible
+        val chromePanelOpen = layerState.core.optionsPage != null || layerState.core.infoOpen ||
+            layerState.scheduleOpen || confirmationVisible
         // The lower chrome's mode, for the chrome itself and for the Stats card under it.
         fun lowerChromeMode(keepControls: Boolean) = playerChromeMode(
             controls = controlsLayerShown || keepControls,
@@ -2139,7 +2145,9 @@ fun VideoPlayerScreen(
         if (confirmationVisible && validRecordConfirmation != null) {
             val (programme, mutation, opening) = validRecordConfirmation
             ConfirmProgrammeActionDialog(
-                action = if (mutation is DvrMutationAction.Stop) ProgrammeAction.STOP_RECORDING else ProgrammeAction.CANCEL_RECORDING,
+                action = if (mutation is DvrMutationAction.Stop) {
+                    ProgrammeAction.STOP_RECORDING
+                } else ProgrammeAction.CANCEL_RECORDING,
                 event = programme,
                 channel = programme.channelId?.let(observation::channel),
                 nowSec = nowSec,
@@ -2152,10 +2160,13 @@ fun VideoPlayerScreen(
                 onDismiss = ::dismissRecordingDialog,
                 onConfirm = confirm@{
                     if (recordConfirmation !== validRecordConfirmation) return@confirm
-                    val stillCurrent = recordingConfirmationIsCurrent(validRecordConfirmation, session.observation.value)
+                    val stillCurrent = recordingConfirmationIsCurrent(
+                        validRecordConfirmation, session.observation.value,
+                    )
                     dismissRecordingDialog()
                     if (stillCurrent) dvrMutationActions.launchMutation(
-                        mutation, opening, { session.observation.value }, { nowSec }, uiSettingsStore, notices, scope, recordInFlight,
+                        mutation, opening, { session.observation.value }, { nowSec },
+                        uiSettingsStore, notices, scope, recordInFlight,
                     )
                 },
             )
