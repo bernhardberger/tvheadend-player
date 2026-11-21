@@ -21,12 +21,15 @@ import at.bernhardberger.tvhplayer.touch.testutil.captureTouch
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouchWindows
 import at.bernhardberger.tvhplayer.touch.ui.DvrChangeDialog
 import at.bernhardberger.tvhplayer.touch.ui.ProgramRecordControl
+import at.bernhardberger.tvhplayer.touch.ui.RuleSchedule
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import at.bernhardberger.tvhplayer.ui.MobileDarkColors
+import at.bernhardberger.tvhplayer.ui.screens.recordings.StopConfirmationTimes
+import at.bernhardberger.tvhplayer.ui.screens.recordings.stopConfirmationSentence
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -46,6 +49,7 @@ class GuideScreenTest {
     private val details = mutableListOf<String>()
     private val watched = mutableListOf<String>()
     private val cancelled = mutableListOf<String>()
+    private val stopped = mutableListOf<String>()
 
     @Test
     @Config(qualifiers = TABLET)
@@ -77,22 +81,35 @@ class GuideScreenTest {
     @Config(qualifiers = TABLET)
     fun tabletProgramsOfferOnlyTheirOwnRecordingControl() {
         var asking by mutableStateOf(false)
+        var askingStop by mutableStateOf(false)
+        val stopTimes = StopConfirmationTimes(recordedSec = 17 * 60L, remainingSec = 88 * 60L)
         show(
             overviewFixture().withRecordControls(
-                mapOf(SNOWLINE_ID to ProgramRecordControl.Cancel, COASTAL_MILES_ID to null),
-            ).scheduledByRule(TIDE_WATCH_ID),
+                mapOf(SNOWLINE_ID to ProgramRecordControl.Cancel, HARBOR_KICKOFF_ID to ProgramRecordControl.Stop),
+            ).withRuleSchedules(mapOf(TIDE_WATCH_ID to RuleSchedule.Scheduled, COASTAL_MILES_ID to RuleSchedule.Skipped)),
         ) {
-            if (asking) {
+            if (askingStop) {
+                DvrChangeDialog(
+                    SharedR.string.stop_recording_confirm_title, SharedR.string.stop_recording_confirm_body,
+                    SharedR.string.keep_recording, SharedR.string.stop_recording, {}, { askingStop = false },
+                    stopTimes = stopTimes,
+                )
+            } else if (asking) {
                 DvrChangeDialog(
                     SharedR.string.cancel_recording_confirm_title, SharedR.string.cancel_recording_confirm_body,
                     SharedR.string.keep_recording, SharedR.string.cancel_recording, {}, { asking = false },
                 )
             }
         }
-        // A program whose only recording answer is Stop or Skip shows none, rather than a dimmed Record.
+        // A skipped program says so where Record would stand; the row marks it instead of showing a clock.
         compose.onAllNodesWithText("Coastal Miles")[0].performClick()
         compose.onNodeWithText(COASTAL_MILES_SYNOPSIS_START, substring = true).assertIsDisplayed()
-        listOf("Record", "Cancel recording").forEach { compose.onAllNodes(hasText(it)).assertCountEquals(0) }
+        val skipped = compose.activity.getString(SharedR.string.autorec_editor_skipped)
+        compose.onNodeWithText(skipped).assertIsDisplayed()
+        compose.onNodeWithContentDescription(skipped).assertIsDisplayed()
+        listOf("Record", "Cancel recording", "Stop recording").forEach {
+            compose.onAllNodes(hasText(it)).assertCountEquals(0)
+        }
 
         // A program an automatic recording scheduled says so where Record would stand, and offers neither.
         compose.onAllNodesWithText("Tide Watch")[0].performClick()
@@ -108,6 +125,15 @@ class GuideScreenTest {
         compose.onNodeWithText(compose.activity.getString(SharedR.string.cancel_recording_confirm_title))
             .assertIsDisplayed()
         compose.captureTouchWindows(GROUP, "tablet-guide-cancel-confirm", TouchCanvas.TABLET)
+        compose.onNodeWithText(compose.activity.getString(SharedR.string.keep_recording)).performClick()
+
+        compose.onAllNodesWithText("Harbor Kickoff")[0].performClick()
+        compose.onNodeWithText(compose.activity.getString(SharedR.string.stop_recording)).performClick()
+        assertEquals(listOf(HARBOR_KICKOFF_ID), stopped)
+        askingStop = true
+        val spoken = stopConfirmationSentence(stopTimes, compose.activity.resources, spoken = true)
+        compose.onNodeWithText(spoken).assertIsDisplayed()
+        compose.captureTouchWindows(GROUP, "tablet-guide-stop-confirm", TouchCanvas.TABLET)
     }
 
     @Test
@@ -273,6 +299,7 @@ class GuideScreenTest {
             onJump = {},
             onTag = {},
             onCancel = { cancelled += it },
+            onStop = { stopped += it },
         )
         compose.setContent {
             MaterialTheme(colorScheme = MobileDarkColors) {

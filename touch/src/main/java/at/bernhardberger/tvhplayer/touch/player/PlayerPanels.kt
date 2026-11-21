@@ -47,8 +47,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.touch.R
-import at.bernhardberger.tvhplayer.touch.channels.ChannelRows
-import at.bernhardberger.tvhplayer.touch.channels.ChannelsActions
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsLayout
 import at.bernhardberger.tvhplayer.touch.channels.TagFilter
 import at.bernhardberger.tvhplayer.touch.ui.TouchSideSheet
@@ -165,8 +163,10 @@ internal fun PlayerSheets(
         TouchSideSheet(
             onDismissRequest = close, title = title, onBack = back, scrim = false, leading = leading,
             actions = {
-                if (panel == PlayerPanel.Channels && state is LivePlayerState && state.channels.tags.isNotEmpty()) {
-                    TagFilter(state.channels, { onChoice(PlayerChoice.ChannelTag(it)) })
+                if (panel == PlayerPanel.Channels && state is LivePlayerState) {
+                    state.channels.displayedList?.takeIf { it.tags.isNotEmpty() }?.let { list ->
+                        TagFilter(list, { onChoice(PlayerChoice.ChannelTag(it)) })
+                    }
                 }
             },
             content = body,
@@ -213,10 +213,9 @@ private fun ColumnScope.SheetBody(
 ) {
     when (panel) {
         PlayerPanel.Channels -> if (state is LivePlayerState) Box(Modifier.weight(1f).padding(horizontal = 16.dp)) {
-            ChannelRows(
-                state.channels, ChannelsLayout.Phone,
-                ChannelsActions(onPlay = onChannel, onTag = {}, onRetry = {}, onOpenConnectionSettings = {}),
-                showColumnLabels = false,
+            PlayerChannelsContent(
+                state.channels, ChannelsLayout.Phone, onChannel, { onChoice(PlayerChoice.ChannelTag(it)) },
+                { onAction(PlayerAction.RetryChannels) },
             )
         }
         PlayerPanel.Options -> OptionRows(state, onPanel)

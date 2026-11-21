@@ -28,6 +28,7 @@ import at.bernhardberger.tvhplayer.playback.BackgroundPlaybackNotice
 import at.bernhardberger.tvhplayer.playback.LivePauseAvailability
 import at.bernhardberger.tvhplayer.playback.toAppPresentation
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
+import at.bernhardberger.tvhplayer.touch.channels.ChannelsState
 import at.bernhardberger.tvhplayer.touch.testutil.ServerGuide
 import at.bernhardberger.tvhplayer.viewmodels.ChannelScopeState
 import java.time.LocalTime
@@ -202,35 +203,44 @@ class LivePlayerMappingTest {
             pause: LivePauseAvailability = LivePauseAvailability.READY,
             status: LivePlayerStatus = LivePlayerStatus.Playing,
             window: Boolean = false,
+            filtered: Boolean = false,
+            degraded: Boolean = false,
+            loaded: Boolean = true,
         ) = livePlayerState(
             id,
             ChannelScopeState(
                 ChannelBrowsingScope(
                     allChannels = if (known) channels else emptyList(),
-                    visibleChannels = if (known) channels else emptyList(),
-                    tags = emptyList(), allChannelsVisible = true, activeTagId = null,
+                    visibleChannels = if (filtered) listOf(guide.first) else if (known) channels else emptyList(),
+                    tags = listOf(guide.news), allChannelsVisible = true, activeTagId = guide.news.id.takeIf { filtered },
                 ),
                 channelCatalogCurrent = known,
+                settingsLoaded = loaded,
             ),
-            observation, ConnectionUiState.Ready, degraded = false, status, mutableStateOf(null), pause, guide.now,
+            observation, ConnectionUiState.Ready, degraded, status, mutableStateOf(null), pause, guide.now,
             window,
         )
 
         val playing = face(shown)
         assertEquals("Channel One", playing.channel.name)
         assertEquals(guide.programs[0], playing.channel.now?.title)
-        // Of the controls only the timeshift ones are wired, offered while the channel can pause (as on TV).
-        assertEquals(setOf(PlayerControl.Timeshift), playing.offered)
-        assertEquals(setOf(PlayerControl.Timeshift), face(shown, pause = LivePauseAvailability.STARTING).offered)
-        assertEquals(emptySet<PlayerControl>(), face(shown, pause = LivePauseAvailability.UNAVAILABLE).offered)
-        assertEquals(emptySet<PlayerControl>(), face(shown, pause = LivePauseAvailability.OFF).offered)
-        assertEquals(emptySet<PlayerControl>(), face(shown, status = LivePlayerStatus.Tuning).offered)
+        val channelsOnly = setOf(PlayerControl.Channels)
+        val pausable = channelsOnly + PlayerControl.Timeshift
+        assertEquals(pausable, playing.offered)
+        assertEquals(pausable, face(shown, pause = LivePauseAvailability.STARTING).offered)
+        assertEquals(channelsOnly, face(shown, pause = LivePauseAvailability.UNAVAILABLE).offered)
+        assertEquals(channelsOnly, face(shown, pause = LivePauseAvailability.OFF).offered)
+        assertEquals(channelsOnly, face(shown, status = LivePlayerStatus.Tuning).offered)
         // The picture-in-picture button only where the window can be used.
         assertEquals(
-            setOf(PlayerControl.Timeshift, PlayerControl.PictureInPicture), face(shown, window = true).offered,
+            pausable + PlayerControl.PictureInPicture, face(shown, window = true).offered,
         )
         // The list below the picture marks the shown channel as the one playing.
-        assertEquals(listOf(true, false), playing.channels.rows.map { it.playback != null })
+        assertEquals(listOf(true, false), playing.channels.displayedList?.rows?.map { it.playback != null })
+        val saved = face(shown, filtered = true, degraded = true).channels as ChannelsState.Offline
+        assertEquals(guide.news.id.value.toString(), saved.list.selectedTagId)
+        assertEquals(listOf(shown.value.toString()), saved.list.rows.map { it.id })
+        assertSame(ChannelsState.Loading, face(shown, loaded = false).channels)
         // A channel the scope doesn't know yet has no name.
         assertEquals("", face(shown, known = false).channel.name)
     }

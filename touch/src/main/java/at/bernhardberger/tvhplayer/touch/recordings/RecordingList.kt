@@ -360,7 +360,7 @@ private fun Thumbnail(item: RecordingItem) {
         }
         when {
             picture != null -> Image(picture, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-            logo -> ChannelLogoImage(item.channelLogo, item.channelLogoModel, fallback = icon)
+            logo -> ChannelLogoImage(item.channelLogo, item.channelLogoModel, tint ?: accent?.settled ?: neutral, icon)
             else -> icon()
         }
         RecordingBar(item.state, Modifier.align(Alignment.BottomStart).fillMaxWidth().height(3.dp))

@@ -91,6 +91,7 @@ internal fun GuideDestination(
             onOpenConnectionSettings = onOpenConnections,
             onSignIn = onSignIn,
             onCancel = dvr::cancel,
+            onStop = dvr::stopProgram,
         ),
         destinations = destinations,
     )

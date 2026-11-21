@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
@@ -109,17 +108,12 @@ private fun PlayerFace(
     var touches by remember { mutableIntStateOf(0) }
     var touching by remember { mutableStateOf(false) }
     var panel by rememberSaveable { mutableStateOf<PlayerPanel?>(null) }
-    // Sheets and menus close on entering the picture-in-picture window (they don't come back), and
-    // when their control leaves (the tracks went away).
-    val panelGone = panelGone(panel, state, inWindow)
-    LaunchedEffect(panelGone) { if (panelGone) panel = null }
     // Info opens on the program being watched each time; inside the sheet the viewer opens others.
     var infoStack by rememberSaveable(stateSaver = InfoStackSaver) { mutableStateOf(InfoStack()) }
     val showPanel: (PlayerPanel?) -> Unit = {
         if (opensInfo(it, panel)) infoStack = InfoStack((state as? LivePlayerState)?.schedule?.watchingId)
         panel = it
     }
-    val panels = PanelHost(panel, showPanel, onChoice)
     val openOptions = { panel = PlayerPanel.Options }
     var preview by remember(state.key, state.status) { mutableStateOf<Long?>(null) }
     val hideAfter = controlsHideAfter(
@@ -134,9 +128,13 @@ private fun PlayerFace(
         val held = remember { HeldLayout(playerLayout(maxWidth, maxHeight)) }
         if (!inWindow) held.layout = playerLayout(maxWidth, maxHeight)
         val layout = held.layout
+        val panelGone = panelGone(panel, state, inWindow, layout)
+        LaunchedEffect(panelGone) { if (panelGone) panel = null }
+        val activePanel = panel.takeUnless { panelGone }
+        val panels = PanelHost(activePanel, showPanel, onChoice)
         val playing = state.status == LivePlayerStatus.Playing
         // A sheet takes the controls off the picture; a menu keeps them, it belongs to a button.
-        val sheet = panel?.let { !it.atButton(layout) } == true
+        val sheet = activePanel?.let { !it.atButton(layout) } == true
         val controls = !inWindow && !sheet && (visible || !playing)
         val toggle = if (playing && !inWindow) ({ visible = !visible }) else null
         val latestShown by rememberUpdatedState(onControlsShown)
@@ -158,18 +156,17 @@ private fun PlayerFace(
         // On the upright phone a sheet rises only to the picture's foot, so the picture stays in view.
         val belowPicture = maxHeight - WindowInsets.statusBars.asPaddingValues().calculateTopPadding() -
             maxWidth * (9f / 16)
-        if (!inWindow) {
-            PlayerSheets(
-                panel, state, layout, showPanel, onAction, onChoice, onChannel,
-                InfoPage(infoStack) { infoStack = it }, belowPicture, onSeek,
-            )
-        }
+        PlayerSheets(
+            activePanel, state, layout, showPanel, onAction, onChoice, onChannel,
+            InfoPage(infoStack) { infoStack = it }, belowPicture, onSeek,
+        )
     }
 }
 
-private fun panelGone(panel: PlayerPanel?, state: PlayerFaceState, inWindow: Boolean) = when {
+private fun panelGone(panel: PlayerPanel?, state: PlayerFaceState, inWindow: Boolean, layout: PlayerLayout) = when {
     inWindow -> true
-    panel == PlayerPanel.Markers -> (state as? RecordingPlayerState)?.hasMarkers != true
+    panel == PlayerPanel.Channels && layout.upright -> true
+    panel == PlayerPanel.Markers -> layout.upright || (state as? RecordingPlayerState)?.hasMarkers != true
     else -> panel?.button?.control?.let { it !in state.offered } == true
 }
 
@@ -248,12 +245,6 @@ private fun BoxScope.LandscapeFooter(
         LandscapePlayerContent(
             state, layout, preview, onAction, panels, onPreview, onSeek, Modifier.align(Alignment.BottomCenter),
             notice = notices,
-        )
-    } else if (!controls && !sheet) {
-        // Controls hidden: the thin line stays on the edge.
-        FaceTimeline(
-            state, layout, false, null, {}, onSeek,
-            Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(28.dp).offset(y = 20.dp),
         )
     }
     if (!showFooter) {

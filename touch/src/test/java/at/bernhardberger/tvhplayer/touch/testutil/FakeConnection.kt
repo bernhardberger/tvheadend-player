@@ -71,7 +71,9 @@ internal class FakeConnection(
     fun presentation() = AppConnectionViewModel(session, owner, notices)
 
     /** The Channels destination's state, as the composition root's view model gives it. */
-    fun channels() = ChannelsViewModel(session, ChannelTagSettingsStore(MemoryPreferences()), owner.liveProfile)
+    fun channels() = ChannelsViewModel(session, channelTagSettings(), owner.liveProfile)
+
+    fun channelTagSettings() = ChannelTagSettingsStore(MemoryPreferences())
 
     /** The Recordings destination's state, as the composition root's view model gives it. */
     fun recordings() = RecordingsViewModel(session)

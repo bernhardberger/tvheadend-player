@@ -35,9 +35,14 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Text
+import androidx.compose.material3.TooltipAnchorPosition
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,6 +64,7 @@ import at.bernhardberger.tvhplayer.touch.ui.DetailsEpisode
 import at.bernhardberger.tvhplayer.touch.ui.DetailsFacts
 import at.bernhardberger.tvhplayer.touch.ui.DetailsPictureScrim
 import at.bernhardberger.tvhplayer.touch.ui.DetailsSynopsis
+import at.bernhardberger.tvhplayer.touch.ui.RecordingRemoveControl
 import at.bernhardberger.tvhplayer.touch.ui.joinParts
 
 /** The picked recording beside the tablet's list. */
@@ -265,6 +271,10 @@ private fun Progress(state: RecordingProgress, clock: RecordingClock, modifier: 
 
 @Composable
 private fun PlayButtons(item: RecordingItem, actions: RecordingsActions, equalWidth: Boolean) {
+    if (item.remove == RecordingRemoveControl.RemoveEntry) {
+        actions.onDelete?.let { RecordingActionButton(item.remove) { it(item.id) } }
+        return
+    }
     val onPlay = actions.onPlay ?: return
     val width = if (equalWidth) Modifier.fillMaxWidth() else Modifier
     val height = if (equalWidth) Modifier.heightIn(min = 48.dp) else Modifier
@@ -290,19 +300,39 @@ private fun PlayButtons(item: RecordingItem, actions: RecordingsActions, equalWi
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ItemIcons(item: RecordingItem, actions: RecordingsActions) {
     val remove = item.remove
-    val onDelete = actions.onDelete
-    if (remove != null && onDelete != null) {
-        IconButton(onClick = { onDelete(item.id) }) {
-            Icon(painterResource(remove.icon), stringResource(remove.label))
+    when (remove) {
+        RecordingRemoveControl.Stop -> actions.onStop?.let { RecordingActionButton(remove) { it(item.id) } }
+        RecordingRemoveControl.Delete -> actions.onDelete?.let { delete ->
+            val label = stringResource(remove.label)
+            TooltipBox(
+                positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+                tooltip = { PlainTooltip { Text(label) } },
+                state = rememberTooltipState(),
+            ) {
+                IconButton(onClick = { delete(item.id) }) {
+                    Icon(painterResource(remove.icon), label)
+                }
+            }
         }
+        RecordingRemoveControl.RemoveEntry, null -> Unit // Remove entry goes with the labeled actions.
     }
     actions.onMore?.let { onMore ->
         IconButton(onClick = { onMore(item.id) }) {
             Icon(painterResource(R.drawable.recordings_more), stringResource(R.string.recordings_more))
         }
+    }
+}
+
+@Composable
+private fun RecordingActionButton(control: RecordingRemoveControl, onClick: () -> Unit) {
+    FilledTonalButton(onClick = onClick) {
+        Icon(painterResource(control.icon), null, Modifier.size(ButtonDefaults.IconSize))
+        Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+        Text(stringResource(control.label))
     }
 }
 

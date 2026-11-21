@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.touch.channels
 
 import at.bernhardberger.tvhplayer.touch.ui.ProgramRecordControl
+import at.bernhardberger.tvhplayer.touch.ui.RuleSchedule
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
@@ -61,7 +62,7 @@ internal data class ChannelProgram(
     val timeLeft: String? = null,
     val scheduled: Boolean = false,
     /** Scheduled by an automatic recording or a repeating timer: "Scheduled" in place of [record]. */
-    val scheduledByRule: Boolean = false,
+    val ruleSchedule: RuleSchedule? = null,
     /** What its recording control does; null offers none. */
     val record: ProgramRecordControl? = ProgramRecordControl.Record,
 )
@@ -92,6 +93,7 @@ internal class ChannelsActions(
     val onSignIn: (() -> Unit)? = null,
     /** Cancel of the scheduled recording of what is on now; it asks first. */
     val onCancel: ((String) -> Unit)? = null,
+    val onStop: ((String) -> Unit)? = null,
 )
 
 /**

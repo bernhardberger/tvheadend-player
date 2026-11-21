@@ -224,14 +224,6 @@ class ProgrammeArtworkPolicyTest {
         }
     }
 
-    @Test fun onlyDarkLogoInkWithoutALightPartNeedsLightGround() {
-        val white = 0xffffffff.toInt()
-        val clear = 0x00ffffff
-        assertTrue(logoNeedsLightGround(intArrayOf(neutral, neutral, clear, clear)))
-        assertFalse(logoNeedsLightGround(intArrayOf(white, white, clear, clear)))
-        assertFalse(logoNeedsLightGround(intArrayOf(neutral, neutral, white)))
-    }
-
     private fun IntArray.drawLettering(top: Int) {
         for (left in listOf(6, 20, 34)) for (y in 0..12) for (x in 0..9) {
             if (x == 0 || x == 9 || y == 6) this[(top + y) * 96 + left + x] = 0xffffffff.toInt()

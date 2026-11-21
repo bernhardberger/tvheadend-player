@@ -26,9 +26,7 @@ import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.playback.LivePauseAvailability
 import at.bernhardberger.tvhplayer.playback.BackgroundPlaybackNotice
-import at.bernhardberger.tvhplayer.touch.channels.ChannelList
 import at.bernhardberger.tvhplayer.touch.channels.ChannelRow
-import at.bernhardberger.tvhplayer.touch.channels.ChannelsState
 import at.bernhardberger.tvhplayer.touch.channels.channelRow
 import at.bernhardberger.tvhplayer.touch.channels.channelsState
 import at.bernhardberger.tvhplayer.touch.ui.ArtworkModels
@@ -205,8 +203,7 @@ internal fun timeshiftOffered(availability: LivePauseAvailability, status: LiveP
  * The face for [shownId] without its clock and episode texts, which need resources (see
  * [withProgramTexts]). The channel list below the picture marks [shownId] as playing. A channel
  * the scope does not know yet keeps an empty name so Back and the picture are there at once.
- * Past the picture, Back and the channel list only the timeshift controls are wired, and only those
- * are offered.
+ * The channel list can be opened as a sheet on landscape layouts; upright layouts show it inline.
  */
 internal fun livePlayerState(
     shownId: ChannelId,
@@ -223,19 +220,14 @@ internal fun livePlayerState(
 ): LivePlayerState {
     val id = shownId.value.toString()
     val channel = scope.scope.allChannels.firstOrNull { it.id == shownId }
-    val rows = channelsState(scope, connection, degraded, observation, now, playingId = id, artwork = artwork)
-    val list = when (val channels = rows) {
-        is ChannelsState.Ready -> channels.list
-        is ChannelsState.Offline -> channels.list
-        else -> ChannelList(emptyList())
-    }
     return LivePlayerState(
         channel = channel?.let { channelRow(it, observation, now, artwork = artwork) } ?: ChannelRow(id, ""),
-        channels = list,
+        channels = channelsState(scope, connection, degraded, observation, now, playingId = id, artwork = artwork),
         frame = null,
         timeline = timeline,
         status = status,
         offered = buildSet {
+            add(PlayerControl.Channels)
             if (timeshiftOffered(pause, status)) add(PlayerControl.Timeshift)
             // Without the window (no feature, or switched off for the app) its button is absent.
             if (window) add(PlayerControl.PictureInPicture)

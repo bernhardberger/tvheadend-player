@@ -5,6 +5,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import at.bernhardberger.tvhplayer.touch.testutil.TouchFixtureArt
 import at.bernhardberger.tvhplayer.touch.ui.ProgramRecordControl
+import at.bernhardberger.tvhplayer.touch.ui.RuleSchedule
 
 // Round 37's Guide drawings: Sunday, November 15, a little after 8:45 PM.
 
@@ -181,13 +182,15 @@ internal fun GuideState.withRecordControls(records: Map<String, ProgramRecordCon
 
 internal const val SNOWLINE_ID = "ridge-earth-10:00 PM-Snowline"
 internal const val TIDE_WATCH_ID = "ridge-earth-9:00 PM-Tide Watch"
+internal const val HARBOR_KICKOFF_ID = "harbor-sport-8:30 PM-Harbor Kickoff"
 
-/** Programs [ids] are scheduled by an automatic recording: they show the state and offer no control. */
-internal fun GuideState.scheduledByRule(vararg ids: String): GuideState = copy(
+/** Programs a rule scheduled show its state and offer no control. */
+internal fun GuideState.withRuleSchedules(schedules: Map<String, RuleSchedule>): GuideState = copy(
     channels = channels.map { channel ->
         channel.copy(
             programs = channel.programs.map {
-                if (it.id in ids) it.copy(scheduled = true, scheduledByRule = true, record = null) else it
+                val schedule = schedules[it.id]
+                if (schedule != null) it.copy(scheduled = true, ruleSchedule = schedule, record = null) else it
             },
         )
     },
