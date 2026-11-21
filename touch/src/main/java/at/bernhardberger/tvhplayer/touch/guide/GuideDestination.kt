@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.touch.guide
 
+import at.bernhardberger.tvhplayer.touch.ui.LocalArtworkModels
 import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -17,6 +18,7 @@ import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.common.formatDayHeader
 import at.bernhardberger.tvhplayer.ui.common.formatDayMonth
 import at.bernhardberger.tvhplayer.ui.common.formatFirstAired
+import at.bernhardberger.tvhplayer.ui.common.formatMetadataNumber
 import at.bernhardberger.tvhplayer.ui.common.formatNarrowDuration
 import at.bernhardberger.tvhplayer.ui.common.formatTimeInterval
 import at.bernhardberger.tvhplayer.ui.common.programmeCategoryLabelRes
@@ -30,16 +32,20 @@ import java.time.ZoneId
 import java.util.Locale
 
 /**
- * The Guide destination of the app over the shared channel scope and the session's guide. Watch,
- * Record, Show in Guide and the other airings' links are left out until the player and the
- * server's changes are wired.
+ * The Guide destination of the app over the shared channel scope and the session's guide. Watch
+ * plays a program on now through [onWatch], and the one on now on the [playingId] channel shows as
+ * watched; Record, Show in Guide and the other airings' links are left out until the server's
+ * changes are wired.
  */
+@Suppress("LongParameterList") // The app's connection, its player and its pages.
 @Composable
 internal fun GuideDestination(
     guide: GuideViewModel,
     channels: ChannelsViewModel,
     connection: AppConnectionViewModel,
     destinations: List<Destination>,
+    playingId: String?,
+    onWatch: ((String) -> Unit)?,
     onOpenConnections: () -> Unit,
     onSignIn: () -> Unit,
 ) {
@@ -57,16 +63,20 @@ internal fun GuideDestination(
     }
     LaunchedEffect(coverage, observation.currentSession) { coverage?.let(guide::request) }
     val texts = remember(context, locale) { guideTexts(context, locale) }
-    val state = remember(presentation, scope, observation, selection, pendingVersion, nowSec, texts) {
+    val artwork = LocalArtworkModels.current
+    val state = remember(
+        presentation, scope, observation, selection, pendingVersion, nowSec, texts, artwork, playingId,
+    ) {
         val dayLoading = coverage?.let(guide::isPending) == true
         guideState(
             scope, presentation.connection, presentation.degraded, observation, selection, dayLoading, clock, texts,
+            artwork, playingId,
         )
     }
     GuideScreen(
         state = state,
         actions = GuideActions(
-            onWatch = null,
+            onWatch = onWatch,
             onRecord = null,
             onRecordOptions = null,
             onDetails = guide::openDetails,
@@ -106,6 +116,18 @@ private fun guideTexts(context: Context, locale: Locale): GuideTexts {
                 ?: event.genre?.takeIf(String::isNotBlank)
         },
         firstAired = { formatFirstAired(it, locale) },
+        count = { number, of ->
+            if (of != null) {
+                resources.getString(SharedR.string.details_count_of, number.toInt(), of.toInt())
+            } else {
+                formatMetadataNumber(number, locale)
+            }
+        },
+        broadcast = {
+            resources.getString(
+                if (it) SharedR.string.details_broadcast_new else SharedR.string.details_broadcast_repeat,
+            )
+        },
     )
 }
 

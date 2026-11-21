@@ -3,6 +3,9 @@
 
 package at.bernhardberger.tvhplayer.touch.di
 
+import at.bernhardberger.tvhplayer.images.buildImageLoader
+import at.bernhardberger.tvhplayer.images.RemoteLogoCache
+import coil3.ImageLoader
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -166,4 +169,26 @@ val touchModule = module {
     }
     viewModel { RecordingsViewModel(session = get()) }
     viewModel { GuideViewModel(session = get()) }
+
+    // The TV's loader (AppModule): server artwork with the session, remote logos through the shared cache.
+    // Its crossfade is the TV's 200 ms. No settings page clears the cache yet, so nothing else is cleared with it.
+    single { RemoteLogoCache(androidContext()) }
+    single<ImageLoader> {
+        buildImageLoader(
+            androidContext(), get<SdkRuntimeOwner>().session, get(),
+            userAgent = remoteLogoUserAgent(androidContext()), crossfadeMillis = ARTWORK_CROSSFADE_MS,
+        )
+    }
+}
+
+private const val ARTWORK_CROSSFADE_MS = 200
+
+/**
+ * The TV's user agent for remote logo hosts (app RemoteLogoUserAgent.kt), with touch's name and its
+ * installed version when it has one.
+ */
+private fun remoteLogoUserAgent(context: Context): String {
+    val version = context.packageManager.getPackageInfo(context.packageName, 0).versionName
+    val product = if (version.isNullOrBlank()) "TvheadendPlayerTouch" else "TvheadendPlayerTouch/$version"
+    return "$product (+https://github.com/bernhardberger/tvheadend-player)"
 }

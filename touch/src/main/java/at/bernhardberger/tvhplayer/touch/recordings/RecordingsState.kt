@@ -116,6 +116,10 @@ internal data class RecordingItem(
     val length: Duration?,
     val state: RecordingProgress = RecordingProgress.Unwatched,
     val details: RecordingDetails = RecordingDetails(),
+    /** The server image's model for the touch-level image composable; the fixture painter wins. */
+    val channelLogoModel: Any? = null,
+    /** The server image's model for the touch-level image composable; the fixture painter wins. */
+    val pictureModel: Any? = null,
 )
 
 /** A date label: a day's ("Today", "Wed, Nov 11") or a month's ("October"). */

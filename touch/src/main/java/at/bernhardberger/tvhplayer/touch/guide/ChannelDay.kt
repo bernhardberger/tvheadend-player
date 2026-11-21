@@ -118,8 +118,11 @@ private fun DayRow(
         trailingContent = {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (program.scheduled) ScheduledIcon()
-                program.still?.let {
-                    ProgramPicture(it, Modifier.size(if (wide) 96.dp else 72.dp, if (wide) 54.dp else 40.dp))
+                if (program.hasStill) {
+                    ProgramPicture(
+                        program.still, Modifier.size(if (wide) 96.dp else 72.dp, if (wide) 54.dp else 40.dp),
+                        model = program.stillModel,
+                    )
                 }
                 Icon(painterResource(R.drawable.guide_expand_more), null)
             }

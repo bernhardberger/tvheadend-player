@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -44,7 +45,14 @@ internal fun DetailsBackButton(label: String, onBack: () -> Unit) {
 
 /** A channel's logo on its tinted tile, as the Channels list draws it; the caller gives the size. */
 @Composable
-internal fun ChannelLogoTile(logo: Painter?, tint: Color?, modifier: Modifier, shape: RoundedCornerShape = LogoShape) {
+internal fun ChannelLogoTile(
+    logo: Painter?,
+    tint: Color?,
+    modifier: Modifier,
+    shape: RoundedCornerShape = LogoShape,
+    /** The server logo's image model, drawn when [logo] is null; the no-logo icon stands in until it loads. */
+    model: Any? = null,
+) {
     val scheme = MaterialTheme.colorScheme
     val fill = if (logo == null || tint == null) {
         Modifier.background(scheme.surfaceContainerHigh)
@@ -56,7 +64,9 @@ internal fun ChannelLogoTile(logo: Painter?, tint: Color?, modifier: Modifier, s
         contentAlignment = Alignment.Center,
     ) {
         if (logo == null) {
-            Icon(painterResource(R.drawable.play_tv_outline), null, tint = scheme.onSurfaceVariant)
+            ArtworkImage(null, model, Modifier.fillMaxSize()) {
+                Icon(painterResource(R.drawable.play_tv_outline), null, tint = scheme.onSurfaceVariant)
+            }
         } else {
             Image(logo, null)
         }

@@ -20,9 +20,8 @@ import at.bernhardberger.tvheadend.sdk.android.DiscoveredTvheadendServer
 import at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult
 import at.bernhardberger.tvheadend.sdk.android.TvheadendDiscoveryTestFactory
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
-import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
-import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileListResult
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileWriteResult
@@ -30,8 +29,10 @@ import at.bernhardberger.tvheadend.sdk.core.SessionFailure
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi
+import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import at.bernhardberger.tvhplayer.touch.testutil.FakeConnection
+import at.bernhardberger.tvhplayer.touch.testutil.ImageLoaderRule
 import at.bernhardberger.tvhplayer.touch.testutil.ServerGuide
 import at.bernhardberger.tvhplayer.ui.MobileDarkColors
 import kotlin.time.Clock
@@ -52,6 +53,7 @@ import org.robolectric.annotation.Config
 @OptIn(TvheadendTestingApi::class)
 class TouchAppTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
+    @get:Rule val images = ImageLoaderRule()
 
     private var connection = FakeConnection()
     private val server = DiscoveredTvheadendServer("Tvheadend", "192.168.1.20", 9982)
@@ -186,6 +188,11 @@ class TouchAppTest {
         compose.onNodeWithText(guide.programs[2]).assertIsDisplayed()
         listOf(R.string.channels_watch, R.string.channels_record, R.string.channels_details, R.string.channels_show_in_guide)
             .forEach { compose.onNodeWithText(label(it)).assertDoesNotExist() }
+        // The logo and the open program's picture come from the server through the image loader.
+        val session = connection.session.observation.value.currentSession
+        val logo = AppArtworkSource(session, (guide.logo as ChannelIcon.ImageCache).artworkId)
+        assertTrue(images.requested.toString(), logo in images.requested)
+        assertTrue(images.requested.toString(), AppArtworkSource(session, guide.picture) in images.requested)
     }
 
     @Test
@@ -289,14 +296,7 @@ class TouchAppTest {
         runBlocking { connection.store.addAnonymous(server.host, server.port, "Home server", true) }
         show()
         val guide = ServerGuide(Clock.System.now())
-        connection.session.publish(
-            SessionObservation.create(
-                sessionState = ready().sessionState,
-                channelState = ChannelRepositoryState.Current(guide.catalog),
-                epgState = EpgRepositoryState.Current(guide.snapshot),
-                dvrState = DvrRepositoryState.Current(guide.dvr),
-            ),
-        )
+        connection.session.publish(guide.connected())
         compose.waitForIdle()
         return guide
     }

@@ -1,5 +1,8 @@
 package at.bernhardberger.tvhplayer.touch
 
+import androidx.compose.runtime.remember
+import at.bernhardberger.tvhplayer.touch.ui.LocalArtworkModels
+import at.bernhardberger.tvhplayer.touch.ui.ArtworkModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -108,7 +111,7 @@ internal fun TouchApp(
             )
         }
         else -> AppDestinations(
-            connection, channels, recordings, guide, playingId, onWatch,
+            session, connection, channels, recordings, guide, playingId, onWatch,
             onOpenConnections = { page = Page.Connections },
             onSignIn = { page = Page.SignIn },
         )
@@ -180,6 +183,7 @@ private fun AppFrame(
     val texts = rememberChannelsTexts()
     val state = channelsState(
         scope, presentation.connection, presentation.degraded, observation, now, texts, playingId,
+        LocalArtworkModels.current,
     )
     ChannelsScreen(
         state = state,
@@ -199,6 +203,7 @@ private fun AppFrame(
 @Suppress("LongParameterList") // One view model per destination.
 @Composable
 private fun AppDestinations(
+    session: TvheadendSession,
     connection: AppConnectionViewModel,
     channels: ChannelsViewModel,
     recordings: RecordingsViewModel,
@@ -209,12 +214,15 @@ private fun AppDestinations(
     onSignIn: () -> Unit,
 ) {
     val selection = rememberSaveable { mutableStateOf(Destination.Channels) }
-    CompositionLocalProvider(LocalFrameSelection provides selection) {
+    val artwork = remember(session) { ArtworkModels(session) }
+    CompositionLocalProvider(LocalFrameSelection provides selection, LocalArtworkModels provides artwork) {
         when (selection.value) {
             Destination.Recordings ->
                 RecordingsDestination(recordings, connection, AppDestinationList, onOpenConnections, onSignIn)
             Destination.Guide ->
-                GuideDestination(guide, channels, connection, AppDestinationList, onOpenConnections, onSignIn)
+                GuideDestination(
+                    guide, channels, connection, AppDestinationList, playingId, onWatch, onOpenConnections, onSignIn,
+                )
             Destination.Channels -> AppFrame(connection, channels, playingId, onWatch, onOpenConnections, onSignIn)
         }
     }

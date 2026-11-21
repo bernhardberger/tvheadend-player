@@ -1,11 +1,13 @@
 package at.bernhardberger.tvhplayer.touch.recordings
 
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.DvrSnapshot
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition
 import at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi
+import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.core.AppErrorCondition
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.DvrArchiveGrouping
@@ -14,6 +16,7 @@ import at.bernhardberger.tvhplayer.core.DvrArchiveSort
 import at.bernhardberger.tvhplayer.core.DvrArchiveView
 import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
 import at.bernhardberger.tvhplayer.touch.testutil.ServerGuide
+import at.bernhardberger.tvhplayer.touch.ui.ArtworkModels
 import java.time.ZoneOffset
 import java.util.Locale
 import kotlin.time.Instant
@@ -109,6 +112,23 @@ class RecordingsMappingTest {
         val running = now.recordings.single()
         assertEquals("Channel One", running.channel)
         assertEquals(true, running.state is RecordingProgress.Recording)
+    }
+
+    @Test
+    fun recordingsCarryTheirChannelsLogoAndTheirPicture() {
+        val connected = guide.connected()
+        val state = recordingsState(
+            connected, DvrArchiveView(), ConnectionUiState.Ready, false, clock, texts, ArtworkModels(tvheadend = null),
+        )
+        val logo = AppArtworkSource(connected.currentSession, (guide.logo as ChannelIcon.ImageCache).artworkId)
+        val byTitle = state.root.recordings.associateBy { it.title }
+        val film = byTitle.getValue("Harbor Lights")
+        assertEquals(logo, film.channelLogoModel)
+        assertEquals(AppArtworkSource(connected.currentSession, guide.picture), film.pictureModel)
+        // The second channel has no logo and the diary no picture.
+        val diary = byTitle.getValue("Mountain Diary")
+        assertEquals(null, diary.channelLogoModel)
+        assertEquals(null, diary.pictureModel)
     }
 
     private fun RecordingsState.titles() = root.recordings.map { it.title }

@@ -3,6 +3,7 @@
 
 package at.bernhardberger.tvhplayer.touch.recordings
 
+import at.bernhardberger.tvhplayer.touch.ui.ArtworkImage
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -205,7 +206,8 @@ private fun PageChannel(
 
 @Composable
 private fun ChannelTile(item: RecordingItem, modifier: Modifier) {
-    val logo = item.channelLogo ?: return
+    val logo = item.channelLogo
+    if (logo == null && item.channelLogoModel == null) return
     val tint = item.logoTint ?: MaterialTheme.colorScheme.surfaceContainerHigh
     val shape = RoundedCornerShape(8.dp)
     Box(
@@ -213,7 +215,7 @@ private fun ChannelTile(item: RecordingItem, modifier: Modifier) {
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape).padding(3.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Image(logo, null)
+        if (logo != null) Image(logo, null) else ArtworkImage(null, item.channelLogoModel, Modifier.fillMaxSize())
     }
 }
 
@@ -224,9 +226,7 @@ private fun Picture(item: RecordingItem, modifier: Modifier) {
         modifier.aspectRatio(PICTURE_RATIO).background(MaterialTheme.colorScheme.surfaceContainerHighest),
         contentAlignment = Alignment.Center,
     ) {
-        if (picture != null) {
-            Image(picture, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-        } else {
+        ArtworkImage(picture, item.pictureModel, Modifier.fillMaxSize(), ContentScale.Crop) {
             Icon(
                 painterResource(R.drawable.video_library_outline), null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,

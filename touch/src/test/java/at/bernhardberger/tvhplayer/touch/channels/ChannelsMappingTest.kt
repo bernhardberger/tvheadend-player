@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.touch.channels
 
 import at.bernhardberger.tvheadend.sdk.core.Channel
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
@@ -10,11 +11,13 @@ import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition
 import at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi
+import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.core.AppErrorCondition
 import at.bernhardberger.tvhplayer.core.ChannelBrowsingScope
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
 import at.bernhardberger.tvhplayer.touch.testutil.ServerGuide
+import at.bernhardberger.tvhplayer.touch.ui.ArtworkModels
 import at.bernhardberger.tvhplayer.viewmodels.ChannelScopeState
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
@@ -156,6 +159,22 @@ class ChannelsMappingTest {
         val row = channelRow(guide.first, observation, guide.now, texts = texts)
         assertEquals(listOf(true, false), row.details?.following?.map { it.scheduled })
         assertEquals(false, row.next?.scheduled)
+    }
+
+    @Test
+    fun rowsCarryTheServersImagesByTheSession() {
+        val artwork = ArtworkModels(tvheadend = null)
+        val connected = guide.connected()
+        val session = connected.currentSession
+        val logo = AppArtworkSource(session, (guide.logo as ChannelIcon.ImageCache).artworkId)
+        val row = channelRow(guide.first, connected, guide.now, texts = texts, artwork = artwork)
+        assertEquals(logo, row.logoModel)
+        assertEquals(AppArtworkSource(session, guide.picture), row.details?.artworkModel)
+        assertEquals(null, channelRow(guide.second, connected, guide.now, artwork = artwork).logoModel)
+        // Without a current session the logo falls back to its saved copy and pictures stay out.
+        val offline = channelRow(guide.first, observation, guide.now, texts = texts, artwork = artwork)
+        assertEquals(AppArtworkSource(null, logo.id), offline.logoModel)
+        assertEquals(null, offline.details?.artworkModel)
     }
 
     private fun DvrEntry.copyRemoved() = DvrEntry.create(

@@ -3,6 +3,7 @@
 
 package at.bernhardberger.tvhplayer.touch.recordings
 
+import at.bernhardberger.tvhplayer.touch.ui.ArtworkImage
 import android.icu.text.DateFormat
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -339,9 +340,7 @@ private fun Thumbnail(item: RecordingItem) {
         contentAlignment = Alignment.Center,
     ) {
         val picture = item.picture
-        if (picture != null) {
-            Image(picture, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-        } else {
+        ArtworkImage(picture, item.pictureModel, Modifier.fillMaxSize(), ContentScale.Crop) {
             Icon(
                 painterResource(R.drawable.video_library_outline), null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,

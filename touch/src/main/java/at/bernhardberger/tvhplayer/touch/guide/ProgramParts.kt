@@ -3,6 +3,7 @@
 
 package at.bernhardberger.tvhplayer.touch.guide
 
+import at.bernhardberger.tvhplayer.touch.ui.ArtworkImage
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -221,7 +222,10 @@ internal fun ProgramProgress(
     }
 }
 
-/** A 16:9 picture with the on-air strip along its foot and REC in its corner while it records. */
+/**
+ * A 16:9 picture with the on-air strip along its foot and REC in its corner while it records; the
+ * strip of the program [watching] in the player is orange (section 13).
+ */
 @Composable
 internal fun ProgramPicture(
     picture: Painter?,
@@ -229,15 +233,18 @@ internal fun ProgramPicture(
     progress: Float? = null,
     recording: Boolean = false,
     strip: Boolean = true,
+    /** The server picture's model, drawn when [picture] is null. */
+    model: Any? = null,
+    watching: Boolean = false,
 ) {
     Box(
         modifier.aspectRatio(PICTURE_RATIO).clip(PictureShape)
             .background(MaterialTheme.colorScheme.surfaceContainerHighest),
     ) {
-        if (picture != null) Image(picture, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        ArtworkImage(picture, model, Modifier.fillMaxSize(), ContentScale.Crop)
         if (recording) Box(Modifier.padding(6.dp)) { RecPill() }
         if (strip && progress != null) {
-            ProgramBar(progress, recording, Modifier.align(Alignment.BottomStart).fillMaxWidth().height(3.dp))
+            ProgramBar(progress, recording, Modifier.align(Alignment.BottomStart).fillMaxWidth().height(3.dp), watching)
         }
     }
 }

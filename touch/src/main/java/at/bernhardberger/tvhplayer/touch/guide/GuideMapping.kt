@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.touch.guide
 
+import at.bernhardberger.tvhplayer.core.programmeArtwork
+import at.bernhardberger.tvhplayer.touch.ui.ArtworkModels
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.EpgCreditRole
@@ -52,13 +54,18 @@ internal class GuideTexts(
     val episode: (EpgEvent) -> String?,
     val genre: (EpgEvent) -> String?,
     val firstAired: (epochMillis: Long) -> String,
+    /** A metadata number, "2 of 3" with the [of] count the mapping found to cover it. */
+    val count: (number: Long, of: Long?) -> String,
+    /** Broadcast: "New" or "Repeat". */
+    val broadcast: (isNew: Boolean) -> String,
 )
 
 /**
  * The Guide destination from the shared channel scope and the session's guide: the overview from
  * the day's jump time, By channel's day, the day tabs and the opened program's Details.
  *
- * Programs carry no pictures and channels no logos (the loaders are not shared yet).
+ * With [artwork] channels carry their logos' and programs their pictures' image models; the program
+ * on now on the [playing] channel is the one watched.
  */
 @Suppress("LongParameterList")
 internal fun guideState(
@@ -70,6 +77,8 @@ internal fun guideState(
     dayLoading: Boolean,
     clock: GuideClock,
     texts: GuideTexts,
+    artwork: ArtworkModels? = null,
+    playing: String? = null,
 ): GuideState {
     val browsing = scope.scope
     val current = scope.channelCatalogCurrent
@@ -96,7 +105,9 @@ internal fun guideState(
                 unavailable(connection)
             }
         snapshot == null -> unavailable(connection)
-        else -> GuideMapper(browsing.visibleChannels, observation, snapshot.events, clock, today, texts)
+        else -> GuideMapper(
+            browsing.visibleChannels, observation, snapshot.events, clock, today, texts, artwork, playing,
+        )
             .state(selection, tags, selectedTagId)
             .copy(
                 dayLoading = dayLoading,
@@ -147,6 +158,7 @@ internal fun guideWindow(date: LocalDate, jump: LocalTime?, clock: GuideClock): 
     return GuideWindow(start until end, anchor)
 }
 
+@Suppress("LongParameterList")
 private class GuideMapper(
     private val channels: List<Channel>,
     private val observation: SessionObservation,
@@ -154,6 +166,8 @@ private class GuideMapper(
     private val clock: GuideClock,
     private val today: LocalDate,
     private val texts: GuideTexts,
+    private val artwork: ArtworkModels?,
+    private val playing: String?,
 ) {
     private val byChannel: Map<ChannelId?, List<EpgEvent>> = events.asSequence()
         .filter { it.stop > it.start && it.stop.epochSeconds > clock.nowSec }
@@ -161,6 +175,7 @@ private class GuideMapper(
         .sortedBy { it.start }
         .groupBy { it.channelId }
     private val names = channels.associate { it.id to it.name.orEmpty() }
+    private val logos = channels.associate { it.id to artwork?.logo(it.icon, observation) }
 
     fun state(selection: GuideSelection, tags: List<ChannelTag>, selectedTagId: String?): GuideState {
         val days = guideDays(channels.flatMap { byChannel[it.id].orEmpty() }, clock)
@@ -204,6 +219,7 @@ private class GuideMapper(
         return GuideChannel(
             id = channel.id.value.toString(),
             name = channel.name.orEmpty(),
+            logoModel = logos[channel.id],
             programs = overview.map(::program),
             gap = gap,
             day = day.map(::program),
@@ -212,9 +228,10 @@ private class GuideMapper(
 
     private fun program(event: EpgEvent): GuideProgram {
         val running = event.isRunning(clock.nowSec)
+        val channelId = event.channelId?.value?.toString().orEmpty()
         return GuideProgram(
             id = event.id.value.toString(),
-            channelId = event.channelId?.value?.toString().orEmpty(),
+            channelId = channelId,
             title = event.title.orEmpty(),
             start = texts.clock(event.start.epochSeconds),
             number = texts.number(event),
@@ -224,10 +241,12 @@ private class GuideMapper(
             timeRange = texts.timeRange(event.start.epochSeconds, event.stop.epochSeconds),
             episode = texts.episode(event),
             synopsis = event.synopsis(),
+            stillModel = artwork?.picture(programmeArtwork(event), observation),
             progress = event.progress(clock.nowSec).takeIf { running },
             timeLeft = texts.duration(event.stop.epochSeconds - clock.nowSec).takeIf { running },
             recording = observation.runningRecordingForEvent(event) != null,
             scheduled = observation.isScheduled(event),
+            watching = running && channelId == playing,
         )
     }
 
@@ -238,6 +257,7 @@ private class GuideMapper(
             id = program.id,
             channelId = program.channelId,
             channel = names[event.channelId].orEmpty(),
+            channelLogoModel = logos[event.channelId],
             title = program.title,
             episode = program.episode,
             length = program.length,
@@ -248,24 +268,44 @@ private class GuideMapper(
             progress = program.progress,
             timeLeft = program.timeLeft,
             recording = program.recording,
+            pictureModel = program.stillModel,
+            watching = program.watching,
             synopsis = program.synopsis,
             otherAirings = otherAirings(event, events, clock.nowSec, AIRINGS_LIMIT).map(::airing),
             credits = credits(event),
-            facts = listOfNotNull(
-                program.genre?.let { ProgramFact(FactKey.Genre, it) },
-                episode?.seasonNumber?.let { ProgramFact(FactKey.Season, it.toString()) },
-                episode?.episodeNumber?.let { ProgramFact(FactKey.Episode, it.toString()) },
-                program.year?.let { ProgramFact(FactKey.Year, it) },
-                programmeAgeRating(event.rating?.label, event.rating?.age)?.let { ProgramFact(FactKey.AgeRating, it) },
-                event.firstAired?.let { ProgramFact(FactKey.FirstAired, texts.firstAired(it.toEpochMilliseconds())) },
-                event.categories?.filter(String::isNotBlank)?.takeIf { it.isNotEmpty() }
-                    ?.let { ProgramFact(FactKey.Categories, it.joinToString(" • ")) },
-            ),
+            facts = facts(event, program),
         )
+    }
+
+    /**
+     * The TV's facts in its order (app ProgrammeDetailsPage.kt `programmeAboutFacts`): a season,
+     * episode or part number reads "2 of 3" when the server's count covers it, an episode without a
+     * number its on-screen text; Broadcast says New or Repeat.
+     */
+    private fun facts(event: EpgEvent, program: GuideProgram): List<ProgramFact> {
+        val episode = event.episode
+        fun count(number: Long?, of: Long?) = number?.let { texts.count(it, of?.takeIf { total -> total >= it }) }
+        fun list(values: List<String>?) =
+            values?.map(String::trim)?.filter(String::isNotEmpty)?.distinct()?.takeIf { it.isNotEmpty() }
+                ?.joinToString(" • ")
+        return listOf(
+            FactKey.Genre to program.genre,
+            FactKey.Season to count(episode?.seasonNumber, episode?.seasonCount),
+            FactKey.Episode to (count(episode?.episodeNumber, episode?.episodeCount) ?: episode?.onscreen),
+            FactKey.Part to count(episode?.partNumber, episode?.partCount),
+            FactKey.Year to program.year,
+            FactKey.AgeRating to programmeAgeRating(event.rating?.label, event.rating?.age),
+            FactKey.Stars to event.rating?.stars?.let { texts.count(it, null) },
+            FactKey.FirstAired to event.firstAired?.let { texts.firstAired(it.toEpochMilliseconds()) },
+            FactKey.Broadcast to event.isNew?.let(texts.broadcast),
+            FactKey.Categories to list(event.categories),
+            FactKey.Keywords to list(event.keywords),
+        ).mapNotNull { (key, value) -> value?.trim()?.takeIf(String::isNotEmpty)?.let { ProgramFact(key, it) } }
     }
 
     private fun airing(event: EpgEvent) = ProgramAiring(
         id = event.id.value.toString(),
+        logoModel = logos[event.channelId],
         time = texts.airing(event.start.epochSeconds, today),
         line = listOfNotNull(names[event.channelId], texts.number(event), event.subtitle?.takeIf(String::isNotBlank)),
         scheduled = observation.isScheduled(event),
@@ -273,15 +313,18 @@ private class GuideMapper(
 
     @OptIn(ExperimentalTvheadendApi::class)
     private fun credits(event: EpgEvent): List<ProgramCredit> {
-        // Guests and presenters have no section of their own in the design.
+        // The TV's roles and order (app ProgrammeDetailsPage.kt `programmeCreditFacts`): one entry
+        // per name and role, since the wire may repeat a pair.
         val roles = listOf(
             CreditRole.Cast to EpgCreditRole.ACTOR,
+            CreditRole.Guests to EpgCreditRole.GUEST,
+            CreditRole.Presenters to EpgCreditRole.PRESENTER,
             CreditRole.Director to EpgCreditRole.DIRECTOR,
             CreditRole.Writer to EpgCreditRole.WRITER,
         )
         val credits = event.credits.orEmpty()
         return roles.mapNotNull { (role, kind) ->
-            credits.filter { it.role == kind }.map { it.name }.filter(String::isNotBlank)
+            credits.filter { it.role == kind }.map { it.name.trim() }.filter(String::isNotEmpty).distinct()
                 .takeIf { it.isNotEmpty() }?.let { ProgramCredit(role, it) }
         }
     }
