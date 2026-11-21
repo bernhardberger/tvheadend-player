@@ -2,6 +2,7 @@ package at.bernhardberger.tvhplayer.images
 
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -50,6 +51,15 @@ class LogoInkTest {
         val empty = IntArray(W * H)
         assertNull(inkFadingLogoParts(empty, W, H, FOCUSED_ROW))
         assertArrayEquals(IntArray(W * H), empty)
+    }
+
+    @Test fun onlyDarkLogoInkWithoutALightPartNeedsLightGround() {
+        val neutral = 0xff191c1e.toInt()
+        val white = 0xffffffff.toInt()
+        val clear = 0x00ffffff
+        assertTrue(logoNeedsLightGround(intArrayOf(neutral, neutral, clear, clear)))
+        assertFalse(logoNeedsLightGround(intArrayOf(white, white, clear, clear)))
+        assertFalse(logoNeedsLightGround(intArrayOf(neutral, neutral, white)))
     }
 
     private class Logo {
