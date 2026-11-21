@@ -11,7 +11,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -28,6 +29,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -54,21 +56,23 @@ internal fun ChannelLogoTile(
     model: Any? = null,
 ) {
     val scheme = MaterialTheme.colorScheme
-    val fill = if (logo == null || tint == null) {
+    val fill = if ((logo == null && model == null) || tint == null) {
         Modifier.background(scheme.surfaceContainerHigh)
     } else {
         Modifier.background(Brush.linearGradient(listOf(tint, lerp(tint, Color.Black, LOGO_SHADE))))
     }
     Box(
-        modifier.clip(shape).then(fill).border(1.dp, scheme.outlineVariant, shape).padding(4.dp),
+        modifier.clip(shape).then(fill).border(1.dp, scheme.outlineVariant, shape),
         contentAlignment = Alignment.Center,
     ) {
+        // Whatever its shape, the logo is fitted into the same share of the tile (section 13).
+        val box = Modifier.fillMaxWidth(LOGO_WIDTH_SHARE).fillMaxHeight(LOGO_HEIGHT_SHARE)
         if (logo == null) {
-            ArtworkImage(null, model, Modifier.fillMaxSize()) {
+            ArtworkImage(null, model, box) {
                 Icon(painterResource(R.drawable.play_tv_outline), null, tint = scheme.onSurfaceVariant)
             }
         } else {
-            Image(logo, null)
+            Image(logo, null, box, contentScale = ContentScale.Fit)
         }
     }
 }
@@ -142,3 +146,5 @@ private fun Fact(key: String, value: String, keyWidth: Dp) {
 
 private val LogoShape = RoundedCornerShape(12.dp)
 private const val LOGO_SHADE = 0.35f
+private const val LOGO_WIDTH_SHARE = 0.76f
+private const val LOGO_HEIGHT_SHARE = 0.62f
