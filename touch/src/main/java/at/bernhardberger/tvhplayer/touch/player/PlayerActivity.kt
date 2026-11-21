@@ -144,10 +144,9 @@ class PlayerActivity : ComponentActivity() {
         }
         lifecycleScope.launch {
             requested.map { it is Tune }.distinctUntilChanged().collectLatest { live ->
-                if (live) {
-                    launch { retuneOnNewSession(runtime, session) }
-                    followConnection(runtime, session)
-                }
+                if (!live) return@collectLatest
+                launch { retuneOnNewSession(runtime, session) }
+                followConnection(runtime, session)
             }
         }
         finishRecordingAtEof(lifecycleScope, runtime, requested, { lifecycle.currentState }, ::leave)
@@ -157,6 +156,7 @@ class PlayerActivity : ComponentActivity() {
             finish()
         }
         setContent {
+            SystemBarsForOrientation(window, pictureWindow.inWindow.collectAsStateWithLifecycle().value)
             MaterialTheme(colorScheme = MobileDarkColors) {
                 CompositionLocalProvider(LocalChannelAccents provides get<ChannelAccents>()) {
                     // The window's one notice host, for the connection in use, as browsing builds it.
@@ -286,7 +286,7 @@ class PlayerActivity : ComponentActivity() {
         SideEffect { pictureWindow.mode = options.aspect }
         PlayerEffects(
             timeshift, shown, controlsShown && !paused && !inWindow, liveStart && !paused,
-            session, runtime, notices, window,
+            session, runtime, notices,
         )
         val now = Instant.fromEpochSeconds(minute * SECONDS_PER_MINUTE)
         val programs = timeshift.programs.value
