@@ -1,5 +1,9 @@
 package at.bernhardberger.tvhplayer.touch
 
+import android.content.pm.ApplicationInfo
+import kotlinx.coroutines.Dispatchers
+import org.robolectric.shadows.ShadowLog
+
 import android.os.Looper
 import android.view.ViewGroup
 import android.view.WindowInsets
@@ -535,6 +539,29 @@ class TouchAppTest {
     }
 
     @Test
+    fun channelsIgnoreEpgUpdatesOutsideTheirRowsButShowAChangedCurrentProgram() {
+        val info = compose.activity.applicationInfo
+        val oldFlags = info.flags
+        info.flags = oldFlags or ApplicationInfo.FLAG_DEBUGGABLE
+        ShadowLog.clear()
+        fun mappings() = ShadowLog.getLogsForTag("TouchArtwork").count { it.msg.startsWith("mapped Channels ") }
+        try {
+            val guide = savedConnectionWithGuide()
+            compose.onNodeWithText(guide.programs[0], substring = true).assertIsDisplayed()
+            val initial = mappings()
+            assertTrue(initial > 0)
+            compose.runOnIdle { connection.session.publish(guide.connected(epg = guide.refreshedEpg())) }
+            compose.runOnIdle { assertEquals("No map for an event outside the shown rows", initial, mappings()) }
+            compose.runOnIdle {
+                connection.session.publish(guide.connected(epg = guide.refreshedEpg("Updated News")))
+            }
+            compose.onNodeWithText("Updated News", substring = true).assertIsDisplayed()
+        } finally {
+            info.flags = oldFlags
+        }
+    }
+
+    @Test
     fun aTagFiltersTheChannels() {
         val guide = savedConnectionWithGuide()
         compose.onNode(hasClickAction() and hasText(label(R.string.channels_all))).performClick()
@@ -557,6 +584,25 @@ class TouchAppTest {
         compose.onNodeWithText(label(R.string.channels_saved)).assertIsDisplayed()
         compose.onNodeWithText(guide.first.name!!).assertIsDisplayed()
         compose.onNodeWithText(guide.second.name!!).assertIsDisplayed()
+    }
+
+    @Test
+    fun recordingsDoNotRemapWhenOnlyTheGuideChanges() {
+        val info = compose.activity.applicationInfo
+        val oldFlags = info.flags
+        info.flags = oldFlags or ApplicationInfo.FLAG_DEBUGGABLE
+        ShadowLog.clear()
+        fun mappings() = ShadowLog.getLogsForTag("TouchArtwork").count { it.msg.startsWith("mapped Recordings ") }
+        try {
+            val guide = savedConnectionWithGuide()
+            openRecordings()
+            val initial = mappings()
+            assertTrue(initial > 0)
+            compose.runOnIdle { connection.session.publish(guide.connected(epg = guide.refreshedEpg())) }
+            compose.runOnIdle { assertEquals("An EPG-only update leaves Recordings unchanged", initial, mappings()) }
+        } finally {
+            info.flags = oldFlags
+        }
     }
 
     @Test
@@ -1220,7 +1266,7 @@ class TouchAppTest {
             MaterialTheme(colorScheme = MobileDarkColors) {
                 TouchApp(
                     connection.browseSession, connection.owner, presentation, channels, recordings, guide,
-                    connection.noticeCenter,
+                    connection.noticeCenter, channelsDispatcher = Dispatchers.Main.immediate,
                 ) {
                     flowOf(TvheadendDiscoveryTestFactory.discovering(listOf(server)))
                 }

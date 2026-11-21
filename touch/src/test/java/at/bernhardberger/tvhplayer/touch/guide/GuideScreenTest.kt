@@ -449,18 +449,25 @@ class GuideScreenTest {
         val before = noon.toEpochMilliseconds() + 29 * 60_000 + 50_000
         withMappingTrace {
             try {
-                connection.session.publish(ServerGuide(noon).connected())
+                val guide = ServerGuide(noon)
+                connection.session.publish(guide.connected())
                 assertTrue(SystemClock.setCurrentTimeMillis(before))
                 showDestination(connection) {}
                 compose.onNodeWithText("Evening News").assertIsDisplayed()
                 assertTrue(SystemClock.setCurrentTimeMillis(before + 5_000))
                 compose.mainClock.advanceTimeBy(5_016)
                 compose.runOnIdle { assertEquals("No remap within the same minute", 1, guideMappings()) }
+                compose.runOnIdle { connection.session.publish(guide.connected(epg = guide.refreshedEpg())) }
+                compose.runOnIdle { assertEquals("No remap for an event outside the shown window", 1, guideMappings()) }
+                compose.runOnIdle {
+                    connection.session.publish(guide.connected(epg = guide.refreshedEpg("Updated News")))
+                }
+                compose.onNodeWithText("Updated News").assertIsDisplayed()
                 assertTrue(SystemClock.setCurrentTimeMillis(before + 10_000))
                 compose.mainClock.advanceTimeBy(5_016)
                 compose.onNodeWithText("Weather").assertIsDisplayed()
-                compose.onAllNodesWithText("Evening News").assertCountEquals(0)
-                compose.runOnIdle { assertEquals("The minute wakes the mapper", 2, guideMappings()) }
+                compose.onAllNodesWithText("Updated News").assertCountEquals(0)
+                compose.runOnIdle { assertEquals("The minute wakes the mapper", 3, guideMappings()) }
             } finally {
                 connection.close()
             }

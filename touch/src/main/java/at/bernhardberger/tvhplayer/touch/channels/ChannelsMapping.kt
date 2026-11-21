@@ -6,8 +6,11 @@ import at.bernhardberger.tvhplayer.ui.screens.programmeRecordKeyAction
 import at.bernhardberger.tvhplayer.core.programmeArtwork
 import at.bernhardberger.tvhplayer.touch.ui.ArtworkModels
 import at.bernhardberger.tvheadend.sdk.core.Channel
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
+import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.activeRecordingChannelIds
 import at.bernhardberger.tvhplayer.core.browseAppError
@@ -41,6 +44,7 @@ internal fun channelsState(
     texts: ChannelsTexts = ChannelsTexts.TitlesOnly,
     playingId: String? = null,
     artwork: ArtworkModels? = null,
+    programs: List<ChannelRowPrograms>? = null,
 ): ChannelsState {
     val browsing = scope.scope
     val current = scope.channelCatalogCurrent
@@ -63,7 +67,9 @@ internal fun channelsState(
         }
         else -> {
             val mapper = RowMapper(observation, now, texts, artwork)
-            val rows = browsing.visibleChannels.map { mapper.row(it, playing = it.id.value.toString() == playingId) }
+            val rows = browsing.visibleChannels.mapIndexed { index, channel ->
+                mapper.row(channel, playing = channel.id.value.toString() == playingId, programs?.get(index))
+            }
             val list = ChannelList(rows, tags, selectedTagId, hasLogos = true)
             if (degraded) ChannelsState.Offline(list) else ChannelsState.Ready(list)
         }
@@ -94,15 +100,11 @@ private class RowMapper(
         activeRecordingChannelIds(entries, now.epochSeconds)
     }
 
-    fun row(channel: Channel, playing: Boolean): ChannelRow {
-        val running = observation.eventAt(channel.id, now)
-        val next = observation.nextEvent(channel.id, now)
-        // Each later program is the one after the program running at the previous one's start.
-        val following = generateSequence(next) { observation.nextEvent(channel.id, it.start) }
-            .drop(1)
-            .take(FOLLOWING_LIMIT)
-            .map { it.program() }
-            .toList()
+    fun row(channel: Channel, playing: Boolean, projected: ChannelRowPrograms? = null): ChannelRow {
+        val programs = projected ?: observation.channelRowPrograms(channel.id, now)
+        val running = programs.running
+        val next = programs.ahead.firstOrNull()
+        val following = programs.ahead.drop(1).map { it.program() }
         val details = ChannelDetails(
             artworkModel = running?.let { artwork?.picture(programmeArtwork(it), observation) },
             episode = running?.let { texts.episode(it) },
@@ -160,6 +162,25 @@ private class RowMapper(
         sequenceOf(summary, description)
             .mapNotNull { it?.replace("\\r\\n", "\n")?.replace("\\n", "\n")?.trim() }
             .firstOrNull { it.isNotBlank() && it != title?.trim() && it != subtitle?.trim() }
+}
+
+internal data class ChannelRowPrograms(
+    val running: EpgEvent?,
+    val ahead: List<EpgEvent>,
+)
+
+internal fun SessionObservation.channelRowPrograms(id: ChannelId, now: Instant): ChannelRowPrograms =
+    ChannelRowPrograms(
+        eventAt(id, now),
+        generateSequence(nextEvent(id, now)) { nextEvent(id, it.start) }.take(FOLLOWING_LIMIT + 1).toList(),
+    )
+
+internal fun SessionObservation.sameProgrammeAuthority(previous: SessionObservation): Boolean {
+    if (currentSession !== previous.currentSession) return false
+    val write = (sessionState as? SessionState.Ready)?.capabilities?.dvrWrite
+    val previousWrite = (previous.sessionState as? SessionState.Ready)?.capabilities?.dvrWrite
+    return write == previousWrite && recordingProgressCapability == previous.recordingProgressCapability &&
+        (dvrState is DvrRepositoryState.Current) == (previous.dvrState is DvrRepositoryState.Current)
 }
 
 private const val FOLLOWING_LIMIT = 3

@@ -17,6 +17,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -32,12 +33,20 @@ import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.serverProfileDisplayName
 import at.bernhardberger.tvhplayer.ui.screens.settings.rememberSavedConnectionRestore
 import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
+import at.bernhardberger.tvheadend.sdk.core.SessionObservation
+import at.bernhardberger.tvhplayer.core.ConnectionUiState
+import at.bernhardberger.tvhplayer.touch.channels.ChannelRowPrograms
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsActions
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsScreen
+import at.bernhardberger.tvhplayer.touch.channels.ChannelsState
+import at.bernhardberger.tvhplayer.touch.channels.ChannelsTexts
+import at.bernhardberger.tvhplayer.touch.channels.channelRowPrograms
+import at.bernhardberger.tvhplayer.touch.channels.sameProgrammeAuthority
 import at.bernhardberger.tvhplayer.touch.channels.channelsState
 import at.bernhardberger.tvhplayer.touch.channels.rememberChannelsTexts
 import at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
+import at.bernhardberger.tvhplayer.viewmodels.ChannelScopeState
 import at.bernhardberger.tvhplayer.ui.common.rememberCurrentEpochSeconds
 import kotlin.time.Instant
 import at.bernhardberger.tvhplayer.touch.connect.ActiveConnectionUiState
@@ -56,6 +65,10 @@ import at.bernhardberger.tvhplayer.touch.guide.GuideDestination
 import at.bernhardberger.tvhplayer.touch.guide.GuideViewModel
 import at.bernhardberger.tvhplayer.touch.recordings.RecordingsDestination
 import at.bernhardberger.tvhplayer.touch.recordings.RecordingsViewModel
+import at.bernhardberger.tvhplayer.touch.ui.epgChangeCounts
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.Flow
 
 /** [SignIn] is the Connections page opened on the editor, for a password that can't be read. */
@@ -79,6 +92,7 @@ internal fun TouchApp(
     playingId: String? = null,
     onWatch: ((String) -> Unit)? = null,
     onPlayRecording: ((String, Boolean) -> Unit)? = null,
+    channelsDispatcher: CoroutineDispatcher = Dispatchers.Default,
     discovery: () -> Flow<TvheadendDiscoveryState>,
 ) {
     val profile by owner.serverProfile.collectAsStateWithLifecycle()
@@ -116,6 +130,7 @@ internal fun TouchApp(
             }
             else -> AppDestinations(
                 session, dvr, connection, channels, recordings, guide, playingId, onWatch, onPlayRecording,
+                channelsDispatcher = channelsDispatcher,
                 onOpenConnections = { page = Page.Connections },
                 onSignIn = { page = Page.SignIn },
             )
@@ -196,6 +211,7 @@ private fun ServerProfileSummary.uiState(status: ConnectionStatus) = ActiveConne
  * and the row controls with nothing behind them (Details, Show in Guide) are left out.
  */
 @Composable
+@Suppress("LongParameterList")
 private fun AppFrame(
     connection: AppConnectionViewModel,
     channels: ChannelsViewModel,
@@ -204,21 +220,39 @@ private fun AppFrame(
     dvr: DvrControls,
     onOpenConnections: () -> Unit,
     onSignIn: () -> Unit,
+    mappingDispatcher: CoroutineDispatcher,
 ) {
     ArtworkScreenShown("Channels")
-    val presentation by connection.uiState.collectAsStateWithLifecycle()
-    val scope by channels.scope.collectAsStateWithLifecycle()
+    val presentation = connection.uiState.collectAsStateWithLifecycle().value
+    val scope = channels.scope.collectAsStateWithLifecycle().value
     // The scope is republished for channel changes only; the guide comes with every observation.
-    val observation by channels.observation.collectAsStateWithLifecycle()
+    val observation = channels.observation.collectAsStateWithLifecycle().value
     val nowSec = rememberCurrentEpochSeconds()
     val now = Instant.fromEpochSeconds(nowSec())
     val texts = rememberChannelsTexts()
     val artwork = LocalArtworkModels.current
-    val state = traceArtworkMapping(LocalContext.current, "Channels") {
-        channelsState(
-            scope, presentation.connection, presentation.degraded, observation, now, texts, playingId, artwork,
-        )
+    val context = LocalContext.current.applicationContext
+    val key = ChannelsMappingKey(scope, presentation.connection, presentation.degraded, now, texts, playingId, artwork)
+    val mapped by produceState<ChannelsMappingResult?>(null, key, observation) {
+        val previous = value
+        value = withContext(mappingDispatcher) {
+            val programs = scope.scope.visibleChannels.map { observation.channelRowPrograms(it.id, now) }
+            val sameRows = previous?.key == key && previous.programs == programs &&
+                observation.sameProgrammeAuthority(previous.observation) &&
+                observation.dvrSnapshotForDisplay === previous.observation.dvrSnapshotForDisplay
+            val state = if (sameRows) previous.state else {
+                val counts = context.epgChangeCounts(previous?.observation, observation)
+                traceArtworkMapping(context, "Channels", if (counts.isEmpty()) null else "epg$counts") {
+                    channelsState(
+                        scope, presentation.connection, presentation.degraded, observation, now, texts,
+                        playingId, artwork, programs,
+                    )
+                }
+            }
+            ChannelsMappingResult(key, observation, programs, state)
+        }
     }
+    val state = mapped?.takeIf { it.key.scope.profileId == scope.profileId }?.state ?: ChannelsState.Loading
     ChannelsScreen(
         state = state,
         actions = ChannelsActions(
@@ -234,6 +268,23 @@ private fun AppFrame(
     )
 }
 
+private data class ChannelsMappingKey(
+    val scope: ChannelScopeState,
+    val connection: ConnectionUiState,
+    val degraded: Boolean,
+    val now: Instant,
+    val texts: ChannelsTexts,
+    val playingId: String?,
+    val artwork: ArtworkModels?,
+)
+
+private class ChannelsMappingResult(
+    val key: ChannelsMappingKey,
+    val observation: SessionObservation,
+    val programs: List<ChannelRowPrograms>,
+    val state: ChannelsState,
+)
+
 /** Each destination's screen draws the frame, so the selection is kept here and picks the screen. */
 @Suppress("LongParameterList") // One view model per destination.
 @Composable
@@ -247,6 +298,7 @@ private fun AppDestinations(
     playingId: String?,
     onWatch: ((String) -> Unit)?,
     onPlayRecording: ((String, Boolean) -> Unit)?,
+    channelsDispatcher: CoroutineDispatcher,
     onOpenConnections: () -> Unit,
     onSignIn: () -> Unit,
 ) {
@@ -265,7 +317,7 @@ private fun AppDestinations(
                     onOpenConnections, onSignIn,
                 )
             Destination.Channels ->
-                AppFrame(connection, channels, playingId, onWatch, dvr, onOpenConnections, onSignIn)
+                AppFrame(connection, channels, playingId, onWatch, dvr, onOpenConnections, onSignIn, channelsDispatcher)
         }
     }
 }

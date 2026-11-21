@@ -127,6 +127,33 @@ internal fun guideState(
 /** The jump times after Now, as drawn (section 7); which times to offer is an open design question. */
 internal val GUIDE_JUMP_TIMES: List<LocalTime> = listOf(LocalTime.of(20, 15), LocalTime.of(22, 0))
 
+/** Raw inputs to the visible schedule, including the tabs and the separately opened Details. */
+internal data class GuideEpgProjection(
+    val days: List<LocalDate>,
+    val events: Map<ChannelId?, List<EpgEvent>>,
+    val details: EpgEvent?,
+)
+
+internal fun GuideMappingInput.epgProjection(): GuideEpgProjection? {
+    val snapshot = observation.epgSnapshotForDisplay ?: return null
+    val visible = scope.scope.visibleChannels.mapTo(HashSet()) { it.id }
+    val upcoming = snapshot.events.filter {
+        it.channelId in visible && it.stop > it.start && it.stop.epochSeconds > clock.nowSec
+    }
+    val days = guideDays(upcoming, clock)
+    val date = selection.dateIn(days)
+    val jump = selection.jump?.takeIf { second ->
+        second > clock.nowSec && GUIDE_JUMP_TIMES.any { date.atTime(it).atZone(clock.zone).toEpochSecond() == second }
+    }
+    val window = guideWindow(date, jump, clock)
+    val end = maxOf(window.daySec.last + 1, window.anchorSec + OVERVIEW_SPAN_SEC)
+    val events = upcoming.asSequence()
+        .filter { it.stop.epochSeconds > window.daySec.first && it.start.epochSeconds < end }
+        .groupBy { it.channelId }
+    val details = selection.detailsId?.toLongOrNull()?.let { id -> snapshot.events.firstOrNull { it.id.value == id } }
+    return GuideEpgProjection(days, events, details)
+}
+
 /** The day tabs: today, then every later day the visible channels have programs on. */
 internal fun guideDays(events: List<EpgEvent>, clock: GuideClock): List<LocalDate> {
     val today = clock.today
