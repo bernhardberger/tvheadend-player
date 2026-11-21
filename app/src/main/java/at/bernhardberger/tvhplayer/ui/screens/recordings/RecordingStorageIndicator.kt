@@ -20,7 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.DvrDiskSpaceState
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.RecordingSpaceIndicator
 import at.bernhardberger.tvhplayer.core.RecordingSpaceLevel
 import at.bernhardberger.tvhplayer.core.recordingSpaceIndicator

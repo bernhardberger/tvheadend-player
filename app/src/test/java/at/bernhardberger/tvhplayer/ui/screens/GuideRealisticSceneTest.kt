@@ -56,7 +56,7 @@ import at.bernhardberger.tvheadend.sdk.media3.createTvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionCall
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.notices.NoticeContext
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime

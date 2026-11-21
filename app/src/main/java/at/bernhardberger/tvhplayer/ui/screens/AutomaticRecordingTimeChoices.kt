@@ -12,7 +12,8 @@ import androidx.compose.ui.state.ToggleableState
 import androidx.tv.material3.Checkbox
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.RecordingRuleChannel
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.core.RecordingStartWindow
 import at.bernhardberger.tvhplayer.ui.components.GuidedStepAction
@@ -47,14 +48,14 @@ private fun AutomaticRecordingChannelTime(state: AutomaticRecordingEditorState, 
         { state.navigation.open(AutomaticRecordingEditorLevel.CHANNEL, channelRowId(state.draft.channel)) },
         editorRowModifier(state.navigation, "channel"),
         subtitleMaxLines = 2, subtitle = automaticRecordingChannelLabel(state.draft, channels),
-        trailingIcon = R.drawable.ic_keyboard_arrow_right,
+        trailingIcon = AppR.drawable.ic_keyboard_arrow_right,
     )
     GuidedStepAction(
         stringResource(R.string.autorec_editor_days),
         { state.navigation.open(AutomaticRecordingEditorLevel.DAYS, "done") },
         editorRowModifier(state.navigation, "days"),
         subtitleMaxLines = 2, subtitle = automaticRecordingDaysLabel(state.draft.days),
-        trailingIcon = R.drawable.ic_keyboard_arrow_right,
+        trailingIcon = AppR.drawable.ic_keyboard_arrow_right,
     )
     GuidedStepAction(
         stringResource(R.string.autorec_editor_start_window),
@@ -63,7 +64,7 @@ private fun AutomaticRecordingChannelTime(state: AutomaticRecordingEditorState, 
         },
         editorRowModifier(state.navigation, "start-window"),
         subtitleMaxLines = 2, subtitle = automaticRecordingWindowLabel(state.draft.startWindow),
-        trailingIcon = R.drawable.ic_keyboard_arrow_right,
+        trailingIcon = AppR.drawable.ic_keyboard_arrow_right,
     )
 }
 
@@ -139,7 +140,7 @@ private fun AutomaticRecordingStartWindow(state: AutomaticRecordingEditorState) 
                     AutomaticRecordingEditorLevel.BEFORE_HOUR, "hour-${time.hour}")
             },
             editorRowModifier(state.navigation, if (after) "after" else "before"),
-            trailingIcon = R.drawable.ic_keyboard_arrow_right,
+            trailingIcon = AppR.drawable.ic_keyboard_arrow_right,
             subtitleMaxLines = 2, subtitle = when {
                 after && current is RecordingStartWindow.After -> formatClock(current.time)
                 !after && current is RecordingStartWindow.Before -> formatClock(current.time)

@@ -9,7 +9,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import at.bernhardberger.tvheadend.sdk.core.StreamProfileId
 import at.bernhardberger.tvheadend.sdk.core.StreamProfilesResult
 import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.ui.common.formatDurationSeconds
 import at.bernhardberger.tvhplayer.core.streamProfilePresentation
 import at.bernhardberger.tvhplayer.settings.FrameRateSwitching

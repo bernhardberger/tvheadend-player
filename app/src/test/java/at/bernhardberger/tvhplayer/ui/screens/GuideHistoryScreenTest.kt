@@ -20,7 +20,7 @@ import at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult
 import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.testing.*
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.notices.NoticeContext
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime

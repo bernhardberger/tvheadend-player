@@ -27,7 +27,7 @@ import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.MaterialTheme
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.visibleChannelNumber
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.TvTextColors

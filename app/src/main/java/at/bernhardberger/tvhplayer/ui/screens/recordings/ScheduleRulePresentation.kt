@@ -29,7 +29,8 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.AutomaticRecordingKind
 import at.bernhardberger.tvhplayer.core.AutomaticRecordingListItem
 import at.bernhardberger.tvhplayer.core.toDraft
@@ -80,9 +81,9 @@ internal fun scheduleRuleRowId(id: String, kind: AutomaticRecordingKind) =
 
 internal fun AutomaticRecordingListItem.icon() =
     when (kind) {
-        AutomaticRecordingKind.TITLE -> R.drawable.ic_title
-        AutomaticRecordingKind.TIMER -> R.drawable.ic_schedule
-        else -> R.drawable.ic_fiber_smart_record
+        AutomaticRecordingKind.TITLE -> AppR.drawable.ic_title
+        AutomaticRecordingKind.TIMER -> AppR.drawable.ic_schedule
+        else -> AppR.drawable.ic_fiber_smart_record
     }
 
 @Composable
@@ -175,12 +176,12 @@ internal fun ScheduleRulePane(item: AutomaticRecordingListItem, channels: List<C
             status = { statusModifier ->
                 Column(statusModifier) {
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        ProgrammeStatusLine(whenLabel, R.drawable.ic_event, "automatic-recording-pane-when")
+                        ProgrammeStatusLine(whenLabel, AppR.drawable.ic_event, "automatic-recording-pane-when")
                         ProgrammeStatusLine(stringResource(R.string.schedule_automatic_keep, keepLabel),
-                            R.drawable.ic_hourglass_bottom, "automatic-recording-pane-keep")
+                            AppR.drawable.ic_hourglass_bottom, "automatic-recording-pane-keep")
                         if (item.upcomingEntries.isEmpty()) {
                             ProgrammeStatusLine(stringResource(R.string.schedule_automatic_nothing),
-                                R.drawable.ic_schedule, "automatic-recording-pane-next", maxLines = 2)
+                                AppR.drawable.ic_schedule, "automatic-recording-pane-next", maxLines = 2)
                         }
                     }
                     if (item.upcomingEntries.isNotEmpty()) ScheduleUpcomingEntries(item, channels, subject.name)

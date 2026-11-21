@@ -41,7 +41,7 @@ import androidx.tv.material3.ProvideTextStyle
 import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.di.PlayerStatsLevel
 import at.bernhardberger.tvhplayer.playback.AppPlaybackDiagnostics
 import at.bernhardberger.tvhplayer.playback.AppPlaybackSource

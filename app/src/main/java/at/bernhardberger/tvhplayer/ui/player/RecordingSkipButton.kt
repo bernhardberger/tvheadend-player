@@ -58,7 +58,7 @@ import androidx.tv.material3.Button
 import androidx.tv.material3.ButtonDefaults
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.layout.layout
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.RecordingMarkKind
 import at.bernhardberger.tvhplayer.playback.RecordingSkipAction
 import kotlin.math.roundToInt

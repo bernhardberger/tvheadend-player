@@ -5,7 +5,7 @@ import androidx.compose.ui.res.stringResource
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileAuthenticationMode
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileListResult
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileSummary
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.settings.serverProfileDisplayName
 
 private const val DEFAULT_PORT = 9982

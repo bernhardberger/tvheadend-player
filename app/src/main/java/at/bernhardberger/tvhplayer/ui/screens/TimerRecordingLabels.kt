@@ -5,7 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import at.bernhardberger.tvheadend.sdk.core.Channel
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.RecordingDraftField
 import at.bernhardberger.tvhplayer.core.RecordingSubmitUnavailable
 import at.bernhardberger.tvhplayer.ui.common.formatClock

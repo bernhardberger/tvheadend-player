@@ -4,7 +4,8 @@ import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.AutomaticRecordingKind
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvhplayer.ui.components.ConfirmationDialog
@@ -17,7 +18,7 @@ internal fun AutomaticRecordingDeleteDialog(
 ) {
     RecordingRuleDeleteDialog(
         kind = state.baseline.kind,
-        subject = ConfirmationSubject.Rule(R.drawable.ic_fiber_smart_record, state.baseline.pattern.words,
+        subject = ConfirmationSubject.Rule(AppR.drawable.ic_fiber_smart_record, state.baseline.pattern.words,
             listOf(stringResource(when (state.baseline.kind) {
                 AutomaticRecordingKind.SERIES -> R.string.automatic_recording_kind_series
                 AutomaticRecordingKind.TITLE -> R.string.automatic_recording_kind_title
@@ -48,9 +49,9 @@ internal fun RecordingRuleDeleteDialog(
         subject = subject,
         sentence = formatAutomaticRecordingDeleteBody(LocalContext.current, kind, scheduledCount, changed),
         safe = ConfirmationChoice(stringResource(R.string.keep),
-            R.drawable.ic_check, "$prefix-keep"),
+            AppR.drawable.ic_check, "$prefix-keep"),
         action = ConfirmationChoice(stringResource(R.string.context_delete),
-            R.drawable.ic_delete_outlined, "$prefix-delete-confirm"),
+            AppR.drawable.ic_delete_outlined, "$prefix-delete-confirm"),
         onDismiss = onDismiss, onConfirm = onConfirm,
     )
 }

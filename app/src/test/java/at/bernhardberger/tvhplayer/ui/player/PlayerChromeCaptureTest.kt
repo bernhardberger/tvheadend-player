@@ -6,7 +6,7 @@ import at.bernhardberger.tvhplayer.core.RecordingMark
 import at.bernhardberger.tvhplayer.core.RecordingMarkKind
 
 import androidx.compose.ui.res.stringResource
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import androidx.compose.ui.semantics.getOrNull
 
 
@@ -448,7 +448,7 @@ class PlayerChromeCaptureTest {
                 }
             }
             if (next == Scene.PROGRAMME_CONFIRM_STOP) {
-                compose.onNodeWithTag("two-column-first").assertIsFocused().assertTextEquals(ApplicationProvider.getApplicationContext<Application>().getString(at.bernhardberger.tvhplayer.R.string.keep_recording))
+                compose.onNodeWithTag("two-column-first").assertIsFocused().assertTextEquals(ApplicationProvider.getApplicationContext<Application>().getString(at.bernhardberger.tvhplayer.presentation.R.string.keep_recording))
             }
             if (next == Scene.RAIL_PEEK) {
                 // The preview describes the focused card, never a neighbour.
@@ -935,7 +935,7 @@ class PlayerChromeCaptureTest {
             onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {}, onInteraction = {},
             onRecord = {},
             recordState = recordState,
-            downHint = androidx.compose.ui.res.stringResource(at.bernhardberger.tvhplayer.R.string.nav_channels),
+            downHint = androidx.compose.ui.res.stringResource(at.bernhardberger.tvhplayer.presentation.R.string.nav_channels),
             decorationCoversControls = tray != null,
             numberEntryShown = numberEntryShown,
             controlsDecoration = { actionsAlpha, controls ->

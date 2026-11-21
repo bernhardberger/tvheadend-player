@@ -24,7 +24,7 @@ import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.tv.material3.MaterialTheme
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.ProgrammeAxis
 import at.bernhardberger.tvhplayer.core.SeekbarDomain
 import at.bernhardberger.tvhplayer.core.SeekbarRange

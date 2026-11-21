@@ -26,7 +26,7 @@ import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionObservation
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.*
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.notices.NoticeContext

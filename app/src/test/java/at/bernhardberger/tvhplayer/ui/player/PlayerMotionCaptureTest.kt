@@ -71,7 +71,7 @@ import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
 import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
 import at.bernhardberger.tvhplayer.core.deviceFaultDetail
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import androidx.compose.ui.res.stringResource
 import coil3.ImageLoader
 import coil3.map.Mapper

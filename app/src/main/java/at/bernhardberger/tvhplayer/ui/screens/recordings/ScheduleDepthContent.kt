@@ -22,7 +22,7 @@ import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.core.AutomaticRecordingList
 import at.bernhardberger.tvhplayer.core.DvrScheduleSection
@@ -160,6 +160,7 @@ private fun rememberScheduleLevels(
         levels[SCHEDULE_ROOT_LEVEL] = DepthLevel(
             id = SCHEDULE_ROOT_LEVEL,
             rows = rows,
+            wholePageRows = { it.id.startsWith("recording:") }, keepPageOnRowChanges = true,
             heading = { emphasis ->
                 if (rows.isNotEmpty()) Column(Modifier.testTag("schedule-upcoming-heading")) {
                     ArchiveLevelHeading(stringResource(R.string.schedule_upcoming), emphasis, null, atRoot = false)

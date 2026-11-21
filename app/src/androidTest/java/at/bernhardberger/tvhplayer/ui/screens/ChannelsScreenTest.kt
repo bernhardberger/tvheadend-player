@@ -44,7 +44,7 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.ChannelTag
 import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.testing.testSessionObservation
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme

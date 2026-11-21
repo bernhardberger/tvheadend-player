@@ -20,7 +20,7 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
 import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvhplayer.ExternalTargetAcceptanceRule
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule

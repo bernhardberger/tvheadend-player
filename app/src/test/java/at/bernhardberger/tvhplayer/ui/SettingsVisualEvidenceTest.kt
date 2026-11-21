@@ -140,8 +140,8 @@ class SettingsVisualEvidenceTest {
         var setupCalls = 0
         lateinit var navigation: DepthNavigationState
         val resources = RuntimeEnvironment.getApplication().resources
-        val cacheLabel = resources.getString(at.bernhardberger.tvhplayer.R.string.clear_cache)
-        val setupLabel = resources.getString(at.bernhardberger.tvhplayer.R.string.appliance_setup)
+        val cacheLabel = resources.getString(at.bernhardberger.tvhplayer.presentation.R.string.clear_cache)
+        val setupLabel = resources.getString(at.bernhardberger.tvhplayer.presentation.R.string.appliance_setup)
         val still = File("../artifacts/settings-c-review/approved-comparison-still.png")
             .takeIf { it.isFile }?.let { requireNotNull(BitmapFactory.decodeFile(it.path)).asImageBitmap() }
         compose.setContent {
@@ -158,10 +158,10 @@ class SettingsVisualEvidenceTest {
                             SettingsScreenNavigation(navigation,
                                 // The status page opens only while a retry can fix the connection.
                                 listOf(settingsRootLevel(connectionStatus = fixtureStatus(
-                                    resources.getString(at.bernhardberger.tvhplayer.R.string.error_101_title))),
+                                    resources.getString(at.bernhardberger.tvhplayer.presentation.R.string.error_101_title))),
                                     settingsApplianceLevel(false, { setupCalls++ }, companionInstalled = true)) +
                                     fixtureConnectionLevels(fixtureStatus(
-                                        resources.getString(at.bernhardberger.tvhplayer.R.string.error_101_title)),
+                                        resources.getString(at.bernhardberger.tvhplayer.presentation.R.string.error_101_title)),
                                         showRetry = true) +
                                     settingsGeneralLevels(UiSettings(), AppLanguage.SYSTEM, CacheStatistics.EMPTY, cacheState,
                                         {}, { cacheCalls++; cacheState = CacheClearState.CLEARING }),
@@ -169,8 +169,8 @@ class SettingsVisualEvidenceTest {
                         }
                         if (cacheState == CacheClearState.CLEARED || cacheState == CacheClearState.FAILED) {
                             AppNoticePresentation(androidx.compose.ui.res.stringResource(
-                                if (cacheState == CacheClearState.CLEARED) at.bernhardberger.tvhplayer.R.string.cache_notice_cleared
-                                else at.bernhardberger.tvhplayer.R.string.cache_notice_failed))
+                                if (cacheState == CacheClearState.CLEARED) at.bernhardberger.tvhplayer.presentation.R.string.cache_notice_cleared
+                                else at.bernhardberger.tvhplayer.presentation.R.string.cache_notice_failed))
                         }
                     }
                 }
@@ -183,8 +183,8 @@ class SettingsVisualEvidenceTest {
         capture("$prefix-connection-preview", writeImages = captures)
         compose.pressKey(Key.DirectionCenter)
         compose.onNodeWithTag("settings-row-${serverProfileRowId(fixtureActiveServer.id)}").assertIsFocused()
-        compose.onNodeWithText(resources.getString(at.bernhardberger.tvhplayer.R.string.connection_try_again)).assertIsDisplayed()
-        compose.onNodeWithText(resources.getString(at.bernhardberger.tvhplayer.R.string.setup_connection),
+        compose.onNodeWithText(resources.getString(at.bernhardberger.tvhplayer.presentation.R.string.connection_try_again)).assertIsDisplayed()
+        compose.onNodeWithText(resources.getString(at.bernhardberger.tvhplayer.presentation.R.string.setup_connection),
             useUnmergedTree = true).assertIsDisplayed() // Preview of the focused server's level.
         compose.onAllNodes(hasSetTextAction()).assertCountEquals(0)
         capture("$prefix-connection-overview", writeImages = captures)

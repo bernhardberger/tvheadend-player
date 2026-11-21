@@ -10,7 +10,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.*
 import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.*
 import at.bernhardberger.tvhplayer.ui.common.*
 import at.bernhardberger.tvhplayer.ui.components.*
@@ -86,7 +87,7 @@ internal fun RecordingPlaybackChoice(
             ) {
                 if (resumePosition != null) PlaybackChoiceButton(
                     stringResource(R.string.recording_resume_from, formatPlaybackDuration(positionMs)),
-                    R.drawable.ic_play_arrow, resumeEnd, filled = true,
+                    AppR.drawable.ic_play_arrow, resumeEnd, filled = true,
                     onClick = { onPlay(RecordingPlaybackStart.RESUME) },
                     modifier = Modifier.stacked(resumeFocus).semantics { contentDescription = spokenResume }
                         .testTag("recording-resume"),
@@ -95,13 +96,14 @@ internal fun RecordingPlaybackChoice(
                     stringResource(
                         if (resumePosition == null) R.string.recording_choice_play else R.string.context_start_over,
                     ),
-                    if (resumePosition == null) R.drawable.ic_play_arrow else R.drawable.ic_replay,
+                    if (resumePosition == null) AppR.drawable.ic_play_arrow else AppR.drawable.ic_replay,
                     startEnd, filled = resumePosition == null,
                     onClick = { onPlay(RecordingPlaybackStart.START_OVER) },
                     modifier = Modifier.stacked(startFocus).testTag("recording-start-over"),
                 )
                 if (onWatchLive != null) PlaybackChoiceButton(
-                    stringResource(R.string.context_watch_live), R.drawable.ic_live_tv_outlined, null, filled = false,
+                    stringResource(R.string.context_watch_live), AppR.drawable.ic_live_tv_outlined, null,
+                    filled = false,
                     onClick = onWatchLive,
                     modifier = Modifier.stacked(liveFocus).testTag("recording-watch-live"),
                 )

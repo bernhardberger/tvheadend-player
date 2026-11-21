@@ -30,7 +30,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyPress
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.settings.ChannelsLayout
 import at.bernhardberger.tvhplayer.settings.ChannelsView

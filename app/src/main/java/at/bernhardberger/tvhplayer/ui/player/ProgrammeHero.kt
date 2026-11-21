@@ -21,7 +21,7 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.ui.components.LocalArtworkContext
 import at.bernhardberger.tvhplayer.core.programmeArtworkModel
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers

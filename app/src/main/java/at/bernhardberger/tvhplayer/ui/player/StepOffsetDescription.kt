@@ -11,7 +11,7 @@ import androidx.compose.runtime.setValue
 import kotlinx.coroutines.delay
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.StepReadout
 import at.bernhardberger.tvhplayer.ui.common.formatSpokenDuration
 

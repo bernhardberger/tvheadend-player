@@ -474,7 +474,7 @@ class PlayerChromeEvidenceTest {
         assertTrue("$marker follows $scheduledNext", marker.left >= scheduledNext.right)
         assertEquals(scheduledNext.center.y, marker.center.y, 1f)
         compose.onNode(hasText("Next • 21:00 Failed next", substring = true) and hasContentDescription(
-            ApplicationProvider.getApplicationContext<Application>().getString(at.bernhardberger.tvhplayer.R.string.player_scheduled), substring = true))
+            ApplicationProvider.getApplicationContext<Application>().getString(at.bernhardberger.tvhplayer.presentation.R.string.player_scheduled), substring = true))
             .assertExists()
         val failed = compose.onNodeWithText("Failed title", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         val absent = compose.onNodeWithText("Absent title", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot

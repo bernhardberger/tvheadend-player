@@ -38,7 +38,7 @@ import androidx.tv.material3.MaterialTheme
 import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvhplayer.BuildConfig
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.profiling.profileLayout
 import at.bernhardberger.tvhplayer.profiling.profileTrace
 import at.bernhardberger.tvhplayer.ui.TvSpacing8

@@ -50,7 +50,7 @@ import at.bernhardberger.tvhplayer.core.recordingIsRunning
 import at.bernhardberger.tvhplayer.core.glanceBadges
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.programmeArtwork
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelIcon

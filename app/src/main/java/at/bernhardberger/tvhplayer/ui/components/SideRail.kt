@@ -104,7 +104,8 @@ import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy
 import at.bernhardberger.tvhplayer.ui.common.rememberDetailsEpochSeconds
 import at.bernhardberger.tvhplayer.ui.player.NowPlayingPlate
 import at.bernhardberger.tvhplayer.ui.player.NowPlayingPlateWidth
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.BrowseShellBackAction
 import at.bernhardberger.tvhplayer.core.browseShellBackAction
 import at.bernhardberger.tvhplayer.models.RailItem
@@ -297,7 +298,7 @@ internal fun SideRail(
             if (AppDestination.HOME in availableDestinations) {
                 add(RailItem(AppDestination.HOME, homeLabel) {
                     Icon(
-                        painter = painterResource(R.drawable.ic_home),
+                        painter = painterResource(AppR.drawable.ic_home),
                         contentDescription = null,
                         modifier = Modifier.size(24.dp),
                     )
@@ -306,7 +307,7 @@ internal fun SideRail(
             if (AppDestination.CHANNELS in availableDestinations) {
                 add(RailItem(AppDestination.CHANNELS, channelsLabel) {
                     Icon(
-                        painter = painterResource(R.drawable.ic_list),
+                        painter = painterResource(AppR.drawable.ic_list),
                         contentDescription = null,
                         modifier = Modifier.size(24.dp),
                     )
@@ -315,7 +316,7 @@ internal fun SideRail(
             if (AppDestination.GUIDE in availableDestinations) {
                 add(RailItem(AppDestination.GUIDE, epgLabel) {
                     Icon(
-                        painter = painterResource(R.drawable.ic_event),
+                        painter = painterResource(AppR.drawable.ic_event),
                         contentDescription = null,
                         modifier = Modifier.size(24.dp),
                     )
@@ -324,7 +325,7 @@ internal fun SideRail(
             if (AppDestination.RECORDINGS in availableDestinations) {
                 add(RailItem(AppDestination.RECORDINGS, recordingsLabel) {
                     Icon(
-                        painter = painterResource(R.drawable.ic_video_library),
+                        painter = painterResource(AppR.drawable.ic_video_library),
                         contentDescription = null,
                         modifier = Modifier.size(24.dp),
                     )
@@ -340,7 +341,7 @@ internal fun SideRail(
             if (AppDestination.SETTINGS in availableDestinations) {
                 add(RailItem(AppDestination.SETTINGS, settingsLabel) {
                     Icon(
-                        painter = painterResource(R.drawable.ic_settings),
+                        painter = painterResource(AppR.drawable.ic_settings),
                         contentDescription = null,
                         modifier = Modifier.size(24.dp),
                     )
@@ -714,7 +715,7 @@ private fun DrawerBrandHeader(drawerValue: DrawerValue) {
             .testTag("global-drawer-brand"),
     ) {
         Image(
-            painter = painterResource(R.drawable.startup_brand_symbol),
+            painter = painterResource(AppR.drawable.startup_brand_symbol),
             contentDescription = null,
             modifier = Modifier
                 .align(Alignment.CenterStart)
@@ -732,7 +733,7 @@ private fun DrawerBrandHeader(drawerValue: DrawerValue) {
                 .padding(start = ExpandedItemLabelStart),
         ) {
             Image(
-                painter = painterResource(R.drawable.brand_wordmark),
+                painter = painterResource(AppR.drawable.brand_wordmark),
                 contentDescription = stringResource(R.string.app_name),
                 // A logo keeps its drawn proportions instead of following font scale.
                 modifier = Modifier
@@ -896,9 +897,9 @@ private fun DrawerNowPlayingControls(
                     else -> stringResource(R.string.stop)
                 }
                 val icon = when (control) {
-                    "fullscreen" -> R.drawable.ic_fullscreen
-                    "pause" -> if (paused) R.drawable.ic_play_arrow else R.drawable.ic_pause
-                    else -> R.drawable.ic_stop
+                    "fullscreen" -> AppR.drawable.ic_fullscreen
+                    "pause" -> if (paused) AppR.drawable.ic_play_arrow else AppR.drawable.ic_pause
+                    else -> AppR.drawable.ic_stop
                 }
                 IconButton(
                     onClick = when (control) { "fullscreen" -> onOpen; "pause" -> onTogglePause; else -> onStop },

@@ -252,7 +252,7 @@ abstract class LivePlayerChromeFixture {
         assertSubscriptionSettled("the screen's Main scope finishes cancellation") { scope.coroutineContext[Job]!!.isCompleted }
     }
 
-    protected val liveTvSurface get() = context.getString(at.bernhardberger.tvhplayer.R.string.player_live_tv_surface)
+    protected val liveTvSurface get() = context.getString(at.bernhardberger.tvhplayer.presentation.R.string.player_live_tv_surface)
 
     protected fun focusableNodes() = compose.onAllNodes(isFocusable(), useUnmergedTree = true).fetchSemanticsNodes().size
 

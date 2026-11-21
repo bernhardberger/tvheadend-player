@@ -38,7 +38,8 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.*
 import at.bernhardberger.tvheadend.sdk.core.*
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
 import at.bernhardberger.tvhplayer.core.programmeCategory
 import at.bernhardberger.tvhplayer.core.programmeArtwork
@@ -167,7 +168,7 @@ internal fun ChannelSchedule(
         }
         if (offline) Row(Modifier.fillMaxWidth().padding(horizontal = ScheduleTextKeyline).semantics { liveRegion = LiveRegionMode.Polite },
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(TvSpacing12)) {
-            ProgrammeStatusLine(stringResource(R.string.channel_schedule_offline), R.drawable.ic_error_outlined,
+            ProgrammeStatusLine(stringResource(R.string.channel_schedule_offline), AppR.drawable.ic_error_outlined,
                 "channel-schedule-offline", Modifier.weight(1f), maxLines = 2)
             Button(onClick = onRetry, modifier = Modifier.onFocusChanged { if (it.isFocused) rowOwnsFocus = false }) { Text(stringResource(R.string.retry)) }
         }
@@ -479,7 +480,7 @@ private fun ChannelScheduleRow(
                     }
                     if (failed) {
                         Spacer(Modifier.width(TvSpacing8))
-                        Icon(painterResource(R.drawable.ic_error_outlined), contentDescription = null,
+                        Icon(painterResource(AppR.drawable.ic_error_outlined), contentDescription = null,
                             modifier = Modifier.size(recordingMarkSize()), tint = errorMarkColor(focused))
                     }
                 }

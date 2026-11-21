@@ -31,7 +31,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileAuthenticationMode
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileSummary
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.notices.Notice
 import at.bernhardberger.tvhplayer.settings.serverProfileDisplayName
 import at.bernhardberger.tvhplayer.ui.TvTextSecondaryAlpha

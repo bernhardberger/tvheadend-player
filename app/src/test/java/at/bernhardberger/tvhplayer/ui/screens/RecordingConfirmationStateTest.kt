@@ -15,7 +15,7 @@ import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.core.DvrLibraryMode
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.notices.*
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.screens.recordings.StopConfirmationTimes

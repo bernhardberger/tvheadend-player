@@ -2,7 +2,7 @@ package at.bernhardberger.tvhplayer.ui.common
 
 import android.content.res.Resources
 import at.bernhardberger.tvheadend.sdk.core.EpgEpisode
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
 
 internal fun EpgEventEntry.isRunning(nowSec: Long): Boolean =

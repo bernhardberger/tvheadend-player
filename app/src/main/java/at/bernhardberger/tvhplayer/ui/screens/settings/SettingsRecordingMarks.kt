@@ -2,7 +2,7 @@ package at.bernhardberger.tvhplayer.ui.screens.settings
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.settings.AdBreakMode
 import at.bernhardberger.tvhplayer.settings.SkipLanding
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthLevel

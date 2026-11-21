@@ -21,7 +21,8 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import androidx.lifecycle.compose.LifecycleResumeEffect
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.ui.SettingsSection
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthLevel
@@ -57,7 +58,7 @@ internal fun settingsApplianceLevel(
         stringResource(R.string.settings_appliance),
         if (companionInstalled) listOf(
             settingsRow("setup", setup,
-                trailingIcon = R.drawable.ic_open_in_new,
+                trailingIcon = AppR.drawable.ic_open_in_new,
                 supporting = stringResource(
                     if (serviceEnabled) R.string.appliance_service_enabled
                     else R.string.appliance_service_disabled
@@ -74,7 +75,7 @@ internal fun settingsApplianceLevel(
 @Composable
 private fun ApplianceSetupReader(title: String, onDismiss: () -> Unit) {
     SettingsReadingDialog(title, onDismiss, trailing = {
-        Image(painterResource(R.drawable.qr_appliance_companion),
+        Image(painterResource(AppR.drawable.qr_appliance_companion),
             contentDescription = stringResource(R.string.appliance_companion_qr_description),
             modifier = Modifier.size(270.dp))
     }) {

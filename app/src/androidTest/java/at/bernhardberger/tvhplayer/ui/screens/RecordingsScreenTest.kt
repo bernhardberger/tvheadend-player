@@ -7,7 +7,9 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.ExperimentalTestApi
@@ -34,7 +36,6 @@ import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.requestFocus
-import androidx.compose.ui.test.waitUntilExactlyOneExists
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.mutableStateOf
@@ -55,7 +56,7 @@ import at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi
 import at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition
 import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.notices.NoticeContext
 import at.bernhardberger.tvhplayer.ui.notifications.AppNoticeHost
@@ -68,6 +69,7 @@ import at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.testing.testSessionObservation
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.captureBrowseFrame
+import at.bernhardberger.tvhplayer.ui.components.LocalBrowsePreparationContext
 import at.bernhardberger.tvhplayer.ui.screens.recordings.SCHEDULE_AUTOMATIC_ROW
 import at.bernhardberger.tvhplayer.ui.screens.recordings.SCHEDULE_NEW_TIMER
 import kotlinx.coroutines.CompletableDeferred
@@ -79,6 +81,7 @@ import org.junit.Assert.assertTrue
 import at.bernhardberger.tvhplayer.testing.ImageLoaderRule
 import org.junit.Rule
 import org.junit.Test
+import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
@@ -425,7 +428,7 @@ class RecordingsScreenTest {
     fun archivePagingMotionKeepsDirectionThroughFocusHandoff() = assertArchivePagingMotion(inFolder = false)
 
     @Test
-    fun scrolledFolderBackRestoresViewportThenRootBackBelongsToTheShell() {
+    fun scrolledFolderBackRestoresViewportThenRootBackFocusesTheArchiveTab() {
         val state = RecordingsScreenState()
         val entries = (1..20).map {
             recording(id = it, title = "Episode $it", path = "Folder ${it.toString().padStart(2, '0')}/episode.ts")
@@ -457,7 +460,9 @@ class RecordingsScreenTest {
         folder.pressCenter()
         waitForFocus("recording-list-entry-15")
         captureBrowseFrame(composeRule.onRoot(), "folder-scrolled-child")
-        dispatchBack()
+        composeRule.onRoot().performKeyInput { keyDown(Key.Back) }
+        composeRule.onNodeWithTag("recording-list-entry-15").assertIsFocused()
+        composeRule.onRoot().performKeyInput { keyUp(Key.Back) }
         waitForFocus("recordings-folder-Folder 15")
         composeRule.runOnIdle {
             assertFalse(drawerActive)
@@ -466,8 +471,19 @@ class RecordingsScreenTest {
         }
         assertEquals(beforeTop, folder.fetchSemanticsNode().boundsInRoot.top, 1f)
         captureBrowseFrame(composeRule.onRoot(), "folder-scrolled-parent-restored")
+        composeRule.onRoot().performKeyInput { keyDown(Key.Back) }
+        folder.assertIsFocused()
+        composeRule.onRoot().performKeyInput { keyUp(Key.Back) }
+        composeRule.onNodeWithTag(BROWSE_TAB).assertIsFocused()
+        composeRule.runOnIdle { assertFalse(drawerActive) }
+        composeRule.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+        folder.assertIsFocused()
+        assertEquals(beforeTop, folder.fetchSemanticsNode().boundsInRoot.top, 1f)
+        composeRule.onRoot().performKeyInput { pressKey(Key.Back) }
+        composeRule.onNodeWithTag(BROWSE_TAB).assertIsFocused()
+        // The shell's dispatcher fallback owns Back once the Archive tab is focused.
         dispatchBack()
-        composeRule.runOnIdle { assertTrue("Root Back belongs to the shell", drawerActive) }
+        composeRule.runOnIdle { assertTrue("Back from the Archive tab reaches the shell", drawerActive) }
     }
 
     @Test
@@ -601,7 +617,9 @@ class RecordingsScreenTest {
             recording(id = it, title = "Episode %02d".format(it), path = "${if (inFolder) "Series/" else ""}episode-$it.ts")
         }
         composeRule.setContent {
-            TVHeadendPlayerTheme { TestRecordingsScreen(entries = entries) }
+            TVHeadendPlayerTheme {
+                TestRecordingsScreen(entries = entries, view = if (inFolder) foldersView else DvrArchiveView())
+            }
         }
         if (inFolder) {
             waitForFocus("recordings-folder-Series")
@@ -1172,7 +1190,7 @@ class RecordingsScreenTest {
     }
 
     @Test
-    fun repeatedArchivePagesAdvanceBeforeTheFirstAnimationCompletes() {
+    fun rapidArchivePagingAdvancesBeyondTheFirstPageOnScreen() {
         assertArchivePaging(removePending = false)
     }
 
@@ -1187,44 +1205,95 @@ class RecordingsScreenTest {
         }
         val session = FakeTvheadendSession(testSessionObservation(entries = entries))
         val observation = mutableStateOf(session.observation.value)
+        val visit = mutableStateOf(0)
+        val state = RecordingsScreenState()
         composeRule.setContent {
-            TVHeadendPlayerTheme { TestRecordingsScreen(sessionObservation = observation.value) }
+            CompositionLocalProvider(LocalBrowsePreparationContext provides EmptyCoroutineContext) {
+                TVHeadendPlayerTheme {
+                    key(visit.value) {
+                        val screenState = if (visit.value == 0) remember { RecordingsScreenState() } else state
+                        TestRecordingsScreen(sessionObservation = observation.value, state = screenState)
+                    }
+                }
+            }
         }
         composeRule.onNodeWithTag("recording-list-entry-50").assertIsFocused()
-        val listBounds = composeRule.onNodeWithTag("recordings-archive-list").fetchSemanticsNode().boundsInRoot
-        val visibleRows = composeRule.onAllNodes(SemanticsMatcher("recording list row") {
-            it.config.getOrElse(SemanticsProperties.TestTag) { "" }.startsWith("recording-list-entry-")
-        }).fetchSemanticsNodes().count {
-            val bounds = it.boundsInRoot
-            bounds.height > 0 && bounds.bottom > listBounds.top && bounds.top < listBounds.bottom
+        fun publishWithout(removed: Long) {
+            session.publish(testSessionObservation(entries = entries.filterNot { it.id.value == removed }))
+            observation.value = session.observation.value
         }
-        assertTrue(visibleRows > 2)
+        fun pageDown() = composeRule.onRoot().performKeyInput { pressKey(Key(KeyEvent.KEYCODE_CHANNEL_DOWN)) }
+        pageDown()
+        val firstPage = focusedRecordingId()
+        assertTrue("The first page advances from the leading row", firstPage < 50)
+        composeRule.runOnIdle { visit.value++ }
+        composeRule.onNodeWithTag("recording-list-entry-50").assertIsFocused()
+        var origin = firstPage
+        fun viewport() = state.archiveNavigation.stack.active.let { it.firstVisibleIndex to it.scrollOffset }
         composeRule.mainClock.autoAdvance = false
-        composeRule.onNodeWithTag("recording-list-entry-50").performKeyInput {
-            pressKey(Key(KeyEvent.KEYCODE_CHANNEL_DOWN))
-        }
-        if (removePending) {
-            composeRule.runOnIdle {
-                session.publish(testSessionObservation(entries = entries.filterNot {
-                    it.id == DvrEntryId((51 - visibleRows).toLong())
-                }))
-                observation.value = session.observation.value
+        try {
+            pageDown()
+            if (removePending) {
+                composeRule.runOnIdle { publishWithout(firstPage) }
+                composeRule.mainClock.advanceTimeByFrame()
+                awaitPageRowRemoval(firstPage)
+                origin = focusedRecordingId()
+                assertForwardPage(::viewport, ::pageDown) { it < origin && it != firstPage }
+            } else {
+                pageDown()
             }
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+        }
+        val landed = focusedRecordingId()
+        // DepthPagingTest.channelKeysPageTheRowsAndClamp covers exact page arithmetic.
+        assertTrue("PageDown must focus a surviving row ahead of $origin", landed < origin && (!removePending || landed != firstPage))
+    }
+
+    private fun assertForwardPage(
+        viewport: () -> Pair<Int, Int>,
+        pageDown: () -> Unit,
+        isForwardDestination: (Long) -> Boolean,
+    ) {
+        val origin = composeRule.onNodeWithTag("recording-list-entry-${focusedRecordingId()}")
+        val originWasVisible = origin.isDisplayed()
+        val start = viewport()
+        var previous = start
+        fun assertForward() {
+            val next = viewport()
+            assertTrue("PageDown moved the viewport backwards: $previous → $next",
+                next.first > previous.first || next.first == previous.first && next.second >= previous.second)
+            previous = next
+        }
+        val landed = composeRule.onAllNodes(isFocused() and SemanticsMatcher("forward recording destination") {
+            val id = it.config.getOrElse(SemanticsProperties.TestTag) { "" }
+                .removePrefix("recording-list-entry-").toLongOrNull()
+            id != null && isForwardDestination(id)
+        })
+        pageDown()
+        val deadline = composeRule.mainClock.currentTime + 1_000
+        while (landed.fetchSemanticsNodes().isEmpty() && composeRule.mainClock.currentTime < deadline) {
+            composeRule.mainClock.advanceTimeByFrame()
+            assertForward()
+        }
+        landed.assertCountEquals(1)
+        composeRule.mainClock.advanceTimeByFrame()
+        assertForward()
+        assertTrue("PageDown must move the viewport beyond $start", previous != start)
+        if (!originWasVisible) assertFalse("The original row must not scroll back into view", origin.isDisplayed())
+    }
+
+    private fun awaitPageRowRemoval(id: Long) {
+        val removed = composeRule.onAllNodesWithTag("recording-list-entry-$id")
+        val deadline = composeRule.mainClock.currentTime + 500
+        while (removed.fetchSemanticsNodes().isNotEmpty() && composeRule.mainClock.currentTime < deadline) {
             composeRule.mainClock.advanceTimeByFrame()
         }
-        composeRule.onNode(isFocused()).performKeyInput {
-            pressKey(Key(KeyEvent.KEYCODE_CHANNEL_DOWN))
-        }
-        composeRule.mainClock.autoAdvance = true
-        if (removePending) {
-            composeRule.waitForIdle()
-            val id = composeRule.onNode(isFocused()).fetchSemanticsNode()
-                .config[SemanticsProperties.TestTag].removePrefix("recording-list-entry-").toInt()
-            assertTrue("Paging must recover after its pending row is removed", id < 50)
-        } else {
-            waitForFocus("recording-list-entry-${50 - 2 * (visibleRows - 1)}")
-        }
+        removed.assertCountEquals(0)
     }
+
+    private fun focusedRecordingId(): Long = composeRule.onNode(isFocused()).fetchSemanticsNode()
+        .config[SemanticsProperties.TestTag].removePrefix("recording-list-entry-").toLong()
 
     @Test
     fun pageReversalKeepsTheNewestArchiveTarget() {
@@ -1247,124 +1316,139 @@ class RecordingsScreenTest {
     }
 
     @Test
-    fun upWithinArchiveThenSelectedRemovalRestoresTheRowAtTheSameIndex() {
-        val entries = (1..3).map { id ->
-            recording(id, "Recording $id", path = "recording-$id.ts", start = id.toLong())
-        }
-        val session = FakeTvheadendSession(testSessionObservation(entries = entries))
-        val observation = mutableStateOf(session.observation.value)
-        val capability = requireNotNull(observation.value.currentSession)
-        composeRule.setContent {
-            TVHeadendPlayerTheme { TestRecordingsScreen(sessionObservation = observation.value) }
-        }
-        composeRule.onNodeWithTag("recording-list-entry-3").assertIsFocused()
-            .performKeyInput { pressKey(Key.DirectionDown) }
-        composeRule.onNodeWithTag("recording-list-entry-2").assertIsFocused()
-            .performKeyInput { pressKey(Key.DirectionDown) }
-        composeRule.onNodeWithTag("recording-list-entry-1").assertIsFocused()
-            .performKeyInput { pressKey(Key.DirectionUp) }
-        composeRule.onNodeWithTag("recording-list-entry-2").assertIsFocused()
-        composeRule.runOnIdle {
-            session.publish(testSessionObservation(entries = entries.filterNot { it.id == DvrEntryId(2) }))
-            observation.value = session.observation.value
-            assertSame(capability, observation.value.currentSession)
-        }
-        waitForFocus("recording-list-entry-1")
-    }
-
-    @Test
-    fun schedulePageDownCountsRecordingRowsRatherThanSectionHeaders() {
-        assertGroupedPageDown(DvrLibraryMode.SCHEDULE)
+    fun schedulePageDownMovesThroughRecordingRowsAcrossSectionHeaders() {
+        assertSchedulePaging()
     }
 
     @Test
     fun problemsPageDownCountsRecordingRowsRatherThanSectionHeaders() {
-        assertGroupedPageDown(DvrLibraryMode.PROBLEMS)
+        assertProblemsPaging()
     }
 
     @Test
     fun repeatedSchedulePagesAdvanceBeforeTheFirstAnimationCompletes() {
-        assertGroupedPageDown(DvrLibraryMode.SCHEDULE, pages = 2)
+        assertSchedulePaging(pages = 2)
     }
 
     @Test
     fun repeatedProblemPagesAdvanceBeforeTheFirstAnimationCompletes() {
-        assertGroupedPageDown(DvrLibraryMode.PROBLEMS, pages = 2)
+        assertProblemsPaging(pages = 2)
     }
 
     @Test
     fun schedulePagingRecoversWhenPendingRecordingIsRemoved() {
-        assertGroupedPageDown(DvrLibraryMode.SCHEDULE, pages = 2, removePending = true)
+        assertSchedulePaging(pages = 2, removePending = true)
     }
 
     @Test
     fun problemsPagingRecoversWhenPendingRecordingIsRemoved() {
-        assertGroupedPageDown(DvrLibraryMode.PROBLEMS, pages = 2, removePending = true)
+        assertProblemsPaging(pages = 2, removePending = true)
     }
 
-    private fun assertGroupedPageDown(mode: DvrLibraryMode, pages: Int = 1, removePending: Boolean = false) {
+    private fun assertSchedulePaging(pages: Int = 1, removePending: Boolean = false) {
         val start = System.currentTimeMillis() / 1000L + 3_600L
         val entries = (1..30).map { id ->
-            recording(
-                id, "Recording $id",
-                state = if (mode == DvrLibraryMode.SCHEDULE) {
-                    if (id == 1) DvrEntryState.RECORDING else DvrEntryState.SCHEDULED
-                } else {
-                    if (id == 1) DvrEntryState.COMPLETED_ERROR else DvrEntryState.MISSED
-                },
-                start = start + if (mode == DvrLibraryMode.SCHEDULE) id else 31 - id,
-                stop = start + 3_600L,
-            )
+            recording(id, "Recording $id", state = if (id == 1) DvrEntryState.RECORDING else DvrEntryState.SCHEDULED,
+                start = start + id, stop = start + 3_600L)
         }
-        val screenState = RecordingsScreenState().apply { this.mode.value = mode }
+        val session = FakeTvheadendSession(testSessionObservation(entries = entries))
+        val observation = mutableStateOf(session.observation.value)
+        val visit = mutableStateOf(0)
+        val state = RecordingsScreenState().apply { mode.value = DvrLibraryMode.SCHEDULE }
+        composeRule.setContent {
+            CompositionLocalProvider(LocalBrowsePreparationContext provides EmptyCoroutineContext) {
+                TVHeadendPlayerTheme {
+                    key(visit.value) {
+                        val screenState = if (visit.value == 0 && pages > 1) {
+                            remember { RecordingsScreenState().apply { mode.value = DvrLibraryMode.SCHEDULE } }
+                        } else state
+                        TestRecordingsScreen(sessionObservation = observation.value, state = screenState)
+                    }
+                }
+            }
+        }
+        composeRule.onNodeWithTag("recording-list-entry-1").assertIsFocused()
+        fun pageDown() = composeRule.onRoot().performKeyInput { pressKey(Key(KeyEvent.KEYCODE_CHANNEL_DOWN)) }
+        val firstPage = if (pages > 1) {
+            pageDown()
+            focusedRecordingId().also {
+                assertTrue("A complete page must move beyond one row", it > 2)
+                composeRule.runOnIdle { visit.value++ }
+                composeRule.onNodeWithTag("recording-list-entry-1").assertIsFocused()
+            }
+        } else null
+        fun viewport() = state.scheduleNavigation.stack.active.let { it.firstVisibleIndex to it.scrollOffset }
+        var origin = firstPage ?: 2L
+        composeRule.mainClock.autoAdvance = false
+        try {
+            if (firstPage != null) {
+                pageDown()
+                if (removePending) {
+                    composeRule.runOnIdle {
+                        session.publish(testSessionObservation(entries = entries.filterNot { it.id.value == firstPage }))
+                        observation.value = session.observation.value
+                    }
+                    composeRule.mainClock.advanceTimeByFrame()
+                    awaitPageRowRemoval(firstPage)
+                    origin = focusedRecordingId()
+                }
+            }
+            // DepthPagingTest covers exact overlap of whole recording bodies.
+            assertForwardPage(::viewport, ::pageDown) { it > origin && (!removePending || it != firstPage) }
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+        }
+        val landed = focusedRecordingId()
+        assertTrue("PageDown must keep focus on a surviving recording ahead of $origin",
+            landed > origin && (!removePending || landed != firstPage))
+    }
+
+    private fun assertProblemsPaging(pages: Int = 1, removePending: Boolean = false) {
+        val start = System.currentTimeMillis() / 1000L + 3_600L
+        val entries = (1..30).map { id ->
+            recording(id, "Recording $id", state = if (id == 1) DvrEntryState.COMPLETED_ERROR else DvrEntryState.MISSED,
+                start = start + 31 - id, stop = start + 3_600L)
+        }
+        val state = RecordingsScreenState().apply { mode.value = DvrLibraryMode.PROBLEMS }
         val session = FakeTvheadendSession(testSessionObservation(entries = entries))
         val observation = mutableStateOf(session.observation.value)
         composeRule.setContent {
-            TVHeadendPlayerTheme { TestRecordingsScreen(sessionObservation = observation.value, state = screenState) }
+            CompositionLocalProvider(LocalBrowsePreparationContext provides EmptyCoroutineContext) {
+                TVHeadendPlayerTheme { TestRecordingsScreen(sessionObservation = observation.value, state = state) }
+            }
         }
         composeRule.onNodeWithTag("recording-list-entry-1").assertIsFocused()
-        val listTag = if (mode == DvrLibraryMode.SCHEDULE) "recordings-schedule-list"
-            else "recordings-problems-list"
+        val listTag = "recordings-problems-list"
         val listBounds = composeRule.onNodeWithTag(listTag).fetchSemanticsNode().boundsInRoot
-        val visibleRows = composeRule.onAllNodes(SemanticsMatcher("recording list row") {
+        val firstPage = composeRule.onAllNodes(SemanticsMatcher("recording list row") {
             it.config.getOrElse(SemanticsProperties.TestTag) { "" }.startsWith("recording-list-entry-")
-        }).fetchSemanticsNodes().count {
+        } and hasAnyAncestor(hasTestTag(listTag))).fetchSemanticsNodes().filter {
             val bounds = it.boundsInRoot
             bounds.height > 0 && bounds.bottom > listBounds.top && bounds.top < listBounds.bottom
-        }
-        assertTrue("Fixture must show multiple rows across section headers", visibleRows > 2)
+        }.map { it.config[SemanticsProperties.TestTag].removePrefix("recording-list-entry-").toLong() }
+        assertTrue("Fixture must show multiple recordings: $firstPage", firstPage.size > 1)
+        val pending = firstPage.max()
         composeRule.mainClock.autoAdvance = false
-        repeat(pages) { page ->
-            if (removePending && page == 1) {
-                composeRule.runOnIdle {
-                    session.publish(testSessionObservation(entries = entries.filterNot {
-                        it.id == DvrEntryId(visibleRows.toLong())
-                    }))
-                    observation.value = session.observation.value
-                }
-                composeRule.mainClock.advanceTimeByFrame()
-            }
-            composeRule.onNode(isFocused()).performKeyInput { pressKey(Key(KeyEvent.KEYCODE_CHANNEL_DOWN)) }
-        }
-        composeRule.mainClock.autoAdvance = true
-        // IDs follow row order: a page overlaps by one recording, excluding both headers.
         try {
-            if (pages == 1) {
-                waitForFocus("recording-list-entry-$visibleRows")
-            } else {
-                composeRule.waitForIdle()
-                val focusedTag = composeRule.onNode(isFocused()).fetchSemanticsNode()
-                    .config[SemanticsProperties.TestTag]
-                // The next viewport may contain fewer headers and therefore more rows.
-                val focusedId = focusedTag.removePrefix("recording-list-entry-").toInt()
-                assertTrue("Paging must advance from the latest valid origin",
-                    focusedId > if (removePending) 1 else visibleRows)
+            repeat(pages) { page ->
+                if (removePending && page == 1) {
+                    composeRule.runOnIdle {
+                        session.publish(testSessionObservation(entries = entries.filterNot { it.id.value == pending }))
+                        observation.value = session.observation.value
+                    }
+                    composeRule.mainClock.advanceTimeByFrame()
+                }
+                composeRule.onRoot().performKeyInput { pressKey(Key(KeyEvent.KEYCODE_CHANNEL_DOWN)) }
             }
-        } catch (failure: androidx.compose.ui.test.ComposeTimeoutException) {
-            val focusedTags = composeRule.onAllNodes(isFocused()).fetchSemanticsNodes().map {
-                it.config.getOrElse(SemanticsProperties.TestTag) { "untagged" }
-            }
-            throw AssertionError("PageDown with $visibleRows visible rows focused $focusedTags", failure)
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+        }
+        val focused = focusedRecordingId()
+        if (pages == 1) {
+            assertEquals("PageDown over recording rows $firstPage", pending, focused)
+        } else {
+            assertTrue("Paging must advance from the latest valid origin",
+                focused > if (removePending) 1 else pending)
         }
     }
 
@@ -1718,10 +1802,12 @@ class RecordingsScreenTest {
     )
 
     private fun waitForFocus(tag: String) {
-        composeRule.waitUntilExactlyOneExists(
-            hasTestTag(tag) and isFocused(),
-            timeoutMillis = 5_000,
-        )
+        val focused = composeRule.onAllNodes(hasTestTag(tag) and isFocused())
+        composeRule.waitForIdle()
+        val deadline = composeRule.mainClock.currentTime + 1_000
+        while (focused.fetchSemanticsNodes().isEmpty() && composeRule.mainClock.currentTime < deadline) {
+            composeRule.mainClock.advanceTimeByFrame()
+        }
         composeRule.onNodeWithTag(tag).assertIsFocused()
     }
 

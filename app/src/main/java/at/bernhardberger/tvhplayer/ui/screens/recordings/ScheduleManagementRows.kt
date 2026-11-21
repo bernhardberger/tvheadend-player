@@ -19,7 +19,8 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Icon
 import androidx.tv.material3.ListItem
 import androidx.tv.material3.Text
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.AutomaticRecordingList
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.TvSpacing48
@@ -50,7 +51,7 @@ internal fun scheduleManagementRows(
     ) { modifier, activate ->
         Column {
             ScheduleManagementRow(SCHEDULE_NEW_TIMER, stringResource(R.string.schedule_new_timer),
-                stringResource(R.string.schedule_new_timer_help), R.drawable.ic_schedule, R.drawable.ic_add,
+                stringResource(R.string.schedule_new_timer_help), AppR.drawable.ic_schedule, AppR.drawable.ic_add,
                 modifier, activate, enabled = canAdd)
             Spacer(Modifier.height(4.dp))
         }
@@ -60,8 +61,8 @@ internal fun scheduleManagementRows(
     ) { modifier, activate ->
         Column {
             ScheduleManagementRow(SCHEDULE_AUTOMATIC_ROW, stringResource(R.string.automatic_recording_new_overline),
-                automaticRecordingCountLabel(automatic), R.drawable.ic_fiber_smart_record,
-                R.drawable.ic_keyboard_arrow_right, modifier, activate)
+                automaticRecordingCountLabel(automatic), AppR.drawable.ic_fiber_smart_record,
+                AppR.drawable.ic_keyboard_arrow_right, modifier, activate)
             HorizontalDivider(Modifier.padding(vertical = TvSpacing8))
             if (empty) Column(Modifier.fillMaxWidth().padding(vertical = TvSpacing48)) {
                 ModeEmptyState(R.string.recordings_schedule_empty)

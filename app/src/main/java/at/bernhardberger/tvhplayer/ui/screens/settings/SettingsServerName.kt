@@ -23,7 +23,8 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileSummary
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.settings.serverProfileAddress
 import at.bernhardberger.tvhplayer.ui.TvBrowseColumnWidth
 import at.bernhardberger.tvhplayer.ui.components.GuidedStepAction
@@ -92,7 +93,7 @@ internal fun SettingsServerName(
             }
             GuidedStepAction(
                 title = stringResource(R.string.server_name_save),
-                icon = R.drawable.ic_check,
+                icon = AppR.drawable.ic_check,
                 onClick = save,
                 modifier = Modifier.testTag(SERVER_NAME_SAVE),
             )

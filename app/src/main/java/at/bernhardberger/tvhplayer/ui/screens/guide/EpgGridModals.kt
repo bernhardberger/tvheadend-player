@@ -11,7 +11,8 @@ import at.bernhardberger.tvheadend.sdk.core.DvrConfiguration
 import at.bernhardberger.tvheadend.sdk.core.DvrEventEntries
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.ProgrammeAction
 import at.bernhardberger.tvhplayer.core.programmeArtwork
 import at.bernhardberger.tvhplayer.core.recordingElapsedProgress
@@ -68,9 +69,11 @@ internal fun ConfirmProgrammeActionDialog(
             sentence = if (stopping) stopConfirmationSentence(times, resources, spoken = false)
                 else stringResource(R.string.cancel_recording_confirm_body),
             spokenSentence = if (stopping) stopConfirmationSentence(times, resources, spoken = true) else null,
-            safe = ConfirmationChoice(stringResource(R.string.keep_recording), R.drawable.ic_check, "two-column-first"),
+            safe = ConfirmationChoice(
+                stringResource(R.string.keep_recording), AppR.drawable.ic_check, "two-column-first",
+            ),
             action = ConfirmationChoice(programmeActionLabel(action),
-                if (stopping) R.drawable.ic_stop else R.drawable.ic_close, "two-column-second"),
+                if (stopping) AppR.drawable.ic_stop else AppR.drawable.ic_close, "two-column-second"),
             onConfirm = onConfirm,
             onDismiss = onDismiss,
             onPreviewKeyEvent = onPreviewKeyEvent,

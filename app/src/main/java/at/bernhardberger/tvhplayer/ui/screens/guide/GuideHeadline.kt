@@ -37,7 +37,8 @@ import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.settings.GuideRows
 import at.bernhardberger.tvhplayer.ui.TvSpacing4
 import at.bernhardberger.tvhplayer.core.EpgFocusColumn
@@ -360,20 +361,20 @@ private fun GuideHeadlineRecordingBadge(entry: DvrEntry) {
     when (entry.state) {
         DvrEntryState.COMPLETED -> StatusBadge(
             stringResource(R.string.details_recorded), StatusBadgeTone.NEUTRAL,
-            Modifier.testTag("recording-badge-recorded"), icon = R.drawable.ic_video_library,
+            Modifier.testTag("recording-badge-recorded"), icon = AppR.drawable.ic_video_library,
         )
         DvrEntryState.MISSED -> StatusBadge(
             stringResource(R.string.recording_state_missed), StatusBadgeTone.ERROR,
-            Modifier.testTag("recording-badge-missed"), icon = R.drawable.ic_error_outlined,
+            Modifier.testTag("recording-badge-missed"), icon = AppR.drawable.ic_error_outlined,
             contentDescription = stringResource(R.string.recording_notice_missed),
         )
         DvrEntryState.COMPLETED_ERROR -> StatusBadge(
             stringResource(R.string.recording_state_failed), StatusBadgeTone.ERROR,
-            Modifier.testTag("recording-badge-failed"), icon = R.drawable.ic_error_outlined,
+            Modifier.testTag("recording-badge-failed"), icon = AppR.drawable.ic_error_outlined,
         )
         DvrEntryState.SCHEDULED if entry.rule == null && entry.enabled != false -> StatusBadge(
             stringResource(R.string.recording_state_scheduled), StatusBadgeTone.NEUTRAL,
-            Modifier.testTag("recording-badge-scheduled"), icon = R.drawable.ic_schedule,
+            Modifier.testTag("recording-badge-scheduled"), icon = AppR.drawable.ic_schedule,
         )
         else -> RecordingBadge(
             entry.state, rule = entry.rule, skipped = entry.enabled == false,

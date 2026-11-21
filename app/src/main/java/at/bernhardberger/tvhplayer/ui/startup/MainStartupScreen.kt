@@ -73,7 +73,8 @@ import at.bernhardberger.tvhplayer.ui.player.PlayerBusyRing
 import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.AppErrorAction
 import at.bernhardberger.tvhplayer.core.MainStartupMessageKind
 import at.bernhardberger.tvhplayer.core.MainStartupLoadingFeedback
@@ -83,7 +84,7 @@ import at.bernhardberger.tvhplayer.ui.components.AppErrorAlert
 private val MainStartupContentMaxWidth = 560.dp
 internal val MainStartupMarkSize = 80.dp
 private val MainStartupBackground = Color(0xFF0F1014)
-private val MainStartupBrandFont = FontFamily(Font(R.font.outfit_550, FontWeight(550)))
+private val MainStartupBrandFont = FontFamily(Font(AppR.font.outfit_550, FontWeight(550)))
 private const val MainStartupRootTag = "main-startup-root"
 private const val MainStartupMarkTag = "main-startup-mark"
 
@@ -351,7 +352,7 @@ private fun StartupLogo(
     // Read only the shown value below so a new request cannot cut off the outgoing mark.
     val slot = (channel == null) to display
     StartupSlot(slot, motionEnabled, identity = slot.first to display?.channel?.id) { (brand, logo), _ ->
-        if (brand) Image(painterResource(R.drawable.startup_brand_symbol), null,
+        if (brand) Image(painterResource(AppR.drawable.startup_brand_symbol), null,
             Modifier.fillMaxSize().testTag(MainStartupMarkTag))
         else if (logo != null) ProvideArtworkSession(logo.session, logo.observation) {
             PiconBox(logo.channel.icon, Modifier.fillMaxSize().testTag("startup-logo-${logo.channel.name}"))
@@ -402,7 +403,7 @@ internal fun MainStartupFrame(
             ) {
                 if (brandingVisible) {
                     Image(
-                        painter = painterResource(R.drawable.startup_brand_symbol),
+                        painter = painterResource(AppR.drawable.startup_brand_symbol),
                         contentDescription = null,
                         modifier = markModifier
                             .size(MainStartupMarkSize)

@@ -26,7 +26,8 @@ import androidx.compose.ui.res.stringResource
 import android.view.KeyEvent as AndroidKeyEvent
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.AppError
 import at.bernhardberger.tvhplayer.core.AppErrorAction
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
@@ -223,7 +224,7 @@ internal fun LivePlayerServerWait(
         visible = current != null,
         message = failure?.let { text.title(it.condition) }.orEmpty(),
         detail = failure?.let { text.paragraph(it.condition) },
-        icon = painterResource(R.drawable.ic_error_outlined),
+        icon = painterResource(AppR.drawable.ic_error_outlined),
         actions = failure?.actions.orEmpty().mapNotNull { action ->
             when (action) {
                 AppErrorAction.RETRY -> state::retry

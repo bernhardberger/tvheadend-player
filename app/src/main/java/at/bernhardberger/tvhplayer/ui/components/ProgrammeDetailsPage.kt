@@ -72,7 +72,8 @@ import androidx.tv.material3.*
 import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionStreamType
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.*
 import at.bernhardberger.tvhplayer.ui.LocalWarmPlayback
 import at.bernhardberger.tvhplayer.ui.TvCardFocusedScale
@@ -636,7 +637,7 @@ private fun DetailsAbout(synopsis: String?, onRead: () -> Unit, modifier: Modifi
                     horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                     Box(Modifier.weight(1f)) { DetailsSynopsis(synopsis.orEmpty(), onTextArea, textHeight) }
                     // Like a focused button, the arrow's circle turns white and the arrow dark.
-                    Icon(painterResource(R.drawable.ic_arrow_forward), null,
+                    Icon(painterResource(AppR.drawable.ic_arrow_forward), null,
                         Modifier.size(32.dp).background(
                             if (focused) MaterialTheme.colorScheme.onSurface
                             else MaterialTheme.colorScheme.onSurface.copy(alpha = .12f),
@@ -782,7 +783,7 @@ private fun DetailsNextHint(section: String) {
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(section, Modifier.weight(1f, fill = false), style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Icon(painterResource(R.drawable.ic_expand_more), null, Modifier.size(14.dp),
+        Icon(painterResource(AppR.drawable.ic_expand_more), null, Modifier.size(14.dp),
             tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
@@ -1351,7 +1352,7 @@ private fun DetailsInformation(
                 StatusBadge(
                     formatRecordingExpiryDate(
                         removal, nowSec, LocalContext.current.resources, LocalConfiguration.current.locales[0]),
-                    StatusBadgeTone.NEUTRAL, icon = R.drawable.ic_hourglass_bottom,
+                    StatusBadgeTone.NEUTRAL, icon = AppR.drawable.ic_hourglass_bottom,
                 )
             } else detailsStatus(event, recording, nowSec)?.let {
                 DetailsStatusBadge(it, rule = recordingRule(recordingKind) ?: recording?.rule,
@@ -1425,7 +1426,7 @@ private fun DetailsInformation(
         // The same warning as the recording's row and pane.
         if (recording != null && remember(recording) { recordingStoppedEarly(recording) != null }) {
             Spacer(Modifier.height(8.dp))
-            ProgrammeStatusLine(stringResource(R.string.recordings_stopped_early), R.drawable.ic_warning_outlined,
+            ProgrammeStatusLine(stringResource(R.string.recordings_stopped_early), AppR.drawable.ic_warning_outlined,
                 "details-stopped-early", modifier = Modifier.widthIn(max = 470.dp))
         }
     }
@@ -1595,7 +1596,7 @@ private fun DetailsActions(
                                 recordingKind)), maxLines = 1, softWrap = false)
                         }
                         is DetailsRowButton.RecordChoice, is DetailsRowButton.More -> {
-                            Icon(painterResource(if (button is DetailsRowButton.More) R.drawable.ic_more_horiz
+                            Icon(painterResource(if (button is DetailsRowButton.More) AppR.drawable.ic_more_horiz
                                 else BrowseContextAction.RECORD.icon(watchChannel = false)), null,
                                 Modifier.size(ButtonDefaults.IconSize))
                             Spacer(Modifier.width(ButtonDefaults.IconSpacing))

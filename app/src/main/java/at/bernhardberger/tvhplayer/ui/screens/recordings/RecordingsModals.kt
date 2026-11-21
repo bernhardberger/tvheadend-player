@@ -10,7 +10,8 @@ import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.deleteRemovesEntryOnly
 import at.bernhardberger.tvhplayer.core.recordingArtwork
 import at.bernhardberger.tvhplayer.core.recordingElapsedProgress
@@ -65,7 +66,7 @@ internal fun RecordingConfirmationDialog(
             sentence = recordingConfirmationSentence(action, removeEntry, entry, nowSec),
             safe = ConfirmationChoice(
                 stringResource(if (action == PendingRecordingAction.DELETE) R.string.keep else R.string.keep_recording),
-                R.drawable.ic_check, "recording-confirmation-back"),
+                AppR.drawable.ic_check, "recording-confirmation-back"),
             action = ConfirmationChoice(stringResource(recordingConfirmationActionLabel(action, removeEntry)),
                 recordingConfirmationActionIcon(action), "recording-confirmation-confirm"),
             onDismiss = onDismiss, onConfirm = onConfirm, backEnabled = backEnabled,
@@ -169,7 +170,7 @@ private fun recordingConfirmationActionLabel(action: PendingRecordingAction, rem
     }
 
 private fun recordingConfirmationActionIcon(action: PendingRecordingAction): Int = when (action) {
-    PendingRecordingAction.STOP -> R.drawable.ic_stop
-    PendingRecordingAction.CANCEL -> R.drawable.ic_close
-    PendingRecordingAction.DELETE -> R.drawable.ic_delete_outlined
+    PendingRecordingAction.STOP -> AppR.drawable.ic_stop
+    PendingRecordingAction.CANCEL -> AppR.drawable.ic_close
+    PendingRecordingAction.DELETE -> AppR.drawable.ic_delete_outlined
 }
