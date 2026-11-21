@@ -27,6 +27,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.AlignmentLine
 import androidx.compose.ui.layout.FirstBaseline
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.input.key.onPreviewKeyEvent
@@ -52,6 +54,7 @@ import at.bernhardberger.tvhplayer.ui.components.listEdgeFades
 import at.bernhardberger.tvhplayer.ui.components.rememberListEdgeBringIntoView
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -80,6 +83,9 @@ class DepthLevel(
     val initialItemId: String? = null,
     val passiveContent: (@Composable () -> Unit)? = null,
     val emptyContent: (@Composable () -> Unit)? = null,
+    // Opt in to counting just the fully visible focus targets, not their surrounding lazy items.
+    val wholePageRows: ((DepthItem) -> Boolean)? = null,
+    val keepPageOnRowChanges: Boolean = false,
 )
 
 /** One composed column in the sliding strip. Path is its visual identity. */
@@ -89,6 +95,8 @@ private class DepthStripColumn(val path: List<String>, val level: DepthLevel, va
 class DepthNavigationState(initial: DepthStack) {
     var stack by mutableStateOf(initial)
         private set
+    internal var pendingPageDestination by mutableStateOf<(() -> String?)?>(null)
+    internal var cancelPendingPage: (() -> Unit)? = null
     fun update(value: DepthStack) { stack = value }
     fun pop() { stack = stack.pop() }
 
@@ -127,7 +135,7 @@ internal const val DepthParentSlideAlpha = 0.25f
 internal val DepthListTopReserve = 4.dp
 
 /** How long a restore waits for its row to compose before it lets the pane go. */
-private const val RestoreFocusWaitMillis = 1000L
+internal const val RESTORE_FOCUS_WAIT_MILLIS = 1000L
 
 private val DepthBrowseEasing = CubicBezierEasing(0.18f, 1f, 0.22f, 1f)
 private fun depthStripSpec() = tween<Float>(DepthSlideMillis, easing = DepthBrowseEasing)
@@ -269,7 +277,12 @@ fun DepthNavigation(
         if (latestIsCurrent.value && state.stack == stack && reconciled != stack) state.update(reconciled)
         previousInitialItemId = level.initialItemId
     }
-    BackHandler(isCurrent && backEnabled && initialFocusEnabled && (stack.canPop || onRootBack != null)) {
+    // Only a root heading with its own Back destination can share the list's Back cycle.
+    var focusedHeadingPath by remember { mutableStateOf<List<String>?>(null) }
+    val rootHeadingBack = focusedHeadingPath != null && !stack.canPop && onRootBack != null
+    val ownsBack = isCurrent && backEnabled && (stack.canPop || onRootBack != null)
+    BackHandler(ownsBack && (initialFocusEnabled || rootHeadingBack)) {
+        state.cancelPendingPage?.invoke()
         if (stack.canPop) pop() else onRootBack?.invoke()
     }
 
@@ -302,19 +315,20 @@ fun DepthNavigation(
     }
     val displayed = if (moving) unionStrip(held, desired) else desired
 
-    // A control in a level's heading (Recordings' options button) takes its own keys, not the list's.
-    var focusedHeadingPath by remember { mutableStateOf<List<String>?>(null) }
     Box(modifier.backKeyCycleFocus(backCycle).onPreviewKeyEvent { event ->
-        if (!isCurrent || focusedHeadingPath != null) {
+        val native = event.nativeKeyEvent
+        val code = native.keyCode
+        // A heading keeps its own directional keys even when it shares root Back.
+        val headingOwnsKey = focusedHeadingPath != null && !(rootHeadingBack && code == KeyEvent.KEYCODE_BACK)
+        if (!isCurrent || headingOwnsKey) {
             backCycle.reset()
             return@onPreviewKeyEvent false
         }
-        val native = event.nativeKeyEvent
-        val code = native.keyCode
         if (code == KeyEvent.KEYCODE_BACK) {
             return@onPreviewKeyEvent backCycle.handle(native.action == KeyEvent.ACTION_DOWN,
                 native.repeatCount, native.isCanceled,
                 enabled = backEnabled && (state.stack.canPop || onRootBack != null)) {
+                state.cancelPendingPage?.invoke()
                 if (state.stack.canPop) pop() else onRootBack?.invoke()
             }
         }
@@ -353,7 +367,10 @@ fun DepthNavigation(
             pendingRootBack = null
             val action = pendingExit
             pendingExit = null
-            if (!native.isCanceled && pendingRootVisit == state.stack.visit) action?.invoke()
+            if (!native.isCanceled && pendingRootVisit == state.stack.visit && action != null) {
+                state.cancelPendingPage?.invoke()
+                action()
+            }
         }
         consumed
     }) {
@@ -393,6 +410,7 @@ fun DepthNavigation(
                                 if (focused) focusedHeadingPath = column.path
                                 else if (focusedHeadingPath == column.path) focusedHeadingPath = null
                             },
+                            navigation = state,
                             columnWidth = columnWidth,
                             contentPadding = contentPadding,
                             previewAlpha = previewAlpha,
@@ -512,6 +530,7 @@ private fun DepthStripPane(
     emphasis: () -> Float,
     columnWidth: Dp,
     onHeadingFocus: (Boolean) -> Unit = {},
+    navigation: DepthNavigationState? = null,
     contentPadding: PaddingValues,
     previewAlpha: Float,
     parentAlpha: Float,
@@ -539,6 +558,7 @@ private fun DepthStripPane(
     val latestStillOwning = rememberUpdatedState(stillOwning)
     val latestFocusedId = rememberUpdatedState(focusedItemId)
     val latestFocusEnabled = rememberUpdatedState(initialFocusEnabled)
+    val latestIdentities = rememberUpdatedState(identities)
     val targetAlpha = when {
         active || column.level.passiveContent != null -> 1f
         column.path.size < activePath.size -> parentAlpha
@@ -555,26 +575,111 @@ private fun DepthStripPane(
         label = "depth-column-alpha",
     )
     val focus = remember { mutableStateMapOf<String, FocusRequester>() }
+    val wholePageRows = column.level.wholePageRows
+    val pageRows = remember { mutableMapOf<String, LayoutCoordinates>() }
+    var pageViewport by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    fun visiblePageSize(): Int {
+        val visible = list.layoutInfo.visibleItemsInfo
+        if (wholePageRows == null) return visible.size
+        return pageViewport?.takeIf { it.isAttached }?.let { viewport ->
+            visible.count { item ->
+                pageRows[item.key]?.takeIf { it.isAttached }?.let { row ->
+                    val bounds = viewport.localBoundingBoxOf(row, clipBounds = false)
+                    bounds.top >= 0f && bounds.bottom <= viewport.size.height
+                } ?: false
+            }
+        } ?: 0
+    }
     val scope = rememberCoroutineScope()
     val bringIntoViewSpec = rememberListEdgeBringIntoView(list, DepthListTopReserve)
     // Where focus scrolling would place a row, as the item offset from the list's top. For a row
     // the list is about to be scrolled to, [destinationIndex] says whether rows will lie before
     // it, which the list as it stands now may not tell.
-    fun pivotOffset(destinationIndex: Int? = null): Int {
+    fun pivotOffset(destinationIndex: Int): Int {
         val layout = list.layoutInfo
         val offset = layout.beforeContentPadding.toFloat()
         val size = (layout.visibleItemsInfo.firstOrNull()?.size ?: 0).toFloat()
         val container = layout.viewportSize.height.toFloat()
-        return when {
-            destinationIndex == null -> bringIntoViewSpec.calculateScrollDistance(offset, size, container)
-            destinationIndex == 0 -> 0f
-            else -> bringIntoViewSpec.calculateScrollDistance(offset, size, container, Float.POSITIVE_INFINITY)
-        }.roundToInt()
+        return if (destinationIndex == 0) 0 else bringIntoViewSpec
+            .calculateScrollDistance(offset, size, container, Float.POSITIVE_INFINITY).roundToInt()
     }
     var pageJob by remember { mutableStateOf<Job?>(null) }
     var pageTarget by remember { mutableStateOf<String?>(null) }
-    DisposableEffect(active, capturedVisit, initialFocusEnabled, identities) {
-        onDispose { pageJob?.cancel(); pageTarget = null }
+    var pageTargetIndex by remember { mutableIntStateOf(-1) }
+    var lastFocusedRow by remember { mutableStateOf<String?>(null) }
+    var headingHasFocus by remember { mutableStateOf(false) }
+    var listHasFocus by remember { mutableStateOf(false) }
+    var focusLostToRemoval by remember { mutableStateOf(false) }
+    var pageRecovery by remember { mutableIntStateOf(0) }
+    val keepPage = column.level.keepPageOnRowChanges
+    fun cancelPage() {
+        pageJob?.cancel()
+        pageTarget = null
+        focusLostToRemoval = false
+    }
+    if (active && keepPage) DisposableEffect(capturedVisit) {
+        val pendingDestination = {
+            pageTarget.takeIf { latestStillOwning.value(capturedVisit) && latestFocusEnabled.value }
+        }
+        val cancel = ::cancelPage
+        navigation?.pendingPageDestination = pendingDestination
+        navigation?.cancelPendingPage = cancel
+        onDispose {
+            if (navigation?.pendingPageDestination === pendingDestination) {
+                navigation.pendingPageDestination = null
+                navigation.cancelPendingPage = null
+            }
+        }
+    }
+    fun pageTo(target: Int) {
+        val id = identities[target].id
+        pageJob?.cancel()
+        pageTarget = id
+        pageTargetIndex = target
+        pageJob = scope.launch {
+            var landed = false
+            try {
+                list.animateScrollToItem(target, pivotOffset(destinationIndex = target))
+                val job = coroutineContext[Job]
+                fun stillOwnsPage() = pageJob === job && pageTarget == id && !headingHasFocus
+                fun canFocusPage() = latestStillOwning.value(capturedVisit) && latestFocusEnabled.value &&
+                    latestIdentities.value.getOrNull(target)?.id == id
+                withTimeoutOrNull(RESTORE_FOCUS_WAIT_MILLIS) {
+                    while (stillOwnsPage() && canFocusPage()) {
+                        val placed = list.layoutInfo.visibleItemsInfo.any { it.key == id && it.index == target }
+                        val requested = placed && focus[id]?.requestFocus() == true
+                        if (requested && (!keepPage || lastFocusedRow == id)) {
+                            landed = true
+                            break
+                        }
+                        // The item can be measured before its focus target is ready.
+                        withFrameNanos { }
+                    }
+                }
+            } finally {
+                // Reconciliation will restart a surviving request whose destination moved.
+                val destinationMoved = keepPage && latestIdentities.value.getOrNull(target)?.id != id &&
+                    latestIdentities.value.any { it.id == id }
+                if (pageJob === coroutineContext[Job] && !destinationMoved) {
+                    pageTarget = null
+                    // A timed-out page cannot leave the list unfocused after its row was deleted.
+                    val needsRecovery = !landed && !headingHasFocus && (!listHasFocus || focusLostToRemoval)
+                    focusLostToRemoval = false
+                    val canRecover = keepPage && latestStillOwning.value(capturedVisit) && latestFocusEnabled.value
+                    if (isActive && needsRecovery && canRecover) pageRecovery++
+                }
+            }
+        }
+    }
+    DisposableEffect(active, capturedVisit, initialFocusEnabled, identities.takeUnless { keepPage }) {
+        onDispose { cancelPage() }
+    }
+    if (keepPage && active) LaunchedEffect(capturedVisit, identities) {
+        // An earlier request may be gone, but do not discard a newer press aimed at a surviving row.
+        val id = pageTarget ?: return@LaunchedEffect
+        val target = identities.indexOfFirst { it.id == id }
+        if (target < 0) cancelPage()
+        else if (target != pageTargetIndex) pageTo(target)
     }
     // A level left scrolled keeps its list for the next visit, with a row partly under the top
     // fade; as a preview it starts with that row whole under its heading instead, unfaded. Back
@@ -614,7 +719,9 @@ private fun DepthStripPane(
                 if (!latestActive.value || latestScrollHeld.value.value) 0f else bringIntoViewSpec.calculateScrollDistance(offset, size, containerSize)
         }
     }
-    LaunchedEffect(capturedVisit, active, initialFocusEnabled, targetId, column.level.rows.map { it.item.id }) {
+    LaunchedEffect(
+        capturedVisit, active, initialFocusEnabled, targetId, pageRecovery, column.level.rows.map { it.item.id },
+    ) {
         try {
             if (targetId == null) return@LaunchedEffect
             val targetIndex = column.level.rows.indexOfFirst { it.item.id == targetId }
@@ -626,9 +733,11 @@ private fun DepthStripPane(
                     list.layoutInfo.visibleItemsInfo.none { it.key == targetId }) list.scrollToItem(targetIndex)
                 return@LaunchedEffect
             }
-            if (!initialFocusEnabled) return@LaunchedEffect
+            fun pageOrHeadingOwnsFocus() = keepPage && (pageTarget != null || headingHasFocus)
+            if (!initialFocusEnabled || pageOrHeadingOwnsFocus()) return@LaunchedEffect
             suspend fun stillThisTarget() =
-                latestStillOwning.value(capturedVisit) && latestFocusEnabled.value && latestFocusedId.value == targetId
+                latestStillOwning.value(capturedVisit) && latestFocusEnabled.value &&
+                    latestFocusedId.value == targetId && !pageOrHeadingOwnsFocus()
             // Focus the system re-seats while the level that held it goes away can scroll this list
             // to its own row. A browse level returns to where it stood on becoming active, whatever
             // moved it since, before focus returns to its row; a choice level opens on its selection.
@@ -652,7 +761,7 @@ private fun DepthStripPane(
                 }
             }
             // A row that never composes ends the restore instead of holding the pane.
-            withTimeoutOrNull(RestoreFocusWaitMillis) { snapshotFlow { focus[targetId] }.first { it != null } }
+            withTimeoutOrNull(RESTORE_FOCUS_WAIT_MILLIS) { snapshotFlow { focus[targetId] }.first { it != null } }
                 ?: return@LaunchedEffect
             if (stillThisTarget() && initialFocusEnabled) {
                 focus[targetId]?.requestFocus()
@@ -696,7 +805,13 @@ private fun DepthStripPane(
                 ),
         ) {
             Layout(
-                modifier = Modifier.onFocusChanged { onHeadingFocus(it.hasFocus) },
+                modifier = Modifier.onFocusChanged {
+                    if (keepPage) {
+                        headingHasFocus = it.hasFocus
+                        if (it.hasFocus) cancelPage()
+                    }
+                    onHeadingFocus(it.hasFocus)
+                }.then(if (keepPage) Modifier.focusGroup() else Modifier),
                 content = {
                     Box(if (visuallyActive) Modifier.testTag("depth-heading") else Modifier) {
                         column.level.heading(emphasis)
@@ -737,10 +852,21 @@ private fun DepthStripPane(
                     state = list,
                     contentPadding = PaddingValues(top = DepthListTopReserve, bottom = ListBottomReserve),
                     modifier = Modifier.fillMaxSize()
+                        .then(if (wholePageRows != null) Modifier.onGloballyPositioned { pageViewport = it } else Modifier)
                         .listEdgeFades(list, topFade = !preview)
                         .then(if (active && activeFocusRequester != null) Modifier.focusRequester(activeFocusRequester) else Modifier)
                         .onFocusChanged {
-                            if (!it.hasFocus) { pageJob?.cancel(); pageTarget = null }
+                            if (keepPage) listHasFocus = it.hasFocus
+                            if (!it.hasFocus) {
+                                val rows = latestIdentities.value
+                                // Deleting the focused row can unseat focus before the surviving
+                                // page lands. Leaving the list or changing its owner still cancels.
+                                val focusedRowRemoved = keepPage && lastFocusedRow != null &&
+                                    rows.none { row -> row.id == lastFocusedRow } &&
+                                    rows.any { row -> row.id == pageTarget }
+                                lastFocusedRow = null
+                                if (focusedRowRemoved) focusLostToRemoval = true else cancelPage()
+                            }
                         }
                         .onPreviewKeyEvent { event ->
                             if (!active) return@onPreviewKeyEvent false
@@ -749,30 +875,24 @@ private fun DepthStripPane(
                             if (native.action == KeyEvent.ACTION_DOWN) { restoring = false; scrollHeld.value = false }
                             val direction = pageKeyDirection?.invoke(native.keyCode)
                             if (direction == null) {
-                                if (native.action == KeyEvent.ACTION_DOWN) { pageJob?.cancel(); pageTarget = null }
+                                if (native.action == KeyEvent.ACTION_DOWN) cancelPage()
                                 return@onPreviewKeyEvent false
                             }
                             if (native.action == KeyEvent.ACTION_DOWN) {
-                                val current = identities.indexOfFirst { it.id == (pageTarget ?: latestFocusedId.value) }
-                                val target = (current + direction * (list.layoutInfo.visibleItemsInfo.size - 1).coerceAtLeast(1))
+                                val current = identities.indexOfFirst { it.id == pageTarget }.takeIf { it >= 0 }
+                                    ?: identities.indexOfFirst { it.id == latestFocusedId.value }.takeIf { it >= 0 }
+                                    ?: return@onPreviewKeyEvent true
+                                val target = (current + direction * (visiblePageSize() - 1).coerceAtLeast(1))
                                     .coerceIn(0, identities.lastIndex)
-                                val id = identities[target].id
-                                pageJob?.cancel()
-                                pageTarget = id
-                                pageJob = scope.launch {
-                                    list.animateScrollToItem(target, pivotOffset())
-                                    snapshotFlow { focus[id] }.first { it != null }
-                                    if (latestStillOwning.value(capturedVisit) && latestFocusEnabled.value && pageTarget == id) {
-                                        focus[id]?.requestFocus()
-                                        pageTarget = null
-                                    }
-                                }
+                                pageTo(target)
                             }
                             true
                         }
                         .focusProperties {
                             onEnter = {
-                                if (latestActive.value) focus[latestFocusedId.value]?.requestFocus()
+                                if (latestActive.value && !focusLostToRemoval) {
+                                    focus[latestFocusedId.value]?.requestFocus()
+                                }
                             }
                         }.focusGroup(),
                 ) {
@@ -780,10 +900,18 @@ private fun DepthStripPane(
                         val requester = remember(row.item.id) { FocusRequester() }
                         DisposableEffect(row.item.id, active) {
                             if (active) focus[row.item.id] = requester
-                            onDispose { if (focus[row.item.id] === requester) focus.remove(row.item.id) }
+                            onDispose {
+                                if (focus[row.item.id] === requester) focus.remove(row.item.id)
+                            }
+                        }
+                        if (wholePageRows?.invoke(row.item) == true) DisposableEffect(row.item.id) {
+                            onDispose { pageRows.remove(row.item.id) }
                         }
                         row.content(
                             Modifier.focusRequester(requester)
+                                .then(if (wholePageRows?.invoke(row.item) == true) Modifier.onGloballyPositioned {
+                                    pageRows[row.item.id] = it
+                                } else Modifier)
                                 .focusProperties {
                                     canFocus = active
                                     right = FocusRequester.Cancel
@@ -793,7 +921,11 @@ private fun DepthStripPane(
                                     if (it.isFocused && latestActive.value &&
                                         latestStillOwning.value(capturedVisit) &&
                                         !(restoring && row.item.id != latestFocusedId.value)) {
-                                        onFocusItem(row.item.id, identities, capturedVisit)
+                                        if (keepPage) lastFocusedRow = row.item.id
+                                        // Framework re-seating is not the requested page destination.
+                                        if (!focusLostToRemoval || pageTarget == row.item.id) {
+                                            onFocusItem(row.item.id, identities, capturedVisit)
+                                        }
                                     }
                                 },
                         ) { if (latestActive.value) onActivate(row, capturedVisit) }

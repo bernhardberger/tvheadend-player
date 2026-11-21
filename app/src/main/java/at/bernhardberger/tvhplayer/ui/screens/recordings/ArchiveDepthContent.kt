@@ -129,6 +129,7 @@ internal fun ArchiveDepthContent(
     nowSeconds: () -> Long = { System.currentTimeMillis() / 1000L },
     /** Drawn over the root headline's band (the options button), so it slides and fades with the root column. */
     rootHeadingEnd: (@Composable () -> Unit)? = null,
+    onRootBack: (() -> Unit)? = null,
 ) {
     val latestRootHeadingEnd = rememberUpdatedState(rootHeadingEnd)
     val latestOnOpenRecording = rememberUpdatedState(onOpenRecording)
@@ -164,6 +165,7 @@ internal fun ArchiveDepthContent(
         initialFocusEnabled = initialFocusEnabled,
         backEnabled = backEnabled,
         activeFocusRequester = contentFocus,
+        onRootBack = onRootBack,
         onRootLeft = onDrawerFocus,
         onFirstRowUp = onFirstRowUp,
         pageKeyDirection = at.bernhardberger.tvhplayer.core.ChannelNavigation::pageDirectionForKeyCode,
@@ -201,6 +203,7 @@ private fun rememberArchiveLevels(
                 (root.folderAt(path)?.allRecordings()?.size ?: 0)
             levels[id] = DepthLevel(
                 id = id,
+                keepPageOnRowChanges = true,
                 heading = { emphasis ->
                     Box {
                         ArchiveLevelHeading(

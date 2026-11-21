@@ -654,10 +654,18 @@ internal fun RecordingsScreenContent(
     LaunchedEffect(observedEntries, observedArchive, observedRecordingNow) {
         // Transfer locally before removing the actual focused node. Keeping only the
         // old key would recreate the node and leave the same focus vacancy.
-        if (removalHandoff && initialFocusEnabled &&
+        val pendingDestination = when (mode) {
+            DvrLibraryMode.ARCHIVE -> archiveNavigation.takeIf { archiveLevel == reconciledArchiveStack.active.levelId }
+            DvrLibraryMode.SCHEDULE -> scheduleNavigation
+            DvrLibraryMode.PROBLEMS -> null
+        }?.pendingPageDestination?.invoke()
+        val needsHeaderHandoff = removalHandoff && pendingDestination !in observedKeys
+        if (needsHeaderHandoff && initialFocusEnabled &&
             drawerState?.currentValue != androidx.tv.material3.DrawerValue.Open
         ) {
-            if (focusHeader()) {
+            // Park outside the depth strip: its options button deliberately blocks automatic
+            // row restoration while it owns focus.
+            if (modeFocus.requestFocus()) {
                 contentFocusOwned = false
                 requestContentFocus = observedKeys.isNotEmpty()
             }
@@ -835,12 +843,18 @@ internal fun RecordingsScreenContent(
             startPadding = startPadding,
             endPadding = endPadding,
             onFocused = {
+                // Actual tab focus ends paging even when a deleted origin already unseated the list.
+                when (mode) {
+                    DvrLibraryMode.ARCHIVE -> archiveNavigation.cancelPendingPage?.invoke()
+                    DvrLibraryMode.SCHEDULE -> scheduleNavigation.cancelPendingPage?.invoke()
+                    DvrLibraryMode.PROBLEMS -> Unit
+                }
                 modeMotion.select(it, DvrLibraryMode.entries)
                 if (mode != it) {
                     screenState.requestedScheduleEntryId.value = null
-                    contentFocusOwned = false
-                    requestContentFocus = false
                 }
+                contentFocusOwned = false
+                requestContentFocus = false
                 mode = it
             },
             onClick = {
@@ -929,13 +943,19 @@ internal fun RecordingsScreenContent(
                         overlays.detailsEntry == null && overlays.folderMenu == null && !overlays.optionsOpen &&
                         (contentFocusOwned || requestContentFocus),
                     backEnabled = backEnabled && overlays.detailsEntry == null && overlays.folderMenu == null &&
-                        !overlays.optionsOpen && contentFocusOwned,
+                        !overlays.optionsOpen && (contentFocusOwned || optionsHasFocus),
                     grouping = chosenGrouping,
                     sort = chosenView.sort,
                     fullRoot = if (owner.isCurrent) fullArchive else frame.fullArchive,
                     show = chosenView.show,
                     onFirstRowUp = {
                         if (owner.isCurrent && focusHeader()) contentFocusOwned = false
+                    },
+                    onRootBack = {
+                        if (owner.isCurrent && (modeFocus.requestFocus() || drawerFocus?.requestFocus() == true)) {
+                            contentFocusOwned = false
+                            requestContentFocus = false
+                        }
                     },
                     contentFocus = contentFocus,
                     onDrawerFocus = drawerFocus?.let { focus -> {
