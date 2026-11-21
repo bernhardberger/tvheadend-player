@@ -7,9 +7,16 @@ import android.os.SystemClock
 import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.platform.LocalContext
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
+import at.bernhardberger.tvheadend.sdk.core.SessionState
+import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvhplayer.images.LogoInkTransformation
 import coil3.EventListener
 import coil3.ImageLoader
@@ -27,6 +34,9 @@ import coil3.request.SuccessResult
 import coil3.request.transformations
 import coil3.size.Dimension
 import coil3.size.Size
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import java.util.concurrent.atomic.AtomicLong
 
 internal fun ImageLoader.withArtworkTrace(context: Context): ImageLoader =
@@ -36,10 +46,49 @@ internal fun ImageLoader.withArtworkTrace(context: Context): ImageLoader =
 
 @Composable
 internal fun ArtworkScreenShown(screen: String) {
-    if (LocalContext.current.isDebuggable) {
-        val shownMs = remember(screen) { SystemClock.elapsedRealtime() }
-        LaunchedEffect(screen) { Log.d(ARTWORK_LOG_TAG, "screen $screen shown atMs=$shownMs") }
+    rememberArtworkScreenStart(screen)
+}
+
+internal val LocalArtworkConnectedAt = compositionLocalOf<State<Long?>?> { null }
+
+@Composable
+internal fun rememberArtworkConnectedAt(session: TvheadendSession): State<Long?>? {
+    if (!LocalContext.current.isDebuggable) return null
+    return produceState<Long?>(null, session) {
+        session.observation.map { it.sessionState }
+            .map { it == SessionState.Synchronizing || it is SessionState.Ready }
+            .distinctUntilChanged()
+            .collect { value = if (it) SystemClock.elapsedRealtime() else null }
     }
+}
+
+@Composable
+internal fun ArtworkFirstLoad(screen: String, waitingFor: String?) {
+    val shownMs = rememberArtworkScreenStart(screen) ?: return
+    val connectedAt = LocalArtworkConnectedAt.current
+    val latestWait = rememberUpdatedState(waitingFor)
+    LaunchedEffect(screen, shownMs, connectedAt) {
+        val waits = linkedSetOf<String>()
+        snapshotFlow { latestWait.value }.first { wait ->
+            if (wait != null) waits.add(wait)
+            wait == null
+        }
+        val now = SystemClock.elapsedRealtime()
+        val connectedMs = connectedAt?.value?.let { now - it } ?: "-"
+        val reason = waits.joinToString("+").ifEmpty { "none" }
+        Log.d(
+            ARTWORK_LOG_TAG,
+            "screen $screen firstLoadEnd screenMs=${now - shownMs} connectedMs=$connectedMs reason=$reason",
+        )
+    }
+}
+
+@Composable
+private fun rememberArtworkScreenStart(screen: String): Long? {
+    if (!LocalContext.current.isDebuggable) return null
+    val shownMs = remember(screen) { SystemClock.elapsedRealtime() }
+    LaunchedEffect(screen) { Log.d(ARTWORK_LOG_TAG, "screen $screen shown atMs=$shownMs") }
+    return shownMs
 }
 
 internal fun <T> traceArtworkMapping(

@@ -1,7 +1,7 @@
 package at.bernhardberger.tvhplayer.touch.guide
 
 import at.bernhardberger.tvhplayer.touch.ui.DvrControls
-import at.bernhardberger.tvhplayer.touch.ui.ArtworkScreenShown
+import at.bernhardberger.tvhplayer.touch.ui.ArtworkFirstLoad
 import at.bernhardberger.tvhplayer.touch.ui.LocalArtworkModels
 import android.content.Context
 import android.content.res.Configuration
@@ -55,7 +55,6 @@ internal fun GuideDestination(
     onOpenConnections: () -> Unit,
     onSignIn: () -> Unit,
 ) {
-    ArtworkScreenShown("Guide")
     val presentation by connection.uiState.collectAsStateWithLifecycle()
     val scope by channels.scope.collectAsStateWithLifecycle()
     val observation by guide.observation.collectAsStateWithLifecycle()
@@ -84,6 +83,7 @@ internal fun GuideDestination(
     val state = if (dayLoading || details !== mapped.details) {
         mapped.copy(dayLoading = dayLoading, details = details)
     } else mapped
+    ArtworkFirstLoad("Guide", firstLoadWait(state, input))
     // Forget invalid choices, so they cannot silently return when a tag or the schedule changes again.
     val available = selection.copy(
         day = selection.day?.takeIf { it in state.dayDates },
@@ -112,6 +112,14 @@ internal fun GuideDestination(
         ),
         destinations = destinations,
     )
+}
+
+private fun firstLoadWait(state: GuideState, input: GuideMappingInput): String? = when {
+    state.availability != GuideAvailability.Loading -> null
+    !input.scope.settingsLoaded -> "settings"
+    input.scope.scope.visibleChannels.isEmpty() -> "channels"
+    input.observation.epgSnapshotForDisplay == null -> "guideSnapshot"
+    else -> "mapping"
 }
 
 private val EmptyGuide =

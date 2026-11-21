@@ -3,7 +3,9 @@ package at.bernhardberger.tvhplayer.touch
 import at.bernhardberger.tvhplayer.touch.ui.ConfirmDvrChange
 import at.bernhardberger.tvhplayer.touch.ui.DvrControls
 import androidx.compose.runtime.remember
-import at.bernhardberger.tvhplayer.touch.ui.ArtworkScreenShown
+import at.bernhardberger.tvhplayer.touch.ui.ArtworkFirstLoad
+import at.bernhardberger.tvhplayer.touch.ui.LocalArtworkConnectedAt
+import at.bernhardberger.tvhplayer.touch.ui.rememberArtworkConnectedAt
 import at.bernhardberger.tvhplayer.touch.ui.traceArtworkMapping
 import at.bernhardberger.tvhplayer.touch.ui.LocalArtworkModels
 import at.bernhardberger.tvhplayer.touch.ui.ArtworkModels
@@ -106,6 +108,7 @@ internal fun TouchApp(
     val profile by owner.serverProfile.collectAsStateWithLifecycle()
     val profiles by owner.profiles.collectAsStateWithLifecycle()
     val presentation by connection.uiState.collectAsStateWithLifecycle()
+    val connectedAt = rememberArtworkConnectedAt(session)
     val connect = viewModel { ConnectViewModel(session, owner) }
     val dvr = viewModel { DvrControls(session, notices) }
     SideEffect { connect.discovery = discovery }
@@ -136,13 +139,15 @@ internal fun TouchApp(
                     onSaved = { page = Page.Connections },
                 )
             }
-            else -> AppDestinations(
-                session, dvr, connection, channels, recordings, guide, playingId, onWatch, onPlayRecording,
-                channelsDispatcher = channelsDispatcher,
-                playingRecordingId = playingRecordingId,
-                onOpenConnections = { page = Page.Connections },
-                onSignIn = { page = Page.SignIn },
-            )
+            else -> CompositionLocalProvider(LocalArtworkConnectedAt provides connectedAt) {
+                AppDestinations(
+                    session, dvr, connection, channels, recordings, guide, playingId, onWatch, onPlayRecording,
+                    channelsDispatcher = channelsDispatcher,
+                    playingRecordingId = playingRecordingId,
+                    onOpenConnections = { page = Page.Connections },
+                    onSignIn = { page = Page.SignIn },
+                )
+            }
         }
     }
 }
@@ -231,7 +236,6 @@ private fun AppFrame(
     onSignIn: () -> Unit,
     mappingDispatcher: CoroutineDispatcher,
 ) {
-    ArtworkScreenShown("Channels")
     val presentation = connection.uiState.collectAsStateWithLifecycle().value
     val scope = channels.scope.collectAsStateWithLifecycle().value
     // The scope is republished for channel changes only; the guide comes with every observation.
@@ -251,6 +255,11 @@ private fun AppFrame(
         }
     }
     val state = mapped?.takeIf { it.key.scope.profileId == scope.profileId }?.state ?: ChannelsState.Loading
+    ArtworkFirstLoad("Channels", if (state == ChannelsState.Loading) when {
+        !scope.settingsLoaded -> "settings"
+        scope.scope.visibleChannels.isEmpty() -> "channels"
+        else -> "mapping"
+    } else null)
     CompositionLocalProvider(LocalChannelProgressClock provides rememberCurrentEpochSeconds()) {
         ChannelsScreen(
             state = state,
