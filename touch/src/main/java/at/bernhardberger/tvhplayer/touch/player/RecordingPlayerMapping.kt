@@ -12,15 +12,18 @@ import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvhplayer.core.AppErrorCondition
 import at.bernhardberger.tvhplayer.core.RecordingFailureDetail
 import at.bernhardberger.tvhplayer.core.RecordingMark
+import at.bernhardberger.tvhplayer.core.RecordingMarkKind
 import at.bernhardberger.tvhplayer.core.RecordingTimelinePresentation
 import at.bernhardberger.tvhplayer.core.recordingArtwork
 import at.bernhardberger.tvhplayer.core.recordingErrorCondition
 import at.bernhardberger.tvhplayer.core.recordingFailureDetail
 import at.bernhardberger.tvhplayer.core.recordingIsRunning
+import at.bernhardberger.tvhplayer.core.recordingMarkStops
 import at.bernhardberger.tvhplayer.core.recordingPaddedStop
 import at.bernhardberger.tvhplayer.core.recordingProgramMarks
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
+import at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.playback.RecordingSkipAction
 import at.bernhardberger.tvhplayer.settings.AdBreakMode
 import at.bernhardberger.tvhplayer.touch.channels.ChannelRow
@@ -75,8 +78,12 @@ internal fun recordingPlayerState(
     val presented = status == LivePlayerStatus.Playing
     val range = (timeline as? RecordingTimelinePresentation.Seekable)?.range.takeIf { presented }
     val durationMs = range?.endMs ?: 0L
-    val programMarks = entry?.takeIf { markerRevision != null && durationMs > 0L }
+    val revision = markerRevision.takeIf { range != null }
+    val programMarks = entry?.takeIf { revision != null }
         ?.let { recordingProgramMarks(it, durationMs) }.orEmpty()
+    val displayedMarks = if (revision == null) emptyList() else marks + programMarks
+    val stops = recordingMarkStops(displayedMarks, durationMs)
+    val hasMarkers = stops.isNotEmpty()
     return RecordingPlayerState(
         key = target.recordingId.value.toString(),
         channel = recordingChannel(entry, observation, now, artwork, noChannel),
@@ -90,13 +97,13 @@ internal fun recordingPlayerState(
         durationMs = durationMs,
         displayDurationMs = range?.displayEndMs ?: durationMs,
         positionMs = positionMs,
-        marks = if (markerRevision == null) emptyList() else marks + programMarks,
+        marks = displayedMarks,
         programMarks = programMarks,
-        markerRevision = markerRevision,
+        markerRevision = revision,
         adBreakSetting = adBreakSetting,
         adBreakPick = adBreakPick,
-        skipPrompt = skipPrompt.takeIf { presented },
-        controlsSkip = controlsSkip.takeIf { presented },
+        skipPrompt = skipPrompt.takeIf { hasMarkers },
+        controlsSkip = controlsSkip.takeIf { hasMarkers },
         status = status,
         paused = presented && !playWhenReady,
         buffering = playback is AppPlaybackState.Buffering && presented,
@@ -106,11 +113,28 @@ internal fun recordingPlayerState(
         tracks = tracks,
         options = options,
         offered = recordingControls(
-            presented, recordingInfo != null, markerRevision != null, tracks, allowPictureInPicture,
+            presented, recordingInfo != null, hasMarkers, displayedMarks.any {
+                it.kind == RecordingMarkKind.AD_BREAK && it.startMs in 0 until durationMs
+            }, tracks, allowPictureInPicture,
         ),
         info = recordingInfo,
     )
 }
+
+internal fun ownsRecordingPlayback(
+    target: AppPlaybackTarget.Recording,
+    active: AppPlaybackTarget?,
+    selection: RecordingPlaybackSelection?,
+    observation: SessionObservation,
+): Boolean = active == target && selection?.recordingId == target.recordingId &&
+    selection.currentSession === observation.currentSession
+
+internal fun recordingRuntimeControls(offered: Set<PlayerControl>): Set<PlayerControl> = offered.intersect(
+    setOf(
+        PlayerControl.FullScreen, PlayerControl.Info, PlayerControl.Timeshift, PlayerControl.PictureInPicture,
+        PlayerControl.Markers, PlayerControl.Settings,
+    ),
+)
 
 /** The same single-entry projection as Browse; EPG enrichment is supplied by the caller. */
 internal fun recordingPlayerInfo(
@@ -163,6 +187,7 @@ private fun recordingControls(
     presented: Boolean,
     hasInfo: Boolean,
     ownsMarkers: Boolean,
+    hasAdBreaks: Boolean,
     tracks: PlayerTracks,
     allowPictureInPicture: Boolean,
 ): Set<PlayerControl> = buildSet {
@@ -170,7 +195,7 @@ private fun recordingControls(
     if (hasInfo) add(PlayerControl.Info)
     if (presented) {
         add(PlayerControl.Timeshift)
-        add(PlayerControl.Settings)
+        if (hasAdBreaks) add(PlayerControl.Settings)
         if (ownsMarkers) add(PlayerControl.Markers)
         if (tracks.audio.isNotEmpty()) add(PlayerControl.Audio)
         if (tracks.subtitles.isNotEmpty()) add(PlayerControl.Subtitles)

@@ -228,7 +228,7 @@ private fun ColumnScope.SheetBody(
             is RecordingPlayerState -> state.info?.let { RecordingInfo(it, panel, info, onPanel, onChoice) }
         }
         PlayerPanel.Markers -> if (state is RecordingPlayerState) {
-            RecordingMarkerRows(state, onSeek, Modifier.weight(1f))
+            RecordingMarkerRows(state, recordingMarkerTap(state, onSeek, onChoice), Modifier.weight(1f))
         }
         else -> EntryRows(panelEntries(panel, state, onChoice, done))
     }
@@ -289,8 +289,10 @@ private fun PlayerBottomSheet(
 private fun OptionRows(state: PlayerFaceState, onPanel: (PlayerPanel?) -> Unit) {
     val options = state.options
     val profile = options.profilePick?.let { options.profiles.getOrNull(it) }
+    val adBreakOnly = (state as? RecordingPlayerState)?.adBreakOnlyOptions == true
     val rows = listOfNotNull(
-        Triple(R.string.player_display_mode, stringResource(options.displayMode.label), PlayerPanel.DisplayMode),
+        if (adBreakOnly) null else
+            Triple(R.string.player_display_mode, stringResource(options.displayMode.label), PlayerPanel.DisplayMode),
         if (state is RecordingPlayerState) {
             val selected = state.adBreakPick?.let { stringResource(it.label) } ?: adBreakDefault(state)
             Triple(SharedR.string.ad_breaks_setting, selected, PlayerPanel.AdBreaks)
@@ -302,7 +304,8 @@ private fun OptionRows(state: PlayerFaceState, onPanel: (PlayerPanel?) -> Unit) 
                 PlayerPanel.Profile,
             )
         },
-        options.stats?.let { Triple(R.string.player_stats, stringResource(it.label), PlayerPanel.Stats) },
+        options.stats?.takeUnless { adBreakOnly }
+            ?.let { Triple(R.string.player_stats, stringResource(it.label), PlayerPanel.Stats) },
     )
     Rows {
         rows.forEachIndexed { index, (label, value, target) ->

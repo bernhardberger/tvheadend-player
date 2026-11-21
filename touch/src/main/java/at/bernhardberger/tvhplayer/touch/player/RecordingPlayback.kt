@@ -12,6 +12,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -20,10 +21,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.res.stringResource
 import androidx.media3.common.util.UnstableApi
 import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvhplayer.core.GrowingTimelineDisplayEnd
+import at.bernhardberger.tvhplayer.core.RecordingMark
 import at.bernhardberger.tvhplayer.core.RecordingTimelinePresentation
 import at.bernhardberger.tvhplayer.core.SeekbarRange
 import at.bernhardberger.tvhplayer.core.recordingTimelinePresentation
@@ -31,9 +34,12 @@ import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection
+import at.bernhardberger.tvhplayer.playback.RecordingSkipAction
 import at.bernhardberger.tvhplayer.settings.AdBreakMode
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
+import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.touch.recordings.RecordingClock
+import at.bernhardberger.tvhplayer.touch.recordings.RecordingsTexts
 import at.bernhardberger.tvhplayer.touch.recordings.dayText
 import at.bernhardberger.tvhplayer.touch.recordings.recordingDay
 import at.bernhardberger.tvhplayer.touch.recordings.recordingsTexts
@@ -44,8 +50,11 @@ import at.bernhardberger.tvhplayer.touch.ui.rememberStandalonePicture
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.common.programmeCreditFacts
 import at.bernhardberger.tvhplayer.ui.common.rememberCurrentEpochSeconds
+import java.io.IOException
 import java.time.ZoneId
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import kotlin.time.Instant
 import kotlin.time.toJavaInstant
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
@@ -57,6 +66,7 @@ internal fun RecordingPlayback(
     route: RecordingRoute,
     runtime: AppPlaybackRuntime,
     session: TvheadendSession,
+    settings: PlayerSettingsStore,
     artwork: ArtworkModels,
     pictureWindow: PlayerWindow,
     window: Window,
@@ -70,7 +80,7 @@ internal fun RecordingPlayback(
     val texts = remember(context, locale, observation.dvrConfigurationsState) {
         recordingsTexts(context, locale, observation)
     }
-    val currentTarget by runtime.activeTarget.collectAsStateWithLifecycle()
+    val active by runtime.activeTarget.collectAsStateWithLifecycle()
     val playback by runtime.state.collectAsStateWithLifecycle()
     val selection by runtime.recordingSelection.collectAsStateWithLifecycle()
     val admission by runtime.recordingAdmission.collectAsStateWithLifecycle()
@@ -84,32 +94,29 @@ internal fun RecordingPlayback(
     val target = AppPlaybackTarget.Recording(route.id)
     val owned = selection?.takeIf { it.recordingId == route.id && it.currentSession === observation.currentSession }
     val ownedAdmission = admission.takeIf { owned != null }
-    val installed = currentTarget == target && owned != null
+    val installed = ownsRecordingPlayback(target, active, selection, observation)
     val ownedPlayback = playback.takeIf {
         installed || owned != null && (it as? AppPlaybackState.Failed)?.target == target
-    }
-        ?: AppPlaybackState.Starting
+    } ?: AppPlaybackState.Starting
     val growing = recordingIsCurrentlyGrowing(observation, owned, ownedAdmission)
     val samples = remember(video.epoch, route.id) { RecordingSamples() }
     SampleRecording(runtime, samples, installed, growing, shown && playWhenReady && !inWindow)
     // Timeline geometry is recomputed only when duration changes; position is read by the face's timeline.
     val timeline = recordingTimelinePresentation(0L, samples.durationMs, growing, samples.displayMs)
     val clock = RecordingClock(now.toJavaInstant(), zone, locale) { formatClock(it, locale) }
-    val info = observation.dvrEntry(route.id)?.let { entry ->
-        val event = entry.eventId?.let(observation::event)
-        recordingPlayerInfo(entry, ownedAdmission, clock, texts).copy(
-            credits = programmeCreditFacts(event, LocalResources.current),
-        )
-    }
+    val info = recordingPlaybackInfo(observation, route.id, ownedAdmission, clock, texts)
     val recordedOn = info?.item?.start?.let {
         joinParts(listOf(dayText(recordingDay(it, clock)), clock.time(it.atZone(zone))))
     }.orEmpty()
+    val markers = recordingMarkerPresentation(runtime, installed)
+    val adBreaks = recordingAdBreakChoice(settings, route.id)
     val face = recordingPlayerState(
         target, observation, ownedPlayback, ownedAdmission, timeline, samples.position,
-        marks = emptyList(), markerRevision = null, skipPrompt = null, controlsSkip = null,
-        adBreakSetting = AdBreakMode.OFF, adBreakPick = null, playWhenReady = playWhenReady, now = now,
-        recordedDate = { recordedOn },
-        finishClock = { formatClock(it.toJavaInstant().atZone(zone), locale) },
+        marks = markers.marks, markerRevision = markers.revision,
+        skipPrompt = markers.prompt, controlsSkip = markers.controlsSkip,
+        adBreakSetting = adBreaks.default, adBreakPick = adBreaks.selected,
+        playWhenReady = playWhenReady, now = now,
+        recordedDate = { recordedOn }, finishClock = { formatClock(it.toJavaInstant().atZone(zone), locale) },
         episodeLine = texts.episode, noChannel = texts.noChannel,
         unknownTitle = stringResource(SharedR.string.recordings_title),
         tracks = PlayerTracks(), options = PlaybackOptions(), brightness = brightness,
@@ -117,10 +124,60 @@ internal fun RecordingPlayback(
         info = info,
     )
     RecordingPlaybackFace(
-        face.copy(growing = growing, offered = recordingRuntimeControls(face.offered)), owned, runtime, session,
+        face.copy(growing = growing, offered = recordingRuntimeControls(face.offered), adBreakOnlyOptions = true),
+        owned, runtime, session,
         pictureWindow, installed && video.visible, inWindow, timeline, back, { shown = it },
         onBrightness = { brightness = it; applyBrightness(window, it) },
+        onAdBreakMode = { if (PlayerControl.Settings in face.offered) adBreaks.set(it) },
     )
+}
+
+@Composable
+private fun recordingPlaybackInfo(
+    observation: SessionObservation,
+    id: DvrEntryId,
+    admission: RecordingPlaybackAdmission?,
+    clock: RecordingClock,
+    texts: RecordingsTexts,
+): RecordingPlayerInfo? = observation.dvrEntry(id)?.let { entry ->
+    recordingPlayerInfo(entry, admission, clock, texts).copy(
+        credits = programmeCreditFacts(entry.eventId?.let(observation::event), LocalResources.current),
+    )
+}
+
+private data class RecordingAdBreakChoice(
+    val default: AdBreakMode,
+    val selected: AdBreakMode?,
+    val set: (AdBreakMode?) -> Unit,
+)
+
+private data class RecordingMarkerPresentation(
+    val marks: List<RecordingMark>,
+    val revision: Long?,
+    val prompt: RecordingSkipAction?,
+    val controlsSkip: RecordingSkipAction?,
+)
+
+@Composable
+private fun recordingMarkerPresentation(runtime: AppPlaybackRuntime, installed: Boolean): RecordingMarkerPresentation {
+    if (!installed) return RecordingMarkerPresentation(emptyList(), null, null, null)
+    val marks by runtime.recordingMarks.collectAsStateWithLifecycle()
+    val revision by runtime.recordingMarkerRevision.collectAsStateWithLifecycle()
+    val prompt by runtime.recordingSkipPrompt.collectAsStateWithLifecycle()
+    val controlsSkip by runtime.recordingControlsSkip.collectAsStateWithLifecycle()
+    return RecordingMarkerPresentation(marks, revision, prompt, controlsSkip)
+}
+
+@Composable
+private fun recordingAdBreakChoice(settings: PlayerSettingsStore, id: DvrEntryId): RecordingAdBreakChoice {
+    val choices by settings.recordingAdBreaks.choices.collectAsStateWithLifecycle(null)
+    val defaultMode by remember(settings) { settings.playerSettings.map { it.adBreakMode } }
+        .collectAsStateWithLifecycle(AdBreakMode.ASK)
+    val scope = rememberCoroutineScope()
+    val rendered = choices
+    return RecordingAdBreakChoice(defaultMode, rendered?.get(id.value)) { mode ->
+        if (rendered != null) scope.launch { setRecordingAdBreakMode(settings, rendered.profile, id.value, mode) }
+    }
 }
 
 @OptIn(UnstableApi::class)
@@ -137,6 +194,7 @@ private fun RecordingPlaybackFace(
     back: () -> Unit,
     onControlsShown: (Boolean) -> Unit,
     onBrightness: (Float) -> Unit,
+    onAdBreakMode: (AdBreakMode?) -> Unit,
 ) {
     val picture = rememberStandalonePicture(face.artwork, face.artworkModel)
     SideEffect { pictureWindow.mode = AspectRatioMode.FIT }
@@ -156,11 +214,34 @@ private fun RecordingPlaybackFace(
         onSeek = { if (ownsPlayback()) recordingDragMove(timeline.at(0L), it)
             ?.let { move -> runtime.seekTo(move.positionMs) } },
         onBrightness = onBrightness,
-        onChoice = {},
+        onChoice = { if (ownsPlayback()) runtime.recordingChoice(it, onAdBreakMode) },
         video = { TouchVideoSurface(runtime.player, videoVisible, it, pictureWindow::attach) },
         onControlsShown = onControlsShown, inWindow = inWindow, hideAfterMs = rememberControlsTimeout(),
         progressing = rememberPlayerProgressing(runtime.player).value, notices = LocalFrameNotices.current,
     )
+}
+
+private fun AppPlaybackRuntime.recordingChoice(choice: PlayerChoice, onAdBreakMode: (AdBreakMode?) -> Unit) {
+    when (choice) {
+        is RecordingMove.Marker -> seekRecordingMarker(choice.positionMs, choice.expectedRevision, choice.programMarks)
+        is RecordingSkipChoice.Accept -> skipRecordingAdBreak(choice.action, choice.fromControls)
+        is RecordingSkipChoice.Dismiss -> dismissRecordingSkipPrompt(choice.action)
+        is PlayerChoice.AdBreaks -> onAdBreakMode(choice.mode)
+        else -> Unit
+    }
+}
+
+private suspend fun setRecordingAdBreakMode(
+    settings: PlayerSettingsStore,
+    profile: String?,
+    recordingId: Long,
+    mode: AdBreakMode?,
+) {
+    try {
+        settings.recordingAdBreaks.set(profile, recordingId, mode)
+    } catch (_: IOException) {
+        // Leave the selection as read from the store.
+    }
 }
 
 @OptIn(UnstableApi::class)
@@ -174,10 +255,6 @@ private fun RecordingTimelinePresentation.at(positionMs: Long): SeekbarRange? =
     (this as? RecordingTimelinePresentation.Seekable)?.range?.let {
         it.copy(positionMs = positionMs.coerceIn(it.startMs, it.endMs))
     }
-
-internal fun recordingRuntimeControls(offered: Set<PlayerControl>): Set<PlayerControl> = offered.intersect(
-    setOf(PlayerControl.FullScreen, PlayerControl.Info, PlayerControl.Timeshift, PlayerControl.PictureInPicture),
-)
 
 @kotlin.OptIn(ExperimentalTvheadendApi::class)
 // Matches the TV's currentRecordingIsGrowing: the installed admission alone can outlive recording.

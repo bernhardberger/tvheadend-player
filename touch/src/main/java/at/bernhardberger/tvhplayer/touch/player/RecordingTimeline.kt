@@ -3,6 +3,7 @@
 package at.bernhardberger.tvhplayer.touch.player
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,6 +23,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -35,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.core.RecordingMark
 import at.bernhardberger.tvhplayer.core.RecordingMarkHint
 import at.bernhardberger.tvhplayer.core.RecordingMarkKind
+import at.bernhardberger.tvhplayer.core.RecordingMarkStop
 import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
 import at.bernhardberger.tvhplayer.core.leftPx
 import at.bernhardberger.tvhplayer.core.visibleRecordingMarkHints
@@ -51,6 +54,7 @@ internal fun FaceTimeline(
     onPreview: (Long?) -> Unit,
     onSeek: (Long) -> Unit,
     modifier: Modifier,
+    onChoice: (PlayerChoice) -> Unit = {},
 ) {
     when (state) {
         is LivePlayerState -> PlayerTimeline(
@@ -58,7 +62,7 @@ internal fun FaceTimeline(
             { onPreview(it?.times(1_000L)) }, { onSeek(it * 1_000L) }, modifier,
         )
         is RecordingPlayerState ->
-            RecordingTimeline(state, layout, controls, preview, onPreview, onSeek, modifier)
+            RecordingTimeline(state, layout, controls, preview, onPreview, onSeek, modifier, onChoice)
     }
 }
 
@@ -71,6 +75,7 @@ internal fun RecordingTimeline(
     onPreview: (Long?) -> Unit,
     onSeek: (Long) -> Unit,
     modifier: Modifier,
+    onChoice: (PlayerChoice) -> Unit,
 ) {
     if (!state.seekable) return
     val duration = state.displayDurationMs
@@ -89,7 +94,9 @@ internal fun RecordingTimeline(
         RecordingTrack(marks, duration, current, position, trackY, thickness, preview != null, Modifier.fillMaxSize())
         if (controls) {
             if (hintInset > 0.dp) {
-                RecordingHints(marks, duration, trackY - layout.recordingHintLift, Modifier.fillMaxSize())
+                RecordingHints(marks, duration, trackY - layout.recordingHintLift, Modifier.fillMaxSize()) { mark ->
+                    recordingMarkerMove(state, mark.startMs)?.let { move -> { onChoice(move) } }
+                }
             }
             PositionThumb(markerX, trackY, layout, preview != null)
         }
@@ -219,13 +226,28 @@ internal fun recordingHintInset(layout: PlayerLayout, marks: List<RecordingMark>
 
 /** Measure the actual Material symbols (including localized badges), then apply the TV collision rule. */
 @Composable
-private fun RecordingHints(marks: List<RecordingMark>, duration: Long, y: Dp, modifier: Modifier) {
+private fun RecordingHints(
+    marks: List<RecordingMark>,
+    duration: Long,
+    y: Dp,
+    modifier: Modifier,
+    jump: (RecordingMark) -> (() -> Unit)?,
+) {
     val ink = MaterialTheme.colorScheme.onSurface
     Layout(
         content = {
-            marks.forEach {
-                Box(Modifier.clearAndSetSemantics { testTag = "recording-marker-symbol" }) {
-                    RecordingSymbol(it.kind, ink)
+            marks.forEach { mark ->
+                val onClick = jump(mark)
+                val hint = if (onClick == null) {
+                    Modifier.clearAndSetSemantics { testTag = "recording-marker-symbol" }
+                } else {
+                    val stop = RecordingMarkStop(mark.startMs, mark)
+                    val label = recordingMarkName(stop) ?: formatPlaybackDuration(stop.positionMs)
+                    Modifier.testTag("recording-marker-symbol").semantics { contentDescription = label }
+                        .clickable(role = Role.Button, onClick = onClick)
+                }
+                Box(hint) {
+                    RecordingSymbol(mark.kind, ink)
                 }
             }
         },
