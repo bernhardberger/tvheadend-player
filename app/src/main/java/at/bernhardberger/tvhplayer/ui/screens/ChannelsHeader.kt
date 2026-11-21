@@ -19,6 +19,9 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.unit.constrainHeight
+import androidx.compose.ui.unit.constrainWidth
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -51,11 +54,13 @@ internal class ChannelsHeaderFocus {
  * nothing to choose, so Tags is not shown. Tags names the active [tag], or "All channels" on its
  * resting tone without one; Filter names the active [filter] after its [filterDot].
  * A [leading] action sits before the buttons and takes the start edge; it applies the modifier it
- * receives to its first focusable.
+ * receives to its first focusable. The wall clock, reading [nowSec], follows the buttons and takes
+ * no focus, so the View options button stays the row's end stop.
  */
 @Composable
 internal fun ChannelsHeader(
     title: String,
+    nowSec: () -> Long,
     tag: String?,
     focus: ChannelsHeaderFocus,
     showTags: Boolean,
@@ -92,6 +97,7 @@ internal fun ChannelsHeader(
     TopLevelBrowseHeader(
         title = title,
         showTitle = showTitle,
+        nowSec = nowSec,
         modifier = modifier
             .onPreviewKeyEvent { event ->
                 event.type == KeyEventType.KeyDown && event.key == Key.DirectionDown && onMoveToContent()
@@ -103,10 +109,8 @@ internal fun ChannelsHeader(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 leading?.invoke(this, startEdge.focusProperties { up = FocusRequester.Cancel })
-                if (tagsShown || filterShown) Row(
-                    horizontalArrangement = Arrangement.spacedBy(TvSpacing8),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
+                // Measured after the leading action and View options, the values take what is left.
+                if (tagsShown || filterShown) ValueButtonsRow(Modifier.weight(1f, fill = false)) {
                     if (tagsShown) RoundIconButton(
                         icon = painterResource(AppR.drawable.ic_sell),
                         label = stringResource(R.string.browse_tags),
@@ -150,4 +154,35 @@ internal fun ChannelsHeader(
             }
         },
     )
+}
+
+/**
+ * The Tags and Filter buttons side by side, [TvSpacing8] apart, each as wide as it wants while they
+ * fit. Short of room they share it fairly: a button narrower than an equal share keeps its width,
+ * the others split the rest, and their values ellipsize. No room is reserved for the icons; on the
+ * 960dp canvas the group never gets narrow enough to reach them.
+ */
+@Composable
+private fun ValueButtonsRow(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    Layout(content, modifier) { measurables, constraints ->
+        val gap = TvSpacing8.roundToPx()
+        val wanted = measurables.map { it.maxIntrinsicWidth(constraints.maxHeight) }
+        val widths = IntArray(measurables.size)
+        var room = (constraints.maxWidth - gap * (measurables.size - 1)).coerceAtLeast(0)
+        wanted.indices.sortedBy { wanted[it] }.forEachIndexed { given, index ->
+            widths[index] = minOf(wanted[index], room / (measurables.size - given))
+            room -= widths[index]
+        }
+        val placeables = measurables.mapIndexed { index, measurable ->
+            measurable.measure(constraints.copy(minWidth = 0, maxWidth = widths[index]))
+        }
+        val height = constraints.constrainHeight(placeables.maxOf { it.height })
+        layout(constraints.constrainWidth(placeables.sumOf { it.width } + gap * (placeables.size - 1)), height) {
+            var x = 0
+            placeables.forEach {
+                it.placeRelative(x, (height - it.height) / 2)
+                x += it.width + gap
+            }
+        }
+    }
 }

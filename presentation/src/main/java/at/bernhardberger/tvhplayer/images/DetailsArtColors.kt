@@ -10,7 +10,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /** Small process-only cache, scoped by the captured session and artwork, not by programme title. */
-internal object DetailsArtColors {
+object DetailsArtColors {
     // Art without a usable colour is remembered too, so it is not decoded again on every focus.
     private val colors = LruCache<Any, Sample>(128)
     private var generation = 0L

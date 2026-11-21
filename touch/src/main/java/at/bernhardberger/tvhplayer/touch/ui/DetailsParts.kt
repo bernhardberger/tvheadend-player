@@ -54,10 +54,12 @@ internal fun ChannelLogoTile(
     model: Any? = null,
 ) {
     val scheme = MaterialTheme.colorScheme
-    val fill = if ((logo == null && model == null) || tint == null) {
+    val accent = if (tint == null) rememberChannelAccent(model) else null
+    val ground = tint ?: accent?.animated?.value
+    val fill = if ((logo == null && model == null) || ground == null) {
         Modifier.background(scheme.surfaceContainerHigh)
     } else {
-        Modifier.background(Brush.linearGradient(listOf(tint, lerp(tint, Color.Black, LOGO_SHADE))))
+        Modifier.background(Brush.linearGradient(listOf(ground, lerp(ground, Color.Black, LOGO_SHADE))))
     }
     Box(
         modifier.clip(shape).then(fill).border(1.dp, scheme.outlineVariant, shape),

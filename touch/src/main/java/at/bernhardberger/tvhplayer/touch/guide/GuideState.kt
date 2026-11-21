@@ -129,6 +129,8 @@ internal data class GuideProgram(
     val timeLeft: String? = null,
     val recording: Boolean = false,
     val scheduled: Boolean = false,
+    /** Scheduled by an automatic recording or a repeating timer: stacked clocks, "Scheduled" in place of [record]. */
+    val scheduledByRule: Boolean = false,
     /** What its recording control does; null offers none. */
     val record: ProgramRecordControl? = ProgramRecordControl.Record,
     /** The date heading a By channel day starts here, "Monday, November 16". */
@@ -162,6 +164,8 @@ internal data class ProgramDetails(
     val recording: Boolean = false,
     /** What its recording control does; null offers none. */
     val record: ProgramRecordControl? = ProgramRecordControl.Record,
+    /** As [GuideProgram.scheduledByRule]. */
+    val scheduledByRule: Boolean = false,
     /** A still: across the tablet's page. */
     val picture: Painter? = null,
     /** Key art: the phone's picture card; the still stands in. */
@@ -189,6 +193,7 @@ internal data class ProgramAiring(
     /** As parts: "Amber Stage", "S2 E5", "Low Water". */
     val line: List<String>,
     val scheduled: Boolean = false,
+    val scheduledByRule: Boolean = false,
     /** The server image's model for the touch-level image composable; the fixture painter wins. */
     val logoModel: Any? = null,
 )

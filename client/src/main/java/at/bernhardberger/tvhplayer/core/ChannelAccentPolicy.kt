@@ -58,7 +58,7 @@ fun selectAccentRgb(candidates: List<Int?>): Int {
 }
 
 /** Returns hue in 0..360, saturation in 0..1, value in 0..1. */
-internal fun rgbToHsv(rgb: Int): Triple<Float, Float, Float> {
+fun rgbToHsv(rgb: Int): Triple<Float, Float, Float> {
     val r = ((rgb shr 16) and 0xFF) / 255f
     val g = ((rgb shr 8) and 0xFF) / 255f
     val b = (rgb and 0xFF) / 255f
@@ -76,7 +76,7 @@ internal fun rgbToHsv(rgb: Int): Triple<Float, Float, Float> {
     return Triple(if (hue < 0f) hue + 360f else hue, saturation, maxC)
 }
 
-internal fun hsvToRgb(hue: Float, saturation: Float, value: Float): Int {
+fun hsvToRgb(hue: Float, saturation: Float, value: Float): Int {
     val h = ((hue % 360f) + 360f) % 360f
     val c = value * saturation
     val x = c * (1f - abs((h / 60f) % 2f - 1f))

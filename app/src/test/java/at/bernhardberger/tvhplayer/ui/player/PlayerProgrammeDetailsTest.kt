@@ -317,7 +317,7 @@ class PlayerProgrammeDetailsTest {
                 }) {
                 PlayerChrome(
                     mode = PlayerChromeMode.CONTROLS,
-                    content = PlayerChromeContent("20:15", PlayerInfoBarData("101", "Ridge Earth", "Chrome title", "")),
+                    content = PlayerChromeContent(PlayerChromeClockSec, PlayerInfoBarData("101", "Ridge Earth", "Chrome title", "")),
                     timeline = if (recording) PlayerChromeTimeline.Recording(0L, 3_000L)
                         else PlayerChromeTimeline.Live(AppTimeshiftState(), nowSec = 2_000),
                     actions = PlayerChromeActions(active = !opened, paused = false, restoreFocus = restore),

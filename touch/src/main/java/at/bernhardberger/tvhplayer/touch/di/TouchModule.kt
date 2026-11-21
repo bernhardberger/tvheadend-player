@@ -3,8 +3,10 @@
 
 package at.bernhardberger.tvhplayer.touch.di
 
-import at.bernhardberger.tvhplayer.images.buildImageLoader
+import at.bernhardberger.tvhplayer.images.ChannelAccents
+import at.bernhardberger.tvhplayer.images.DetailsArtColors
 import at.bernhardberger.tvhplayer.images.RemoteLogoCache
+import at.bernhardberger.tvhplayer.images.buildImageLoader
 import coil3.ImageLoader
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -37,6 +39,7 @@ import at.bernhardberger.tvhplayer.profiling.ProfilePlaybackTrace
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
+import at.bernhardberger.tvhplayer.stores.ChannelAccentStore
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -171,8 +174,17 @@ val touchModule = module {
     viewModel { GuideViewModel(session = get()) }
 
     // The TV's loader (AppModule): server artwork with the session, remote logos through the shared cache.
-    // Its crossfade is the TV's 200 ms. No settings page clears the cache yet, so nothing else is cleared with it.
-    single { RemoteLogoCache(androidContext()) }
+    single { RemoteLogoCache(androidContext(), onClear = DetailsArtColors::clear) }
+    single { ChannelAccentStore(androidContext()) }
+    single {
+        val context = androidContext()
+        val session = get<SdkRuntimeOwner>().session
+        ChannelAccents(get(), session.artwork::cacheKey).also { accents ->
+            get<CoroutineScope>(qualifier = Application).launch(Dispatchers.Default) {
+                accents.fillIn(session.observation, context)
+            }
+        }
+    }
     single<ImageLoader> {
         buildImageLoader(
             androidContext(), get<SdkRuntimeOwner>().session, get(),

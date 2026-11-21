@@ -56,6 +56,7 @@ import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.foundation.focusGroup
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -120,6 +121,7 @@ import at.bernhardberger.tvhplayer.ui.TvBrowseLeadingInset
 import at.bernhardberger.tvhplayer.ui.TvBrowseTrailingInset
 import at.bernhardberger.tvhplayer.ui.TvCardFocusedScale
 import at.bernhardberger.tvhplayer.ui.TvGridGutter
+import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
 import at.bernhardberger.tvhplayer.ui.TvLogoPlateColor
 import at.bernhardberger.tvhplayer.ui.TvTextColors
 import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
@@ -145,6 +147,10 @@ import at.bernhardberger.tvhplayer.ui.components.LocalBrowseDrawerState
 import at.bernhardberger.tvhplayer.ui.components.LocalBrowseNavigationFocus
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeArtwork
 import at.bernhardberger.tvhplayer.ui.components.RoundIconButton
+import at.bernhardberger.tvhplayer.ui.components.WallClock
+import at.bernhardberger.tvhplayer.ui.components.WallClockGap
+import at.bernhardberger.tvhplayer.ui.components.WALL_CLOCK_TAG
+import at.bernhardberger.tvhplayer.ui.player.wallClockMinute
 import at.bernhardberger.tvhplayer.ui.components.RowHeading
 import at.bernhardberger.tvhplayer.ui.components.RowChangeMotion
 import at.bernhardberger.tvhplayer.ui.components.StandardCardTextGap
@@ -601,9 +607,7 @@ internal fun HomeContent(
                     hintRequester = hintRequester,
                     onHintFocusChanged = { hintFocused = it },
                     onWhatsNew = { hintFocused = false; readingWhatsNew = true; onWhatsNewOpened() },
-                    nowSec = nowSec,
-                    locale = locale,
-                    zone = zone,
+                    nowSec = wallClockMinute(nowSec),
                     endMargin = endMargin,
                     viewRequester = viewRequester,
                     firstSectionRequester = firstSection?.let(requesters::get) ?: emptyFocus,
@@ -622,7 +626,7 @@ internal fun HomeContent(
                     },
                 )
                 Spacer(Modifier.height(((if (sections.firstOrNull()?.headingTitle() != null) ordinarySlot else HomeTopSlot) -
-                    24.dp - TvBrowseHeaderHeight).coerceAtLeast(0.dp)))
+                    TvGridVerticalMargin - TvBrowseHeaderHeight).coerceAtLeast(0.dp)))
                 // Keep the focused action attached until the first card accepts focus. Removing
                 // it first lets non-touch-mode focus search escape to the navigation rail.
                 if (sections.isEmpty() || emptyHasFocus) {
@@ -876,13 +880,30 @@ internal fun HomeContent(
                     .testTag("home-up-hint").semantics { hideFromAccessibility() },
                 tint = TvTextColors.secondary.copy(alpha = 0.5f))
         }
+        // The expanded On now view has scrolled the header away; its clock stands in the header's
+        // place on its own and fades with the view's backdrop.
+        val immersiveClock by remember { derivedStateOf { motion.background.value > 0f } }
+        if (onNow != null && immersiveClock) {
+            WallClock(
+                { nowSec },
+                Modifier.align(Alignment.TopEnd).padding(top = TvGridVerticalMargin, end = endMargin)
+                    .graphicsLayer {
+                        alpha = motion.background.value
+                        // The lines overflow the 40dp band; an offscreen layer would clip them.
+                        compositingStrategy = CompositingStrategy.ModulateAlpha
+                    }
+                    .testTag("home-immersive-clock"),
+            )
+        }
     }
 }
 
 internal fun homeRowCardWidth(contentWidth: Dp, columns: Int, gap: Dp): Dp =
     ((contentWidth - gap * (columns - 1)) / columns).coerceAtLeast(0.dp)
 
-/** The existing date, clock and View options header, now the page's first scrolling item. */
+private val HomeHeaderSpacing = 16.dp
+
+/** The Tags and View options header ending in the wall clock, the page's first scrolling item. */
 @Composable
 private fun HomeHeader(
     updateHintShown: Boolean,
@@ -890,8 +911,6 @@ private fun HomeHeader(
     onHintFocusChanged: (Boolean) -> Unit,
     onWhatsNew: () -> Unit,
     nowSec: Long,
-    locale: Locale,
-    zone: ZoneId,
     endMargin: Dp,
     viewRequester: FocusRequester,
     firstSectionRequester: FocusRequester?,
@@ -904,70 +923,71 @@ private fun HomeHeader(
     onTags: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // The clock is measured first, so it always gets its reserved width on the end edge; the
+    // buttons share what is left.
     Row(
         modifier
             .fillMaxWidth()
-            .padding(top = 24.dp, end = endMargin)
+            .padding(top = TvGridVerticalMargin, end = endMargin)
             .height(TvBrowseHeaderHeight)
             .testTag("home-header"),
-        horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.End),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (updateHintShown) {
-            RoundIconButton(
-                icon = painterResource(AppR.drawable.ic_auto_awesome),
-                label = stringResource(R.string.whats_new),
-                value = stringResource(R.string.whats_new_hint, at.bernhardberger.tvhplayer.BuildConfig.VERSION_NAME),
-                active = false,
-                onClick = onWhatsNew,
-                focusRequester = hintRequester,
-                onFocused = onFocused,
-                modifier = Modifier.onFocusChanged { onHintFocusChanged(it.isFocused) }.focusProperties {
+        Row(
+            Modifier.weight(1f),
+            horizontalArrangement = Arrangement.spacedBy(HomeHeaderSpacing, Alignment.End),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (updateHintShown) {
+                RoundIconButton(
+                    icon = painterResource(AppR.drawable.ic_auto_awesome),
+                    label = stringResource(R.string.whats_new),
+                    value = stringResource(
+                        R.string.whats_new_hint,
+                        at.bernhardberger.tvhplayer.BuildConfig.VERSION_NAME,
+                    ),
+                    active = false,
+                    onClick = onWhatsNew,
+                    focusRequester = hintRequester,
+                    onFocused = onFocused,
+                    modifier = Modifier.onFocusChanged { onHintFocusChanged(it.isFocused) }.focusProperties {
+                        up = FocusRequester.Cancel
+                        down = firstSectionRequester ?: FocusRequester.Cancel
+                        if (ltr) { left = rail; right = tagsRequester } else { right = rail; left = tagsRequester }
+                    }.testTag("home-update-hint"),
+                )
+            }
+            RoundIconButton(icon = painterResource(AppR.drawable.ic_sell),
+                label = stringResource(R.string.browse_tags), value = tag ?: stringResource(R.string.all_channels),
+                active = tag != null, onClick = onTags, focusRequester = tagsRequester, onFocused = onFocused,
+                modifier = Modifier.focusProperties {
                     up = FocusRequester.Cancel
                     down = firstSectionRequester ?: FocusRequester.Cancel
-                    if (ltr) { left = rail; right = tagsRequester } else { right = rail; left = tagsRequester }
-                }.testTag("home-update-hint"),
+                    val leading = if (updateHintShown) hintRequester else rail
+                    if (ltr) { left = leading; right = viewRequester } else { right = leading; left = viewRequester }
+                }.testTag("home-tags-button"))
+            RoundIconButton(
+                icon = painterResource(AppR.drawable.ic_tune),
+                label = stringResource(R.string.channels_view_options),
+                onClick = onViewOptions,
+                focusRequester = viewRequester,
+                onFocused = onFocused,
+                modifier = Modifier
+                    .focusProperties {
+                        up = FocusRequester.Cancel
+                        down = firstSectionRequester ?: FocusRequester.Cancel
+                        if (ltr) {
+                            left = tagsRequester
+                            right = FocusRequester.Cancel
+                        } else {
+                            right = tagsRequester
+                            left = FocusRequester.Cancel
+                        }
+                    }
+                    .testTag("home-view-button"),
             )
         }
-        Column(horizontalAlignment = Alignment.End) {
-        Text(
-            text = formatClock(Instant.ofEpochSecond(nowSec).atZone(zone), locale),
-            style = MaterialTheme.typography.titleMedium,
-            color = TvTextColors.tertiary,
-            maxLines = 1,
-        )
-        Text(formatRecordingDate(nowSec, dateOnly = true, locale = locale),
-            style = MaterialTheme.typography.bodySmall, color = TvTextColors.secondary, maxLines = 1)
-        }
-        RoundIconButton(icon = painterResource(AppR.drawable.ic_sell),
-            label = stringResource(R.string.browse_tags), value = tag ?: stringResource(R.string.all_channels),
-            active = tag != null, onClick = onTags, focusRequester = tagsRequester, onFocused = onFocused,
-            modifier = Modifier.focusProperties {
-                up = FocusRequester.Cancel
-                down = firstSectionRequester ?: FocusRequester.Cancel
-                val leading = if (updateHintShown) hintRequester else rail
-                if (ltr) { left = leading; right = viewRequester } else { right = leading; left = viewRequester }
-            }.testTag("home-tags-button"))
-        RoundIconButton(
-            icon = painterResource(AppR.drawable.ic_tune),
-            label = stringResource(R.string.channels_view_options),
-            onClick = onViewOptions,
-            focusRequester = viewRequester,
-            onFocused = onFocused,
-            modifier = Modifier
-                .focusProperties {
-                    up = FocusRequester.Cancel
-                    down = firstSectionRequester ?: FocusRequester.Cancel
-                    if (ltr) {
-                        left = tagsRequester
-                        right = FocusRequester.Cancel
-                    } else {
-                        right = tagsRequester
-                        left = FocusRequester.Cancel
-                    }
-                }
-                .testTag("home-view-button"),
-        )
+        WallClock({ nowSec }, Modifier.padding(start = WallClockGap).testTag(WALL_CLOCK_TAG))
     }
 }
 

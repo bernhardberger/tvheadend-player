@@ -6,11 +6,13 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvhplayer.di.SdkRuntimeOwner
+import at.bernhardberger.tvhplayer.images.ChannelAccents
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.touch.player.PlayerActivity
@@ -22,6 +24,8 @@ import at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import at.bernhardberger.tvhplayer.touch.guide.GuideViewModel
 import at.bernhardberger.tvhplayer.touch.recordings.RecordingsViewModel
+import at.bernhardberger.tvhplayer.touch.ui.LocalChannelAccents
+import org.koin.android.ext.android.get
 import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.viewModel
 
@@ -46,12 +50,14 @@ class MainActivity : ComponentActivity() {
             MaterialTheme(colorScheme = MobileDarkColors) {
                 val target by sdk.playbackRuntime.activeTarget.collectAsStateWithLifecycle()
                 val playback by sdk.playbackRuntime.state.collectAsStateWithLifecycle()
-                TouchApp(
-                    session, owner, connection, channels, recordings, guide, notices,
-                    playingId = playingChannelId(target, playback)?.value?.toString(),
-                    onWatch = ::watch,
-                    discovery = { discoverServers(context) },
-                )
+                CompositionLocalProvider(LocalChannelAccents provides get<ChannelAccents>()) {
+                    TouchApp(
+                        session, owner, connection, channels, recordings, guide, notices,
+                        playingId = playingChannelId(target, playback)?.value?.toString(),
+                        onWatch = ::watch,
+                        discovery = { discoverServers(context) },
+                    )
+                }
             }
         }
     }

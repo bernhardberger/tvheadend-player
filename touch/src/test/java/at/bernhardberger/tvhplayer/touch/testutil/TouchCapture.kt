@@ -3,8 +3,12 @@ package at.bernhardberger.tvhplayer.touch.testutil
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Rect
+import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowInsets
 import android.view.WindowManager
 import android.view.inspector.WindowInspector
 import androidx.activity.ComponentActivity
@@ -46,9 +50,11 @@ fun AndroidComposeTestRule<*, out ComponentActivity>.captureTouch(group: String,
 }
 
 /**
- * [captureTouch] with the popups and dialogs open over the activity drawn in, which Robolectric
- * keeps in windows of their own: a popup (a menu) at its window position, a dialog (a bottom
- * sheet) against the bottom edge as the system lays it out.
+ * [captureTouch] with the popups, sheets and dialogs open over the activity drawn in, which
+ * Robolectric keeps in windows of their own and does not lay out on a screen. Each window is
+ * placed as the system would by its layout parameters: a popup by its gravity and offset in the
+ * activity's window, any other window by its gravity in the screen less the system bars it fits.
+ * A window asking for the screen behind it dimmed gets its dim amount of black under it.
  */
 fun AndroidComposeTestRule<*, out ComponentActivity>.captureTouchWindows(group: String, name: String, canvas: TouchCanvas) {
     val views = runOnIdle { WindowInspector.getGlobalWindowViews().filter { it.isAttachedToWindow } }
@@ -61,16 +67,20 @@ fun AndroidComposeTestRule<*, out ComponentActivity>.captureTouchWindows(group: 
     val bitmap = Bitmap.createBitmap(canvas.width, canvas.height, Bitmap.Config.ARGB_8888)
     runOnIdle {
         val frame = Canvas(bitmap)
+        val density = activity.resources.displayMetrics.density
         views.forEach { view ->
             val params = view.layoutParams as? WindowManager.LayoutParams
-            val popup = params != null &&
-                params.type in WindowManager.LayoutParams.FIRST_SUB_WINDOW..WindowManager.LayoutParams.LAST_SUB_WINDOW
-            val decor = view == activity.window.decorView
             frame.save()
-            when {
-                decor -> Unit
-                popup -> frame.translate(params.x.toFloat(), params.y.toFloat())
-                else -> frame.translate(0f, (canvas.height - view.height).toFloat())
+            if (params != null) {
+                if (params.flags and WindowManager.LayoutParams.FLAG_DIM_BEHIND != 0) {
+                    frame.drawColor(Color.argb((params.dimAmount * 255).roundToInt(), 0, 0, 0))
+                }
+                val placed = Rect()
+                Gravity.apply(
+                    params.gravity, view.width, view.height, windowFrame(params, canvas, density), params.x, params.y,
+                    placed,
+                )
+                frame.translate(placed.left.toFloat(), placed.top.toFloat())
             }
             view.draw(frame)
             frame.restore()
@@ -79,13 +89,34 @@ fun AndroidComposeTestRule<*, out ComponentActivity>.captureTouchWindows(group: 
     write(group, name, bitmap)
 }
 
+/**
+ * Where a window is laid out: a popup (a sub-window) in its activity's window, which fills the
+ * canvas; any other window in the canvas less the reserved system bars its parameters fit.
+ */
+private fun windowFrame(params: WindowManager.LayoutParams, canvas: TouchCanvas, density: Float): Rect {
+    val frame = Rect(0, 0, canvas.width, canvas.height)
+    val subWindow =
+        params.type in WindowManager.LayoutParams.FIRST_SUB_WINDOW..WindowManager.LayoutParams.LAST_SUB_WINDOW
+    if (subWindow) return frame
+    val fits = params.fitInsetsTypes
+    if (fits and WindowInsets.Type.statusBars() != 0) frame.top += statusBar(canvas, density)
+    if (fits and WindowInsets.Type.navigationBars() != 0) frame.bottom -= navigationBar(density)
+    return frame
+}
+
+private fun statusBar(canvas: TouchCanvas, density: Float) = (canvas.statusBarDp * density).roundToInt()
+
+private fun navigationBar(density: Float) = (NAVIGATION_BAR_DP * density).roundToInt()
+
+private const val NAVIGATION_BAR_DP = 24
+
 private fun reserveSystemBars(content: View, canvas: TouchCanvas) {
     val density = content.resources.displayMetrics.density
     ViewCompat.dispatchApplyWindowInsets(
         content,
         WindowInsetsCompat.Builder()
-            .setInsets(WindowInsetsCompat.Type.statusBars(), Insets.of(0, (canvas.statusBarDp * density).roundToInt(), 0, 0))
-            .setInsets(WindowInsetsCompat.Type.navigationBars(), Insets.of(0, 0, 0, (24 * density).roundToInt()))
+            .setInsets(WindowInsetsCompat.Type.statusBars(), Insets.of(0, statusBar(canvas, density), 0, 0))
+            .setInsets(WindowInsetsCompat.Type.navigationBars(), Insets.of(0, 0, 0, navigationBar(density)))
             .setVisible(WindowInsetsCompat.Type.systemBars(), true)
             .build(),
     )

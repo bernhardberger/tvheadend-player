@@ -841,6 +841,7 @@ internal fun RecordingsScreenContent(
             modeFocus = modeFocus,
             problemCount = problemGroups.sumOf { it.entries.size },
             diskSpace = observation.dvrDiskSpaceState,
+            nowSec = nowSecProvider,
             startPadding = startPadding,
             endPadding = endPadding,
             onFocused = {
@@ -1821,6 +1822,7 @@ private fun RecordingsHeader(
     modeFocus: FocusRequester,
     problemCount: Int,
     diskSpace: at.bernhardberger.tvheadend.sdk.core.DvrDiskSpaceState,
+    nowSec: () -> Long,
     startPadding: Dp,
     endPadding: Dp,
     onFocused: (DvrLibraryMode) -> Unit,
@@ -1830,6 +1832,7 @@ private fun RecordingsHeader(
 ) {
     TopLevelBrowseHeader(
         title = stringResource(R.string.recordings_title),
+        nowSec = nowSec,
         modifier = Modifier
             .padding(start = startPadding + TvBrowseLeadingInset, end = maxOf(endPadding, TvBrowseTrailingInset))
             .heightIn(min = recordingsHeaderMinHeight())

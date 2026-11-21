@@ -109,8 +109,6 @@
     <string name="recordings_watch">Watch</string>
     <!-- TV: context_delete -->
     <string name="recordings_delete">Delete</string>
-    <!-- The confirming button of the Remove entry dialog; the TV's dialog says "Remove entry" (remove_entry) -->
-    <string name="recordings_remove">Remove</string>
     <!-- TV: details_more -->
     <string name="recordings_more">More</string>
     <!-- TV: back -->

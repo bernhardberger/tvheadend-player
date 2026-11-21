@@ -358,7 +358,6 @@ dependencies {
     implementation(libs.androidx.media3.session)
     implementation(libs.kotlinx.coroutines.core)
 
-    implementation(libs.androidx.palette)
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
 

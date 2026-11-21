@@ -89,7 +89,7 @@ class AppNoticeCaptureTest {
                     Box(Modifier.fillMaxSize().background(if (overPlayer) Color(0xFFF2EEDC) else Color(0xFF111822))) {
                         if (overPlayer) PlayerChrome(
                             mode = if (controlsVisible) PlayerChromeMode.CONTROLS else PlayerChromeMode.BANNER,
-                            content = PlayerChromeContent("18:30", liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 101, "Documentary HD", programme,
+                            content = PlayerChromeContent(1_791_138_600L, liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 101, "Documentary HD", programme,
                                 null, false, now.epochSeconds, "")),
                             timeline = PlayerChromeTimeline.Live(AppTimeshiftState(), now.epochSeconds, programme),
                             actions = PlayerChromeActions(active = false),

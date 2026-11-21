@@ -57,6 +57,7 @@ import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.channels.ChannelActionLabel
 import at.bernhardberger.tvhplayer.touch.recordings.RecPill
 import at.bernhardberger.tvhplayer.touch.ui.ProgramRecordControl
+import at.bernhardberger.tvhplayer.touch.ui.RuleScheduledState
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 
 @Composable
@@ -82,6 +83,7 @@ internal fun ProgramActions(
     actions: GuideActions,
     modifier: Modifier = Modifier,
     onDetails: (() -> Unit)? = null,
+    scheduledByRule: Boolean = false,
     detailsIcon: Boolean = true,
     compact: Boolean = false,
 ) {
@@ -94,7 +96,10 @@ internal fun ProgramActions(
     ) {
         val watch = actions.onWatch?.takeIf { onNow }
         if (watch != null) WatchButton(contentPadding = padding) { watch(channelId) }
-        ProgramRecordAction(record, programId, actions, contentPadding = padding, leads = watch == null)
+        ProgramRecordAction(
+            record, programId, actions, contentPadding = padding, leads = watch == null,
+            scheduledByRule = scheduledByRule,
+        )
         if (onDetails != null) {
             TextButton(onClick = onDetails) {
                 if (detailsIcon) {
@@ -120,7 +125,8 @@ internal fun WatchButton(
 
 /**
  * The program's recording control: Record, split with its options arrow when there are options, or Cancel
- * of its scheduled recording. Without an action behind it, it is left out.
+ * of its scheduled recording. Without an action behind it, it is left out. A program an automatic recording
+ * scheduled shows "Scheduled" instead ([RuleScheduledState]).
  */
 @Composable
 internal fun ProgramRecordAction(
@@ -130,7 +136,12 @@ internal fun ProgramRecordAction(
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues? = null,
     leads: Boolean = false,
+    scheduledByRule: Boolean = false,
 ) {
+    if (scheduledByRule) {
+        RuleScheduledState(modifier)
+        return
+    }
     val onRecord = actions.onRecord
     val onOptions = actions.onRecordOptions
     val onCancel = actions.onCancel

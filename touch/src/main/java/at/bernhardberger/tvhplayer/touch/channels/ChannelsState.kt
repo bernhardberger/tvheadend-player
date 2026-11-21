@@ -60,6 +60,8 @@ internal data class ChannelProgram(
     val progress: Float? = null,
     val timeLeft: String? = null,
     val scheduled: Boolean = false,
+    /** Scheduled by an automatic recording or a repeating timer: "Scheduled" in place of [record]. */
+    val scheduledByRule: Boolean = false,
     /** What its recording control does; null offers none. */
     val record: ProgramRecordControl? = ProgramRecordControl.Record,
 )

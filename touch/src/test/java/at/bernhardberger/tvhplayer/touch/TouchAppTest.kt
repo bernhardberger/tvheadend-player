@@ -18,6 +18,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
@@ -27,6 +28,7 @@ import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
+import at.bernhardberger.tvheadend.sdk.core.AutorecRuleId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrMutationResult
 import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
@@ -543,6 +545,20 @@ class TouchAppTest {
         compose.onNode(isDialog()).assertDoesNotExist()
         compose.onNode(hasText(guide.programs[1]) and hasContentDescription(label(R.string.channels_scheduled)))
             .assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = TABLET)
+    fun aProgramAnAutomaticRecordingScheduledSaysSoInsteadOfOfferingRecord() {
+        val guide = savedConnectionWithGuide()
+        val bySeries = guide.scheduling(WEATHER_ENTRY, event = 2, rule = AutorecRuleId("weather"))
+        connection.session.publish(guide.connected(guide.dvr.entries + bySeries))
+        openGuide()
+        compose.onNodeWithText(guide.programs[1]).performClick()
+        compose.onNodeWithText(label(SharedR.string.recording_state_scheduled)).assertIsDisplayed()
+        listOf(label(R.string.channels_record), label(SharedR.string.cancel_recording)).forEach {
+            compose.onAllNodes(hasClickAction() and hasText(it)).assertCountEquals(0)
+        }
     }
 
     @Test

@@ -363,9 +363,14 @@ class HomeCaptureTest {
         assertTrue("fifth programme peeks in right margin", bounds("home-onnow-4").left >= 902.dp)
         assertTrue("fifth programme is visible", bounds("home-onnow-4").left < 960.dp)
         assertTrue("header is above viewport", bounds("home-header").bottom <= 0.dp)
+        compose.onNodeWithTag("home-immersive-clock").assertIsDisplayed()
         compose.onNodeWithTag("home-up-hint", useUnmergedTree = true).assertExists()
         assertEquals("On now heading keeps quiet size", 18f / 28f,
             layerScope("home-heading-ON_NOW").scaleX, 0.02f)
+        key(Key.DirectionDown)
+        settle("home-genre-0")
+        compose.onNodeWithTag("home-immersive-clock").assertDoesNotExist()
+        assertTrue("header is still above viewport", bounds("home-header").bottom <= 0.dp)
     }
 
     /** One, two and three current-activity cards, each card half the content width. */

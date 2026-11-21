@@ -2,8 +2,8 @@ package at.bernhardberger.tvhplayer.ui.player
 
 import at.bernhardberger.tvhplayer.ui.components.focusedInfoSwap
 import at.bernhardberger.tvhplayer.ui.components.rememberUnlessHeld
+import at.bernhardberger.tvhplayer.ui.components.WallClock
 import at.bernhardberger.tvhplayer.ui.TvBrowseHeaderHeight
-import at.bernhardberger.tvhplayer.ui.TvTextSecondaryAlpha
 import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
 import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
 import androidx.compose.animation.AnimatedContent
@@ -156,9 +156,9 @@ private fun selectedFormat(tracks: Tracks, type: Int): Format? = tracks.groups
     .firstOrNull { it.type == type && it.isSelected }
     ?.let { group -> (0 until group.length).firstOrNull(group::isTrackSelected)?.let(group::getTrackFormat) }
 
-/** Header slot: the top-end clock over a full-width top fade. */
+/** Header slot: the top-end wall clock over a full-width top fade, placed as on the browse screens. */
 @Composable
-internal fun PlayerChromeHeader(clock: String, modifier: Modifier = Modifier) {
+internal fun PlayerChromeHeader(clockSec: Long, modifier: Modifier = Modifier) {
     Box(modifier) {
         if (LocalPlayerPageScrim.current == null || LocalPlayerControlsMotion.current == null) {
             Box(Modifier.fillMaxWidth().height(PlayerChromeTokens.topScrimHeight).background(PlayerChromeTokens.topScrim))
@@ -166,8 +166,7 @@ internal fun PlayerChromeHeader(clock: String, modifier: Modifier = Modifier) {
         // The room's header band, as a browse room's header actions stand in it.
         Box(Modifier.align(Alignment.TopEnd).padding(top = TvGridVerticalMargin, end = TvGridHorizontalMargin)
             .heightIn(min = TvBrowseHeaderHeight), contentAlignment = Alignment.CenterEnd) {
-            Text(clock, style = MaterialTheme.typography.titleLarge, maxLines = 1, color = MaterialTheme.colorScheme.onSurface.copy(alpha = TvTextSecondaryAlpha),
-                modifier = Modifier.testTag("player-top-cluster"))
+            WallClock({ clockSec }, Modifier.testTag("player-top-cluster"))
         }
     }
 }

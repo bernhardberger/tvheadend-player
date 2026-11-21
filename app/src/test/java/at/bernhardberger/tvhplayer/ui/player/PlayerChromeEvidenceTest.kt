@@ -427,7 +427,7 @@ class PlayerChromeEvidenceTest {
     @Test fun topIdentityDropsTheLogoSlotWithoutAPiconAndStartsTheNameOnTheKeyline() {
         var withLogo by mutableStateOf(true)
         compose.setContent { TVHeadendPlayerTheme {
-            ProvideArtworkSession(session) { PlayerTopIdentity(PlayerChromeContent("", info(false), picon = if (withLogo) ChannelIcon.parse("imagecache/2") else null),
+            ProvideArtworkSession(session) { PlayerTopIdentity(PlayerChromeContent(0L, info(false), picon = if (withLogo) ChannelIcon.parse("imagecache/2") else null),
                 Modifier.fillMaxSize()) }
         } }
         fun bounds(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
@@ -491,7 +491,7 @@ class PlayerChromeEvidenceTest {
             Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.White)) {
                 PlayerPage<Unit>(details = null, player = {
                     PlayerControlsLayer(visible = true, modalVisible = false) {
-                        PlayerOverlayChrome(headerContent = { PlayerChromeHeader("", it) }) {
+                        PlayerOverlayChrome(headerContent = { PlayerChromeHeader(0L, it) }) {
                             Spacer(Modifier.height(content))
                         }
                     }
@@ -570,7 +570,7 @@ class PlayerChromeEvidenceTest {
                     Box(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(TvSurfaceColors.containerLowest, TvSurfaceColors.containerHigh)))) {
                         if (scene == Scene.BRIGHT_SCRIM) {
                             Image(brightStill.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                            PlayerChromeHeader("20:37", Modifier.fillMaxSize())
+                            PlayerChromeHeader(1_791_146_220L, Modifier.fillMaxSize())
                         }
                     Box(Modifier.fillMaxSize().padding(48.dp)) {
                         when (scene) {
