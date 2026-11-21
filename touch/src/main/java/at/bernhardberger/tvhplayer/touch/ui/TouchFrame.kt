@@ -1,3 +1,5 @@
+@file:Suppress("MatchingDeclarationName") // Destination identifies this frame's slots.
+
 package at.bernhardberger.tvhplayer.touch.ui
 
 import androidx.activity.compose.BackHandler
@@ -6,8 +8,10 @@ import androidx.annotation.StringRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -40,7 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.window.core.layout.WindowSizeClass
 import at.bernhardberger.tvhplayer.touch.R
 
-private enum class Destination(
+internal enum class Destination(
     @param:StringRes val label: Int,
     @param:DrawableRes val outline: Int,
     @param:DrawableRes val filled: Int,
@@ -52,7 +56,12 @@ private enum class Destination(
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-internal fun TouchFrame(modifier: Modifier = Modifier) {
+internal fun TouchFrame(
+    modifier: Modifier = Modifier,
+    actions: @Composable RowScope.(Destination) -> Unit = {},
+    belowTopBar: @Composable (Destination) -> Unit = {},
+    content: @Composable (Destination) -> Unit = {},
+) {
     var selected by rememberSaveable { mutableStateOf(Destination.Channels) }
     val select: (Destination) -> Unit = { selected = it }
     BackHandler(enabled = selected != Destination.Channels) {
@@ -68,27 +77,44 @@ internal fun TouchFrame(modifier: Modifier = Modifier) {
         Scaffold(
             modifier = Modifier.weight(1f),
             topBar = {
-                TopAppBar(title = {
-                    Text(
-                        text = stringResource(selected.label),
-                        modifier = Modifier
-                            .padding(start = if (mediumOrWider && !expanded) 8.dp else 0.dp)
-                            .semantics { heading() },
-                        style = if (mediumOrWider) {
-                            MaterialTheme.typography.headlineMediumEmphasized
-                        } else {
-                            MaterialTheme.typography.headlineSmallEmphasized
-                        },
-                    )
-                })
+                Column {
+                    DestinationTopBar(selected, mediumOrWider, expanded, actions)
+                    belowTopBar(selected)
+                }
             },
             bottomBar = {
                 if (!expanded) DestinationBar(selected, mediumOrWider, select)
             },
         ) { innerPadding ->
-            Box(Modifier.fillMaxSize().padding(innerPadding))
+            Box(Modifier.fillMaxSize().padding(innerPadding)) { content(selected) }
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun DestinationTopBar(
+    selected: Destination,
+    mediumOrWider: Boolean,
+    expanded: Boolean,
+    actions: @Composable RowScope.(Destination) -> Unit,
+) {
+    TopAppBar(
+        title = {
+            Text(
+                text = stringResource(selected.label),
+                modifier = Modifier
+                    .padding(start = if (mediumOrWider && !expanded) 8.dp else 0.dp)
+                    .semantics { heading() },
+                style = if (mediumOrWider) {
+                    MaterialTheme.typography.headlineMediumEmphasized
+                } else {
+                    MaterialTheme.typography.headlineSmallEmphasized
+                },
+            )
+        },
+        actions = { actions(selected) },
+    )
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)

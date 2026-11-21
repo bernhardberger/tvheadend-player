@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- TV: all_channels -->
+    <string name="channels_all">All channels</string>
+    <!-- TV: details_status_on_now -->
+    <string name="channels_on_now">On now</string>
+    <string name="channels_next">Next</string>
+    <!-- TV: no_epg -->
+    <string name="channels_no_program">No program information</string>
+    <!-- TV: player_minutes_left -->
+    <string name="channels_time_left">%1$s left</string>
+    <string name="channels_program_and_time_left">%1$s • %2$s</string>
+    <string name="channels_expand">Show programs on %1$s</string>
+    <string name="channels_collapse">Hide programs on %1$s</string>
+    <!-- TV: player_status_rec -->
+    <string name="channels_rec">REC</string>
+    <!-- TV: recording_notice_fallback -->
+    <string name="channels_recording">Recording</string>
+    <!-- TV: channel_recording_spoken -->
+    <string name="channels_recording_on_channel">Recording on this channel</string>
+    <!-- TV: player_scheduled -->
+    <string name="channels_scheduled">Recording scheduled</string>
+    <!-- TV: player_playing -->
+    <string name="channels_playing">Playing</string>
+    <!-- TV: context_watch -->
+    <string name="channels_watch">Watch</string>
+    <!-- TV: context_record -->
+    <string name="channels_record">Record</string>
+    <!-- TV: context_details -->
+    <string name="channels_details">Details</string>
+    <!-- TV: context_show_guide -->
+    <string name="channels_show_in_guide">Show in Guide</string>
+    <!-- TV: connection_loading_channels -->
+    <string name="channels_loading">Loading channels…</string>
+    <!-- TV: error_101_title -->
+    <string name="channels_unreachable">Can’t reach the server</string>
+    <!-- TV: error_101_reason and error_hint_check_server -->
+    <string name="channels_unreachable_reason">The server didn’t respond to the connection. Check that the server is running and on the same network.</string>
+    <!-- TV: error_103_title -->
+    <string name="channels_sign_in_failed">Sign-in failed</string>
+    <!-- TV: error_103_reason and error_hint_check_sign_in -->
+    <string name="channels_sign_in_reason">The server didn’t accept the username or password. Check them in Connection settings.</string>
+    <!-- TV: action_retry -->
+    <string name="channels_retry">Retry</string>
+    <!-- TV: action_connection_settings -->
+    <string name="channels_connection_settings">Connection settings</string>
+    <!-- TV: connection_offline_saved -->
+    <string name="channels_offline">Can’t reach the server • Showing saved channels</string>
+    <string name="channels_saved">Showing saved channels</string>
+    <!-- TV: error_110_reason -->
+    <string name="channels_reconnect_in">Reconnecting in %1$s…</string>
+    <!-- TV: error_110_reason_pending -->
+    <string name="channels_reconnecting">Reconnecting…</string>
+    <!-- TV: error_108_title -->
+    <string name="channels_empty">No channels</string>
+    <!-- TV: error_108_reason, without the period because this is standalone supporting text -->
+    <string name="channels_empty_reason">This account has no channels</string>
+    <!-- TV: empty_channel_tag, without the period because this is standalone supporting text -->
+    <string name="channels_empty_tag">This channel tag is empty</string>
+</resources>
