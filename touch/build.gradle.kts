@@ -17,13 +17,31 @@ android {
         minSdk = 28
         targetSdk = 36
     }
-    buildTypes.getByName("debug").applicationIdSuffix = ".touch.debug"
+    buildTypes {
+        val debug = getByName("debug")
+        debug.applicationIdSuffix = ".touch.debug"
+        create("optimized") {
+            // Match the debug APK's install identity without inheriting debug behavior.
+            applicationIdSuffix = debug.applicationIdSuffix
+            signingConfig = debug.signingConfig
+            isDebuggable = false
+            isMinifyEnabled = true
+            matchingFallbacks += "release"
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
+    }
     buildFeatures.compose = true
     testOptions.unitTests.isIncludeAndroidResources = true
 }
 
 androidComponents.beforeVariants { variant ->
-    variant.enable = variant.buildType == "debug"
+    val isDebug = variant.buildType == "debug"
+    variant.enable = isDebug || variant.buildType == "optimized"
+    if (!isDebug && variant.enable) {
+        variant.hostTests.values.forEach { it.enable = false }
+        variant.deviceTests.values.forEach { it.enable = false }
+        variant.enableLint = false
+    }
 }
 
 tasks.withType<Test>().configureEach {
