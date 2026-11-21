@@ -90,7 +90,8 @@ DVR actions and the formatters behind recordings and programme details:
 actions, with `currentDvrMutation` and `currentDvrConfigurations`; the caller
 passes the preferred recording profile), `ui/common/TimeConverter`,
 `ui/common/Epg`, `ui/common/RecordingExpiry`, `ui/common/NumberFormatting` and
-`programmeCategoryLabelRes` in `ui/common/ProgrammeCategoryLabelRes`.
+`programmeCategoryLabelRes` in `ui/common/ProgrammeCategoryLabelRes`, and the
+stop-recording sentence in `ui/screens/recordings/StopConfirmationSentence`.
 Picture colors: `images/ChannelAccents` (channel colors sampled from picons and
 kept in `ChannelAccentStore`), `images/DetailsArtColors` and `images/ArtworkSample`;
 `rememberChannelAccent` and the glows that draw stay in `:app`.
