@@ -2,6 +2,8 @@ package at.bernhardberger.tvhplayer.touch
 
 import android.os.Looper
 import android.view.ViewGroup
+import android.view.WindowInsets
+import android.view.inspector.WindowInspector
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
@@ -108,6 +110,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.util.ReflectionHelpers
 
 /** The app's pages on the SDK's fake session and profile store: first run, the frame and Connections. */
 @RunWith(RobolectricTestRunner::class)
@@ -714,6 +717,7 @@ class TouchAppTest {
         // Keep recording changes nothing.
         compose.onNode(cancel).performClick()
         compose.onNodeWithText(label(SharedR.string.cancel_recording_confirm_title)).assertIsDisplayed()
+        assertEquals(WindowInsets.Type.systemBars(), dialogRequestedBars())
         inDialog(SharedR.string.keep_recording).performClick()
         compose.waitForIdle()
         compose.onNode(isDialog()).assertDoesNotExist()
@@ -808,6 +812,7 @@ class TouchAppTest {
         playerButton(R.string.channels_details).performClick()
         playerButton(SharedR.string.cancel_recording).performClick()
         inDialog(SharedR.string.cancel_recording).assertIsDisplayed()
+        assertEquals("The landscape player dialog should request hidden system bars", 0, dialogRequestedBars())
         assertTrue(FakeSessionCall.DVR_CANCEL_ENTRY !in connection.session.calls)
         compose.runOnIdle { inWindow.value = true }
         compose.onNode(isDialog()).assertDoesNotExist()
@@ -868,6 +873,16 @@ class TouchAppTest {
 
     private fun playerButton(@StringRes id: Int) =
         compose.onNode(hasClickAction() and (hasText(label(id)) or hasContentDescription(label(id))))
+
+    private fun dialogRequestedBars(): Int = compose.runOnIdle {
+        val decor = WindowInspector.getGlobalWindowViews().single {
+            it.isAttachedToWindow && it !== compose.activity.window.decorView
+        }
+        val controller = checkNotNull(decor.windowInsetsController)
+        // The platform's requested mask, not its reported/visible insets (which Robolectric doesn't render).
+        ReflectionHelpers.callInstanceMethod<Int>(controller, "getRequestedVisibleTypes") and
+            WindowInsets.Type.systemBars()
+    }
 
     private fun expandedChannelRecord(guide: ServerGuide): SemanticsNodeInteraction {
         compose.onNodeWithContentDescription(compose.activity.getString(R.string.channels_expand, guide.first.name))

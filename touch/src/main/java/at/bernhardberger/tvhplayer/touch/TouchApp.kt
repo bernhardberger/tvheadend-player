@@ -4,12 +4,14 @@ import at.bernhardberger.tvhplayer.touch.ui.ConfirmDvrChange
 import at.bernhardberger.tvhplayer.touch.ui.DvrControls
 import androidx.compose.runtime.remember
 import at.bernhardberger.tvhplayer.touch.ui.ArtworkScreenShown
+import at.bernhardberger.tvhplayer.touch.ui.traceArtworkMapping
 import at.bernhardberger.tvhplayer.touch.ui.LocalArtworkModels
 import at.bernhardberger.tvhplayer.touch.ui.ArtworkModels
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -211,10 +213,12 @@ private fun AppFrame(
     val nowSec = rememberCurrentEpochSeconds()
     val now = Instant.fromEpochSeconds(nowSec())
     val texts = rememberChannelsTexts()
-    val state = channelsState(
-        scope, presentation.connection, presentation.degraded, observation, now, texts, playingId,
-        LocalArtworkModels.current,
-    )
+    val artwork = LocalArtworkModels.current
+    val state = traceArtworkMapping(LocalContext.current, "Channels") {
+        channelsState(
+            scope, presentation.connection, presentation.degraded, observation, now, texts, playingId, artwork,
+        )
+    }
     ChannelsScreen(
         state = state,
         actions = ChannelsActions(
