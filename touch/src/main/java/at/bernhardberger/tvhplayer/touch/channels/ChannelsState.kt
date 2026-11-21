@@ -2,6 +2,7 @@ package at.bernhardberger.tvhplayer.touch.channels
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
+import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvhplayer.core.AppError
 
 internal sealed interface ChannelsState {
@@ -43,14 +44,14 @@ internal data class ChannelRow(
 )
 
 /** The producer supplies the viewer's position, not the on-air position. */
-internal data class ChannelPlayback(val progress: Float)
+internal data class ChannelPlayback(val progress: Float?)
 
 /** A channel fallback mark is distinct from a linked program's running recording. */
 internal enum class ChannelRecording { Program, Channel }
 
 internal data class ChannelProgram(
     val title: String,
-    /** Null while the start's clock text has no shared formatter; the line is then left out. */
+    /** Null leaves the start's line out. */
     val start: String?,
     val timeRange: String? = null,
     val progress: Float? = null,
@@ -81,3 +82,24 @@ internal class ChannelsActions(
     val onShowInGuide: ((String) -> Unit)? = null,
     val onSignIn: (() -> Unit)? = null,
 )
+
+/**
+ * The row texts from the shared formatters; a null text leaves its line out. [TitlesOnly] gives
+ * none, for a row that shows the titles alone.
+ */
+internal class ChannelsTexts(
+    /** "9:00 PM". */
+    val clock: (epochSec: Long) -> String?,
+    /** "8:00–9:00 PM". */
+    val timeRange: (startSec: Long, stopSec: Long) -> String?,
+    /** "13m", "1h 27m". */
+    val duration: (seconds: Long) -> String?,
+    /** "S2 E4 • The Long Tide". */
+    val episode: (EpgEvent) -> String?,
+    /** "Drama". */
+    val genre: (EpgEvent) -> String?,
+) {
+    companion object {
+        val TitlesOnly = ChannelsTexts({ null }, { _, _ -> null }, { null }, { null }, { null })
+    }
+}

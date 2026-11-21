@@ -29,6 +29,11 @@ import androidx.compose.ui.unit.dp
 import androidx.window.core.layout.WindowSizeClass
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.ui.Destination
+import at.bernhardberger.tvhplayer.touch.ui.ListFailure
+import at.bernhardberger.tvhplayer.touch.ui.ListMessage
+import at.bernhardberger.tvhplayer.touch.ui.MessageKind
+import at.bernhardberger.tvhplayer.touch.ui.OfflineBanner
+import at.bernhardberger.tvhplayer.touch.ui.OfflineTexts
 import at.bernhardberger.tvhplayer.touch.ui.TouchFrame
 
 @Composable
@@ -99,10 +104,12 @@ private fun ChannelsContent(
         ChannelsState.Unreachable -> ChannelsMessage(MessageKind.Unreachable, actions)
         ChannelsState.SignInFailed -> ChannelsMessage(MessageKind.SignInFailed, actions)
         ChannelsState.SignInNeeded -> ChannelsMessage(MessageKind.SignInNeeded, actions)
-        is ChannelsState.Failed -> ChannelsFailure(state.error, actions)
+        is ChannelsState.Failed -> ListFailure(state.error, actions.onRetry, actions.onOpenConnectionSettings)
         is ChannelsState.Offline -> {
             Column(Modifier.fillMaxSize().padding(horizontal = layout.margin)) {
-                OfflineBanner(layout, state.retryIn, actions.onOpenConnectionSettings)
+                OfflineBanner(
+                    !layout.tablet, ChannelsOfflineTexts, actions.onOpenConnectionSettings, retryIn = state.retryIn,
+                )
                 if (!layout.tablet && state.list.canFilter) TagFilter(state.list, actions.onTag)
                 ChannelRows(state.list, layout, actions, offline = true)
             }
@@ -121,6 +128,19 @@ private fun ChannelsContent(
         }
     }
 }
+
+/** The shared message form with Channels' actions; sign-in needed opens the sign-in editor when there is one. */
+@Composable
+private fun ChannelsMessage(kind: MessageKind, actions: ChannelsActions) {
+    val settings = if (kind == MessageKind.SignInNeeded) {
+        actions.onSignIn ?: actions.onOpenConnectionSettings
+    } else {
+        actions.onOpenConnectionSettings
+    }
+    ListMessage(kind, settings, actions.onRetry) { actions.onTag(null) }
+}
+
+private val ChannelsOfflineTexts = OfflineTexts(R.string.channels_offline, R.string.channels_saved)
 
 private val ChannelList.canFilter: Boolean get() = rows.isNotEmpty() || selectedTagId != null
 

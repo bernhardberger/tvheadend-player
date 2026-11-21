@@ -1,0 +1,244 @@
+package at.bernhardberger.tvhplayer.touch.player
+
+import androidx.annotation.OptIn
+import androidx.compose.runtime.mutableStateOf
+import androidx.media3.common.util.UnstableApi
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvheadend.sdk.core.EpgEvent
+import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
+import at.bernhardberger.tvheadend.sdk.core.EpgSnapshot
+import at.bernhardberger.tvheadend.sdk.core.EventId
+import at.bernhardberger.tvheadend.sdk.core.SessionObservation
+import at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi
+import at.bernhardberger.tvheadend.sdk.media3.PlaybackRecoveryReason
+import at.bernhardberger.tvheadend.sdk.media3.testing.TimeshiftTestFixture
+import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssue
+import at.bernhardberger.tvhplayer.core.AppErrorCondition
+import at.bernhardberger.tvhplayer.core.ChannelBrowsingScope
+import at.bernhardberger.tvhplayer.core.ConnectionUiState
+import at.bernhardberger.tvhplayer.playback.AppPlaybackFailureReason
+import at.bernhardberger.tvhplayer.playback.AppPlaybackState
+import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
+import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
+import at.bernhardberger.tvhplayer.playback.BackgroundPlaybackNotice
+import at.bernhardberger.tvhplayer.playback.LivePauseAvailability
+import at.bernhardberger.tvhplayer.playback.toAppPresentation
+import at.bernhardberger.tvhplayer.touch.testutil.ServerGuide
+import at.bernhardberger.tvhplayer.viewmodels.ChannelScopeState
+import java.time.LocalTime
+import java.time.ZoneOffset
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
+import org.junit.Test
+
+@OptIn(UnstableApi::class)
+@kotlin.OptIn(TvheadendTestingApi::class)
+class LivePlayerMappingTest {
+    private val guide = ServerGuide(Instant.fromEpochSeconds(NOW))
+    private val shown = guide.first.id
+    private val other = guide.second.id
+
+    @Test
+    fun statusFollowsTheRuntimeAsOnTv() {
+        data class Case(
+            val name: String,
+            val state: AppPlaybackState,
+            val expected: LivePlayerStatus,
+            val connected: Boolean = true,
+            val playing: Boolean = true,
+            val issue: SubscriptionIssue? = null,
+            val serverStopped: Boolean = false,
+            val requestFailed: Boolean = false,
+            val notice: BackgroundPlaybackNotice? = null,
+        )
+        val recovering = AppPlaybackState.Recovering(PlaybackRecoveryReason.LIVE_ENDED, retryDelayMillis = 1_000)
+        val noTuner = AppPlaybackState.Failed(
+            AppPlaybackFailureReason.OTHER, subscriptionIssue = SubscriptionIssue.NO_FREE_ADAPTER,
+        )
+        val cases = listOf(
+            Case("picture shown", AppPlaybackState.Playing, LivePlayerStatus.Playing),
+            Case("stall of a shown picture", AppPlaybackState.Buffering, LivePlayerStatus.Playing),
+            Case("starting", AppPlaybackState.Starting, LivePlayerStatus.Tuning),
+            Case("nothing asked yet", AppPlaybackState.Idle, LivePlayerStatus.Tuning, playing = false),
+            Case("previous channel still on", AppPlaybackState.Playing, LivePlayerStatus.Tuning, playing = false),
+            Case("another channel's issue", AppPlaybackState.Playing, LivePlayerStatus.Tuning, playing = false,
+                issue = SubscriptionIssue.NO_FREE_ADAPTER),
+            Case("connection lost", AppPlaybackState.Playing, LivePlayerStatus.Reconnecting(null), connected = false),
+            Case("runtime recovering", recovering, LivePlayerStatus.Reconnecting(null)),
+            Case("no free tuner", noTuner, LivePlayerStatus.Unavailable(AppErrorCondition.NO_FREE_ADAPTER),
+                playing = false),
+            Case("issue on the shown channel", AppPlaybackState.Playing,
+                LivePlayerStatus.Unavailable(AppErrorCondition.NO_FREE_ADAPTER),
+                issue = SubscriptionIssue.NO_FREE_ADAPTER),
+            Case("start rejected", AppPlaybackState.Idle,
+                LivePlayerStatus.Unavailable(AppErrorCondition.STREAM_STOPPED),
+                playing = false, requestFailed = true),
+            Case("server stopped the stream", AppPlaybackState.Playing,
+                LivePlayerStatus.Unavailable(AppErrorCondition.STREAM_STOPPED), serverStopped = true),
+            Case("this device's player failed",
+                AppPlaybackState.Failed(AppPlaybackFailureReason.OTHER, deviceFault = true),
+                LivePlayerStatus.Unavailable(AppErrorCondition.CHANNEL_PLAYBACK_FAILED), playing = false),
+            Case("keep limit ran out", AppPlaybackState.Finished, LivePlayerStatus.PauseEnded, playing = false,
+                notice = BackgroundPlaybackNotice.LIMIT_EXPIRED),
+        )
+        cases.forEach { case ->
+            val status = liveStatus(
+                connected = case.connected, state = case.state, issue = case.issue, serverStopped = case.serverStopped,
+                playingId = if (case.playing) shown else other, shownId = shown,
+                requestFailed = case.requestFailed, notice = case.notice,
+            )
+            assertEquals(case.name, case.expected, status)
+        }
+    }
+
+    @Test
+    fun barFollowsTheTimeshiftSampleByTheTvProgramWindow() {
+        data class Case(val name: String, val sample: AppTimeshiftState, val expected: LiveTimeline?, val now: Instant = live)
+        val b = LocalTime.of(20, 0)
+        val cases = listOf(
+            Case("at the live edge", timeshift(50, 90, 90.minutes), LiveTimeline(b, 3_600, 0, 1_800, 1_800)),
+            Case("within the live-edge tolerance", timeshift(50, 90, 90.minutes - 3.seconds),
+                LiveTimeline(b, 3_600, 0, 1_800, 1_800, behind = 0)),
+            Case("paused while live moves on", timeshift(50, 92, 90.minutes, edge = live + 2.minutes),
+                LiveTimeline(b, 3_600, 0, 1_800, 1_920, behind = 120)),
+            Case("behind and playing", timeshift(50, 90, 80.minutes, readerBehind = 10.minutes),
+                LiveTimeline(b, 3_600, 0, 1_200, 1_800, behind = 600)),
+            Case("buffer starts after the program", timeshift(70, 90, 80.minutes),
+                LiveTimeline(b, 3_600, 600, 1_200, 1_800, behind = 600)),
+            Case("behind into the previous program", timeshift(50, 90, 55.minutes),
+                LiveTimeline(LocalTime.of(19, 0), 3_600, 3_000, 3_300, 3_600, behind = 2_100, liveEdge = false)),
+            Case("no timeshift: the program on air", AppTimeshiftState(),
+                LiveTimeline(b, 3_600, bufferStart = null, position = 1_800, live = 1_800)),
+            Case("no timeshift and nothing on air", AppTimeshiftState(), null, now = live + 3.hours),
+        )
+        cases.forEach { case ->
+            assertEquals(case.name, case.expected, liveTimeline(case.sample, case.now.epochSeconds, ZoneOffset.UTC, ::eventAt))
+        }
+    }
+
+    @Test
+    fun skipsAndDragsMoveByTheTvRules() {
+        assertEquals(TimeshiftMove.By(-10_000), skipMove(timeshift(50, 90, 80.minutes), -10_000))
+        assertEquals(TimeshiftMove.By(30_000), skipMove(timeshift(50, 90, 80.minutes), 30_000))
+        assertEquals(TimeshiftMove.None, skipMove(timeshift(50, 90, 50.minutes), -10_000))
+        assertEquals(TimeshiftMove.None, skipMove(timeshift(50, 90, 90.minutes), 30_000))
+        // A forward skip that reaches the live edge goes live rather than stopping just short of it.
+        assertEquals(TimeshiftMove.GoLive, skipMove(timeshift(50, 90, 89.minutes + 40.seconds), 30_000))
+        assertEquals(TimeshiftMove.GoLive, skipMove(timeshift(50, 90, 89.minutes + 27.seconds), 30_000))
+        assertEquals(TimeshiftMove.By(30_000), skipMove(timeshift(50, 90, 89.minutes + 20.seconds), 30_000))
+        assertEquals(TimeshiftMove.None, skipMove(AppTimeshiftState(), 30_000))
+
+        val behind = LiveTimeline(LocalTime.of(20, 0), 3_600, 0, 1_200, 1_800)
+        assertEquals(TimeshiftMove.GoLive, dragMove(behind, 1_800))
+        assertEquals(TimeshiftMove.None, dragMove(behind, 1_200))
+        assertEquals(TimeshiftMove.By(-600_000), dragMove(behind, 600))
+        // In an earlier program the bar's end is that program's end, not live.
+        val earlier = behind.copy(position = 3_300, live = 3_600, behind = 2_100, liveEdge = false)
+        assertEquals(TimeshiftMove.By(300_000), dragMove(earlier, 3_600))
+    }
+
+    @Test
+    fun bufferStartKeepsItsSnapshotForTheSegment() {
+        val fixture = TimeshiftTestFixture(120.minutes)
+        fixture.updateHistory(50.minutes, 90.minutes, estimatedLiveEdgeTime = live)
+        val first = fixture.state.value.toAppPresentation(fixture.playbackPosition(80.minutes))
+        val held = heldHistoryStart(null, first)
+        assertEquals(first.timeline, held)
+        fixture.updateHistory(51.minutes, 91.minutes, estimatedLiveEdgeTime = live + 1.minutes)
+        val later = fixture.state.value.toAppPresentation(fixture.playbackPosition(80.minutes))
+        assertSame(held, heldHistoryStart(held, later))
+        fixture.restartSegment()
+        fixture.updateHistory(0.minutes, 1.minutes, estimatedLiveEdgeTime = live + 2.minutes)
+        val restarted = fixture.state.value.toAppPresentation(fixture.playbackPosition(1.minutes))
+        assertEquals(restarted.timeline, heldHistoryStart(held, restarted))
+        assertEquals(null, heldHistoryStart(held, AppTimeshiftState()))
+    }
+
+    @Test
+    fun onlyALiveTargetThatHasNotEndedIsPlaying() {
+        val live = AppPlaybackTarget.Live(shown)
+        assertEquals(shown, playingChannelId(live, AppPlaybackState.Starting))
+        assertEquals(shown, playingChannelId(live, AppPlaybackState.Playing))
+        assertEquals(null, playingChannelId(live, AppPlaybackState.Failed(AppPlaybackFailureReason.OTHER)))
+        assertEquals(null, playingChannelId(live, AppPlaybackState.Finished))
+        assertEquals(null, playingChannelId(AppPlaybackTarget.Recording(DvrEntryId(1)), AppPlaybackState.Playing))
+        assertEquals(null, playingChannelId(null, AppPlaybackState.Idle))
+    }
+
+    @Test
+    fun faceCarriesTheShownChannelAndOffersOnlyWhatIsWired() {
+        val observation = SessionObservation.create(epgState = EpgRepositoryState.Current(guide.snapshot))
+        val channels = listOf(guide.first, guide.second)
+        fun face(
+            id: at.bernhardberger.tvheadend.sdk.core.ChannelId,
+            known: Boolean = true,
+            pause: LivePauseAvailability = LivePauseAvailability.READY,
+            status: LivePlayerStatus = LivePlayerStatus.Playing,
+        ) = livePlayerState(
+            id,
+            ChannelScopeState(
+                ChannelBrowsingScope(
+                    allChannels = if (known) channels else emptyList(),
+                    visibleChannels = if (known) channels else emptyList(),
+                    tags = emptyList(), allChannelsVisible = true, activeTagId = null,
+                ),
+                channelCatalogCurrent = known,
+            ),
+            observation, ConnectionUiState.Ready, degraded = false, status, mutableStateOf(null), pause, guide.now,
+        )
+
+        val playing = face(shown)
+        assertEquals("Channel One", playing.channel.name)
+        assertEquals(guide.programs[0], playing.channel.now?.title)
+        // Of the controls only the timeshift ones are wired, offered while the channel can pause (as on TV).
+        assertEquals(setOf(PlayerControl.Timeshift), playing.offered)
+        assertEquals(setOf(PlayerControl.Timeshift), face(shown, pause = LivePauseAvailability.STARTING).offered)
+        assertEquals(emptySet<PlayerControl>(), face(shown, pause = LivePauseAvailability.UNAVAILABLE).offered)
+        assertEquals(emptySet<PlayerControl>(), face(shown, pause = LivePauseAvailability.OFF).offered)
+        assertEquals(emptySet<PlayerControl>(), face(shown, status = LivePlayerStatus.Tuning).offered)
+        // The list below the picture marks the shown channel as the one playing.
+        assertEquals(listOf(true, false), playing.channels.rows.map { it.playback != null })
+        // A channel the scope doesn't know yet has no name.
+        assertEquals("", face(shown, known = false).channel.name)
+    }
+
+    // Program A 19:00-20:00 has aired, B 20:00-21:00 is on; live is 20:30. Content minutes map to the
+    // clock through the history's end, which is live (or [edge]).
+    private val live = Instant.parse("2026-09-07T20:30:00Z")
+    private val programs = EpgSnapshot.create(
+        events = listOf(program(2, "2026-09-07T20:00:00Z", "2026-09-07T21:00:00Z")),
+        historicalEvents = listOf(program(1, "2026-09-07T19:00:00Z", "2026-09-07T20:00:00Z")),
+    )
+    private val schedule = SessionObservation.create(epgState = EpgRepositoryState.Current(programs))
+
+    private fun program(id: Long, start: String, stop: String) = EpgEvent.create(
+        id = EventId(id), channelId = ChannelId(1), start = Instant.parse(start), stop = Instant.parse(stop),
+        title = "Program $id",
+    )
+
+    private fun eventAt(time: Instant) = schedule.eventAt(ChannelId(1), time)
+
+    private fun timeshift(
+        startMinute: Int,
+        endMinute: Int,
+        position: Duration,
+        readerBehind: Duration? = null,
+        edge: Instant = live,
+    ): AppTimeshiftState {
+        val fixture = TimeshiftTestFixture(120.minutes)
+        fixture.updateHistory(
+            startMinute.minutes, endMinute.minutes, readerBehindLive = readerBehind, estimatedLiveEdgeTime = edge,
+        )
+        return fixture.state.value.toAppPresentation(fixture.playbackPosition(position))
+    }
+
+    private companion object {
+        const val NOW = 1_800_000_000L
+    }
+}

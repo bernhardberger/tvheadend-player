@@ -426,10 +426,11 @@ class TouchAppTest {
         val guide = savedConnectionWithGuide()
         compose.onNodeWithText(guide.first.name!!).assertIsDisplayed()
         compose.onNodeWithText(guide.second.name!!).assertIsDisplayed()
-        compose.onNodeWithText(guide.programs[0]).assertIsDisplayed()
+        // The phone row writes what is left of the program on now beside its title.
+        compose.onNodeWithText(guide.programs[0], substring = true).assertIsDisplayed()
 
-        // Guide is not wired yet, and the open row offers nothing to play or record.
-        compose.onNodeWithText(label(R.string.nav_epg)).assertDoesNotExist()
+        // The open row offers nothing to play or record yet.
+        compose.onNodeWithText(label(R.string.nav_epg)).assertIsDisplayed()
         compose.onNodeWithText(label(R.string.nav_recordings)).assertIsDisplayed()
         compose.onNodeWithContentDescription(compose.activity.getString(R.string.channels_expand, guide.first.name))
             .performClick()
@@ -522,6 +523,44 @@ class TouchAppTest {
         compose.waitForIdle()
     }
 
+    @Test
+    fun guideShowsTheServersProgramsWithoutUnwiredControls() {
+        val guide = savedConnectionWithGuide()
+        openGuide()
+        compose.onNodeWithText(guide.programs[0]).assertIsDisplayed()
+
+        // A tap opens the program in place; only Details has something behind it.
+        compose.onNodeWithText(guide.programs[0]).performClick()
+        listOf(R.string.channels_watch, R.string.channels_record)
+            .forEach { compose.onNodeWithText(label(it)).assertDoesNotExist() }
+        compose.onNode(hasClickAction() and hasText(label(R.string.channels_details))).performClick()
+
+        compose.onNodeWithText("About ${guide.programs[0]}").assertIsDisplayed()
+        listOf(R.string.channels_watch, R.string.channels_record, R.string.channels_show_in_guide)
+            .forEach { compose.onNodeWithText(label(it)).assertDoesNotExist() }
+    }
+
+    @Test
+    fun guideWaitsForTheServersGuideInTheFirstLoadForm() {
+        runBlocking { connection.store.addAnonymous(server.host, server.port, "Home server", true) }
+        show()
+        connection.session.publish(
+            SessionObservation.create(
+                sessionState = ready().sessionState,
+                channelState = ChannelRepositoryState.Current(ServerGuide(Clock.System.now()).catalog),
+            ),
+        )
+        openGuide()
+
+        compose.onNodeWithText(label(SharedR.string.epg_loading)).assertIsDisplayed()
+        compose.onNodeWithText(label(R.string.guide_overview)).assertDoesNotExist()
+    }
+
+    private fun openGuide() {
+        compose.onNode(hasClickAction() and hasText(label(R.string.nav_epg))).performClick()
+        compose.waitForIdle()
+    }
+
     private fun openRecordings() {
         compose.onNode(hasClickAction() and hasText(label(R.string.nav_recordings))).performClick()
         compose.waitForIdle()
@@ -557,9 +596,10 @@ class TouchAppTest {
         val presentation = connection.presentation()
         val channels = connection.channels()
         val recordings = connection.recordings()
+        val guide = connection.guide()
         content = {
             MaterialTheme(colorScheme = MobileDarkColors) {
-                TouchApp(connection.session, connection.owner, presentation, channels, recordings) {
+                TouchApp(connection.session, connection.owner, presentation, channels, recordings, guide) {
                     flowOf(TvheadendDiscoveryTestFactory.discovering(listOf(server)))
                 }
             }

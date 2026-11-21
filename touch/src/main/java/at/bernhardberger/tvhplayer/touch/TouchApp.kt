@@ -26,9 +26,11 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsActions
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsScreen
 import at.bernhardberger.tvhplayer.touch.channels.channelsState
+import at.bernhardberger.tvhplayer.touch.channels.rememberChannelsTexts
 import at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
-import kotlin.time.Clock
+import at.bernhardberger.tvhplayer.ui.common.rememberCurrentEpochSeconds
+import kotlin.time.Instant
 import at.bernhardberger.tvhplayer.touch.connect.ActiveConnectionUiState
 import at.bernhardberger.tvhplayer.touch.connect.ConnectViewModel
 import at.bernhardberger.tvhplayer.touch.connect.ConnectionStatus
@@ -38,6 +40,8 @@ import at.bernhardberger.tvhplayer.touch.connect.FirstRunFlow
 import at.bernhardberger.tvhplayer.touch.connect.connectionStatus
 import at.bernhardberger.tvhplayer.touch.ui.Destination
 import at.bernhardberger.tvhplayer.touch.ui.LocalFrameSelection
+import at.bernhardberger.tvhplayer.touch.guide.GuideDestination
+import at.bernhardberger.tvhplayer.touch.guide.GuideViewModel
 import at.bernhardberger.tvhplayer.touch.recordings.RecordingsDestination
 import at.bernhardberger.tvhplayer.touch.recordings.RecordingsViewModel
 import kotlinx.coroutines.flow.Flow
@@ -58,6 +62,9 @@ internal fun TouchApp(
     connection: AppConnectionViewModel,
     channels: ChannelsViewModel,
     recordings: RecordingsViewModel,
+    guide: GuideViewModel,
+    playingId: String? = null,
+    onWatch: ((String) -> Unit)? = null,
     discovery: () -> Flow<TvheadendDiscoveryState>,
 ) {
     val profile by owner.serverProfile.collectAsStateWithLifecycle()
@@ -89,7 +96,7 @@ internal fun TouchApp(
             )
         }
         else -> AppDestinations(
-            connection, channels, recordings,
+            connection, channels, recordings, guide, playingId, onWatch,
             onOpenConnections = { page = Page.Connections },
             onSignIn = { page = Page.SignIn },
         )
@@ -162,12 +169,14 @@ private fun ServerProfileSummary.uiState(status: ConnectionStatus) = ActiveConne
 
 /**
  * The frame with Channels and Recordings wired: the destinations without data are not offered yet,
- * and the row controls with nothing behind them (Watch, Record, Details, Show in Guide) are left out.
+ * and the row controls with nothing behind them (Record, Details, Show in Guide) are left out.
  */
 @Composable
 private fun AppFrame(
     connection: AppConnectionViewModel,
     channels: ChannelsViewModel,
+    playingId: String?,
+    onWatch: ((String) -> Unit)?,
     onOpenConnections: () -> Unit,
     onSignIn: () -> Unit,
 ) {
@@ -175,11 +184,16 @@ private fun AppFrame(
     val scope by channels.scope.collectAsStateWithLifecycle()
     // The scope is republished for channel changes only; the guide comes with every observation.
     val observation by channels.observation.collectAsStateWithLifecycle()
-    val state = channelsState(scope, presentation.connection, presentation.degraded, observation, Clock.System.now())
+    val nowSec = rememberCurrentEpochSeconds()
+    val now = Instant.fromEpochSeconds(nowSec())
+    val texts = rememberChannelsTexts()
+    val state = channelsState(
+        scope, presentation.connection, presentation.degraded, observation, now, texts, playingId,
+    )
     ChannelsScreen(
         state = state,
         actions = ChannelsActions(
-            onPlay = null,
+            onPlay = onWatch,
             onTag = { id -> channels.selectTag(id?.let { ChannelTagId(it.toLong()) }) },
             onRetry = { connection.reconnectNow() },
             // Until Home exists, connection settings open from the end of the Channels top bar.
@@ -191,11 +205,15 @@ private fun AppFrame(
 }
 
 /** Each destination's screen draws the frame, so the selection is kept here and picks the screen. */
+@Suppress("LongParameterList") // One view model per destination.
 @Composable
 private fun AppDestinations(
     connection: AppConnectionViewModel,
     channels: ChannelsViewModel,
     recordings: RecordingsViewModel,
+    guide: GuideViewModel,
+    playingId: String?,
+    onWatch: ((String) -> Unit)?,
     onOpenConnections: () -> Unit,
     onSignIn: () -> Unit,
 ) {
@@ -204,9 +222,11 @@ private fun AppDestinations(
         when (selection.value) {
             Destination.Recordings ->
                 RecordingsDestination(recordings, connection, AppDestinationList, onOpenConnections, onSignIn)
-            else -> AppFrame(connection, channels, onOpenConnections, onSignIn)
+            Destination.Guide ->
+                GuideDestination(guide, channels, connection, AppDestinationList, onOpenConnections, onSignIn)
+            Destination.Channels -> AppFrame(connection, channels, playingId, onWatch, onOpenConnections, onSignIn)
         }
     }
 }
 
-private val AppDestinationList = listOf(Destination.Channels, Destination.Recordings)
+private val AppDestinationList = Destination.entries

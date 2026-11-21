@@ -17,6 +17,7 @@ import at.bernhardberger.tvhplayer.notices.NoticeContext
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
+import at.bernhardberger.tvhplayer.touch.guide.GuideViewModel
 import at.bernhardberger.tvhplayer.touch.recordings.RecordingsViewModel
 import at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
@@ -27,6 +28,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlin.coroutines.EmptyCoroutineContext
 
 /**
  * The app's session and profile owner on the SDK's fakes, as the composition root builds them.
@@ -76,6 +78,9 @@ internal class FakeConnection(
     fun failReadAfterNextWrite() {
         writes.failReadAfterNextWrite = true
     }
+
+    /** The Guide on Main, so a coverage request settles with the looper. */
+    fun guide() = GuideViewModel(session, EmptyCoroutineContext)
 
     fun close() = scope.cancel()
 }

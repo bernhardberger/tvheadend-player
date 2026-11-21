@@ -19,6 +19,7 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -46,6 +47,7 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.core.os.ConfigurationCompat
 import at.bernhardberger.tvhplayer.touch.R
+import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import kotlin.math.abs
@@ -54,7 +56,7 @@ import kotlin.math.roundToInt
 
 @Composable
 internal fun PlayerTimeline(
-    timeline: LiveTimeline,
+    source: State<LiveTimeline?>,
     status: LivePlayerStatus,
     layout: PlayerLayout,
     visibleControls: Boolean,
@@ -63,8 +65,10 @@ internal fun PlayerTimeline(
     onSeek: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // The bar alone reads the sampled values, so a sample redraws it and nothing around it.
+    val timeline = source.value ?: return
     val playing = status == LivePlayerStatus.Playing
-    val seekable = playing && timeline.bufferStart != null && timeline.bufferStart < timeline.live
+    val seekable = playing && timeline.seekable
     val allowDrag = visibleControls && seekable
     val position = if (status == LivePlayerStatus.Tuning) timeline.live else preview ?: timeline.position
     val bottomOffset = if (layout.upright) 2.dp else 24.dp
@@ -78,7 +82,9 @@ internal fun PlayerTimeline(
         }
         if (preview != null) {
             DragLabel(
-                playerClock(timeline, position), position == timeline.live, layout.upright,
+                playerClock(timeline.programStart, position),
+                timeline.liveEdge && position == timeline.live,
+                layout.upright,
                 markerX, trackY, maxWidth,
             )
         }
@@ -94,7 +100,7 @@ private fun timelineDrag(
 ): Modifier {
     val first = checkNotNull(timeline.bufferStart)
     val label = stringResource(R.string.player_timeline)
-    val positionLabel = behindLive(timeline.live - position)
+    val positionLabel = behindLive(timeline.behindAt(position))
     val latestTimeline by rememberUpdatedState(timeline)
     val latestSeek by rememberUpdatedState(onSeek)
     val latestPreview by rememberUpdatedState(onPreviewChange)
@@ -230,10 +236,10 @@ private fun DragLabel(time: String, live: Boolean, compact: Boolean, markerX: Dp
 }
 
 @Composable
-internal fun playerClock(timeline: LiveTimeline, seconds: Int): String {
+internal fun playerClock(programStart: LocalTime, seconds: Int): String {
     val config = LocalConfiguration.current
     val locale = checkNotNull(ConfigurationCompat.getLocales(config)[0])
-    return timeline.programStart.plusSeconds(seconds.toLong())
+    return programStart.plusSeconds(seconds.toLong())
         .format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).withLocale(locale))
 }
 

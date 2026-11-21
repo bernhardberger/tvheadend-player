@@ -1,8 +1,10 @@
 package at.bernhardberger.tvhplayer.touch.player
 
+import androidx.compose.runtime.State
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import at.bernhardberger.tvhplayer.core.AppErrorCondition
 import at.bernhardberger.tvhplayer.touch.channels.ChannelList
 import at.bernhardberger.tvhplayer.touch.channels.ChannelRow
 import at.bernhardberger.tvhplayer.touch.guide.GuideProgram
@@ -13,14 +15,24 @@ internal data class LivePlayerState(
     val channel: ChannelRow,
     val channels: ChannelList,
     val frame: Painter?,
-    val timeline: LiveTimeline,
+    /** The bar's moving values, read only by what draws them so a sample redraws the bar, not the face. */
+    val timeline: State<LiveTimeline?>,
     val status: LivePlayerStatus = LivePlayerStatus.Playing,
     val paused: Boolean = false,
     val brightness: Float = 0.62f,
     val tracks: PlayerTracks = PlayerTracks(),
     val options: PlaybackOptions = PlaybackOptions(),
     val schedule: ChannelSchedule? = null,
+    val offered: Set<PlayerControl> = PlayerControl.entries.toSet(),
 )
+
+/**
+ * The face's controls that have something behind them; one not offered is left out, not dimmed.
+ * [Timeshift] is pause, the skips, the drag and Go live; the timeline itself always shows the program.
+ */
+internal enum class PlayerControl {
+    Timeshift, Record, Audio, Subtitles, Settings, Channels, Info, PictureInPicture, FullScreen,
+}
 
 /**
  * The watched channel's day for the Info sheet, as the Guide's By channel view shows it: [days] for the
@@ -119,18 +131,37 @@ internal enum class PlayerPanel(val menu: Boolean) {
     val optionsPage: Boolean get() = this == Options || this == DisplayMode || this == Profile || this == Stats
 }
 
-/** Offsets are seconds from [programStart]; [live] is the end of the seekable buffer. */
+/**
+ * Offsets are seconds from [programStart]; [live] is the end of the seekable buffer inside the bar,
+ * which is the live edge itself when [liveEdge], else the program's end (the viewer watches an earlier
+ * program). [behind] is how far the viewer is behind live, 0 at the live edge; it can exceed the bar.
+ */
 internal data class LiveTimeline(
     val programStart: LocalTime,
     val duration: Int,
     val bufferStart: Int?,
     val position: Int,
     val live: Int,
+    val behind: Int = live - position,
+    val liveEdge: Boolean = true,
 ) {
     init {
-        require(duration > 0 && position in 0..live && live <= duration)
+        require(duration > 0 && position in 0..live && live <= duration && behind >= 0)
         require(bufferStart == null || bufferStart in 0..position)
     }
+
+    /** Pause, the skips and the drag have a buffer to move in. */
+    val seekable: Boolean get() = bufferStart != null && bufferStart < live
+
+    /** How far behind live the viewer would be at [shown], a dragged position or the current one. */
+    fun behindAt(shown: Int): Int = (behind + position - shown).coerceAtLeast(0)
+}
+
+/** What a skip or a drag asks of the runtime. */
+internal sealed interface TimeshiftMove {
+    data object None : TimeshiftMove
+    data object GoLive : TimeshiftMove
+    data class By(val deltaMs: Long) : TimeshiftMove
 }
 
 internal sealed interface LivePlayerStatus {
@@ -138,7 +169,9 @@ internal sealed interface LivePlayerStatus {
     data object Tuning : LivePlayerStatus
     data class Reconnecting(val nextAttemptSeconds: Int?) : LivePlayerStatus
     data object PauseEnded : LivePlayerStatus
-    data object Unavailable : LivePlayerStatus
+
+    /** The channel can't play; [condition] says why, null for the drawn busy-tuner case. */
+    data class Unavailable(val condition: AppErrorCondition? = null) : LivePlayerStatus
 }
 
 internal enum class PlayerAction {

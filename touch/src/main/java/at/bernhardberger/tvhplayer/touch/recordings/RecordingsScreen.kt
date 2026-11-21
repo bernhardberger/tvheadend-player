@@ -61,12 +61,7 @@ internal fun RecordingsScreen(
     initiallyPicked: String? = null,
     destinations: List<Destination> = Destination.entries,
 ) {
-    val window = currentWindowAdaptiveInfoV2().windowSizeClass
-    val layout = when {
-        window.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND) -> RecordingsLayout.Wide
-        window.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND) -> RecordingsLayout.Upright
-        else -> RecordingsLayout.Phone
-    }
+    val layout = recordingsLayout()
     val grouping = state.view.grouping
     var path by rememberSaveable(grouping) { mutableStateOf<List<String>>(ArrayList(initialPath)) }
     var picked by rememberSaveable(grouping) { mutableStateOf(initiallyPicked) }
@@ -89,13 +84,16 @@ internal fun RecordingsScreen(
                     TitleActions(state.space, layout) { sheet = SheetPage.Main }
                 }
             },
+            belowTopBar = { destination ->
+                if (destination == Destination.Recordings) RecordingsLoadingLine(state.availability, layout)
+            },
         ) { destination ->
             if (destination != Destination.Recordings) return@TouchFrame
             // Registered after the frame's own handler, so a page or a folder level takes Back first.
             BackHandler(enabled = page) { picked = null }
             BackHandler(enabled = !page && levels.size > 1) { path = ArrayList(path.take(levels.size - 2)) }
             if (!listed) {
-                RecordingsStandIn(state.availability, actions)
+                RecordingsStandIn(state.availability, layout, actions)
             } else if (pageItem != null) {
                 RecordingPage(pageItem, state.clock, layout, actions) { picked = null }
             } else {
@@ -121,6 +119,16 @@ internal fun RecordingsScreen(
                 onClose = { sheet = null },
             )
         }
+    }
+}
+
+@Composable
+private fun recordingsLayout(): RecordingsLayout {
+    val window = currentWindowAdaptiveInfoV2().windowSizeClass
+    return when {
+        window.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND) -> RecordingsLayout.Wide
+        window.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND) -> RecordingsLayout.Upright
+        else -> RecordingsLayout.Phone
     }
 }
 

@@ -37,11 +37,10 @@ import androidx.core.view.WindowInsetsCompat
 import at.bernhardberger.tvheadend.sdk.android.DiscoveredTvheadendServer
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import at.bernhardberger.tvhplayer.touch.R
-import at.bernhardberger.tvhplayer.touch.channels.ChannelsActions
-import at.bernhardberger.tvhplayer.touch.channels.ChannelsMessage
-import at.bernhardberger.tvhplayer.touch.channels.MessageKind
 import at.bernhardberger.tvhplayer.touch.testutil.TouchCanvas
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouch
+import at.bernhardberger.tvhplayer.touch.ui.ListMessage
+import at.bernhardberger.tvhplayer.touch.ui.MessageKind
 import at.bernhardberger.tvhplayer.touch.ui.TouchFrame
 import at.bernhardberger.tvhplayer.ui.screens.onboarding.SetupAction
 import at.bernhardberger.tvhplayer.ui.screens.onboarding.SetupFailure
@@ -331,7 +330,7 @@ class ConnectScreensTest {
 
     private fun signInNeeded(name: String, canvas: TouchCanvas) {
         show {
-            TouchFrame(content = { ChannelsMessage(MessageKind.SignInNeeded, ChannelsActions({}, {}, {}, {})) })
+            TouchFrame(content = { ListMessage(MessageKind.SignInNeeded, onSettings = {}) })
         }
         capture(name, canvas)
     }

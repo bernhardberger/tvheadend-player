@@ -35,6 +35,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -59,7 +62,7 @@ import at.bernhardberger.tvhplayer.touch.channels.ChannelsActions
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsLayout
 import at.bernhardberger.tvhplayer.touch.channels.TagFilter
 
-private const val DRAG_ALPHA = .38f
+internal const val DRAG_ALPHA = .38f
 
 /** The open menu or sheet and what its lists report back; shared by the player's two faces. */
 internal class PanelHost(
@@ -93,21 +96,26 @@ internal fun LandscapePlayerContent(
         )
         if (state.status == LivePlayerStatus.Playing) {
             LiveOffer(
-                state.timeline, preview, onAction, layout,
+                state.timeline, state.offered, preview, onAction, layout,
                 modifier = Modifier.align(Alignment.BottomEnd)
                     .padding(bottom = trackBottom + if (tablet) 26.dp else 16.dp),
             )
         }
-        val clockModifier = Modifier.padding(bottom = trackBottom - 8.dp)
-        ClockText(playerClock(state.timeline, 0), clockModifier.align(Alignment.BottomStart))
-        ClockText(
-            playerClock(state.timeline, state.timeline.duration), clockModifier.align(Alignment.BottomEnd),
-        )
-        PlayerTimeline(
-            state.timeline, state.status, layout, true, preview, onPreviewChange, onSeek,
-            Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = trackGutter)
-                .padding(bottom = trackBottom - 24.dp).height(44.dp),
-        )
+        // Without a program running there is no window to draw: the footer keeps its program and actions.
+        // The clocks follow the program only, so a position sample does not recompose the footer.
+        val program by remember(state.timeline) {
+            derivedStateOf { state.timeline.value?.let { it.programStart to it.duration } }
+        }
+        program?.let { (start, duration) ->
+            val clockModifier = Modifier.padding(bottom = trackBottom - 8.dp)
+            ClockText(playerClock(start, 0), clockModifier.align(Alignment.BottomStart))
+            ClockText(playerClock(start, duration), clockModifier.align(Alignment.BottomEnd))
+            PlayerTimeline(
+                state.timeline, state.status, layout, true, preview, onPreviewChange, onSeek,
+                Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = trackGutter)
+                    .padding(bottom = trackBottom - 24.dp).height(44.dp),
+            )
+        }
         PlayerActionRow(
             state, layout, dragging, onAction, panels,
             Modifier.align(Alignment.BottomCenter).padding(bottom = rowBottom),
@@ -237,48 +245,6 @@ private fun PlayerChannelList(
 }
 
 @Composable
-internal fun LiveOffer(
-    timeline: LiveTimeline,
-    preview: Int?,
-    onAction: (PlayerAction) -> Unit,
-    layout: PlayerLayout,
-    modifier: Modifier = Modifier,
-    showLive: Boolean = true,
-) {
-    val behind = timeline.live - (preview ?: timeline.position)
-    Row(modifier, horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-        if (showLive && (behind > 0 || preview == null)) {
-            Text(
-                behindLive(behind), color = MaterialTheme.colorScheme.tertiary,
-                style = MaterialTheme.typography.labelLarge,
-            )
-        }
-        if (layout.upright) Spacer(Modifier.weight(1f))
-        if (showLive && behind > 0) {
-            val buttonFill = Color(0xCC37393A)
-            Button(
-                onClick = { onAction(PlayerAction.GoLive) }, enabled = preview == null,
-                modifier = Modifier.alpha(if (preview == null) 1f else DRAG_ALPHA),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = buttonFill, contentColor = Color.White,
-                    disabledContainerColor = buttonFill, disabledContentColor = Color.White,
-                ),
-                contentPadding = PaddingValues(horizontal = 13.dp),
-            ) {
-                Icon(painterResource(R.drawable.player_go_live), null, Modifier.size(18.dp))
-                Spacer(Modifier.width(6.dp))
-                Text(stringResource(R.string.player_go_live), maxLines = 1)
-            }
-        }
-        if (layout == PlayerLayout.Phone && preview == null) {
-            PlayerIconButton(
-                R.drawable.player_fullscreen, R.string.player_full_screen, { onAction(PlayerAction.FullScreen) },
-            )
-        }
-    }
-}
-
-@Composable
 private fun PlayerActionRow(
     state: LivePlayerState,
     layout: PlayerLayout,
@@ -302,19 +268,30 @@ private fun PlayerActionRow(
         MenuButton(menu, R.drawable.channels_record, R.string.player_record, !dragging, PlayerPanel.Record)
         MenuButton(menu, R.drawable.player_audio, R.string.player_audio, !dragging && listening, PlayerPanel.Audio)
         MenuButton(
-            menu, R.drawable.player_subtitles, R.string.player_subtitles, !dragging && listening, PlayerPanel.Subtitles,
+            menu, R.drawable.player_subtitles, R.string.player_subtitles, !dragging && listening,
+            PlayerPanel.Subtitles,
         )
         Spacer(Modifier.weight(1f))
         MenuButton(
-            menu, R.drawable.channels_info, R.string.player_info, !dragging && state.schedule != null, PlayerPanel.Info,
+            menu, R.drawable.channels_info, R.string.player_info, !dragging && state.schedule != null,
+            PlayerPanel.Info,
         )
-        if (!layout.upright) {
+        if (!layout.upright && PlayerControl.Channels in state.offered) {
             ActionButton(R.drawable.player_channels, R.string.player_channels, true, !dragging, colors, false, {
                 panels.onPanel(PlayerPanel.Channels)
             })
         }
     }
 }
+
+private val PlayerPanel.control: PlayerControl?
+    get() = when (this) {
+        PlayerPanel.Record -> PlayerControl.Record
+        PlayerPanel.Audio -> PlayerControl.Audio
+        PlayerPanel.Subtitles -> PlayerControl.Subtitles
+        PlayerPanel.Info -> PlayerControl.Info
+        else -> null
+    }
 
 private class MenuButtonStyle(
     val state: LivePlayerState,
@@ -334,6 +311,7 @@ private fun MenuButton(
     enabled: Boolean,
     target: PlayerPanel,
 ) {
+    if (target.control !in style.state.offered) return
     val panels = style.panels
     val open = panels.panel?.button == target
     val toggle = { panels.onPanel(if (open) null else target) }
