@@ -709,17 +709,19 @@ tuner loss and interruption are failures, limit expiry is informational.
   component with orange playback position.
 - Unknown timing is shown as unknown; never interpolate across unrelated
   coordinates or imply seekability that is not verified.
-- **Browse list edges** (accepted 2026-10-23, after the TV Design Kit's Cards
-  example). The Channels list, Recordings Archive (active, preview and parent
-  columns), Schedule and Problems lists and Settings depth lists run to the
-  screen bottom. While rows continue below, the list fades out over its bottom
-  140dp; while rows have scrolled away above, a 48dp top fade appears. Focus
-  never settles in either fade: the TV pivot works inside the band between them,
-  with 8dp breathing room for the focus scale. At the first-row boundary the
-  list holds still for a pivot move shorter than the extra top room scrolling
-  would reserve, so the third row does not nudge the list under the top fade.
+- **Browse list edges** (owner decision 2026-11-21). The Channels list,
+  Recordings Archive (active, preview and parent columns), Schedule and Problems
+  lists and Settings depth lists run to the screen bottom. Browse lists use the
+  same 80dp linear fade at both edges: the bottom fades while rows continue
+  below, and the top fades only while rows have scrolled away above. The
+  Material for TV kit uses bottom-only list masks; equal lengths follow the
+  platform fading edge and other TV apps that fade at both edges. Once
+  scrolled, the list uses the platform TV pivot: focus rests at 30% of the
+  full list viewport when scroll bounds allow. Returning to the first row
+  restores the resting line without oscillating across the boundary.
   `ui/components/ListEdgeFade.kt` owns the sizes, mask and scroll policy. The
-  Guide keeps its own fades; modal side panels keep theirs (§10).
+  Guide keeps its own fades; modal side panels keep theirs (§10). The player's
+  channel schedule keeps its 48dp top fade and the focus inset based on it.
 
 ### Channels • layouts, headline and backdrop
 
@@ -760,15 +762,10 @@ only.
   with its 12dp focus reserve inside that additional inset. Standard rows are
   340dp wide, with a 92dp visual gap to the passive headline pane at x562.
   At rest the first row starts at y100, 32dp below the header controls as in
-  the Grid. Scrolled focus settles on the same line when the scroll range
-  allows, while earlier rows pass under the top fade.
-  The list follows the browse list edges in §9: it runs to the screen bottom
-  behind the 140dp fade, and the 48dp top fade appears only while earlier rows
-  exist; returning to the first-row boundary removes it. The header and the headline pane
-  are outside these masks. Rows scroll out under the fades; **settled focus never
-  enters them** — native scrolling and explicit restoration share the readable
-  viewport, including focus-scale breathing room. The TV pivot policy must settle
-  at the top boundary without alternating scroll requests or flickering the fade.
+  the Grid. Scrolled focus uses the platform TV pivot across the full viewport,
+  from screen top to bottom. Earlier rows pass under the top fade.
+  The list follows the browse list edges in §9, and its header and headline pane
+  are outside the masks. Returning to the first-row boundary removes the top fade.
 - Rows are the library's standard `ListItem`: native padding, height and growth
   at 1.3× fonts, with the logo on a 72×40 charcoal plate in the leading slot
   (4dp corners, aspect preserved, as the player's channel chip), native 16sp
@@ -1406,11 +1403,11 @@ focus above one continuous list, and the selected day's tab is brought whole
 into view wherever the list or the tabs moved it; later days start under a sentence-case
 `titleSmall` date over a divider, and gaps (time column plus "No program
 information until …") are passive rows in the secondary tone, as is the end line.
-The list runs to the sheet's bottom edge with the shared list edge fades and
-bring-into-view reserve; its band starts one row lower (the shared top
-overflow), so a row above the focused one is always clear of the top fade. While nothing has loaded, skeleton tabs and rows hold
-focus and announce loading; offline uses the shared programme status line with
-Retry.
+The list runs to the sheet's bottom edge with the shared bottom fade and its
+own 48dp top fade and focus inset. The focus inset includes the one-row top
+overflow, keeping the row above focus clear of the fade. While nothing has
+loaded, skeleton tabs and rows hold focus and announce loading; offline uses
+the shared programme status line with Retry.
 OK opens the shared details page; Menu/hold OK opens the shared context menu.
 Back from details restores the source row and keeps the row the sheet opened on. From a
 browsed list row other than the opening row, Back focuses the selected day's tab without moving the list. From the

@@ -7,12 +7,14 @@ import at.bernhardberger.tvhplayer.notices.NoticeContext
 import at.bernhardberger.tvhplayer.notices.DvrMutationFeedback
 import at.bernhardberger.tvhplayer.testutil.tagBounds
 import at.bernhardberger.tvhplayer.testutil.labelToFocusedFillGap
+import at.bernhardberger.tvhplayer.testutil.LeanbackFeature
 import at.bernhardberger.tvhplayer.testutil.pressKey
 import at.bernhardberger.tvhplayer.testutil.settleFrames
 
 import android.app.Application
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
+import at.bernhardberger.tvhplayer.ui.components.ListBottomFadeHeight
 import at.bernhardberger.tvhplayer.ui.components.LocalWatchingIndicator
 import at.bernhardberger.tvhplayer.ui.components.LocalWatchingTarget
 import at.bernhardberger.tvhplayer.testutil.CaptureOutput
@@ -123,6 +125,7 @@ import org.koin.dsl.module
 class RecordingsVisualLayoutTest {
     @get:Rule val images = ImageLoaderRule()
     @get:Rule val compose = createComposeRule()
+    @get:Rule val leanback = LeanbackFeature()
     private lateinit var session: FakeTvheadendSession
     private lateinit var view: View
     private lateinit var backDispatcher: OnBackPressedDispatcher
@@ -514,7 +517,7 @@ class RecordingsVisualLayoutTest {
     }
 
     @Test fun scheduleDeepLinkScrollsToTheEntryBeforeFocus() {
-        enableLeanback()
+        leanback.enable()
         screenState.open(at.bernhardberger.tvhplayer.core.DvrLibraryMode.SCHEDULE, DvrEntryId(48))
         show(entries = (40L..49L).map { recording(it, "Scheduled expedition ${it - 39}", null,
             DvrEntryState.SCHEDULED, startEpochSeconds = 1_900_000_000L + it * 3600) })
@@ -1228,7 +1231,15 @@ class RecordingsVisualLayoutTest {
 
     @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
         instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
-    fun headerFrameFlatDefault() = headerFrame("flat-default", DvrArchiveView())
+    fun headerFrameFlatDefault() {
+        leanback.enable()
+        headerFrame("flat-default", DvrArchiveView())
+        val headline = activeHeading().bounds.top
+        repeat(7) { if (!tagFocused("recording-list-entry-8")) key(Key.DirectionDown) }
+        focused("recording-list-entry-8")
+        assertEquals(headline, activeHeading().bounds.top, .5f)
+        capture("flat-scrolled", 1f, assertScrolledPivot(8, previous = 3), outputs = HEADER_CAPTURES)
+    }
 
     @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
         instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
@@ -1275,7 +1286,20 @@ class RecordingsVisualLayoutTest {
 
     @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
         instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
-    fun problemsClearResting() = problemsClearFrame("resting")
+    fun problemsClearResting() {
+        leanback.enable()
+        problemsClearFrame("resting")
+        val headline = bounds("archive-level-heading").top
+        val entries = requireNotNull(session.observation.value.dvrSnapshotForDisplay).entries
+        publish(entries + (60L..67L).map {
+            recording(it, "Unfinished expedition ${it - 59}", "expedition$it.ts", DvrEntryState.COMPLETED_ERROR,
+                startEpochSeconds = nowSeconds() - (it - 60) * 2400 - 8 * 86400L)
+        })
+        repeat(9) { if (!tagFocused("recording-list-entry-65")) key(Key.DirectionDown) }
+        focused("recording-list-entry-65")
+        assertEquals(headline, bounds("archive-level-heading").top, .5f)
+        capture("scrolled", 1f, assertScrolledPivot(65, problems = true, previous = 64), outputs = "build/outputs/problems-clear")
+    }
 
     @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
         instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
@@ -1619,26 +1643,28 @@ class RecordingsVisualLayoutTest {
     }
 
     @Test fun multiItemListsExposeMiddleRowNativeFocusAndGeometry() {
+        leanback.enable()
+        startView = DvrArchiveView()
         val entries = (1L..8L).map { recording(it, "Expedition episode $it", "Documentaries/episode$it.ts") } +
             (40L..47L).map { recording(it, "Scheduled expedition ${it - 39}", null, DvrEntryState.SCHEDULED,
                 startEpochSeconds = 1_791_086_400) } +
             (60L..67L).map { recording(it, "Unfinished expedition ${it - 59}", null, DvrEntryState.COMPLETED_ERROR,
                 startEpochSeconds = 1_791_000_000) }
         show(entries = entries)
-        focused("recordings-folder-Documentaries")
-        key(Key.DirectionCenter)
         focused("recording-list-entry-1")
         val archivePane = bounds("recording-metadata-pane")
         key(Key.DirectionDown)
         focused("recording-list-entry-2")
         // Archive spacing is unchanged: record its existing overlap, but still require complete focus growth.
         assertMiddleFocus(2, checkNeighbourClearance = false)
-        key(Key.DirectionUp)
+        repeat(4) { key(Key.DirectionDown) }
+        focused("recording-list-entry-6")
+        assertScrolledPivot(6)
         openScheduleSubnav()
         compose.onNodeWithText("Schedule").assertIsFocused()
         repeat(3) { key(Key.DirectionDown) }
         focused("recording-list-entry-40")
-        assertDenseListGeometry(expectedRows = 3)
+        assertDenseListGeometry()
         // The focused entry's pane takes the column of the Archive's recording preview.
         assertEquals(archivePane.width, bounds("recording-metadata-pane").width, .1f)
         assertEquals(archivePane.left, bounds("recording-metadata-pane").left, .1f)
@@ -1662,13 +1688,27 @@ class RecordingsVisualLayoutTest {
         focused("recording-list-entry-61")
         assertPaneTitle("Unfinished expedition 2")
         assertMiddleFocus(61)
+        repeat(4) { key(Key.DirectionDown) }
+        focused("recording-list-entry-65")
+        assertScrolledPivot(65, problems = true)
         assertNoCommands()
     }
 
-    private fun enableLeanback() {
-        org.robolectric.Shadows.shadowOf(ApplicationProvider.getApplicationContext<Application>().packageManager)
-            .setSystemFeature("android.software.leanback", true)
-    }
+    private fun assertScrolledPivot(focused: Long, problems: Boolean = false, previous: Long? = null): String =
+        with(compose.density) {
+            val viewport = bounds(if (problems) "recordings-problems-list" else "depth-active")
+            val top = if (problems) viewport.top else bounds("depth-heading").bottom
+            val height = viewport.bottom - top
+            val focusedTop = bounds("recording-list-entry-$focused").top
+            assertEquals("scrolled focus uses the whole viewport", top + .3f * height, focusedTop, 2.dp.toPx())
+            val fadeEnd = top + ListBottomFadeHeight.toPx()
+            assertTrue("focused row starts below the top fade", focusedTop >= fadeEnd)
+            val readingBand = previous?.let {
+                val title = bounds("recording-list-headline-$it")
+                "; previousTitle=${title.top.toDp()}..${title.bottom.toDp()}; fadeEnd=${fadeEnd.toDp()}"
+            }.orEmpty()
+            "pivotDp: viewportTop=${top.toDp()}; viewportHeight=${height.toDp()}; focusedTop=${focusedTop.toDp()}$readingBand"
+        }
 
     @Test fun ruleMenuRejectsAnEntryThatCompletedBeforeActivation() {
         val entry = paneEntries(long = false).single { it.id == DvrEntryId(40) }
@@ -2381,7 +2421,7 @@ class RecordingsVisualLayoutTest {
     @Test @Category(VisualCapture::class) @Config(qualifiers = "en-rUS-w960dp-h540dp-land-xhdpi",
         instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
     fun scheduleEntryRowsPhase2Captures() {
-        enableLeanback()
+        leanback.enable()
         val outputs = "build/outputs/slice-7b"
         presentationLibrary(firstRow = true, scheduled = true)
         val entries = requireNotNull(session.observation.value.dvrSnapshotForDisplay).entries
@@ -2415,6 +2455,7 @@ class RecordingsVisualLayoutTest {
         assertEquals(headline, activeHeading().bounds.top, .5f)
         compose.onNodeWithTag("schedule-new-timer").assertIsNotDisplayed()
         compose.onNodeWithTag("schedule-automatic-recordings").assertIsNotDisplayed()
+        capture("Bx5-schedule-scrolled", 1f, assertScrolledPivot(46, previous = 45), outputs)
         publish(listOf(DvrEntry.create(
             DvrEntryId(12), title = ridge.title, state = DvrEntryState.SCHEDULED, enabled = false,
             start = Instant.fromEpochSeconds(nowSeconds() + 3_600),
@@ -3645,9 +3686,10 @@ class RecordingsVisualLayoutTest {
         return results.single()
     }
 
-    private fun assertDenseListGeometry(expectedRows: Int = 6) {
+    private fun assertDenseListGeometry(expectedRows: Int? = null) {
         val rows = visibleListRows().filter { it.height > 63.5f }
-        assertEquals(expectedRows, rows.size)
+        assertTrue("at least two visible rows are needed to check spacing", rows.size >= 2)
+        if (expectedRows != null) assertEquals(expectedRows, rows.size)
         rows.forEachIndexed { index, row ->
             assertEquals(rows.first().top + index * 68f, row.top, .5f)
             assertEquals(64f, row.height, .5f)

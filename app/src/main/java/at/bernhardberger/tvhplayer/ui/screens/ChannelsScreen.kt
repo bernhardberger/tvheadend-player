@@ -353,17 +353,14 @@ internal fun ChannelsScreenContent(
     }
 
     val listState = rememberLazyListState()
-    // Native focus scrolling and the explicit preview anchor share one viewport policy:
-    // the readable band between the fades, with the original reserve at the top boundary.
+    // Preview restoration uses the same pivot as native focus scrolling.
     // Without a notice above it the list reaches the screen's top under the shell's inset, so
     // a scrolled list's earlier rows fade into the screen edge rather than end at the band.
     val listTopOverflow = if (tagNotice) 0.dp else contentPadding.calculateTopPadding()
     // The resting Grid line leaves room above the first focused List row's native scale.
     val headerContentLine = TvBrowseHeaderHeight + TvBrowseHeaderContentGap
     val listTopReserve = if (tagNotice) ChannelsListTopReserve else headerContentLine
-    val bringIntoViewSpec = rememberListEdgeBringIntoView(
-        listState, listTopReserve, listTopOverflow, anchorAtTopReserve = !tagNotice,
-    )
+    val bringIntoViewSpec = rememberListEdgeBringIntoView(listState, listTopReserve, listTopOverflow)
     val density = LocalDensity.current
     val gridState = rememberLazyGridState()
     val rowState = rememberLazyListState()
