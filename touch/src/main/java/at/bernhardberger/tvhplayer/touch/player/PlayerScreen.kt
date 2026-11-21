@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.aspectRatio
@@ -197,6 +196,7 @@ private fun BoxScope.LandscapeFooter(
     if (showFooter) {
         LandscapePlayerContent(
             state, layout, preview, onAction, panels, onPreview, onSeek, Modifier.align(Alignment.BottomCenter),
+            notice = notices,
         )
     } else if (!controls && !sheet) {
         // Controls hidden: the thin line stays on the edge.
@@ -205,17 +205,11 @@ private fun BoxScope.LandscapeFooter(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(28.dp).offset(y = 20.dp),
         )
     }
-    // Bottom start over the picture: above the timeline while the footer shows, at the footer's margins when not.
-    notices(Modifier.align(Alignment.BottomStart).padding(noticePlace(layout, showFooter)))
-}
-
-/** The notice's place in the footer; [TouchNotice] adds its own 16dp beside and 12dp below. */
-private fun noticePlace(layout: PlayerLayout, footer: Boolean): PaddingValues {
-    val tablet = layout == PlayerLayout.Tablet
-    val margin = if (tablet) 40.dp else 48.dp
-    // The program's foot, which stands on the timeline (LandscapePlayerContent).
-    val aboveTimeline = if (tablet) 136.dp else 112.dp
-    return PaddingValues(start = margin - 16.dp, bottom = (if (footer) aboveTimeline else margin) - 12.dp)
+    if (!showFooter) {
+        val margin = if (layout == PlayerLayout.Tablet) 40.dp else 48.dp
+        // TouchNotice adds 16dp at the sides and 12dp below the snackbar.
+        notices(Modifier.align(Alignment.BottomStart).padding(start = margin - 16.dp, bottom = margin - 12.dp))
+    }
 }
 
 @Composable
