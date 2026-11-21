@@ -2,7 +2,14 @@ package at.bernhardberger.tvhplayer.touch.player
 
 import androidx.activity.ComponentActivity
 import androidx.activity.ComponentDialog
+import android.app.PictureInPictureParams
+import android.content.pm.PackageManager
 import android.os.Looper
+import androidx.lifecycle.Lifecycle
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.PlayerView
+import org.robolectric.Robolectric
+import org.robolectric.Shadows.shadowOf
 import androidx.annotation.OptIn
 import androidx.compose.runtime.SideEffect
 import androidx.media3.common.Player
@@ -76,6 +83,40 @@ class PlayerScreenTest {
         AppClock.systemUses24Hour = uses24Hour
     }
 
+    /**
+     * Closing the window with its X: the mode change, then the stop and finish, then whatever the
+     * main looper still holds. The system forgets the activity's token on dismissal and answers a
+     * later parameter update with IllegalStateException; the activity below does the same once it is
+     * stopped, which Robolectric's own shadow does not.
+     */
+    @Test
+    @OptIn(UnstableApi::class)
+    fun closingTheWindowSendsNoParametersToTheGoneActivity() {
+        shadowOf(compose.activity.packageManager).setSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE, true)
+        val controller = Robolectric.buildActivity(TokenActivity::class.java).setup()
+        val activity = controller.get()
+        val player = ExoPlayer.Builder(activity).build()
+        val window = PlayerWindow(activity, player)
+        val view = PlayerView(activity)
+        activity.setContentView(view)
+        shadowOf(Looper.getMainLooper()).idle()
+        window.open()
+        window.attach(view)
+        assertTrue("Parameters reach the activity while it plays", activity.updates > 0)
+        window.left()
+        controller.pause().stop()
+        // The closing window still lays the picture out once more.
+        view.layout(0, 0, view.width / 2 + 1, view.height / 2 + 1)
+        activity.finish()
+        shadowOf(Looper.getMainLooper()).idle()
+        // Then onDestroy lets go of the window and the picture's view.
+        window.close()
+        controller.destroy()
+        player.release()
+        // Not even an attempt: the narrow catch is only for the gap the system leaves.
+        assertEquals(0, activity.late)
+    }
+
     /** Playback starting while the face is composed must not leave the Play glyph behind. */
     @Test
     @OptIn(UnstableApi::class)
@@ -127,6 +168,38 @@ class PlayerScreenTest {
         assertInlineChannels()
         capture("tablet-upright-player", TouchCanvas.TABLET_UPRIGHT)
         infoSheet("tablet-upright-player", TouchCanvas.TABLET_UPRIGHT, details = false)
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
+    fun controlsLeaveByThemselvesWhilePlayingAndATouchRestartsTheCount() {
+        // Before composing: idling with the clock running would let the count run out unseen.
+        compose.mainClock.autoAdvance = false
+        show(hideAfterMs = hideMs)
+        compose.mainClock.advanceTimeBy(hideMs * 3 / 4)
+        // A finger resting on the bar holds them; lifting it starts the count anew.
+        timeline().performTouchInput { down(center) }
+        compose.mainClock.advanceTimeBy(hideMs * 2)
+        tag("player-transport").assertIsDisplayed()
+        timeline().performTouchInput { up() }
+        compose.mainClock.advanceTimeBy(hideMs * 3 / 4)
+        tag("player-transport").assertIsDisplayed()
+        compose.mainClock.advanceTimeBy(hideMs / 2)
+        tag("player-transport").assertDoesNotExist()
+        // Upright, only the layer over the picture leaves: the list below stays.
+        assertInlineChannels()
+        tapPicture()
+        compose.mainClock.advanceTimeByFrame()
+        paused.value = true
+        compose.mainClock.advanceTimeBy(hideMs * 2)
+        tag("player-transport").assertIsDisplayed()
+        // The end of the hold starts the count anew.
+        paused.value = false
+        compose.mainClock.advanceTimeBy(hideMs * 3 / 4)
+        tag("player-transport").assertIsDisplayed()
+        compose.mainClock.advanceTimeBy(hideMs / 2)
+        tag("player-transport").assertDoesNotExist()
+        compose.mainClock.autoAdvance = true
     }
 
     @Test
@@ -224,7 +297,10 @@ class PlayerScreenTest {
     private val played = mutableListOf<String>()
     private val status = mutableStateOf<LivePlayerStatus>(LivePlayerStatus.Playing)
 
-    private fun show() {
+    private val paused = mutableStateOf(false)
+    private val hideMs = 1_000L
+
+    private fun show(hideAfterMs: Long? = null) {
         val channels = channelsFixture(playing = true)
         val channel = channels.rows.first().copy(
             details = ChannelDetails(
@@ -264,8 +340,8 @@ class PlayerScreenTest {
         compose.setContent {
             MaterialTheme(colorScheme = MobileDarkColors) {
                 PlayerScreen(
-                    fixture.copy(status = status.value), { actions += it }, { seeks += it }, {}, { played += it },
-                    { choices += it },
+                    fixture.copy(status = status.value, paused = paused.value), { actions += it }, { seeks += it }, {},
+                    { played += it }, { choices += it }, hideAfterMs = hideAfterMs,
                 )
             }
         }
@@ -436,6 +512,20 @@ class PlayerScreenTest {
 }
 
 @OptIn(UnstableApi::class)
+/** Like the system after a dismissal: parameters for a stopped activity have no token to land on. */
+private class TokenActivity : ComponentActivity() {
+    var updates = 0
+    var late = 0
+
+    override fun setPictureInPictureParams(params: PictureInPictureParams) {
+        if (!lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) late++
+        check(late == 0) {
+            "setPictureInPictureParams: Can't find activity for token"
+        }
+        updates++
+    }
+}
+
 private class PlayIntentPlayer : SimpleBasePlayer(Looper.getMainLooper()) {
     private var playWhenReady = false
 

@@ -101,8 +101,6 @@
     <ID>CyclomaticComplexMethod:JourneyProfileActivity.kt:JourneyProfileActivity$override fun onCreate</ID>
     <ID>CyclomaticComplexMethod:MainStartupKeyCycleOwner.kt:MainStartupKeyCycleOwner$fun keyEvent: MainStartupKeyDecision</ID>
     <ID>CyclomaticComplexMethod:MainStartupPresentation.kt:fun mainStartupPresentation: MainStartupPresentation</ID>
-    <ID>CyclomaticComplexMethod:NoticeFormatter.kt:NoticeFormatter$fun format: FormattedNotice</ID>
-    <ID>CyclomaticComplexMethod:NoticeFormatter.kt:NoticeFormatter$private fun formatDvr: FormattedNotice</ID>
     <ID>CyclomaticComplexMethod:PiconBox.kt:@Composable fun PiconBox</ID>
     <ID>CyclomaticComplexMethod:PlaybackKeyPolicy.kt:fun playerKeyAction: PlayerKeyAction</ID>
     <ID>CyclomaticComplexMethod:PlaybackOptionsSheet.kt:@Composable internal fun PlaybackOptionRow</ID>
@@ -604,8 +602,6 @@
     <ID>MaxLineLength:MainStartupPresentation.kt:WaitingConnectionFailure$else -&gt; WaitingConnectionFailure(latched = waitingConnectionFailure(connectionState, latched.takeUnless { retrying }))</ID>
     <ID>MaxLineLength:MainStartupPresentation.kt:if</ID>
     <ID>MaxLineLength:NavigationEdgeFade.kt:private</ID>
-    <ID>MaxLineLength:NoticeFormatter.kt:NoticeFormatter$add(context.resources.getQuantityString(R.plurals.recording_notice_count, notice.count, notice.count))</ID>
-    <ID>MaxLineLength:NoticeFormatter.kt:NoticeFormatter$val name = entry.title?.trim()?.takeIf(String::isNotEmpty) ?: channel ?: context.getString(R.string.recording_notice_fallback)</ID>
     <ID>MaxLineLength:PiconBox.kt:/** The width a logo of [logo]'s size is drawn in by [InlineLogoScale] in a [box]; the whole box when its size is unknown. */</ID>
     <ID>MaxLineLength:PlaybackOptionsSheet.kt:checked != null</ID>
     <ID>MaxLineLength:PlaybackOptionsSheet.kt:currentValue = if (subtitleState == PlaybackTrackContentState.EMPTY) subtitlesOffLabel else subtitlesValue</ID>

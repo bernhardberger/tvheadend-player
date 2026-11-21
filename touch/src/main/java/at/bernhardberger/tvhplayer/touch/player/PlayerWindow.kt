@@ -5,10 +5,14 @@ import android.app.PictureInPictureParams
 import android.content.pm.PackageManager
 import android.graphics.Rect
 import android.os.Build
+import android.util.Log
 import android.util.Rational
 import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.annotation.OptIn
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
 import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
@@ -35,18 +39,23 @@ internal class PlayerWindow(private val activity: ComponentActivity, private val
     private val videoSize = object : Player.Listener {
         override fun onVideoSizeChanged(videoSize: VideoSize) = update()
     }
-    private val appSwitch = AppOpsManager.OnOpChangedListener { _, _ ->
-        activity.runOnUiThread { if (!activity.isDestroyed) update() }
+    private val appSwitch = AppOpsManager.OnOpChangedListener { _, _ -> activity.runOnUiThread(::update) }
+
+    // Each resume sets the parameters: the first one after creation, and the return from the window
+    // to full screen. A window closed with its X never resumes the activity again.
+    private val resumed = object : DefaultLifecycleObserver {
+        override fun onResume(owner: LifecycleOwner) = update()
     }
 
     fun open() {
         activity.getSystemService(AppOpsManager::class.java)
             ?.startWatchingMode(AppOpsManager.OPSTR_PICTURE_IN_PICTURE, activity.packageName, appSwitch)
         player.addListener(videoSize)
-        update()
+        activity.lifecycle.addObserver(resumed)
     }
 
     fun close() {
+        activity.lifecycle.removeObserver(resumed)
         activity.getSystemService(AppOpsManager::class.java)?.stopWatchingMode(appSwitch)
         player.removeListener(videoSize)
         attach(null)
@@ -62,20 +71,30 @@ internal class PlayerWindow(private val activity: ComponentActivity, private val
         playerView?.let {
             it.addOnLayoutChangeListener(relayout)
             it.videoSurfaceView?.addOnLayoutChangeListener(relayout)
+            update()
         }
-        update()
     }
 
-    /** Back from the window: the parameters again once the full-screen layout has settled. */
+    /** Out of the window: back to full screen (the next resume and layout set the parameters) or closed. */
     fun left() {
         inWindow.value = false
-        view?.post(::update) ?: update()
     }
 
+    /**
+     * Only while the activity is started and not finishing: a closed window stops and finishes it,
+     * and the system has forgotten it by then.
+     */
     fun update() {
         available.value = activity.canUseWindow()
-        if (activity.packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)) {
+        if (!activity.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED) || activity.isFinishing) return
+        if (!activity.packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)) return
+        try {
             activity.setPictureInPictureParams(params())
+        } catch (gone: IllegalStateException) {
+            // Closing the window with its X removes the activity's token in the system before the
+            // client hears of it ("setPictureInPictureParams: Can't find activity for token"); a
+            // layout or video size change in that gap has nowhere to go, and nothing to update.
+            Log.d(TAG, "Window closed before its parameters arrived", gone)
         }
     }
 
@@ -86,6 +105,10 @@ internal class PlayerWindow(private val activity: ComponentActivity, private val
         val entered = activity.enterPictureInPictureMode(params())
         if (entered) inWindow.value = true
         return entered
+    }
+
+    private companion object {
+        const val TAG = "PlayerWindow"
     }
 
     private fun params(): PictureInPictureParams = PictureInPictureParams.Builder().apply {

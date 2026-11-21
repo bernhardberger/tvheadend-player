@@ -6,6 +6,20 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.platform.LocalContext
+import at.bernhardberger.tvheadend.sdk.core.DvrMutationKind
+import at.bernhardberger.tvhplayer.notices.ConnectionNoticeKind
+import at.bernhardberger.tvhplayer.notices.DvrMutationFeedback
+import at.bernhardberger.tvhplayer.notices.Notice
+import at.bernhardberger.tvhplayer.touch.recordings.RecordingsActions
+import at.bernhardberger.tvhplayer.touch.recordings.RecordingsScreen
+import at.bernhardberger.tvhplayer.touch.recordings.RecordingsState
+import at.bernhardberger.tvhplayer.touch.recordings.flatFixture
+import at.bernhardberger.tvhplayer.touch.ui.LocalFrameNotices
+import at.bernhardberger.tvhplayer.touch.ui.TouchNotice
+import at.bernhardberger.tvhplayer.ui.notifications.NoticeFormatter
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -86,6 +100,48 @@ class TouchFrameTest {
         }
         compose.onNode(destination).assertDoesNotExist()
         compose.onNode(heading and hasText("Channels")).assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w1280dp-h800dp-land-xhdpi")
+    fun tabletNoticeBesideTheRail() {
+        showRecordingsWith(Notice.DvrActionFailed(DvrMutationKind.CANCEL, DvrMutationFeedback.CONNECTION_LIMIT))
+        compose.captureTouch("slice0", "tablet-notice", TouchCanvas.TABLET)
+
+        notice.value = Notice.Connection(ConnectionNoticeKind.RESTORED)
+        compose.captureTouch("slice0", "tablet-notice-one-line", TouchCanvas.TABLET)
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
+    fun phoneNoticeAboveTheBar() {
+        showRecordingsWith(
+            Notice.DvrActionFailed(DvrMutationKind.CANCEL, DvrMutationFeedback.CONNECTION_LIMIT),
+            flatFixture(harborLights = true),
+        )
+        compose.captureTouch("slice0", "phone-notice", TouchCanvas.PHONE)
+    }
+
+    private val notice = mutableStateOf<Notice?>(null)
+
+    /** The Recordings fixture with [shown] in the frame's notice place, as the host draws it. */
+    private fun showRecordingsWith(shown: Notice, recordings: RecordingsState = flatFixture()) {
+        notice.value = shown
+        val actions = RecordingsActions(onView = {}, onPlay = { _, _ -> }, onDelete = {}, onMore = {})
+        compose.setContent {
+            MaterialTheme(colorScheme = MobileDarkColors) {
+                val formatter = NoticeFormatter(LocalContext.current)
+                val host: @Composable (Modifier) -> Unit = { modifier ->
+                    notice.value?.let { formatter.format(it) }?.let { TouchNotice(it.headline, it.detail, modifier) }
+                }
+                CompositionLocalProvider(LocalFrameNotices provides host) {
+                    RecordingsScreen(recordings, actions)
+                }
+            }
+        }
+        val headline = NoticeFormatter(compose.activity).format(shown).headline
+        compose.onNode(SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion) and hasText(headline))
+            .assertIsDisplayed()
     }
 
     private fun show(restoration: StateRestorationTester? = null) {

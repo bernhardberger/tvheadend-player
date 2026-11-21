@@ -42,6 +42,8 @@ import at.bernhardberger.tvhplayer.touch.connect.EditConnectionFlow
 import at.bernhardberger.tvhplayer.touch.connect.FirstRunFlow
 import at.bernhardberger.tvhplayer.touch.connect.connectionStatus
 import at.bernhardberger.tvhplayer.touch.ui.Destination
+import at.bernhardberger.tvhplayer.touch.ui.FrameNotices
+import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.touch.ui.LocalFrameSelection
 import at.bernhardberger.tvhplayer.touch.guide.GuideDestination
 import at.bernhardberger.tvhplayer.touch.guide.GuideViewModel
@@ -66,6 +68,7 @@ internal fun TouchApp(
     channels: ChannelsViewModel,
     recordings: RecordingsViewModel,
     guide: GuideViewModel,
+    notices: NoticeCenter,
     playingId: String? = null,
     onWatch: ((String) -> Unit)? = null,
     discovery: () -> Flow<TvheadendDiscoveryState>,
@@ -98,11 +101,13 @@ internal fun TouchApp(
                 onSaved = { page = Page.Connections },
             )
         }
-        else -> AppDestinations(
-            session, connection, channels, recordings, guide, playingId, onWatch,
-            onOpenConnections = { page = Page.Connections },
-            onSignIn = { page = Page.SignIn },
-        )
+        else -> FrameNotices(notices, owner, session) {
+            AppDestinations(
+                session, connection, channels, recordings, guide, playingId, onWatch,
+                onOpenConnections = { page = Page.Connections },
+                onSignIn = { page = Page.SignIn },
+            )
+        }
     }
 }
 

@@ -50,10 +50,15 @@ internal class FakeConnection(
         session, writes, PlayerSettingsStore(MemoryPreferences()), Dispatchers.Main,
         { readForEditing },
     )
+    /** The queue's clock; a test that times notices sets it to the Compose main clock. */
+    var noticeClock: () -> Long = { 0L }
+
+    /** The app's one notice queue, for the connection in use as the composition root builds it. */
+    val noticeCenter = NoticeCenter({ noticeClock() }) {
+        NoticeContext(owner.configurationGeneration.value, session.observation.value.currentSession?.generationIdentity)
+    }
     private val notices = ConnectionNoticeSource(
-        session.observation, owner.configurationGeneration,
-        NoticeCenter({ 0L }) { NoticeContext(owner.configurationGeneration.value, null) },
-        owner.switchInProgress,
+        session.observation, owner.configurationGeneration, noticeCenter, owner.switchInProgress,
     )
 
     /** Starts the owner, which reads the saved connection as the app does at start. */

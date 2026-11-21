@@ -43,10 +43,11 @@ internal class ChannelsHeaderFocus {
 }
 
 /**
- * The Channels header: the [title] is its pane title, not drawn; the Tags and View options buttons
- * sit at its end, with the Guide's Filter between them when [showFilter]. Down returns to the
- * content's remembered item, the start edge leads to the navigation rail (or back to content that
- * reached it with its end edge, see [onReturnToContent]) and Up stays. A single channel set has
+ * The Channels header: the [title] is its pane title, drawn at its start only with [showTitle]; the
+ * Tags and View options buttons sit at its end, with the Guide's Filter between them when
+ * [showFilter]. Down returns to the content's remembered item, the start edge leads to the
+ * navigation rail (or back to content that reached it with its end edge, see [onReturnToContent])
+ * and Up stays. The drawn title is no focus target. A single channel set has
  * nothing to choose, so Tags is not shown. Tags names the active [tag], or "All channels" on its
  * resting tone without one; Filter names the active [filter] after its [filterDot].
  * A [leading] action sits before the buttons and takes the start edge; it applies the modifier it
@@ -68,6 +69,7 @@ internal fun ChannelsHeader(
     showFilter: Boolean = false,
     filter: String? = null,
     filterDot: Color? = null,
+    showTitle: Boolean = false,
 ) {
     val ltr = LocalLayoutDirection.current == LayoutDirection.Ltr
     val rail = navigationFocus ?: FocusRequester.Default
@@ -89,6 +91,7 @@ internal fun ChannelsHeader(
     val viewIsFirst = leading == null && !tagsShown && !filterShown
     TopLevelBrowseHeader(
         title = title,
+        showTitle = showTitle,
         modifier = modifier
             .onPreviewKeyEvent { event ->
                 event.type == KeyEventType.KeyDown && event.key == Key.DirectionDown && onMoveToContent()
