@@ -45,6 +45,7 @@ internal fun channelsState(
     playingId: String? = null,
     artwork: ArtworkModels? = null,
     programs: List<ChannelRowPrograms>? = null,
+    checkpoint: () -> Unit = {},
 ): ChannelsState {
     val browsing = scope.scope
     val current = scope.channelCatalogCurrent
@@ -68,6 +69,7 @@ internal fun channelsState(
         else -> {
             val mapper = RowMapper(observation, now, texts, artwork)
             val rows = browsing.visibleChannels.mapIndexed { index, channel ->
+                checkpoint()
                 mapper.row(channel, playing = channel.id.value.toString() == playingId, programs?.get(index))
             }
             val list = ChannelList(rows, tags, selectedTagId, hasLogos = true)
@@ -143,6 +145,7 @@ private class RowMapper(
             ruleSchedule = observation.ruleSchedule(this),
             record = programRecordControl(programmeRecordKeyAction(this, observation, nowSec)),
             eventId = id,
+            airing = (start.epochSeconds until stop.epochSeconds).takeIf { running },
         )
     }
 
@@ -167,7 +170,13 @@ private class RowMapper(
 internal data class ChannelRowPrograms(
     val running: EpgEvent?,
     val ahead: List<EpgEvent>,
-)
+) {
+    fun nextBoundary(now: Instant): Long = sequenceOf(running?.stop, ahead.firstOrNull()?.start)
+        .filterNotNull()
+        .filter { it > now }
+        .minOfOrNull { it.epochSeconds + if (it.nanosecondsOfSecond == 0) 0 else 1 }
+        ?: Long.MAX_VALUE
+}
 
 internal fun SessionObservation.channelRowPrograms(id: ChannelId, now: Instant): ChannelRowPrograms =
     ChannelRowPrograms(

@@ -47,6 +47,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -406,6 +407,8 @@ private fun ChannelProgress(
     modifier: Modifier,
 ) {
     val fraction = (playback?.progress ?: program?.progress ?: return).coerceIn(0f, 1f)
+    val clock = LocalChannelProgressClock.current
+    val airing = program?.airing
     val scheme = MaterialTheme.colorScheme
     val fill = when {
         playback != null -> scheme.tertiary
@@ -413,10 +416,17 @@ private fun ChannelProgress(
         else -> scheme.primary
     }
     LinearProgressIndicator(
-        progress = { fraction }, modifier = modifier.height(4.dp), color = fill,
+        progress = {
+            if (clock == null || airing == null) fraction else {
+                val duration = airing.last + 1 - airing.first
+                (clock() - airing.first).coerceIn(0L, duration).toFloat() / duration
+            }
+        }, modifier = modifier.height(4.dp), color = fill,
         trackColor = scheme.onSurface.copy(alpha = TRACK_ALPHA), gapSize = 0.dp, drawStopIndicator = {},
     )
 }
+
+internal val LocalChannelProgressClock = staticCompositionLocalOf<(() -> Long)?> { null }
 
 /** REC after a running recording's title; the Guide overview's leading program takes it too (section 13). */
 @Composable

@@ -68,6 +68,7 @@ internal data class ChannelProgram(
     val record: ProgramRecordControl? = ProgramRecordControl.Record,
     /** The event drawn on this row, if the row can dispatch a recording action. */
     val eventId: EventId? = null,
+    val airing: LongRange? = null,
 )
 
 internal data class ChannelDetails(
