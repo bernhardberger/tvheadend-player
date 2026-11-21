@@ -16,6 +16,7 @@
 
 - A recording that starts before its program offers *Skip to program start* while the padding plays. The offer counts down only while you can see it.
 - The skip button in a recording's controls has a skip icon and a see-through container.
+- Left and Right now skip in finished recordings whose file doesn't say how long it is near its start, such as some remuxed files. Before, skipping did nothing (#46).
 - The live player's info bar shows a red *REC* badge when the program you're watching is being recorded. Its *Next* line shows the red dot as soon as the recording of the next program has started (#47).
 - A recording mark on a program now means that this program is being recorded. Cards and progress bars in Channels, on Home and in the player's channel list no longer turn red because a recording of the program before or after is still running through its padding.
 - A timer that isn't tied to a program marks its channel, not a program, while it runs. Home's recent channels show *REC* on a channel that's recording.
