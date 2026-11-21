@@ -88,6 +88,7 @@ internal fun TouchSideSheet(
     modifier: Modifier = Modifier,
     onBack: (() -> Unit)? = null,
     scrim: Boolean = true,
+    leading: (@Composable () -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {},
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -139,7 +140,7 @@ internal fun TouchSideSheet(
             color = MaterialTheme.colorScheme.surfaceContainerLow,
         ) {
             Column(Modifier.fillMaxSize()) {
-                SheetHead(title, onBack, closeLabel, hide, actions)
+                SheetHead(title, onBack, leading, closeLabel, hide, actions)
                 content()
             }
         }
@@ -208,6 +209,7 @@ private fun Modifier.predictiveBackShrink(progress: () -> Float, rtl: Boolean) =
 private fun SheetHead(
     title: String,
     onBack: (() -> Unit)?,
+    leading: (@Composable () -> Unit)?,
     closeLabel: String,
     onClose: () -> Unit,
     actions: @Composable RowScope.() -> Unit,
@@ -223,9 +225,13 @@ private fun SheetHead(
                 Icon(painterResource(R.drawable.connect_back_outline), stringResource(R.string.side_sheet_back))
             }
         }
+        leading?.let {
+            Box(Modifier.padding(start = if (onBack == null) 0.dp else 4.dp, end = 12.dp)) { it() }
+        }
         Text(
             title,
-            Modifier.weight(1f).padding(start = if (onBack == null) 0.dp else 4.dp).semantics { heading() },
+            Modifier.weight(1f).padding(start = if (onBack == null || leading != null) 0.dp else 4.dp)
+                .semantics { heading() },
             style = MaterialTheme.typography.titleLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

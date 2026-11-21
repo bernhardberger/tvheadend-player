@@ -43,6 +43,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.touch.R
@@ -61,6 +62,7 @@ private val PlayerPanel.title: Int
         PlayerPanel.Audio -> R.string.player_audio
         PlayerPanel.Subtitles -> R.string.player_subtitles
         PlayerPanel.Channels -> R.string.player_channels
+        PlayerPanel.Info, PlayerPanel.InfoDetails -> R.string.player_info
         PlayerPanel.Options -> R.string.player_settings
         PlayerPanel.DisplayMode -> R.string.player_display_mode
         PlayerPanel.Profile -> R.string.player_stream_profile
@@ -69,6 +71,9 @@ private val PlayerPanel.title: Int
 
 /** The space between a menu and its button. */
 private val MenuGap = 8.dp
+
+// BottomSheetDefaults.DragHandle: a 4 dp handle with 22 dp above and below it.
+private val DragHandleHeight = 48.dp
 
 /** A Record, Audio or Subtitles menu, opening above the button it belongs to. */
 @Composable
@@ -136,30 +141,25 @@ internal fun PlayerSheets(
     onAction: (PlayerAction) -> Unit,
     onChoice: (PlayerChoice) -> Unit,
     onChannel: (String) -> Unit,
+    info: InfoPage,
+    phoneSheetHeight: Dp,
 ) {
     if (panel == null || panel.atButton(layout)) return
     val close = { onPanel(null) }
-    val title = stringResource(panel.title)
-    val back = if (panel.optionsPage && panel != PlayerPanel.Options) ({ onPanel(PlayerPanel.Options) }) else null
+    val infoPanel = panel.button == PlayerPanel.Info
+    // Info is the channel's day, so the channel names it, as the Guide's channel head does.
+    val title = if (infoPanel) state.channel.name else stringResource(panel.title)
+    val back = panel.parent?.let { parent -> { onPanel(parent) } }
+    val leading: (@Composable () -> Unit)? = if (infoPanel) ({ InfoLogo(state) }) else null
     val done = if (panel.optionsPage) ({ onPanel(PlayerPanel.Options) }) else close
     val body: @Composable ColumnScope.() -> Unit = {
-        when (panel) {
-            PlayerPanel.Channels -> Box(Modifier.weight(1f).padding(horizontal = 16.dp)) {
-                ChannelRows(
-                    state.channels, ChannelsLayout.Phone,
-                    ChannelsActions(onPlay = onChannel, onTag = {}, onRetry = {}, onOpenConnectionSettings = {}),
-                    showColumnLabels = false,
-                )
-            }
-            PlayerPanel.Options -> OptionRows(state.options, onPanel)
-            else -> EntryRows(panelEntries(panel, state, onAction, onChoice, done))
-        }
+        SheetBody(panel, state, onPanel, onAction, onChoice, onChannel, info, done)
     }
     if (layout == PlayerLayout.Phone) {
-        PlayerBottomSheet(title, back, close, body)
+        PlayerBottomSheet(title, back, leading, close, phoneSheetHeight, body)
     } else {
         TouchSideSheet(
-            onDismissRequest = close, title = title, onBack = back, scrim = false,
+            onDismissRequest = close, title = title, onBack = back, scrim = false, leading = leading,
             actions = {
                 if (panel == PlayerPanel.Channels && state.channels.tags.isNotEmpty()) {
                     TagFilter(state.channels, { onChoice(PlayerChoice.ChannelTag(it)) })
@@ -170,20 +170,63 @@ internal fun PlayerSheets(
     }
 }
 
+// The page a sheet's Back returns to: Info's day list, or the Playback options rows.
+private val PlayerPanel.parent: PlayerPanel?
+    get() = when {
+        this == PlayerPanel.InfoDetails -> PlayerPanel.Info
+        optionsPage && this != PlayerPanel.Options -> PlayerPanel.Options
+        else -> null
+    }
+
+@Composable
+private fun ColumnScope.SheetBody(
+    panel: PlayerPanel,
+    state: LivePlayerState,
+    onPanel: (PlayerPanel?) -> Unit,
+    onAction: (PlayerAction) -> Unit,
+    onChoice: (PlayerChoice) -> Unit,
+    onChannel: (String) -> Unit,
+    info: InfoPage,
+    done: () -> Unit,
+) {
+    when (panel) {
+        PlayerPanel.Channels -> Box(Modifier.weight(1f).padding(horizontal = 16.dp)) {
+            ChannelRows(
+                state.channels, ChannelsLayout.Phone,
+                ChannelsActions(onPlay = onChannel, onTag = {}, onRetry = {}, onOpenConnectionSettings = {}),
+                showColumnLabels = false,
+            )
+        }
+        PlayerPanel.Options -> OptionRows(state.options, onPanel)
+        PlayerPanel.Info, PlayerPanel.InfoDetails -> state.schedule?.let {
+            InfoBody(panel, it, info, onPanel, onChoice)
+        }
+        else -> EntryRows(panelEntries(panel, state, onAction, onChoice, done))
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PlayerBottomSheet(
     title: String,
     back: (() -> Unit)?,
+    leading: (@Composable () -> Unit)?,
     onClose: () -> Unit,
+    maxHeight: Dp,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     ModalBottomSheet(
         onDismissRequest = onClose,
         sheetState = rememberBottomSheetState(SheetValue.Hidden, setOf(SheetValue.Hidden, SheetValue.Expanded)),
+        // The content pads for the navigation bar itself, inside its height limit.
+        contentWindowInsets = { WindowInsets(0) },
     ) {
         if (back != null) BackHandler(onBack = back)
-        Column(Modifier.semantics { paneTitle = title }.windowInsetsPadding(WindowInsets.navigationBars)) {
+        // The limit sits on the content: on the sheet's own modifier it also bounds the sheet's anchors.
+        Column(
+            Modifier.heightIn(max = maxHeight - DragHandleHeight).semantics { paneTitle = title }
+                .windowInsetsPadding(WindowInsets.navigationBars),
+        ) {
             Row(
                 Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(horizontal = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -193,9 +236,17 @@ private fun PlayerBottomSheet(
                         Icon(painterResource(R.drawable.connect_back_outline), stringResource(R.string.side_sheet_back))
                     }
                 }
+                leading?.let {
+                    Box(Modifier.padding(start = if (back == null) 8.dp else 4.dp, end = 12.dp)) { it() }
+                }
+                val start = when {
+                    leading != null -> 0.dp
+                    back == null -> 8.dp
+                    else -> 4.dp
+                }
                 Text(
                     title,
-                    Modifier.weight(1f).padding(start = if (back == null) 8.dp else 4.dp).semantics { heading() },
+                    Modifier.weight(1f).padding(start = start).semantics { heading() },
                     style = MaterialTheme.typography.titleLarge,
                 )
             }

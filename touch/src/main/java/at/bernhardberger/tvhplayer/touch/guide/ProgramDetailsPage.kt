@@ -132,18 +132,41 @@ private fun UprightPage(details: ProgramDetails, actions: GuideActions, onBack: 
 private fun PhonePage(details: ProgramDetails, actions: GuideActions, onBack: () -> Unit) {
     Column(Modifier.fillMaxSize()) {
         PageBar(details, onBack, transparent = false)
-        Column(
+        ProgramDetailsColumn(
+            details, actions,
             Modifier.fillMaxSize().verticalScroll(rememberScrollState())
                 .windowInsetsPadding(WindowInsets.navigationBars).padding(horizontal = 16.dp),
-        ) {
-            ProgramPicture(details.art ?: details.picture, Modifier.fillMaxWidth(), strip = false)
-            Lead(details, MaterialTheme.typography.headlineMedium, Modifier.padding(top = 16.dp))
-            Timing(details, Modifier.padding(top = 16.dp))
+        )
+    }
+}
+
+/**
+ * The phone's single column of details. The player's Info sheet shows it too ([inPlayer]): the program
+ * is already playing and in view, so Record stands alone, without Watch or Show in Guide.
+ */
+@Composable
+internal fun ProgramDetailsColumn(
+    details: ProgramDetails,
+    actions: GuideActions,
+    modifier: Modifier,
+    inPlayer: Boolean = false,
+) {
+    Column(modifier) {
+        ProgramPicture(details.art ?: details.picture, Modifier.fillMaxWidth(), strip = false)
+        Lead(details, MaterialTheme.typography.headlineMedium, Modifier.padding(top = 16.dp))
+        Timing(details, Modifier.padding(top = 16.dp))
+        if (inPlayer) {
+            RecordButton(
+                { actions.onRecord(details.id) },
+                { actions.onRecordOptions(details.id) },
+                Modifier.padding(top = 16.dp),
+            )
+        } else {
             Actions(details, actions, Modifier.padding(top = 16.dp), equalWidth = true)
-            DetailsSynopsis(details.synopsis, Modifier.padding(top = 20.dp))
-            Sections(details, actions, columns = 1, keyWidth = 116.dp, Modifier)
-            Spacer(Modifier.height(24.dp))
         }
+        DetailsSynopsis(details.synopsis, Modifier.padding(top = 20.dp))
+        Sections(details, actions, columns = 1, keyWidth = 116.dp, Modifier)
+        Spacer(Modifier.height(24.dp))
     }
 }
 

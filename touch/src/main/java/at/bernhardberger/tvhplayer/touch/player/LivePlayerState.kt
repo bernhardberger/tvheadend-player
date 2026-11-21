@@ -5,6 +5,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.touch.channels.ChannelList
 import at.bernhardberger.tvhplayer.touch.channels.ChannelRow
+import at.bernhardberger.tvhplayer.touch.guide.GuideProgram
+import at.bernhardberger.tvhplayer.touch.guide.ProgramDetails
 import java.time.LocalTime
 
 internal data class LivePlayerState(
@@ -17,7 +19,23 @@ internal data class LivePlayerState(
     val brightness: Float = 0.62f,
     val tracks: PlayerTracks = PlayerTracks(),
     val options: PlaybackOptions = PlaybackOptions(),
+    val schedule: ChannelSchedule? = null,
 )
+
+/**
+ * The watched channel's day for the Info sheet, as the Guide's By channel view shows it: [days] for the
+ * day picker with [selectedDay] and its [date], and the [details] loaded so far by program id.
+ */
+internal data class ChannelSchedule(
+    val programs: List<GuideProgram>,
+    val days: List<String>,
+    val selectedDay: Int = 0,
+    val date: String,
+    val details: Map<String, ProgramDetails> = emptyMap(),
+) {
+    /** The program on air, which Info opens on. */
+    val watchingId: String? get() = programs.firstOrNull { it.onNow }?.id
+}
 
 /** A stream's audio or subtitle track, named by its language or role with layout and format below. */
 internal data class PlayerTrack(
@@ -68,13 +86,19 @@ internal sealed interface PlayerChoice {
     data class Display(val mode: DisplayMode) : PlayerChoice
     data class Stats(val level: StatsLevel) : PlayerChoice
     data class ChannelTag(val id: String?) : PlayerChoice
+    data class Day(val index: Int) : PlayerChoice
+    data class Record(val programId: String) : PlayerChoice
+    data class RecordOptions(val programId: String) : PlayerChoice
 }
 
 /** What the player shows over its face: a menu at a button, or a sheet and the page it is on. */
 internal enum class PlayerPanel(val menu: Boolean) {
-    Record(true), Audio(true), Subtitles(true), Channels(false),
+    Record(true), Audio(true), Subtitles(true), Channels(false), Info(false), InfoDetails(false),
     Options(false), DisplayMode(false), Profile(false), Stats(false),
     ;
+
+    /** The button that opened this panel: Info's details page still belongs to Info. */
+    val button: PlayerPanel get() = if (this == InfoDetails) Info else this
 
     val optionsPage: Boolean get() = this == Options || this == DisplayMode || this == Profile || this == Stats
 }
@@ -103,7 +127,7 @@ internal sealed interface LivePlayerStatus {
 
 internal enum class PlayerAction {
     Back, PictureInPicture, FullScreen, BackTen, TogglePlay, ForwardThirty,
-    GoLive, RecordProgram, RecordSeries, RecordAll, Info, WatchLive,
+    GoLive, RecordProgram, RecordSeries, RecordAll, WatchLive,
 }
 
 internal enum class PlayerLayout(val upright: Boolean, val trackThickness: Dp, val skipIconSize: Dp) {

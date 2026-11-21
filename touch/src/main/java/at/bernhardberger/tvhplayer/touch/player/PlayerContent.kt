@@ -300,9 +300,9 @@ private fun PlayerActionRow(
             menu, R.drawable.player_subtitles, R.string.player_subtitles, !dragging && listening, PlayerPanel.Subtitles,
         )
         Spacer(Modifier.weight(1f))
-        ActionButton(R.drawable.channels_info, R.string.player_info, label, !dragging, colors, false, {
-            onAction(PlayerAction.Info)
-        })
+        MenuButton(
+            menu, R.drawable.channels_info, R.string.player_info, !dragging && state.schedule != null, PlayerPanel.Info,
+        )
         if (!layout.upright) {
             ActionButton(R.drawable.player_channels, R.string.player_channels, true, !dragging, colors, false, {
                 panels.onPanel(PlayerPanel.Channels)
@@ -320,7 +320,7 @@ private class MenuButtonStyle(
     val panels: PanelHost,
 )
 
-/** Record, Audio or Subtitles: opens its list as a menu at the button, or as a bottom sheet on the phone. */
+/** Record, Audio, Subtitles or Info: a menu at the button or a sheet, the button showing it open. */
 @Composable
 private fun MenuButton(
     style: MenuButtonStyle,
@@ -330,7 +330,7 @@ private fun MenuButton(
     target: PlayerPanel,
 ) {
     val panels = style.panels
-    val open = panels.panel == target
+    val open = panels.panel?.button == target
     val toggle = { panels.onPanel(if (open) null else target) }
     val menu: @Composable () -> Unit = {
         if (target.atButton(style.layout)) {

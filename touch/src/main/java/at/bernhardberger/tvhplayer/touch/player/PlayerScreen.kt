@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -51,7 +52,13 @@ internal fun PlayerScreen(
 ) {
     var visible by rememberSaveable(state.channel.id) { mutableStateOf(true) }
     var panel by rememberSaveable { mutableStateOf<PlayerPanel?>(null) }
-    val panels = PanelHost(panel, { panel = it }, onChoice)
+    // Info opens on the program being watched each time; inside the sheet the viewer opens others.
+    var infoOpen by rememberSaveable { mutableStateOf<String?>(null) }
+    val showPanel: (PlayerPanel?) -> Unit = {
+        if (it == PlayerPanel.Info && panel?.button != PlayerPanel.Info) infoOpen = state.schedule?.watchingId
+        panel = it
+    }
+    val panels = PanelHost(panel, showPanel, onChoice)
     val openOptions = { panel = PlayerPanel.Options }
     var preview by remember(state.channel.id, state.status) { mutableStateOf<Int?>(null) }
     BoxWithConstraints(modifier.fillMaxSize().background(Color.Black)) {
@@ -95,7 +102,13 @@ internal fun PlayerScreen(
                 )
             }
         }
-        PlayerSheets(panel, state, layout, { panel = it }, onAction, onChoice, onChannel)
+        // On the upright phone a sheet rises only to the picture's foot, so the picture stays in view.
+        val belowPicture = maxHeight - WindowInsets.statusBars.asPaddingValues().calculateTopPadding() -
+            maxWidth * (9f / 16)
+        PlayerSheets(
+            panel, state, layout, showPanel, onAction, onChoice, onChannel,
+            InfoPage(infoOpen) { infoOpen = it }, belowPicture,
+        )
     }
 }
 

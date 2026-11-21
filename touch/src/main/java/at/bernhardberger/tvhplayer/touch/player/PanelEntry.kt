@@ -47,7 +47,7 @@ internal fun panelEntries(
             make.choice(stringResource(it.label), null, options.stats == it, PlayerChoice.Stats(it))
         }
         PlayerPanel.Profile -> make.profiles(options)
-        PlayerPanel.Channels, PlayerPanel.Options -> emptyList()
+        PlayerPanel.Channels, PlayerPanel.Options, PlayerPanel.Info, PlayerPanel.InfoDetails -> emptyList()
     }
 }
 

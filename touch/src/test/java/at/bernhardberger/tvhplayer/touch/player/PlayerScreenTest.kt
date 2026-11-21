@@ -24,6 +24,9 @@ import androidx.compose.ui.test.performTouchInput
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.channels.ChannelDetails
 import at.bernhardberger.tvhplayer.touch.channels.channelsFixture
+import at.bernhardberger.tvhplayer.touch.guide.RIDGE_LIGHT_ID
+import at.bernhardberger.tvhplayer.touch.guide.byChannelFixture
+import at.bernhardberger.tvhplayer.touch.guide.ridgeLightDetails
 import at.bernhardberger.tvhplayer.touch.testutil.TouchCanvas
 import at.bernhardberger.tvhplayer.touch.testutil.TouchFixtureArt
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouch
@@ -81,6 +84,7 @@ class PlayerScreenTest {
         show()
         assertInlineChannels()
         capture("tablet-upright-player", TouchCanvas.TABLET_UPRIGHT)
+        infoSheet("tablet-upright-player", TouchCanvas.TABLET_UPRIGHT, details = false)
     }
 
     @Test
@@ -127,6 +131,7 @@ class PlayerScreenTest {
     fun tabletMenusOpenAtTheirButtonAndSheetsLeaveThePictureClear() {
         show()
         menusAndSheets("tablet-player", TouchCanvas.TABLET, subtitles = true, profile = true)
+        infoSheet("tablet-player", TouchCanvas.TABLET, details = true)
     }
 
     @Test
@@ -134,6 +139,7 @@ class PlayerScreenTest {
     fun landscapePhoneMenusAndSheets() {
         show()
         menusAndSheets("phone-player-landscape", TouchCanvas.PHONE_LANDSCAPE, subtitles = false, profile = false)
+        infoSheet("phone-player-landscape", TouchCanvas.PHONE_LANDSCAPE, details = false)
     }
 
     @Test
@@ -166,6 +172,8 @@ class PlayerScreenTest {
         back()
         text(R.string.player_display_mode).assertDoesNotExist()
         tag("player-transport").assertIsDisplayed()
+
+        infoSheet("phone-player", canvas, details = true)
     }
 
     private val seeks = mutableListOf<Int>()
@@ -199,6 +207,12 @@ class PlayerScreenTest {
             options = PlaybackOptions(
                 profiles = listOf(StreamProfile("htsp", direct = true), StreamProfile("h264-720p"), StreamProfile("hevc-1080p")),
             ),
+            schedule = byChannelFixture(phone = true).let {
+                ChannelSchedule(
+                    it.channels.first().programs, it.days, it.selectedDay, it.date,
+                    details = mapOf(RIDGE_LIGHT_ID to ridgeLightDetails()),
+                )
+            },
         )
         compose.setContent {
             MaterialTheme(colorScheme = MobileDarkColors) {
@@ -249,6 +263,36 @@ class PlayerScreenTest {
         optionsPages("$prefix-options", canvas, profile)
         compose.onNodeWithContentDescription(compose.activity.getString(R.string.side_sheet_close)).performClick()
         chromeIsVisible()
+    }
+
+    /**
+     * Info opens on the watched program with Record and Details but no Watch; Details replaces the day in
+     * the sheet without Watch or Show in Guide, and Back returns to the day, then closes the sheet.
+     */
+    private fun infoSheet(prefix: String, canvas: TouchCanvas, details: Boolean) {
+        val recordOptions = compose.activity.getString(R.string.guide_record_options)
+        button(R.string.player_info).performClick()
+        // The phone held sideways shows the open program's head; its buttons scroll into view.
+        compose.onNodeWithContentDescription(recordOptions).assertExists()
+        button(R.string.channels_details).assertExists()
+        text(R.string.channels_watch).assertDoesNotExist()
+        tag("player-transport").assertDoesNotExist()
+        captureWindows("$prefix-info", canvas)
+        if (details) {
+            button(R.string.channels_details).performClick()
+            compose.onNodeWithText("Tomorrow 2:00 AM").assertExists()
+            button(R.string.channels_details).assertDoesNotExist()
+            text(R.string.channels_watch).assertDoesNotExist()
+            text(R.string.channels_show_in_guide).assertDoesNotExist()
+            captureWindows("$prefix-info-details", canvas)
+            compose.onNodeWithContentDescription(recordOptions).performClick()
+            compose.runOnIdle { assertEquals(PlayerChoice.RecordOptions(RIDGE_LIGHT_ID), choices.last()) }
+            back()
+            button(R.string.channels_details).assertIsDisplayed()
+        }
+        back()
+        compose.onNodeWithContentDescription(recordOptions).assertDoesNotExist()
+        tag("player-transport").assertIsDisplayed()
     }
 
     /** Playback options: a row opens its list inside the sheet, and Back returns to the rows. */
