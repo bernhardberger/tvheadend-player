@@ -9,6 +9,7 @@ import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -103,6 +104,7 @@ class GuideScreenTest {
     fun uprightOverview() {
         show(overviewFixture(upright = true))
         assertPartLinesWhole()
+        assertTimeLeftStays()
         capture("tablet-upright-guide-overview", TouchCanvas.TABLET_UPRIGHT)
     }
 
@@ -126,6 +128,7 @@ class GuideScreenTest {
     fun phoneOverviewOpensInPlaceAndTabsSwitchTheView() {
         show(phoneOverviewFixture())
         assertPartLinesWhole()
+        assertTimeLeftStays()
         capture("phone-guide-overview", TouchCanvas.PHONE)
 
         compose.onNodeWithText("Glass Harbor").performClick()
@@ -196,6 +199,12 @@ class GuideScreenTest {
             val layout = layouts.single()
             assertFalse(layout.layoutInput.text.text, (0 until layout.lineCount).any(layout::isLineEllipsized))
         }
+    }
+
+    /** Ridge Light's "13m left • Documentary" is too wide for its narrow row: the genre stands last and goes. */
+    private fun assertTimeLeftStays() {
+        compose.onAllNodesWithText("13m left", useUnmergedTree = true).onFirst().assertIsDisplayed()
+        compose.onAllNodes(hasText("13m left • Documentary"), useUnmergedTree = true).assertCountEquals(0)
     }
 
     private fun back() = compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }

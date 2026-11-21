@@ -110,7 +110,7 @@ private fun DayRow(
                 maxLines = 1,
             )
         },
-        supportingContent = { PartsLine(program.line) },
+        supportingContent = { PartsLine(program.rowLine()) },
         trailingContent = {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (program.scheduled) ScheduledIcon()
@@ -153,7 +153,7 @@ private fun OpenProgram(
                     Column(Modifier.weight(1f)) {
                         OpenHead(program, layout)
                         // The phone writes the time line beside the picture and the bar below it.
-                        if (layout == GuideLayout.Phone) OpenLine(program, Modifier.padding(top = 4.dp))
+                        if (layout == GuideLayout.Phone) OpenLine(program, phone = true, Modifier.padding(top = 4.dp))
                         if (wide) {
                             OpenFacts(program, Modifier.padding(top = 4.dp))
                             ProgramActions(
@@ -225,7 +225,7 @@ private fun OpenHead(program: GuideProgram, layout: GuideLayout) {
 @Composable
 private fun OpenFacts(program: GuideProgram, modifier: Modifier) {
     Column(modifier.fillMaxWidth()) {
-        OpenLine(program, Modifier)
+        OpenLine(program, phone = false, Modifier)
         program.progress?.let {
             ProgramProgress(it, program.timeLeft, program.recording, Modifier.padding(top = 12.dp))
         }
@@ -233,9 +233,12 @@ private fun OpenFacts(program: GuideProgram, modifier: Modifier) {
 }
 
 @Composable
-private fun OpenLine(program: GuideProgram, modifier: Modifier) {
-    program.openLine?.let {
-        PartsLine(it, modifier, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
+private fun OpenLine(program: GuideProgram, phone: Boolean, modifier: Modifier) {
+    val line = program.openLine(phone)
+    if (line.isNotEmpty()) {
+        PartsLine(
+            line, modifier, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline,
+        )
     }
 }
 

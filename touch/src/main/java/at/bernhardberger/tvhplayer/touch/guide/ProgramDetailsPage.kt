@@ -182,14 +182,15 @@ private fun Lead(
     Column(modifier) {
         Text(details.title, Modifier.semantics { heading() }, style = titleStyle)
         DetailsEpisode(details.episode)
-        if (details.metadata.isNotEmpty() || details.ageRating != null) {
+        val metadata = programLine(null, listOf(details.length), details.year, details.genre)
+        if (metadata.isNotEmpty() || details.ageRating != null) {
             Row(
                 Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (details.metadata.isNotEmpty()) {
+                if (metadata.isNotEmpty()) {
                     PartsLine(
-                        details.metadata, Modifier.weight(1f, fill = false),
+                        metadata, Modifier.weight(1f, fill = false),
                         style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline,
                     )
                 }

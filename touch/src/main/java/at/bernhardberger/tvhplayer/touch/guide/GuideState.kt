@@ -2,8 +2,10 @@ package at.bernhardberger.tvhplayer.touch.guide
 
 import androidx.annotation.PluralsRes
 import androidx.annotation.StringRes
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.res.stringResource
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.channels.ChannelTag
 
@@ -12,6 +14,29 @@ internal enum class GuideView(@param:StringRes val label: Int) {
     Overview(R.string.guide_overview),
     ByChannel(R.string.guide_by_channel),
 }
+
+/**
+ * A program's " • " line in the design's order (touch-design §7): the episode number, the time facts, the
+ * year, and the genre last, so a narrow line, which drops whole parts from its end, loses the genre first.
+ */
+internal fun programLine(number: String?, times: List<String?>, year: String?, genre: String?): List<String> =
+    listOfNotNull(number) + times.filterNotNull() + listOfNotNull(year, genre)
+
+/** A closed row's line: what is left of a running program, else its length. */
+@Composable
+internal fun GuideProgram.rowLine(): List<String> = programLine(number, listOf(timeLeftText() ?: length), null, genre)
+
+/** The opened program's line; the phone writes the time range with the length there instead. */
+@Composable
+internal fun GuideProgram.openLine(phone: Boolean): List<String> =
+    if (phone) {
+        programLine(null, listOf(timeRange, length), null, null)
+    } else {
+        programLine(null, listOf(length ?: timeLeftText()), year, genre)
+    }
+
+@Composable
+private fun GuideProgram.timeLeftText(): String? = timeLeft?.let { stringResource(R.string.channels_time_left, it) }
 
 /** The canvas the Guide lays out for. */
 internal enum class GuideLayout {
@@ -63,10 +88,11 @@ internal data class GuideProgram(
     val title: String,
     /** "8:00 PM". */
     val start: String,
-    /** The closed row's line as parts, e.g. "S1 E6", "Documentary"; a narrow row drops whole parts from the end. */
-    val line: List<String>,
-    /** The opened program's line as parts, e.g. "60m", "Documentary", "2024". */
-    val openLine: List<String>? = null,
+    /** The facts of its " • " line, which [programLine] puts in order: "S1 E6", "60m", "2024", "Documentary". */
+    val number: String? = null,
+    val length: String? = null,
+    val year: String? = null,
+    val genre: String? = null,
     /** "8:00–9:00 PM". */
     val timeRange: String? = null,
     val episode: String? = null,
@@ -95,8 +121,10 @@ internal data class ProgramDetails(
     val logoTint: Color? = null,
     val title: String,
     val episode: String? = null,
-    /** As parts: "Drama", "2024", "1h 27m". */
-    val metadata: List<String> = emptyList(),
+    /** The facts of the line under the title, in [programLine]'s order: "1h 27m", "2024", "Drama". */
+    val length: String? = null,
+    val year: String? = null,
+    val genre: String? = null,
     val ageRating: String? = null,
     val timeRange: String,
     val progress: Float? = null,

@@ -182,7 +182,7 @@ private fun ColumnItem(
                         maxLines = 2, overflow = TextOverflow.Ellipsis,
                     )
                     PartsLine(
-                        if (open) program.openLine ?: program.line else program.line,
+                        if (open) program.openLine(phone = false) else program.rowLine(),
                         style = if (lead) type.bodyMedium else type.bodySmall, color = scheme.onSurfaceVariant,
                     )
                 }
@@ -279,7 +279,7 @@ internal fun OverviewRows(
                         },
                         overlineContent = { PartsLine(listOf(channel.name, program.start)) },
                         supportingContent = {
-                            PartsLine(program.line, style = MaterialTheme.typography.bodyMedium)
+                            PartsLine(program.rowLine(), style = MaterialTheme.typography.bodyMedium)
                         },
                         trailingContent = program.still?.let {
                             { ProgramPicture(it, Modifier.width(96.dp), program.progress, program.recording) }

@@ -41,20 +41,20 @@ private fun program(
     c: Channel,
     start: String,
     title: String,
-    line: String,
+    genre: String?,
     still: String? = null,
     progress: Float? = null,
+    number: String? = null,
+    length: String? = null,
+    timeLeft: String? = null,
 ) = GuideProgram(
-    id = "${c.id}-$start-$title", channelId = c.id, title = title, start = start, line = parts(line),
-    still = still?.let(::art), progress = progress,
+    id = "${c.id}-$start-$title", channelId = c.id, title = title, start = start, number = number, length = length,
+    genre = genre, still = still?.let(::art), progress = progress, timeLeft = timeLeft,
 )
 
-/** A drawn " • " line as its parts. */
-private fun parts(line: String) = line.split(" • ")
-
-/** Several start-time/title pairs sharing one line. */
-private fun same(c: Channel, line: String, vararg rows: Pair<String, String>) =
-    rows.map { (start, title) -> program(c, start, title, line) }
+/** Several start-time/title pairs of one genre and, where given, one episode number. */
+private fun same(c: Channel, genre: String, vararg rows: Pair<String, String>, number: String? = null) =
+    rows.map { (start, title) -> program(c, start, title, genre, number = number) }
 
 private fun base(channels: List<GuideChannel>) = GuideState(
     channels = channels,
@@ -68,18 +68,18 @@ internal const val GLASS_HARBOR_ID = "amber-stage-7:50 PM-Glass Harbor"
 internal const val COASTAL_MILES_ID = "amber-stage-10:05 PM-Coastal Miles"
 internal const val RIDGE_LIGHT_ID = "ridge-earth-8:00 PM-Ridge Light"
 
-private fun ridgeLightLead() = program(RidgeEarth, "8:00 PM", "Ridge Light", "Documentary • 13m left", "still-ridge-light", 0.78f)
+private fun ridgeLightLead() = program(RidgeEarth, "8:00 PM", "Ridge Light", "Documentary", "still-ridge-light", 0.78f, timeLeft = "13m")
 
-private fun glassHarborLead() = program(AmberStage, "7:50 PM", "Glass Harbor", "Drama • 30m left", "still-glass-harbor", 0.66f)
-    .copy(episode = "S2 E4 • The Long Tide", synopsis = GLASS_HARBOR_SYNOPSIS, timeLeft = "30m")
+private fun glassHarborLead() = program(AmberStage, "7:50 PM", "Glass Harbor", "Drama", "still-glass-harbor", 0.66f, timeLeft = "30m")
+    .copy(episode = "S2 E4 • The Long Tide", synopsis = GLASS_HARBOR_SYNOPSIS)
 
 /** The tablet's magazine; the upright tablet's columns run further down the night. */
 internal fun overviewFixture(upright: Boolean = false): GuideState {
-    val ridge = listOf(ridgeLightLead()) + same(RidgeEarth, "S1 E6 • Documentary", "9:00 PM" to "Tide Watch") +
+    val ridge = listOf(ridgeLightLead()) + same(RidgeEarth, "Documentary", "9:00 PM" to "Tide Watch", number = "S1 E6") +
         program(RidgeEarth, "10:00 PM", "Snowline", "Documentary").copy(scheduled = true) +
         same(RidgeEarth, "Documentary", "10:45 PM" to "Six Bridges and a River That Changed Its Mind", "12:15 AM" to "Ridge at Night") +
-        same(RidgeEarth, "S2 E2 • Documentary", "2:00 AM" to "Ridge Light") +
-        same(RidgeEarth, "S1 E5 • Documentary", "3:00 AM" to "Tide Watch") +
+        same(RidgeEarth, "Documentary", "2:00 AM" to "Ridge Light", number = "S2 E2") +
+        same(RidgeEarth, "Documentary", "3:00 AM" to "Tide Watch", number = "S1 E5") +
         if (upright) {
             same(
                 RidgeEarth, "Documentary", "4:00 AM" to "Snowline", "4:45 AM" to "Ridge at Night",
@@ -90,27 +90,27 @@ internal fun overviewFixture(upright: Boolean = false): GuideState {
             emptyList()
         }
     val amber = listOf(glassHarborLead()) + same(AmberStage, "Talk show", "9:17 PM" to "The Kettle Hour") +
-        program(AmberStage, "10:05 PM", "Coastal Miles", "Travel").copy(
-            openLine = parts("Travel • 50m"), synopsis = COASTAL_MILES_SYNOPSIS,
+        program(AmberStage, "10:05 PM", "Coastal Miles", "Travel", length = "50m").copy(
+            synopsis = COASTAL_MILES_SYNOPSIS,
         ) +
         same(AmberStage, "Talk show", "10:55 PM" to "Amber Late") +
-        same(AmberStage, "S2 E4 • Drama", "11:40 PM" to "Glass Harbor") +
+        same(AmberStage, "Drama", "11:40 PM" to "Glass Harbor", number = "S2 E4") +
         same(AmberStage, "Talk show", "1:10 AM" to "The Kettle Hour") +
         same(AmberStage, "Travel", "2:00 AM" to "Coastal Miles") +
         if (upright) {
             same(AmberStage, "Talk show", "2:50 AM" to "Amber Late") +
-                same(AmberStage, "S2 E3 • Drama", "3:35 AM" to "Glass Harbor") +
+                same(AmberStage, "Drama", "3:35 AM" to "Glass Harbor", number = "S2 E3") +
                 same(AmberStage, "Talk show", "5:05 AM" to "The Kettle Hour") +
                 same(AmberStage, "Magazine", "6:00 AM" to "Amber Morning") +
                 same(AmberStage, "Travel", "8:30 AM" to "Coastal Miles") +
                 same(AmberStage, "Talk show", "9:20 AM" to "The Kettle Hour") +
-                same(AmberStage, "S2 E4 • Drama", "10:10 AM" to "Glass Harbor") +
+                same(AmberStage, "Drama", "10:10 AM" to "Glass Harbor", number = "S2 E4") +
                 same(AmberStage, "Magazine", "11:40 AM" to "Amber Midday")
         } else {
             emptyList()
         }
     val harbor = listOf(
-        program(HarborSport, "8:30 PM", "Harbor Kickoff", "Football • 1h 28m left", "still-harbor-kickoff", 0.16f)
+        program(HarborSport, "8:30 PM", "Harbor Kickoff", "Football", "still-harbor-kickoff", 0.16f, timeLeft = "1h 28m")
             .copy(recording = true),
     ) + same(HarborSport, "Football", "10:15 PM" to "Extra Time") +
         same(HarborSport, "Basketball", "11:00 PM" to "River Court") +
@@ -130,7 +130,7 @@ internal fun overviewFixture(upright: Boolean = false): GuideState {
             emptyList()
         }
     val northline = listOf(
-        program(NorthlineNews, "8:00 PM", "Northline Tonight", "News • 13m left", "still-northline-studio", 0.78f),
+        program(NorthlineNews, "8:00 PM", "Northline Tonight", "News", "still-northline-studio", 0.78f, timeLeft = "13m"),
     ) + same(NorthlineNews, "Weather", "9:00 PM" to "Skyglass Weather") +
         same(NorthlineNews, "Report", "9:15 PM" to "Field Desk") +
         same(NorthlineNews, "News", "10:00 PM" to "World Briefing", "10:30 PM" to "Northline Late") +
@@ -147,8 +147,8 @@ internal fun overviewFixture(upright: Boolean = false): GuideState {
             emptyList()
         }
     val kite = listOf(
-        program(KiteKids, "8:30 PM", "Paper Kite Tales", "Kids • 8m left", "still-paper-kite-tales", 0.68f),
-    ) + same(KiteKids, "S1 E10 • Kids", "8:55 PM" to "Little Orbit") +
+        program(KiteKids, "8:30 PM", "Paper Kite Tales", "Kids", "still-paper-kite-tales", 0.68f, timeLeft = "8m"),
+    ) + same(KiteKids, "Kids", "8:55 PM" to "Little Orbit", number = "S1 E10") +
         same(KiteKids, "Kids", "9:20 PM" to "Paper Kite Tales", "9:45 PM" to "Good Night, Kites")
     return base(
         listOf(
@@ -166,61 +166,62 @@ internal fun phoneOverviewFixture() = base(
         channel(
             HarborSport,
             listOf(
-                program(HarborSport, "8:30 PM", "Harbor Kickoff", "Football • 1h 28m left", "still-harbor-kickoff", 0.16f)
+                program(HarborSport, "8:30 PM", "Harbor Kickoff", "Football", "still-harbor-kickoff", 0.16f, timeLeft = "1h 28m")
                     .copy(recording = true),
             ),
         ),
         channel(
             NorthlineNews,
-            listOf(program(NorthlineNews, "8:00 PM", "Northline Tonight", "News • 13m left", "still-northline-studio", 0.78f)),
+            listOf(program(NorthlineNews, "8:00 PM", "Northline Tonight", "News", "still-northline-studio", 0.78f, timeLeft = "13m")),
         ),
         channel(
-            KiteKids, listOf(program(KiteKids, "8:30 PM", "Paper Kite Tales", "Kids • 8m left", "still-paper-kite-tales", 0.68f)),
+            KiteKids, listOf(program(KiteKids, "8:30 PM", "Paper Kite Tales", "Kids", "still-paper-kite-tales", 0.68f, timeLeft = "8m")),
         ),
-        channel(IonFrame, listOf(program(IonFrame, "8:15 PM", "Ion Wake", "Sci-fi • 1h 18m left", "still-ion-wake", 0.29f))),
+        channel(IonFrame, listOf(program(IonFrame, "8:15 PM", "Ion Wake", "Sci-fi", "still-ion-wake", 0.29f, timeLeft = "1h 18m"))),
         channel(
             HarborLights,
             listOf(
-                program(HarborLights, "8:00 PM", "Harbor Lights Live", "Music • 1h 13m left", "still-harbor-lights-live", 0.39f),
+                program(HarborLights, "8:00 PM", "Harbor Lights Live", "Music", "still-harbor-lights-live", 0.39f, timeLeft = "1h 13m"),
             ),
         ),
-        channel(LanternHour, listOf(program(LanternHour, "8:00 PM", "Stories by Lamplight", "Culture • 43m left"))),
+        channel(LanternHour, listOf(program(LanternHour, "8:00 PM", "Stories by Lamplight", "Culture", timeLeft = "43m"))),
     ),
 )
 
 /** By channel: Ridge Earth's day with Ridge Light open; Glass Drama has no guide data. */
 internal fun byChannelFixture(phone: Boolean = false, upright: Boolean = false): GuideState {
-    val ridgeLight = program(RidgeEarth, "8:00 PM", "Ridge Light", "S2 E3 • 60m", "still-ridge-light", 0.78f).copy(
+    val ridgeLight = program(RidgeEarth, "8:00 PM", "Ridge Light", "Documentary", "still-ridge-light", 0.78f, "S2 E3", "60m").copy(
         art = art("ridge-light"),
         episode = "S2 E3 • Winter on the ridge",
-        openLine = parts(if (phone) "8:00–9:00 PM • 60m" else "60m • Documentary • 2024"),
+        year = "2024",
         timeRange = "8:00–9:00 PM",
         timeLeft = "13m",
         synopsis = if (phone) "$RIDGE_LIGHT_SYNOPSIS." else "$RIDGE_LIGHT_SYNOPSIS while the valley holds on to the last warm days.",
     )
-    val withGenre = !phone
+    // The phone's day rows leave the genre out, as drawn.
+    val genre = "Documentary".takeUnless { phone }
     val day = listOf(
         ridgeLight,
-        program(RidgeEarth, "9:00 PM", "Tide Watch", if (withGenre) "S1 E6 • 60m • Documentary" else "S1 E6 • 60m", "still-tide-watch"),
-        program(RidgeEarth, "10:00 PM", "Snowline", "45m • Documentary").copy(scheduled = true),
-        program(RidgeEarth, "10:45 PM", "Six Bridges and a River That Changed Its Mind", "1h 30m • Documentary"),
-        program(RidgeEarth, "12:15 AM", "Ridge at Night", "1h 45m • Documentary").copy(section = "Monday, November 16"),
-        program(RidgeEarth, "2:00 AM", "Ridge Light", "S2 E2 • The long autumn • 60m", "ridge-light"),
-        program(RidgeEarth, "3:00 AM", "Tide Watch", if (withGenre) "S1 E5 • 60m • Documentary" else "S1 E5 • 60m", "still-tide-watch"),
+        program(RidgeEarth, "9:00 PM", "Tide Watch", genre, "still-tide-watch", number = "S1 E6", length = "60m"),
+        program(RidgeEarth, "10:00 PM", "Snowline", "Documentary", length = "45m").copy(scheduled = true),
+        program(RidgeEarth, "10:45 PM", "Six Bridges and a River That Changed Its Mind", "Documentary", length = "1h 30m"),
+        program(RidgeEarth, "12:15 AM", "Ridge at Night", "Documentary", length = "1h 45m").copy(section = "Monday, November 16"),
+        program(RidgeEarth, "2:00 AM", "Ridge Light", null, "ridge-light", number = "S2 E2", length = "60m"),
+        program(RidgeEarth, "3:00 AM", "Tide Watch", genre, "still-tide-watch", number = "S1 E5", length = "60m"),
     ) + if (upright) {
         listOf(
-            program(RidgeEarth, "4:00 AM", "Snowline", "45m • Documentary"),
-            program(RidgeEarth, "4:45 AM", "Ridge at Night", "1h 45m • Documentary"),
-            program(RidgeEarth, "6:30 AM", "First Light", "45m • Documentary"),
+            program(RidgeEarth, "4:00 AM", "Snowline", "Documentary", length = "45m"),
+            program(RidgeEarth, "4:45 AM", "Ridge at Night", "Documentary", length = "1h 45m"),
+            program(RidgeEarth, "6:30 AM", "First Light", "Documentary", length = "45m"),
         )
     } else {
         emptyList()
     }
     val others = listOf(AmberStage, HarborSport, NorthlineNews, KiteKids, IonFrame, HarborLights, LanternHour, LittleOrbit)
-        .map { channel(it, listOf(program(it, "8:00 PM", it.name, "60m"))) }
+        .map { channel(it, listOf(program(it, "8:00 PM", it.name, null, length = "60m"))) }
     return base(
         listOf(channel(RidgeEarth, day)) + others + channel(GlassDrama, emptyList()) +
-            channel(NorthlineWorld, listOf(program(NorthlineWorld, "8:00 PM", "World Briefing", "30m • News"))),
+            channel(NorthlineWorld, listOf(program(NorthlineWorld, "8:00 PM", "World Briefing", "News", length = "30m"))),
     )
 }
 
@@ -232,7 +233,9 @@ internal fun glassHarborDetails() = ProgramDetails(
     logoTint = AmberStage.tint,
     title = "Glass Harbor",
     episode = "S2 E4 • The Long Tide",
-    metadata = parts("Drama • 2024 • 1h 27m"),
+    genre = "Drama",
+    year = "2024",
+    length = "1h 27m",
     ageRating = "12+",
     timeRange = "7:50–9:17 PM",
     progress = 0.66f,
@@ -242,12 +245,12 @@ internal fun glassHarborDetails() = ProgramDetails(
     synopsis = "$GLASS_HARBOR_SYNOPSIS Ines takes the night ferry to Northport with the only copy of the ledger, " +
         "and the pilot who knows the channel has not been seen since the morning tide.",
     otherAirings = listOf(
-        ProgramAiring("gh-1", picon(AmberStage.id), AmberStage.tint, "Today 11:40 PM", parts("Amber Stage • S2 E4 • The Long Tide")),
+        ProgramAiring("gh-1", picon(AmberStage.id), AmberStage.tint, "Today 11:40 PM", listOf("Amber Stage", "S2 E4", "The Long Tide")),
         ProgramAiring(
-            "gh-2", picon(AmberStage.id), AmberStage.tint, "Tomorrow 7:50 PM", parts("Amber Stage • S2 E5 • Low Water"),
+            "gh-2", picon(AmberStage.id), AmberStage.tint, "Tomorrow 7:50 PM", listOf("Amber Stage", "S2 E5", "Low Water"),
             scheduled = true,
         ),
-        ProgramAiring("gh-3", picon(GlassDrama.id), GlassDrama.tint, "Tue 1:15 PM", parts("Glass Drama • S2 E4 • The Long Tide")),
+        ProgramAiring("gh-3", picon(GlassDrama.id), GlassDrama.tint, "Tue 1:15 PM", listOf("Glass Drama", "S2 E4", "The Long Tide")),
     ),
     credits = listOf(
         ProgramCredit(CreditRole.Cast, listOf("Rowan Frost", "Avery Lake", "Morgan Vale")),
