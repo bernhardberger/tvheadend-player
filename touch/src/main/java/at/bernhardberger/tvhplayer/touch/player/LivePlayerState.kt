@@ -211,6 +211,9 @@ internal sealed interface LivePlayerStatus {
     data class Unavailable(val condition: AppErrorCondition? = null) : LivePlayerStatus
 }
 
+internal val LivePlayerStatus.hasTimeline: Boolean
+    get() = this == LivePlayerStatus.Playing || this == LivePlayerStatus.Tuning
+
 internal enum class PlayerAction {
     Back, PictureInPicture, FullScreen, BackTen, TogglePlay, ForwardThirty,
     GoLive, WatchLive, RetryChannels,

@@ -56,6 +56,28 @@ class LivePlayerMappingTest {
     private val other = guide.second.id
 
     @Test
+    fun fullScreenWaitsForASidewaysThenUprightTurnOrAnExit() {
+        val inactive = FullScreenRequest.Inactive
+        val sideways = FullScreenRequest.AwaitingSideways
+        val upright = FullScreenRequest.AwaitingUpright
+        val cases = listOf(
+            Triple(sideways, -1, sideways), Triple(sideways, 0, sideways), Triple(sideways, 45, sideways),
+            Triple(sideways, 90, upright), Triple(sideways, 270, upright),
+            Triple(upright, 90, upright), Triple(upright, 315, upright),
+            Triple(upright, 180, inactive), Triple(upright, 359, inactive),
+            Triple(inactive, 90, inactive),
+        )
+        for ((request, degrees, expected) in cases) {
+            assertEquals("$request at $degrees°", expected, nextFullScreenRequest(request, phoneOrientation(degrees), false))
+        }
+        for (request in listOf(sideways, upright)) {
+            val orientation = PhoneOrientation.Unknown
+            assertEquals(inactive, nextFullScreenRequest(request, orientation, inWindow = true))
+            assertEquals(inactive, nextFullScreenRequest(request, orientation, inWindow = false, exitRequested = true))
+        }
+    }
+
+    @Test
     fun statusFollowsTheRuntimeAsOnTv() {
         data class Case(
             val name: String,
@@ -241,6 +263,22 @@ class LivePlayerMappingTest {
         assertEquals(sheets, face(shown, pause = LivePauseAvailability.OFF).offered)
         assertEquals(sheets, face(shown, status = LivePlayerStatus.Tuning).offered)
         assertEquals(sheets, face(shown, status = LivePlayerStatus.Reconnecting(null)).offered)
+        val timelineRows = listOf(
+            LivePlayerStatus.Playing to true,
+            LivePlayerStatus.Tuning to true,
+            LivePlayerStatus.Reconnecting(null) to false,
+            LivePlayerStatus.PauseEnded to false,
+            LivePlayerStatus.Unavailable(AppErrorCondition.NO_FREE_ADAPTER) to false,
+        )
+        for ((status, hasRow) in timelineRows) {
+            val live = face(shown, status = status)
+            for (layout in PlayerLayout.entries) {
+                val visible = layout == PlayerLayout.Phone && hasRow
+                val offered = live.withFullScreenOffer(layout, false).offered
+                assertEquals("$layout / $status", visible, PlayerControl.FullScreen in offered)
+                assertTrue(PlayerControl.FullScreen !in live.withFullScreenOffer(layout, true).offered)
+            }
+        }
         // The picture-in-picture button only where the window can be used.
         assertEquals(
             pausable + PlayerControl.PictureInPicture, face(shown, window = true).offered,

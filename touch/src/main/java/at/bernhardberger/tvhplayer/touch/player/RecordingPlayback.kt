@@ -70,6 +70,7 @@ internal fun RecordingPlayback(
     pictureWindow: PlayerWindow,
     window: Window,
     back: () -> Unit,
+    fullScreen: () -> Unit,
 ) {
     val context = LocalContext.current
     val locale = LocalConfiguration.current.locales[0]
@@ -125,7 +126,7 @@ internal fun RecordingPlayback(
     )
     RecordingPlaybackFace(
         face.copy(growing = growing), menus, owned, runtime, session,
-        pictureWindow, installed && video.visible, inWindow, timeline, back, { shown = it },
+        pictureWindow, installed && video.visible, inWindow, timeline, back, fullScreen, { shown = it },
         onBrightness = { brightness = it; applyBrightness(window, it) },
         onAdBreakMode = { if (face.hasAdBreakOptions) adBreaks.set(it) },
     )
@@ -192,6 +193,7 @@ private fun RecordingPlaybackFace(
     inWindow: Boolean,
     timeline: RecordingTimelinePresentation,
     back: () -> Unit,
+    fullScreen: () -> Unit,
     onControlsShown: (Boolean) -> Unit,
     onBrightness: (Float) -> Unit,
     onAdBreakMode: (AdBreakMode?) -> Unit,
@@ -208,6 +210,7 @@ private fun RecordingPlaybackFace(
             when (action) {
                 PlayerAction.Back -> back()
                 PlayerAction.PictureInPicture -> pictureWindow.enter()
+                PlayerAction.FullScreen -> fullScreen()
                 else -> if (ownsPlayback()) runtime.recordingAction(timeline, action)
             }
         },

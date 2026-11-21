@@ -107,6 +107,7 @@ class PlayerActivity : ComponentActivity() {
 
     private lateinit var requested: MutableStateFlow<PlayerRoute>
     private lateinit var pictureWindow: PlayerWindow
+    private val fullScreen = PlayerFullScreen(this)
     private val requestFailed = MutableStateFlow<TuneFailure?>(null)
     private var leaving = false
     private val zap: (ChannelId) -> Unit = { channel ->
@@ -126,10 +127,8 @@ class PlayerActivity : ComponentActivity() {
         }
         requested = MutableStateFlow(route)
         pictureWindow = PlayerWindow(this, runtime.player).also { it.open() }
-        enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
-            navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
-        )
+        fullScreen.restore(savedInstanceState, pictureWindow.inWindow)
+        enableEdgeToEdge(statusBarStyle = PlayerBarStyle, navigationBarStyle = PlayerBarStyle)
         onBackPressedDispatcher.addCallback(this) { back() }
         // The window's previous/next step through the channel order Channels shows, as the TV's player.
         lifecycle.addObserver(
@@ -143,7 +142,7 @@ class PlayerActivity : ComponentActivity() {
         lifecycleScope.launch {
             runtime.sessionStops.first()
             leaving = true
-            finish()
+            fullScreen.finishPlayer()
         }
         lifecycleScope.launch {
             requested.collectLatest {
@@ -171,6 +170,7 @@ class PlayerActivity : ComponentActivity() {
                             is Tune -> Player(shown)
                             is RecordingRoute -> RecordingPlayback(
                                 shown, runtime, session, settings, artwork, pictureWindow, window, ::back,
+                                fullScreen = { fullScreen.enter(pictureWindow.inWindow.value) },
                             )
                         }
                     }
@@ -185,8 +185,9 @@ class PlayerActivity : ComponentActivity() {
         if (!::requested.isInitialized || leaving) return
         if (route is RecordingRoute && runtime.enterPlayerScreen(this) == null) {
             leaving = true
-            finish()
+            fullScreen.finishPlayer()
         } else if (route !is Tune || route.intent != null) {
+            fullScreen.release()
             setIntent(intent)
             requested.value = route
         }
@@ -196,6 +197,7 @@ class PlayerActivity : ComponentActivity() {
         super.onSaveInstanceState(outState)
         if (::requested.isInitialized) {
             outState.putParcelable(SAVED_ROUTE, Intent(intent).apply { removeExtra(EXTRA_WATCH_INTENT) })
+            fullScreen.save(outState)
         }
     }
 
@@ -250,7 +252,7 @@ class PlayerActivity : ComponentActivity() {
         leaving = true
         lifecycleScope.launch {
             withContext(NonCancellable) { runtime.stop() }
-            finish()
+            fullScreen.finishPlayer()
         }
     }
 
@@ -258,6 +260,7 @@ class PlayerActivity : ComponentActivity() {
         when (action) {
             PlayerAction.Back -> back()
             PlayerAction.PictureInPicture -> pictureWindow.enter()
+            PlayerAction.FullScreen -> fullScreen.enter(pictureWindow.inWindow.value)
             PlayerAction.WatchLive -> {
                 runtime.consumeBackgroundNotice(BackgroundPlaybackNotice.LIMIT_EXPIRED)
                 val route = requested.value as? Tune
@@ -351,6 +354,7 @@ class PlayerActivity : ComponentActivity() {
 private const val EXTRA_CHANNEL = "channel"
 private const val EXTRA_WATCH_INTENT = "watch_intent"
 private const val SAVED_ROUTE = "player_route"
+private val PlayerBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
 
 private fun Intent.playerRoute(): PlayerRoute? =
     recordingRoute() ?: getLongExtra(EXTRA_CHANNEL, -1L).takeIf { it >= 0 }?.let {

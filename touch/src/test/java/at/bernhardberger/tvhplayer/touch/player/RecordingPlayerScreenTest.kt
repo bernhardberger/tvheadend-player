@@ -2,6 +2,7 @@ package at.bernhardberger.tvhplayer.touch.player
 
 import androidx.activity.ComponentActivity
 import android.content.pm.PackageManager
+import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.os.Looper
 import android.view.WindowInsets
@@ -493,6 +494,73 @@ class RecordingPlayerScreenTest {
         settleRoute()
         assertTrue("A refused window button must leave the player open", !activity.get().isFinishing)
         assertEquals(AppPlaybackTarget.Live(server.first.id), runtime.activeTarget.value)
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
+    fun thePlayingRecordingOffersFullScreenOnAnUprightPhone() = withRecordingRoute(marked = true) { activity, runtime ->
+        assertEquals(AppPlaybackState.Playing, runtime.state.value)
+        button(R.string.player_full_screen).assertIsDisplayed().performClick()
+        assertEquals(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE, activity.requestedOrientation)
+        activity.onBackPressedDispatcher.onBackPressed()
+        settleRoute()
+        assertTrue(activity.isFinishing)
+        assertEquals(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED, activity.requestedOrientation)
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
+    @OptIn(UnstableApi::class)
+    fun fullScreenTurnsTheLivePhoneWithoutChangingPlayback() = withPlayerRoute(live = true) { activity, runtime, _, _ ->
+        val target = runtime.activeTarget.value
+        val epoch = runtime.videoPresentation.value.epoch
+        val item = runtime.player.currentMediaItem
+        val playWhenReady = runtime.player.playWhenReady
+        button(R.string.player_full_screen).performClick()
+        settleRoute()
+        assertEquals(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE, activity.get().requestedOrientation)
+        assertEquals(target, runtime.activeTarget.value)
+        assertEquals(epoch, runtime.videoPresentation.value.epoch)
+        assertTrue(item === runtime.player.currentMediaItem)
+        assertEquals(playWhenReady, runtime.player.playWhenReady)
+
+        val original = activity.get()
+        val sideways = Configuration(original.resources.configuration).apply {
+            orientation = Configuration.ORIENTATION_LANDSCAPE
+            val width = screenWidthDp
+            screenWidthDp = screenHeightDp
+            screenHeightDp = width
+        }
+        activity.configurationChange(sideways)
+        settleRoute()
+        assertTrue("Orientation is handled without recreating the player activity", activity.get() === original)
+        val insets = checkNotNull(original.window.decorView.windowInsetsController)
+        val requestedBars = ReflectionHelpers.callInstanceMethod<Int>(insets, "getRequestedVisibleTypes")
+        assertEquals("Landscape requests hidden bars", 0, requestedBars and WindowInsets.Type.systemBars())
+        assertEquals(epoch, runtime.videoPresentation.value.epoch)
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
+    fun fullScreenSurvivesRecreationButNotTheWindowOrAnotherLaunch() = withPlayerRoute(live = true) { activity, runtime, server, _ ->
+        val sensorLandscape = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        val unspecified = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        button(R.string.player_full_screen).performClick()
+        activity.recreate()
+        settleRoute()
+        assertEquals(sensorLandscape, activity.get().requestedOrientation)
+        val config = activity.get().resources.configuration
+        activity.get().onPictureInPictureModeChanged(true, config)
+        settleRoute()
+        button(R.string.player_full_screen).assertDoesNotExist()
+        assertEquals(unspecified, activity.get().requestedOrientation)
+        activity.get().onPictureInPictureModeChanged(false, config)
+        settleRoute()
+        button(R.string.player_full_screen).performClick()
+        assertEquals(sensorLandscape, activity.get().requestedOrientation)
+        activity.newIntent(PlayerActivity.intent(activity.get(), server.first.id, runtime.notePlaybackIntent()))
+        settleRoute()
+        assertEquals(unspecified, activity.get().requestedOrientation)
     }
 
     private fun assertRecordingRouteHidesSystemBars() = withRecordingRoute(marked = false) { activity, _ ->
