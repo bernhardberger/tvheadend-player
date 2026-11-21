@@ -1535,7 +1535,8 @@ private fun HomeShelfRow(
                         progressColor = progressColor(watching = true),
                         // The corners this card's own marks stand in right now.
                         takenCorners = setOfNotNull(
-                            at.bernhardberger.tvhplayer.images.ArtworkLogoCorner.TOP_END.takeIf { runningState != null },
+                            at.bernhardberger.tvhplayer.images.ArtworkLogoCorner.TOP_END
+                                .takeIf { runningState != null },
                             at.bernhardberger.tvhplayer.images.ArtworkLogoCorner.BOTTOM_END.takeIf { expiry != null },
                         ),
                     )

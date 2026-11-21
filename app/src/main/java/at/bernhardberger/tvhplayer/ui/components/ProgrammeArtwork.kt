@@ -157,7 +157,8 @@ internal fun ProgrammeArtwork(
             AsyncImage(request, null,
                 contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize(),
                 onSuccess = load::onSuccess, onError = { load.onError() })
-            if (load.loaded && channelIcon != null) ArtworkCornerLogo(channelIcon, load.logoPlace(takenCorners), plateModifier,
+            if (load.loaded && channelIcon != null) ArtworkCornerLogo(
+                channelIcon, load.logoPlace(takenCorners), plateModifier,
                 bottomEdge = if (progress != null) TvCardProgressStripHeight else 0.dp)
         }
         // Same embedded strip as the player's schedule tiles; card borders keep clear of it.
@@ -199,7 +200,31 @@ internal fun BoxScope.ArtworkCornerLogo(
         ArtworkLogoGround.DARK_PICTURE -> light
         ArtworkLogoGround.LIGHT_PICTURE -> false
     }
-    if (shaded) Box(Modifier.matchParentSize().drawBehind {
+    if (shaded) ArtworkCornerShade(atStart, atBottom, light, scale)
+    val alignment = corner.alignment()
+    PiconBox(picon, Modifier.align(alignment).padding(bottom = if (atBottom) bottomEdge else 0.dp)
+        .padding(ArtworkLogoInset * scale)
+        .size(ArtworkLogoPlateWidth * scale, ArtworkLogoHeight * scale).then(modifier),
+        // Trimmed, so the logo's visible shape and not its file's empty margin keeps the inset.
+        alignment = alignment, placeholders = false, trim = true, onError = onError,
+        // Parts of the logo that would vanish on a light picture go dark, as on a focused row.
+        ground = if (place.ground == ArtworkLogoGround.LIGHT_PICTURE || light) Color.White
+            else MaterialTheme.colorScheme.background,
+        onLogo = { bitmap ->
+            if (needsLight == null) needsLight = logoTones.getOrPut(picon) { logoTone(bitmap) }
+        })
+}
+
+private fun ArtworkLogoCorner.alignment(): Alignment = when (this) {
+    ArtworkLogoCorner.BOTTOM_START -> Alignment.BottomStart
+    ArtworkLogoCorner.BOTTOM_END -> Alignment.BottomEnd
+    ArtworkLogoCorner.TOP_START -> Alignment.TopStart
+    ArtworkLogoCorner.TOP_END -> Alignment.TopEnd
+}
+
+@Composable
+private fun BoxScope.ArtworkCornerShade(atStart: Boolean, atBottom: Boolean, light: Boolean, scale: Float) {
+    Box(Modifier.matchParentSize().drawBehind {
         val atLeft = atStart == (layoutDirection == LayoutDirection.Ltr)
         val center = Offset(if (atLeft) 0f else size.width, if (atBottom) size.height else 0f)
         val radius = (ArtworkLogoShadeWidth * scale).toPx()
@@ -212,26 +237,15 @@ internal fun BoxScope.ArtworkCornerLogo(
                 1f to Color.Transparent, center = center, radius = radius), radius, center)
         }
     })
-    val alignment = when (corner) {
-        ArtworkLogoCorner.BOTTOM_START -> Alignment.BottomStart
-        ArtworkLogoCorner.BOTTOM_END -> Alignment.BottomEnd
-        ArtworkLogoCorner.TOP_START -> Alignment.TopStart
-        ArtworkLogoCorner.TOP_END -> Alignment.TopEnd
-    }
-    PiconBox(picon, Modifier.align(alignment).padding(bottom = if (atBottom) bottomEdge else 0.dp)
-        .padding(ArtworkLogoInset * scale).size(ArtworkLogoPlateWidth * scale, ArtworkLogoHeight * scale).then(modifier),
-        // Trimmed, so the logo's visible shape and not its file's empty margin keeps the inset.
-        alignment = alignment, placeholders = false, trim = true, onError = onError,
-        // Parts of the logo that would vanish on a light picture go dark, as on a focused row.
-        ground = if (place.ground == ArtworkLogoGround.LIGHT_PICTURE || light) Color.White else MaterialTheme.colorScheme.background,
-        onLogo = { bitmap ->
-            if (needsLight == null) needsLight = logoTones.getOrPut(picon) {
-                val pixels = IntArray(bitmap.width * bitmap.height)
-                (if (bitmap.config == android.graphics.Bitmap.Config.HARDWARE) bitmap.copy(android.graphics.Bitmap.Config.ARGB_8888, false) else bitmap)
-                    .getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
-                logoNeedsLightGround(pixels)
-            }
-        })
+}
+
+private fun logoTone(bitmap: android.graphics.Bitmap): Boolean {
+    val pixels = IntArray(bitmap.width * bitmap.height)
+    val readable = if (bitmap.config == android.graphics.Bitmap.Config.HARDWARE) {
+        bitmap.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
+    } else bitmap
+    readable.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+    return logoNeedsLightGround(pixels)
 }
 
 /** Each logo's tone, judged once: a logo looks the same on every picture. */
@@ -242,11 +256,14 @@ private val logoTones = java.util.concurrent.ConcurrentHashMap<ChannelIcon, Bool
  * picture's bottom, where a logo cannot say it. [scale] and [bottomEdge] as for [ArtworkCornerLogo].
  */
 @Composable
-internal fun BoxScope.ArtworkChannelName(name: String, modifier: Modifier = Modifier, scale: Float = 1f, bottomEdge: Dp = 0.dp) {
+internal fun BoxScope.ArtworkChannelName(
+    name: String, modifier: Modifier = Modifier, scale: Float = 1f, bottomEdge: Dp = 0.dp,
+) {
     Box(Modifier.align(Alignment.BottomStart).fillMaxWidth()
         .background(Brush.verticalGradient(0f to Color.Transparent, 1f to Color.Black.copy(alpha = .8f)))
         .padding(bottom = bottomEdge)
-        .padding(start = ArtworkLogoInset * scale, end = ArtworkLogoInset * scale, top = 20.dp * scale, bottom = 6.dp * scale)) {
+        .padding(start = ArtworkLogoInset * scale, end = ArtworkLogoInset * scale,
+            top = 20.dp * scale, bottom = 6.dp * scale)) {
         Text(name, modifier, style = MaterialTheme.typography.labelLarge, color = Color.White,
             maxLines = 1, overflow = TextOverflow.Ellipsis)
     }

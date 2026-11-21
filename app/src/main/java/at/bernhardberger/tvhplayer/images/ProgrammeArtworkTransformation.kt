@@ -115,7 +115,9 @@ internal class ProgrammeArtworkTransformation(
 }
 
 /** [artworkLogoPlaces] of [bitmap] as a view of [ratio] shows it, centre-cropped. */
-internal fun artworkLogoPlaces(bitmap: Bitmap, ratio: Double, logoShare: Double, startAtRight: Boolean): List<ArtworkLogoPlace> {
+internal fun artworkLogoPlaces(
+    bitmap: Bitmap, ratio: Double, logoShare: Double, startAtRight: Boolean,
+): List<ArtworkLogoPlace> {
     val source = if (bitmap.config == Bitmap.Config.HARDWARE) bitmap.copy(Bitmap.Config.ARGB_8888, false) else bitmap
     val cropWidth = minOf(source.width, (source.height * ratio).roundToInt()).coerceAtLeast(1)
     val cropHeight = minOf(source.height, (source.width / ratio).roundToInt()).coerceAtLeast(1)

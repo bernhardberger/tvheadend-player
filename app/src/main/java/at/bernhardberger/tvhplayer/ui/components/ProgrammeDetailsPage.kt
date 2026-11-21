@@ -991,21 +991,28 @@ private fun AiringCard(
             }
         },
         subtitle = {
-            textShown.AnimatedVisibility({ it }, enter = RowTextEnter, exit = RowTextExit) {
-                Column(Modifier.fillMaxWidth().padding(top = 4.dp).clearAndSetSemantics { testTag = "details-card-subtitle-${item.id.value}" },
-                    verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    episode?.let {
-                        Text(it, style = MaterialTheme.typography.bodySmall,
-                            maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-                    channelName?.let {
-                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-                }
-            }
+            AiringCardSubtitle(textShown, episode, channelName, "details-card-subtitle-${item.id.value}")
         },
     )
+}
+
+@Composable
+private fun AiringCardSubtitle(textShown: Transition<Boolean>, episode: String?, channelName: String?, tag: String) {
+    textShown.AnimatedVisibility({ it }, enter = RowTextEnter, exit = RowTextExit) {
+        Column(
+            Modifier.fillMaxWidth().padding(top = 4.dp).clearAndSetSemantics { testTag = tag },
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            episode?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            channelName?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    }
 }
 
 // The blurred backdrop's decode: 16:9 at a sixth of the screen, blurred at 160px wide. Three

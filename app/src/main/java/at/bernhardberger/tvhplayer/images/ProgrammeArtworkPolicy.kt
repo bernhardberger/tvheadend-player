@@ -316,7 +316,7 @@ internal fun attentionWindow(pixels: IntArray, width: Int, height: Int, ratio: D
     return ArtworkWindow(if (vertical) 0 else start, if (vertical) start else 0, cropWidth, cropHeight)
 }
 
-/** A line of lettering drawn into a picture, in the pixels of the copy it was found on; [right] and [bottom] are past it. */
+/** A line of lettering in the pixels of the analysed copy; [right] and [bottom] are past it. */
 internal class ArtworkLettering(val left: Int, val top: Int, val right: Int, val bottom: Int)
 
 // Neighbouring pixels this close on every colour channel belong to one flat region.
@@ -356,42 +356,54 @@ private fun regionRoot(parent: IntArray, index: Int): Int {
  */
 internal fun artworkLettering(pixels: IntArray, width: Int, height: Int): List<ArtworkLettering> {
     val size = width * height
-    // One pass in reading order: a pixel takes its left neighbour's region, or the one above,
-    // and joins the two where both are flat with it. A region is named by its first pixel.
     val label = IntArray(size)
     val parent = IntArray(size)
+    labelFlatRegions(pixels, width, height, label, parent)
+    val sums = sumFlatRegions(pixels, width, height, label, parent)
+    return chainLettersIntoLines(findLetters(pixels, width, height, sums), width, height)
+}
+
+private fun isFlatWith(r: Int, g: Int, b: Int, other: Int): Boolean =
+    abs(r - (other shr 16 and 255)) <= LETTER_FLAT_STEP &&
+        abs(g - (other shr 8 and 255)) <= LETTER_FLAT_STEP &&
+        abs(b - (other and 255)) <= LETTER_FLAT_STEP
+
+/** Fills [label] and [parent] by joining flat neighbours, with each region rooted at its first pixel. */
+private fun labelFlatRegions(pixels: IntArray, width: Int, height: Int, label: IntArray, parent: IntArray) {
     for (y in 0 until height) {
         val row = y * width
         for (x in 0 until width) {
             val index = row + x
             val pixel = pixels[index]
             val r = pixel shr 16 and 255; val g = pixel shr 8 and 255; val b = pixel and 255
-            var region = -1
-            if (x > 0) {
-                val other = pixels[index - 1]
-                if (abs(r - (other shr 16 and 255)) <= LETTER_FLAT_STEP && abs(g - (other shr 8 and 255)) <= LETTER_FLAT_STEP &&
-                    abs(b - (other and 255)) <= LETTER_FLAT_STEP) region = label[index - 1]
-            }
-            if (y > 0) {
-                val other = pixels[index - width]
-                if (abs(r - (other shr 16 and 255)) <= LETTER_FLAT_STEP && abs(g - (other shr 8 and 255)) <= LETTER_FLAT_STEP &&
-                    abs(b - (other and 255)) <= LETTER_FLAT_STEP) {
-                    val above = label[index - width]
-                    if (region < 0) region = above
-                    else if (region != above) {
-                        val first = regionRoot(parent, region); val second = regionRoot(parent, above)
-                        region = minOf(first, second)
-                        parent[maxOf(first, second)] = region
-                    }
+            var region = if (x > 0 && isFlatWith(r, g, b, pixels[index - 1])) label[index - 1] else -1
+            if (y > 0 && isFlatWith(r, g, b, pixels[index - width])) {
+                val above = label[index - width]
+                if (region < 0) region = above
+                else if (region != above) {
+                    val first = regionRoot(parent, region); val second = regionRoot(parent, above)
+                    region = minOf(first, second)
+                    parent[maxOf(first, second)] = region
                 }
             }
             if (region < 0) { region = index; parent[index] = index }
             label[index] = region
         }
     }
-    // A region's root is its first pixel in reading order, so its top is the root's own row.
+}
+
+private class FlatRegionSums(size: Int) {
     val count = IntArray(size); val minX = IntArray(size); val maxX = IntArray(size); val maxY = IntArray(size)
     val red = IntArray(size); val green = IntArray(size); val blue = IntArray(size)
+}
+
+/** Returns each region's pixel count, bounds and RGB sums, indexed by its root. */
+private fun sumFlatRegions(
+    pixels: IntArray, width: Int, height: Int, label: IntArray, parent: IntArray,
+): FlatRegionSums {
+    val sums = FlatRegionSums(width * height)
+    val count = sums.count; val minX = sums.minX; val maxX = sums.maxX; val maxY = sums.maxY
+    val red = sums.red; val green = sums.green; val blue = sums.blue
     var lastLabel = -1; var lastRegion = -1
     for (y in 0 until height) {
         val row = y * width
@@ -401,42 +413,86 @@ internal fun artworkLettering(pixels: IntArray, width: Int, height: Int): List<A
             val region = if (named == lastLabel) lastRegion else regionRoot(parent, named)
             lastLabel = named; lastRegion = region
             val pixel = pixels[index]
-            if (count[region]++ == 0) { minX[region] = x; maxX[region] = x }
-            else { if (x < minX[region]) minX[region] = x; if (x > maxX[region]) maxX[region] = x }
+            if (count[region]++ == 0) {
+                minX[region] = x; maxX[region] = x
+            } else {
+                if (x < minX[region]) minX[region] = x
+                if (x > maxX[region]) maxX[region] = x
+            }
             maxY[region] = y
             red[region] += pixel shr 16 and 255; green[region] += pixel shr 8 and 255; blue[region] += pixel and 255
         }
     }
-    class Letter(val left: Int, val top: Int, val right: Int, val bottom: Int, val r: Double, val g: Double, val b: Double)
+    return sums
+}
+
+private class Letter(
+    val left: Int, val top: Int, val right: Int, val bottom: Int, val r: Double, val g: Double, val b: Double,
+)
+
+/** Returns the flat regions that are shaped like letters and stand out from their surround. */
+private fun findLetters(pixels: IntArray, width: Int, height: Int, sums: FlatRegionSums): List<Letter> {
     val letters = ArrayList<Letter>()
-    for (region in 0 until size) {
-        val pixelCount = count[region]
-        if (pixelCount < LETTER_MIN_PIXELS) continue
-        val left = minX[region]; val top = region / width
-        val letterWidth = maxX[region] - left + 1; val letterHeight = maxY[region] - top + 1
-        if (letterHeight < LETTER_MIN_HEIGHT * height || letterHeight > LETTER_MAX_HEIGHT * height) continue
-        if (letterWidth > LETTER_MAX_WIDTH * width) continue
-        val aspect = letterWidth.toDouble() / letterHeight
-        if (aspect < LETTER_MIN_ASPECT || aspect > LETTER_MAX_ASPECT) continue
-        val fill = pixelCount.toDouble() / (letterWidth * letterHeight)
-        if (fill < LETTER_MIN_FILL || fill > LETTER_MAX_FILL) continue
-        val edge = maxOf(2, letterHeight / 6)
-        val x0 = maxOf(0, left - edge); val x1 = minOf(width, left + letterWidth + edge)
-        val y0 = maxOf(0, top - edge); val y1 = minOf(height, top + letterHeight + edge)
-        val around = (x1 - x0) * (y1 - y0) - pixelCount
-        if (around < 4) continue
+    for (region in sums.count.indices) {
+        val pixelCount = sums.count[region]
+        if (pixelCount >= LETTER_MIN_PIXELS) {
+            val letter = letterInRegion(pixels, width, height, sums, region, pixelCount)
+            if (letter != null) letters += letter
+        }
+    }
+    return letters
+}
+
+private fun letterInRegion(
+    pixels: IntArray, width: Int, height: Int, sums: FlatRegionSums, region: Int, pixelCount: Int,
+): Letter? {
+    // A region's root is its first pixel in reading order, so its top is the root's own row.
+    val left = sums.minX[region]; val top = region / width
+    val letterWidth = sums.maxX[region] - left + 1; val letterHeight = sums.maxY[region] - top + 1
+    if (!isLetterShape(letterWidth, letterHeight, width, height, pixelCount)) return null
+    val edge = maxOf(2, letterHeight / 6)
+    val x0 = maxOf(0, left - edge); val x1 = minOf(width, left + letterWidth + edge)
+    val y0 = maxOf(0, top - edge); val y1 = minOf(height, top + letterHeight + edge)
+    val around = (x1 - x0) * (y1 - y0) - pixelCount
+    return if (around < 4) null else {
         var r = 0; var g = 0; var b = 0
         for (y in y0 until y1) for (x in x0 until x1) {
             val pixel = pixels[y * width + x]
             r += pixel shr 16 and 255; g += pixel shr 8 and 255; b += pixel and 255
         }
-        val meanR = red[region].toDouble() / pixelCount; val meanG = green[region].toDouble() / pixelCount
-        val meanB = blue[region].toDouble() / pixelCount
-        val contrast = maxOf(abs(meanR - (r - red[region]).toDouble() / around),
-            abs(meanG - (g - green[region]).toDouble() / around), abs(meanB - (b - blue[region]).toDouble() / around))
-        if (contrast < LETTER_CONTRAST) continue
-        letters += Letter(left, top, left + letterWidth, top + letterHeight, meanR, meanG, meanB)
+        val meanR = sums.red[region].toDouble() / pixelCount; val meanG = sums.green[region].toDouble() / pixelCount
+        val meanB = sums.blue[region].toDouble() / pixelCount
+        val contrast = maxOf(abs(meanR - (r - sums.red[region]).toDouble() / around),
+            abs(meanG - (g - sums.green[region]).toDouble() / around),
+            abs(meanB - (b - sums.blue[region]).toDouble() / around))
+        if (contrast < LETTER_CONTRAST) null
+        else Letter(left, top, left + letterWidth, top + letterHeight, meanR, meanG, meanB)
     }
+}
+
+private fun isLetterShape(letterWidth: Int, letterHeight: Int, width: Int, height: Int, pixelCount: Int): Boolean {
+    if (letterHeight < LETTER_MIN_HEIGHT * height || letterHeight > LETTER_MAX_HEIGHT * height ||
+        letterWidth > LETTER_MAX_WIDTH * width
+    ) return false
+    val aspect = letterWidth.toDouble() / letterHeight
+    return if (aspect < LETTER_MIN_ASPECT || aspect > LETTER_MAX_ASPECT) false
+    else {
+        val fill = pixelCount.toDouble() / (letterWidth * letterHeight)
+        fill >= LETTER_MIN_FILL && fill <= LETTER_MAX_FILL
+    }
+}
+
+private fun lettersLineUp(a: Letter, heightA: Int, b: Letter): Boolean {
+    val heightB = b.bottom - b.top
+    val taller = maxOf(heightA, heightB); val shorter = minOf(heightA, heightB)
+    return taller <= LINE_HEIGHT_RATIO * shorter &&
+        minOf(a.bottom, b.bottom) - maxOf(a.top, b.top) >= LINE_OVERLAP * shorter &&
+        maxOf(a.left, b.left) - minOf(a.right, b.right) <= LINE_GAP * taller &&
+        maxOf(abs(a.r - b.r), abs(a.g - b.g), abs(a.b - b.b)) <= LINE_COLOUR
+}
+
+/** Returns a bounding box for each chain of enough neighbouring letters of like height and colour. */
+private fun chainLettersIntoLines(letters: List<Letter>, width: Int, height: Int): List<ArtworkLettering> {
     val line = IntArray(letters.size) { it }
     fun lineOf(index: Int): Int {
         var at = index
@@ -446,13 +502,7 @@ internal fun artworkLettering(pixels: IntArray, width: Int, height: Int): List<A
     for (i in letters.indices) {
         val a = letters[i]; val heightA = a.bottom - a.top
         for (j in i + 1 until letters.size) {
-            val b = letters[j]; val heightB = b.bottom - b.top
-            val taller = maxOf(heightA, heightB); val shorter = minOf(heightA, heightB)
-            if (taller > LINE_HEIGHT_RATIO * shorter) continue
-            if (minOf(a.bottom, b.bottom) - maxOf(a.top, b.top) < LINE_OVERLAP * shorter) continue
-            if (maxOf(a.left, b.left) - minOf(a.right, b.right) > LINE_GAP * taller) continue
-            if (maxOf(abs(a.r - b.r), abs(a.g - b.g), abs(a.b - b.b)) > LINE_COLOUR) continue
-            line[lineOf(i)] = lineOf(j)
+            if (lettersLineUp(a, heightA, letters[j])) line[lineOf(i)] = lineOf(j)
         }
     }
     val lines = ArrayList<ArtworkLettering>()
@@ -474,7 +524,7 @@ internal fun artworkLettering(pixels: IntArray, width: Int, height: Int): List<A
 /** Where a channel's logo stands on a programme picture. */
 internal enum class ArtworkLogoCorner { BOTTOM_START, BOTTOM_END, TOP_START, TOP_END }
 
-/** What a logo stands on in its corner: the corner shade, or the picture itself where that is calm and clearly light or dark. */
+/** A corner shade, or the picture itself where the corner is calm and clearly light or dark. */
 internal enum class ArtworkLogoGround { SHADE, LIGHT_PICTURE, DARK_PICTURE }
 
 internal data class ArtworkLogoPlace(val corner: ArtworkLogoCorner, val ground: ArtworkLogoGround)
@@ -524,8 +574,10 @@ internal fun artworkLogoPlaces(
     fun score(corner: ArtworkLogoCorner, atRight: Boolean, atBottom: Boolean): Scored {
         val left = if (atRight) width - inset - boxWidth else inset
         val top = if (atBottom) height - inset - boxHeight else inset
-        val x0 = (left - reach).roundToInt().coerceAtLeast(1); val x1 = (left + boxWidth + reach).roundToInt().coerceAtMost(width)
-        val y0 = (top - reach).roundToInt().coerceAtLeast(1); val y1 = (top + boxHeight + reach).roundToInt().coerceAtMost(height)
+        val x0 = (left - reach).roundToInt().coerceAtLeast(1)
+        val x1 = (left + boxWidth + reach).roundToInt().coerceAtMost(width)
+        val y0 = (top - reach).roundToInt().coerceAtLeast(1)
+        val y1 = (top + boxHeight + reach).roundToInt().coerceAtMost(height)
         val rx0 = (left - room).roundToInt(); val rx1 = (left + boxWidth + room).roundToInt()
         val ry0 = (top - room).roundToInt(); val ry1 = (top + boxHeight + room).roundToInt()
         val bx0 = left.roundToInt(); val bx1 = (left + boxWidth).roundToInt()
@@ -545,26 +597,12 @@ internal fun artworkLogoPlaces(
         }
         val full = (LOGO_STEP_HIGH - LOGO_STEP_LOW).toDouble()
         val neededShare = needed / full / maxOf(1, neededCount)
-        fun lettered(margin: Double): Double {
-            var covered = 0.0
-            for (line in lettering) {
-                val across = minOf(left + boxWidth + margin, line.right.toDouble()) - maxOf(left - margin, line.left.toDouble())
-                val down = minOf(top + boxHeight + margin, line.bottom.toDouble()) - maxOf(top - margin, line.top.toDouble())
-                if (across > 0 && down > 0) covered += across * down
-            }
-            return minOf(1.0, covered / ((boxWidth + 2 * margin) * (boxHeight + 2 * margin)))
-        }
         val cost = maxOf(neededShare, LOGO_NEIGHBOUR_WEIGHT * near / full / maxOf(1, nearCount)) +
-            LOGO_LETTERING_WEIGHT * lettered(room) + LOGO_LETTERING_NEAR_WEIGHT * lettered(reach)
+            LOGO_LETTERING_WEIGHT * letteringShare(lettering, left, top, boxWidth, boxHeight, room) +
+            LOGO_LETTERING_NEAR_WEIGHT * letteringShare(lettering, left, top, boxWidth, boxHeight, reach)
         fun linear(sum: Int) = (sum.toDouble() / maxOf(1, boxCount) / 255).pow(2.2)
         val luminance = .2126 * linear(r) + .7152 * linear(g) + .0722 * linear(b)
-        val ground = when {
-            neededShare >= LOGO_CALM -> ArtworkLogoGround.SHADE
-            luminance >= LOGO_LIGHT_GROUND -> ArtworkLogoGround.LIGHT_PICTURE
-            luminance <= LOGO_DARK_GROUND -> ArtworkLogoGround.DARK_PICTURE
-            else -> ArtworkLogoGround.SHADE
-        }
-        return Scored(ArtworkLogoPlace(corner, ground), cost)
+        return Scored(ArtworkLogoPlace(corner, logoGround(neededShare, luminance)), cost)
     }
     val left = mutableListOf(
         score(ArtworkLogoCorner.BOTTOM_START, startAtRight, atBottom = true),
@@ -579,6 +617,25 @@ internal fun artworkLogoPlaces(
         ranked += next.place; left -= next
     }
     return ranked
+}
+
+private fun letteringShare(
+    lettering: List<ArtworkLettering>, left: Double, top: Double, boxWidth: Double, boxHeight: Double, margin: Double,
+): Double {
+    var covered = 0.0
+    for (line in lettering) {
+        val across = minOf(left + boxWidth + margin, line.right.toDouble()) - maxOf(left - margin, line.left.toDouble())
+        val down = minOf(top + boxHeight + margin, line.bottom.toDouble()) - maxOf(top - margin, line.top.toDouble())
+        if (across > 0 && down > 0) covered += across * down
+    }
+    return minOf(1.0, covered / ((boxWidth + 2 * margin) * (boxHeight + 2 * margin)))
+}
+
+private fun logoGround(neededShare: Double, luminance: Double): ArtworkLogoGround = when {
+    neededShare >= LOGO_CALM -> ArtworkLogoGround.SHADE
+    luminance >= LOGO_LIGHT_GROUND -> ArtworkLogoGround.LIGHT_PICTURE
+    luminance <= LOGO_DARK_GROUND -> ArtworkLogoGround.DARK_PICTURE
+    else -> ArtworkLogoGround.SHADE
 }
 
 // A logo needs a light ground when little of it is light itself and it reads clearly better on
@@ -599,7 +656,8 @@ private const val LOGO_FULL_CONTRAST = 7.0
 internal fun logoNeedsLightGround(pixels: IntArray): Boolean {
     var count = 0; var light = 0; var onDark = 0.0; var onLight = 0.0
     fun contrast(a: Double, b: Double) =
-        (kotlin.math.ln((maxOf(a, b) + .05) / (minOf(a, b) + .05)) / kotlin.math.ln(LOGO_FULL_CONTRAST)).coerceAtMost(1.0)
+        (kotlin.math.ln((maxOf(a, b) + .05) / (minOf(a, b) + .05)) / kotlin.math.ln(LOGO_FULL_CONTRAST))
+            .coerceAtMost(1.0)
     for (p in pixels) {
         if (p ushr 24 <= 127) continue
         fun linear(v: Int) = (v / 255.0).pow(2.2)
