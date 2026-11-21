@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -21,10 +22,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -34,19 +32,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.images.LogoInkTransformation
 import at.bernhardberger.tvhplayer.touch.R
 import coil3.request.ImageRequest
 import coil3.request.transformations
+import kotlin.math.roundToInt
 
 @Composable
 internal fun DetailsBackButton(label: String, onBack: () -> Unit) {
@@ -97,20 +94,24 @@ internal fun ChannelLogoImage(logo: Painter?, model: Any?, ground: Color, fallba
         ArtworkImage(logo, model, bounds, fallback = fallback)
         return
     }
-    var size by remember { mutableStateOf(IntSize.Zero) }
-    val measuredBounds = bounds.onSizeChanged { size = it }
-    if (size.width <= 0 || size.height <= 0) {
-        Spacer(measuredBounds)
-        return
-    }
     val context = LocalContext.current
-    val request = remember(context, model, ground, size) {
-        // The shared ink rule reads a picon at 400×240 before trimming and fitting its visible shape.
-        ImageRequest.Builder(context).data(model).size(400, 240)
-            .transformations(LogoInkTransformation(ground.toArgb(), size.width, size.height, trim = true))
-            .build()
+    BoxWithConstraints(
+        Modifier.fillMaxWidth().fillMaxHeight(),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (!constraints.hasBoundedWidth || !constraints.hasBoundedHeight) return@BoxWithConstraints
+        // Use the same rounded pixel bounds as fillMaxWidth/Height in this layout pass.
+        val width = (constraints.maxWidth * LOGO_WIDTH_SHARE).roundToInt()
+        val height = (constraints.maxHeight * LOGO_HEIGHT_SHARE).roundToInt()
+        if (width <= 0 || height <= 0) return@BoxWithConstraints
+        val request = remember(context, model, ground, width, height) {
+            // The shared ink rule reads a picon at 400×240 before trimming and fitting its visible shape.
+            ImageRequest.Builder(context).data(model).size(400, 240)
+                .transformations(LogoInkTransformation(ground.toArgb(), width, height, trim = true))
+                .build()
+        }
+        ArtworkImage(null, request, bounds, fallback = fallback)
     }
-    ArtworkImage(null, request, measuredBounds, fallback = fallback)
 }
 
 /** The scrim over a page's top picture: it keeps the bar readable and fades the picture into the page. */

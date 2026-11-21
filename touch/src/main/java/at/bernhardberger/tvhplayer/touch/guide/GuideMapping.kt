@@ -156,10 +156,14 @@ internal fun guideCoverage(
     clock: GuideClock,
 ): GuideCoverage? {
     if (ids.isEmpty()) return null
-    val shown = ids.toSet()
-    val events = observation.epgSnapshotForDisplay?.events.orEmpty().filter { it.channelId in shown }
-    val days = guideDays(events, clock)
-    val window = guideWindow(selection.dateIn(days), null, clock)
+    val date = if (selection.day == null || selection.day == clock.today) {
+        clock.today
+    } else {
+        val shown = ids.toSet()
+        val events = observation.epgSnapshotForDisplay?.events.orEmpty().filter { it.channelId in shown }
+        selection.dateIn(guideDays(events, clock))
+    }
+    val window = guideWindow(date, null, clock)
     return GuideCoverage(ids, window.daySec.first, window.daySec.last + 1)
 }
 
@@ -235,13 +239,17 @@ internal class GuideMapper(
             }
             overview += event
         }
+        // Share formatting, artwork and DVR lookups for events visible in both lists.
+        val day = schedule.asSequence()
+            .filter { it.overlaps(window.daySec) }
+            .associate { it.id to program(it) }
         return GuideChannel(
             id = channel.id.value.toString(),
             name = channel.name.orEmpty(),
             logoModel = logos[channel.id],
-            programs = overview.map { program(it) },
+            programs = overview.map { day[it.id] ?: program(it) },
             gap = gap,
-            day = dayPrograms(schedule.asSequence(), window.daySec, null),
+            day = day.values.toList(),
         )
     }
 
@@ -258,8 +266,10 @@ internal class GuideMapper(
     }
 
     private fun dayPrograms(schedule: Sequence<EpgEvent>, window: LongRange, watched: EpgEvent?): List<GuideProgram> =
-        schedule.filter { it.stop.epochSeconds > window.first && it.start.epochSeconds <= window.last }
-            .map { program(it, watched) }.toList()
+        schedule.filter { it.overlaps(window) }.map { program(it, watched) }.toList()
+
+    private fun EpgEvent.overlaps(window: LongRange): Boolean =
+        stop.epochSeconds > window.first && start.epochSeconds <= window.last
 
     private fun program(event: EpgEvent, watched: EpgEvent? = null): GuideProgram {
         val running = event.isRunning(clock.nowSec)

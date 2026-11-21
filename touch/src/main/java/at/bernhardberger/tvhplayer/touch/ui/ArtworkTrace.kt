@@ -41,6 +41,14 @@ internal fun ArtworkScreenShown(screen: String) {
     }
 }
 
+internal fun <T> traceGuideMapping(context: Context, map: () -> T): T {
+    if (!context.isDebuggable) return map()
+    val startMs = SystemClock.elapsedRealtime()
+    return map().also {
+        Log.d(ARTWORK_LOG_TAG, "mapped Guide ms=${SystemClock.elapsedRealtime() - startMs} startMs=$startMs")
+    }
+}
+
 internal data class ArtworkRequestTimes(
     val startMs: Long,
     val fetchStartMs: Long? = null,
