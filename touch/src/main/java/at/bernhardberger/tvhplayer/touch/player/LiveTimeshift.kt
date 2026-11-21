@@ -29,14 +29,24 @@ import kotlin.time.Instant
  */
 internal class LiveTimeshift(private val runtime: AppPlaybackRuntime, private val scope: CoroutineScope) {
     private val bar = mutableStateOf<LiveTimeline?>(null)
+    private val shown = mutableStateOf(ShownPrograms(null, null))
     private var sample = AppTimeshiftState()
     private var held: TimeshiftTimeline? = null
 
     /** Read only by what draws the bar. */
     val timeline: State<LiveTimeline?> get() = bar
 
+    /** The program the viewer is in and the one after it, by the TV's rule ([shownPrograms]). */
+    val programs: State<ShownPrograms> get() = shown
+
     /** Samples every [intervalMs] while [channelId] is the runtime's target; another target samples nothing. */
-    suspend fun follow(channelId: ChannelId, intervalMs: Long, eventAt: (Instant) -> EpgEvent?) {
+    suspend fun follow(
+        channelId: ChannelId,
+        intervalMs: Long,
+        liveStart: () -> Boolean,
+        eventAt: (Instant) -> EpgEvent?,
+        nextAt: (Instant) -> EpgEvent?,
+    ) {
         while (true) {
             val raw = if (runtime.activeTarget.value == AppPlaybackTarget.Live(channelId)) {
                 runtime.sampleTimeshiftPresentation()
@@ -45,6 +55,7 @@ internal class LiveTimeshift(private val runtime: AppPlaybackRuntime, private va
             sample = raw.copy(historyStartTimeline = held)
             val nowSec = System.currentTimeMillis() / MS_PER_SECOND
             bar.value = liveTimeline(sample, nowSec, ZoneId.systemDefault(), eventAt)
+            shown.value = shownPrograms(sample, liveStart(), Instant.fromEpochSeconds(nowSec), eventAt, nextAt)
             delay(intervalMs)
         }
     }
@@ -85,7 +96,11 @@ internal class LiveTimeshift(private val runtime: AppPlaybackRuntime, private va
     }
 }
 
-/** The player's own play/pause intent, which the live pause state can override. */
+/**
+ * The player's own play/pause intent, which the live pause state can override. Read again once the
+ * listener is in place, as the TV's `rememberPlaybackIntent` does: a change between composition and
+ * the listener would otherwise never arrive.
+ */
 @Composable
 internal fun rememberPlayWhenReady(player: Player): State<Boolean> = produceState(player.playWhenReady, player) {
     val listener = object : Player.Listener {
@@ -94,6 +109,7 @@ internal fun rememberPlayWhenReady(player: Player): State<Boolean> = produceStat
         }
     }
     player.addListener(listener)
+    value = player.playWhenReady
     awaitDispose { player.removeListener(listener) }
 }
 
@@ -113,11 +129,17 @@ internal fun FollowTimeshift(
     timeshift: LiveTimeshift,
     channelId: ChannelId,
     fast: Boolean,
+    liveStart: Boolean,
     eventAt: (Instant) -> EpgEvent?,
+    nextAt: (Instant) -> EpgEvent?,
 ) {
     val interval = if (fast) FAST_SAMPLE_MS else SLOW_SAMPLE_MS
+    val latestLiveStart by rememberUpdatedState(liveStart)
     val latestEventAt by rememberUpdatedState(eventAt)
-    LaunchedEffect(timeshift, channelId, interval) { timeshift.follow(channelId, interval) { latestEventAt(it) } }
+    val latestNextAt by rememberUpdatedState(nextAt)
+    LaunchedEffect(timeshift, channelId, interval) {
+        timeshift.follow(channelId, interval, { latestLiveStart }, { latestEventAt(it) }, { latestNextAt(it) })
+    }
 }
 
 private const val FAST_SAMPLE_MS = 250L

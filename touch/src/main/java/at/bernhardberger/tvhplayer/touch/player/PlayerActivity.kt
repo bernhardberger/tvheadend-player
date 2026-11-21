@@ -1,10 +1,14 @@
 package at.bernhardberger.tvhplayer.touch.player
 
+import android.app.PictureInPictureUiState
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.content.res.Resources
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.view.Window
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.addCallback
@@ -13,6 +17,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.annotation.OptIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -20,7 +25,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalResources
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.util.UnstableApi
@@ -68,8 +77,9 @@ import kotlin.time.Instant
 
 /**
  * The live player. It plays through the app's one playback runtime: it never creates or
- * releases the player. Leaving it (Back, or the activity stopping outside a rotation) stops
- * playback; a tap on another channel while it is open tunes that one here.
+ * releases the player. Back and leaving the app put the picture into the picture-in-picture
+ * window; without the window, and when the window is closed, playback stops. A tap on another
+ * channel while it is open tunes that one here.
  */
 class PlayerActivity : ComponentActivity() {
     private val sdk: SdkRuntimeOwner by inject()
@@ -78,10 +88,8 @@ class PlayerActivity : ComponentActivity() {
     private val channels: ChannelsViewModel by viewModel()
     private val runtime get() = sdk.playbackRuntime
 
-    /** The channel asked for; a new [Tune.token] tunes again (Watch live after the pause ended). */
-    private data class Tune(val channelId: ChannelId, val token: Int = 0)
-
     private lateinit var requested: MutableStateFlow<Tune>
+    private lateinit var pictureWindow: PlayerWindow
     private val requestFailed = MutableStateFlow(false)
     private var leaving = false
 
@@ -95,14 +103,15 @@ class PlayerActivity : ComponentActivity() {
             return
         }
         requested = MutableStateFlow(Tune(channelId))
+        pictureWindow = PlayerWindow(this, runtime.player).also { it.open() }
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
         )
-        onBackPressedDispatcher.addCallback(this) { leave() }
-        lifecycleScope.launch { requested.collectLatest(::tune) }
-        lifecycleScope.launch { retuneOnNewSession() }
-        lifecycleScope.launch { followConnection() }
+        onBackPressedDispatcher.addCallback(this) { back() }
+        lifecycleScope.launch { requested.collectLatest { tune(runtime, session, it, requestFailed) } }
+        lifecycleScope.launch { retuneOnNewSession(runtime, session) }
+        lifecycleScope.launch { followConnection(runtime, session) }
         lifecycleScope.launch {
             runtime.sessionStops.first()
             leaving = true
@@ -116,18 +125,55 @@ class PlayerActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         val channelId = intent.channelId() ?: return
-        // A newer tap replaces one still starting; the same channel again changes nothing.
-        if (::requested.isInitialized) requested.update { if (it.channelId == channelId) it else Tune(channelId) }
+        if (::requested.isInitialized) requested.update { tuneTo(it, channelId) }
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        // Android 12 and later enter the window by themselves (auto-enter); before that, here.
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S && ::pictureWindow.isInitialized &&
+            leavePlayer(LeaveTrigger.UserLeave, canUseWindow(), isInPictureInPictureMode, false) == Leave.EnterWindow
+        ) {
+            pictureWindow.enter()
+        }
+    }
+
+    override fun onPictureInPictureUiStateChanged(pipState: PictureInPictureUiState) {
+        super.onPictureInPictureUiStateChanged(pipState)
+        // Android 15 and later say early, so the controls go before the window's animation.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM && pipState.isTransitioningToPip &&
+            ::pictureWindow.isInitialized
+        ) {
+            pictureWindow.inWindow.value = true
+        }
+    }
+
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        if (!::pictureWindow.isInitialized) return
+        if (isInPictureInPictureMode) pictureWindow.inWindow.value = true else pictureWindow.left()
     }
 
     override fun onStop() {
         super.onStop()
-        if (!isChangingConfigurations) leave()
+        // Outside a rotation: the window closed, or the player hidden without one.
+        if (leavePlayer(LeaveTrigger.Hidden, false, isInPictureInPictureMode, isChangingConfigurations) == Leave.Stop) {
+            leave()
+        }
     }
 
     override fun onDestroy() {
+        if (::pictureWindow.isInitialized) pictureWindow.close()
         runtime.onLivePlayerClosed(this)
         super.onDestroy()
+    }
+
+    private fun back() {
+        when (leavePlayer(LeaveTrigger.Back, canUseWindow(), isInPictureInPictureMode, false)) {
+            Leave.EnterWindow -> if (!pictureWindow.enter()) leave()
+            Leave.Stop -> leave()
+            Leave.Stay -> Unit
+        }
     }
 
     private fun leave() {
@@ -139,63 +185,20 @@ class PlayerActivity : ComponentActivity() {
         }
     }
 
-    private fun watchLive() {
-        runtime.consumeBackgroundNotice(BackgroundPlaybackNotice.LIMIT_EXPIRED)
-        requested.update { it.copy(token = it.token + 1) }
-    }
-
-    @OptIn(UnstableApi::class)
-    private suspend fun tune(tune: Tune) {
-        requestFailed.value = false
-        val intent = runtime.notePlaybackIntent()
-        val state = runtime.state.value
-        if (tune.token == 0 && playingChannelId(runtime.activeTarget.value, state) == tune.channelId &&
-            state !is AppPlaybackState.Idle
-        ) {
-            // Already playing (or starting) this channel: adopt it instead of tuning it again.
-            runtime.notePlaybackIntentServed(intent)
-            withContext(NonCancellable) { runtime.retuneAfterReconnect() }
-            return
-        }
-        val selection = session.observation.mapNotNull { currentLivePlaybackSelection(it, tune.channelId) }.first()
-        if (runtime.isPlaybackIntentStopped(intent)) return
-        val result = runtime.playLive(selection, intent)
-        if (result?.isStarted != true && !runtime.isPlaybackIntentStopped(intent)) {
-            requestFailed.value = true
-            runtime.stopAfterLoss()
-        }
-    }
-
-    /** A session that replaced the one the channel started on retunes it, as the TV's player does. */
-    private suspend fun retuneOnNewSession() {
-        session.observation.map { it.currentSession }
-            .distinctUntilChanged { a, b -> a === b }
-            .filterNotNull()
-            .drop(1)
-            .collect { runtime.retuneAfterReconnect() }
-    }
-
-    /** The TV's loss handling: a lost connection stops the channel, its return retries it. */
-    private suspend fun followConnection() {
-        var lost = false
-        combine(
-            session.observation.map { it.sessionState.toConnectionState() is ConnectionState.Connected },
-            runtime.videoPresentation.map { it.channelStartAtMillis != null },
-        ) { connected, starting -> connected to starting }
-            .distinctUntilChanged()
-            .collect { (connected, starting) ->
-                when {
-                    starting -> lost = false
-                    connected && lost -> {
-                        lost = false
-                        runtime.retryLive(viewerRetry = false)
-                    }
-                    !connected && !lost -> {
-                        lost = true
-                        if (runtime.stopAfterLoss(unlessChannelStarting = true) == null) lost = false
-                    }
-                }
+    private fun act(action: PlayerAction, timeshift: LiveTimeshift, paused: Boolean) {
+        when (action) {
+            PlayerAction.Back -> back()
+            PlayerAction.PictureInPicture -> pictureWindow.enter()
+            PlayerAction.WatchLive -> {
+                runtime.consumeBackgroundNotice(BackgroundPlaybackNotice.LIMIT_EXPIRED)
+                requested.update { it.copy(token = it.token + 1) }
             }
+            PlayerAction.TogglePlay -> timeshift.toggle(paused)
+            PlayerAction.BackTen -> timeshift.skip(-BACK_SKIP_MS)
+            PlayerAction.ForwardThirty -> timeshift.skip(FORWARD_SKIP_MS)
+            PlayerAction.GoLive -> timeshift.goLive()
+            else -> Unit
+        }
     }
 
     @Composable
@@ -206,6 +209,9 @@ class PlayerActivity : ComponentActivity() {
         val video by runtime.videoPresentation.collectAsStateWithLifecycle()
         val tune by requested.collectAsStateWithLifecycle()
         val failed by requestFailed.collectAsStateWithLifecycle()
+        val inWindow by pictureWindow.inWindow.collectAsStateWithLifecycle()
+        val windowAvailable by pictureWindow.available.collectAsStateWithLifecycle()
+        val liveStart by runtime.liveStartUndisturbed.collectAsStateWithLifecycle()
         // The texts and the channel list move on the minute, not on every tick of the clock.
         val clock = rememberCurrentEpochSeconds()
         val minute by remember { derivedStateOf { clock() / SECONDS_PER_MINUTE } }
@@ -214,63 +220,43 @@ class PlayerActivity : ComponentActivity() {
         val commands = rememberCoroutineScope()
         val timeshift = remember { LiveTimeshift(runtime, commands) }
         var controlsShown by remember { mutableStateOf(true) }
-        var brightness by remember { mutableFloatStateOf(systemBrightness()) }
+        var brightness by remember { mutableFloatStateOf(brightnessSlider(systemBrightness(this))) }
         val shown = tune.channelId
         val status = currentStatus(runtime, observation, shown, failed)
         val paused = !livePlayWhenReady(pause, playWhenReady)
-        FollowTimeshift(timeshift, shown, fast = controlsShown && !paused) {
-            session.observation.value.eventAt(shown, it)
-        }
+        FollowTimeshift(
+            timeshift, shown, fast = controlsShown && !paused && !inWindow, liveStart = liveStart && !paused,
+            eventAt = { session.observation.value.eventAt(shown, it) },
+            nextAt = { session.observation.value.nextEvent(shown, it) },
+        )
         ConsumePauseNotices(runtime)
+        SystemBarsForOrientation(window)
         val now = Instant.fromEpochSeconds(minute * SECONDS_PER_MINUTE)
         val state = livePlayerState(
             shown, scope, observation, presentation.connection, presentation.degraded, status,
-            timeshift.timeline, pause.availability, now,
+            timeshift.timeline, pause.availability, now, window = windowAvailable,
         )
         PlayerScreen(
             state = state.copy(
-                channel = state.channel.withProgramTexts(observation, shown, now, LocalResources.current),
+                channel = state.channel.withProgramTexts(timeshift.programs.value, now, LocalResources.current),
                 brightness = brightness,
                 paused = paused,
             ),
-            onAction = { action ->
-                when (action) {
-                    PlayerAction.Back -> leave()
-                    PlayerAction.WatchLive -> watchLive()
-                    PlayerAction.TogglePlay -> timeshift.toggle(paused)
-                    PlayerAction.BackTen -> timeshift.skip(-BACK_SKIP_MS)
-                    PlayerAction.ForwardThirty -> timeshift.skip(FORWARD_SKIP_MS)
-                    PlayerAction.GoLive -> timeshift.goLive()
-                    else -> Unit
-                }
-            },
+            onAction = { act(it, timeshift, paused) },
             onSeek = timeshift::seek,
-            onBrightness = { value ->
-                brightness = value
-                window.attributes = window.attributes.apply { screenBrightness = value.coerceIn(MIN_BRIGHTNESS, 1f) }
-            },
-            onChannel = { id ->
-                val channelId = ChannelId(id.toLong())
-                requested.update { if (it.channelId == channelId) it else Tune(channelId) }
-            },
+            onBrightness = { brightness = it; applyBrightness(window, it) },
+            onChannel = { id -> requested.update { tuneTo(it, ChannelId(id.toLong())) } },
             onChoice = { choice ->
                 if (choice is PlayerChoice.ChannelTag) channels.selectTag(choice.id?.let { ChannelTagId(it.toLong()) })
             },
-            video = { modifier -> TouchVideoSurface(runtime.player, video.visible, modifier) },
+            video = { modifier -> TouchVideoSurface(runtime.player, video.visible, modifier, pictureWindow::attach) },
             onControlsShown = { controlsShown = it },
+            inWindow = inWindow,
         )
     }
 
-
-    private fun systemBrightness(): Float =
-        Settings.System.getInt(contentResolver, Settings.System.SCREEN_BRIGHTNESS, DEFAULT_BRIGHTNESS) / MAX_BRIGHTNESS
-
     companion object {
         private const val EXTRA_CHANNEL = "channel"
-        private const val DEFAULT_BRIGHTNESS = 128
-        private const val MAX_BRIGHTNESS = 255f
-        // Zero would turn the backlight off on some devices.
-        private const val MIN_BRIGHTNESS = 0.01f
         private const val SECONDS_PER_MINUTE = 60L
         private const val BACK_SKIP_MS = 10_000L
         private const val FORWARD_SKIP_MS = 30_000L
@@ -282,6 +268,105 @@ class PlayerActivity : ComponentActivity() {
             getLongExtra(EXTRA_CHANNEL, -1L).takeIf { it >= 0 }?.let(::ChannelId)
     }
 }
+
+/** The channel asked for; a new [token] tunes again (Watch live after the pause ended). */
+private data class Tune(val channelId: ChannelId, val token: Int = 0)
+
+/** A newer tap replaces one still starting; the same channel again changes nothing. */
+private fun tuneTo(current: Tune, channelId: ChannelId): Tune =
+    if (current.channelId == channelId) current else Tune(channelId)
+
+@OptIn(UnstableApi::class)
+private suspend fun tune(
+    runtime: AppPlaybackRuntime,
+    session: TvheadendSession,
+    tune: Tune,
+    requestFailed: MutableStateFlow<Boolean>,
+) {
+    requestFailed.value = false
+    val intent = runtime.notePlaybackIntent()
+    val state = runtime.state.value
+    if (tune.token == 0 && playingChannelId(runtime.activeTarget.value, state) == tune.channelId &&
+        state !is AppPlaybackState.Idle
+    ) {
+        // Already playing (or starting) this channel: adopt it instead of tuning it again.
+        runtime.notePlaybackIntentServed(intent)
+        withContext(NonCancellable) { runtime.retuneAfterReconnect() }
+        return
+    }
+    val selection = session.observation.mapNotNull { currentLivePlaybackSelection(it, tune.channelId) }.first()
+    if (runtime.isPlaybackIntentStopped(intent)) return
+    val result = runtime.playLive(selection, intent)
+    if (result?.isStarted != true && !runtime.isPlaybackIntentStopped(intent)) {
+        requestFailed.value = true
+        runtime.stopAfterLoss()
+    }
+}
+
+/** A session that replaced the one the channel started on retunes it, as the TV's player does. */
+private suspend fun retuneOnNewSession(runtime: AppPlaybackRuntime, session: TvheadendSession) {
+    session.observation.map { it.currentSession }
+        .distinctUntilChanged { a, b -> a === b }
+        .filterNotNull()
+        .drop(1)
+        .collect { runtime.retuneAfterReconnect() }
+}
+
+/** The TV's loss handling: a lost connection stops the channel, its return retries it. */
+private suspend fun followConnection(runtime: AppPlaybackRuntime, session: TvheadendSession) {
+    var lost = false
+    combine(
+        session.observation.map { it.sessionState.toConnectionState() is ConnectionState.Connected },
+        runtime.videoPresentation.map { it.channelStartAtMillis != null },
+    ) { connected, starting -> connected to starting }
+        .distinctUntilChanged()
+        .collect { (connected, starting) ->
+            when {
+                starting -> lost = false
+                connected && lost -> {
+                    lost = false
+                    runtime.retryLive(viewerRetry = false)
+                }
+                !connected && !lost -> {
+                    lost = true
+                    if (runtime.stopAfterLoss(unlessChannelStarting = true) == null) lost = false
+                }
+            }
+        }
+}
+
+/** The system's backlight level (0–1), which the slider shows on its own curve ([brightnessSlider]). */
+private fun systemBrightness(context: Context): Float = Settings.System.getInt(
+    context.contentResolver, Settings.System.SCREEN_BRIGHTNESS, DEFAULT_BRIGHTNESS,
+) / MAX_BRIGHTNESS
+
+/** The slider sets this window's backlight only; the system setting stays as it was. */
+private fun applyBrightness(window: Window, slider: Float) {
+    window.attributes = window.attributes.apply {
+        screenBrightness = brightnessLevel(slider).coerceIn(MIN_BRIGHTNESS, 1f)
+    }
+}
+
+/**
+ * Landscape plays full screen without the system bars (the drawings tablet-player and
+ * phone-player-landscape); a swipe from the edge shows them for a moment. Upright keeps them
+ * (phone-player, tablet-upright-player).
+ */
+@Composable
+private fun SystemBarsForOrientation(window: Window) {
+    val landscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    LaunchedEffect(window, landscape) {
+        val bars = WindowCompat.getInsetsController(window, window.decorView)
+        bars.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        val systemBars = WindowInsetsCompat.Type.systemBars()
+        if (landscape) bars.hide(systemBars) else bars.show(systemBars)
+    }
+}
+
+private const val DEFAULT_BRIGHTNESS = 128
+private const val MAX_BRIGHTNESS = 255f
+// Zero would turn the backlight off on some devices.
+private const val MIN_BRIGHTNESS = 0.01f
 
 /** The face's status from the runtime, the session and this activity's own failed request, as the TV derives it. */
 @OptIn(UnstableApi::class)
@@ -309,15 +394,12 @@ private fun currentStatus(
     )
 }
 
-/** The running and next program's clock, episode and genre texts, by the shared formatters. */
-private fun ChannelRow.withProgramTexts(
-    observation: SessionObservation,
-    channelId: ChannelId,
-    now: Instant,
-    resources: Resources,
-): ChannelRow {
-    val running = observation.eventAt(channelId, now)
-    val next = observation.nextEvent(channelId, now)
+/**
+ * The clock, episode and genre texts of the program the viewer is in and the one after it, by the
+ * shared formatters.
+ */
+private fun ChannelRow.withProgramTexts(programs: ShownPrograms, now: Instant, resources: Resources): ChannelRow {
+    val running = programs.now
     val nowSec = now.epochSeconds
     return copy(
         now = running?.let {
@@ -327,7 +409,7 @@ private fun ChannelRow.withProgramTexts(
                 progress = it.progress(nowSec),
             )
         },
-        next = next?.let { ChannelProgram(it.title.orEmpty(), start = formatClock(it.start.epochSeconds)) },
+        next = programs.next?.let { ChannelProgram(it.title.orEmpty(), start = formatClock(it.start.epochSeconds)) },
         details = (details ?: ChannelDetails()).copy(
             episode = running?.episodeLine(resources),
             metadata = running?.genre?.takeIf(String::isNotBlank),

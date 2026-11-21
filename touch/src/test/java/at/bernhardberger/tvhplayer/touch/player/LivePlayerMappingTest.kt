@@ -35,6 +35,7 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 @OptIn(UnstableApi::class)
@@ -123,6 +124,22 @@ class LivePlayerMappingTest {
     }
 
     @Test
+    fun faceNamesTheProgramTheViewerIsIn() {
+        data class Case(val name: String, val sample: AppTimeshiftState, val now: String?, val next: String?)
+        val cases = listOf(
+            Case("at the live edge", timeshift(50, 90, 90.minutes), "Program 2", null),
+            Case("behind into the previous program", timeshift(50, 90, 55.minutes), "Program 1", "Program 2"),
+            Case("no timeshift: the program on air", AppTimeshiftState(), "Program 2", null),
+        )
+        cases.forEach { case ->
+            val shown = shownPrograms(case.sample, liveStart = false, live, ::eventAt) {
+                schedule.nextEvent(ChannelId(1), it)
+            }
+            assertEquals(case.name, case.now to case.next, shown.now?.title to shown.next?.title)
+        }
+    }
+
+    @Test
     fun skipsAndDragsMoveByTheTvRules() {
         assertEquals(TimeshiftMove.By(-10_000), skipMove(timeshift(50, 90, 80.minutes), -10_000))
         assertEquals(TimeshiftMove.By(30_000), skipMove(timeshift(50, 90, 80.minutes), 30_000))
@@ -180,6 +197,7 @@ class LivePlayerMappingTest {
             known: Boolean = true,
             pause: LivePauseAvailability = LivePauseAvailability.READY,
             status: LivePlayerStatus = LivePlayerStatus.Playing,
+            window: Boolean = false,
         ) = livePlayerState(
             id,
             ChannelScopeState(
@@ -191,6 +209,7 @@ class LivePlayerMappingTest {
                 channelCatalogCurrent = known,
             ),
             observation, ConnectionUiState.Ready, degraded = false, status, mutableStateOf(null), pause, guide.now,
+            window,
         )
 
         val playing = face(shown)
@@ -202,10 +221,66 @@ class LivePlayerMappingTest {
         assertEquals(emptySet<PlayerControl>(), face(shown, pause = LivePauseAvailability.UNAVAILABLE).offered)
         assertEquals(emptySet<PlayerControl>(), face(shown, pause = LivePauseAvailability.OFF).offered)
         assertEquals(emptySet<PlayerControl>(), face(shown, status = LivePlayerStatus.Tuning).offered)
+        // The picture-in-picture button only where the window can be used.
+        assertEquals(
+            setOf(PlayerControl.Timeshift, PlayerControl.PictureInPicture), face(shown, window = true).offered,
+        )
         // The list below the picture marks the shown channel as the one playing.
         assertEquals(listOf(true, false), playing.channels.rows.map { it.playback != null })
         // A channel the scope doesn't know yet has no name.
         assertEquals("", face(shown, known = false).channel.name)
+    }
+
+    @Test
+    fun backAndLeavingUseTheWindowWhenThereIsOne() {
+        data class Case(val trigger: LeaveTrigger, val available: Boolean, val inWindow: Boolean, val rotating: Boolean)
+        val cases = mapOf(
+            Case(LeaveTrigger.Back, available = true, inWindow = false, rotating = false) to Leave.EnterWindow,
+            // Paused or playing alike: the pause state is no input.
+            Case(LeaveTrigger.Back, available = false, inWindow = false, rotating = false) to Leave.Stop,
+            Case(LeaveTrigger.Back, available = true, inWindow = true, rotating = false) to Leave.Stay,
+            Case(LeaveTrigger.UserLeave, available = true, inWindow = false, rotating = false) to Leave.EnterWindow,
+            // Without the window the activity is hidden next, and that stops.
+            Case(LeaveTrigger.UserLeave, available = false, inWindow = false, rotating = false) to Leave.Stay,
+            Case(LeaveTrigger.UserLeave, available = true, inWindow = true, rotating = false) to Leave.Stay,
+            // Hidden outside a rotation: the window closed, or no window.
+            Case(LeaveTrigger.Hidden, available = true, inWindow = true, rotating = false) to Leave.Stop,
+            Case(LeaveTrigger.Hidden, available = false, inWindow = false, rotating = false) to Leave.Stop,
+            Case(LeaveTrigger.Hidden, available = true, inWindow = false, rotating = true) to Leave.Stay,
+        )
+        cases.forEach { (case, expected) ->
+            assertEquals(case.toString(), expected, leavePlayer(case.trigger, case.available, case.inWindow, case.rotating))
+        }
+        // Watch on the playing channel brings its player back; another channel, or none playing, tunes.
+        assertEquals(false, watchTunes(ChannelId(1), ChannelId(1)))
+        assertEquals(true, watchTunes(ChannelId(2), ChannelId(1)))
+        assertEquals(true, watchTunes(ChannelId(1), null))
+    }
+
+    @Test
+    fun windowFollowsThePictureInsideAndroidsAspectLimits() {
+        assertEquals(17_778 to 10_000, windowAspect(16f / 9))
+        assertEquals(239 to 100, windowAspect(3f))
+        assertEquals(100 to 239, windowAspect(0.2f))
+        listOf(null, 0f, -1f, Float.NaN).forEach { assertEquals(null, windowAspect(it)) }
+        // The window's channel steps wrap round the list, as the TV's do.
+        val list = listOf(ChannelId(1), ChannelId(2), ChannelId(3))
+        assertEquals(ChannelId(2), adjacentChannel(list, ChannelId(1), 1))
+        assertEquals(ChannelId(3), adjacentChannel(list, ChannelId(1), -1))
+        assertEquals(ChannelId(1), adjacentChannel(list, ChannelId(3), 1))
+        assertEquals(ChannelId(1), adjacentChannel(list, ChannelId(9), 1))
+        assertEquals(null, adjacentChannel(emptyList(), ChannelId(1), 1))
+    }
+
+    @Test
+    fun brightnessSliderShowsTheSystemLevelOnTheSystemsCurve() {
+        // A dim indoor backlight of about a tenth sits well up the slider, as on the system's own.
+        assertTrue(brightnessSlider(0.1f) > 0.4f)
+        assertEquals(0f, brightnessSlider(0f), 0.001f)
+        assertEquals(1f, brightnessSlider(1f), 0.01f)
+        listOf(0.01f, 0.05f, 0.1f, 0.4f, 0.8f, 1f).forEach {
+            assertEquals(it, brightnessLevel(brightnessSlider(it)), 0.001f)
+        }
     }
 
     // Program A 19:00-20:00 has aired, B 20:00-21:00 is on; live is 20:30. Content minutes map to the

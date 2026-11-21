@@ -14,6 +14,7 @@ import at.bernhardberger.tvhplayer.di.SdkRuntimeOwner
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.touch.player.PlayerActivity
 import at.bernhardberger.tvhplayer.touch.player.playingChannelId
+import at.bernhardberger.tvhplayer.touch.player.watchTunes
 import at.bernhardberger.tvhplayer.ui.MobileDarkColors
 import at.bernhardberger.tvhplayer.ui.screens.onboarding.discoverServers
 import at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel
@@ -54,8 +55,12 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun watch(channelId: String) {
-        // The tap is the viewing intent: a stop from before it must not close the player it opens.
-        sdk.playbackRuntime.notePlaybackIntent()
-        startActivity(PlayerActivity.intent(this, ChannelId(channelId.toLong())))
+        val id = ChannelId(channelId.toLong())
+        val runtime = sdk.playbackRuntime
+        // A tap that tunes is the viewing intent: a stop from before it must not close the player it opens.
+        // Watch on the playing channel only brings its player back.
+        val playing = playingChannelId(runtime.activeTarget.value, runtime.state.value)
+        if (watchTunes(id, playing)) runtime.notePlaybackIntent()
+        startActivity(PlayerActivity.intent(this, id))
     }
 }

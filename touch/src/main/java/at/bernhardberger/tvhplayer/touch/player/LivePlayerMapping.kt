@@ -13,6 +13,9 @@ import at.bernhardberger.tvheadend.sdk.media3.TimeshiftWallClockMapping
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssue
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.PlaybackStatusPresentation
+import at.bernhardberger.tvhplayer.core.ProgrammePositionWindow
+import at.bernhardberger.tvhplayer.core.committedProgrammeEvent
+import at.bernhardberger.tvhplayer.core.nextProgrammeEvent
 import at.bernhardberger.tvhplayer.core.TIMESHIFT_LIVE_EDGE_TOLERANCE_MS
 import at.bernhardberger.tvhplayer.core.liveChannelCondition
 import at.bernhardberger.tvhplayer.core.liveInterrupted
@@ -20,7 +23,6 @@ import at.bernhardberger.tvhplayer.core.playbackStatusPresentation
 import at.bernhardberger.tvhplayer.core.programmePositionWindow
 import at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
-import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.playback.LivePauseAvailability
 import at.bernhardberger.tvhplayer.playback.BackgroundPlaybackNotice
@@ -32,11 +34,6 @@ import at.bernhardberger.tvhplayer.touch.channels.channelsState
 import at.bernhardberger.tvhplayer.viewmodels.ChannelScopeState
 import java.time.ZoneId
 import kotlin.time.Instant
-
-/** The live channel the runtime plays or is starting; a failed or finished target plays nothing. */
-internal fun playingChannelId(target: AppPlaybackTarget?, state: AppPlaybackState): ChannelId? =
-    (target as? AppPlaybackTarget.Live)?.channelId
-        ?.takeUnless { state is AppPlaybackState.Failed || state is AppPlaybackState.Finished }
 
 /**
  * The face's status for [shownId], read as the TV player reads it: the shared channel condition
@@ -98,11 +95,7 @@ internal fun liveTimeline(
     zone: ZoneId,
     eventAt: (Instant) -> EpgEvent?,
 ): LiveTimeline? {
-    val startMapping = sample.historyStartTimeline
-        ?.takeIf { sample.timeline?.describesSameSegment(it) == true }
-        ?.wallClockMapping as? TimeshiftWallClockMapping.Estimate
-    val window = programmePositionWindow(sample, historyStartMapping = startMapping, eventAt = eventAt)
-        ?.takeIf { it.stop > it.start }
+    val window = positionWindow(sample, eventAt)
         ?: return eventAt(Instant.fromEpochSeconds(nowSec))?.let { onAir(it, nowSec, zone) }
     val duration = (window.stop - window.start).inWholeSeconds.toInt()
     fun offset(time: Instant) = (time - window.start).inWholeSeconds.toInt().coerceIn(0, duration)
@@ -118,6 +111,40 @@ internal fun liveTimeline(
         programStart = localTime(window.start.epochSeconds, zone), duration = duration,
         bufferStart = bufferStart, position = position, live = live, behind = behind, liveEdge = liveEdge,
     )
+}
+
+/** The programs the face names: the one shown and the one after it. */
+internal data class ShownPrograms(val now: EpgEvent?, val next: EpgEvent?)
+
+/**
+ * The program the viewer is in and the one after it, by the TV info bar's rule (app
+ * ui/player/ProgrammeWindow.kt `displayedProgrammeEvent` / `displayedNextEvent` over the shared
+ * `committedProgrammeEvent` / `nextProgrammeEvent`): with a position window its program (none for
+ * a slot without one) and the program after the viewer's position; without a window the program
+ * on air while that describes playback ([liveStart], or no timeshift / at the live edge).
+ */
+internal fun shownPrograms(
+    sample: AppTimeshiftState,
+    liveStart: Boolean,
+    now: Instant,
+    eventAt: (Instant) -> EpgEvent?,
+    nextAt: (Instant) -> EpgEvent?,
+): ShownPrograms {
+    val window = positionWindow(sample, eventAt)
+    val onAir = eventAt(now)
+    val shown = committedProgrammeEvent(window != null, window?.event, sample, onAir, liveStart)
+    val next = nextProgrammeEvent(
+        window?.estimatedPosition, window?.event, previewing = false, sample, nextAt(now), liveStart, onAir, nextAt,
+    )
+    return ShownPrograms(shown, next)
+}
+
+private fun positionWindow(sample: AppTimeshiftState, eventAt: (Instant) -> EpgEvent?): ProgrammePositionWindow? {
+    val startMapping = sample.historyStartTimeline
+        ?.takeIf { sample.timeline?.describesSameSegment(it) == true }
+        ?.wallClockMapping as? TimeshiftWallClockMapping.Estimate
+    return programmePositionWindow(sample, historyStartMapping = startMapping, eventAt = eventAt)
+        ?.takeIf { it.stop > it.start }
 }
 
 private fun onAir(event: EpgEvent, nowSec: Long, zone: ZoneId): LiveTimeline? {
@@ -173,15 +200,6 @@ internal fun timeshiftOffered(availability: LivePauseAvailability, status: LiveP
     status == LivePlayerStatus.Playing &&
         (availability == LivePauseAvailability.READY || availability == LivePauseAvailability.STARTING)
 
-/** The TV's rule: the screen stays on only while a visible picture plays without an error. */
-internal fun keepPlayerScreenOn(
-    foreground: Boolean,
-    videoVisible: Boolean,
-    playing: Boolean,
-    hasVideo: Boolean,
-    failed: Boolean,
-): Boolean = foreground && videoVisible && playing && hasVideo && !failed
-
 /**
  * The face for [shownId] without its clock and episode texts, which need resources (see
  * [withProgramTexts]). The channel list below the picture marks [shownId] as playing. A channel
@@ -199,6 +217,7 @@ internal fun livePlayerState(
     timeline: State<LiveTimeline?>,
     pause: LivePauseAvailability,
     now: Instant,
+    window: Boolean = false,
 ): LivePlayerState {
     val id = shownId.value.toString()
     val channel = scope.scope.allChannels.firstOrNull { it.id == shownId }
@@ -213,6 +232,10 @@ internal fun livePlayerState(
         frame = null,
         timeline = timeline,
         status = status,
-        offered = if (timeshiftOffered(pause, status)) setOf(PlayerControl.Timeshift) else emptySet(),
+        offered = buildSet {
+            if (timeshiftOffered(pause, status)) add(PlayerControl.Timeshift)
+            // Without the window (no feature, or switched off for the app) its button is absent.
+            if (window) add(PlayerControl.PictureInPicture)
+        },
     )
 }
