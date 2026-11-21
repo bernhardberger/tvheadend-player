@@ -27,7 +27,9 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentType
 import androidx.compose.ui.semantics.error
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.hideFromAccessibility
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.password
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
@@ -103,7 +105,20 @@ internal fun ConnectionForm(
             else stringResource(SharedR.string.server_name_body, fields.address),
             imeAction = ImeAction.Done,
         )
+        SaveFailedLine(state.saveFailed)
     }
+}
+
+/** The shared sentence the TV shows when a passed connection couldn't be written. */
+@Composable
+private fun SaveFailedLine(shown: Boolean) {
+    if (!shown) return
+    Text(
+        stringResource(SharedR.string.connection_save_failed),
+        Modifier.padding(horizontal = 16.dp).semantics { liveRegion = LiveRegionMode.Polite },
+        color = MaterialTheme.colorScheme.error,
+        style = MaterialTheme.typography.bodyMedium,
+    )
 }
 
 @Composable

@@ -52,8 +52,13 @@ internal fun ConnectionEditor(
     val compact = !currentWindowAdaptiveInfoV2().windowSizeClass
         .isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND)
     var confirmDiscard by rememberSaveable { mutableStateOf(false) }
+    // A save being written can't be left: the connection may already be stored.
     val close = {
-        if (state.fields == original) onCancel() else confirmDiscard = true
+        when {
+            state.saving -> Unit
+            state.fields == original -> onCancel()
+            else -> confirmDiscard = true
+        }
     }
     BasicAlertDialog(
         onDismissRequest = close,
@@ -65,7 +70,7 @@ internal fun ConnectionEditor(
     ) {
         ConnectionEditorContent(state, compact, onFieldsChange, onSave, close, focusPassword)
     }
-    if (confirmDiscard) {
+    if (confirmDiscard && !state.saving) {
         AlertDialog(
             onDismissRequest = { confirmDiscard = false },
             title = { Text(stringResource(SharedR.string.autorec_editor_discard)) },
@@ -111,7 +116,12 @@ private fun ConnectionEditorContent(
                     Modifier.fillMaxWidth().padding(start = 4.dp, end = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    ConnectionIconButton(R.drawable.connect_close_outline, SharedR.string.close, onClick = onClose)
+                    ConnectionIconButton(
+                        R.drawable.connect_close_outline,
+                        SharedR.string.close,
+                        enabled = !state.saving,
+                        onClick = onClose,
+                    )
                     EditorTitle(Modifier.weight(1f).padding(start = 4.dp), compact = true)
                     EditorSave(state.phase, save, compact = true)
                 }
@@ -132,7 +142,9 @@ private fun ConnectionEditorContent(
                     Modifier.fillMaxWidth().padding(top = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
                 ) {
-                    TextButton(onClick = onClose) { Text(stringResource(SharedR.string.cancel)) }
+                    TextButton(onClick = onClose, enabled = !state.saving) {
+                        Text(stringResource(SharedR.string.cancel))
+                    }
                     EditorSave(state.phase, save, compact = false)
                 }
             }

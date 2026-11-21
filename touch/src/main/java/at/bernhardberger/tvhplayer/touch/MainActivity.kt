@@ -38,6 +38,7 @@ class MainActivity : ComponentActivity() {
             statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
         )
+        val context = applicationContext
         setContent {
             MaterialTheme(colorScheme = MobileDarkColors) {
                 val target by sdk.playbackRuntime.activeTarget.collectAsStateWithLifecycle()
@@ -46,7 +47,7 @@ class MainActivity : ComponentActivity() {
                     session, owner, connection, channels, recordings, guide,
                     playingId = playingChannelId(target, playback)?.value?.toString(),
                     onWatch = ::watch,
-                    discovery = { discoverServers(applicationContext) },
+                    discovery = { discoverServers(context) },
                 )
             }
         }

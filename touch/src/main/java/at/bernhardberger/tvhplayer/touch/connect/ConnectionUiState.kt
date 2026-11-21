@@ -59,4 +59,8 @@ internal data class ConnectionUiState(
     val portError: Boolean = false,
     val signInError: Boolean = false,
     val passwordSaved: Boolean = false,
+    /** A save is being written: nothing may close or discard the form until it ends. */
+    val saving: Boolean = false,
+    /** The connection passed but couldn't be saved; Connect or Save writes it again. */
+    val saveFailed: Boolean = false,
 )
