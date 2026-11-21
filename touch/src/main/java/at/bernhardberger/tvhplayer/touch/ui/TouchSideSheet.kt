@@ -36,6 +36,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
@@ -46,12 +47,14 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
@@ -65,6 +68,9 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.min
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
 import at.bernhardberger.tvhplayer.touch.R
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.roundToInt
@@ -74,11 +80,11 @@ import kotlinx.coroutines.launch
 private enum class SideSheetValue { Hidden, Expanded }
 
 /**
- * A modal side sheet detached from the end edge (m3.material.io side sheets: 400dp at most, 16dp
+ * A side sheet detached from the end edge (m3.material.io side sheets: 400dp at most, 16dp
  * margins, 16dp corners, surface container low). Material 3 1.5 has no side sheet; this is built
  * from the pieces its ModalBottomSheet uses: an anchored drag toward the edge, predictive Back and
- * the theme's motion scheme. A tap outside always dismisses; [scrim] only decides whether the
- * content behind it is dimmed. The head always has Close, after any [actions]; with [onBack] it
+ * the theme's motion scheme. A tap outside always dismisses. [scrim] puts the sheet in a modal
+ * window and dims the content behind it. The head always has Close, after any [actions]; with [onBack] it
  * also starts with Back, which system Back then calls.
  */
 @Composable
@@ -90,6 +96,37 @@ internal fun TouchSideSheet(
     scrim: Boolean = true,
     leading: (@Composable () -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {},
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    if (scrim) {
+        Dialog(
+            onDismissRequest = onDismissRequest,
+            properties = DialogProperties(
+                dismissOnBackPress = false,
+                dismissOnClickOutside = false,
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false,
+            ),
+        ) {
+            val window = (LocalView.current.parent as DialogWindowProvider).window
+            // Keep the animated Compose scrim, not a second dim layer from the window.
+            SideEffect { window.setDimAmount(0f) }
+            SideSheetContent(onDismissRequest, title, modifier, onBack, true, leading, actions, content)
+        }
+    } else {
+        SideSheetContent(onDismissRequest, title, modifier, onBack, false, leading, actions, content)
+    }
+}
+
+@Composable
+private fun SideSheetContent(
+    onDismissRequest: () -> Unit,
+    title: String,
+    modifier: Modifier,
+    onBack: (() -> Unit)?,
+    scrim: Boolean,
+    leading: (@Composable () -> Unit)?,
+    actions: @Composable RowScope.() -> Unit,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val motion = MaterialTheme.motionScheme
@@ -134,13 +171,16 @@ internal fun TouchSideSheet(
                 .fillMaxHeight()
                 .sheetMotion(state, hiddenOffset, { backProgress }, rtl, fling)
                 .sheetSemantics(title, closeLabel, hide)
-                .focusRequester(focus)
+                .then(if (scrim) Modifier else Modifier.focusRequester(focus))
                 .focusGroup(),
             shape = MaterialTheme.shapes.large,
             color = MaterialTheme.colorScheme.surfaceContainerLow,
         ) {
             Column(Modifier.fillMaxSize()) {
-                SheetHead(title, onBack, leading, closeLabel, hide, actions)
+                SheetHead(
+                    title, onBack, leading, closeLabel, hide, actions,
+                    if (scrim) Modifier.focusRequester(focus).focusProperties { canFocus = true } else Modifier,
+                )
                 content()
             }
         }
@@ -169,6 +209,7 @@ private fun Scrim(dim: Boolean, shown: () -> Float, closeLabel: String, onClose:
         Modifier.fillMaxSize()
             .graphicsLayer { alpha = shown() }
             .background(color)
+            .then(if (dim) Modifier.focusProperties { canFocus = false } else Modifier)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClose,
             )
@@ -213,6 +254,7 @@ private fun SheetHead(
     closeLabel: String,
     onClose: () -> Unit,
     actions: @Composable RowScope.() -> Unit,
+    closeModifier: Modifier,
 ) {
     // Spec: 24dp start padding, 16dp beside a leading icon, 12dp between the top elements.
     Row(
@@ -236,7 +278,7 @@ private fun SheetHead(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         actions()
-        IconButton(onClick = onClose) {
+        IconButton(onClick = onClose, modifier = closeModifier) {
             Icon(painterResource(R.drawable.connect_close_outline), closeLabel)
         }
     }
