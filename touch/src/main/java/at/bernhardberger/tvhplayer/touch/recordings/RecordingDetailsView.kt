@@ -3,6 +3,8 @@
 
 package at.bernhardberger.tvhplayer.touch.recordings
 
+import at.bernhardberger.tvhplayer.touch.ui.PlayingBars
+
 import at.bernhardberger.tvhplayer.touch.ui.ChannelLogoTile
 import at.bernhardberger.tvhplayer.touch.ui.rememberStandalonePicture
 import androidx.compose.foundation.Image
@@ -262,7 +264,18 @@ private fun Picture(picture: Painter, modifier: Modifier) {
 
 @Composable
 private fun Title(item: RecordingItem, modifier: Modifier, style: TextStyle) {
-    Text(item.title, modifier.semantics { heading() }, style = style)
+    if (item.playing) {
+        Row(
+            modifier.semantics(mergeDescendants = true) { heading() },
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(item.title, Modifier.weight(1f, fill = false), style = style)
+            PlayingBars()
+        }
+    } else {
+        Text(item.title, modifier.semantics { heading() }, style = style)
+    }
 }
 
 @Composable

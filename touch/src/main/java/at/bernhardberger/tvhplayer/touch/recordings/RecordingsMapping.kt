@@ -4,6 +4,7 @@ import at.bernhardberger.tvhplayer.touch.ui.recordingRemoveControl
 import at.bernhardberger.tvhplayer.core.recordingArtwork
 import at.bernhardberger.tvhplayer.touch.ui.ArtworkModels
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
@@ -73,6 +74,7 @@ internal fun recordingsState(
     clock: RecordingClock,
     texts: RecordingsTexts,
     artwork: ArtworkModels? = null,
+    playingRecordingId: DvrEntryId? = null,
 ): RecordingsState {
     val empty = RecordingFolder(ROOT_ID, "")
     val space = observation.dvrDiskSpaceState.recordingSpaceIndicator()?.let {
@@ -104,7 +106,7 @@ internal fun recordingsState(
     val folder = buildDvrArchive(archive.distinctBy { it.id }, view.grouping, naming, view.sort, view.show) {
         recordingWatchState(it, offeredResumePosition(observation.recordingPlaybackAdmission(it)), nowSec)
     }
-    val rows = RowMapper(naming, texts, clock, observation, availability) { entry ->
+    val rows = RowMapper(naming, texts, clock, observation, availability, playingRecordingId) { entry ->
         val logo = entry.channelId?.let(icons::get)
         RowArtwork(artwork?.logo(logo, observation), artwork?.picture(recordingArtwork(entry), observation))
     }
@@ -134,6 +136,7 @@ private class RowMapper(
     val clock: RecordingClock,
     val observation: SessionObservation,
     val availability: RecordingsAvailability,
+    val playingRecordingId: DvrEntryId?,
     val artwork: (DvrEntry) -> RowArtwork,
 ) {
     private val canOfferPlayback = availability == RecordingsAvailability.Current && observation.currentSession != null
@@ -164,6 +167,7 @@ private class RowMapper(
             section = section?.let { RecordingSection(texts.section(it), it.rowDates) },
             remove = observation.recordingRemoveControl(entry),
             play = if (canOfferPlayback) recordingPlayActions(entry, admission) else emptyList(),
+            playing = entry.id == playingRecordingId,
         )
     }
 }

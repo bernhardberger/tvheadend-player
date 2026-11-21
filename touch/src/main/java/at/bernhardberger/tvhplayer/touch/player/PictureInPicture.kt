@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Process
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import kotlin.math.roundToInt
@@ -43,6 +44,13 @@ internal fun playingChannelId(target: AppPlaybackTarget?, state: AppPlaybackStat
 
 /** Watch on the channel that plays brings its player back without tuning again; any other channel tunes. */
 internal fun watchTunes(channelId: ChannelId, playingId: ChannelId?): Boolean = channelId != playingId
+
+/** The recording the runtime is playing or starting, including while its player is in PiP. */
+internal fun playingRecordingId(target: AppPlaybackTarget?, state: AppPlaybackState): DvrEntryId? =
+    when (state) {
+        AppPlaybackState.Idle, AppPlaybackState.Finished, is AppPlaybackState.Failed -> null
+        else -> (target as? AppPlaybackTarget.Recording)?.recordingId
+    }
 
 /**
  * The window's aspect as numerator and denominator, inside the 100:239…239:100 Android allows

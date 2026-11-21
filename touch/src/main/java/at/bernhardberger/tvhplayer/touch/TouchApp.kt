@@ -33,6 +33,7 @@ import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.serverProfileDisplayName
 import at.bernhardberger.tvhplayer.ui.screens.settings.rememberSavedConnectionRestore
 import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.touch.channels.ChannelRowPrograms
@@ -90,6 +91,7 @@ internal fun TouchApp(
     guide: GuideViewModel,
     notices: NoticeCenter,
     playingId: String? = null,
+    playingRecordingId: DvrEntryId? = null,
     onWatch: ((String) -> Unit)? = null,
     onPlayRecording: ((String, Boolean) -> Unit)? = null,
     channelsDispatcher: CoroutineDispatcher = Dispatchers.Default,
@@ -131,6 +133,7 @@ internal fun TouchApp(
             else -> AppDestinations(
                 session, dvr, connection, channels, recordings, guide, playingId, onWatch, onPlayRecording,
                 channelsDispatcher = channelsDispatcher,
+                playingRecordingId = playingRecordingId,
                 onOpenConnections = { page = Page.Connections },
                 onSignIn = { page = Page.SignIn },
             )
@@ -299,6 +302,7 @@ private fun AppDestinations(
     onWatch: ((String) -> Unit)?,
     onPlayRecording: ((String, Boolean) -> Unit)?,
     channelsDispatcher: CoroutineDispatcher,
+    playingRecordingId: DvrEntryId?,
     onOpenConnections: () -> Unit,
     onSignIn: () -> Unit,
 ) {
@@ -310,6 +314,7 @@ private fun AppDestinations(
             Destination.Recordings ->
                 RecordingsDestination(
                     recordings, connection, AppDestinationList, dvr, onOpenConnections, onSignIn, onPlayRecording,
+                    playingRecordingId,
                 )
             Destination.Guide ->
                 GuideDestination(

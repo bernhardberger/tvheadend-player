@@ -132,6 +132,7 @@ internal data class RecordingItem(
     /** How it is removed; null offers no remove control. */
     val remove: RecordingRemoveControl? = RecordingRemoveControl.Delete,
     val play: List<RecordingPlayAction> = emptyList(),
+    val playing: Boolean = false,
 ) {
     val hasPicture: Boolean get() = picture != null || pictureModel != null
     val hasLogo: Boolean get() = channelLogo != null || channelLogoModel != null

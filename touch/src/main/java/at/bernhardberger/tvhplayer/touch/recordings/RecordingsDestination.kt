@@ -13,6 +13,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import at.bernhardberger.tvheadend.sdk.core.DvrConfigurationsState
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvhplayer.core.DvrDateSection
@@ -45,6 +46,7 @@ internal fun RecordingsDestination(
     onOpenConnections: () -> Unit,
     onSignIn: () -> Unit,
     onPlay: ((String, Boolean) -> Unit)?,
+    playingRecordingId: DvrEntryId?,
 ) {
     ArtworkScreenShown("Recordings")
     val presentation by connection.uiState.collectAsStateWithLifecycle()
@@ -64,13 +66,16 @@ internal fun RecordingsDestination(
         observation.takeIf { current == null }, current, observation.dvrState, observation.dvrDiskSpaceState,
         observation.channelCatalogForDisplay, observation.recordingProgressCapability,
         (observation.sessionState as? SessionState.Ready)?.capabilities?.dvrWrite,
-        view, presentation.connection, presentation.degraded, nowSec, texts, artwork,
+        view, presentation.connection, presentation.degraded, nowSec, texts, artwork, playingRecordingId,
     ) {
         val clock = RecordingClock(Instant.ofEpochSecond(nowSec), ZoneId.systemDefault(), locale) {
             formatClock(it, locale)
         }
         traceArtworkMapping(context, "Recordings") {
-            recordingsState(observation, view, presentation.connection, presentation.degraded, clock, texts, artwork)
+            recordingsState(
+                observation, view, presentation.connection, presentation.degraded, clock, texts, artwork,
+                playingRecordingId,
+            )
         }
     }
     RecordingsScreen(

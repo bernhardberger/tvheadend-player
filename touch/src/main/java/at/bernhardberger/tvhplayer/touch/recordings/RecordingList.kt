@@ -3,6 +3,10 @@
 
 package at.bernhardberger.tvhplayer.touch.recordings
 
+import at.bernhardberger.tvhplayer.touch.ui.PlayingBars
+import at.bernhardberger.tvhplayer.touch.ui.playingContainerColor
+import at.bernhardberger.tvhplayer.touch.ui.watchedProgressColor
+
 import at.bernhardberger.tvhplayer.touch.ui.ChannelLogoImage
 import at.bernhardberger.tvhplayer.touch.ui.rememberChannelAccent
 import at.bernhardberger.tvhplayer.touch.ui.rememberStandalonePicture
@@ -304,10 +308,17 @@ private fun RecordingRow(
         },
         supportingContent = { RecordingLineText(line) },
         shapes = ListItemDefaults.segmentedShapes(index, count),
-        colors = rowColors(),
+        colors = if (item.playing) rowColors(playingContainerColor()) else rowColors(),
         contentPadding = RowPadding,
     ) {
-        Text(item.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        if (item.playing) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(item.title, Modifier.weight(1f, fill = false), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                PlayingBars()
+            }
+        } else {
+            Text(item.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
     }
 }
 
@@ -408,7 +419,7 @@ internal fun RecordingBar(
     track: Color = Color.Black.copy(alpha = 0.45f),
 ) {
     val (progress, color) = when (state) {
-        is RecordingProgress.PartlyWatched -> state.progress to MaterialTheme.colorScheme.tertiary
+        is RecordingProgress.PartlyWatched -> state.progress to watchedProgressColor()
         is RecordingProgress.Recording -> state.progress to TvRecordingColor
         else -> return
     }

@@ -20,6 +20,7 @@ import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.touch.player.PlayerActivity
 import at.bernhardberger.tvhplayer.touch.player.playingChannelId
+import at.bernhardberger.tvhplayer.touch.player.playingRecordingId
 import at.bernhardberger.tvhplayer.touch.player.watchTunes
 import at.bernhardberger.tvhplayer.touch.player.RecordingRoute
 import at.bernhardberger.tvhplayer.touch.player.recordingStart
@@ -67,6 +68,7 @@ class MainActivity : ComponentActivity() {
                     TouchApp(
                         session, owner, connection, channels, recordings, guide, notices,
                         playingId = playingChannelId(target, playback)?.value?.toString(),
+                        playingRecordingId = playingRecordingId(target, playback),
                         onWatch = ::watch,
                         onPlayRecording = ::watchRecording,
                         discovery = { discoverServers(context) },

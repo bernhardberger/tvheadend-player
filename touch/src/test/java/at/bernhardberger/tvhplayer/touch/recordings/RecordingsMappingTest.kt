@@ -1,5 +1,11 @@
 package at.bernhardberger.tvhplayer.touch.recordings
 
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvhplayer.playback.AppPlaybackFailureReason
+import at.bernhardberger.tvhplayer.playback.AppPlaybackState
+import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
+import at.bernhardberger.tvhplayer.touch.player.playingRecordingId
+
 import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
@@ -190,6 +196,32 @@ class RecordingsMappingTest {
     private fun mapped(entry: DvrEntry): RecordingItem = recordingsState(
         watchObservation(entry), DvrArchiveView(), ConnectionUiState.Ready, false, clock, texts,
     ).root.recordings.single()
+
+    @Test
+    fun onlyTheActiveRecordingIsMarkedPlaying() {
+        val id = guide.film.id
+        val recording = AppPlaybackTarget.Recording(id)
+        val cases = listOf(
+            Triple(recording, AppPlaybackState.Starting, id),
+            Triple(recording, AppPlaybackState.Playing, id),
+            Triple(recording, AppPlaybackState.Buffering, id),
+            Triple(recording, AppPlaybackState.Idle, null),
+            Triple(recording, AppPlaybackState.Finished, null),
+            Triple(recording, AppPlaybackState.Failed(AppPlaybackFailureReason.OTHER), null),
+            Triple(AppPlaybackTarget.Live(ChannelId(1)), AppPlaybackState.Playing, null),
+            Triple(null, AppPlaybackState.Playing, null),
+        )
+        for ((target, playback, expected) in cases) {
+            val state = recordingsState(
+                guide.connected(), DvrArchiveView(), ConnectionUiState.Ready, false, clock, texts,
+                playingRecordingId = playingRecordingId(target, playback),
+            )
+            assertEquals(
+                playback.toString(), listOfNotNull(expected?.value?.toString()),
+                state.root.recordings.filter { it.playing }.map { it.id },
+            )
+        }
+    }
 
     @OptIn(ExperimentalTvheadendApi::class)
     private fun watchObservation(entry: DvrEntry): SessionObservation {

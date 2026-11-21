@@ -43,6 +43,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.test.platform.app.InstrumentationRegistry
 import at.bernhardberger.tvhplayer.touch.testutil.TouchCanvas
+import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouch
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouchWindows
 import at.bernhardberger.tvhplayer.touch.ui.DvrChangeDialog
@@ -92,6 +93,13 @@ class RecordingsScreenTest {
         capture("tablet-recordings-picked", TouchCanvas.TABLET)
 
         captureDeleteConfirmation("tablet-recordings-delete-confirm", TouchCanvas.TABLET)
+
+        asking = false
+        state.value = flatFixture().withPlayingRecording()
+        val playing = playingMark()
+        compose.onAllNodes(playing).assertCountEquals(2) // Selected row and its pane.
+        resumeButton().assertIsDisplayed()
+        capture("tablet-recordings-playing", TouchCanvas.TABLET)
     }
 
     @Test
@@ -255,6 +263,13 @@ class RecordingsScreenTest {
         compose.onNodeWithContentDescription("View options").performClick()
         compose.onNodeWithText("Group by").assertIsDisplayed()
         captureSheetOver("phone-recordings-view", TouchCanvas.PHONE)
+
+        compose.runOnUiThread {
+            (ShadowDialog.getLatestDialog() as ComponentDialog).onBackPressedDispatcher.onBackPressed()
+        }
+        state.value = flatFixture().withPlayingRecording()
+        compose.onAllNodes(playingMark()).assertCountEquals(1)
+        capture("phone-recordings-playing", TouchCanvas.PHONE)
     }
 
     @Test
@@ -366,6 +381,14 @@ class RecordingsScreenTest {
 
     private fun RecordingsState.withPlay(play: List<RecordingPlayAction>) = copy(
         root = root.copy(recordings = root.recordings.map { if (it.id == PickedId) it.copy(play = play) else it }),
+    )
+
+    private fun RecordingsState.withPlayingRecording() = copy(
+        root = root.copy(recordings = root.recordings.map { it.copy(playing = it.id == PickedId) }),
+    )
+
+    private fun playingMark() = SemanticsMatcher.expectValue(
+        SemanticsProperties.StateDescription, compose.activity.getString(R.string.channels_playing),
     )
 
     private fun pickTheHalfWatchedMatch() =

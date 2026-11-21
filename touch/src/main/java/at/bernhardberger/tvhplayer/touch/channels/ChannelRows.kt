@@ -4,12 +4,6 @@
 package at.bernhardberger.tvhplayer.touch.channels
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -52,9 +46,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -68,13 +60,15 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.ui.ChannelLogoTile
+import at.bernhardberger.tvhplayer.touch.ui.PlayingBars
+import at.bernhardberger.tvhplayer.touch.ui.playingContainerColor
+import at.bernhardberger.tvhplayer.touch.ui.watchedProgressColor
 import at.bernhardberger.tvhplayer.ui.TvOnRecordingContainerColor
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 import at.bernhardberger.tvhplayer.ui.TvRecordingContainerColor
@@ -142,12 +136,11 @@ private fun ChannelItem(
     actions: ChannelsActions,
     toggle: () -> Unit,
 ) {
-    val segmented = ListItemDefaults.segmentedColors()
     val playing = !offline && row.playback != null
     // The playing channel takes the list item's selected container without becoming a selection control:
     // a tap still means Watch, so the row keeps button semantics.
     val container = when {
-        playing -> segmented.selectedContainerColor
+        playing -> playingContainerColor()
         expanded -> MaterialTheme.colorScheme.surfaceContainerHigh
         else -> MaterialTheme.colorScheme.surfaceContainerLow
     }
@@ -408,7 +401,7 @@ private fun ChannelProgress(
     val fraction = (playback?.progress ?: program?.progress ?: return).coerceIn(0f, 1f)
     val scheme = MaterialTheme.colorScheme
     val fill = when {
-        playback != null -> scheme.tertiary
+        playback != null -> watchedProgressColor()
         recording == ChannelRecording.Program -> TvRecordingColor
         else -> scheme.primary
     }
@@ -445,25 +438,6 @@ internal fun RecordingBadge(recording: ChannelRecording, compact: Boolean = fals
 }
 
 @Composable
-private fun PlayingBars() {
-    val animation = rememberInfiniteTransition(label = "Playing")
-    val level by animation.animateFloat(
-        initialValue = 0f, targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(PLAYING_HALF_CYCLE_MS), RepeatMode.Reverse), label = "Bar levels",
-    )
-    val ink = MaterialTheme.colorScheme.onSecondaryContainer
-    val playing = stringResource(R.string.channels_playing)
-    Canvas(Modifier.size(22.dp).semantics { stateDescription = playing }) {
-        val heights = listOf(0.32f + 0.16f * level, 0.82f - 0.22f * level, 0.47f + 0.17f * level)
-        heights.forEachIndexed { index, height ->
-            val x = size.width * (index + 1) / 4
-            val bottom = size.height * 0.9f
-            drawLine(ink, Offset(x, bottom), Offset(x, bottom - size.height * height), 3.dp.toPx(), StrokeCap.Round)
-        }
-    }
-}
-
-@Composable
 private fun SupportingLine(text: String, modifier: Modifier = Modifier, maxLines: Int = 1) {
     Text(
         text, modifier, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -472,4 +446,3 @@ private fun SupportingLine(text: String, modifier: Modifier = Modifier, maxLines
 }
 
 private const val TRACK_ALPHA = 0.2f
-private const val PLAYING_HALF_CYCLE_MS = 480
