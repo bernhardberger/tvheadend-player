@@ -25,11 +25,13 @@ class TopLevelBrowseHeaderTest {
                 Column {
                     TopLevelBrowseHeader(
                         title = "Channels",
+                        nowSec = { 0L },
                         filter = "News",
                         modifier = Modifier.testTag("plain-header"),
                     )
                     TopLevelBrowseHeader(
                         title = "Guide",
+                        nowSec = { 0L },
                         filter = "Movies",
                         modifier = Modifier.testTag("action-header"),
                         actions = {

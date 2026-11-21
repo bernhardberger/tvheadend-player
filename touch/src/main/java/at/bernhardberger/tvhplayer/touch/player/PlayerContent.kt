@@ -284,7 +284,7 @@ private fun PlayerActionRow(
     }
 }
 
-private val PlayerPanel.control: PlayerControl?
+internal val PlayerPanel.control: PlayerControl?
     get() = when (this) {
         PlayerPanel.Record -> PlayerControl.Record
         PlayerPanel.Audio -> PlayerControl.Audio

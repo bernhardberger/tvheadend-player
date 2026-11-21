@@ -18,6 +18,7 @@ import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
+import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import kotlinx.coroutines.flow.MutableStateFlow
 
 /**
@@ -35,6 +36,9 @@ internal class PlayerWindow(private val activity: ComponentActivity, private val
     val inWindow = MutableStateFlow(false)
 
     private var view: PlayerView? = null
+
+    /** The display mode the picture is drawn in, so the window takes the same shape. */
+    var mode: AspectRatioMode = AspectRatioMode.FIT
     private val relayout = View.OnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> update() }
     private val videoSize = object : Player.Listener {
         override fun onVideoSizeChanged(videoSize: VideoSize) = update()
@@ -112,7 +116,7 @@ internal class PlayerWindow(private val activity: ComponentActivity, private val
     }
 
     private fun params(): PictureInPictureParams = PictureInPictureParams.Builder().apply {
-        windowAspect(pictureAspect(player))?.let { (width, height) -> setAspectRatio(Rational(width, height)) }
+        windowAspect(pictureAspect(player, mode))?.let { (width, height) -> setAspectRatio(Rational(width, height)) }
         // The picture's bounds also publish where the exit animation returns to.
         val rect = Rect()
         if (view?.videoSurfaceView?.getGlobalVisibleRect(rect) == true && !rect.isEmpty) setSourceRectHint(rect)

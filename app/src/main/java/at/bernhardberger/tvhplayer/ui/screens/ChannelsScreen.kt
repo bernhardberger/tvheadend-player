@@ -746,6 +746,7 @@ internal fun ChannelsScreenContent(
                 // Immersive's backdrop; the Tags button shows the active group.
                 title = stringResource(R.string.nav_channels),
                 showTitle = layout != ChannelsLayout.IMMERSIVE,
+                nowSec = nowSec,
                 tag = channelScope.activeTagId?.let { id -> groups.firstOrNull { it.tagId == id }?.name },
                 focus = header,
                 showTags = groups.size > 1,

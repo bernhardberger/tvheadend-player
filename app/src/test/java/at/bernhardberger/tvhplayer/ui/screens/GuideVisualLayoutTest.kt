@@ -86,6 +86,9 @@ import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.ui.AppDestination
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.components.SideRail
+import at.bernhardberger.tvhplayer.ui.TvIconButtonSize
+import at.bernhardberger.tvhplayer.ui.components.WallClockGap
+import at.bernhardberger.tvhplayer.ui.components.WALL_CLOCK_TAG
 import at.bernhardberger.tvhplayer.ui.components.rememberPreparedBrowseData
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.common.formatHm
@@ -343,7 +346,8 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
     @Test fun theHeadlineOffNowPillClearsTheWideTagsButtonAtLargeText() = headlineOffPillClearance(1.3f)
 
     private fun headlineOffPillClearance(scale: Float) {
-        val start = now - if (scale == 1f) 7200 else 4800
+        // At 1.3x the clock pushes Tags left; an hour back keeps the Now pill under Tags (4800 put it beside it).
+        val start = now - if (scale == 1f) 7200 else 3600
         position.save(GuidePosition(ChannelId(1), EventId(110), hour, start, 0))
         show(scale = scale, activeTag = true, tagName = "Documentaries and international current affairs",
             playerReturn = savedTimelineReturn())
@@ -879,7 +883,9 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
         key(Key.DirectionRight)
         tagFocused("channels-view-button")
         val viewOptions = bounds("channels-view-button")
-        assertEquals(902f, viewOptions.right, .1f)
+        val clock = bounds(WALL_CLOCK_TAG)
+        assertEquals(902f, clock.right, .1f)
+        assertEquals("View ends the clock's gap before it", WallClockGap.value, clock.left - viewOptions.right, .1f)
         val heading = compose.onNode(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, context().getString(R.string.epg_title))).fetchSemanticsNode().boundsInRoot
         assertEquals("Actions stay centred on the header row", heading.center.y, viewOptions.center.y, .1f)
         assertEquals("The date button shares the header row", heading.center.y, bounds("guide-date-button").center.y, .1f)
@@ -1307,24 +1313,32 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
     // The headline stays below the header row for every group name and genre.
     @Test fun theHeadlineStaysBelowTheHeaderRowWithLongGroupAndFilter() = headlineBelowTheHeader(1f)
 
-    /** The same below-header placement holds for long German buttons at large text. */
+    /**
+     * The same below-header placement holds for long German buttons at large text, on a later day
+     * whose date makes the date button its widest: the widest header the Guide draws.
+     */
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-mdpi")
     fun theHeadlineStaysBelowTheGermanHeaderRowAtLargeText() {
         Locale.setDefault(Locale.GERMANY)
-        headlineBelowTheHeader(1.3f)
+        headlineBelowTheHeader(1.3f, laterDay = true)
     }
 
     /**
-     * The headline stays below the header row regardless of the [group] name or chosen [genre].
+     * The headline stays below the header row regardless of the [group] name or chosen [genre],
+     * on today's window or, with [laterDay], one three days ahead.
      */
     private fun headlineBelowTheHeader(
         scale: Float,
         direction: LayoutDirection = LayoutDirection.Ltr,
         group: String = "Dokumentationen, Reportagen und Wissen aus aller Welt",
         genre: ProgrammeCategory = ProgrammeCategory.SOCIETY_POLITICS,
+        laterDay: Boolean = false,
     ) {
+        val eventHour = if (laterDay) hour + 3 * 86400 else hour
+        if (laterDay) position.save(GuidePosition(ChannelId(1), EventId(110), eventHour, eventHour - 1800, 0))
         show(scale = scale, direction = direction, headline = true, genres = true, activeTag = true, tagName = group,
-            initialGenre = genre,
+            initialGenre = genre, eventHour = eventHour, history = !laterDay,
+            playerReturn = if (laterDay) savedTimelineReturn() else null,
             // A long subtitle exercises the headline's width limit.
             subtitle = "Six weeks with the coastguard as the winter storms arrive on the northern islands")
         headlineTitle(title(1, 0))
@@ -1349,6 +1363,34 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
         assertEquals("The headline ends where it did below the row: $geometry",
             header.bottom + headlineDrop() + headlineHeight, headline.bottom, .5f)
         assertEquals(header.bottom + headlineDrop() + headlineHeight + GuideHeadlineRulerGap.value, bounds("epg-time-ruler").top, .5f)
+        // However wide the actions grow, the clock keeps its reserved width on the trailing inset.
+        val clock = bounds(WALL_CLOCK_TAG)
+        if (direction == LayoutDirection.Ltr) assertEquals("The clock ends on the inset: $clock", 902f, clock.right, .5f)
+        val lines = compose.onAllNodes(hasAnyAncestor(hasTestTag(WALL_CLOCK_TAG)) and SemanticsMatcher.keyIsDefined(SemanticsProperties.Text),
+            useUnmergedTree = true).fetchSemanticsNodes().map { it.boundsInRoot }
+        assertEquals("time and date", 2, lines.size)
+        lines.forEach { assertEquals("The clock is as wide as its lines: $clock / $lines", it.width, clock.width, .5f) }
+        // Short of room only the Tags and Filter values give: View options keeps its disc before the clock's gap.
+        val buttons = listOf("guide-date-button", "channels-tags-button", "guide-filter-button", "channels-view-button")
+            .map(::bounds).let { if (direction == LayoutDirection.Ltr) it else it.reversed() }
+        val view = bounds("channels-view-button")
+        assertEquals("View keeps its disc: $buttons", TvIconButtonSize.value, view.width, .5f)
+        assertEquals("View keeps its disc: $buttons", TvIconButtonSize.value, view.height, .5f)
+        buttons.zipWithNext().forEach { (before, after) ->
+            assertTrue("The buttons stay apart in order: $buttons", before.right <= after.left)
+        }
+        if (laterDay) capture("guide-header-widest-de-font$scale", scale, direction).recycle()
+        if (direction == LayoutDirection.Ltr) {
+            assertEquals("View ends at the clock's gap: $view / $clock", clock.left - WallClockGap.value, view.right, .5f)
+            compose.onNodeWithTag("channels-tags-button").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
+            tagFocused("channels-tags-button")
+            key(Key.DirectionRight)
+            tagFocused("guide-filter-button")
+            key(Key.DirectionRight)
+            tagFocused("channels-view-button")
+            key(Key.DirectionCenter)
+            compose.onNodeWithTag("guide-view-panel").assertExists()
+        }
         assertNoPlayback()
     }
 

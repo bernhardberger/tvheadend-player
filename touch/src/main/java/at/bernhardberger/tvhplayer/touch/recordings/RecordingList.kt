@@ -3,7 +3,8 @@
 
 package at.bernhardberger.tvhplayer.touch.recordings
 
-import at.bernhardberger.tvhplayer.touch.ui.ArtworkImage
+import at.bernhardberger.tvhplayer.touch.ui.ChannelLogoImage
+import at.bernhardberger.tvhplayer.touch.ui.rememberChannelAccent
 import at.bernhardberger.tvhplayer.touch.ui.rememberStandalonePicture
 import android.icu.text.DateFormat
 import androidx.compose.foundation.Image
@@ -341,9 +342,10 @@ internal fun durationText(duration: Duration): String =
 private fun Thumbnail(item: RecordingItem) {
     val picture = rememberStandalonePicture(item.picture, item.pictureModel)
     val logo = picture == null && item.hasLogo
+    val tint = if (logo) item.logoTint ?: rememberChannelAccent(item.channelLogoModel)?.animated?.value else null
     Box(
         Modifier.size(ThumbWidth, ThumbHeight).clip(ThumbShape).background(
-            item.logoTint.takeIf { logo } ?: MaterialTheme.colorScheme.surfaceContainerHighest,
+            tint ?: MaterialTheme.colorScheme.surfaceContainerHighest,
         ),
         contentAlignment = Alignment.Center,
     ) {
@@ -355,9 +357,7 @@ private fun Thumbnail(item: RecordingItem) {
         }
         when {
             picture != null -> Image(picture, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-            logo -> ArtworkImage(
-                item.channelLogo, item.channelLogoModel, Modifier.fillMaxSize().padding(6.dp), fallback = icon,
-            )
+            logo -> ChannelLogoImage(item.channelLogo, item.channelLogoModel, fallback = icon)
             else -> icon()
         }
         RecordingBar(item.state, Modifier.align(Alignment.BottomStart).fillMaxWidth().height(3.dp))

@@ -84,8 +84,8 @@ internal fun ColumnScope.InfoBody(
 
 /** The sheet head's channel logo, sized as the Guide's channel head draws it. */
 @Composable
-internal fun InfoLogo(logo: Painter?, tint: Color?) {
-    ChannelLogoTile(logo, tint, Modifier.size(64.dp, 36.dp), RoundedCornerShape(8.dp))
+internal fun InfoLogo(logo: Painter?, tint: Color?, model: Any? = null) {
+    ChannelLogoTile(logo, tint, Modifier.size(64.dp, 36.dp), RoundedCornerShape(8.dp), model)
 }
 
 /** [ChannelDay]'s list index of the program [id]: each program is one item, a date heading one more. */

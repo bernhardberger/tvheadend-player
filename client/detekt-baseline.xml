@@ -112,6 +112,16 @@
     <ID>MagicNumber:AppError.kt:AppErrorCondition.UNREACHABLE$101</ID>
     <ID>MagicNumber:AppError.kt:AppErrorCondition.USER_LIMIT$208</ID>
     <ID>MagicNumber:AudioChoiceStore.kt:AudioChoiceStore$64</ID>
+    <ID>MagicNumber:ChannelAccentPolicy.kt:120f</ID>
+    <ID>MagicNumber:ChannelAccentPolicy.kt:16</ID>
+    <ID>MagicNumber:ChannelAccentPolicy.kt:180f</ID>
+    <ID>MagicNumber:ChannelAccentPolicy.kt:240f</ID>
+    <ID>MagicNumber:ChannelAccentPolicy.kt:255</ID>
+    <ID>MagicNumber:ChannelAccentPolicy.kt:255f</ID>
+    <ID>MagicNumber:ChannelAccentPolicy.kt:300f</ID>
+    <ID>MagicNumber:ChannelAccentPolicy.kt:360f</ID>
+    <ID>MagicNumber:ChannelAccentPolicy.kt:60f</ID>
+    <ID>MagicNumber:ChannelAccentPolicy.kt:8</ID>
     <ID>MagicNumber:ConnectionNoticeSource.kt:ConnectionNoticeSource$3_000</ID>
     <ID>MagicNumber:DvrChangeNoticeSource.kt:DvrChangeNoticeSource$2_000</ID>
     <ID>MagicNumber:DvrLibraryPolicy.kt:5</ID>

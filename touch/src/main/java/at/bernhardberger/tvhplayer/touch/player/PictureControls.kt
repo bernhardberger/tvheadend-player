@@ -4,9 +4,7 @@ package at.bernhardberger.tvhplayer.touch.player
 
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -41,7 +39,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -57,6 +54,7 @@ import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.ui.common.hintRes
 import at.bernhardberger.tvhplayer.ui.common.titleRes
 import at.bernhardberger.tvhplayer.touch.channels.ChannelRow
+import at.bernhardberger.tvhplayer.touch.ui.ChannelLogoTile
 
 private val OnPicture = Color.White
 private val DarkControl = Color(0xA82C2E2E)
@@ -312,12 +310,8 @@ private fun statusText(status: LivePlayerStatus): Triple<Int, Int, String?>? = w
 
 @Composable
 internal fun ChannelLogo(channel: ChannelRow, modifier: Modifier) {
-    channel.logo?.let {
-        Image(
-            it, null, modifier.clip(RoundedCornerShape(8.dp))
-                .background(channel.logoTint ?: MaterialTheme.colorScheme.surfaceContainerHighest),
-        )
-    }
+    if (channel.logo == null && channel.logoModel == null) return
+    ChannelLogoTile(channel.logo, channel.logoTint, modifier, RoundedCornerShape(8.dp), channel.logoModel)
 }
 
 @Composable

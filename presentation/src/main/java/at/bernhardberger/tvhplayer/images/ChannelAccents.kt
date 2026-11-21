@@ -37,7 +37,7 @@ import kotlinx.coroutines.withContext
  * [sample] is the one sampler for callers and for the fill-in pass ([fillIn]); a key is never sampled
  * twice at the same time. The defaults keep nothing beyond the process and have no keys.
  */
-class ChannelAccents internal constructor(
+class ChannelAccents(
     private val store: ChannelAccentStore,
     private val samplingContext: CoroutineContext,
     private val cacheKey: (CurrentSessionObservation, ArtworkId) -> String?,

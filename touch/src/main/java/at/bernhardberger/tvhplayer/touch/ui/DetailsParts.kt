@@ -3,7 +3,6 @@
 
 package at.bernhardberger.tvhplayer.touch.ui
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -11,7 +10,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -54,23 +54,32 @@ internal fun ChannelLogoTile(
     model: Any? = null,
 ) {
     val scheme = MaterialTheme.colorScheme
-    val fill = if (logo == null || tint == null) {
+    val accent = if (tint == null) rememberChannelAccent(model) else null
+    val ground = tint ?: accent?.animated?.value
+    val fill = if ((logo == null && model == null) || ground == null) {
         Modifier.background(scheme.surfaceContainerHigh)
     } else {
-        Modifier.background(Brush.linearGradient(listOf(tint, lerp(tint, Color.Black, LOGO_SHADE))))
+        Modifier.background(Brush.linearGradient(listOf(ground, lerp(ground, Color.Black, LOGO_SHADE))))
     }
     Box(
-        modifier.clip(shape).then(fill).border(1.dp, scheme.outlineVariant, shape).padding(4.dp),
+        modifier.clip(shape).then(fill).border(1.dp, scheme.outlineVariant, shape),
         contentAlignment = Alignment.Center,
     ) {
-        if (logo == null) {
-            ArtworkImage(null, model, Modifier.fillMaxSize()) {
-                Icon(painterResource(R.drawable.play_tv_outline), null, tint = scheme.onSurfaceVariant)
-            }
-        } else {
-            Image(logo, null)
+        ChannelLogoImage(logo, model) {
+            Icon(painterResource(R.drawable.play_tv_outline), null, tint = scheme.onSurfaceVariant)
         }
     }
+}
+
+/**
+ * A channel's logo fitted, whatever its shape, into the same share of the slot it stands in, centered by the
+ * caller's Box (section 13); [fallback] stands in while a server logo loads or when it fails.
+ */
+@Composable
+internal fun ChannelLogoImage(logo: Painter?, model: Any?, fallback: @Composable () -> Unit = {}) {
+    ArtworkImage(
+        logo, model, Modifier.fillMaxWidth(LOGO_WIDTH_SHARE).fillMaxHeight(LOGO_HEIGHT_SHARE), fallback = fallback,
+    )
 }
 
 /** The scrim over a page's top picture: it keeps the bar readable and fades the picture into the page. */
@@ -142,3 +151,5 @@ private fun Fact(key: String, value: String, keyWidth: Dp) {
 
 private val LogoShape = RoundedCornerShape(12.dp)
 private const val LOGO_SHADE = 0.35f
+private const val LOGO_WIDTH_SHARE = 0.76f
+private const val LOGO_HEIGHT_SHARE = 0.62f

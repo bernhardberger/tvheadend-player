@@ -161,6 +161,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.robolectric.Shadows.shadowOf
 
+/** The wall clock the player chrome fixtures show: 2026-10-04 20:15 UTC. */
+internal const val PlayerChromeClockSec = 1_791_144_900L
+
 abstract class LivePlayerChromeFixture {
     @get:Rule val compose = createComposeRule()
 
@@ -263,7 +266,7 @@ abstract class LivePlayerChromeFixture {
             TVHeadendPlayerTheme {
                 PlayerChrome(
                     mode = PlayerChromeMode.CONTROLS,
-                    content = PlayerChromeContent("20:15", liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 1, "One", null, null, false, 1_800, "Programme"), state = state()),
+                    content = PlayerChromeContent(PlayerChromeClockSec, liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 1, "One", null, null, false, 1_800, "Programme"), state = state()),
                     timeline = PlayerChromeTimeline.Live(
                         at.bernhardberger.tvhplayer.playback.AppTimeshiftState(available = true, bufferStartMs = -600_000,
                             positionMs = -behindLiveMs(), liveEdgeMs = 0, timingKnown = true,

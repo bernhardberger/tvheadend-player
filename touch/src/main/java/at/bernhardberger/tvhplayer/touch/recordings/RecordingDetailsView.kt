@@ -3,11 +3,10 @@
 
 package at.bernhardberger.tvhplayer.touch.recordings
 
-import at.bernhardberger.tvhplayer.touch.ui.ArtworkImage
+import at.bernhardberger.tvhplayer.touch.ui.ChannelLogoTile
 import at.bernhardberger.tvhplayer.touch.ui.rememberStandalonePicture
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -215,17 +214,8 @@ private fun PageChannel(
 
 @Composable
 private fun ChannelTile(item: RecordingItem, modifier: Modifier) {
-    val logo = item.channelLogo
-    if (logo == null && item.channelLogoModel == null) return
-    val tint = item.logoTint ?: MaterialTheme.colorScheme.surfaceContainerHigh
-    val shape = RoundedCornerShape(8.dp)
-    Box(
-        modifier.clip(shape).background(tint)
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape).padding(3.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (logo != null) Image(logo, null) else ArtworkImage(null, item.channelLogoModel, Modifier.fillMaxSize())
-    }
+    if (item.channelLogo == null && item.channelLogoModel == null) return
+    ChannelLogoTile(item.channelLogo, item.logoTint, modifier, RoundedCornerShape(8.dp), item.channelLogoModel)
 }
 
 @Composable

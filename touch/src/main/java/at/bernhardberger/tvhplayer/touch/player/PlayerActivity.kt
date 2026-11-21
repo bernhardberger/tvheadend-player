@@ -18,6 +18,7 @@ import androidx.annotation.OptIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -47,6 +48,7 @@ import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.BackgroundPlaybackNotice
 import at.bernhardberger.tvhplayer.playback.currentLivePlaybackSelection
+import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.touch.channels.ChannelDetails
 import at.bernhardberger.tvhplayer.touch.channels.ChannelProgram
 import at.bernhardberger.tvhplayer.touch.channels.ChannelRow
@@ -72,6 +74,11 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.android.ext.android.inject
+import at.bernhardberger.tvhplayer.notices.NoticeCenter
+import at.bernhardberger.tvhplayer.settings.AppProfileOwner
+import at.bernhardberger.tvhplayer.touch.ui.ArtworkModels
+import at.bernhardberger.tvhplayer.touch.ui.FrameNotices
+import at.bernhardberger.tvhplayer.touch.ui.LocalFrameNotices
 import org.koin.androidx.viewmodel.ext.android.viewModel
 import kotlin.time.Instant
 
@@ -84,6 +91,10 @@ import kotlin.time.Instant
 class PlayerActivity : ComponentActivity() {
     private val sdk: SdkRuntimeOwner by inject()
     private val session: TvheadendSession by inject()
+    private val artwork by lazy { ArtworkModels(session) }
+    private val settings: PlayerSettingsStore by inject()
+    private val notices: NoticeCenter by inject()
+    private val owner: AppProfileOwner by inject()
     private val connection: AppConnectionViewModel by viewModel()
     private val channels: ChannelsViewModel by viewModel()
     private val runtime get() = sdk.playbackRuntime
@@ -126,7 +137,10 @@ class PlayerActivity : ComponentActivity() {
             finish()
         }
         setContent {
-            MaterialTheme(colorScheme = MobileDarkColors) { Player() }
+            MaterialTheme(colorScheme = MobileDarkColors) {
+                // The window's one notice host, for the connection in use, as browsing builds it.
+                FrameNotices(notices, owner, session) { Player() }
+            }
         }
     }
 
@@ -232,34 +246,36 @@ class PlayerActivity : ComponentActivity() {
         val shown = tune.channelId
         val status = currentStatus(runtime, observation, shown, failed)
         val paused = !livePlayWhenReady(pause, playWhenReady)
+        val options = rememberPlayerOptions(runtime, settings, shown, status == LivePlayerStatus.Playing)
+        SideEffect { pictureWindow.mode = options.aspect }
         FollowTimeshift(
             timeshift, shown, fast = controlsShown && !paused && !inWindow, liveStart = liveStart && !paused,
             eventAt = { session.observation.value.eventAt(shown, it) },
             nextAt = { session.observation.value.nextEvent(shown, it) },
         )
-        ConsumePauseNotices(runtime)
+        ConsumePauseNotices(runtime, notices)
         SystemBarsForOrientation(window)
         val now = Instant.fromEpochSeconds(minute * SECONDS_PER_MINUTE)
         val state = livePlayerState(
             shown, scope, observation, presentation.connection, presentation.degraded, status,
-            timeshift.timeline, pause.availability, now, window = windowAvailable,
+            timeshift.timeline, pause.availability, now, window = windowAvailable, artwork = artwork,
         )
         PlayerScreen(
             state = state.copy(
                 channel = state.channel.withProgramTexts(timeshift.programs.value, now, LocalResources.current),
-                brightness = brightness,
-                paused = paused,
+                brightness = brightness, paused = paused,
+                tracks = options.tracks, options = options.options, offered = state.offered + options.offered,
             ),
             onAction = { act(it, timeshift, paused) },
             onSeek = timeshift::seek,
             onBrightness = { brightness = it; applyBrightness(window, it) },
             onChannel = { id -> requested.update { tuneTo(it, ChannelId(id.toLong())) } },
-            onChoice = { channels.choose(it) },
-            video = { modifier -> TouchVideoSurface(runtime.player, video.visible, modifier, pictureWindow::attach) },
+            onChoice = { if (!options.choose(it)) channels.choose(it) },
+            video = { TouchVideoSurface(runtime.player, video.visible, it, pictureWindow::attach, options.aspect) },
             onControlsShown = { controlsShown = it },
             inWindow = inWindow,
             hideAfterMs = rememberControlsTimeout(),
-            progressing = rememberPlayerProgressing(runtime.player).value,
+            progressing = rememberPlayerProgressing(runtime.player).value, notices = LocalFrameNotices.current,
         )
     }
 

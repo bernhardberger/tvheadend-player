@@ -8,6 +8,12 @@ import androidx.activity.ComponentActivity
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.unit.IntRect
+import at.bernhardberger.tvhplayer.touch.testutil.assertLogoFitsItsShare
+import at.bernhardberger.tvhplayer.touch.testutil.markedLogos
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
@@ -227,6 +233,39 @@ class RecordingsScreenTest {
 
         compose.onNodeWithText("Show all").performClick()
         assertEquals(DvrArchiveShow.ALL, state.value.view.show)
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
+    fun aLogoStandingInForThePictureFitsItsShareOfTheSlot() {
+        // Two rows without a picture, each on a ground color found nowhere else, so its slot can be found.
+        val grounds = listOf(Color(0xFF00FF00), Color(0xFF0000FF))
+        val fixture = flatFixture()
+        val standIns = markedLogos().zip(grounds) { logo, ground -> logo to ground }
+        state.value = fixture.copy(
+            root = fixture.root.copy(
+                recordings = fixture.root.recordings.mapIndexed { index, item ->
+                    standIns.getOrNull(index)?.let { (logo, ground) ->
+                        item.copy(
+                            picture = null, channelLogo = logo, logoTint = ground, state = RecordingProgress.Unwatched,
+                        )
+                    } ?: item
+                },
+            ),
+        )
+        show()
+        val screen = compose.onRoot().captureToImage().toPixelMap()
+        grounds.forEachIndexed { index, ground ->
+            var slot = IntRect(screen.width, screen.height, 0, 0)
+            for (x in 0 until screen.width) for (y in 0 until screen.height) {
+                if (screen[x, y] == ground) {
+                    slot = IntRect(
+                        minOf(slot.left, x), minOf(slot.top, y), maxOf(slot.right, x + 1), maxOf(slot.bottom, y + 1),
+                    )
+                }
+            }
+            screen.assertLogoFitsItsShare("stand-in $index", slot)
+        }
     }
 
     private fun show(initialPath: List<String> = emptyList()) {

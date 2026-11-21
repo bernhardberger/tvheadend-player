@@ -4,6 +4,9 @@ import android.app.Application
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -11,6 +14,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -21,6 +25,7 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Density
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.ui.components.TopLevelBrowseHeader
+import at.bernhardberger.tvhplayer.ui.components.WALL_CLOCK_TAG
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -42,7 +47,7 @@ class TopLevelBrowseHeaderTest {
 
     @Test fun titleIsThePaneTitleAndNeverDrawn() {
         compose.setContent {
-            TVHeadendPlayerTheme { TopLevelBrowseHeader("Channels", Modifier.testTag("header")) }
+            TVHeadendPlayerTheme { TopLevelBrowseHeader("Channels", { NOW }, Modifier.testTag("header")) }
         }
         compose.onNodeWithTag("header").assert(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "Channels"))
         compose.onNodeWithText("Channels").assertDoesNotExist()
@@ -50,7 +55,7 @@ class TopLevelBrowseHeaderTest {
 
     @Test fun shownTitleIsAHeadingAtTheLeadingEdgeInThePrimaryTone() {
         compose.setContent {
-            TVHeadendPlayerTheme { TopLevelBrowseHeader("Channels", Modifier.testTag("header"), showTitle = true) }
+            TVHeadendPlayerTheme { TopLevelBrowseHeader("Channels", { NOW }, Modifier.testTag("header"), showTitle = true) }
         }
         compose.onNodeWithTag("header").assert(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "Channels"))
         val title = compose.onNode(hasText("Channels") and isHeading())
@@ -62,7 +67,7 @@ class TopLevelBrowseHeaderTest {
 
     @Test fun filterStaysVisibleAtTheLeadingEdgeInTheSecondaryTone() {
         compose.setContent {
-            TVHeadendPlayerTheme { TopLevelBrowseHeader("News", Modifier.testTag("header"), filter = "Movies") }
+            TVHeadendPlayerTheme { TopLevelBrowseHeader("News", { NOW }, Modifier.testTag("header"), filter = "Movies") }
         }
         compose.onNodeWithText("News").assertDoesNotExist()
         val layouts = mutableListOf<TextLayoutResult>()
@@ -71,12 +76,29 @@ class TopLevelBrowseHeaderTest {
         assertEquals(0f, compose.onNodeWithText("Movies").fetchSemanticsNode().boundsInRoot.left, .1f)
     }
 
+    @Test fun wallClockKeepsItsWidthAndTheHeaderEdgeWhateverTheTimeAndDate() {
+        var now by mutableLongStateOf(SHORT)
+        compose.setContent {
+            TVHeadendPlayerTheme { TopLevelBrowseHeader("Channels", { now }, Modifier.testTag("header"), filter = "News") }
+        }
+        fun read() = compose.onNodeWithTag(WALL_CLOCK_TAG).fetchSemanticsNode().let { it.config[SemanticsProperties.ContentDescription] to it.boundsInRoot }
+        val (shortText, short) = read()
+        compose.runOnIdle { now = WIDE }
+        val (wideText, wide) = read()
+        assertTrue("the time and date changed: $shortText, $wideText", shortText != wideText)
+        assertEquals("the reserved width does not follow the text", short, wide)
+        assertEquals("the clock ends on the header's end edge",
+            compose.onNodeWithTag("header").fetchSemanticsNode().boundsInRoot.right, wide.right, .1f)
+        assertEquals("the clock is not focusable", 0,
+            compose.onAllNodes(hasTestTag(WALL_CLOCK_TAG) and SemanticsMatcher.keyIsDefined(SemanticsProperties.Focused)).fetchSemanticsNodes().size)
+    }
+
     private fun checkSlot(fontScale: Float) {
         compose.setContent {
             CompositionLocalProvider(LocalDensity provides Density(1f, fontScale)) {
                 TVHeadendPlayerTheme {
                     Column(Modifier.fillMaxSize()) {
-                        TopLevelBrowseHeader("Channels", Modifier.testTag("header"), filter = "News")
+                        TopLevelBrowseHeader("Channels", { NOW }, Modifier.testTag("header"), filter = "News")
                         Text("Next row")
                     }
                 }
@@ -96,5 +118,11 @@ class TopLevelBrowseHeaderTest {
             compose.onNodeWithText("Next row").fetchSemanticsNode().boundsInRoot.top >= header.bottom)
         if (fontScale == 1f) assertEquals(40f, header.height, .1f)
         else assertTrue("Large text grows beyond the 40dp minimum (header=$header, text=${layout.size})", header.height > 40f)
+    }
+
+    private companion object {
+        const val NOW = 1_791_144_900L // 2026-10-04 20:15 UTC
+        const val SHORT = 1_777_597_260L // 2026-05-01 01:01 UTC
+        const val WIDE = 1_790_809_080L // 2026-09-30 22:58 UTC
     }
 }

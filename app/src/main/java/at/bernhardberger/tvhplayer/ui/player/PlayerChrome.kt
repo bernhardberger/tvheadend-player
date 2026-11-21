@@ -138,7 +138,9 @@ internal fun PlayerChrome(
             is PlayerChromeTimeline.Recording -> timeline.growing
         }
         val lastLineEndReserve = if (liveEnd) liveDistanceReserve() else 0.dp
-        val header: @Composable (Modifier) -> Unit = { PlayerChromeHeader(content.clock, it.testTag("player-header")) }
+        val header: @Composable (Modifier) -> Unit = {
+            PlayerChromeHeader(content.clockSec, it.testTag("player-header"))
+        }
         // One chrome for every source: the channel at the top, the info bar leading with the programme's
         // artwork, and the [timelineRow] the full width below it.
         val infoBar: @Composable (contentAlpha: () -> Float, programmeFocus: Modifier, timelineRow: @Composable () -> Unit) -> Unit =

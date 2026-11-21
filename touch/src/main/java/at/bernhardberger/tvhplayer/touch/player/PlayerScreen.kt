@@ -9,13 +9,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -62,13 +65,16 @@ internal fun PlayerScreen(
     inWindow: Boolean = false,
     hideAfterMs: Long? = null,
     progressing: Boolean = true,
+    notices: @Composable (Modifier) -> Unit = {},
 ) {
     var visible by rememberSaveable(state.channel.id) { mutableStateOf(true) }
     var touches by remember { mutableIntStateOf(0) }
     var touching by remember { mutableStateOf(false) }
     var panel by rememberSaveable { mutableStateOf<PlayerPanel?>(null) }
-    // Sheets and menus close on entering the picture-in-picture window; they don't come back.
-    LaunchedEffect(inWindow) { if (inWindow) panel = null }
+    // Sheets and menus close on entering the picture-in-picture window (they don't come back), and
+    // when their control leaves (the tracks went away).
+    val panelGone = panelGone(panel, state.offered, inWindow)
+    LaunchedEffect(panelGone) { if (panelGone) panel = null }
     // Info opens on the program being watched each time; inside the sheet the viewer opens others.
     var infoStack by rememberSaveable(stateSaver = InfoStackSaver) { mutableStateOf(InfoStack()) }
     val showPanel: (PlayerPanel?) -> Unit = {
@@ -100,13 +106,15 @@ internal fun PlayerScreen(
         if (layout.upright) {
             UprightPlayer(
                 state, layout, controls, toggle, video, inWindow, preview, { preview = it }, onAction,
-                onBrightness, openOptions, onSeek, panels, onChannel,
+                onBrightness, openOptions, onSeek, panels, onChannel, notices,
             )
         } else {
             Picture(state, layout, controls, toggle, video, inWindow)
             if (!inWindow) {
                 PictureControls(state, layout, controls, preview, onAction, onBrightness, openOptions)
-                LandscapeFooter(state, layout, controls, sheet, preview, { preview = it }, onAction, panels, onSeek)
+                LandscapeFooter(
+                    state, layout, controls, sheet, preview, { preview = it }, onAction, panels, onSeek, notices,
+                )
             }
         }
         // On the upright phone a sheet rises only to the picture's foot, so the picture stays in view.
@@ -120,6 +128,9 @@ internal fun PlayerScreen(
         }
     }
 }
+
+private fun panelGone(panel: PlayerPanel?, offered: Set<PlayerControl>, inWindow: Boolean) =
+    inWindow || panel?.button?.control?.let { it !in offered } == true
 
 /** The upright layout: the picture on top with its controls, the program and the channel list below. */
 @Composable
@@ -138,7 +149,8 @@ private fun UprightPlayer(
     onSeek: (Int) -> Unit,
     panels: PanelHost,
     onChannel: (String) -> Unit,
-) {
+    notices: @Composable (Modifier) -> Unit,
+) = Box(Modifier.fillMaxSize()) {
     Column(
         Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)
             .windowInsetsPadding(WindowInsets.statusBars),
@@ -153,9 +165,17 @@ private fun UprightPlayer(
                         Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(24.dp),
                     )
                 }
+                // The upright tablet's notice stands over the picture, above its timeline.
+                if (layout == PlayerLayout.Upright) {
+                    notices(Modifier.align(Alignment.BottomStart).padding(start = 8.dp, bottom = 12.dp))
+                }
             }
         }
         if (!inWindow) UprightPlayerContent(state, layout, preview != null, onAction, panels, onChannel)
+    }
+    // The upright phone's notice stands at the window's foot, as in browsing, not over the picture.
+    if (!inWindow && layout == PlayerLayout.Phone) {
+        notices(Modifier.align(Alignment.BottomCenter).fillMaxWidth().windowInsetsPadding(WindowInsets.navigationBars))
     }
 }
 
@@ -170,6 +190,7 @@ private fun BoxScope.LandscapeFooter(
     onAction: (PlayerAction) -> Unit,
     panels: PanelHost,
     onSeek: (Int) -> Unit,
+    notices: @Composable (Modifier) -> Unit,
 ) {
     val showFooter = controls && state.status !is LivePlayerStatus.Reconnecting &&
         state.status != LivePlayerStatus.PauseEnded
@@ -184,6 +205,17 @@ private fun BoxScope.LandscapeFooter(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(28.dp).offset(y = 20.dp),
         )
     }
+    // Bottom start over the picture: above the timeline while the footer shows, at the footer's margins when not.
+    notices(Modifier.align(Alignment.BottomStart).padding(noticePlace(layout, showFooter)))
+}
+
+/** The notice's place in the footer; [TouchNotice] adds its own 16dp beside and 12dp below. */
+private fun noticePlace(layout: PlayerLayout, footer: Boolean): PaddingValues {
+    val tablet = layout == PlayerLayout.Tablet
+    val margin = if (tablet) 40.dp else 48.dp
+    // The program's foot, which stands on the timeline (LandscapePlayerContent).
+    val aboveTimeline = if (tablet) 136.dp else 112.dp
+    return PaddingValues(start = margin - 16.dp, bottom = (if (footer) aboveTimeline else margin) - 12.dp)
 }
 
 @Composable

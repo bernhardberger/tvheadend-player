@@ -29,7 +29,8 @@ internal fun playerChromeMode(controls: Boolean, banner: Boolean, stepPreview: B
 
 /** The header's clock, the info bar's identity and programme, and the bar row's state cell. */
 internal data class PlayerChromeContent(
-    val clock: String,
+    /** The wall clock's minute, in epoch seconds: see [wallClockMinute]. */
+    val clockSec: Long,
     val info: PlayerInfoBarData,
     /** What playback is doing: the bar row's state cell, always the real state, also during a step. */
     val state: PlayerStateCell = PlayerStateCell.PLAYING,
@@ -46,6 +47,9 @@ internal data class PlayerChromeContent(
 ) {
     val showChannelMark: Boolean get() = showChannelRecordingMark(channelRecording, info.nowRecording != null)
 }
+
+/** Now floored to the minute, so the chrome's content changes only when the wall clock does. */
+internal fun wallClockMinute(nowSec: Long): Long = Math.floorDiv(nowSec, 60L) * 60L
 
 /** Facts the chrome's timeline shows. */
 internal sealed interface PlayerChromeTimeline {

@@ -19,7 +19,6 @@ import androidx.compose.ui.platform.testTag
 import at.bernhardberger.tvhplayer.core.playerStateCell
 import at.bernhardberger.tvhplayer.core.recordingArtwork
 import at.bernhardberger.tvhplayer.core.recordingBarEnd
-import at.bernhardberger.tvhplayer.ui.common.formatClock
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -734,7 +733,7 @@ fun RecordingPlayerScreen(
             ProvideArtworkSession(retainedSelection?.currentSession, targetObservation) { PlayerChrome(
                 mode = chromeMode(foregroundLayer),
                 content = PlayerChromeContent(
-                    clock = formatClock(nowSec),
+                    clockSec = wallClockMinute(nowSec),
                     info = recordingInfoBarData(entry, channel?.number, nowSec, timelineState.playbackPositionMs,
                         recordedLengthMs, growing),
                     state = chromeState,

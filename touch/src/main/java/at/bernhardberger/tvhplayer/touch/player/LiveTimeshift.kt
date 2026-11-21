@@ -1,5 +1,8 @@
 package at.bernhardberger.tvhplayer.touch.player
 
+import at.bernhardberger.tvhplayer.notices.Notice
+import at.bernhardberger.tvhplayer.notices.NoticeCenter
+import at.bernhardberger.tvhplayer.notices.PauseUnavailableReason
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
@@ -118,9 +121,15 @@ internal fun rememberPlayWhenReady(player: Player): State<Boolean> = produceStat
  * design has no notice for it yet: the transport goes away with the channel's pause.
  */
 @Composable
-internal fun ConsumePauseNotices(runtime: AppPlaybackRuntime) {
+internal fun ConsumePauseNotices(runtime: AppPlaybackRuntime, notices: NoticeCenter) {
     val notice by runtime.livePauseNotice.collectAsStateWithLifecycle()
-    LaunchedEffect(notice) { notice?.let(runtime::consumeLivePauseNotice) }
+    LaunchedEffect(notice) {
+        // A pause asked for while timeshift was starting was dropped: no grant for this channel, as the TV says.
+        notice?.let {
+            notices.post(Notice.PauseUnavailable(PauseUnavailableReason.CHANNEL_UNAVAILABLE), notices.context())
+            runtime.consumeLivePauseNotice(it)
+        }
+    }
 }
 
 /** Samples at the TV player's cadence while the bar shows and moves; the thin line and a paused bar need less. */

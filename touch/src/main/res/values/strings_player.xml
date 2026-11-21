@@ -62,8 +62,6 @@
     <string name="player_audio_automatic">Automatic</string>
     <!-- TV: audio_automatic_playing -->
     <string name="player_audio_playing">Playing: %1$s</string>
-    <!-- TV: audio_description -->
-    <string name="player_audio_description">Audio description</string>
     <!-- TV: playback_option_default -->
     <string name="player_option_default">Default (%1$s)</string>
     <!-- TV: subtitles_off -->

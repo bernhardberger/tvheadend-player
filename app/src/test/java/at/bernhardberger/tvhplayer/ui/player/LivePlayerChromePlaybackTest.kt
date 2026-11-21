@@ -10,6 +10,8 @@ import at.bernhardberger.tvhplayer.di.PlayerStatsLevel
 import at.bernhardberger.tvhplayer.testutil.pressKey
 import at.bernhardberger.tvhplayer.testutil.settleFrames
 import at.bernhardberger.tvhplayer.presentation.R
+import at.bernhardberger.tvhplayer.ui.common.formatClock
+import at.bernhardberger.tvhplayer.ui.common.formatRecordingDate
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -269,7 +271,11 @@ class LivePlayerChromePlaybackTest : LivePlayerChromeFixture() {
         assertFalse(exists("timeshift-seek-preview"))
     }
 
-    @Test fun playerEntersWithAPassiveBannerAndDownLandsOnTheControls() {
+    // Instrumented, the player's System.currentTimeMillis reads the Robolectric clock pinned below.
+    @Test @org.robolectric.annotation.Config(instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.player.LiveTimelinePresentationState"])
+    fun playerEntersWithAPassiveBannerAndDownLandsOnTheControls() {
+        // Pinned inside a minute, the clock shows that minute.
+        assertTrue(android.os.SystemClock.setCurrentTimeMillis((PlayerChromeClockSec + 5) * 1_000L))
         screen()
         assertTrue("Banner on entry", exists("player-banner"))
         assertTrue(exists("player-info-bar"))
@@ -296,8 +302,18 @@ class LivePlayerChromePlaybackTest : LivePlayerChromeFixture() {
         assertTrue("the action row exposes Info", exists("player-info"))
         assertEquals("the header clock is never focusable", 0,
             compose.onAllNodes(hasAnyAncestor(hasTestTag("player-top-cluster")) and isFocusable()).fetchSemanticsNodes().size)
-        assertTrue("the header keeps only the clock, no status chip: ${texts("player-header")}",
-            texts("player-header").matches(Regex("\\d{1,2}:\\d{2}( [AP]M)?")))
+        assertEquals("the header keeps only the clock, no status chip: ${texts("player-header")}", 0,
+            compose.onAllNodes((hasTestTag("player-header") or hasAnyAncestor(hasTestTag("player-header"))) and
+                SemanticsMatcher.keyIsDefined(SemanticsProperties.Text) and !hasAnyAncestor(hasTestTag("player-top-cluster")),
+                useUnmergedTree = true).fetchSemanticsNodes().size)
+        assertEquals("the clock reads its time and date as one statement",
+            "${formatClock(PlayerChromeClockSec)}, " +
+                formatRecordingDate(PlayerChromeClockSec, dateOnly = true, nowSec = PlayerChromeClockSec),
+            description("player-top-cluster"))
+        assertEquals("the time and date are not accessible on their own", 0,
+            compose.onAllNodes(hasAnyAncestor(hasTestTag("player-top-cluster")) or
+                (hasTestTag("player-top-cluster") and SemanticsMatcher.keyIsDefined(SemanticsProperties.Text)))
+                .fetchSemanticsNodes().size)
     }
 
     @Test fun theAudioButtonStandsBesideInfoOnlyWithAChoiceAndReturnsFocusFromItsList() = timeshiftPlaying {
