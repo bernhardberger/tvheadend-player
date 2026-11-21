@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,6 +22,7 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -82,6 +84,7 @@ internal fun TouchFrame(
     // A destination's page can draw its own top bar, or take the whole window (then it handles the insets).
     showTopBar: (Destination) -> Boolean = { true },
     showNavigation: (Destination) -> Boolean = { true },
+    lastActionIsIconOnly: Boolean = false,
     actions: @Composable RowScope.(Destination) -> Unit = {},
     belowTopBar: @Composable (Destination) -> Unit = {},
     content: @Composable (Destination) -> Unit = {},
@@ -108,7 +111,7 @@ internal fun TouchFrame(
             topBar = {
                 if (topBar) {
                     Column {
-                        DestinationTopBar(selected, mediumOrWider, expanded, actions)
+                        DestinationTopBar(selected, mediumOrWider, expanded, lastActionIsIconOnly, actions)
                         belowTopBar(selected)
                     }
                 }
@@ -146,8 +149,12 @@ private fun DestinationTopBar(
     selected: Destination,
     mediumOrWider: Boolean,
     expanded: Boolean,
+    lastActionIsIconOnly: Boolean,
     actions: @Composable RowScope.(Destination) -> Unit,
 ) {
+    val keyline = if (mediumOrWider) 24.dp else 16.dp
+    // The stock bar leaves 4 dp at the end; a 24 dp symbol in its 48 dp target adds another 12 dp.
+    val stockInset = if (lastActionIsIconOnly) 16.dp else 4.dp
     TopAppBar(
         title = {
             Text(
@@ -162,7 +169,10 @@ private fun DestinationTopBar(
                 },
             )
         },
-        actions = { actions(selected) },
+        actions = {
+            actions(selected)
+            Spacer(Modifier.width(keyline - stockInset))
+        },
     )
 }
 

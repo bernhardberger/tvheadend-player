@@ -164,7 +164,6 @@ private fun TagFilter(state: GuideState, actions: GuideActions) {
     MenuButton(
         R.drawable.channels_tag, options, selected,
         onSelect = { actions.onTag(if (it == 0) null else state.tags[it - 1].id) },
-        modifier = Modifier.padding(end = 12.dp),
     )
 }
 

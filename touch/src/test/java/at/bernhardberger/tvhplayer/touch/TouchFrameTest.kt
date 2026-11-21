@@ -1,7 +1,6 @@
 package at.bernhardberger.tvhplayer.touch
 
 import androidx.activity.ComponentActivity
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -29,14 +28,26 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import at.bernhardberger.tvhplayer.touch.channels.ChannelsActions
+import at.bernhardberger.tvhplayer.touch.channels.ChannelsScreen
+import at.bernhardberger.tvhplayer.touch.channels.ChannelsState
+import at.bernhardberger.tvhplayer.touch.channels.channelsFixture
+import at.bernhardberger.tvhplayer.touch.guide.GuideActions
+import at.bernhardberger.tvhplayer.touch.guide.GuideScreen
+import at.bernhardberger.tvhplayer.touch.guide.overviewFixture
+import at.bernhardberger.tvhplayer.touch.guide.phoneOverviewFixture
 import at.bernhardberger.tvhplayer.touch.testutil.TouchCanvas
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouch
 import at.bernhardberger.tvhplayer.touch.ui.Destination
+import at.bernhardberger.tvhplayer.touch.ui.LocalFrameSelection
 import at.bernhardberger.tvhplayer.touch.ui.TouchFrame
 import at.bernhardberger.tvhplayer.ui.MobileDarkColors
 import org.junit.Assert.assertEquals
@@ -72,6 +83,55 @@ class TouchFrameTest {
         assertChannelsFrame(vertical = false)
         compose.captureTouch("slice0", "tablet-upright", TouchCanvas.TABLET_UPRIGHT)
     }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
+    fun compactBrowseActionsEndAtTheContentKeyline() = assertBrowseActionEnds(16.dp, compact = true)
+
+    @Test
+    @Config(qualifiers = "en-rUS-w1280dp-h800dp-land-xhdpi")
+    fun expandedBrowseActionsEndAtTheContentKeyline() = assertBrowseActionEnds(24.dp, compact = false)
+
+    private fun assertBrowseActionEnds(inset: Dp, compact: Boolean) {
+        val selection = mutableStateOf(Destination.Channels)
+        val channels = ChannelsState.Ready(channelsFixture())
+        val guide = (if (compact) phoneOverviewFixture() else overviewFixture()).copy(details = null)
+        val recordings = flatFixture()
+        val channelsActions = ChannelsActions(onPlay = null, onTag = {}, onRetry = {}, onOpenConnectionSettings = {})
+        val guideActions = GuideActions(
+            onWatch = null, onRecord = null, onRecordOptions = null, onDay = {}, onJump = {}, onTag = {},
+        )
+        val recordingsActions = RecordingsActions(onView = {}, onPlay = null, onDelete = null, onMore = null)
+        compose.setContent {
+            MaterialTheme(colorScheme = MobileDarkColors) {
+                CompositionLocalProvider(LocalFrameSelection provides selection) {
+                    when (selection.value) {
+                        Destination.Channels -> ChannelsScreen(channels, channelsActions)
+                        Destination.Guide -> GuideScreen(guide, guideActions)
+                        Destination.Recordings -> RecordingsScreen(recordings, recordingsActions)
+                    }
+                }
+            }
+        }
+        val keyline = compose.onRoot().fetchSemanticsNode().boundsInRoot.right -
+            inset.value * compose.activity.resources.displayMetrics.density
+        val settingsEnd = symbolEnd(R.string.channels_connection_settings)
+        compose.onNode(destination and hasText("Guide")).performClick()
+        val guideEnd = buttonEnd(R.string.channels_all)
+        compose.onNode(destination and hasText("Recordings")).performClick()
+        val recordingsEnd = if (compact) symbolEnd(R.string.recordings_view_options)
+        else buttonEnd(R.string.recordings_view_options)
+        assertEquals("Channels / Guide / Recordings", List(3) { keyline }, listOf(settingsEnd, guideEnd, recordingsEnd))
+    }
+
+    private fun symbolEnd(label: Int) = compose.onNode(
+        hasContentDescription(compose.activity.getString(label)) and !hasClickAction(),
+        useUnmergedTree = true,
+    ).assertIsDisplayed().fetchSemanticsNode().boundsInRoot.right
+
+    private fun buttonEnd(label: Int) = compose.onNode(
+        hasText(compose.activity.getString(label)) and hasClickAction(),
+    ).assertIsDisplayed().fetchSemanticsNode().boundsInRoot.right
 
     @Test
     @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
@@ -148,9 +208,10 @@ class TouchFrameTest {
         val content: @Composable () -> Unit = {
             MaterialTheme(colorScheme = MobileDarkColors) {
                 TouchFrame(
+                    lastActionIsIconOnly = true,
                     actions = { current ->
                         if (current == Destination.Channels) {
-                            IconButton(onClick = {}, modifier = Modifier.padding(end = 4.dp)) {
+                            IconButton(onClick = {}) {
                                 Icon(
                                     painterResource(R.drawable.channels_settings),
                                     stringResource(R.string.channels_connection_settings),

@@ -83,6 +83,7 @@ internal fun RecordingsScreen(
             destinations = destinations,
             showTopBar = { !(it == Destination.Recordings && page) },
             showNavigation = { !(it == Destination.Recordings && page && layout == RecordingsLayout.Phone) },
+            lastActionIsIconOnly = layout.compact,
             actions = { destination ->
                 if (destination == Destination.Recordings && listed) {
                     TitleActions(state.space, layout, sheetOpen = sheet != null) { sheet = SheetPage.Main }
@@ -178,9 +179,7 @@ private fun TitleActions(
             restoreFocus = true
             openViewOptions()
         },
-        // TopAppBar already reserves 4 dp at its end.
-        modifier = Modifier.padding(start = 16.dp, end = BrowseEndInset - 4.dp)
-            .focusRequester(viewOptionsFocus),
+        modifier = Modifier.padding(start = 16.dp).focusRequester(viewOptionsFocus),
         colors = ButtonDefaults.filledTonalButtonColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             contentColor = MaterialTheme.colorScheme.onSurface,

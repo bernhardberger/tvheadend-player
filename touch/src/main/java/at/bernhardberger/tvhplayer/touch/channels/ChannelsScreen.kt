@@ -2,9 +2,11 @@ package at.bernhardberger.tvhplayer.touch.channels
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -58,12 +60,14 @@ internal fun ChannelsScreen(
     TouchFrame(
         modifier = modifier,
         destinations = destinations,
+        lastActionIsIconOnly = true,
         actions = { destination ->
             if (destination == Destination.Channels) {
                 if (layout.tablet && list != null && list.canFilter) {
-                    TagFilter(list, actions.onTag, Modifier.padding(end = 8.dp))
+                    TagFilter(list, actions.onTag)
+                    Spacer(Modifier.width(8.dp))
                 }
-                IconButton(onClick = actions.onOpenConnectionSettings, modifier = Modifier.padding(end = 4.dp)) {
+                IconButton(onClick = actions.onOpenConnectionSettings) {
                     Icon(
                         painterResource(R.drawable.channels_settings),
                         stringResource(R.string.channels_connection_settings),
