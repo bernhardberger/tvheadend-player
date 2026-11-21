@@ -170,8 +170,8 @@ private fun OpenProgram(
                     }
                     Column(Modifier.weight(1f)) {
                         OpenHead(program, layout)
-                        // The phone writes the time line beside the picture and the bar below it.
-                        if (layout == GuideLayout.Phone) OpenLine(program, phone = true, Modifier.padding(top = 4.dp))
+                        // The compact card keeps the facts beside the picture and the progress bar below it.
+                        if (layout.compact) OpenLine(program, Modifier.padding(top = 4.dp))
                         if (wide) {
                             OpenFacts(program, Modifier.padding(top = 4.dp))
                             ProgramActions(
@@ -226,14 +226,11 @@ private fun OpenHead(program: GuideProgram, layout: GuideLayout) {
         itemVerticalAlignment = Alignment.CenterVertically,
     ) {
         if (program.onNow) OnNowBadge()
-        val time = program.timeRange ?: program.start
-        // The phone writes the time with the length on the facts line.
-        if (layout != GuideLayout.Phone || !program.onNow) {
-            Text(
-                time, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-            )
-        }
+        Text(
+            program.timeRange ?: program.start,
+            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+        )
     }
     Text(
         program.title, Modifier.padding(top = 8.dp),
@@ -252,7 +249,7 @@ private fun OpenHead(program: GuideProgram, layout: GuideLayout) {
 @Composable
 private fun OpenFacts(program: GuideProgram, modifier: Modifier) {
     Column(modifier.fillMaxWidth()) {
-        OpenLine(program, phone = false, Modifier)
+        OpenLine(program, Modifier)
         program.progress?.let {
             ProgramProgress(
                 it, program.timeLeft, program.recording, Modifier.padding(top = 12.dp), program.watching,
@@ -262,8 +259,8 @@ private fun OpenFacts(program: GuideProgram, modifier: Modifier) {
 }
 
 @Composable
-private fun OpenLine(program: GuideProgram, phone: Boolean, modifier: Modifier) {
-    val line = program.openLine(phone)
+private fun OpenLine(program: GuideProgram, modifier: Modifier) {
+    val line = program.openLine()
     if (line.isNotEmpty()) {
         PartsLine(
             line, modifier, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline,

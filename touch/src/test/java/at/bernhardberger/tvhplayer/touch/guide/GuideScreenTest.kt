@@ -84,6 +84,7 @@ class GuideScreenTest {
         val titleTop = row.getBoundsInRoot().top
         row.performClick()
         compose.onNodeWithText(COASTAL_MILES_SYNOPSIS_START, substring = true).assertIsDisplayed()
+        compose.onNodeWithText("50m • Travel", useUnmergedTree = true).assertIsDisplayed()
         compose.onAllNodes(hasText("Watch")).assertCountEquals(0)
         assertEquals(emptyList<String>(), watched)
         // Details always stays: on Record's line where the column has room for both, as here.
@@ -200,6 +201,8 @@ class GuideScreenTest {
         var state by mutableStateOf(fixture)
         show(fixture, GuideView.ByChannel, channel = fixture.channels.first().id, open = RIDGE_LIGHT_ID, state = { state })
         compose.onNodeWithText("Monday, November 16").assertIsDisplayed()
+        compose.onAllNodes(hasText("8:00–9:00 PM", substring = true)).assertCountEquals(1)
+        compose.onNodeWithText("60m • 2024 • Documentary").assertIsDisplayed()
         capture("tablet-guide-channel", TouchCanvas.TABLET)
 
         compose.onNodeWithText("Watch").performClick()
@@ -352,12 +355,23 @@ class GuideScreenTest {
     @Test
     @Config(qualifiers = PHONE)
     fun phoneChannelDay() {
-        show(byChannelFixture(phone = true), GuideView.ByChannel, open = RIDGE_LIGHT_ID)
+        val fixture = byChannelFixture(phone = true)
+        val channel = fixture.channels.first()
+        val snowline = channel.programs.first { it.title == "Snowline" }
+        val programs = channel.programs.map {
+            if (it.id == snowline.id) it.copy(timeRange = "10:00–10:45 PM") else it
+        }
+        show(
+            fixture.copy(channels = listOf(channel.copy(programs = programs)) + fixture.channels.drop(1)),
+            GuideView.ByChannel, open = RIDGE_LIGHT_ID,
+        )
         capture("phone-guide-channel", TouchCanvas.PHONE)
 
         // A tap on another program opens it instead.
         compose.onNodeWithText("Snowline").performClick()
         compose.onAllNodes(hasText("Winter on the ridge", substring = true)).assertCountEquals(0)
+        compose.onAllNodes(hasText("10:00–10:45 PM", substring = true)).assertCountEquals(1)
+        compose.onNodeWithText("45m • Documentary").assertIsDisplayed()
     }
 
     @Test
@@ -435,18 +449,25 @@ class GuideScreenTest {
         val before = noon.toEpochMilliseconds() + 29 * 60_000 + 50_000
         withMappingTrace {
             try {
-                connection.session.publish(ServerGuide(noon).connected())
+                val guide = ServerGuide(noon)
+                connection.session.publish(guide.connected())
                 assertTrue(SystemClock.setCurrentTimeMillis(before))
                 showDestination(connection) {}
                 compose.onNodeWithText("Evening News").assertIsDisplayed()
                 assertTrue(SystemClock.setCurrentTimeMillis(before + 5_000))
                 compose.mainClock.advanceTimeBy(5_016)
                 compose.runOnIdle { assertEquals("No remap within the same minute", 1, guideMappings()) }
+                compose.runOnIdle { connection.session.publish(guide.connected(epg = guide.refreshedEpg())) }
+                compose.runOnIdle { assertEquals("No remap for an event outside the shown window", 1, guideMappings()) }
+                compose.runOnIdle {
+                    connection.session.publish(guide.connected(epg = guide.refreshedEpg("Updated News")))
+                }
+                compose.onNodeWithText("Updated News").assertIsDisplayed()
                 assertTrue(SystemClock.setCurrentTimeMillis(before + 10_000))
                 compose.mainClock.advanceTimeBy(5_016)
                 compose.onNodeWithText("Weather").assertIsDisplayed()
-                compose.onAllNodesWithText("Evening News").assertCountEquals(0)
-                compose.runOnIdle { assertEquals("The minute wakes the mapper", 2, guideMappings()) }
+                compose.onAllNodesWithText("Updated News").assertCountEquals(0)
+                compose.runOnIdle { assertEquals("The minute wakes the mapper", 3, guideMappings()) }
             } finally {
                 connection.close()
             }

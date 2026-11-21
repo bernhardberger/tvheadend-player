@@ -31,14 +31,8 @@ internal fun programLine(number: String?, times: List<String?>, year: String?, g
 @Composable
 internal fun GuideProgram.rowLine(): List<String> = programLine(number, listOf(timeLeftText() ?: length), null, genre)
 
-/** The opened program's line; the phone writes the time range with the length there instead. */
-@Composable
-internal fun GuideProgram.openLine(phone: Boolean): List<String> =
-    if (phone) {
-        programLine(null, listOf(timeRange, length), null, null)
-    } else {
-        programLine(null, listOf(length ?: timeLeftText()), year, genre)
-    }
+/** The opened program's facts, separate from the time range and on-air progress. */
+internal fun GuideProgram.openLine(): List<String> = listOfNotNull(length, year, genre)
 
 @Composable
 private fun GuideProgram.timeLeftText(): String? = timeLeft?.let { stringResource(R.string.channels_time_left, it) }

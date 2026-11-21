@@ -63,6 +63,7 @@ import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.channels.ChannelRow
+import at.bernhardberger.tvhplayer.touch.ui.rememberStandalonePicture
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsLayout
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsState
 import at.bernhardberger.tvhplayer.touch.channels.TagFilter
@@ -213,7 +214,10 @@ private fun LandscapeProgram(state: PlayerFaceState, layout: PlayerLayout, modif
         modifier.testTag("player-program"),
         horizontalArrangement = Arrangement.spacedBy(if (tablet) 20.dp else 14.dp),
     ) {
-        val artwork = if (state is RecordingPlayerState) state.artwork else channel.details?.artwork
+        val artwork = when (state) {
+            is LivePlayerState -> rememberStandalonePicture(channel.details?.artwork, channel.details?.artworkModel)
+            is RecordingPlayerState -> rememberStandalonePicture(state.artwork, state.artworkModel)
+        }
         artwork?.let {
             Image(
                 it, null, Modifier.size(if (tablet) 196.dp else 112.dp, if (tablet) 112.dp else 68.dp)

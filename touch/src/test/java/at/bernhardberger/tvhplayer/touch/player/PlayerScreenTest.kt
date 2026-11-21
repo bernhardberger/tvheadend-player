@@ -50,6 +50,8 @@ import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -629,6 +631,14 @@ class PlayerScreenTest {
         button(R.string.channels_details).assertExists()
         text(R.string.channels_watch).assertDoesNotExist()
         tag("player-transport").assertDoesNotExist()
+        if (canvas == TouchCanvas.TABLET) {
+            val facts = compose.onNodeWithText("60m • 2024 • Documentary").assertIsDisplayed()
+            compose.onAllNodes(hasText("8:00–9:00 PM", substring = true)).assertCountEquals(1)
+            val range = compose.onNodeWithText("8:00–9:00 PM").assertIsDisplayed()
+            val title = compose.onNode(hasText("Ridge Light") and !hasClickAction()).getBoundsInRoot()
+            assertTrue(range.getBoundsInRoot().top < title.top && title.top < facts.getBoundsInRoot().top)
+            compose.onNodeWithText("13m left").assertIsDisplayed()
+        }
         captureWindows("$prefix-info", canvas)
         if (details) {
             button(R.string.channels_details).performClick()

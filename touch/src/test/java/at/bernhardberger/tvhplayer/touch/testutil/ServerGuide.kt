@@ -10,6 +10,7 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.ChannelTag
 import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
+import at.bernhardberger.tvheadend.sdk.core.ContentGenre
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
@@ -27,6 +28,7 @@ import at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi
 import at.bernhardberger.tvhplayer.touch.guide.GuideTexts
 import java.time.LocalTime
 import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
@@ -36,7 +38,7 @@ import kotlin.time.Instant
  * description. The running recording and the scheduled one are linked to their programs. The first
  * channel has a logo in the server's image cache, the program on now and the finished film a picture.
  */
-internal class ServerGuide(val now: Instant) {
+internal class ServerGuide(val now: Instant, genres: List<ContentGenre?> = emptyList()) {
     val news = ChannelTag.create(ChannelTagId(NEWS_TAG), name = "News")
     val logo = checkNotNull(ChannelIcon.parse("imagecache/$LOGO"))
     val picture = checkNotNull(ArtworkId.parse("imagecache/$PICTURE"))
@@ -66,6 +68,7 @@ internal class ServerGuide(val now: Instant) {
             EpgEvent.create(
                 EventId(index + 1L), first.id, start, start + 60.minutes, title = title,
                 description = "About $title".takeIf { index == 0 }, image = picture.takeIf { index == 0 },
+                contentGenre = genres.getOrNull(index),
             )
         },
     )
@@ -94,14 +97,25 @@ internal class ServerGuide(val now: Instant) {
     )
 
     /** The server signed in with everything current, with [entries] as its recordings: it has a current session. */
-    fun connected(entries: List<DvrEntry> = dvr.entries) = SessionObservation.create(
+    fun connected(entries: List<DvrEntry> = dvr.entries, epg: EpgSnapshot = snapshot) = SessionObservation.create(
         sessionState = SessionState.Ready(
             ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED),
         ),
         channelState = ChannelRepositoryState.Current(catalog),
-        epgState = EpgRepositoryState.Current(snapshot),
-        dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = entries)),
+        epgState = EpgRepositoryState.Current(epg),
+        dvrState = DvrRepositoryState.Current(if (entries === dvr.entries) dvr else DvrSnapshot.create(entries = entries)),
     )
+
+    fun refreshedEpg(title: String? = null): EpgSnapshot {
+        val running = snapshot.events.first()
+        val changed = title?.let {
+            EpgEvent.create(running.id, first.id, running.start, running.stop, title = it)
+        } ?: running
+        val past = EpgEvent.create(
+            EventId(99), second.id, now - 3.hours, now - 2.hours, title = "Previous show",
+        )
+        return EpgSnapshot.create(listOf(changed) + snapshot.events.drop(1) + past)
+    }
 
     /** The recording the server schedules for the program [event] on the first channel. */
     /** A recording scheduled for program [event]; with [rule], one an automatic recording scheduled. */

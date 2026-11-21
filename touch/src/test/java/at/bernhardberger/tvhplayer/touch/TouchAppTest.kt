@@ -1,5 +1,9 @@
 package at.bernhardberger.tvhplayer.touch
 
+import android.content.pm.ApplicationInfo
+import kotlinx.coroutines.Dispatchers
+import org.robolectric.shadows.ShadowLog
+
 import android.os.Looper
 import android.view.ViewGroup
 import android.view.WindowInsets
@@ -56,6 +60,7 @@ import at.bernhardberger.tvheadend.sdk.android.TvheadendDiscoveryTestFactory
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
+import at.bernhardberger.tvheadend.sdk.core.ContentGenre
 import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileAuthenticationMode
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileId
@@ -71,9 +76,12 @@ import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import at.bernhardberger.tvhplayer.touch.di.touchModule
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsState
+import at.bernhardberger.tvhplayer.touch.channels.channelRow
+import at.bernhardberger.tvhplayer.touch.channels.rememberChannelsTexts
 import at.bernhardberger.tvhplayer.touch.channels.channelsFixture
 import at.bernhardberger.tvhplayer.touch.guide.GuideClock
 import at.bernhardberger.tvhplayer.touch.player.LivePlayerState
+import at.bernhardberger.tvhplayer.touch.player.LiveTimeline
 import at.bernhardberger.tvhplayer.touch.player.PlayerControl
 import at.bernhardberger.tvhplayer.touch.player.PlayerDvrConfirmation
 import at.bernhardberger.tvhplayer.touch.player.PlayerScreen
@@ -81,12 +89,14 @@ import at.bernhardberger.tvhplayer.touch.player.ShownPrograms
 import at.bernhardberger.tvhplayer.touch.player.choose
 import at.bernhardberger.tvhplayer.touch.player.liveRecordOffer
 import at.bernhardberger.tvhplayer.touch.player.playerSchedule
+import at.bernhardberger.tvhplayer.touch.player.withShownPrograms
 import at.bernhardberger.tvhplayer.touch.testutil.FakeConnection
 import at.bernhardberger.tvhplayer.touch.testutil.ImageLoaderRule
 import at.bernhardberger.tvhplayer.touch.testutil.ServerGuide
 import at.bernhardberger.tvhplayer.touch.testutil.TouchCanvas
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouch
 import at.bernhardberger.tvhplayer.touch.ui.ConfirmDvrChange
+import at.bernhardberger.tvhplayer.touch.ui.ArtworkModels
 import at.bernhardberger.tvhplayer.touch.ui.DvrControls
 import at.bernhardberger.tvhplayer.ui.MobileDarkColors
 import at.bernhardberger.tvhplayer.ui.common.AppClock
@@ -529,6 +539,29 @@ class TouchAppTest {
     }
 
     @Test
+    fun channelsIgnoreEpgUpdatesOutsideTheirRowsButShowAChangedCurrentProgram() {
+        val info = compose.activity.applicationInfo
+        val oldFlags = info.flags
+        info.flags = oldFlags or ApplicationInfo.FLAG_DEBUGGABLE
+        ShadowLog.clear()
+        fun mappings() = ShadowLog.getLogsForTag("TouchArtwork").count { it.msg.startsWith("mapped Channels ") }
+        try {
+            val guide = savedConnectionWithGuide()
+            compose.onNodeWithText(guide.programs[0], substring = true).assertIsDisplayed()
+            val initial = mappings()
+            assertTrue(initial > 0)
+            compose.runOnIdle { connection.session.publish(guide.connected(epg = guide.refreshedEpg())) }
+            compose.runOnIdle { assertEquals("No map for an event outside the shown rows", initial, mappings()) }
+            compose.runOnIdle {
+                connection.session.publish(guide.connected(epg = guide.refreshedEpg("Updated News")))
+            }
+            compose.onNodeWithText("Updated News", substring = true).assertIsDisplayed()
+        } finally {
+            info.flags = oldFlags
+        }
+    }
+
+    @Test
     fun aTagFiltersTheChannels() {
         val guide = savedConnectionWithGuide()
         compose.onNode(hasClickAction() and hasText(label(R.string.channels_all))).performClick()
@@ -551,6 +584,25 @@ class TouchAppTest {
         compose.onNodeWithText(label(R.string.channels_saved)).assertIsDisplayed()
         compose.onNodeWithText(guide.first.name!!).assertIsDisplayed()
         compose.onNodeWithText(guide.second.name!!).assertIsDisplayed()
+    }
+
+    @Test
+    fun recordingsDoNotRemapWhenOnlyTheGuideChanges() {
+        val info = compose.activity.applicationInfo
+        val oldFlags = info.flags
+        info.flags = oldFlags or ApplicationInfo.FLAG_DEBUGGABLE
+        ShadowLog.clear()
+        fun mappings() = ShadowLog.getLogsForTag("TouchArtwork").count { it.msg.startsWith("mapped Recordings ") }
+        try {
+            val guide = savedConnectionWithGuide()
+            openRecordings()
+            val initial = mappings()
+            assertTrue(initial > 0)
+            compose.runOnIdle { connection.session.publish(guide.connected(epg = guide.refreshedEpg())) }
+            compose.runOnIdle { assertEquals("An EPG-only update leaves Recordings unchanged", initial, mappings()) }
+        } finally {
+            info.flags = oldFlags
+        }
     }
 
     @Test
@@ -779,6 +831,53 @@ class TouchAppTest {
         }
         compose.waitForIdle()
         assertEquals(emptyList<DvrScheduleRequest>(), connection.scheduleRequests)
+    }
+
+    @Test
+    @Config(qualifiers = TABLET)
+    fun playerProgramLineUsesTheGenreOfTheDisplayedEvent() {
+        val guide = ServerGuide(
+            Instant.fromEpochSeconds(1_800_000_000),
+            listOf(ContentGenre.fromContentType(0x10), ContentGenre.fromContentType(0x90)),
+        )
+        connection.session.publish(guide.connected())
+        val observation = connection.session.observation.value
+        val wall = guide.now + 1.hours
+        val live = observation.event(EventId(2))
+        val shown = mutableStateOf(live)
+        val artwork = ArtworkModels(null)
+        val onAir = channelRow(guide.first, observation, wall, artwork = artwork)
+        val channel = mutableStateOf(onAir)
+        val timeline = mutableStateOf<LiveTimeline?>(null)
+        compose.setContent {
+            val face = onAir.withShownPrograms(
+                ShownPrograms(shown.value, null), wall, rememberChannelsTexts(), artwork, observation,
+            )
+            SideEffect { channel.value = face }
+            MaterialTheme(colorScheme = MobileDarkColors) {
+                PlayerScreen(
+                    LivePlayerState(face, ChannelsState.Loading, null, timeline),
+                    {}, {}, {}, {}, {},
+                )
+            }
+        }
+        fun assertLine(genre: Int?) {
+            val time = checkNotNull(channel.value.now?.timeRange)
+            val expected = genre?.let { compose.activity.getString(R.string.player_time_and_genre, time, label(it)) }
+                ?: time
+            compose.onNodeWithText(expected).assertIsDisplayed()
+        }
+        compose.waitForIdle()
+        assertLine(SharedR.string.programme_category_education_factual)
+        assertEquals(null, channel.value.details?.artworkModel)
+        compose.runOnIdle { shown.value = observation.event(EventId(1)) }
+        compose.waitForIdle()
+        assertLine(SharedR.string.programme_category_film_drama)
+        assertTrue(AppArtworkSource(observation.currentSession, guide.picture) in images.requested)
+        compose.runOnIdle { shown.value = observation.event(EventId(3)) }
+        compose.waitForIdle()
+        assertLine(null)
+        assertEquals(null, channel.value.details?.artworkModel)
     }
 
     @Test
@@ -1167,7 +1266,7 @@ class TouchAppTest {
             MaterialTheme(colorScheme = MobileDarkColors) {
                 TouchApp(
                     connection.browseSession, connection.owner, presentation, channels, recordings, guide,
-                    connection.noticeCenter,
+                    connection.noticeCenter, channelsDispatcher = Dispatchers.Main.immediate,
                 ) {
                     flowOf(TvheadendDiscoveryTestFactory.discovering(listOf(server)))
                 }

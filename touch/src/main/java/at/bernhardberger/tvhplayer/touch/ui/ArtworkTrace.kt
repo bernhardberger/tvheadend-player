@@ -9,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
+import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvhplayer.images.LogoInkTransformation
 import coil3.EventListener
 import coil3.ImageLoader
@@ -47,6 +48,17 @@ internal fun <T> traceArtworkMapping(context: Context, screen: String, reason: S
     return map().also {
         val trigger = reason?.let { " reason=$it" }.orEmpty()
         Log.d(ARTWORK_LOG_TAG, "mapped $screen ms=${SystemClock.elapsedRealtime() - startMs} startMs=$startMs$trigger")
+    }
+}
+
+/** Positional identity differences, including appended/removed entries, for debug traces only. */
+internal fun Context.epgChangeCounts(previous: SessionObservation?, current: SessionObservation): String {
+    if (!isDebuggable || previous == null) return ""
+    val before = previous.epgSnapshotForDisplay?.events.orEmpty()
+    val after = current.epgSnapshotForDisplay?.events.orEmpty()
+    return if (before === after) "" else {
+        val changed = (0 until maxOf(before.size, after.size)).count { before.getOrNull(it) !== after.getOrNull(it) }
+        " changed=$changed of ${after.size} previous=${before.size}"
     }
 }
 

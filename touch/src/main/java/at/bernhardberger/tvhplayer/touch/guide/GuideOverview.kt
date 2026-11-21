@@ -212,7 +212,7 @@ private fun ColumnItem(
                         recording = bare && program.recording,
                     )
                     PartsLine(
-                        if (open) program.openLine(phone = false) else program.rowLine(),
+                        if (open) program.openLine() else program.rowLine(),
                         style = if (lead) type.bodyMedium else type.bodySmall, color = scheme.onSurfaceVariant,
                     )
                 }
