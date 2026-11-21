@@ -22,6 +22,7 @@ import at.bernhardberger.tvhplayer.ui.player.animateShown
 import at.bernhardberger.tvhplayer.ui.screens.guide.ConfirmProgrammeActionDialog
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.first
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.ui.screens.settings.activeProfile
@@ -169,7 +170,7 @@ internal fun ProgrammeDetailsHost(
     }
     fun executeDirect(mutation: DvrMutationAction) {
         mutations.launchMutation(mutation, sessionObservation, currentObservation, nowSecProvider,
-            settingsStore, notices, mutationScope, mutationInFlight)
+            { settingsStore.settings.first().recordingProfileId }, notices, mutationScope, mutationInFlight)
     }
     val act: (EpgEvent, BrowseContextAction) -> Unit = action@{ programme, action ->
         if (action == BrowseContextAction.WATCH_LIVE) {

@@ -64,6 +64,12 @@ directly. `:client` mirrors the app build types (`debug`, `release`, `profile`,
   `programmeArtworkModel`, `programmeArtwork`, `recordingArtwork`).
 - `ui/screens/onboarding/ConnectionSetupPolicy`: resource- and Compose-free
   setup steps, transitions and failure actions; retains its existing package.
+- Recordings and Guide policy, each in its existing package:
+  `core/ChannelNowStatusPolicy` (with `linkedRecordingForEvent`),
+  `ui/screens/RecordingScheduledMark` (`isScheduled`), `core/GlanceBadges`,
+  `core/ProgrammeAgeRating`, `core/RecordingPlaybackPresentation`,
+  `settings/ClockFormat`, `ui/player/ChannelSchedulePolicy` and
+  `ui/screens/GuideCoverageRequestOwner`.
 
 ## What lives in `:presentation`
 
@@ -76,6 +82,12 @@ its localized seconds formatter). Shared channel scope state:
 `images/TvheadendArtworkLoader` (`buildImageLoader`, `remoteLogoHttpClient`) and
 `images/RemoteLogoCache`; the caller passes its user agent, crossfade duration
 and what else to clear with the remote pictures.
+DVR actions and the formatters behind recordings and programme details:
+`ui/screens/DvrMutationActions` (record, stop, delete, series rules and folder
+actions, with `currentDvrMutation` and `currentDvrConfigurations`; the caller
+passes the preferred recording profile), `ui/common/TimeConverter`,
+`ui/common/Epg`, `ui/common/RecordingExpiry`, `ui/common/NumberFormatting` and
+`programmeCategoryLabelRes` in `ui/common/ProgrammeCategoryLabelRes`.
 This library depends on `:client` and uses lifecycle ViewModel, lifecycle
 runtime Compose, Compose state and saveable APIs, and Coil with OkHttp at the
 catalog's Coil version. It holds no composables that draw, no TV widgets or

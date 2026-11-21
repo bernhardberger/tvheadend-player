@@ -17,7 +17,7 @@ import java.time.ZoneId
 import kotlin.time.Instant
 
 /** Display-only history boundary; never turn a wall-clock estimate into a seek grant. */
-internal fun scheduleHistoryStart(state: AppTimeshiftState): Long? {
+fun scheduleHistoryStart(state: AppTimeshiftState): Long? {
     if (!state.available) return null
     val timeline = state.timeline ?: return null
     val mapping = (state.historyStartTimeline?.takeIf { it.describesSameSegment(timeline) }
@@ -25,25 +25,25 @@ internal fun scheduleHistoryStart(state: AppTimeshiftState): Long? {
     return timeline.select(timeline.start)?.let(mapping::estimate)?.epochSeconds
 }
 
-internal fun channelScheduleEvents(
+fun channelScheduleEvents(
     events: List<EpgEvent>, channelId: ChannelId, nowSec: Long, historyStartSec: Long?,
 ): List<EpgEvent> = events.filter {
     it.channelId == channelId && it.stop > it.start &&
         it.stop.epochSeconds > (historyStartSec ?: nowSec)
 }.distinctBy { it.id }.sortedBy { it.start }
 
-internal fun scheduleOffline(connection: ConnectionUiState, epg: EpgRepositoryState): Boolean =
+fun scheduleOffline(connection: ConnectionUiState, epg: EpgRepositoryState): Boolean =
     epg is EpgRepositoryState.Stale || connection.isDegraded(connection == ConnectionUiState.Reconnecting)
 
-internal fun scheduleLoading(connection: ConnectionUiState, epg: EpgRepositoryState): Boolean =
+fun scheduleLoading(connection: ConnectionUiState, epg: EpgRepositoryState): Boolean =
     !scheduleOffline(connection, epg) && connection.awaitsGuide(epg)
 
 /** The schedule asks for the Guide's seven-day reach; the server answers with what it holds. */
-internal fun scheduleCoverageThroughSec(openedAtSec: Long, zone: ZoneId): Long =
+fun scheduleCoverageThroughSec(openedAtSec: Long, zone: ZoneId): Long =
     guideWindowBounds(openedAtSec, zone).latestStartSec + GUIDE_VISIBLE_WINDOW_SEC
 
 /** Later days are still arriving while the request runs and the channel's live coverage stops short of it. */
-internal fun scheduleCoveragePending(
+fun scheduleCoveragePending(
     connection: ConnectionUiState, epg: EpgRepositoryState, channelId: ChannelId,
     throughSec: Long, requestPending: Boolean,
 ): Boolean {

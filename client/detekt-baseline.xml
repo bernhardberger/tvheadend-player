@@ -19,6 +19,7 @@
     <ID>ComplexCondition:AppPlaybackRuntime.kt:AppPlaybackRuntime$targetInstallationInProgress || coordinator.playerCleanupPending.value || state != Player.STATE_BUFFERING &amp;&amp; state != Player.STATE_READY || recoveryPlaybackBlocked(epoch) || player.currentMediaItem.let { it == null || it !== ownedMediaItem } || bufferRecovery != null || liveRecovery.deferredRecovery != null || liveRecovery.interruptedRecovery != null || presentation.state.value.let { it is AppPlaybackState.Recovering || it is AppPlaybackState.Failed }</ID>
     <ID>ComplexCondition:BrowseContextActions.kt:!canModifyRecordings || !recordingPlaybackOffered(admission) || admission is RecordingPlaybackAdmission.Growing || entry.state == DvrEntryState.MISSED</ID>
     <ID>ComplexCondition:ForegroundPlaybackLifecycle.kt:ForegroundPlaybackLifecycle$activeTarget is AppPlaybackTarget.Live &amp;&amp; activeTargetEpoch != null &amp;&amp; timeshiftAvailable &amp;&amp; keepLimit &gt; Duration.ZERO &amp;&amp; interactive</ID>
+    <ID>ComplexCondition:GuideCoverageRequestOwner.kt:GuideCoverageRequestOwner$existing != null &amp;&amp; existing.windowStartSec == windowStartSec &amp;&amp; existing.job.isActive &amp;&amp; orderedChannelIds.all { requests[it] === existing }</ID>
     <ID>ComplexCondition:PlaybackAudioTracks.kt:PlaybackAudioTracks$targetInstallationInProgress() || audioOutputChanging || interruptionMuted() || !targetCommands.isOpen()</ID>
     <ID>ComplexCondition:PlaybackStallWatch.kt:PlaybackStallWatch$!sample.playing || counters == null || since == null || counters !== pictureCounters || sample.renderedFrames != pictureFrames || sample.positionMillis &lt; picturePosition</ID>
     <ID>ComplexCondition:PlayerBackKeyCycle.kt:PlayerBackKeyCycle$tracking &amp;&amp; !held &amp;&amp; startedWithHoldAllowed &amp;&amp; holdAllowed</ID>
@@ -174,12 +175,14 @@
     <ID>MagicNumber:VideoFrameRate.kt:60f</ID>
     <ID>MagicNumber:VideoFrameRate.kt:VideoFrameRateEstimator$1_000_000.0</ID>
     <ID>MatchingDeclarationName:BrowseContextActions.kt:BrowseContextAction</ID>
+    <ID>MatchingDeclarationName:ChannelNowStatusPolicy.kt:ChannelNowStatus</ID>
     <ID>MatchingDeclarationName:PlaybackRecoveryPresentation.kt:PlaybackRetryCommand</ID>
     <ID>MatchingDeclarationName:PlayerHelpers.kt:UiTrack</ID>
     <ID>MatchingDeclarationName:ProgrammeActionPolicy.kt:ProgrammeAction</ID>
     <ID>MatchingDeclarationName:ProgrammeRecordingTargetPolicy.kt:ProgrammeRecordingTarget</ID>
     <ID>MatchingDeclarationName:RecordingMarkHintPolicy.kt:RecordingMarkHint</ID>
     <ID>MatchingDeclarationName:RecordingOpenPolicy.kt:RecordingOpenAction</ID>
+    <ID>MatchingDeclarationName:RecordingPlaybackPresentation.kt:RecordingFinishedAction</ID>
     <ID>MatchingDeclarationName:TrackLabelPolicy.kt:HumanTrackLabel</ID>
     <ID>MatchingDeclarationName:VideoDisplayMode.kt:DisplayModeSpec</ID>
     <ID>MaxLineLength:AppError.kt:AppErrorCondition.NOT_TVHEADEND$/** Something answered at the address, but not Tvheadend's HTSP service; told apart from 105 where a setup test can. */</ID>
@@ -300,8 +303,10 @@
     <ID>ReturnCount:AppPlaybackRuntime.kt:AppPlaybackRuntime$private suspend fun stopPlayback: PlaybackStopResult</ID>
     <ID>ReturnCount:AudioInterruptionController.kt:AudioInterruptionController$private suspend fun handleAudioInterruptionLocked</ID>
     <ID>ReturnCount:AudioInterruptionController.kt:AudioInterruptionController$suspend fun playWithAudioFocusLocked: TimeshiftCommandResult</ID>
+    <ID>ReturnCount:ChannelSchedulePolicy.kt:fun scheduleHistoryStart: Long?</ID>
     <ID>ReturnCount:DvrLibraryPolicy.kt:DvrArchiveFolder$fun folderAt: DvrArchiveFolder?</ID>
     <ID>ReturnCount:ForegroundPlaybackLifecycle.kt:ForegroundPlaybackLifecycle$fun onBackgrounded: ForegroundPlaybackAction</ID>
+    <ID>ReturnCount:GuideCoverageRequestOwner.kt:GuideCoverageRequestOwner$fun request: GuideCoverageRequestToken</ID>
     <ID>ReturnCount:LivePauseController.kt:LivePauseController$suspend fun resolvePendingLivePauseLocked: Boolean</ID>
     <ID>ReturnCount:LiveRecoveryAttempts.kt:internal fun currentLiveRecoveryFence: LiveRecoveryFence?</ID>
     <ID>ReturnCount:LogoInk.kt:fun inkFadingLogoParts: IntArray?</ID>
@@ -315,6 +320,7 @@
     <ID>ReturnCount:PlaybackStatusPresentation.kt:@OptIn(UnstableApi::class) fun recordingPlayerAlert: LivePlayerAlert?</ID>
     <ID>ReturnCount:PlayerBackKeyCycle.kt:PlayerBackKeyCycle$fun onKey: PlayerBackKeyResult</ID>
     <ID>ReturnCount:PlayerSettings.kt:PlayerSettingsStore.Companion$private fun decodeRecentVerdicts: List&lt;StartupBufferVerdict&gt;</ID>
+    <ID>ReturnCount:ProgrammeAgeRating.kt:fun programmeAgeRating: String?</ID>
     <ID>ReturnCount:RecordingMarkerQuery.kt:RecordingMarkerQuery$suspend fun refresh: Boolean</ID>
     <ID>ReturnCount:RecordingMarkers.kt:RecordingMarkers$private suspend fun refreshMarkers: Boolean</ID>
     <ID>ReturnCount:RecordingMetadataPolicy.kt:fun recordingElapsedProgress: Float?</ID>
@@ -361,6 +367,7 @@
     <ID>TooManyFunctions:StartupBufferController.kt:StartupBufferController : ListenerAnalyticsListener</ID>
     <ID>TooManyFunctions:TimelineEpgPolicy.kt:at.bernhardberger.tvhplayer.core.TimelineEpgPolicy.kt</ID>
     <ID>TooManyFunctions:TimeshiftPresentationPolicy.kt:at.bernhardberger.tvhplayer.core.TimeshiftPresentationPolicy.kt</ID>
+    <ID>TopLevelPropertyNaming:ProgrammeAgeRating.kt:// Long enough for FSK, FSF, PEGI, BBFC, MPAA and similar codes. private const val MaxRatingCodeLength = 6</ID>
     <ID>TopLevelPropertyNaming:TimelineEpgPolicy.kt:private const val GuideNowLeadSec = 30 * 60L</ID>
     <ID>UnusedParameter:StartupBufferController.kt:StartupBufferController$committed: Boolean</ID>
   </CurrentIssues>

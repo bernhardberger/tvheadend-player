@@ -146,6 +146,7 @@ import at.bernhardberger.tvhplayer.viewmodels.ChannelScopeState
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 import org.koin.compose.koinInject
 
 internal fun channelsBrowseViewportPadding(
@@ -231,8 +232,8 @@ fun ChannelsScreen(
     ChannelsScreenContent(
         detailsMutationInFlight = recordInFlight,
         onRecordKey = { channelId -> recordMutations.recordChannelProgramme(channelId,
-            { recordSession.observation.value }, { System.currentTimeMillis() / 1000L }, settingsStore,
-            recordNotices, settingsScope, recordInFlight) },
+            { recordSession.observation.value }, { System.currentTimeMillis() / 1000L },
+            { settingsStore.settings.first().recordingProfileId }, recordNotices, settingsScope, recordInFlight) },
         contentPadding = contentPadding,
         initialFocusEnabled = initialFocusEnabled,
         channelScopeState = channelScopeState,

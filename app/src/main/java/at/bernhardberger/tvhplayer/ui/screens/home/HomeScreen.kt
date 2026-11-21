@@ -40,6 +40,7 @@ import at.bernhardberger.tvhplayer.ui.screens.ChannelsGroup
 import at.bernhardberger.tvhplayer.ui.screens.channelsGroups
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 
 /**
  * Home's landing page. The page itself, including the scroll-away header, lives in
@@ -127,7 +128,8 @@ internal fun HomeScreen(
         HomeScreenContent(frame.first.copy(hiddenSections = loadedSettings.hiddenHomeSections), frame.second, contentPadding, initialFocusEnabled,
             mutationInFlight = recordInFlight,
             onRecordKey = { channelId -> if (current(channelId)) recordMutations.recordChannelProgramme(channelId,
-                { recordSession.observation.value }, { System.currentTimeMillis() / 1000L }, settingsStore,
+                { recordSession.observation.value }, { System.currentTimeMillis() / 1000L },
+                { settingsStore.settings.first().recordingProfileId },
                 recordNotices, saveScope, recordInFlight) else null },
             updateHintShown = at.bernhardberger.tvhplayer.settings.whatsNewHintShown(
                 loadedSettings.whatsNewSeenVersion, at.bernhardberger.tvhplayer.BuildConfig.VERSION_CODE, lastUpdateTime, hintNow),

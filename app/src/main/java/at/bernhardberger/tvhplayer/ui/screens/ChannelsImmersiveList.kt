@@ -93,7 +93,6 @@ import at.bernhardberger.tvhplayer.core.browsingFocusChannelId
 import at.bernhardberger.tvhplayer.core.programmeAgeRating
 import at.bernhardberger.tvhplayer.core.showChannelRecordingMark
 import at.bernhardberger.tvhplayer.core.runningRecordingForEvent
-import at.bernhardberger.tvhplayer.core.linkedRecordingForEvent
 import at.bernhardberger.tvhplayer.core.visibleChannelNumber
 import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy
 import at.bernhardberger.tvhplayer.ui.LocalWarmPlayback
@@ -348,10 +347,6 @@ internal class ChannelsImmersiveCards(
     val onExitTowardNavigation: () -> Unit,
     val onPage: (Int) -> Boolean,
 )
-
-/** Whether a recording is scheduled for [event], the mark on a headline's Next line. */
-internal fun SessionObservation.isScheduled(event: EpgEvent?): Boolean =
-    linkedRecordingForEvent(event)?.state == DvrEntryState.SCHEDULED
 
 /**
  * The immersive list: the focused channel's programme above one row of compact zap cards along
