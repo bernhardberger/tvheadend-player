@@ -18,11 +18,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.autofill.ContentType
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentType
 import androidx.compose.ui.semantics.error
+import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.password
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
@@ -56,7 +58,7 @@ internal fun ConnectionForm(
                 support = stringResource(
                     if (addressError) R.string.connect_address_missing else R.string.connect_address_help,
                 ),
-                isError = addressError,
+                error = stringResource(R.string.connect_address_missing).takeIf { addressError },
                 keyboardType = KeyboardType.Uri,
             )
             ConnectionField(
@@ -67,7 +69,7 @@ internal fun ConnectionForm(
                 modifier = Modifier.width(if (compact) 124.dp else 140.dp),
                 support = if (portError) stringResource(R.string.connect_port_invalid)
                 else stringResource(R.string.connect_port_help, USUAL_PORT),
-                isError = portError,
+                error = stringResource(R.string.connect_port_invalid).takeIf { portError },
                 keyboardType = KeyboardType.Number,
             )
         }
@@ -107,8 +109,7 @@ private fun SignInFields(
             onChange = { onFieldsChange(fields.copy(username = it)) },
             enabled = enabled,
             modifier = modifier.semantics { contentType = ContentType.Username },
-            support = errorMessage,
-            isError = errorMessage != null,
+            error = errorMessage,
             trailingIcon = if (errorMessage != null) {
                 { Icon(painterResource(R.drawable.connect_error_outline), contentDescription = null) }
             } else null,
@@ -119,8 +120,10 @@ private fun SignInFields(
             value = fields.password,
             onChange = { onFieldsChange(fields.copy(password = it)) },
             enabled = enabled,
-            support = errorMessage ?: if (compact && showHelp) stringResource(R.string.connect_sign_in_help) else null,
-            isError = errorMessage != null,
+            // The sentence is shown once for the pair: under Password when stacked, under both fields side by side.
+            support = if (compact) errorMessage ?: stringResource(R.string.connect_sign_in_help).takeIf { showHelp }
+            else null,
+            error = errorMessage,
             modifier = modifier,
         )
     }
@@ -135,16 +138,26 @@ private fun SignInFields(
                 username(Modifier.weight(1f))
                 password(Modifier.weight(1f))
             }
-            if (errorMessage == null && showHelp) {
-                Text(
-                    stringResource(R.string.connect_sign_in_help),
-                    Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodySmall,
+            when {
+                // Both fields already carry the sentence as their error, so the shared line is not read again.
+                errorMessage != null -> PairLine(
+                    errorMessage, MaterialTheme.colorScheme.error, Modifier.semantics { hideFromAccessibility() },
+                )
+                showHelp -> PairLine(
+                    stringResource(R.string.connect_sign_in_help), MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
     }
+}
+
+/** Supporting text that belongs to the side-by-side sign-in pair rather than one field. */
+@Composable
+private fun PairLine(text: String, color: Color, modifier: Modifier = Modifier) {
+    Text(
+        text, modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp),
+        color = color, style = MaterialTheme.typography.bodySmall,
+    )
 }
 
 @Composable
@@ -153,7 +166,7 @@ private fun PasswordField(
     onChange: (String) -> Unit,
     enabled: Boolean,
     support: String?,
-    isError: Boolean,
+    error: String?,
     modifier: Modifier,
 ) {
     var visible by remember(enabled) { mutableStateOf(false) }
@@ -167,7 +180,7 @@ private fun PasswordField(
             contentType = ContentType.Password
         },
         support = support,
-        isError = isError,
+        error = error,
         keyboardType = KeyboardType.Password,
         transformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
         trailingIcon = if (value.isNotEmpty()) {
@@ -192,7 +205,7 @@ private fun ConnectionField(
     enabled: Boolean,
     modifier: Modifier,
     support: String? = null,
-    isError: Boolean = false,
+    error: String? = null,
     keyboardType: KeyboardType = KeyboardType.Text,
     imeAction: ImeAction = ImeAction.Next,
     transformation: VisualTransformation = VisualTransformation.None,
@@ -201,9 +214,9 @@ private fun ConnectionField(
     OutlinedTextField(
         value = value,
         onValueChange = onChange,
-        modifier = modifier.semantics { if (isError && support != null) error(support) },
+        modifier = modifier.semantics { if (error != null) error(error) },
         enabled = enabled,
-        isError = isError,
+        isError = error != null,
         singleLine = true,
         label = { Text(stringResource(label)) },
         supportingText = support?.let { text -> { Text(text) } },

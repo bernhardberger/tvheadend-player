@@ -21,6 +21,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -148,22 +149,24 @@ internal fun ChannelsLoadingLine(layout: ChannelsLayout) {
 internal fun ChannelsSkeleton(layout: ChannelsLayout) {
     Column(
         Modifier.fillMaxSize().clipToBounds().padding(horizontal = layout.margin),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+        verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
     ) {
         Text(
             stringResource(R.string.channels_loading),
             Modifier.padding(top = 12.dp, bottom = 16.dp).semantics { liveRegion = LiveRegionMode.Polite },
             style = MaterialTheme.typography.bodyMedium,
         )
-        repeat(if (layout.tablet) TABLET_SKELETON_ROWS else PHONE_SKELETON_ROWS) { index ->
-            SkeletonRow(layout, index)
+        val count = if (layout.tablet) TABLET_SKELETON_ROWS else PHONE_SKELETON_ROWS
+        repeat(count) { index ->
+            SkeletonRow(layout, index, count)
         }
     }
 }
 
 @Composable
-private fun SkeletonRow(layout: ChannelsLayout, index: Int) {
-    val shape = if (index == 0) RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp) else RoundedCornerShape(4.dp)
+private fun SkeletonRow(layout: ChannelsLayout, index: Int, count: Int) {
+    // The same segment corners as the channel rows the skeleton stands in for.
+    val shape = ListItemDefaults.segmentedShapes(index, count).shape
     Row(
         Modifier.fillMaxWidth().height(layout.rowHeight)
             .background(MaterialTheme.colorScheme.surfaceContainer, shape)

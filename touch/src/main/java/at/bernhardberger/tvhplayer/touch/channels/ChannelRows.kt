@@ -13,10 +13,10 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -29,16 +29,21 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.progressSemantics
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.ListItemShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ProvideTextStyle
+import androidx.compose.material3.SegmentedListItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -49,8 +54,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
@@ -61,6 +64,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
@@ -81,8 +86,8 @@ internal fun ChannelRows(
 ) {
     var openId by rememberSaveable(list.selectedTagId) { mutableStateOf(initiallyOpenChannelId) }
     BackHandler(enabled = !offline && list.rows.any { it.id == openId && it.details != null }) { openId = null }
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        if (showColumnLabels) item { ColumnLabels(layout) }
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
+        if (showColumnLabels) item { ColumnLabels(layout, list.hasLogos) }
         itemsIndexed(list.rows, key = { _, row -> row.id }) { index, row ->
             ChannelItem(
                 row = row,
@@ -90,7 +95,7 @@ internal fun ChannelRows(
                 listHasLogos = list.hasLogos,
                 expanded = !offline && openId == row.id && row.details != null,
                 offline = offline,
-                positionShape = rowShape(index, list.rows.lastIndex),
+                shapes = ListItemDefaults.segmentedShapes(index, list.rows.size),
                 actions = actions,
                 toggle = { openId = if (openId == row.id) null else row.id },
             )
@@ -99,14 +104,17 @@ internal fun ChannelRows(
 }
 
 @Composable
-private fun ColumnLabels(layout: ChannelsLayout) {
+private fun ColumnLabels(layout: ChannelsLayout, listHasLogos: Boolean) {
+    val logo = if (listHasLogos) layout.logoWidth + ItemSpacing else 0.dp
     Row(
-        Modifier.fillMaxWidth().padding(start = RowInset, end = RowInset + EndTarget + PlayingSlot).height(28.dp),
+        Modifier.fillMaxWidth()
+            .padding(start = RowInset + logo, end = RowInset + ItemSpacing + ExpandTarget + PlayingSlot)
+            .height(28.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Spacer(identityWeight(layout))
+        Spacer(nameWeight(layout))
         ColumnLabel(R.string.channels_on_now, nowWeight(layout))
-        if (layout.showNext) ColumnLabel(R.string.channels_next, Modifier.weight(3.2f))
+        if (layout.showNext) ColumnLabel(R.string.channels_next, nextWeight())
     }
 }
 
@@ -125,21 +133,28 @@ private fun ChannelItem(
     listHasLogos: Boolean,
     expanded: Boolean,
     offline: Boolean,
-    positionShape: RoundedCornerShape,
+    shapes: ListItemShapes,
     actions: ChannelsActions,
     toggle: () -> Unit,
 ) {
-    val colors = MaterialTheme.colorScheme
+    val segmented = ListItemDefaults.segmentedColors()
     val playing = !offline && row.playback != null
+    // The playing channel takes the list item's selected container without becoming a selection control:
+    // a tap still means Watch, so the row keeps button semantics.
     val container = when {
-        playing -> colors.secondaryContainer
-        expanded -> colors.surfaceContainerHigh
-        else -> colors.surfaceContainerLow
+        playing -> segmented.selectedContainerColor
+        expanded -> MaterialTheme.colorScheme.surfaceContainerHigh
+        else -> MaterialTheme.colorScheme.surfaceContainerLow
     }
-    val shape = if (expanded) RoundedCornerShape(20.dp) else positionShape
-    Column(Modifier.fillMaxWidth().alpha(if (offline) SAVED_ROW_ALPHA else 1f).clip(shape).background(container)) {
-        ChannelHeader(row, layout, listHasLogos, expanded, offline, actions.onPlay, toggle)
-        if (expanded && row.details != null) ChannelExpanded(row, row.details, layout, actions)
+    if (expanded && row.details != null) {
+        // ListItem lays its slots out in one row, so the details below the header cannot live inside it.
+        val shape = ListItemDefaults.segmentedShapes(0, 1).shape
+        Column(Modifier.fillMaxWidth().clip(shape).background(container)) {
+            ChannelHeader(row, layout, listHasLogos, true, offline, Color.Transparent, shapes, actions.onPlay, toggle)
+            ChannelExpanded(row, row.details, layout, actions)
+        }
+    } else {
+        ChannelHeader(row, layout, listHasLogos, false, offline, container, shapes, actions.onPlay, toggle)
     }
 }
 
@@ -150,47 +165,70 @@ private fun ChannelHeader(
     listHasLogos: Boolean,
     expanded: Boolean,
     offline: Boolean,
+    container: Color,
+    shapes: ListItemShapes,
     onPlay: (String) -> Unit,
     toggle: () -> Unit,
 ) {
     val recording = row.recording.takeUnless { offline }
     val playback = row.playback.takeUnless { offline }
-    Row(Modifier.fillMaxWidth().padding(horizontal = RowInset), verticalAlignment = Alignment.CenterVertically) {
-        Row(
-            Modifier.weight(1f).heightIn(min = layout.rowHeight)
-                .clickable(
-                    enabled = !offline, role = Role.Button, onClickLabel = stringResource(R.string.channels_watch),
-                ) { onPlay(row.id) }
-                .padding(vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+    val segmented = ListItemDefaults.segmentedColors()
+    val watch = stringResource(R.string.channels_watch)
+    SegmentedListItem(
+        onClick = { onPlay(row.id) },
+        shapes = shapes,
+        modifier = Modifier.fillMaxWidth().alpha(if (offline) SAVED_ROW_ALPHA else 1f)
+            .heightIn(min = layout.rowHeight)
+            .semantics {
+                role = Role.Button
+                onClick(label = watch, action = null)
+            },
+        enabled = !offline,
+        leadingContent = if (listHasLogos) ({ ChannelLogo(row, layout) }) else null,
+        trailingContent = { ExpandButton(row, expanded, offline, toggle) },
+        verticalAlignment = Alignment.CenterVertically,
+        // A saved row while offline is dimmed as a whole, not recolored to the disabled palette.
+        colors = ListItemDefaults.segmentedColors(
+            containerColor = container,
+            disabledContainerColor = container,
+            disabledContentColor = segmented.contentColor,
+            disabledLeadingContentColor = segmented.leadingContentColor,
+            disabledTrailingContentColor = segmented.trailingContentColor,
+            disabledSupportingContentColor = segmented.supportingContentColor,
+        ),
+        contentPadding = PaddingValues(horizontal = RowInset, vertical = 8.dp),
+    ) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             if (layout.tablet) {
-                TabletRowContent(row, layout, listHasLogos, recording, playback, offline)
+                TabletRowContent(row, layout, recording, playback, offline)
             } else {
-                PhoneRowContent(row, listHasLogos, recording, playback)
+                PhoneRowContent(row, recording, playback)
             }
         }
-        ExpandButton(row, expanded, offline, toggle)
     }
 }
 
 @Composable
 private fun ExpandButton(row: ChannelRow, expanded: Boolean, offline: Boolean, toggle: () -> Unit) {
-    Box(Modifier.width(EndTarget), contentAlignment = Alignment.CenterEnd) {
+    Box(Modifier.width(ExpandTarget), contentAlignment = Alignment.CenterEnd) {
         if (row.details != null || offline) {
             val label = if (expanded) R.string.channels_collapse else R.string.channels_expand
             val scheme = MaterialTheme.colorScheme
-            FilledIconButton(
-                onClick = toggle, enabled = !offline,
-                colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = if (expanded) scheme.secondaryContainer else scheme.surfaceContainerHighest,
-                    contentColor = if (expanded) scheme.onSecondaryContainer else scheme.onSurface,
-                ),
-            ) {
-                Icon(
-                    painterResource(R.drawable.channels_expand), stringResource(label, row.name),
-                    Modifier.rotate(if (expanded) 180f else 0f),
-                )
+            // ListItem counts its row padding towards the trailing touch target, but a tap there means Watch,
+            // so the button keeps its own full target.
+            CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides ExpandTarget) {
+                FilledIconButton(
+                    onClick = toggle, enabled = !offline,
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = if (expanded) scheme.secondaryContainer else scheme.surfaceContainerHighest,
+                        contentColor = if (expanded) scheme.onSecondaryContainer else scheme.onSurface,
+                    ),
+                ) {
+                    Icon(
+                        painterResource(R.drawable.channels_expand), stringResource(label, row.name),
+                        Modifier.rotate(if (expanded) 180f else 0f),
+                    )
+                }
             }
         }
     }
@@ -200,31 +238,23 @@ private fun ExpandButton(row: ChannelRow, expanded: Boolean, offline: Boolean, t
 private fun RowScope.TabletRowContent(
     row: ChannelRow,
     layout: ChannelsLayout,
-    listHasLogos: Boolean,
     recording: ChannelRecording?,
     playback: ChannelPlayback?,
     offline: Boolean,
 ) {
     Row(
-        identityWeight(layout).padding(end = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        nameWeight(layout).padding(end = ItemSpacing), horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (listHasLogos) ChannelLogo(row, layout)
-        Row(
-            Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                row.name, Modifier.weight(1f, fill = false),
-                style = MaterialTheme.typography.titleMedium, maxLines = 2,
-            )
-            if (recording == ChannelRecording.Channel) RecordingBadge(recording, compact = true)
-        }
+        Text(
+            row.name, Modifier.weight(1f, fill = false),
+            style = MaterialTheme.typography.titleMedium, maxLines = 2,
+        )
+        if (recording == ChannelRecording.Channel) RecordingBadge(recording, compact = true)
     }
-    TabletNow(row.now, playback, recording, nowWeight(layout).padding(end = 12.dp))
+    TabletNow(row.now, playback, recording, nowWeight(layout).padding(end = ItemSpacing))
     if (layout.showNext) {
-        NextProgram(row.next, !offline, Modifier.weight(3.2f))
+        NextProgram(row.next, !offline, nextWeight())
     }
     Box(Modifier.width(PlayingSlot), contentAlignment = Alignment.CenterStart) {
         if (playback != null) PlayingBars()
@@ -234,12 +264,10 @@ private fun RowScope.TabletRowContent(
 @Composable
 private fun RowScope.PhoneRowContent(
     row: ChannelRow,
-    listHasLogos: Boolean,
     recording: ChannelRecording?,
     playback: ChannelPlayback?,
 ) {
-    if (listHasLogos) ChannelLogo(row, ChannelsLayout.Phone)
-    Column(Modifier.weight(1f).padding(start = if (listHasLogos) 14.dp else 0.dp)) {
+    Column(Modifier.weight(1f)) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             ChannelName(row.name, Modifier.weight(1f))
             if (playback != null) PlayingBars()
@@ -291,18 +319,22 @@ private fun ChannelLogo(row: ChannelRow, layout: ChannelsLayout) {
     }
 }
 
-private fun RowScope.identityWeight(layout: ChannelsLayout) = Modifier.weight(if (layout.showNext) 3f else 4.2f)
-private fun RowScope.nowWeight(layout: ChannelsLayout) = Modifier.weight(if (layout.showNext) 3.8f else 5.8f)
+// The logo sits in the list item's leading slot, so these weights split what remains after it; they keep the
+// On now and Next columns where the drawings put them.
+private fun RowScope.nameWeight(layout: ChannelsLayout) = Modifier.weight(if (layout.showNext) 2.04f else 2.82f)
+private fun RowScope.nowWeight(layout: ChannelsLayout) = Modifier.weight(if (layout.showNext) 4.32f else 7.18f)
+private fun RowScope.nextWeight() = Modifier.weight(3.64f)
 
-private fun rowShape(index: Int, lastIndex: Int) = RoundedCornerShape(
-    topStart = if (index == 0) 16.dp else 4.dp,
-    topEnd = if (index == 0) 16.dp else 4.dp,
-    bottomStart = if (index == lastIndex) 16.dp else 4.dp,
-    bottomEnd = if (index == lastIndex) 16.dp else 4.dp,
-)
+private val ChannelsLayout.logoWidth
+    get() = when (this) {
+        ChannelsLayout.Wide, ChannelsLayout.Upright -> 112.dp
+        ChannelsLayout.Phone -> 88.dp
+    }
 
+// The gap ListItem puts between its leading or trailing slot and the content.
+private val ItemSpacing = 12.dp
+private val ExpandTarget = 48.dp
 private val RowInset = 10.dp
-private val EndTarget = 54.dp
 private val PlayingSlot = 30.dp
 private const val LOGO_SHADE = 0.35f
 private const val SAVED_ROW_ALPHA = 0.58f
@@ -366,12 +398,10 @@ private fun ChannelProgress(
         recording == ChannelRecording.Program -> TvRecordingColor
         else -> scheme.primary
     }
-    val track = scheme.onSurface.copy(alpha = TRACK_ALPHA)
-    Canvas(modifier.height(4.dp).progressSemantics(fraction)) {
-        val cap = CornerRadius(size.height / 2)
-        drawRoundRect(track, cornerRadius = cap)
-        if (fraction > 0f) drawRoundRect(fill, size = Size(size.width * fraction, size.height), cornerRadius = cap)
-    }
+    LinearProgressIndicator(
+        progress = { fraction }, modifier = modifier.height(4.dp), color = fill,
+        trackColor = scheme.onSurface.copy(alpha = TRACK_ALPHA), gapSize = 0.dp, drawStopIndicator = {},
+    )
 }
 
 @Composable

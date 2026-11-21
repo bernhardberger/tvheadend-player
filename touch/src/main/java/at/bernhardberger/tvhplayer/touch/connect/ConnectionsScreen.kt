@@ -147,7 +147,10 @@ private fun ActiveConnectionCard(active: ActiveConnectionUiState, onEdit: () -> 
     }
 }
 
-/** A bullet separates parts in the same line, but never begins a wrapped line. */
+/**
+ * A bullet separates parts in the same line, but never begins or ends a wrapped line. FlowRow cannot do this: it
+ * places every child it is given, so a separator kept with either neighbour shows at a line's start or end.
+ */
 @Composable
 private fun ConnectionDetails(address: String, port: String, username: String) {
     Layout(content = {
@@ -201,7 +204,7 @@ private fun RemoveConnectionDialog(name: String, onCancel: () -> Unit, onRemove:
         onDismissRequest = onCancel,
         modifier = Modifier.widthIn(max = 492.dp).padding(horizontal = 26.dp),
         title = { Text(stringResource(R.string.connect_remove_title, name)) },
-        text = { Text(stringResource(R.string.connect_remove_body)) },
+        text = { Text(stringResource(R.string.connect_remove_body_active)) },
         confirmButton = { TextButton(onClick = onRemove) { Text(stringResource(R.string.connect_remove)) } },
         dismissButton = { TextButton(onClick = onCancel) { Text(stringResource(R.string.connect_cancel)) } },
         properties = DialogProperties(usePlatformDefaultWidth = false),

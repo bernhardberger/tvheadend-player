@@ -83,7 +83,7 @@
     <string name="connect_remove_description">Remove connection</string>
     <string name="connect_port_detail">port %1$d</string>
     <string name="connect_remove_title">Remove %1$s?</string>
-    <!-- TV key: server_remove_body (this device instead of this TV) -->
-    <string name="connect_remove_body">This connection’s recent channels, audio choices, and saved pictures are deleted from this device. Recordings stay on the server.</string>
+    <!-- TV key: server_remove_body_active (this device instead of this TV) -->
+    <string name="connect_remove_body_active">Playback stops, and no connection is in use until you choose one. This connection’s recent channels, audio choices, and saved pictures are deleted from this device. Recordings stay on the server.</string>
     <string name="connect_remove">Remove</string>
 </resources>
