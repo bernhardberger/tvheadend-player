@@ -160,6 +160,8 @@ private fun rememberScheduleLevels(
         levels[SCHEDULE_ROOT_LEVEL] = DepthLevel(
             id = SCHEDULE_ROOT_LEVEL,
             rows = rows,
+            wholePageRows = { it.id.startsWith("recording:") },
+            keepPageOnRowChanges = true,
             heading = { emphasis ->
                 if (rows.isNotEmpty()) Column(Modifier.testTag("schedule-upcoming-heading")) {
                     ArchiveLevelHeading(stringResource(R.string.schedule_upcoming), emphasis, null, atRoot = false)

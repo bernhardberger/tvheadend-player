@@ -201,6 +201,7 @@ private fun rememberArchiveLevels(
                 (root.folderAt(path)?.allRecordings()?.size ?: 0)
             levels[id] = DepthLevel(
                 id = id,
+                keepPageOnRowChanges = true,
                 heading = { emphasis ->
                     Box {
                         ArchiveLevelHeading(
