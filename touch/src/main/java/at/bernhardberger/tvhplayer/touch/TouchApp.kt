@@ -2,10 +2,10 @@ package at.bernhardberger.tvhplayer.touch
 
 import at.bernhardberger.tvhplayer.touch.ui.ConfirmDvrChange
 import at.bernhardberger.tvhplayer.touch.ui.DvrControls
-import at.bernhardberger.tvhplayer.touch.ui.rememberDvrControls
 import androidx.compose.runtime.remember
 import at.bernhardberger.tvhplayer.touch.ui.LocalArtworkModels
 import at.bernhardberger.tvhplayer.touch.ui.ArtworkModels
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -46,6 +46,7 @@ import at.bernhardberger.tvhplayer.touch.connect.FirstRunFlow
 import at.bernhardberger.tvhplayer.touch.connect.connectionStatus
 import at.bernhardberger.tvhplayer.touch.ui.Destination
 import at.bernhardberger.tvhplayer.touch.ui.FrameNotices
+import at.bernhardberger.tvhplayer.touch.ui.BottomWindowNotices
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.touch.ui.LocalFrameSelection
 import at.bernhardberger.tvhplayer.touch.guide.GuideDestination
@@ -80,6 +81,7 @@ internal fun TouchApp(
     val profiles by owner.profiles.collectAsStateWithLifecycle()
     val presentation by connection.uiState.collectAsStateWithLifecycle()
     val connect = viewModel { ConnectViewModel(session, owner) }
+    val dvr = viewModel { DvrControls(session, notices) }
     SideEffect { connect.discovery = discovery }
     var page by rememberSaveable { mutableStateOf(Page.Frame) }
     // First run follows the settled profile: a removal's passing "no connection" does not open it,
@@ -89,24 +91,27 @@ internal fun TouchApp(
         // Whatever was open belonged to the removed connection; nothing stays behind first run.
         if (firstRun) page = Page.Frame else connect.releaseFirstRun()
     }
-    when {
-        profile == null -> Surface(Modifier.fillMaxSize()) {}
-        firstRun -> FirstRunFlow(connect.firstRun())
-        page != Page.Frame -> {
-            val active = (profiles as? ServerProfileListResult.Available)?.let { list ->
-                list.profiles.firstOrNull { it.id == list.activeId }
+    FrameNotices(notices, owner, session) {
+        when {
+            profile == null -> Surface(Modifier.fillMaxSize()) {}
+            firstRun -> Box(Modifier.fillMaxSize()) {
+                FirstRunFlow(connect.firstRun())
+                BottomWindowNotices()
             }
-            ConnectionsPage(
-                session, owner, connect, active?.uiState(connectionStatus(profile, presentation)), active,
-                listed = profiles is ServerProfileListResult.Available,
-                signIn = page == Page.SignIn,
-                onBack = { page = Page.Frame },
-                onSaved = { page = Page.Connections },
-            )
-        }
-        else -> FrameNotices(notices, owner, session) {
-            AppDestinations(
-                session, notices, connection, channels, recordings, guide, playingId, onWatch,
+            page != Page.Frame -> {
+                val active = (profiles as? ServerProfileListResult.Available)?.let { list ->
+                    list.profiles.firstOrNull { it.id == list.activeId }
+                }
+                ConnectionsPage(
+                    session, owner, connect, active?.uiState(connectionStatus(profile, presentation)), active,
+                    listed = profiles is ServerProfileListResult.Available,
+                    signIn = page == Page.SignIn,
+                    onBack = { page = Page.Frame },
+                    onSaved = { page = Page.Connections },
+                )
+            }
+            else -> AppDestinations(
+                session, dvr, connection, channels, recordings, guide, playingId, onWatch,
                 onOpenConnections = { page = Page.Connections },
                 onSignIn = { page = Page.SignIn },
             )
@@ -130,7 +135,7 @@ private fun ConnectionsPage(
     signIn: Boolean,
     onBack: () -> Unit,
     onSaved: () -> Unit,
-) {
+) = Box(Modifier.fillMaxSize()) {
     var editing by rememberSaveable { mutableStateOf(false) }
     ConnectionsScreen(
         active = card,
@@ -143,13 +148,10 @@ private fun ConnectionsPage(
     val kept = connect.openEditor.takeIf { active == null && !listed }
     val editorShown = (editing || signIn) && (active != null || kept != null) && !connect.removing
     LaunchedEffect(editorShown) { if (!editorShown) connect.releaseEditor() }
-    if (editorShown) {
+    val editorLoaded = if (editorShown) {
         val restoreSaved = rememberSavedConnectionRestore(session, owner)
         val setup = if (active != null) {
-            // An unreadable saved sign-in keeps a password connection one, whichever way the editor opened.
-            val requireSignIn = active.authenticationMode == ServerProfileAuthenticationMode.PASSWORD &&
-                !active.credentialsAvailable
-            connect.editor(active.id, active.label.orEmpty(), requireSignIn, restoreSaved)
+            connect.editor(active.id, active.label.orEmpty(), active.requiresSignIn, restoreSaved)
         } else checkNotNull(kept)
         // The editor closes once the change and its name are saved.
         LaunchedEffect(setup, setup.finished) {
@@ -167,8 +169,15 @@ private fun ConnectionsPage(
             },
             focusPassword = signIn,
         )
-    }
+        setup.loaded
+    } else false
+    // The editor is a separate window. Once it is open, only that window consumes notices.
+    if (!editorLoaded) BottomWindowNotices()
 }
+
+// An unreadable saved sign-in keeps a password connection one, whichever way the editor opened.
+private val ServerProfileSummary.requiresSignIn: Boolean
+    get() = authenticationMode == ServerProfileAuthenticationMode.PASSWORD && !credentialsAvailable
 
 private fun ServerProfileSummary.uiState(status: ConnectionStatus) = ActiveConnectionUiState(
     name = serverProfileDisplayName(this),
@@ -212,9 +221,7 @@ private fun AppFrame(
             // Until Home exists, connection settings open from the end of the Channels top bar.
             onOpenConnectionSettings = onOpenConnections,
             onSignIn = onSignIn,
-            onRecord = dvr::recordChannel,
-            onCancel = dvr::cancelChannel,
-            onStop = dvr::stopChannel,
+            onRecordControl = dvr::channelRecordControl,
         ),
         destinations = AppDestinationList,
     )
@@ -225,7 +232,7 @@ private fun AppFrame(
 @Composable
 private fun AppDestinations(
     session: TvheadendSession,
-    notices: NoticeCenter,
+    dvr: DvrControls,
     connection: AppConnectionViewModel,
     channels: ChannelsViewModel,
     recordings: RecordingsViewModel,
@@ -237,7 +244,6 @@ private fun AppDestinations(
 ) {
     val selection = rememberSaveable { mutableStateOf(Destination.Channels) }
     val artwork = remember(session) { ArtworkModels(session) }
-    val dvr = rememberDvrControls(session, notices)
     ConfirmDvrChange(dvr)
     CompositionLocalProvider(LocalFrameSelection provides selection, LocalArtworkModels provides artwork) {
         when (selection.value) {

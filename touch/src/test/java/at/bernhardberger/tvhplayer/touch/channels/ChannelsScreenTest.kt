@@ -337,7 +337,7 @@ class ChannelsScreenTest {
             compose.mainClock.advanceTimeBy(48)
             val slot = compose.onNodeWithTag("fresh").captureToImage()
             fun inkKey(ground: Color): String = LogoInkTransformation(
-                ground.toArgb(), (slot.width * 0.76f).roundToInt(), (slot.height * 0.62f).roundToInt(), trim = true,
+                ground.toArgb(), (slot.width * 0.64f).roundToInt(), (slot.height * 0.50f).roundToInt(), trim = true,
             ).cacheKey
             fun ground(tag: String): Color {
                 val pixels = compose.onNodeWithTag(tag).captureToImage().toPixelMap()
@@ -396,7 +396,7 @@ class ChannelsScreenTest {
         onTag = {},
         onRetry = {},
         onOpenConnectionSettings = {},
-        onRecord = if (optional) ({}) else null,
+        onRecordControl = if (optional) ({ _, _, _ -> }) else null,
         onDetails = if (optional) ({}) else null,
         onShowInGuide = if (optional) ({}) else null,
     )

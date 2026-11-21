@@ -22,7 +22,7 @@ internal fun markedLogos(): List<BitmapPainter> = listOf(ImageBitmap(100, 100), 
 
 /**
  * The logo rule of the touch design (section 13): the [LogoMark] logo drawn in [slot] of this image stays within
- * 76% of the slot's width and 62% of its height, reaches that box on one side ("contain") and is centered.
+ * 64% of the slot's width and 50% of its height, reaches that box on one side ("contain") and is centered.
  */
 internal fun PixelMap.assertLogoFitsItsShare(
     name: String,
@@ -47,9 +47,10 @@ internal fun PixelMap.assertLogoFitsItsShare(
         false -> assertTrue("$name: $width×$height does not fill the height of its box", reachesHeight)
         null -> assertTrue("$name: $width×$height does not fill its box on either side", reachesWidth || reachesHeight)
     }
-    assertTrue("$name: off center horizontally", abs(left - right) <= 1)
-    assertTrue("$name: off center vertically", abs(top - bottom) <= 1)
+    // The centered share box and the fitted logo inside it can each round by half a pixel.
+    assertTrue("$name: horizontal margins $left/$right", abs(left - right) <= 2)
+    assertTrue("$name: vertical margins $top/$bottom", abs(top - bottom) <= 2)
 }
 
-private const val WIDTH_SHARE = 0.76f
-private const val HEIGHT_SHARE = 0.62f
+private const val WIDTH_SHARE = 0.64f
+private const val HEIGHT_SHARE = 0.50f

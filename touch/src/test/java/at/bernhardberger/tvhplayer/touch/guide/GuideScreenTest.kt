@@ -18,6 +18,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.lifecycle.viewmodel.compose.viewModel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.EpgRepository
@@ -29,10 +30,10 @@ import at.bernhardberger.tvhplayer.touch.testutil.TouchCanvas
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouch
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouchWindows
 import at.bernhardberger.tvhplayer.touch.ui.DvrChangeDialog
+import at.bernhardberger.tvhplayer.touch.ui.DvrControls
 import at.bernhardberger.tvhplayer.touch.ui.ProgramRecordControl
 import at.bernhardberger.tvhplayer.touch.ui.RuleSchedule
 import at.bernhardberger.tvhplayer.touch.ui.Destination
-import at.bernhardberger.tvhplayer.touch.ui.rememberDvrControls
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -441,9 +442,10 @@ class GuideScreenTest {
         val presentation = connection.presentation()
         compose.setContent {
             MaterialTheme(colorScheme = MobileDarkColors) {
+                val dvr = viewModel { DvrControls(session, connection.noticeCenter) }
                 GuideDestination(
                     guide, channels, presentation, listOf(Destination.Guide), playingId = null, onWatch = null,
-                    dvr = rememberDvrControls(fake, connection.noticeCenter), onOpenConnections = {}, onSignIn = {},
+                    dvr = dvr, onOpenConnections = {}, onSignIn = {},
                 )
             }
         }

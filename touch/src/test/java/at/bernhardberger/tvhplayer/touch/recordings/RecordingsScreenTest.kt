@@ -66,6 +66,7 @@ class RecordingsScreenTest {
     private val state = mutableStateOf(flatFixture())
     private val deleted = mutableListOf<String>()
     private val stopped = mutableListOf<String>()
+    private val played = mutableListOf<Pair<String, Boolean>>()
     private var asking by mutableStateOf(false)
 
     @Test
@@ -79,12 +80,11 @@ class RecordingsScreenTest {
         capture("tablet-recordings-root", TouchCanvas.TABLET)
 
         pickTheHalfWatchedMatch()
-        compose.onNodeWithText("Resume").assertIsDisplayed()
+        resumeButton().assertIsDisplayed()
         compose.onNodeWithText("All recordings").assertIsDisplayed()
         capture("tablet-recordings-picked", TouchCanvas.TABLET)
 
-        askToDelete()
-        compose.captureTouchWindows(GROUP, "tablet-recordings-delete-confirm", TouchCanvas.TABLET)
+        captureDeleteConfirmation("tablet-recordings-delete-confirm", TouchCanvas.TABLET)
     }
 
     @Test
@@ -96,7 +96,7 @@ class RecordingsScreenTest {
         compose.onNodeWithContentDescription("Delete").assertDoesNotExist()
         compose.onNodeWithText("Remove entry").performClick()
         assertEquals(listOf(PickedId), deleted)
-        compose.onNodeWithText("Resume").assertDoesNotExist()
+        resumeButton().assertDoesNotExist()
 
         state.value = flatFixture().withRemove(RecordingRemoveControl.Stop)
         compose.onNodeWithContentDescription("Delete").assertDoesNotExist()
@@ -107,6 +107,25 @@ class RecordingsScreenTest {
         state.value = flatFixture().withRemove(null)
         compose.onNodeWithText("Remove entry").assertDoesNotExist()
         compose.onNodeWithContentDescription("Delete").assertDoesNotExist()
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w1280dp-h800dp-land-xhdpi")
+    fun playButtonsFollowTheOfferedActionsNotTheBar() {
+        show()
+        pickTheHalfWatchedMatch()
+        resumeButton().performClick()
+        compose.onNodeWithText("Watch from beginning").performClick()
+        assertEquals(listOf(PickedId to false, PickedId to true), played)
+
+        // The same half-watched bar doesn't confer permission to Resume or start over.
+        state.value = flatFixture().withPlay(emptyList())
+        resumeButton().assertDoesNotExist()
+        compose.onNodeWithText("Watch from beginning").assertDoesNotExist()
+        compose.onNodeWithText("Watch").assertDoesNotExist()
+        state.value = flatFixture().withPlay(listOf(RecordingPlayAction.Watch))
+        compose.onNodeWithText("Watch").performClick()
+        assertEquals(PickedId to false, played.last())
     }
 
     @Test
@@ -160,7 +179,7 @@ class RecordingsScreenTest {
         assertLine("Kingsbridge – Northport • Sat, Nov 14 • 1h 45m • Harbor Sport")
         compose.onNodeWithText("Basketball").assertDoesNotExist()
         pickTheHalfWatchedMatch()
-        compose.onNodeWithText("Resume").assertIsDisplayed()
+        resumeButton().assertIsDisplayed()
         capture("tablet-recordings", TouchCanvas.TABLET)
 
         back()
@@ -198,7 +217,7 @@ class RecordingsScreenTest {
 
         pickTheHalfWatchedMatch()
         compose.onNodeWithText("All recordings").assertDoesNotExist()
-        compose.onNodeWithText("Resume").assertIsDisplayed()
+        resumeButton().assertIsDisplayed()
         capture("tablet-upright-recording", TouchCanvas.TABLET_UPRIGHT)
 
         back()
@@ -232,8 +251,7 @@ class RecordingsScreenTest {
         compose.onNodeWithText("Watch from beginning").assertIsDisplayed()
         capture("phone-recording-details", TouchCanvas.PHONE)
 
-        askToDelete()
-        compose.captureTouchWindows(GROUP, "phone-recordings-delete-confirm", TouchCanvas.PHONE)
+        captureDeleteConfirmation("phone-recordings-delete-confirm", TouchCanvas.PHONE)
     }
 
     @Test
@@ -297,7 +315,7 @@ class RecordingsScreenTest {
                 val regrouped = if (view.grouping == DvrArchiveGrouping.FOLDERS) foldersFixture() else flatFixture()
                 state.value = regrouped.copy(view = view)
             },
-            onPlay = { _, _ -> },
+            onPlay = { id, fromStart -> played += id to fromStart },
             onDelete = { deleted += it },
             onMore = {},
             onStop = { stopped += it },
@@ -316,12 +334,10 @@ class RecordingsScreenTest {
         }
     }
 
-    /** Delete on the picked recording, and the app's question over the screen. */
-    private fun askToDelete() {
-        compose.onNodeWithContentDescription("Delete").performClick()
-        assertEquals(listOf(PickedId), deleted)
+    /** Paint the shared dialog for capture only; TouchAppTest covers the Delete action and confirmation. */
+    private fun captureDeleteConfirmation(name: String, canvas: TouchCanvas) {
         asking = true
-        compose.onNodeWithText("Delete this recording?").assertIsDisplayed()
+        compose.captureTouchWindows(GROUP, name, canvas)
     }
 
     /** The picked recording offering [remove], as the shared rule decides it. */
@@ -329,8 +345,14 @@ class RecordingsScreenTest {
         root = root.copy(recordings = root.recordings.map { if (it.id == PickedId) it.copy(remove = remove) else it }),
     )
 
+    private fun RecordingsState.withPlay(play: List<RecordingPlayAction>) = copy(
+        root = root.copy(recordings = root.recordings.map { if (it.id == PickedId) it.copy(play = play) else it }),
+    )
+
     private fun pickTheHalfWatchedMatch() =
         compose.onNodeWithText("Westvale – Ridge Town", substring = true).performClick()
+
+    private fun resumeButton() = compose.onNodeWithContentDescription("Resume from", substring = true)
 
     // Times and lengths keep their parts together with (narrow) no-break spaces.
     private fun assertLine(line: String) {

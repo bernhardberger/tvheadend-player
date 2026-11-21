@@ -16,8 +16,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,11 +25,14 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.text
 import androidx.compose.ui.text.AnnotatedString
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
@@ -46,16 +47,16 @@ import at.bernhardberger.tvhplayer.core.recordingContextActions
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import at.bernhardberger.tvhplayer.touch.R
-import at.bernhardberger.tvhplayer.ui.common.rememberCurrentEpochSeconds
 import at.bernhardberger.tvhplayer.ui.screens.DvrMutationAction
 import at.bernhardberger.tvhplayer.ui.screens.DvrMutationActions
 import at.bernhardberger.tvhplayer.ui.screens.currentDvrMutation
 import at.bernhardberger.tvhplayer.ui.screens.launchMutation
-import at.bernhardberger.tvhplayer.ui.screens.recordChannelProgramme
+import at.bernhardberger.tvhplayer.ui.screens.programmeRecordKeyAction
 import at.bernhardberger.tvhplayer.ui.screens.recordings.StopConfirmationTimes
 import at.bernhardberger.tvhplayer.ui.screens.recordings.stopConfirmationSentence
 import at.bernhardberger.tvhplayer.ui.screens.recordings.stopConfirmationTimes
-import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
+import kotlin.time.Clock
 import kotlin.time.Instant
 
 /** The recording control a program offers; its icon and label are kept here so a swap is one line. */
@@ -148,15 +149,31 @@ internal fun recordingRemoveControl(actions: List<BrowseContextAction>): Recordi
 /** What [entry] offers to remove it, by the shared rule of the TV's Recordings screen. */
 @OptIn(ExperimentalTvheadendApi::class)
 internal fun SessionObservation.recordingRemoveControl(entry: DvrEntry): RecordingRemoveControl? {
-    val canModify = currentSession != null &&
+    val canModify = currentSession != null && dvrState is DvrRepositoryState.Current &&
         (sessionState as? SessionState.Ready)?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
     return recordingRemoveControl(recordingContextActions(entry, recordingPlaybackAdmission(entry), canModify))
 }
 
-/** A change waiting for the viewer's answer, checked against [source] again when confirmed. */
+/** The exact offer confirmed by the viewer, not just the wire mutation it maps to. */
+internal sealed interface DvrConfirmationTarget {
+    val recordingId: DvrEntryId
+
+    data class Programme(
+        override val recordingId: DvrEntryId,
+        val eventId: EventId,
+        val control: ProgramRecordControl,
+    ) : DvrConfirmationTarget
+
+    data class Recording(
+        override val recordingId: DvrEntryId,
+        val control: RecordingRemoveControl,
+    ) : DvrConfirmationTarget
+}
+
 internal class PendingDvrChange(
     val mutation: DvrMutationAction,
     val source: SessionObservation,
+    val target: DvrConfirmationTarget,
     @param:StringRes val title: Int,
     @param:StringRes val body: Int,
     @param:StringRes val dismiss: Int,
@@ -174,31 +191,56 @@ internal class PendingDvrChange(
 internal class DvrControls(
     private val session: TvheadendSession,
     private val notices: NoticeCenter,
-    private val scope: CoroutineScope,
-    private val nowSec: () -> Long,
-) {
+    private val nowSec: () -> Long = { Clock.System.now().epochSeconds },
+) : ViewModel() {
     private val mutations = DvrMutationActions(session.dvrRepository)
     private val inFlight = mutableStateOf<DvrMutationAction?>(null)
+    val commandInFlight: Boolean get() = inFlight.value != null
     var pending by mutableStateOf<PendingDvrChange?>(null)
         private set
 
     private val observation: SessionObservation get() = session.observation.value
 
+    init {
+        viewModelScope.launch {
+            session.observation.collect { current ->
+                if (pending?.isStillOffered(current) == false) dismiss()
+            }
+        }
+    }
+
     /** Records a Guide program (EpgGridScreen's Record key). */
     fun record(programId: String) {
         val current = observation
         val event = programId.toLongOrNull()?.let { current.event(EventId(it)) } ?: return
-        val capability = current.currentSession ?: return
-        launch(DvrMutationAction.CreateProgramme(event.programmeRecordingTarget(capability), null), current)
+        record(event, current)
     }
 
-    /** Records what is on now on a channel (ChannelsScreen's Record key); a scheduled one asks to cancel. */
-    fun recordChannel(channelId: String) {
-        val id = channelId.toLongOrNull()?.let(::ChannelId) ?: return
-        val action = mutations.recordChannelProgramme(
-            id, { observation }, nowSec, { null }, notices, scope, inFlight,
+    private fun record(
+        event: EpgEvent,
+        current: SessionObservation,
+        stillCurrent: (SessionObservation) -> Boolean = { true },
+    ) {
+        val capability = current.currentSession ?: return
+        launch(
+            DvrMutationAction.CreateProgramme(event.programmeRecordingTarget(capability), null),
+            current, stillCurrent,
         )
-        if (action == BrowseContextAction.CANCEL) cancelChannel(channelId)
+    }
+
+    /** Never substitute the next programme for the one on the expanded row. */
+    fun channelRecordControl(channelId: String, eventId: EventId, control: ProgramRecordControl) {
+        val id = channelId.toLongOrNull()?.let(::ChannelId) ?: return
+        val onAir: (SessionObservation) -> Boolean = { latest ->
+            latest.eventAt(id, Instant.fromEpochSeconds(nowSec()))?.id == eventId
+        }
+        val current = observation
+        val event = current.event(eventId)?.takeIf { onAir(current) } ?: return
+        when (control) {
+            ProgramRecordControl.Record -> record(event, current, onAir)
+            ProgramRecordControl.Cancel -> askCancel(event, current)
+            ProgramRecordControl.Stop -> askProgrammeStop(event, current)
+        }
     }
 
     /** Asks to cancel a Guide program's scheduled recording (ProgrammeDetailsHost's Cancel). */
@@ -207,29 +249,21 @@ internal class DvrControls(
         programId.toLongOrNull()?.let { current.event(EventId(it)) }?.let { askCancel(it, current) }
     }
 
-    /** Asks to cancel the scheduled recording of what is on now on a channel. */
-    fun cancelChannel(channelId: String) {
-        val current = observation
-        val id = channelId.toLongOrNull()?.let(::ChannelId) ?: return
-        current.eventAt(id, Instant.fromEpochSeconds(nowSec()))?.let { askCancel(it, current) }
-    }
-
     fun stopProgram(programId: String) {
         val current = observation
         val event = programId.toLongOrNull()?.let { current.event(EventId(it)) } ?: return
-        current.dvrEntryForEvent(event)?.let { askStop(it, current) }
+        askProgrammeStop(event, current)
     }
 
-    fun stopChannel(channelId: String) {
-        val current = observation
-        val id = channelId.toLongOrNull()?.let(::ChannelId) ?: return
-        val event = current.eventAt(id, Instant.fromEpochSeconds(nowSec())) ?: return
-        current.dvrEntryForEvent(event)?.let { askStop(it, current) }
+    private fun askProgrammeStop(event: EpgEvent, current: SessionObservation) {
+        val entry = current.dvrEntryForEvent(event) ?: return
+        askStop(entry, current, DvrConfirmationTarget.Programme(entry.id, event.id, ProgramRecordControl.Stop))
     }
 
     fun stopRecording(recordingId: String) {
         val current = observation
-        recordingId.toLongOrNull()?.let { current.dvrEntry(DvrEntryId(it)) }?.let { askStop(it, current) }
+        val entry = recordingId.toLongOrNull()?.let { current.dvrEntry(DvrEntryId(it)) } ?: return
+        askStop(entry, current, DvrConfirmationTarget.Recording(entry.id, RecordingRemoveControl.Stop))
     }
 
     /** Asks to delete a recording, or to remove an entry without a file (RecordingsScreen's Delete). */
@@ -241,14 +275,19 @@ internal class DvrControls(
         if (capability == null || entry == null || control == null) return
         ask(
             DvrMutationAction.Delete(capability, entry.id), current,
+            DvrConfirmationTarget.Recording(entry.id, control),
             control.confirmTitle, control.confirmBody, SharedR.string.cancel, control.confirmButton,
         )
     }
 
-    fun confirm() {
-        val change = pending ?: return
-        pending = null
-        launch(change.mutation, change.source)
+    fun confirm(change: PendingDvrChange) {
+        if (pending !== change) return
+        if (!change.isStillOffered(observation)) {
+            dismiss()
+        } else if (!commandInFlight) {
+            dismiss()
+            launch(change.mutation, change.source) { change.isStillOffered(it) }
+        }
     }
 
     fun dismiss() {
@@ -260,16 +299,17 @@ internal class DvrControls(
         val recording = current.dvrEntryForEvent(event) ?: return
         ask(
             DvrMutationAction.Cancel(capability, recording.id), current,
+            DvrConfirmationTarget.Programme(recording.id, event.id, ProgramRecordControl.Cancel),
             SharedR.string.cancel_recording_confirm_title, SharedR.string.cancel_recording_confirm_body,
             SharedR.string.keep_recording, SharedR.string.cancel_recording,
         )
     }
 
-    private fun askStop(entry: DvrEntry, current: SessionObservation) {
+    private fun askStop(entry: DvrEntry, current: SessionObservation, target: DvrConfirmationTarget) {
         val capability = current.currentSession ?: return
         val control = RecordingRemoveControl.Stop
         ask(
-            DvrMutationAction.Stop(capability, entry.id), current,
+            DvrMutationAction.Stop(capability, entry.id), current, target,
             control.confirmTitle, control.confirmBody, SharedR.string.keep_recording, control.confirmButton,
             stopConfirmationTimes(entry, nowSec()),
         )
@@ -279,26 +319,41 @@ internal class DvrControls(
     private fun ask(
         mutation: DvrMutationAction,
         source: SessionObservation,
+        target: DvrConfirmationTarget,
         title: Int,
         body: Int,
         dismiss: Int,
         confirm: Int,
         stopTimes: StopConfirmationTimes? = null,
     ) {
-        if (currentDvrMutation(mutation, source, source) == null) return
-        pending = PendingDvrChange(mutation, source, title, body, dismiss, confirm, stopTimes)
+        val change = PendingDvrChange(mutation, source, target, title, body, dismiss, confirm, stopTimes)
+        if (change.isStillOffered(observation)) pending = change
     }
 
-    private fun launch(mutation: DvrMutationAction, source: SessionObservation) {
-        mutations.launchMutation(mutation, source, { observation }, nowSec, { null }, notices, scope, inFlight)
+    private fun PendingDvrChange.isStillOffered(current: SessionObservation): Boolean {
+        if (currentDvrMutation(mutation, source, current) == null) return false
+        return when (val asked = target) {
+            is DvrConfirmationTarget.Recording ->
+                current.dvrEntry(asked.recordingId)?.let(current::recordingRemoveControl) == asked.control
+            is DvrConfirmationTarget.Programme -> current.event(asked.eventId)?.let { event ->
+                current.dvrEntryForEvent(event)?.id == asked.recordingId &&
+                    programRecordControl(programmeRecordKeyAction(event, current, nowSec())) == asked.control
+            } == true
+        }
     }
-}
 
-@Composable
-internal fun rememberDvrControls(session: TvheadendSession, notices: NoticeCenter): DvrControls {
-    val scope = rememberCoroutineScope()
-    val nowSec = rememberCurrentEpochSeconds()
-    return remember(session, notices, scope) { DvrControls(session, notices, scope, nowSec) }
+    private fun launch(
+        mutation: DvrMutationAction,
+        source: SessionObservation,
+        stillCurrent: (SessionObservation) -> Boolean,
+    ) {
+        mutations.launchMutation(
+            mutation, source,
+            // The shared launch can be dispatched later. Never pass a live proof for a stale touch action.
+            { observation.takeIf(stillCurrent) ?: SessionObservation.create() },
+            nowSec, { null }, notices, viewModelScope, inFlight,
+        )
+    }
 }
 
 /** Asks about the change [controls] wait on, if any. */
@@ -306,8 +361,9 @@ internal fun rememberDvrControls(session: TvheadendSession, notices: NoticeCente
 internal fun ConfirmDvrChange(controls: DvrControls) {
     val change = controls.pending ?: return
     DvrChangeDialog(
-        change.title, change.body, change.dismiss, change.confirm, controls::confirm, controls::dismiss,
+        change.title, change.body, change.dismiss, change.confirm, { controls.confirm(change) }, controls::dismiss,
         stopTimes = change.stopTimes,
+        confirmEnabled = !controls.commandInFlight,
     )
 }
 
@@ -321,6 +377,7 @@ internal fun DvrChangeDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
     stopTimes: StopConfirmationTimes? = null,
+    confirmEnabled: Boolean = true,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -337,7 +394,7 @@ internal fun DvrChangeDialog(
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onConfirm) { Text(stringResource(confirm)) } },
+        confirmButton = { TextButton(onClick = onConfirm, enabled = confirmEnabled) { Text(stringResource(confirm)) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(dismiss)) } },
     )
 }

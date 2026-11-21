@@ -50,8 +50,11 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -66,6 +69,8 @@ import at.bernhardberger.tvhplayer.touch.ui.DetailsPictureScrim
 import at.bernhardberger.tvhplayer.touch.ui.DetailsSynopsis
 import at.bernhardberger.tvhplayer.touch.ui.RecordingRemoveControl
 import at.bernhardberger.tvhplayer.touch.ui.joinParts
+import at.bernhardberger.tvhplayer.ui.common.formatSpokenDuration
+import at.bernhardberger.tvhplayer.presentation.R as SharedR
 
 /** The picked recording beside the tablet's list. */
 @Composable
@@ -275,28 +280,45 @@ private fun PlayButtons(item: RecordingItem, actions: RecordingsActions, equalWi
         actions.onDelete?.let { RecordingActionButton(item.remove) { it(item.id) } }
         return
     }
-    val onPlay = actions.onPlay ?: return
+    val onPlay = actions.onPlay?.takeIf { item.play.isNotEmpty() } ?: return
     val width = if (equalWidth) Modifier.fillMaxWidth() else Modifier
     val height = if (equalWidth) Modifier.heightIn(min = 48.dp) else Modifier
+    val padding = if (equalWidth) ButtonDefaults.SmallContentPadding else ButtonDefaults.ContentPadding
     Row(width, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         val share = if (equalWidth) Modifier.weight(1f).then(height) else Modifier
-        val resume = item.state is RecordingProgress.PartlyWatched
-        Button(onClick = { onPlay(item.id, false) }, modifier = share) {
-            Icon(painterResource(R.drawable.channels_play), null, Modifier.size(ButtonDefaults.IconSize))
-            Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-            Text(stringResource(if (resume) R.string.recordings_resume else R.string.recordings_watch), maxLines = 1)
-        }
-        if (resume) {
-            FilledTonalButton(
-                onClick = { onPlay(item.id, true) }, modifier = share,
-                contentPadding = if (equalWidth) ButtonDefaults.SmallContentPadding else ButtonDefaults.ContentPadding,
-            ) {
-                Text(
-                    stringResource(R.string.recordings_watch_from_beginning), maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+        item.play.forEach { action ->
+            when (action) {
+                RecordingPlayAction.StartOver -> FilledTonalButton(
+                    onClick = { onPlay(item.id, true) }, modifier = share,
+                    contentPadding = padding,
+                ) {
+                    Text(
+                        stringResource(R.string.recordings_watch_from_beginning), maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                is RecordingPlayAction.Resume, RecordingPlayAction.Watch ->
+                    PrimaryPlayButton(action as? RecordingPlayAction.Resume, share) { onPlay(item.id, false) }
             }
         }
+    }
+}
+
+@Composable
+private fun PrimaryPlayButton(resume: RecordingPlayAction.Resume?, modifier: Modifier, onClick: () -> Unit) {
+    Button(onClick = onClick, modifier = modifier) {
+        Icon(painterResource(R.drawable.channels_play), null, Modifier.size(ButtonDefaults.IconSize))
+        Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+        val label = if (resume == null) R.string.recordings_watch else R.string.recordings_resume
+        val spoken = resume?.let {
+            val duration = formatSpokenDuration(it.position.inWholeSeconds, LocalContext.current.resources)
+            stringResource(SharedR.string.recording_resume_from, duration)
+        }
+        Text(
+            stringResource(label),
+            if (spoken == null) Modifier else Modifier.clearAndSetSemantics { contentDescription = spoken },
+            maxLines = 1,
+        )
     }
 }
 
@@ -339,14 +361,18 @@ private fun RecordingActionButton(control: RecordingRemoveControl, onClick: () -
 @Composable
 private fun Facts(details: RecordingDetails, columns: Int, keyWidth: Dp) {
     val facts = listOfNotNull(
-        details.genre?.let { R.string.recordings_genre to it },
-        details.recorded?.let { R.string.recordings_recorded to it },
-        details.size?.let { R.string.recordings_size to it },
-        details.picture?.let { R.string.recordings_picture to it },
-        details.audio?.let { R.string.recordings_audio to it },
-        details.subtitles?.let { R.string.recordings_subtitles to it },
-        details.errors?.let { R.string.recordings_errors to it },
-        details.retention?.let { R.string.recordings_retention to it },
+        details.genre?.let { SharedR.string.details_genre to it },
+        details.size?.let { SharedR.string.details_size to it },
+        details.picture?.let { SharedR.string.details_picture to it },
+        details.audio?.let { SharedR.string.details_audio to it },
+        details.subtitles?.let { SharedR.string.subtitles to it },
+        details.errors?.let { SharedR.string.details_errors to it },
+        details.recorded?.let {
+            val label = if (details.recordedIsScheduled) SharedR.string.recording_state_scheduled
+            else SharedR.string.details_recorded
+            label to it
+        },
+        details.retention?.let { SharedR.string.details_retention to it },
     ).map { (key, value) -> stringResource(key) to value }
     DetailsFacts(stringResource(R.string.recordings_details), facts, columns, keyWidth)
 }
