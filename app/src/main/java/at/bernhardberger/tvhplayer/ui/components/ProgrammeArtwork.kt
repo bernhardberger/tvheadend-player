@@ -185,7 +185,7 @@ private val ArtworkLogoShadeHeight = 70.dp
 @Composable
 internal fun BoxScope.ArtworkCornerLogo(
     picon: ChannelIcon, place: ArtworkLogoPlace, modifier: Modifier = Modifier, scale: Float = 1f,
-    bottomEdge: Dp = 0.dp,
+    bottomEdge: Dp = 0.dp, onError: (() -> Unit)? = null,
 ) {
     val corner = place.corner
     val atBottom = corner == ArtworkLogoCorner.BOTTOM_START || corner == ArtworkLogoCorner.BOTTOM_END
@@ -221,7 +221,7 @@ internal fun BoxScope.ArtworkCornerLogo(
     PiconBox(picon, Modifier.align(alignment).padding(bottom = if (atBottom) bottomEdge else 0.dp)
         .padding(ArtworkLogoInset * scale).size(ArtworkLogoPlateWidth * scale, ArtworkLogoHeight * scale).then(modifier),
         // Trimmed, so the logo's visible shape and not its file's empty margin keeps the inset.
-        alignment = alignment, placeholders = false, trim = true,
+        alignment = alignment, placeholders = false, trim = true, onError = onError,
         // Parts of the logo that would vanish on a light picture go dark, as on a focused row.
         ground = if (place.ground == ArtworkLogoGround.LIGHT_PICTURE || light) Color.White else MaterialTheme.colorScheme.background,
         onLogo = { bitmap ->

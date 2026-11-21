@@ -8,6 +8,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -105,6 +106,21 @@ class ChannelsRowCardPictureTest {
         compose.onNodeWithTag("$CARD-art-picon", useUnmergedTree = true).assertExists()
     }
 
+    @Test fun aFailedLogoLeavesTheChannelNameOnThePicture() {
+        picture.complete { SuccessResult(bitmap(), it, DataSource.MEMORY_CACHE) }
+        show(logoFails = true)
+
+        compose.onNodeWithTag("$CARD-art", useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithTag("$CARD-art-name", useUnmergedTree = true).assertTextEquals(CHANNEL_NAME)
+        compose.onNodeWithTag("$CARD-art-picon", useUnmergedTree = true).assertDoesNotExist()
+    }
+
+    @Test fun aFailedLogoLeavesTheChannelNameOnACardWithoutAPicture() {
+        show(programmePicture = false, logoFails = true)
+
+        compose.onNodeWithTag("$CARD-picon", useUnmergedTree = true).assertTextEquals(CHANNEL_NAME)
+    }
+
     @Test fun aChannelOnlyRecordingUsesThePictureCornerWithoutAddingCardHeight() {
         picture.complete { SuccessResult(bitmap(), it, DataSource.MEMORY_CACHE) }
         show()
@@ -162,7 +178,7 @@ class ChannelsRowCardPictureTest {
             compose.onNodeWithTag("channel-recording-indicator", useUnmergedTree = true).assertDoesNotExist()
         }
 
-    private fun show(recording: Boolean = false, programmePicture: Boolean = true) {
+    private fun show(recording: Boolean = false, programmePicture: Boolean = true, logoFails: Boolean = false) {
         val session = FakeSessionObservation(SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(
                 streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED,
@@ -175,14 +191,17 @@ class ChannelsRowCardPictureTest {
             .components {
                 add(Interceptor { chain ->
                     val model = chain.request.data as AppArtworkSource
-                    if (model.id == PICTURE) picture.await()(chain.request)
-                    else SuccessResult(bitmap(), chain.request, DataSource.MEMORY_CACHE)
+                    when {
+                        model.id == PICTURE -> picture.await()(chain.request)
+                        logoFails -> ErrorResult(null, chain.request, IllegalStateException("Synthetic logo failure"))
+                        else -> SuccessResult(bitmap(), chain.request, DataSource.MEMORY_CACHE)
+                    }
                 })
             }
             .coroutineContext(Dispatchers.Main.immediate)
             .diskCache(null)
             .build())
-        val channel = Channel.create(ChannelId(1), name = "Ridge Earth HD", number = 101,
+        val channel = Channel.create(ChannelId(1), name = CHANNEL_NAME, number = 101,
             icon = ChannelIcon.ImageCache(ArtworkId(1)))
         val event = EpgEvent.create(EventId(1), channel.id, Instant.fromEpochSeconds(NOW - 60),
             Instant.fromEpochSeconds(NOW + 600), title = "Northern Lights", image = PICTURE)
@@ -220,5 +239,6 @@ class ChannelsRowCardPictureTest {
         val PICTURE = ArtworkId(7)
         const val NOW = 1_800_000_000L
         const val CARD = "channels-immersive-1"
+        const val CHANNEL_NAME = "Ridge Earth HD"
     }
 }

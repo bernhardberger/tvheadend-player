@@ -530,6 +530,7 @@ internal fun ChannelsRowCard(
     val programme = running?.title?.takeIf { it.isNotBlank() }
     val tag = "$tagPrefix-${channel.id.value}"
     val session = LocalArtworkContext.current.currentSession
+    var logoFailed by remember(channel.icon, session) { mutableStateOf(false) }
     val art = running?.let(::programmeArtwork)?.takeIf { programmePicture && session != null }
     val context = LocalPlatformContext.current
     val textHeight = with(LocalDensity.current) { MaterialTheme.typography.titleSmall.lineHeight.toDp() } +
@@ -560,6 +561,10 @@ internal fun ChannelsRowCard(
         art = art.takeUnless { artLoad.failed },
         picon = channel.icon,
         picture = {
+            // Without a usable logo, the picture names the channel unless the card names it below.
+            val name = channel.name?.takeIf { !channelName && it.isNotBlank() }
+            val pictureLogo = channel.icon.takeUnless { logoFailed && name != null }
+            val onLogoError = { logoFailed = true }
             if (artLoad.needsFallback) {
                 ChannelAccentFill(channel.icon, channel.id, Modifier.fillMaxSize())
                 Box(Modifier.fillMaxSize().padding(top = ImmersiveCardLogoInset, bottom = textHeight + ImmersiveCardLogoInset),
@@ -570,12 +575,10 @@ internal fun ChannelsRowCard(
                     )
                     val logo = Modifier.fillMaxWidth(ImmersiveCardLogoWidthFraction)
                         .fillMaxHeight().testTag("$tag-picon")
-                    val name = channel.name.orEmpty()
-                    // Without a logo the channel's name stands in its place, unless the card names it below.
-                    if (channel.icon == null && !channelName && name.isNotBlank()) Text(name, logo.wrapContentHeight(),
+                    if (pictureLogo == null && name != null) Text(name, logo.wrapContentHeight(),
                         style = MaterialTheme.typography.titleMedium, color = TvTextColors.primary,
                         textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    else PiconBox(channel.icon, logo, ground = ground)
+                    else PiconBox(pictureLogo, logo, ground = ground, onError = onLogoError)
                 }
             }
             val lineModifier = Modifier.align(Alignment.BottomStart).fillMaxWidth()
@@ -605,17 +608,16 @@ internal fun ChannelsRowCard(
             // The picture carries the channel's logo in its embed corner, like the airing cards.
             // In the picture's own corner; the top end is the recording mark's and the top start
             // the playing mark's, each only while it shows.
-            val artLogo = channel.icon
             val progress = programmeProgress(running, nowSec)
             val bottomEdge = if (progress != null) TvCardProgressStripHeight else 0.dp
-            if (showsArt && artLogo != null) ArtworkCornerLogo(artLogo,
+            if (showsArt && pictureLogo != null) ArtworkCornerLogo(pictureLogo,
                 artLoad.logoPlace(setOfNotNull(
                     ArtworkLogoCorner.TOP_END.takeIf { recording != null || showChannelMark },
                     ArtworkLogoCorner.TOP_START.takeIf { playbackIndicator != ChannelPlaybackIndicator.NONE })),
-                Modifier.testTag("$tag-art-picon"), scale = width / AiringCardWidth, bottomEdge = bottomEdge)
-            // A channel without a logo is named on the picture, unless the card names it below.
-            else if (showsArt && !channelName && !channel.name.isNullOrBlank()) ArtworkChannelName(
-                channel.name.orEmpty(), Modifier.testTag("$tag-art-name"), scale = width / AiringCardWidth, bottomEdge = bottomEdge)
+                Modifier.testTag("$tag-art-picon"), scale = width / AiringCardWidth, bottomEdge = bottomEdge,
+                onError = onLogoError)
+            else if (showsArt && name != null) ArtworkChannelName(
+                name, Modifier.testTag("$tag-art-name"), scale = width / AiringCardWidth, bottomEdge = bottomEdge)
             if (playbackIndicator != ChannelPlaybackIndicator.NONE) {
                 CardPlaybackPlate(Modifier.align(Alignment.TopStart).padding(ImmersiveCardEmbedInset)) {
                     ChannelPlaybackMarker(playbackIndicator)
