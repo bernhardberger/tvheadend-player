@@ -3,6 +3,7 @@ package at.bernhardberger.tvhplayer.touch.recordings
 import at.bernhardberger.tvhplayer.touch.ui.ArtworkScreenShown
 import at.bernhardberger.tvhplayer.touch.ui.DvrControls
 import at.bernhardberger.tvhplayer.touch.ui.LocalArtworkModels
+import at.bernhardberger.tvhplayer.touch.ui.traceArtworkMapping
 import android.content.res.Resources
 import android.icu.text.DateFormat
 import androidx.compose.runtime.Composable
@@ -58,7 +59,9 @@ internal fun RecordingsDestination(
         val clock = RecordingClock(Instant.ofEpochSecond(nowSec), ZoneId.systemDefault(), locale) {
             formatClock(it, locale)
         }
-        recordingsState(observation, view, presentation.connection, presentation.degraded, clock, texts, artwork)
+        traceArtworkMapping(context, "Recordings") {
+            recordingsState(observation, view, presentation.connection, presentation.degraded, clock, texts, artwork)
+        }
     }
     RecordingsScreen(
         state = state,

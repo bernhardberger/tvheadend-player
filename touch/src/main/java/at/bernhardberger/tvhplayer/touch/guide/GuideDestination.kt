@@ -3,10 +3,11 @@ package at.bernhardberger.tvhplayer.touch.guide
 import at.bernhardberger.tvhplayer.touch.ui.DvrControls
 import at.bernhardberger.tvhplayer.touch.ui.ArtworkScreenShown
 import at.bernhardberger.tvhplayer.touch.ui.LocalArtworkModels
-import at.bernhardberger.tvhplayer.touch.ui.traceGuideMapping
 import android.content.Context
+import android.content.res.Configuration
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalConfiguration
@@ -26,7 +27,8 @@ import at.bernhardberger.tvhplayer.ui.common.formatNarrowDuration
 import at.bernhardberger.tvhplayer.ui.common.formatTimeInterval
 import at.bernhardberger.tvhplayer.ui.common.programmeCategoryLabelRes
 import at.bernhardberger.tvhplayer.ui.common.programmeEpisodeLine
-import at.bernhardberger.tvhplayer.ui.common.rememberCurrentEpochSeconds
+import at.bernhardberger.tvhplayer.ui.common.AppClock
+import at.bernhardberger.tvhplayer.ui.common.rememberDetailsEpochSeconds
 import at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import java.time.Instant
@@ -60,35 +62,34 @@ internal fun GuideDestination(
     val selection by guide.selection.collectAsStateWithLifecycle()
     val pendingVersion by guide.pendingVersion.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    val locale = LocalConfiguration.current.locales[0]
-    val nowSec = rememberCurrentEpochSeconds()()
-    val clock = GuideClock(nowSec, ZoneId.systemDefault())
+    val configuration = LocalConfiguration.current
+    val nowSec = rememberDetailsEpochSeconds()
+    val clock = GuideClock(nowSec - Math.floorMod(nowSec, 60L), ZoneId.systemDefault())
     val coverage = remember(scope, observation, selection.day, clock.zone, clock.today) {
         guideCoverage(scope, observation, selection, clock)
     }
     LaunchedEffect(coverage, observation.currentSession?.generationIdentity) { coverage?.let(guide::request) }
-    val texts = remember(context, locale) { guideTexts(context, locale) }
-    val artwork = LocalArtworkModels.current
-    val mapped = remember(
-        presentation, scope, observation, selection, clock, texts, artwork, playingId,
-    ) {
-        traceGuideMapping(context) {
-            guideState(
-                scope, presentation.connection, presentation.degraded, observation, selection, false, clock, texts,
-                artwork, playingId,
-            )
-        }
-    }
+    val input = GuideMappingInput(
+        scope, presentation.connection, presentation.degraded, observation, selection, clock,
+        Configuration(configuration), AppClock.uses24Hour, LocalArtworkModels.current, playingId,
+    )
+    SideEffect { guide.map(context, input) }
+    val result by guide.mapped.collectAsStateWithLifecycle()
+    val retained = result?.takeIf { it.input.scope.profileId == scope.profileId }
+    val mapped = retained?.state ?: EmptyGuide
     val dayLoading = remember(mapped.listed, coverage, pendingVersion, observation.currentSession?.generationIdentity) {
         mapped.listed && coverage?.let(guide::isPending) == true
     }
-    val state = if (dayLoading) mapped.copy(dayLoading = true) else mapped
+    val details = mapped.details?.takeIf { it.id == selection.detailsId }
+    val state = if (dayLoading || details !== mapped.details) {
+        mapped.copy(dayLoading = dayLoading, details = details)
+    } else mapped
     // Forget invalid choices, so they cannot silently return when a tag or the schedule changes again.
     val available = selection.copy(
         day = selection.day?.takeIf { it in state.dayDates },
         jump = state.jumpTimes.getOrNull(state.selectedJump - 1),
     )
-    if (state.listed && selection != available) {
+    if (state.listed && selection != available && input.changesFrom(retained?.input).isEmpty()) {
         LaunchedEffect(selection, available) { guide.reconcileSelection(selection, available) }
     }
     GuideScreen(
@@ -113,9 +114,18 @@ internal fun GuideDestination(
     )
 }
 
-internal fun guideTexts(context: Context, locale: Locale): GuideTexts {
+private val EmptyGuide =
+    GuideState(emptyList(), days = emptyList(), date = "", availability = GuideAvailability.Loading)
+
+internal fun guideTexts(
+    context: Context,
+    locale: Locale,
+    zone: ZoneId = ZoneId.systemDefault(),
+    uses24Hour: Boolean? = null,
+): GuideTexts {
     val resources = context.resources
-    val zone = ZoneId.systemDefault()
+    // The Player's synchronous caller keeps reading the live preference; the worker gets a captured value.
+    fun use24Hour() = uses24Hour ?: AppClock.uses24Hour
     fun at(epochSec: Long) = Instant.ofEpochSecond(epochSec).atZone(zone)
     fun day(date: LocalDate, today: LocalDate) = when (date) {
         today -> resources.getString(SharedR.string.channel_schedule_today)
@@ -123,12 +133,14 @@ internal fun guideTexts(context: Context, locale: Locale): GuideTexts {
         else -> formatDayMonth(date, locale)
     }
     return GuideTexts(
-        clock = { formatClock(at(it), locale) },
-        timeRange = { start, stop -> formatTimeInterval(start, stop, locale = locale) },
+        clock = { formatClock(at(it), locale, use24Hour()) },
+        timeRange = { start, stop -> formatTimeInterval(start, stop, locale = locale, uses24Hour = use24Hour()) },
         duration = { formatNarrowDuration(it, resources) },
         day = ::day,
         date = { formatDayHeader(it, locale) },
-        airing = { start, today -> "${day(at(start).toLocalDate(), today)} ${formatClock(at(start), locale)}" },
+        airing = { start, today ->
+            "${day(at(start).toLocalDate(), today)} ${formatClock(at(start), locale, use24Hour())}"
+        },
         number = { episodeLabel(it.episode, resources) },
         episode = { programmeEpisodeLine(it.episode, it.subtitle, resources).takeIf(String::isNotBlank) },
         genre = { event ->

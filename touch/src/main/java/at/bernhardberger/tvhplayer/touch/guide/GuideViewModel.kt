@@ -1,13 +1,23 @@
 package at.bernhardberger.tvhplayer.touch.guide
 
+import android.content.Context
+import android.content.res.Configuration
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
+import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.core.SessionGenerationIdentity
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
+import at.bernhardberger.tvhplayer.core.ConnectionUiState
+import at.bernhardberger.tvhplayer.touch.ui.ArtworkModels
+import at.bernhardberger.tvhplayer.touch.ui.traceArtworkMapping
 import at.bernhardberger.tvhplayer.ui.screens.GuideCoverageRequestOwner
+import at.bernhardberger.tvhplayer.viewmodels.ChannelScopeState
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -28,6 +38,7 @@ import kotlin.time.Instant
 internal class GuideViewModel(
     private val session: TvheadendSession,
     private val acquisitionContext: CoroutineContext = Dispatchers.Default,
+    private val mappingDispatcher: CoroutineDispatcher = Dispatchers.Default.limitedParallelism(1),
 ) : ViewModel() {
     val observation: StateFlow<SessionObservation> = session.observation
     private val mutableSelection = MutableStateFlow(GuideSelection())
@@ -40,6 +51,10 @@ internal class GuideViewModel(
         mutablePending.update { it + 1 }
     }
     private var coverageSession: SessionGenerationIdentity? = null
+    private val mutableMapped = MutableStateFlow<GuideMappingResult?>(null)
+    val mapped = mutableMapped.asStateFlow()
+    private var mappingInput: GuideMappingInput? = null
+    private var mappingJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -57,6 +72,29 @@ internal class GuideViewModel(
 
     // Retain Details across configuration changes, but start closed after process death.
     fun openDetails(programId: String?) = mutableSelection.update { it.copy(detailsId = programId) }
+
+    fun map(context: Context, input: GuideMappingInput) {
+        val changes = input.changesFrom(mappingInput)
+        if (changes.isEmpty()) return
+        mappingInput = input
+        mappingJob?.cancel()
+        val app = context.applicationContext
+        mappingJob = viewModelScope.launch {
+            val state = withContext(mappingDispatcher) {
+                traceArtworkMapping(app, "Guide", changes.joinToString("+")) {
+                    val localized = app.createConfigurationContext(input.configuration)
+                    val texts = guideTexts(
+                        localized, input.configuration.locales[0], input.clock.zone, input.uses24Hour,
+                    )
+                    guideState(
+                        input.scope, input.connection, input.degraded, input.observation, input.selection, false,
+                        input.clock, texts, input.artwork, input.playingId,
+                    )
+                }
+            }
+            if (mappingInput === input) mutableMapped.value = GuideMappingResult(input, state)
+        }
+    }
 
     /** Asks the server for the [coverage] window's guide unless that request is already running. */
     fun request(coverage: GuideCoverage) {
@@ -83,6 +121,51 @@ internal class GuideViewModel(
         requests.dispose()
     }
 }
+
+internal class GuideMappingInput(
+    val scope: ChannelScopeState,
+    val connection: ConnectionUiState,
+    val degraded: Boolean,
+    val observation: SessionObservation,
+    val selection: GuideSelection,
+    val clock: GuideClock,
+    val configuration: Configuration,
+    val uses24Hour: Boolean,
+    val artwork: ArtworkModels?,
+    val playingId: String?,
+) {
+    fun changesFrom(previous: GuideMappingInput?): List<String> {
+        if (previous == null) return listOf("initial")
+        return buildList {
+            if (scope !== previous.scope) add("scope")
+            if (connection != previous.connection || degraded != previous.degraded) add("connection")
+            addObservationChanges(observation, previous.observation)
+            if (selection != previous.selection) add("selection")
+            if (clock != previous.clock) add("clock")
+            if (configuration != previous.configuration || uses24Hour != previous.uses24Hour) add("format")
+            if (artwork !== previous.artwork) add("artwork")
+            if (playingId != previous.playingId) add("playing")
+        }
+    }
+}
+
+private fun MutableList<String>.addObservationChanges(current: SessionObservation, previous: SessionObservation) {
+    // The SDK keeps this list when it only republishes coverage or historical events.
+    if (current.epgSnapshotForDisplay?.events !== previous.epgSnapshotForDisplay?.events) add("epg")
+    if (current.dvrSnapshotForDisplay !== previous.dvrSnapshotForDisplay) add("dvr")
+    if (current.channelCatalogForDisplay !== previous.channelCatalogForDisplay) add("catalog")
+    if (!current.sameGuideAuthority(previous)) add("authority")
+}
+
+private fun SessionObservation.sameGuideAuthority(previous: SessionObservation): Boolean {
+    if (currentSession !== previous.currentSession) return false
+    val write = (sessionState as? SessionState.Ready)?.capabilities?.dvrWrite
+    val previousWrite = (previous.sessionState as? SessionState.Ready)?.capabilities?.dvrWrite
+    return write == previousWrite && recordingProgressCapability == previous.recordingProgressCapability &&
+        (dvrState is DvrRepositoryState.Current) == (previous.dvrState is DvrRepositoryState.Current)
+}
+
+internal class GuideMappingResult(val input: GuideMappingInput, val state: GuideState)
 
 /** The shown channels and the selected day's window a coverage request asks for. */
 internal data class GuideCoverage(val channelIds: List<ChannelId>, val startSec: Long, val throughSec: Long)
