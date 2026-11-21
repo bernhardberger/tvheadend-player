@@ -19,11 +19,13 @@ import at.bernhardberger.tvheadend.sdk.core.TimerecRuleId
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** Which control the touch screens offer for the shared DVR actions; Stop, Skip and Unskip wait for later. */
+/** Which control the touch screens offer for the shared DVR actions; Skip and Unskip wait for later. */
 class DvrControlsTest {
     @Test
-    fun theRecordKeyActionBecomesRecordOrCancel() {
-        val offered = mapOf(RECORD to ProgramRecordControl.Record, CANCEL to ProgramRecordControl.Cancel)
+    fun theRecordKeyActionBecomesRecordCancelOrStop() {
+        val offered = mapOf(
+            RECORD to ProgramRecordControl.Record, CANCEL to ProgramRecordControl.Cancel, STOP to ProgramRecordControl.Stop,
+        )
         (BrowseContextAction.entries + null).forEach {
             assertEquals(it.toString(), offered[it], programRecordControl(it))
         }
@@ -34,7 +36,7 @@ class DvrControlsTest {
         listOf(
             listOf(PLAY, RESUME, DELETE) to RecordingRemoveControl.Delete,
             listOf(REMOVE_ENTRY) to RecordingRemoveControl.RemoveEntry,
-            listOf(STOP) to null,
+            listOf(STOP) to RecordingRemoveControl.Stop,
             listOf(CANCEL) to null,
             listOf(SKIP, UNSKIP) to null,
             emptyList<BrowseContextAction>() to null,
@@ -42,17 +44,17 @@ class DvrControlsTest {
     }
 
     @Test
-    fun onlyAnEnabledRuleScheduleShowsAsScheduledByRule() {
+    fun ruleSchedulesShowWhetherTheEpisodeWillRecord() {
         val series = AutorecRuleId("series")
         val timer = TimerecRuleId("timer")
         listOf(
-            entry(DvrEntryState.SCHEDULED, series) to true,
-            entry(DvrEntryState.SCHEDULED, timer = timer) to true,
-            entry(DvrEntryState.SCHEDULED) to false,
-            entry(DvrEntryState.SCHEDULED, series, enabled = false) to false,
-            entry(DvrEntryState.RECORDING, series) to false,
-            null to false,
-        ).forEach { (entry, byRule) -> assertEquals(entry.toString(), byRule, scheduledByRule(entry)) }
+            entry(DvrEntryState.SCHEDULED, series) to RuleSchedule.Scheduled,
+            entry(DvrEntryState.SCHEDULED, timer = timer) to RuleSchedule.Scheduled,
+            entry(DvrEntryState.SCHEDULED) to null,
+            entry(DvrEntryState.SCHEDULED, series, enabled = false) to RuleSchedule.Skipped,
+            entry(DvrEntryState.RECORDING, series) to null,
+            null to null,
+        ).forEach { (entry, schedule) -> assertEquals(entry.toString(), schedule, ruleSchedule(entry)) }
     }
 
     private fun entry(

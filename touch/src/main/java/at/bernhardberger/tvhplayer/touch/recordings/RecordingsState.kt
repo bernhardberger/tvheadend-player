@@ -170,6 +170,7 @@ internal class RecordingsActions(
     val onRetry: () -> Unit = {},
     val onOpenConnectionSettings: () -> Unit = {},
     val onSignIn: (() -> Unit)? = null,
+    val onStop: ((String) -> Unit)? = null,
 )
 
 /**

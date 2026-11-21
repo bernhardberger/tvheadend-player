@@ -107,8 +107,6 @@
     <string name="recordings_watch_from_beginning">Watch from beginning</string>
     <!-- TV: context_watch -->
     <string name="recordings_watch">Watch</string>
-    <!-- TV: context_delete -->
-    <string name="recordings_delete">Delete</string>
     <!-- TV: details_more -->
     <string name="recordings_more">More</string>
     <!-- TV: back -->

@@ -77,9 +77,9 @@ internal class ServerGuide(val now: Instant) {
 
     /** The recording the server schedules for the program [event] on the first channel. */
     /** A recording scheduled for program [event]; with [rule], one an automatic recording scheduled. */
-    fun scheduling(id: Long, event: Int, rule: AutorecRuleId? = null) = recording(
+    fun scheduling(id: Long, event: Int, rule: AutorecRuleId? = null, enabled: Boolean? = null) = recording(
         id, programs[event - 1], first, snapshot.events.first { it.id == EventId(event.toLong()) }.start,
-        DvrEntryState.SCHEDULED, event = event.toLong(), rule = rule,
+        DvrEntryState.SCHEDULED, event = event.toLong(), rule = rule, enabled = enabled,
     )
 
     private fun recording(
@@ -93,10 +93,11 @@ internal class ServerGuide(val now: Instant) {
         event: Long? = null,
         image: ArtworkId? = null,
         rule: AutorecRuleId? = null,
+        enabled: Boolean? = null,
     ) = DvrEntry.create(
         id = DvrEntryId(id), channelId = channel.id, start = start, stop = start + 60.minutes, title = title,
         state = state, folder = folder?.let(::listOf), playCount = playCount, eventId = event?.let(::EventId),
-        image = image, autorecRuleId = rule,
+        image = image, autorecRuleId = rule, enabled = enabled,
     )
 
     private companion object {

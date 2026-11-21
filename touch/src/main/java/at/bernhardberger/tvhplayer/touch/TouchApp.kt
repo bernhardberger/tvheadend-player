@@ -214,6 +214,7 @@ private fun AppFrame(
             onSignIn = onSignIn,
             onRecord = dvr::recordChannel,
             onCancel = dvr::cancelChannel,
+            onStop = dvr::stopChannel,
         ),
         destinations = AppDestinationList,
     )

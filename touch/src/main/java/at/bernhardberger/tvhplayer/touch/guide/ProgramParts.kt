@@ -57,7 +57,8 @@ import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.channels.ChannelActionLabel
 import at.bernhardberger.tvhplayer.touch.recordings.RecPill
 import at.bernhardberger.tvhplayer.touch.ui.ProgramRecordControl
-import at.bernhardberger.tvhplayer.touch.ui.RuleScheduledState
+import at.bernhardberger.tvhplayer.touch.ui.RuleSchedule
+import at.bernhardberger.tvhplayer.touch.ui.RuleScheduleState
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 
 @Composable
@@ -83,7 +84,7 @@ internal fun ProgramActions(
     actions: GuideActions,
     modifier: Modifier = Modifier,
     onDetails: (() -> Unit)? = null,
-    scheduledByRule: Boolean = false,
+    ruleSchedule: RuleSchedule? = null,
     detailsIcon: Boolean = true,
     compact: Boolean = false,
 ) {
@@ -98,7 +99,7 @@ internal fun ProgramActions(
         if (watch != null) WatchButton(contentPadding = padding) { watch(channelId) }
         ProgramRecordAction(
             record, programId, actions, contentPadding = padding, leads = watch == null,
-            scheduledByRule = scheduledByRule,
+            ruleSchedule = ruleSchedule,
         )
         if (onDetails != null) {
             TextButton(onClick = onDetails) {
@@ -125,8 +126,8 @@ internal fun WatchButton(
 
 /**
  * The program's recording control: Record, split with its options arrow when there are options, or Cancel
- * of its scheduled recording. Without an action behind it, it is left out. A program an automatic recording
- * scheduled shows "Scheduled" instead ([RuleScheduledState]).
+ * of its scheduled recording, or Stop. Without an action behind it, it is left out. A program an automatic recording
+ * scheduled shows its status instead ([RuleScheduleState]).
  */
 @Composable
 internal fun ProgramRecordAction(
@@ -136,32 +137,32 @@ internal fun ProgramRecordAction(
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues? = null,
     leads: Boolean = false,
-    scheduledByRule: Boolean = false,
+    ruleSchedule: RuleSchedule? = null,
 ) {
-    if (scheduledByRule) {
-        RuleScheduledState(modifier)
+    if (ruleSchedule != null) {
+        RuleScheduleState(ruleSchedule, modifier)
         return
     }
-    val onRecord = actions.onRecord
+    val onControl = when (record) {
+        ProgramRecordControl.Record -> actions.onRecord
+        ProgramRecordControl.Cancel -> actions.onCancel
+        ProgramRecordControl.Stop -> actions.onStop
+        null -> null
+    }
     val onOptions = actions.onRecordOptions
-    val onCancel = actions.onCancel
     when {
-        record == ProgramRecordControl.Record && onRecord != null && onOptions != null -> RecordButton(
-            { onRecord(programId) }, { onOptions(programId) }, modifier,
+        record == ProgramRecordControl.Record && onControl != null && onOptions != null -> RecordButton(
+            { onControl(programId) }, { onOptions(programId) }, modifier,
             contentPadding ?: SplitButtonDefaults.leadingButtonContentPaddingFor(ButtonDefaults.MinHeight), leads,
         )
-        record == ProgramRecordControl.Record && onRecord != null ->
+        record != null && onControl != null ->
             RecordControlButton(record, modifier, contentPadding ?: ButtonDefaults.ContentPadding, leads) {
-                onRecord(programId)
-            }
-        record == ProgramRecordControl.Cancel && onCancel != null ->
-            RecordControlButton(record, modifier, contentPadding ?: ButtonDefaults.ContentPadding, leads) {
-                onCancel(programId)
+                onControl(programId)
             }
     }
 }
 
-/** Record without options, or Cancel: filled where it [leads], else tonal, as Record is. */
+/** Record without options, Cancel or Stop: filled where it [leads], else tonal. */
 @Composable
 internal fun RecordControlButton(
     control: ProgramRecordControl,
