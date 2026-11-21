@@ -312,7 +312,17 @@ internal fun OverviewRows(
                         },
                         overlineContent = { PartsLine(listOf(channel.name, program.start)) },
                         supportingContent = {
-                            PartsLine(program.rowLine(), style = MaterialTheme.typography.bodyMedium)
+                            Column {
+                                PartsLine(program.rowLine(), style = MaterialTheme.typography.bodyMedium)
+                                // Without the thumbnail its bar stands under the text to the row's end, in the
+                                // room a three-line row has there, so the row keeps the height of one with it.
+                                program.progress?.takeIf { picture == null }?.let {
+                                    ProgramBar(
+                                        it, program.recording,
+                                        Modifier.padding(top = 4.dp).fillMaxWidth().height(4.dp), program.watching,
+                                    )
+                                }
+                            }
                         },
                         trailingContent = picture?.let {
                             {

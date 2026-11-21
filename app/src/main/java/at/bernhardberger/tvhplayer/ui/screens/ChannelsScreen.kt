@@ -355,13 +355,17 @@ internal fun ChannelsScreenContent(
 
     val listState = rememberLazyListState()
     // Preview restoration uses the same pivot as native focus scrolling.
-    // Without a notice above it the list reaches the screen's top under the shell's inset, so
-    // a scrolled list's earlier rows fade into the screen edge rather than end at the band.
-    val listTopOverflow = if (tagNotice) 0.dp else contentPadding.calculateTopPadding()
+    // Without a notice above it the list's viewport begins below the header band, so scrolled
+    // rows fade out under its top edge before they reach the screen title. Their scrolled pivot
+    // still counts from the screen's top, so rows rest where they did and peek at both ends.
+    val listTopInset = if (tagNotice) 0.dp else TvBrowseHeaderHeight
     // The resting Grid line leaves room above the first focused List row's native scale.
     val headerContentLine = TvBrowseHeaderHeight + TvBrowseHeaderContentGap
-    val listTopReserve = if (tagNotice) ChannelsListTopReserve else headerContentLine
-    val bringIntoViewSpec = rememberListEdgeBringIntoView(listState, listTopReserve, listTopOverflow)
+    val listTopReserve = if (tagNotice) ChannelsListTopReserve else TvBrowseHeaderContentGap
+    val bringIntoViewSpec = rememberListEdgeBringIntoView(
+        listState, listTopReserve,
+        scrolledTopOverflow = if (tagNotice) 0.dp else contentPadding.calculateTopPadding() + listTopInset,
+    )
     val density = LocalDensity.current
     val gridState = rememberLazyGridState()
     val rowState = rememberLazyListState()
@@ -738,8 +742,10 @@ internal fun ChannelsScreenContent(
             @Composable
             fun Header() {
             ChannelsHeader(
-                // The destination is the header's pane title; the Tags button shows the active group.
+                // The destination is the header's pane title, drawn over List and Grid but not over
+                // Immersive's backdrop; the Tags button shows the active group.
                 title = stringResource(R.string.nav_channels),
+                showTitle = layout != ChannelsLayout.IMMERSIVE,
                 tag = channelScope.activeTagId?.let { id -> groups.firstOrNull { it.tagId == id }?.name },
                 focus = header,
                 showTags = groups.size > 1,
@@ -973,8 +979,8 @@ internal fun ChannelsScreenContent(
                         .fillMaxSize(),
                 ) {
                     // Standard list column: 12dp focus-scale reserve, 340dp rows, run-out to the
-                    // screen bottom under its fade; after scrolling, rows run on to the screen's top
-                    // under the top fade.
+                    // screen bottom under its fade; after scrolling, rows fade out under the top fade
+                    // below the header band.
                     // Focus stays between the fades; scrolled-out rows may pass beneath them.
                     Column(
                         Modifier
@@ -998,12 +1004,12 @@ internal fun ChannelsScreenContent(
                                 contentPadding = PaddingValues(
                                     start = ChannelRowEdgeInset,
                                     end = ChannelRowEdgeInset,
-                                    top = listTopOverflow + listTopReserve,
+                                    top = listTopReserve,
                                     bottom = ListBottomReserve,
                                 ),
                                 modifier = Modifier
                                     .weight(1f)
-                                    .overflowTop(listTopOverflow)
+                                    .padding(top = listTopInset)
                                     .listEdgeFades(listState)
                                     .testTag("channels-list")
                                     .then(contentEntry)

@@ -9,7 +9,7 @@ entry points are exhausted; avoid asking them to rediscover this table.
 |---|---|
 | Shared visual theme and layout tokens | `:brand`, in `brand/src/main/java/at/bernhardberger/tvhplayer/ui/Theme.kt` and `brand/src/main/java/at/bernhardberger/tvhplayer/ui/TvLayout.kt`; no dependency on `:app` or `:client`. |
 | Player texts and translations | `:presentation`, in `presentation/src/main/res/values*/`; the variant-specific launcher label stays in `:app` and companion texts stay in `:appliance`. |
-| Transient user feedback | Add a `Notice` subtype in `client/src/main/java/at/bernhardberger/tvhplayer/notices/Notice.kt` and a formatter branch in `app/src/main/java/at/bernhardberger/tvhplayer/ui/notifications/NoticeFormatter.kt`; post to the singleton `NoticeCenter`. Do not create local Toasts, snackbars or inline action-result labels. |
+| Transient user feedback | Add a `Notice` subtype in `client/src/main/java/at/bernhardberger/tvhplayer/notices/Notice.kt` and a formatter branch in `presentation/src/main/java/at/bernhardberger/tvhplayer/ui/notifications/NoticeFormatter.kt`; post to the singleton `NoticeCenter`. Do not create local Toasts, snackbars or inline action-result labels. |
 | Process composition, top-level routes, profile guards, and destination rendering | `app/src/main/java/at/bernhardberger/tvhplayer/ui/AppRoot.kt` |
 | Typed Navigation 3 keys and stack policy | `app/src/main/java/at/bernhardberger/tvhplayer/ui/AppNavigation.kt` |
 | Player/service lifecycle and SDK command orchestration | `client/src/main/java/at/bernhardberger/tvhplayer/playback/AppPlaybackRuntime.kt` |

@@ -11,6 +11,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvhplayer.di.SdkRuntimeOwner
+import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.touch.player.PlayerActivity
 import at.bernhardberger.tvhplayer.touch.player.playingChannelId
@@ -28,6 +29,7 @@ class MainActivity : ComponentActivity() {
     private val session: TvheadendSession by inject()
     private val owner: AppProfileOwner by inject()
     private val sdk: SdkRuntimeOwner by inject()
+    private val notices: NoticeCenter by inject()
     private val connection: AppConnectionViewModel by viewModel()
     private val channels: ChannelsViewModel by viewModel()
     private val recordings: RecordingsViewModel by viewModel()
@@ -45,7 +47,7 @@ class MainActivity : ComponentActivity() {
                 val target by sdk.playbackRuntime.activeTarget.collectAsStateWithLifecycle()
                 val playback by sdk.playbackRuntime.state.collectAsStateWithLifecycle()
                 TouchApp(
-                    session, owner, connection, channels, recordings, guide,
+                    session, owner, connection, channels, recordings, guide, notices,
                     playingId = playingChannelId(target, playback)?.value?.toString(),
                     onWatch = ::watch,
                     discovery = { discoverServers(context) },

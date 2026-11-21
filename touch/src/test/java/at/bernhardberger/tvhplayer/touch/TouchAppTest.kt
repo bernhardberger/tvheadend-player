@@ -1,6 +1,16 @@
 package at.bernhardberger.tvhplayer.touch
 
 import android.os.Looper
+import android.view.ViewGroup
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.core.graphics.Insets
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.lifecycle.Lifecycle
+import at.bernhardberger.tvheadend.sdk.core.DvrMutationKind
+import at.bernhardberger.tvhplayer.notices.DvrMutationFeedback
+import at.bernhardberger.tvhplayer.notices.Notice
+import at.bernhardberger.tvhplayer.ui.notifications.NoticeFormatter
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.annotation.StringRes
@@ -581,6 +591,95 @@ class TouchAppTest {
         compose.onNodeWithText(label(R.string.guide_overview)).assertDoesNotExist()
     }
 
+    @Test
+    fun postedNoticesShowOneAfterAnotherAndLeaveAfterTheirTime() {
+        val failed = Notice.DvrActionFailed(DvrMutationKind.CANCEL, DvrMutationFeedback.CONNECTION_LIMIT)
+        val next = Notice.RecordUnavailable(null)
+        showSavedConnectionForNotices()
+        post(failed)
+        post(next)
+
+        val failure = NoticeFormatter(compose.activity).format(failed)
+        notice(failure.headline).assertIsDisplayed()
+            .assert(hasText(checkNotNull(failure.detail)))
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
+        val second = NoticeFormatter(compose.activity).format(next).headline
+        notice(second).assertDoesNotExist()
+
+        // A failure stays its six seconds, and only then the next one comes.
+        advance(FAILURE_MILLIS - 1_000)
+        notice(failure.headline).assertIsDisplayed()
+        advance(1_100)
+        notice(failure.headline).assertDoesNotExist()
+        notice(second).assertIsDisplayed()
+        advance(INFO_MILLIS + 100)
+        notice(second).assertDoesNotExist()
+    }
+
+    @Test
+    fun noticesWaitWhileTheKeyboardIsUpOrTheAppIsAwayAndGetNoFreshTime() {
+        val failed = Notice.DvrActionFailed(DvrMutationKind.DELETE, DvrMutationFeedback.REJECTED)
+        showSavedConnectionForNotices()
+        val headline = NoticeFormatter(compose.activity).format(failed).headline
+        keyboard(shown = true)
+        post(failed)
+        advance(2_000)
+        notice(headline).assertDoesNotExist()
+
+        // Waiting cost it nothing: it starts its whole time once the keyboard is gone.
+        keyboard(shown = false)
+        advance(FAILURE_MILLIS - 2_000)
+        notice(headline).assertIsDisplayed()
+
+        // Away, its time runs on; back, it shows for what is left and no longer.
+        compose.activityRule.scenario.moveToState(Lifecycle.State.STARTED)
+        advance(1_000)
+        notice(headline).assertDoesNotExist()
+        compose.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
+        advance(100)
+        notice(headline).assertIsDisplayed()
+        advance(1_000)
+        notice(headline).assertDoesNotExist()
+    }
+
+    private fun showSavedConnectionForNotices() {
+        runBlocking { connection.store.addAnonymous(server.host, server.port, "Home server", true) }
+        connection.noticeClock = { compose.mainClock.currentTime }
+        show()
+        connection.session.publish(ready())
+        compose.onNode(heading and hasText(label(R.string.nav_channels))).assertIsDisplayed()
+        compose.mainClock.autoAdvance = false
+    }
+
+    private fun post(notice: Notice) {
+        compose.runOnIdle { assertTrue(connection.noticeCenter.post(notice, connection.noticeCenter.context())) }
+        advance(16)
+    }
+
+    private fun notice(headline: String) = compose.onNode(
+        SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion) and hasText(headline),
+    )
+
+    private fun advance(millis: Long) {
+        compose.mainClock.advanceTimeBy(millis)
+        compose.waitForIdle()
+    }
+
+    /** The keyboard's insets as the system sends them when it opens or closes. */
+    private fun keyboard(shown: Boolean) {
+        compose.runOnIdle {
+            val content = compose.activity.findViewById<ViewGroup>(android.R.id.content).getChildAt(0)
+            ViewCompat.dispatchApplyWindowInsets(
+                content,
+                WindowInsetsCompat.Builder()
+                    .setInsets(WindowInsetsCompat.Type.ime(), Insets.of(0, 0, 0, if (shown) KEYBOARD_PX else 0))
+                    .setVisible(WindowInsetsCompat.Type.ime(), shown)
+                    .build(),
+            )
+        }
+        advance(16)
+    }
+
     private fun openGuide() {
         compose.onNode(hasClickAction() and hasText(label(R.string.nav_epg))).performClick()
         compose.waitForIdle()
@@ -617,7 +716,10 @@ class TouchAppTest {
         val guide = connection.guide()
         content = {
             MaterialTheme(colorScheme = MobileDarkColors) {
-                TouchApp(connection.session, connection.owner, presentation, channels, recordings, guide) {
+                TouchApp(
+                    connection.session, connection.owner, presentation, channels, recordings, guide,
+                    connection.noticeCenter,
+                ) {
                     flowOf(TvheadendDiscoveryTestFactory.discovering(listOf(server)))
                 }
             }
@@ -659,4 +761,10 @@ class TouchAppTest {
             ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED),
         ),
     )
+
+    private companion object {
+        const val FAILURE_MILLIS = 6_000L
+        const val INFO_MILLIS = 4_000L
+        const val KEYBOARD_PX = 600
+    }
 }

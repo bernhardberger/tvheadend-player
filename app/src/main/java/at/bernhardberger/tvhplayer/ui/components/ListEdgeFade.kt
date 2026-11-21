@@ -83,6 +83,8 @@ internal fun PanelListEdges(
  * content padding, kept until earlier rows exist; its bottom content padding is
  * [ListBottomReserve]. [topOverflow] extends the viewport above the band. Once scrolled,
  * browse lists use the real viewport; the player's schedule keeps its date-strip insets.
+ * [scrolledTopOverflow] measures the scrolled pivot from that far above a viewport that starts
+ * below a header, so its rows rest where a list reaching the screen's top would hold them.
  */
 @Composable
 @OptIn(ExperimentalFoundationApi::class)
@@ -91,10 +93,11 @@ internal fun rememberListEdgeBringIntoView(
     topReserve: Dp,
     topOverflow: Dp = 0.dp,
     keepScrolledInsets: Boolean = false,
+    scrolledTopOverflow: Dp = 0.dp,
 ): InsetBringIntoViewSpec {
     val platform = LocalBringIntoViewSpec.current
     val density = LocalDensity.current
-    return remember(platform, density, listState, topReserve, topOverflow, keepScrolledInsets) {
+    return remember(platform, density, listState, topReserve, topOverflow, keepScrolledInsets, scrolledTopOverflow) {
         with(density) {
             InsetBringIntoViewSpec(
                 delegate = platform,
@@ -102,7 +105,7 @@ internal fun rememberListEdgeBringIntoView(
                 bottomInsetPx = ListBottomReserve.toPx(),
                 scrolledTopInsetPx = if (keepScrolledInsets) {
                     (topOverflow + PlayerScheduleTopFadeHeight + ListFocusBreathingRoom).toPx()
-                } else 0f,
+                } else -scrolledTopOverflow.toPx(),
                 scrolledBottomInsetPx = if (keepScrolledInsets) ListBottomReserve.toPx() else 0f,
                 scrollBackAvailablePx = {
                     if (listState.firstVisibleItemIndex == 0) {

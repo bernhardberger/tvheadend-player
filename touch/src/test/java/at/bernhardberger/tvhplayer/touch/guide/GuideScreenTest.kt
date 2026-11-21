@@ -2,10 +2,12 @@ package at.bernhardberger.tvhplayer.touch.guide
 
 import androidx.activity.ComponentActivity
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getBoundsInRoot
+import androidx.compose.ui.test.hasProgressBarRangeInfo
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -167,6 +169,14 @@ class GuideScreenTest {
         show(phoneOverviewFixture().withoutSomePictures())
         // REC does not vanish with the thumbnail.
         compose.onNodeWithContentDescription("Recording").assertIsDisplayed()
+        // Nor does the time on air: Harbor Kickoff and Paper Kite Tales keep their progress under the text.
+        for (progress in listOf(0.16f, 0.68f)) {
+            compose.onNode(hasProgressBarRangeInfo(ProgressBarRangeInfo(progress, 0f..1f)), useUnmergedTree = true)
+                .assertIsDisplayed()
+        }
+        // The bar fits under the third line: a row without its thumbnail keeps the height of one with it.
+        val withThumbnail = compose.onNodeWithText("Ridge Light").fetchSemanticsNode().size.height
+        assertEquals(withThumbnail, compose.onNodeWithText("Harbor Kickoff").fetchSemanticsNode().size.height)
         capture("phone-guide-overview-no-picture", TouchCanvas.PHONE)
     }
 

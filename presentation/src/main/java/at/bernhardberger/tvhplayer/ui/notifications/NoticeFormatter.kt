@@ -1,8 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.notifications
 
 import android.content.Context
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalContext
 import at.bernhardberger.tvheadend.sdk.core.DvrChangeKind
 import at.bernhardberger.tvheadend.sdk.core.DvrChangeOrigin
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
@@ -21,10 +19,10 @@ import java.time.format.TextStyle
 import kotlin.time.Clock
 import kotlin.time.Instant
 
-internal enum class AppNoticeIcon {
+enum class AppNoticeIcon {
     SCHEDULE, RECORDING, CHECK, STOP, WARNING, CANCEL, DELETE, CONNECTED, DISCONNECTED, SIGN_IN_REJECTED
 }
-internal data class FormattedNotice(val headline: String, val detail: String? = null, val icon: AppNoticeIcon? = null)
+data class FormattedNotice(val headline: String, val detail: String? = null, val icon: AppNoticeIcon? = null)
 
 private fun dvrFailureReason(failure: DvrMutationFeedback): Int = when (failure) {
     DvrMutationFeedback.PERMISSION_DENIED -> R.string.recording_action_permission
@@ -37,7 +35,7 @@ private fun dvrFailureReason(failure: DvrMutationFeedback): Int = when (failure)
 }
 
 /** The only resource/wording boundary for transient feedback. */
-internal class NoticeFormatter(private val context: Context) {
+class NoticeFormatter(private val context: Context) {
     fun format(notice: Notice, now: Instant = Clock.System.now()): FormattedNotice = when (notice) {
         is Notice.RecordUnavailable -> FormattedNotice(context.getString(R.string.record_unavailable),
             notice.reason?.let { context.getString(when (it) {
@@ -183,10 +181,7 @@ internal class NoticeFormatter(private val context: Context) {
     }
 }
 
-@Composable
-internal fun DvrSubscriptionError.label(): String = label(LocalContext.current)
-
-internal fun DvrSubscriptionError.label(context: Context): String = context.getString(when (this) {
+fun DvrSubscriptionError.label(context: Context): String = context.getString(when (this) {
     DvrSubscriptionError.NO_FREE_ADAPTER -> R.string.error_201_title
     DvrSubscriptionError.BAD_SIGNAL, DvrSubscriptionError.TUNING_FAILED, DvrSubscriptionError.NO_SERVICE,
     DvrSubscriptionError.INVALID_SERVICE, DvrSubscriptionError.WEAK_STREAM -> R.string.error_202_title
