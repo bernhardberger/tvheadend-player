@@ -64,10 +64,11 @@ internal fun PlayerScreen(
     inWindow: Boolean = false,
     hideAfterMs: Long? = null,
     progressing: Boolean = true,
+    confirmationOpen: Boolean = false,
     notices: @Composable (Modifier) -> Unit = {},
 ) = PlayerFace(
     state, onAction, { onSeek((it / 1_000).toInt()) }, onBrightness, onChannel, onChoice, modifier, video,
-    onControlsShown, onInfoShown, inWindow, hideAfterMs, progressing, notices,
+    onControlsShown, onInfoShown, inWindow, hideAfterMs, progressing, confirmationOpen, notices,
 )
 
 @Composable
@@ -86,7 +87,7 @@ internal fun PlayerScreen(
     notices: @Composable (Modifier) -> Unit = {},
 ) = PlayerFace(
     state, onAction, onSeek, onBrightness, {}, onChoice, modifier, video,
-    onControlsShown, {}, inWindow, hideAfterMs, progressing, notices,
+    onControlsShown, {}, inWindow, hideAfterMs, progressing, false, notices,
 )
 
 @Composable
@@ -104,6 +105,7 @@ private fun PlayerFace(
     inWindow: Boolean,
     hideAfterMs: Long?,
     progressing: Boolean,
+    confirmationOpen: Boolean,
     notices: @Composable (Modifier) -> Unit,
 ) {
     var visible by rememberSaveable(state.key) { mutableStateOf(true) }
@@ -122,7 +124,7 @@ private fun PlayerFace(
     var preview by remember(state.key, state.status) { mutableStateOf<Long?>(null) }
     val hideAfter = controlsHideAfter(
         visible, state.status, state.paused, progressing, dragging = preview != null, fingerDown = touching,
-        panelOpen = panel != null, inWindow = inWindow, timeoutMs = hideAfterMs,
+        panelOpen = panel != null || confirmationOpen, inWindow = inWindow, timeoutMs = hideAfterMs,
     )
     HideControlsAfter(hideAfter, touches) { visible = false }
     val face = modifier.fillMaxSize().background(Color.Black)

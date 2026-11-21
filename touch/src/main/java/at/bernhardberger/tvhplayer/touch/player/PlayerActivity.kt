@@ -29,9 +29,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalResources
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.viewmodel.compose.viewModel as lifecycleViewModel
 import androidx.media3.common.util.UnstableApi
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
-import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
@@ -82,6 +82,7 @@ import java.time.ZoneId
 import at.bernhardberger.tvhplayer.touch.ui.LocalChannelAccents
 import at.bernhardberger.tvhplayer.touch.ui.FrameNotices
 import at.bernhardberger.tvhplayer.touch.ui.LocalFrameNotices
+import at.bernhardberger.tvhplayer.touch.ui.DvrControls
 import org.koin.androidx.viewmodel.ext.android.viewModel
 import kotlin.time.Instant
 
@@ -298,27 +299,27 @@ class PlayerActivity : ComponentActivity() {
             !inWindow && PlayerControl.Info in state.offered, guide, shown, scope.scope.allChannels, observation,
             programs, GuideClock(now.epochSeconds, ZoneId.systemDefault()), artwork, presentation,
         )
+        val dvr = lifecycleViewModel { DvrControls(session, notices) }
         PlayerScreen(
-            state = state.copy(
-                channel = state.channel.withProgramTexts(programs, now, LocalResources.current),
-                brightness = brightness, paused = paused,
-                tracks = options.tracks, options = options.options, offered = state.offered + options.offered,
-                schedule = info.schedule,
+            state = state.withControls(
+                state.channel.withProgramTexts(programs, now, LocalResources.current), brightness, paused,
+                options, info.schedule, liveRecordOffer(shown, programs, observation, now.epochSeconds),
             ),
             onAction = { act(it, timeshift, paused) },
             onSeek = timeshift::seek,
             onBrightness = { brightness = it; applyBrightness(window, it) },
             onChannel = { id -> requested.update { tuneTo(it, ChannelId(id.toLong())) } },
-            onChoice = {
-                if (it is PlayerChoice.Day) info.onDay(it.index) else if (!options.choose(it)) channels.choose(it)
+            onChoice = playerChoices(dvr, info, options, channels) {
+                session.currentLiveRecord((requested.value as? Tune)?.channelId, timeshift.programs.value, clock())
             },
             onInfoShown = info.onShown,
             video = { TouchVideoSurface(runtime.player, video.visible, it, pictureWindow::attach, options.aspect) },
             onControlsShown = { controlsShown = it },
             inWindow = inWindow,
-            hideAfterMs = rememberControlsTimeout(),
+            hideAfterMs = rememberControlsTimeout(), confirmationOpen = dvr.pending != null,
             progressing = rememberPlayerProgressing(runtime.player).value, notices = LocalFrameNotices.current,
         )
+        PlayerDvrConfirmation(dvr, inWindow)
     }
 
     companion object {
@@ -341,10 +342,6 @@ class PlayerActivity : ComponentActivity() {
 private data class Tune(val channelId: ChannelId, val token: Int = 0) : PlayerRoute
 
 /** A newer tap replaces one still starting; the same channel again changes nothing. */
-private fun ChannelsViewModel.choose(choice: PlayerChoice) {
-    if (choice is PlayerChoice.ChannelTag) selectTag(choice.id?.let { ChannelTagId(it.toLong()) })
-}
-
 private fun tuneTo(current: PlayerRoute, channelId: ChannelId): Tune =
     if (current is Tune && current.channelId == channelId) current else Tune(channelId)
 

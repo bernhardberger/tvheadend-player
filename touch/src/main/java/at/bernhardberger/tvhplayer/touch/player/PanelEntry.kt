@@ -11,15 +11,9 @@ internal class PanelEntry(val label: String, val detail: String?, val selected: 
 
 /** Builds the lines of one list; every pick reports itself and then runs [done]. */
 private class EntryMaker(
-    val onAction: (PlayerAction) -> Unit,
     val onChoice: (PlayerChoice) -> Unit,
     val done: () -> Unit,
 ) {
-    fun command(label: String, detail: String?, action: PlayerAction) = PanelEntry(label, detail, null) {
-        onAction(action)
-        done()
-    }
-
     fun choice(label: String, detail: String?, selected: Boolean, pick: PlayerChoice) =
         PanelEntry(label, detail, selected) {
             onChoice(pick)
@@ -32,14 +26,12 @@ private class EntryMaker(
 internal fun panelEntries(
     panel: PlayerPanel,
     state: PlayerFaceState,
-    onAction: (PlayerAction) -> Unit,
     onChoice: (PlayerChoice) -> Unit,
     done: () -> Unit,
 ): List<PanelEntry> {
-    val make = EntryMaker(onAction, onChoice, done)
+    val make = EntryMaker(onChoice, done)
     val options = state.options
     return when (panel) {
-        PlayerPanel.Record -> (state as? LivePlayerState)?.let { make.record(it) }.orEmpty()
         PlayerPanel.Audio -> make.audio(state.tracks)
         PlayerPanel.Subtitles -> make.subtitles(state.tracks)
         PlayerPanel.DisplayMode -> DisplayMode.entries.map {
@@ -85,27 +77,6 @@ private val AdBreakMode.help: Int
         AdBreakMode.AUTOMATIC -> SharedR.string.ad_breaks_automatic_help
         AdBreakMode.OFF -> SharedR.string.ad_breaks_off_help
     }
-
-@Composable
-private fun EntryMaker.record(state: LivePlayerState) = listOf(
-    command(
-        stringResource(R.string.player_record),
-        state.timeline.value?.let {
-            stringResource(R.string.player_record_program_detail, playerClock(it.programStart, it.duration))
-        },
-        PlayerAction.RecordProgram,
-    ),
-    command(
-        stringResource(R.string.player_record_series),
-        stringResource(R.string.player_record_series_detail),
-        PlayerAction.RecordSeries,
-    ),
-    command(
-        stringResource(R.string.player_record_all),
-        state.channel.now?.title?.let { stringResource(R.string.player_record_all_detail, it) },
-        PlayerAction.RecordAll,
-    ),
-)
 
 @Composable
 private fun EntryMaker.audio(tracks: PlayerTracks): List<PanelEntry> = buildList {

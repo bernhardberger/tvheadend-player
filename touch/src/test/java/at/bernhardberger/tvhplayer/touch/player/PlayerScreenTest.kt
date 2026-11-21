@@ -1,5 +1,10 @@
 package at.bernhardberger.tvhplayer.touch.player
 
+import at.bernhardberger.tvheadend.sdk.core.EventId
+import at.bernhardberger.tvhplayer.touch.testutil.ServerGuide
+import at.bernhardberger.tvhplayer.touch.ui.ProgramRecordControl
+import kotlin.time.Instant
+
 import androidx.activity.ComponentActivity
 import androidx.activity.ComponentDialog
 import android.app.PictureInPictureParams
@@ -53,6 +58,8 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -389,13 +396,10 @@ class PlayerScreenTest {
         show()
         val canvas = TouchCanvas.PHONE
         button(R.string.player_record).performClick()
-        text(R.string.player_record_series).assertIsDisplayed()
-        tag("player-transport").assertDoesNotExist()
-        timeline().assertExists()
-        captureWindows("phone-player-record", canvas)
-        text(R.string.player_record_series).performClick()
-        compose.runOnIdle { assertEquals(listOf(PlayerAction.RecordSeries), actions) }
+        compose.runOnIdle { assertEquals(PlayerChoice.LiveRecord(fixtureRecord), choices.removeLast()) }
         text(R.string.player_record_series).assertDoesNotExist()
+        timeline().assertExists()
+        capture("phone-player-record", canvas)
         tag("player-transport").assertIsDisplayed()
 
         button(R.string.player_audio).performClick()
@@ -431,6 +435,11 @@ class PlayerScreenTest {
 
     private val paused = mutableStateOf(false)
     private val offered = mutableStateOf(PlayerControl.entries.toSet())
+    private val fixtureRecord = LiveRecordOffer(
+        EventId(1), ProgramRecordControl.Record,
+        requireNotNull(ServerGuide(Instant.fromEpochSeconds(1_800_000_000)).connected().currentSession)
+            .generationIdentity,
+    )
     private val hideMs = 1_000L
 
     private fun show(hideAfterMs: Long? = null) {
@@ -444,6 +453,7 @@ class PlayerScreenTest {
         )
         val fixture = LivePlayerState(
             channel = channel, channels = ChannelsState.Ready(channels),
+            liveRecord = fixtureRecord,
             frame = BitmapPainter(TouchFixtureArt.art("still-ridge-light").asImageBitmap()),
             timeline = mutableStateOf(LiveTimeline(LocalTime.of(20, 0), 3600, 1510, 2568, 2820)),
             tracks = PlayerTracks(
@@ -466,10 +476,12 @@ class PlayerScreenTest {
             // The player marks Ridge Light, on now on the channel playing, as the item being watched.
             schedule = byChannelFixture(phone = true).let { day ->
                 ChannelSchedule(
-                    day.channels.first().programs.map { it.copy(watching = it.id == RIDGE_LIGHT_ID) },
+                    day.channels.first().programs.map {
+                        if (it.id == RIDGE_LIGHT_ID) it.copy(watching = true, record = ProgramRecordControl.Record) else it
+                    },
                     day.days, day.selectedDay, day.date,
                     details = mapOf(
-                        RIDGE_LIGHT_ID to ridgeLightDetails().copy(watching = true),
+                        RIDGE_LIGHT_ID to ridgeLightDetails().copy(watching = true, record = ProgramRecordControl.Record),
                         RIDGE_LIGHT_REPEAT_ID to ridgeLightRepeatDetails(),
                     )::get,
                 )
@@ -566,12 +578,10 @@ class PlayerScreenTest {
         /** Each menu opens at its button with the controls kept; each sheet clears the picture and closes on it. */
     private fun menusAndSheets(prefix: String, canvas: TouchCanvas, subtitles: Boolean, profile: Boolean) {
         button(R.string.player_record).performClick()
-        text(R.string.player_record_all).assertIsDisplayed()
-        chromeIsVisible()
-        captureWindows("$prefix-record", canvas)
-        text(R.string.player_record_all).performClick()
-        compose.runOnIdle { assertEquals(listOf(PlayerAction.RecordAll), actions) }
+        compose.runOnIdle { assertEquals(PlayerChoice.LiveRecord(fixtureRecord), choices.removeLast()) }
         text(R.string.player_record_all).assertDoesNotExist()
+        chromeIsVisible()
+        capture("$prefix-record", canvas)
 
         button(R.string.player_audio).performClick()
         text(SharedR.string.audio_description).assertIsDisplayed()
@@ -611,6 +621,10 @@ class PlayerScreenTest {
     private fun infoSheet(prefix: String, canvas: TouchCanvas, details: Boolean) {
         val recordOptions = compose.activity.getString(R.string.guide_record_options)
         button(R.string.player_info).performClick()
+        compose.onNode(
+            hasClickAction() and hasText(compose.activity.getString(R.string.channels_record)) and
+                !hasAnyAncestor(hasTestTag("player-actions")),
+        ).assertExists()
         compose.onNodeWithContentDescription(recordOptions).assertDoesNotExist()
         button(R.string.channels_details).assertExists()
         text(R.string.channels_watch).assertDoesNotExist()

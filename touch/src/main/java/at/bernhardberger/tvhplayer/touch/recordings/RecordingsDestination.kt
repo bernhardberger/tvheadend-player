@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.touch.recordings
 
+import at.bernhardberger.tvhplayer.touch.ui.ArtworkScreenShown
 import at.bernhardberger.tvhplayer.touch.ui.DvrControls
 import at.bernhardberger.tvhplayer.touch.ui.LocalArtworkModels
 import android.content.res.Resources
@@ -43,6 +44,7 @@ internal fun RecordingsDestination(
     onSignIn: () -> Unit,
     onPlay: ((String, Boolean) -> Unit)?,
 ) {
+    ArtworkScreenShown("Recordings")
     val presentation by connection.uiState.collectAsStateWithLifecycle()
     val observation by recordings.observation.collectAsStateWithLifecycle()
     val view by recordings.view.collectAsStateWithLifecycle()

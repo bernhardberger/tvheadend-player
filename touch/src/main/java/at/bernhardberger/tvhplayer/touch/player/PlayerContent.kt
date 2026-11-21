@@ -124,7 +124,7 @@ internal fun LandscapePlayerContent(
         }
         LandscapeTimeline(state, layout, preview, onPreviewChange, onSeek, trackBottom, trackGutter)
         PlayerActionRow(
-            state, layout, dragging, onAction, panels,
+            state, layout, dragging, panels,
             Modifier.align(Alignment.BottomCenter).padding(bottom = rowBottom),
         )
     }
@@ -295,7 +295,7 @@ internal fun UprightPlayerContent(
             episode?.let { ProgramLine(it, MaterialTheme.colorScheme.onSurfaceVariant) }
         }
         PlayerActionRow(
-            state, layout, dragging, onAction, panels,
+            state, layout, dragging, panels,
             Modifier.padding(horizontal = inset - 8.dp).padding(top = 14.dp, bottom = 12.dp),
         )
         when (state) {
@@ -361,7 +361,6 @@ private fun PlayerActionRow(
     state: PlayerFaceState,
     layout: PlayerLayout,
     dragging: Boolean,
-    onAction: (PlayerAction) -> Unit,
     panels: PanelHost,
     modifier: Modifier,
 ) {
@@ -376,8 +375,12 @@ private fun PlayerActionRow(
         modifier.fillMaxWidth().alpha(if (dragging) DRAG_ALPHA else 1f).testTag("player-actions"),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        val menu = MenuButtonStyle(state, layout, label, colors, onAction, panels)
-        MenuButton(menu, R.drawable.channels_record, R.string.player_record, !dragging, PlayerPanel.Record)
+        val menu = MenuButtonStyle(state, layout, label, colors, panels)
+        (state as? LivePlayerState)?.liveRecord?.let { record ->
+            if (PlayerControl.Record in state.offered) {
+                RecordAction(record, label, !dragging, colors) { panels.onChoice(PlayerChoice.LiveRecord(record)) }
+            }
+        }
         MenuButton(menu, R.drawable.player_audio, R.string.player_audio, !dragging && listening, PlayerPanel.Audio)
         MenuButton(
             menu, R.drawable.player_subtitles, R.string.player_subtitles, !dragging && listening,
@@ -407,7 +410,6 @@ private fun BrowseButton(state: PlayerFaceState, dragging: Boolean, colors: Butt
 
 internal val PlayerPanel.control: PlayerControl?
     get() = when (this) {
-        PlayerPanel.Record -> PlayerControl.Record
         PlayerPanel.Audio -> PlayerControl.Audio
         PlayerPanel.Subtitles -> PlayerControl.Subtitles
         PlayerPanel.Channels -> PlayerControl.Channels
@@ -421,11 +423,10 @@ private class MenuButtonStyle(
     val layout: PlayerLayout,
     val label: Boolean,
     val colors: ButtonColors,
-    val onAction: (PlayerAction) -> Unit,
     val panels: PanelHost,
 )
 
-/** Record, Audio, Subtitles or Info: a menu at the button or a sheet, the button showing it open. */
+/** Audio, Subtitles or Info: a menu at the button or a sheet, the button showing it open. */
 @Composable
 private fun MenuButton(
     style: MenuButtonStyle,
@@ -441,7 +442,7 @@ private fun MenuButton(
     val menu: @Composable () -> Unit = {
         if (target.atButton(style.layout)) {
             val close = { panels.onPanel(null) }
-            PlayerMenu(open, panelEntries(target, style.state, style.onAction, panels.onChoice, close), close)
+            PlayerMenu(open, panelEntries(target, style.state, panels.onChoice, close), close)
         }
     }
     if (style.label) {
@@ -466,7 +467,7 @@ private fun MenuButton(
 
 /** [open] marks the button whose menu is showing; [menu] is that menu, anchored to the button. */
 @Composable
-private fun ActionButton(
+internal fun ActionButton(
     @DrawableRes icon: Int,
     @StringRes name: Int,
     label: Boolean,

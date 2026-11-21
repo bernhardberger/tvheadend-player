@@ -56,6 +56,7 @@ import at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import at.bernhardberger.tvhplayer.touch.guide.GuideViewModel
 import at.bernhardberger.tvhplayer.touch.recordings.RecordingsViewModel
+import at.bernhardberger.tvhplayer.touch.ui.withArtworkTrace
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.dsl.viewModel
 import org.koin.core.qualifier.named
@@ -203,7 +204,7 @@ val touchModule = module {
         buildImageLoader(
             androidContext(), get<SdkRuntimeOwner>().session, get(),
             userAgent = remoteLogoUserAgent(androidContext()), crossfadeMillis = ARTWORK_CROSSFADE_MS,
-        )
+        ).withArtworkTrace(androidContext())
     }
 }
 

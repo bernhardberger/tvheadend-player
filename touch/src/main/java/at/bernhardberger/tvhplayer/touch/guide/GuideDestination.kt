@@ -1,7 +1,9 @@
 package at.bernhardberger.tvhplayer.touch.guide
 
 import at.bernhardberger.tvhplayer.touch.ui.DvrControls
+import at.bernhardberger.tvhplayer.touch.ui.ArtworkScreenShown
 import at.bernhardberger.tvhplayer.touch.ui.LocalArtworkModels
+import at.bernhardberger.tvhplayer.touch.ui.traceGuideMapping
 import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -51,6 +53,7 @@ internal fun GuideDestination(
     onOpenConnections: () -> Unit,
     onSignIn: () -> Unit,
 ) {
+    ArtworkScreenShown("Guide")
     val presentation by connection.uiState.collectAsStateWithLifecycle()
     val scope by channels.scope.collectAsStateWithLifecycle()
     val observation by guide.observation.collectAsStateWithLifecycle()
@@ -66,15 +69,20 @@ internal fun GuideDestination(
     LaunchedEffect(coverage, observation.currentSession?.generationIdentity) { coverage?.let(guide::request) }
     val texts = remember(context, locale) { guideTexts(context, locale) }
     val artwork = LocalArtworkModels.current
-    val state = remember(
-        presentation, scope, observation, selection, pendingVersion, nowSec, texts, artwork, playingId,
+    val mapped = remember(
+        presentation, scope, observation, selection, clock, texts, artwork, playingId,
     ) {
-        val dayLoading = coverage?.let(guide::isPending) == true
-        guideState(
-            scope, presentation.connection, presentation.degraded, observation, selection, dayLoading, clock, texts,
-            artwork, playingId,
-        )
+        traceGuideMapping(context) {
+            guideState(
+                scope, presentation.connection, presentation.degraded, observation, selection, false, clock, texts,
+                artwork, playingId,
+            )
+        }
     }
+    val dayLoading = remember(mapped.listed, coverage, pendingVersion, observation.currentSession?.generationIdentity) {
+        mapped.listed && coverage?.let(guide::isPending) == true
+    }
+    val state = if (dayLoading) mapped.copy(dayLoading = true) else mapped
     // Forget invalid choices, so they cannot silently return when a tag or the schedule changes again.
     val available = selection.copy(
         day = selection.day?.takeIf { it in state.dayDates },

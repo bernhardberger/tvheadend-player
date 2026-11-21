@@ -3,6 +3,7 @@ package at.bernhardberger.tvhplayer.touch
 import at.bernhardberger.tvhplayer.touch.ui.ConfirmDvrChange
 import at.bernhardberger.tvhplayer.touch.ui.DvrControls
 import androidx.compose.runtime.remember
+import at.bernhardberger.tvhplayer.touch.ui.ArtworkScreenShown
 import at.bernhardberger.tvhplayer.touch.ui.LocalArtworkModels
 import at.bernhardberger.tvhplayer.touch.ui.ArtworkModels
 import androidx.compose.foundation.layout.Box
@@ -202,6 +203,7 @@ private fun AppFrame(
     onOpenConnections: () -> Unit,
     onSignIn: () -> Unit,
 ) {
+    ArtworkScreenShown("Channels")
     val presentation by connection.uiState.collectAsStateWithLifecycle()
     val scope by channels.scope.collectAsStateWithLifecycle()
     // The scope is republished for channel changes only; the guide comes with every observation.

@@ -18,6 +18,7 @@ import androidx.annotation.StringRes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertCountEquals
@@ -67,6 +68,17 @@ import at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStoreCall
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import at.bernhardberger.tvhplayer.touch.di.touchModule
+import at.bernhardberger.tvhplayer.touch.channels.ChannelsState
+import at.bernhardberger.tvhplayer.touch.channels.channelsFixture
+import at.bernhardberger.tvhplayer.touch.guide.GuideClock
+import at.bernhardberger.tvhplayer.touch.player.LivePlayerState
+import at.bernhardberger.tvhplayer.touch.player.PlayerControl
+import at.bernhardberger.tvhplayer.touch.player.PlayerDvrConfirmation
+import at.bernhardberger.tvhplayer.touch.player.PlayerScreen
+import at.bernhardberger.tvhplayer.touch.player.ShownPrograms
+import at.bernhardberger.tvhplayer.touch.player.choose
+import at.bernhardberger.tvhplayer.touch.player.liveRecordOffer
+import at.bernhardberger.tvhplayer.touch.player.playerSchedule
 import at.bernhardberger.tvhplayer.touch.testutil.FakeConnection
 import at.bernhardberger.tvhplayer.touch.testutil.ImageLoaderRule
 import at.bernhardberger.tvhplayer.touch.testutil.ServerGuide
@@ -80,6 +92,7 @@ import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import java.time.ZoneId
 import kotlin.time.toJavaInstant
 import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlin.time.Duration.Companion.hours
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
@@ -763,6 +776,98 @@ class TouchAppTest {
         compose.waitForIdle()
         assertEquals(emptyList<DvrScheduleRequest>(), connection.scheduleRequests)
     }
+
+    @Test
+    @Config(qualifiers = TABLET)
+    fun recordFromPlayerInfoSchedulesTheChosenProgrammeSilently() {
+        val guide = ServerGuide(Instant.fromEpochSeconds(1_800_000_000))
+        connection.session.publish(guide.connected())
+        connection.session.dvrRepository.scriptScheduleEntry(DvrMutationResult.Confirmed(DvrEntryId(WEATHER_ENTRY)))
+        connection.dvrRepliesHeld.value = true
+        showLiveDvr(guide)
+        playerButton(R.string.player_info).performClick()
+        compose.onNodeWithText(guide.programs[1]).performClick()
+        playerButton(R.string.channels_record).performClick()
+        compose.waitForIdle()
+        assertEquals(DvrSchedule.Programme(EventId(2)), connection.scheduleRequests.single().schedule)
+        connection.dvrRepliesHeld.value = false
+        compose.waitForIdle()
+        assertEquals(null, connection.noticeCenter.state.value.active)
+        assertTrue(connection.noticeCenter.state.value.pending.isEmpty())
+    }
+
+    @Test
+    @Config(qualifiers = TABLET)
+    fun cancelFromPlayerDetailsAsksFirstAndIsDismissedInTheWindow() {
+        val guide = ServerGuide(Instant.fromEpochSeconds(1_800_000_000))
+        connection.session.publish(guide.connected())
+        val inWindow = mutableStateOf(false)
+        showLiveDvr(guide, inWindow = { inWindow.value })
+        playerButton(R.string.player_info).performClick()
+        compose.onNodeWithText(guide.programs[2]).performClick()
+        playerButton(R.string.channels_details).performClick()
+        playerButton(SharedR.string.cancel_recording).performClick()
+        inDialog(SharedR.string.cancel_recording).assertIsDisplayed()
+        assertTrue(FakeSessionCall.DVR_CANCEL_ENTRY !in connection.session.calls)
+        compose.runOnIdle { inWindow.value = true }
+        compose.onNode(isDialog()).assertDoesNotExist()
+        compose.runOnIdle { inWindow.value = false }
+        compose.onNode(isDialog()).assertDoesNotExist()
+        assertTrue(FakeSessionCall.DVR_CANCEL_ENTRY !in connection.session.calls)
+    }
+
+    @Test
+    @Config(qualifiers = TABLET)
+    fun aStalePlayerRecordTapDoesNotRecordTheNewDisplayedProgramme() {
+        val guide = ServerGuide(Instant.fromEpochSeconds(1_800_000_000))
+        connection.session.publish(guide.connected(emptyList()))
+        val displayed = mutableStateOf(EventId(1))
+        showLiveDvr(guide, displayed = { displayed.value })
+        val record = playerButton(R.string.player_record)
+        val staleTap = record.fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
+        compose.runOnIdle {
+            displayed.value = EventId(2)
+            staleTap()
+        }
+        compose.waitForIdle()
+        assertTrue(connection.scheduleRequests.isEmpty())
+        connection.session.dvrRepository.scriptScheduleEntry(DvrMutationResult.Confirmed(DvrEntryId(WEATHER_ENTRY)))
+        record.performClick()
+        compose.waitForIdle()
+        assertEquals(DvrSchedule.Programme(EventId(2)), connection.scheduleRequests.single().schedule)
+    }
+
+    private fun showLiveDvr(
+        guide: ServerGuide,
+        inWindow: () -> Boolean = { false },
+        displayed: () -> EventId = { EventId(1) },
+    ) {
+        val rows = channelsFixture(playing = true)
+        val state = LivePlayerState(rows.rows.first(), ChannelsState.Ready(rows), null, mutableStateOf(null))
+        val observation = connection.session.observation.value
+        fun programs() = ShownPrograms(observation.event(displayed()), null)
+        fun offer() = liveRecordOffer(guide.first.id, programs(), connection.session.observation.value, guide.now.epochSeconds)
+        val clock = GuideClock(guide.now.epochSeconds, ZoneId.systemDefault())
+        compose.setContent {
+            val dvr = viewModel { DvrControls(connection.browseSession, connection.noticeCenter) { guide.now.epochSeconds } }
+            MaterialTheme(colorScheme = MobileDarkColors) {
+                PlayerScreen(
+                    state.copy(
+                        schedule = playerSchedule(
+                            guide.first.id, listOf(guide.first), observation, programs(), clock, guide.texts,
+                        ),
+                        liveRecord = offer(), offered = setOf(PlayerControl.Info, PlayerControl.Record),
+                    ),
+                    {}, {}, {}, {}, { dvr.choose(it, ::offer) },
+                    video = {}, inWindow = inWindow(), confirmationOpen = dvr.pending != null,
+                )
+                PlayerDvrConfirmation(dvr, inWindow())
+            }
+        }
+    }
+
+    private fun playerButton(@StringRes id: Int) =
+        compose.onNode(hasClickAction() and (hasText(label(id)) or hasContentDescription(label(id))))
 
     private fun expandedChannelRecord(guide: ServerGuide): SemanticsNodeInteraction {
         compose.onNodeWithContentDescription(compose.activity.getString(R.string.channels_expand, guide.first.name))

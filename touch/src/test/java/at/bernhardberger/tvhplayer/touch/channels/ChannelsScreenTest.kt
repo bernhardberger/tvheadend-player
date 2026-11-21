@@ -45,6 +45,7 @@ import at.bernhardberger.tvhplayer.touch.testutil.assertLogoFitsItsShare
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouch
 import at.bernhardberger.tvhplayer.touch.testutil.markedLogos
 import at.bernhardberger.tvhplayer.touch.ui.ArtworkModels
+import at.bernhardberger.tvhplayer.touch.ui.ArtworkImage
 import at.bernhardberger.tvhplayer.touch.ui.ChannelLogoTile
 import at.bernhardberger.tvhplayer.touch.ui.LocalChannelAccents
 import at.bernhardberger.tvhplayer.ui.MobileDarkColors
@@ -52,6 +53,7 @@ import coil3.asImage
 import coil3.decode.DataSource
 import coil3.intercept.Interceptor
 import coil3.request.ErrorResult
+import coil3.request.ImageRequest
 import coil3.request.SuccessResult
 import coil3.request.transformations
 import coil3.size.Size
@@ -228,6 +230,7 @@ class ChannelsScreenTest {
     fun serverLogoTilesShowTheirFallbackOnlyWhenTheLogoIsMissingOrFails() {
         val failing = AppArtworkSource(null, ArtworkId(1))
         val loading = AppArtworkSource(null, ArtworkId(2))
+        val picture = AppArtworkSource(null, ArtworkId(3))
         val loadedColor = Color.Magenta
         val bitmap = Bitmap.createBitmap(30, 30, Bitmap.Config.ARGB_8888)
             .apply { eraseColor(loadedColor.toArgb()) }
@@ -239,19 +242,26 @@ class ChannelsScreenTest {
         })
         images.apply(object : Statement() {
             override fun evaluate() {
+                compose.mainClock.autoAdvance = false
+                val pictureRequest = ImageRequest.Builder(compose.activity).data(picture).size(30, 30).build()
                 compose.setContent {
                     MaterialTheme(colorScheme = MobileDarkColors) {
                         Column {
+                            ArtworkImage(null, pictureRequest, Modifier.size(30.dp))
                             listOf("missing" to null, "failing" to failing, "loading" to loading).forEach { (tag, model) ->
                                 ChannelLogoTile(null, null, Modifier.size(112.dp, 56.dp).testTag(tag), model = model)
                             }
                         }
                     }
                 }
+                compose.waitForIdle()
+                assertTrue("the picture starts in the first layout", picture in images.requested)
+                assertTrue("the logo starts in the same layout as the picture", loading in images.requested)
+                compose.mainClock.autoAdvance = true
                 val ground = MobileDarkColors.surfaceContainerHigh
                 val missingCenter = tileCenter("missing")
                 assertNotEquals("an absent model shows the fallback icon", setOf(ground), missingCenter)
-                assertEquals(setOf(failing, loading), images.requested.toSet())
+                assertEquals(setOf(failing, loading, picture), images.requested.toSet())
                 assertEquals("a pending logo shows only the ground", setOf(ground), tileCenter("loading"))
                 assertEquals("a pending failure shows only the ground", setOf(ground), tileCenter("failing"))
 

@@ -30,6 +30,7 @@ import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
 import org.junit.Test
 
 @OptIn(TvheadendTestingApi::class)
@@ -97,6 +98,7 @@ class GuideMappingTest {
 
         assertEquals(guide.programs, first.programs.map { it.title })
         val onNow = first.programs[0]
+        assertSame("overview and the channel day reuse the same mapped program", onNow, first.day?.first())
         assertEquals(0.5f, onNow.progress)
         assertEquals("30m", onNow.timeLeft)
         assertEquals("07:30", onNow.start)
