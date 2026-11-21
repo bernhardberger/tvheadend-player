@@ -38,9 +38,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -52,18 +50,24 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import at.bernhardberger.tvhplayer.core.RecordingMark
 import at.bernhardberger.tvhplayer.core.RecordingMarkKind
 import at.bernhardberger.tvhplayer.core.RecordingMarkStop
 import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
-import at.bernhardberger.tvhplayer.settings.AdBreakMode
+import at.bernhardberger.tvhplayer.playback.RecordingSkipAction
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
 
 @Composable
 internal fun RecordingClock(state: RecordingPlayerState, preview: Long?, modifier: Modifier) {
-    ClockText(formatPlaybackDuration(preview ?: state.positionMs.value), modifier)
+    ClockText(recordingClockLabel(state, preview), modifier)
 }
+
+@Composable
+private fun recordingClockLabel(state: RecordingPlayerState, preview: Long?): String =
+    recordingPositionLabel(
+        preview ?: state.positionMs.value, state.durationMs, state.displayDurationMs, state.growing,
+        stringResource(SharedR.string.timeshift_live),
+    )
 
 @Composable
 internal fun RecordingPositionLine(
@@ -76,8 +80,8 @@ internal fun RecordingPositionLine(
 ) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         if (state.durationMs > 0) {
-            val position = formatPlaybackDuration(preview ?: state.positionMs.value)
-            val length = formatPlaybackDuration(state.durationMs)
+            val position = recordingClockLabel(state, preview)
+            val length = formatPlaybackDuration(state.displayDurationMs)
             Text(
                 stringResource(R.string.player_recording_position, position, length),
                 style = MaterialTheme.typography.labelLarge, color = Color.White,
@@ -96,7 +100,7 @@ internal fun RecordingAdAction(
     onChoice: (PlayerChoice) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val offer = currentAdOffer(state) ?: return
+    val offer = state.controlsSkip ?: return
     Box(modifier) { SkipAdButton(offer, dragging, bare = false, onChoice) }
 }
 
@@ -107,35 +111,24 @@ internal fun BareAdOffer(
     onChoice: (PlayerChoice) -> Unit,
     modifier: Modifier,
 ) {
-    val offer = currentAdOffer(state)
-    var dismissed by remember(state.key, offer) { mutableStateOf(false) }
-    if (offer == null || !visible || dismissed) return
-    if (state.adBreakMode != AdBreakMode.ASK || !state.askOnEntry) return
+    val offer = state.skipPrompt ?: return
+    if (!visible) return
     Row(modifier.testTag("recording-ad-prompt"), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         PictureOfferButton(SharedR.string.server_keep_watching, null, false, {
-            dismissed = true
-            onChoice(PlayerChoice.KeepWatching(offer))
+            onChoice(RecordingSkipChoice.Dismiss(offer))
         }, bare = true)
-        SkipAdButton(offer, false, bare = true) {
-            dismissed = true
-            onChoice(it)
-        }
+        SkipAdButton(offer, false, bare = true, onChoice)
     }
 }
 
 @Composable
-private fun currentAdOffer(state: RecordingPlayerState): RecordingMark? {
-    if (state.status != LivePlayerStatus.Playing || PlayerControl.Timeshift !in state.offered) return null
-    val offer by remember(state.marks, state.positionMs, state.adBreakMode) {
-        derivedStateOf { recordingAdOffer(state.marks, state.positionMs.value, state.adBreakMode) }
-    }
-    return offer
-}
-
-@Composable
-private fun SkipAdButton(offer: RecordingMark, dragging: Boolean, bare: Boolean, onChoice: (PlayerChoice) -> Unit) {
-    PictureOfferButton(SharedR.string.skip_ad_break, R.drawable.player_skip_ad, dragging, {
-        onChoice(PlayerChoice.SkipAdBreak(offer))
+private fun SkipAdButton(
+    offer: RecordingSkipAction, dragging: Boolean, bare: Boolean, onChoice: (PlayerChoice) -> Unit,
+) {
+    val label = if (offer.mark.kind == RecordingMarkKind.PROGRAM_START) SharedR.string.skip_to_program_start
+    else SharedR.string.skip_ad_break
+    PictureOfferButton(label, R.drawable.player_skip_ad, dragging, {
+        onChoice(RecordingSkipChoice.Accept(offer, fromControls = !bare))
     }, bare)
 }
 

@@ -72,8 +72,8 @@ internal fun RecordingTimeline(
     onSeek: (Long) -> Unit,
     modifier: Modifier,
 ) {
-    val duration = state.durationMs
-    if (duration <= 0) return
+    if (!state.seekable) return
+    val duration = state.displayDurationMs
     val current = state.positionMs.value.coerceIn(0, duration)
     val position = (preview ?: current).coerceIn(0, duration)
     val marks = remember(state.marks, duration) { recordingTrackMarks(state.marks, duration) }
@@ -123,7 +123,9 @@ private fun recordingBarDrag(
         .semantics {
             contentDescription = label
             stateDescription = positionLabel
-            progressBarRangeInfo = ProgressBarRangeInfo(position.toFloat(), 0f..duration.toFloat())
+            progressBarRangeInfo = ProgressBarRangeInfo(
+                position.coerceAtMost(duration).toFloat(), 0f..duration.toFloat(),
+            )
             setProgress {
                 val target = it.roundToLong().coerceIn(0, duration)
                 if (target == current) false else {
@@ -136,9 +138,11 @@ private fun recordingBarDrag(
             snapPx = snapPx,
             targetAt = { x, width ->
                 if (width <= 0) null else {
-                    val distance = (duration * (x / width).toDouble().coerceIn(0.0, 1.0)).roundToLong()
-                    val radius = (duration * (snapPx / width).toDouble()).roundToLong()
-                    recordingDrag(distance, current, radius, state.stops, state.marks).positionMs
+                    val displayDuration = state.displayDurationMs
+                    val distance = (displayDuration * (x / width).toDouble().coerceIn(0.0, 1.0)).roundToLong()
+                    val radius = (displayDuration * (snapPx / width).toDouble()).roundToLong()
+                    recordingDrag(distance.coerceAtMost(duration), current.coerceAtMost(duration), radius,
+                        state.stops, state.marks).positionMs
                 }
             },
             current = { current }, onPreview = onPreview, onSeek = onSeek,

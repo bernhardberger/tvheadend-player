@@ -51,6 +51,7 @@ class RecordingPlayerScreenTest {
     private val position = mutableLongStateOf(RECORDING_BEFORE_AD)
     private val hasMarks = mutableStateOf(true)
     private val choice = mutableStateOf<AdBreakMode?>(null)
+    private val dismissed = mutableStateOf(false)
     private val notice = mutableStateOf<Notice?>(null)
     private val seeks = mutableListOf<Long>()
     private val choices = mutableListOf<PlayerChoice>()
@@ -106,7 +107,10 @@ class RecordingPlayerScreenTest {
         tapPicture()
         button(SharedR.string.skip_ad_break).performClick()
         compose.runOnIdle {
-            assertEquals(listOf(PlayerChoice.KeepWatching(fixtureAd), PlayerChoice.SkipAdBreak(fixtureAd)), choices)
+            assertEquals(
+                listOf(RecordingSkipChoice.Dismiss(fixtureAdToken), RecordingSkipChoice.Accept(fixtureAdToken, true)),
+                choices,
+            )
             position.longValue = fixtureAd.endMs
         }
         button(SharedR.string.skip_ad_break).assertDoesNotExist()
@@ -173,9 +177,19 @@ class RecordingPlayerScreenTest {
         val fixture = recordingPlayerFixture(position)
         compose.setContent {
             MaterialTheme(colorScheme = MobileDarkColors) {
+                val offer = fixtureAdOffer(position.longValue, choice.value)
                 PlayerScreen(
-                    fixture.copy(marks = fixture.marks.takeIf { hasMarks.value }.orEmpty(), adBreakPick = choice.value),
-                    onAction = {}, onSeek = { seeks += it }, onBrightness = {}, onChoice = { choices += it },
+                    fixture.copy(
+                        marks = fixture.marks.takeIf { hasMarks.value }.orEmpty(),
+                        adBreakPick = choice.value,
+                        controlsSkip = offer,
+                        skipPrompt = offer.takeIf { !dismissed.value && choice.value != AdBreakMode.AUTOMATIC },
+                    ),
+                    onAction = {}, onSeek = { seeks += it }, onBrightness = {},
+                    onChoice = {
+                        if (it is RecordingSkipChoice.Dismiss) dismissed.value = true
+                        choices += it
+                    },
                 ) { modifier ->
                     val formatter = NoticeFormatter(LocalContext.current)
                     notice.value?.let(formatter::format)?.let { TouchNotice(it.headline, it.detail, modifier) }

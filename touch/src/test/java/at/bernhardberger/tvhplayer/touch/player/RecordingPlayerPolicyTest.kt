@@ -4,7 +4,6 @@ import at.bernhardberger.tvhplayer.core.RecordingMark
 import at.bernhardberger.tvhplayer.core.RecordingMarkKind
 import at.bernhardberger.tvhplayer.core.RecordingMarkStop
 import at.bernhardberger.tvhplayer.core.recordingMarkStops
-import at.bernhardberger.tvhplayer.settings.AdBreakMode
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -28,16 +27,6 @@ class RecordingPlayerPolicyTest {
         )
         cases.forEach { (target, expected) ->
             assertEquals("at $target", expected, recordingDrag(target, 6_500L, 60L, stops, marks))
-        }
-    }
-
-    @Test
-    fun `manual skip is available throughout the half open break unless off`() {
-        for (mode in AdBreakMode.entries) {
-            listOf(999L, 1_000L, 1_500L, 1_999L, 2_000L, 3_500L).forEach { position ->
-                val expected = ad.takeIf { position in 1_000L until 2_000L && mode != AdBreakMode.OFF }
-                assertEquals("$mode at $position", expected, recordingAdOffer(marks, position, mode))
-            }
         }
     }
 

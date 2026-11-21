@@ -4,6 +4,7 @@ import androidx.compose.runtime.State
 import androidx.compose.ui.graphics.painter.Painter
 import at.bernhardberger.tvhplayer.core.RecordingMark
 import at.bernhardberger.tvhplayer.core.recordingMarkStops
+import at.bernhardberger.tvhplayer.playback.RecordingSkipAction
 import at.bernhardberger.tvhplayer.settings.AdBreakMode
 import at.bernhardberger.tvhplayer.touch.channels.ChannelRow
 
@@ -37,8 +38,6 @@ internal data class RecordingPlayerState(
     val marks: List<RecordingMark> = emptyList(),
     val adBreakSetting: AdBreakMode = AdBreakMode.ASK,
     val adBreakPick: AdBreakMode? = null,
-    /** A runtime with entry history can withhold the bare-picture prompt after a deliberate seek. */
-    val askOnEntry: Boolean = true,
     override val status: LivePlayerStatus = LivePlayerStatus.Playing,
     override val paused: Boolean = false,
     override val brightness: Float = 0.62f,
@@ -48,9 +47,17 @@ internal data class RecordingPlayerState(
         PlayerControl.Timeshift, PlayerControl.Audio, PlayerControl.Subtitles, PlayerControl.Settings,
         PlayerControl.Info, PlayerControl.PictureInPicture, PlayerControl.FullScreen, PlayerControl.Markers,
     ),
+    val buffering: Boolean = false,
+    val programMarks: List<RecordingMark> = emptyList(),
+    val skipPrompt: RecordingSkipAction? = null,
+    val controlsSkip: RecordingSkipAction? = null,
+    val markerRevision: Long? = null,
+    val displayDurationMs: Long = durationMs,
+    val growing: Boolean = false,
+    val artworkModel: Any? = null,
+    val failureDetail: String? = null,
 ) : PlayerFaceState {
     val stops = recordingMarkStops(marks, durationMs)
     val hasMarkers get() = PlayerControl.Markers in offered && stops.isNotEmpty()
-    val adBreakMode get() = adBreakPick ?: adBreakSetting
     override val seekable get() = durationMs > 0
 }

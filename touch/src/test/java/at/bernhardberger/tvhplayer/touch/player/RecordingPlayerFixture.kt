@@ -6,6 +6,10 @@ import androidx.compose.ui.graphics.painter.BitmapPainter
 import at.bernhardberger.tvhplayer.core.HumanTrackLabel
 import at.bernhardberger.tvhplayer.core.RecordingMark
 import at.bernhardberger.tvhplayer.core.RecordingMarkKind
+import at.bernhardberger.tvhplayer.core.recordingSkipAction
+import at.bernhardberger.tvhplayer.playback.RecordingSkipAction
+import at.bernhardberger.tvhplayer.settings.AdBreakMode
+import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.touch.channels.channelsFixture
 import at.bernhardberger.tvhplayer.touch.testutil.TouchFixtureArt
 
@@ -13,6 +17,12 @@ internal const val RECORDING_LENGTH = 6_300_000L
 internal const val RECORDING_BEFORE_AD = 3_150_000L
 internal const val RECORDING_INSIDE_AD = 3_222_000L
 internal val fixtureAd = RecordingMark(RecordingMarkKind.AD_BREAK, 3_180_000L, 3_720_000L)
+internal val fixtureAdToken = RecordingSkipAction(fixtureAd, fixtureAd.endMs)
+
+internal fun fixtureAdOffer(position: Long, mode: AdBreakMode?): RecordingSkipAction? =
+    fixtureAdToken.takeIf {
+        recordingSkipAction(listOf(fixtureAd), position, PlayerSettings(adBreakMode = mode ?: AdBreakMode.ASK)) != null
+    }
 
 internal fun recordingPlayerFixture(position: State<Long>) = RecordingPlayerState(
     key = "harbor-kickoff",
