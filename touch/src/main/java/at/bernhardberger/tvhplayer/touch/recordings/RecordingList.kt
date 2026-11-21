@@ -80,6 +80,7 @@ internal fun RecordingList(
     onOpen: (String) -> Unit,
     onPick: (String) -> Unit,
     modifier: Modifier = Modifier,
+    highlightPlaying: Boolean = false,
 ) {
     Column(modifier.fillMaxSize()) {
         head()
@@ -96,7 +97,9 @@ internal fun RecordingList(
                 val context = RowContext(section.label?.dates ?: RowDates.None, oneChannel)
                 group(section.items, key = { it.id }) { item, index, count ->
                     val line = recordingLine(item, context, clock)
-                    RecordingRow(item, line, level.showsThumbnails, item.id == pickedId, index, count) {
+                    RecordingRow(
+                        item, line, level.showsThumbnails, item.id == pickedId, highlightPlaying, index, count,
+                    ) {
                         onPick(item.id)
                     }
                 }
@@ -288,6 +291,7 @@ private fun RecordingRow(
     line: List<RecordingLinePart>,
     thumbnail: Boolean,
     selected: Boolean,
+    highlightPlaying: Boolean,
     index: Int,
     count: Int,
     onPick: () -> Unit,
@@ -308,7 +312,7 @@ private fun RecordingRow(
         },
         supportingContent = { RecordingLineText(line) },
         shapes = ListItemDefaults.segmentedShapes(index, count),
-        colors = if (item.playing) rowColors(playingContainerColor()) else rowColors(),
+        colors = if (item.playing && highlightPlaying) rowColors(playingContainerColor()) else rowColors(),
         contentPadding = RowPadding,
     ) {
         if (item.playing) {

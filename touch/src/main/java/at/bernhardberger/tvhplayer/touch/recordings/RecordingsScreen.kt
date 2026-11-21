@@ -278,7 +278,9 @@ private fun BrowseLevel(
                 if (picked == null) Placeholder(level) else RecordingPane(picked, state.clock, actions)
             }
         }
-        else -> RecordingList(level, state.clock, oneChannel, null, head, onOpen, onPick, margin)
+        else -> RecordingList(
+            level, state.clock, oneChannel, null, head, onOpen, onPick, margin, highlightPlaying = true,
+        )
     }
 }
 

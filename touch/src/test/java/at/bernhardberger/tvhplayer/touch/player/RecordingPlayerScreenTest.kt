@@ -424,6 +424,25 @@ class RecordingPlayerScreenTest {
 
     @Test
     @OptIn(UnstableApi::class)
+    fun leavingBrowseCancelsAPendingRecordingStart() {
+        val hold = MutableStateFlow(false)
+        withRecordingRoute(marked = true, holdSettings = hold) { _, runtime ->
+            val replacement = ServerGuide(Instant.parse("2026-11-11T21:00:00Z")).diary.id
+            Robolectric.buildActivity(MainActivity::class.java).setup().use { browse ->
+                hold.value = true
+                browse.get().watchRecording(replacement)
+                settleRoute(runtime.player)
+                browse.pause().stop()
+                hold.value = false
+                settleRoute(runtime.player)
+                assertTrue("A stopped browse must not install its pending recording",
+                    runtime.activeTarget.value != AppPlaybackTarget.Recording(replacement))
+            }
+        }
+    }
+
+    @Test
+    @OptIn(UnstableApi::class)
     fun recordingEofDoesNotStopAQueuedReplacement() {
         val hold = MutableStateFlow(false)
         withRecordingRoute(marked = true, holdSettings = hold) { activity, runtime ->

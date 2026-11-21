@@ -42,12 +42,15 @@ import kotlin.time.toJavaDuration
 internal fun recordingPlayActions(
     entry: DvrEntry,
     admission: RecordingPlaybackAdmission?,
+    playing: Boolean = false,
 ): List<RecordingPlayAction> {
     // A Remove entry action stands alone; all other play actions follow shared admission.
-    if (deleteRemovesEntryOnly(entry)) return emptyList()
-    return recordingContextActions(entry, admission, canModifyRecordings = false).mapNotNull { action ->
+    if (!playing && deleteRemovesEntryOnly(entry)) return emptyList()
+    val actions = recordingContextActions(entry, admission, canModifyRecordings = false, playing = playing)
+    return actions.mapNotNull { action ->
         when (action) {
             BrowseContextAction.PLAY, BrowseContextAction.WATCH -> RecordingPlayAction.Watch
+            BrowseContextAction.CONTINUE_WATCHING -> RecordingPlayAction.ContinueWatching
             BrowseContextAction.RESUME -> offeredResumePosition(admission)?.let { RecordingPlayAction.Resume(it) }
             BrowseContextAction.START_OVER -> RecordingPlayAction.StartOver
             else -> null
@@ -161,13 +164,14 @@ private class RowMapper(
     fun item(entry: DvrEntry, section: DvrDateSection?): RecordingItem {
         val art = artwork(entry)
         val admission = observation.recordingPlaybackAdmission(entry)
+        val playing = entry.id == playingRecordingId
         return recordingItem(entry, admission, naming.channelName(entry), texts, clock.now.epochSecond).copy(
             channelLogoModel = art.logo,
             pictureModel = art.picture,
             section = section?.let { RecordingSection(texts.section(it), it.rowDates) },
             remove = observation.recordingRemoveControl(entry),
-            play = if (canOfferPlayback) recordingPlayActions(entry, admission) else emptyList(),
-            playing = entry.id == playingRecordingId,
+            play = if (canOfferPlayback || playing) recordingPlayActions(entry, admission, playing) else emptyList(),
+            playing = playing,
         )
     }
 }

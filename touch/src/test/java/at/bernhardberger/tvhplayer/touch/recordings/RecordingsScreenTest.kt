@@ -24,8 +24,11 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -98,7 +101,13 @@ class RecordingsScreenTest {
         state.value = flatFixture().withPlayingRecording()
         val playing = playingMark()
         compose.onAllNodes(playing).assertCountEquals(2) // Selected row and its pane.
-        resumeButton().assertIsDisplayed()
+        assertPlayingActions()
+        capture("tablet-recording-pane-playing", TouchCanvas.TABLET)
+
+        state.value = flatFixture().withPlayingRecording("field-desk")
+        compose.onAllNodes(playing).assertCountEquals(1)
+        compose.onNodeWithText("Field Desk").assertIsNotSelected()
+        compose.onNode(hasClickAction() and hasText("Westvale – Ridge Town", substring = true)).assertIsSelected()
         capture("tablet-recordings-playing", TouchCanvas.TABLET)
     }
 
@@ -270,6 +279,13 @@ class RecordingsScreenTest {
         state.value = flatFixture().withPlayingRecording()
         compose.onAllNodes(playingMark()).assertCountEquals(1)
         capture("phone-recordings-playing", TouchCanvas.PHONE)
+
+        state.value = flatFixture().withPlayingRecording("field-desk", title = FieldDeskEpisode)
+        val layouts = mutableListOf<TextLayoutResult>()
+        compose.onNodeWithText(FieldDeskEpisode, useUnmergedTree = true)
+            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        assertTrue("The long title must give way to the playing bars", layouts.single().isLineEllipsized(0))
+        compose.onNode(playingMark(), useUnmergedTree = true).assertIsDisplayed()
     }
 
     @Test
@@ -286,6 +302,21 @@ class RecordingsScreenTest {
         capture("phone-recording-details", TouchCanvas.PHONE)
 
         captureDeleteConfirmation("phone-recordings-delete-confirm", TouchCanvas.PHONE)
+
+        asking = false
+        state.value = foldersFixture().withPlayingRecording()
+        capture("phone-recording-details-playing", TouchCanvas.PHONE)
+        val continueWatching = compose.activity.getString(SharedR.string.player_continue_watching)
+        val layouts = mutableListOf<TextLayoutResult>()
+        compose.onNodeWithText(continueWatching, useUnmergedTree = true)
+            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        val layout = layouts.single()
+        assertEquals(
+            "Continue watching must fit the button",
+            continueWatching.length,
+            layout.getLineEnd(layout.lineCount - 1, visibleEnd = true),
+        )
+        assertPlayingActions()
     }
 
     @Test
@@ -383,13 +414,36 @@ class RecordingsScreenTest {
         root = root.copy(recordings = root.recordings.map { if (it.id == PickedId) it.copy(play = play) else it }),
     )
 
-    private fun RecordingsState.withPlayingRecording() = copy(
-        root = root.copy(recordings = root.recordings.map { it.copy(playing = it.id == PickedId) }),
-    )
+    private fun RecordingsState.withPlayingRecording(id: String = PickedId, title: String? = null): RecordingsState {
+        fun mark(folder: RecordingFolder): RecordingFolder = folder.copy(
+            folders = folder.folders.map(::mark),
+            recordings = folder.recordings.map { item ->
+                if (item.id != id) item else item.copy(
+                    playing = true,
+                    title = title ?: item.title,
+                    play = listOfNotNull(
+                        RecordingPlayAction.ContinueWatching,
+                        RecordingPlayAction.StartOver.takeIf { RecordingPlayAction.StartOver in item.play },
+                    ),
+                    state = if (id == "field-desk") RecordingProgress.PartlyWatched(java.time.Duration.ofMinutes(25), 0.44f)
+                    else item.state,
+                )
+            },
+        )
+        return copy(root = mark(root))
+    }
 
     private fun playingMark() = SemanticsMatcher.expectValue(
         SemanticsProperties.StateDescription, compose.activity.getString(R.string.channels_playing),
     )
+
+    private fun assertPlayingActions() {
+        val label = compose.activity.getString(SharedR.string.player_continue_watching)
+        resumeButton().assertDoesNotExist()
+        compose.onNodeWithText(label).assertIsDisplayed().performClick()
+        compose.onNodeWithText("Watch from beginning").assertIsDisplayed().performClick()
+        assertEquals(listOf(PickedId to false, PickedId to true), played.takeLast(2))
+    }
 
     private fun pickTheHalfWatchedMatch() =
         compose.onNodeWithText("Westvale – Ridge Town", substring = true).performClick()
