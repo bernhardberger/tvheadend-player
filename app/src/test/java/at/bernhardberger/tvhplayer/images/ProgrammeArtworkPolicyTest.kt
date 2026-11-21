@@ -165,6 +165,24 @@ class ProgrammeArtworkPolicyTest {
             artworkLogoPlaces(pixels, 96, 144, logoShare = .42).first().corner)
     }
 
+    @Test fun aCompactLineWithATallCapitalNeedsAtLeastFiveLetters() {
+        fun lettering(count: Int): List<ArtworkLettering> {
+            val pixels = titlePixels(IntRange.EMPTY)
+            // Keep both words as wide as each other, with the capital making the box tall.
+            for (letter in 0 until count) {
+                val left = 6 + letter * 36 / (count - 1)
+                val top = if (letter == 0) 16 else 26
+                for (y in top..40) for (x in 0..5) {
+                    if (x == 0 || x == 5 || y == 32) pixels[y * 96 + left + x] = 0xffffffff.toInt()
+                }
+            }
+            return artworkLettering(pixels, 96, 144)
+        }
+
+        assertEquals("five letters make a line", 1, lettering(5).size)
+        assertTrue("four letters with the same proportions do not", lettering(4).isEmpty())
+    }
+
     @Test fun logoLeavesSpaceBesideDrawnInLettering() {
         // The lettering ends above the logo's own space, but still crowds it.
         val pixels = titlePixels(IntRange.EMPTY).apply { drawLettering(top = 98) }

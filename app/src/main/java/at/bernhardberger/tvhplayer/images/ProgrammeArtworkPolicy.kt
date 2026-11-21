@@ -339,7 +339,11 @@ private const val LINE_OVERLAP = .45
 private const val LINE_GAP = 1.6
 private const val LINE_COLOUR = 55.0
 private const val LINE_LETTERS = 3
+// A line must be this many times as wide as tall. A word of five or more letters can be squarer:
+// a tall capital or descender adds height even to a short word.
 private const val LINE_ASPECT = 1.8
+private const val LINE_WORD_LETTERS = 5
+private const val LINE_WORD_ASPECT = 1.5
 
 private fun regionRoot(parent: IntArray, index: Int): Int {
     var at = index
@@ -516,7 +520,8 @@ private fun chainLettersIntoLines(letters: List<Letter>, width: Int, height: Int
             left = minOf(left, letter.left); top = minOf(top, letter.top)
             right = maxOf(right, letter.right); bottom = maxOf(bottom, letter.bottom)
         }
-        if (right - left >= LINE_ASPECT * (bottom - top)) lines += ArtworkLettering(left, top, right, bottom)
+        val aspect = if (members[head] >= LINE_WORD_LETTERS) LINE_WORD_ASPECT else LINE_ASPECT
+        if (right - left >= aspect * (bottom - top)) lines += ArtworkLettering(left, top, right, bottom)
     }
     return lines
 }
