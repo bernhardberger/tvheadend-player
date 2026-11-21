@@ -5,14 +5,13 @@ package at.bernhardberger.tvhplayer.touch.player
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.material3.MaterialTheme
@@ -30,6 +29,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -40,15 +40,16 @@ import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.core.os.ConfigurationCompat
 import at.bernhardberger.tvhplayer.touch.R
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import kotlin.math.abs
+import kotlin.math.max
 import kotlin.math.roundToInt
 
 @Composable
@@ -199,38 +200,31 @@ private fun PositionThumb(x: Dp, y: Dp, layout: PlayerLayout, dragging: Boolean)
     )
 }
 
+/**
+ * The slider's value label (Material: label container 44dp high, as wide as its text, inverse
+ * surface, labelLarge), centered on the handle and kept over the bar. At the live edge "Live"
+ * stands above the time as a marker's name would (labelMedium).
+ */
 @Composable
 private fun DragLabel(time: String, live: Boolean, compact: Boolean, markerX: Dp, trackY: Dp, trackWidth: Dp) {
     val colors = MaterialTheme.colorScheme
     val type = MaterialTheme.typography
-    val labelWidth = 108.dp.coerceAtMost(trackWidth)
-    val labelRise = when {
-        compact -> 74.dp
-        live -> 85.dp
-        else -> 69.dp
-    }
-    val horizontalPadding = if (compact) 12.dp else 16.dp
-    Box(
-        Modifier.absoluteOffset(
-            x = (markerX - labelWidth / 2).coerceIn(0.dp, trackWidth - labelWidth),
-            y = trackY - labelRise,
-        ).width(labelWidth).wrapContentHeight(Alignment.Top, unbounded = true),
-        contentAlignment = Alignment.Center,
+    val gap = if (compact) 42.dp else 28.dp
+    Surface(
+        modifier = Modifier.layout { measurable, _ ->
+            val label = measurable.measure(Constraints())
+            val x = (markerX.roundToPx() - label.width / 2).coerceIn(0, max(0, trackWidth.roundToPx() - label.width))
+            layout(0, 0) { label.place(x, (trackY - gap).roundToPx() - label.height) }
+        }.heightIn(min = 44.dp),
+        shape = RoundedCornerShape(14.dp), color = colors.inverseSurface, contentColor = colors.inverseOnSurface,
     ) {
-        Surface(
-            shape = RoundedCornerShape(14.dp), color = colors.inverseSurface, contentColor = colors.inverseOnSurface,
+        Column(
+            Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
         ) {
-            Column(
-                Modifier.padding(
-                    start = horizontalPadding, end = horizontalPadding,
-                    top = if (compact) 6.dp else 8.dp,
-                    bottom = if (compact) 6.dp else 9.dp,
-                ),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                if (live) Text(stringResource(R.string.player_live), style = type.labelMedium)
-                Text(time, style = if (compact) type.labelLarge else type.titleMedium.copy(fontSize = 19.sp))
-            }
+            if (live) Text(stringResource(R.string.player_live), style = type.labelMedium)
+            Text(time, style = type.labelLarge)
         }
     }
 }

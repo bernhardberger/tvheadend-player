@@ -35,6 +35,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.touch.R
 
@@ -45,19 +46,20 @@ internal fun PlayerScreen(
     onSeek: (Int) -> Unit,
     onBrightness: (Float) -> Unit,
     onChannel: (String) -> Unit,
+    onChoice: (PlayerChoice) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var visible by rememberSaveable(state.channel.id) { mutableStateOf(true) }
+    var panel by rememberSaveable { mutableStateOf<PlayerPanel?>(null) }
+    val panels = PanelHost(panel, { panel = it }, onChoice)
+    val openOptions = { panel = PlayerPanel.Options }
     var preview by remember(state.channel.id, state.status) { mutableStateOf<Int?>(null) }
     BoxWithConstraints(modifier.fillMaxSize().background(Color.Black)) {
-        val layout = when {
-            maxWidth >= maxHeight && maxHeight >= 600.dp -> PlayerLayout.Tablet
-            maxWidth >= maxHeight -> PlayerLayout.PhoneLandscape
-            maxWidth >= 600.dp -> PlayerLayout.Upright
-            else -> PlayerLayout.Phone
-        }
+        val layout = playerLayout(maxWidth, maxHeight)
         val playing = state.status == LivePlayerStatus.Playing
-        val controls = visible || !playing
+        // A sheet takes the controls off the picture; a menu keeps them, it belongs to a button.
+        val sheet = panel?.let { !it.atButton(layout) } == true
+        val controls = !sheet && (visible || !playing)
         val toggle = if (playing) ({ visible = !visible }) else null
         if (layout.upright) {
             Column(
@@ -66,7 +68,7 @@ internal fun PlayerScreen(
             ) {
                 Box(Modifier.fillMaxWidth().aspectRatio(16f / 9).background(Color.Black)) {
                     Picture(state, layout, controls, toggle)
-                    PictureControls(state, layout, controls, preview, onAction, onBrightness)
+                    PictureControls(state, layout, controls, preview, onAction, onBrightness, openOptions)
                     if (state.status.hasTimeline) {
                         PlayerTimeline(
                             state.timeline, state.status, layout, controls, preview, { preview = it }, onSeek,
@@ -74,25 +76,26 @@ internal fun PlayerScreen(
                         )
                     }
                 }
-                UprightPlayerContent(state, layout, preview != null, onAction, onChannel)
+                UprightPlayerContent(state, layout, preview != null, onAction, panels, onChannel)
             }
         } else {
             Picture(state, layout, controls, toggle)
-            PictureControls(state, layout, controls, preview, onAction, onBrightness)
+            PictureControls(state, layout, controls, preview, onAction, onBrightness, openOptions)
             val showFooter = controls && state.status !is LivePlayerStatus.Reconnecting &&
                 state.status != LivePlayerStatus.PauseEnded
             if (showFooter) {
                 LandscapePlayerContent(
-                    state, layout, preview, onAction, { preview = it }, onSeek,
+                    state, layout, preview, onAction, panels, { preview = it }, onSeek,
                     Modifier.align(Alignment.BottomCenter),
                 )
-            } else if (!controls) {
+            } else if (!controls && !sheet) {
                 PlayerTimeline(
                     state.timeline, state.status, layout, false, null, {}, onSeek,
                     Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(28.dp).offset(y = 20.dp),
                 )
             }
         }
+        PlayerSheets(panel, state, layout, { panel = it }, onAction, onChoice, onChannel)
     }
 }
 
@@ -146,6 +149,13 @@ private fun Frame(state: LivePlayerState, layout: PlayerLayout, controls: Boolea
             Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = .5f)))
         }
     }
+}
+
+private fun playerLayout(width: Dp, height: Dp) = when {
+    width >= height && height >= 600.dp -> PlayerLayout.Tablet
+    width >= height -> PlayerLayout.PhoneLandscape
+    width >= 600.dp -> PlayerLayout.Upright
+    else -> PlayerLayout.Phone
 }
 
 private val LivePlayerStatus.hasTimeline: Boolean

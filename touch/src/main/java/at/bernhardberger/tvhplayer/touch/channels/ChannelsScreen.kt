@@ -121,7 +121,7 @@ private fun ChannelsContent(
 private val ChannelList.canFilter: Boolean get() = rows.isNotEmpty() || selectedTagId != null
 
 @Composable
-private fun TagFilter(list: ChannelList, onTag: (String?) -> Unit, modifier: Modifier = Modifier) {
+internal fun TagFilter(list: ChannelList, onTag: (String?) -> Unit, modifier: Modifier = Modifier) {
     var open by remember { mutableStateOf(false) }
     val all = stringResource(R.string.channels_all)
     val label = list.tags.find { it.id == list.selectedTagId }?.label ?: all

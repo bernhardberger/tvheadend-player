@@ -26,7 +26,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -49,17 +48,23 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.channels.ChannelRow
 import at.bernhardberger.tvhplayer.touch.channels.ChannelRows
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsActions
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsLayout
+import at.bernhardberger.tvhplayer.touch.channels.TagFilter
 
 private const val DRAG_ALPHA = .38f
+
+/** The open menu or sheet and what its lists report back; shared by the player's two faces. */
+internal class PanelHost(
+    val panel: PlayerPanel?,
+    val onPanel: (PlayerPanel?) -> Unit,
+    val onChoice: (PlayerChoice) -> Unit,
+)
 
 @Composable
 internal fun LandscapePlayerContent(
@@ -67,6 +72,7 @@ internal fun LandscapePlayerContent(
     layout: PlayerLayout,
     preview: Int?,
     onAction: (PlayerAction) -> Unit,
+    panels: PanelHost,
     onPreviewChange: (Int?) -> Unit,
     onSeek: (Int) -> Unit,
     modifier: Modifier,
@@ -91,9 +97,9 @@ internal fun LandscapePlayerContent(
             )
         }
         val clockModifier = Modifier.padding(bottom = trackBottom - 8.dp)
-        ClockText(playerClock(state.timeline, 0), layout, clockModifier.align(Alignment.BottomStart))
+        ClockText(playerClock(state.timeline, 0), clockModifier.align(Alignment.BottomStart))
         ClockText(
-            playerClock(state.timeline, state.timeline.duration), layout, clockModifier.align(Alignment.BottomEnd),
+            playerClock(state.timeline, state.timeline.duration), clockModifier.align(Alignment.BottomEnd),
         )
         PlayerTimeline(
             state.timeline, state.status, layout, true, preview, onPreviewChange, onSeek,
@@ -101,7 +107,7 @@ internal fun LandscapePlayerContent(
                 .padding(bottom = trackBottom - 24.dp).height(44.dp),
         )
         PlayerActionRow(
-            state, layout, dragging, onAction,
+            state, layout, dragging, onAction, panels,
             Modifier.align(Alignment.BottomCenter).padding(bottom = rowBottom),
         )
     }
@@ -126,13 +132,10 @@ private fun LandscapeProgram(channel: ChannelRow, layout: PlayerLayout, modifier
             } else {
                 time ?: genre
             }
-            summary?.let {
-                ProgramLine(it, style = if (tablet) type.bodyMedium.copy(fontSize = 15.sp) else
-                    type.bodyMedium.copy(fontSize = 13.sp, lineHeight = 18.sp))
-            }
+            summary?.let { ProgramLine(it) }
             ProgramTitle(channel.now?.title, layout)
             channel.details?.episode?.let {
-                ProgramLine(it, style = if (tablet) type.bodyLarge.copy(fontSize = 17.sp) else type.bodyMedium)
+                ProgramLine(it, style = if (tablet) type.bodyLarge else type.bodyMedium)
             }
             if (tablet) {
                 channel.next?.let { ProgramLine(stringResource(R.string.player_next_program, it.start, it.title)) }
@@ -147,6 +150,7 @@ internal fun UprightPlayerContent(
     layout: PlayerLayout,
     dragging: Boolean,
     onAction: (PlayerAction) -> Unit,
+    panels: PanelHost,
     onChannel: (String) -> Unit,
 ) {
     val inset = if (layout == PlayerLayout.Phone) 16.dp else 24.dp
@@ -160,7 +164,7 @@ internal fun UprightPlayerContent(
                 ChannelLogo(channel, Modifier.size(64.dp, 36.dp))
                 Text(
                     channel.name, Modifier.weight(1f).padding(horizontal = 12.dp),
-                    style = MaterialTheme.typography.titleSmall,
+                    style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
                 channel.now?.timeRange?.let { ProgramLine(it, MaterialTheme.colorScheme.onSurfaceVariant) }
@@ -170,10 +174,10 @@ internal fun UprightPlayerContent(
             channel.details?.episode?.let { ProgramLine(it, MaterialTheme.colorScheme.onSurfaceVariant) }
         }
         PlayerActionRow(
-            state, layout, dragging, onAction,
+            state, layout, dragging, onAction, panels,
             Modifier.padding(horizontal = inset - 8.dp).padding(top = 14.dp, bottom = 12.dp),
         )
-        PlayerChannelList(state, layout, onAction, onChannel, Modifier.weight(1f))
+        PlayerChannelList(state, layout, panels.onChoice, onChannel, Modifier.weight(1f))
     }
 }
 
@@ -182,7 +186,7 @@ internal fun UprightPlayerContent(
 private fun PlayerChannelList(
     state: LivePlayerState,
     layout: PlayerLayout,
-    onAction: (PlayerAction) -> Unit,
+    onChoice: (PlayerChoice) -> Unit,
     onChannel: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -211,37 +215,17 @@ private fun PlayerChannelList(
                     color = colors.onSurface, style = MaterialTheme.typography.titleMedium,
                 )
                 if (state.channels.tags.isNotEmpty()) {
-                    ChannelGroupButton(state, onAction)
+                    TagFilter(state.channels, { onChoice(PlayerChoice.ChannelTag(it)) })
                 }
             }
             ChannelRows(
                 state.channels, if (layout == PlayerLayout.Phone) ChannelsLayout.Phone else ChannelsLayout.Upright,
                 ChannelsActions(
-                    onPlay = onChannel, onTag = { onAction(PlayerAction.ChannelGroups) }, onRetry = {},
-                    onOpenConnectionSettings = { onAction(PlayerAction.Settings) },
+                    onPlay = onChannel, onTag = {}, onRetry = {}, onOpenConnectionSettings = {},
                 ),
                 showColumnLabels = false,
             )
         }
-    }
-}
-
-@Composable
-private fun ChannelGroupButton(state: LivePlayerState, onAction: (PlayerAction) -> Unit) {
-    val colors = MaterialTheme.colorScheme
-    FilledTonalButton(
-        onClick = { onAction(PlayerAction.ChannelGroups) },
-        colors = ButtonDefaults.filledTonalButtonColors(
-            containerColor = colors.surfaceContainerHigh, contentColor = colors.onSurface,
-        ),
-        contentPadding = PaddingValues(horizontal = 14.dp),
-    ) {
-        Icon(painterResource(R.drawable.channels_tag), null, Modifier.size(18.dp))
-        Spacer(Modifier.width(8.dp))
-        Text(state.channels.tags.firstOrNull { it.id == state.channels.selectedTagId }?.label
-            ?: stringResource(R.string.channels_all))
-        Spacer(Modifier.width(4.dp))
-        Icon(painterResource(R.drawable.channels_expand), null, Modifier.size(18.dp))
     }
 }
 
@@ -293,6 +277,7 @@ private fun PlayerActionRow(
     layout: PlayerLayout,
     dragging: Boolean,
     onAction: (PlayerAction) -> Unit,
+    panels: PanelHost,
     modifier: Modifier,
 ) {
     val label = layout != PlayerLayout.PhoneLandscape &&
@@ -306,27 +291,53 @@ private fun PlayerActionRow(
         modifier.fillMaxWidth().alpha(if (dragging) DRAG_ALPHA else 1f).testTag("player-actions"),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        ActionButton(R.drawable.channels_record, R.string.player_record, label, !dragging, colors) {
-            onAction(PlayerAction.Record)
-        }
-        ActionButton(R.drawable.player_audio, R.string.player_audio, label, !dragging && listening, colors) {
-            onAction(PlayerAction.Audio)
-        }
-        ActionButton(R.drawable.player_subtitles, R.string.player_subtitles, label, !dragging && listening, colors) {
-            onAction(PlayerAction.Subtitles)
-        }
+        val menu = MenuButtonStyle(state, layout, label, colors, onAction, panels)
+        MenuButton(menu, R.drawable.channels_record, R.string.player_record, !dragging, PlayerPanel.Record)
+        MenuButton(menu, R.drawable.player_audio, R.string.player_audio, !dragging && listening, PlayerPanel.Audio)
+        MenuButton(
+            menu, R.drawable.player_subtitles, R.string.player_subtitles, !dragging && listening, PlayerPanel.Subtitles,
+        )
         Spacer(Modifier.weight(1f))
-        ActionButton(R.drawable.channels_info, R.string.player_info, label, !dragging, colors) {
+        ActionButton(R.drawable.channels_info, R.string.player_info, label, !dragging, colors, false, {
             onAction(PlayerAction.Info)
-        }
+        })
         if (!layout.upright) {
-            ActionButton(R.drawable.player_channels, R.string.player_channels, true, !dragging, colors) {
-                onAction(PlayerAction.Channels)
-            }
+            ActionButton(R.drawable.player_channels, R.string.player_channels, true, !dragging, colors, false, {
+                panels.onPanel(PlayerPanel.Channels)
+            })
         }
     }
 }
 
+private class MenuButtonStyle(
+    val state: LivePlayerState,
+    val layout: PlayerLayout,
+    val label: Boolean,
+    val colors: ButtonColors,
+    val onAction: (PlayerAction) -> Unit,
+    val panels: PanelHost,
+)
+
+/** Record, Audio or Subtitles: opens its list as a menu at the button, or as a bottom sheet on the phone. */
+@Composable
+private fun MenuButton(
+    style: MenuButtonStyle,
+    @DrawableRes icon: Int,
+    @StringRes name: Int,
+    enabled: Boolean,
+    target: PlayerPanel,
+) {
+    val panels = style.panels
+    val open = panels.panel == target
+    ActionButton(icon, name, style.label, enabled, style.colors, open, { panels.onPanel(if (open) null else target) }) {
+        if (target.atButton(style.layout)) {
+            val close = { panels.onPanel(null) }
+            PlayerMenu(open, panelEntries(target, style.state, style.onAction, panels.onChoice, close), close)
+        }
+    }
+}
+
+/** [open] marks the button whose menu is showing; [menu] is that menu, anchored to the button. */
 @Composable
 private fun ActionButton(
     @DrawableRes icon: Int,
@@ -334,19 +345,26 @@ private fun ActionButton(
     label: Boolean,
     enabled: Boolean,
     colors: ButtonColors,
+    open: Boolean,
     onClick: () -> Unit,
+    menu: @Composable () -> Unit = {},
 ) {
     val description = stringResource(name)
-    TextButton(
-        onClick = onClick, enabled = enabled, colors = colors,
-        modifier = if (label) Modifier else Modifier.semantics { contentDescription = description },
-        contentPadding = PaddingValues(horizontal = if (label) 8.dp else 2.dp),
-    ) {
-        Icon(painterResource(icon), null, Modifier.size(20.dp))
-        if (label) {
-            Spacer(Modifier.width(6.dp))
-            Text(description, maxLines = 1, style = MaterialTheme.typography.labelLarge)
+    val openColor = MaterialTheme.colorScheme.surfaceContainerHighest
+    Box {
+        TextButton(
+            onClick = onClick, enabled = enabled,
+            colors = if (open) colors.copy(containerColor = openColor) else colors,
+            modifier = if (label) Modifier else Modifier.semantics { contentDescription = description },
+            contentPadding = PaddingValues(horizontal = if (label) 8.dp else 2.dp),
+        ) {
+            Icon(painterResource(icon), null, Modifier.size(20.dp))
+            if (label) {
+                Spacer(Modifier.width(6.dp))
+                Text(description, maxLines = 1, style = MaterialTheme.typography.labelLarge)
+            }
         }
+        menu()
     }
 }
 
@@ -355,23 +373,16 @@ private fun ProgramTitle(title: String?, layout: PlayerLayout, color: Color = Co
     title?.let {
         val type = MaterialTheme.typography
         Text(
-            it, color = color, style = when (layout) {
-                PlayerLayout.Tablet -> type.headlineLarge.copy(fontSize = 34.sp, lineHeight = 42.sp)
-                PlayerLayout.PhoneLandscape -> type.headlineSmall.copy(lineHeight = 30.sp)
-                else -> type.headlineSmall
-            },
-            maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium,
+            it, color = color, style = if (layout == PlayerLayout.Tablet) type.displaySmall else type.headlineSmall,
+            maxLines = 1, overflow = TextOverflow.Ellipsis,
         )
     }
 }
 
 @Composable
-private fun ClockText(value: String, layout: PlayerLayout, modifier: Modifier) {
+private fun ClockText(value: String, modifier: Modifier) {
     Text(
-        value, modifier, color = Color.White.copy(alpha = .8f),
-        style = MaterialTheme.typography.labelLarge.copy(
-            fontSize = if (layout == PlayerLayout.Tablet) 15.sp else 13.sp,
-        ),
+        value, modifier, color = Color.White.copy(alpha = .8f), style = MaterialTheme.typography.bodyMedium,
         maxLines = 1,
     )
 }

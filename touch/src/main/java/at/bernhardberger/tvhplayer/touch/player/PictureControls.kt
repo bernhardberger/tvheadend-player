@@ -49,7 +49,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.DpSize
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.channels.ChannelRow
@@ -65,6 +64,7 @@ internal fun BoxScope.PictureControls(
     preview: Int?,
     onAction: (PlayerAction) -> Unit,
     onBrightness: (Float) -> Unit,
+    onSettings: () -> Unit,
 ) {
     if (!visible) return
     val status = state.status
@@ -77,7 +77,7 @@ internal fun BoxScope.PictureControls(
         else -> 0.dp
     }
     if (preview == null) {
-        PlayerTopBar(state, layout, onAction, Modifier.align(Alignment.TopCenter))
+        PlayerTopBar(state, layout, onAction, onSettings, Modifier.align(Alignment.TopCenter))
         if (playing || tuning) {
             Transport(state, layout, onAction, Modifier.align(Alignment.Center).offset(y = centerOffset))
             if (!layout.upright) {
@@ -105,6 +105,7 @@ private fun PlayerTopBar(
     state: LivePlayerState,
     layout: PlayerLayout,
     onAction: (PlayerAction) -> Unit,
+    onSettings: () -> Unit,
     modifier: Modifier,
 ) {
     val inset = when (layout) {
@@ -122,9 +123,7 @@ private fun PlayerTopBar(
             val logoWidth = if (layout == PlayerLayout.Tablet) 86.dp else 64.dp
             ChannelLogo(state.channel, Modifier.width(logoWidth).height(40.dp))
             val type = MaterialTheme.typography
-            val channelType = if (layout == PlayerLayout.Tablet) type.titleLarge else type.titleMedium.copy(
-                fontSize = 18.sp,
-            )
+            val channelType = if (layout == PlayerLayout.Tablet) type.titleLarge else type.titleMedium
             Text(
                 state.channel.name, Modifier.weight(1f).padding(horizontal = 12.dp), color = OnPicture,
                 style = channelType, maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -132,7 +131,7 @@ private fun PlayerTopBar(
         } else {
             Spacer(Modifier.weight(1f))
         }
-        PlayerIconButton(R.drawable.channels_settings, R.string.player_settings, { onAction(PlayerAction.Settings) })
+        PlayerIconButton(R.drawable.channels_settings, R.string.player_settings, onSettings)
         PlayerIconButton(
             R.drawable.player_pip, R.string.player_picture_in_picture, { onAction(PlayerAction.PictureInPicture) },
             enabled = state.status != LivePlayerStatus.Unavailable,
