@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.res.stringResource
+import at.bernhardberger.tvhplayer.core.AppError
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.channels.ChannelTag
 
@@ -65,7 +66,23 @@ internal data class GuideState(
     val selectedJump: Int = 0,
     /** Details the producer has for a program, by program id. */
     val details: Map<String, ProgramDetails> = emptyMap(),
+    /** Whether there is a list yet, or saved content while offline. */
+    val availability: GuideAvailability = GuideAvailability.Current,
+    /** The picked day's or time's programs are still coming: a short wait inside the shown Guide. */
+    val dayLoading: Boolean = false,
 )
+
+/** Section 12's states of the Guide as a whole; only [Current] and [Offline] show the list. */
+internal sealed interface GuideAvailability {
+    data object Current : GuideAvailability
+    data object Loading : GuideAvailability
+    data object Offline : GuideAvailability
+    data object SignInNeeded : GuideAvailability
+    data class Failed(val error: AppError) : GuideAvailability
+}
+
+internal val GuideState.listed: Boolean
+    get() = availability == GuideAvailability.Current || availability == GuideAvailability.Offline
 
 internal data class GuideChannel(
     val id: String,
@@ -77,6 +94,8 @@ internal data class GuideChannel(
     val programs: List<GuideProgram> = emptyList(),
     /** A gap after [programs] in the overview. */
     val gap: GuideGap? = null,
+    /** The selected day in By channel when it differs from the overview's [programs]; null uses them. */
+    val day: List<GuideProgram>? = null,
 )
 
 /** No programs until [until] ("6:00 AM"), from [start]. */
@@ -178,17 +197,22 @@ internal enum class FactKey(@param:StringRes val label: Int) {
     Categories(R.string.guide_categories),
 }
 
+/** A null action leaves its control out: the app offers only what has something behind it. */
 internal class GuideActions(
-    val onWatch: (channelId: String) -> Unit,
-    val onRecord: (programId: String) -> Unit,
+    val onWatch: ((channelId: String) -> Unit)?,
+    val onRecord: ((programId: String) -> Unit)?,
     /** The Record split button's arrow: series and other ways to record. */
-    val onRecordOptions: (programId: String) -> Unit,
+    val onRecordOptions: ((programId: String) -> Unit)?,
     /** Details opened; the producer may load more for [GuideState.details]. */
     val onDetails: (programId: String) -> Unit = {},
     val onDay: (Int) -> Unit,
     val onJump: (Int) -> Unit,
     val onTag: (String?) -> Unit,
     /** Details' Show in Guide; the Guide itself already shows the program. */
-    val onShowInGuide: (programId: String) -> Unit = {},
-    val onAiring: (programId: String) -> Unit = {},
+    val onShowInGuide: ((programId: String) -> Unit)? = {},
+    val onAiring: ((programId: String) -> Unit)? = {},
+    /** Section 12's failure and offline ways on: try again, connection settings, sign in. */
+    val onRetry: () -> Unit = {},
+    val onOpenConnectionSettings: () -> Unit = {},
+    val onSignIn: (() -> Unit)? = null,
 )

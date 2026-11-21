@@ -100,6 +100,17 @@ class GuideScreenTest {
     }
 
     @Test
+    @Config(qualifiers = TABLET)
+    fun tabletFirstLoad() {
+        show(overviewFixture().copy(availability = GuideAvailability.Loading))
+        compose.onNodeWithText("Loading guide…").assertIsDisplayed()
+        // The view switch and the day bar come with the list.
+        compose.onNodeWithText("Overview").assertDoesNotExist()
+        compose.onNodeWithText("Now").assertDoesNotExist()
+        capture("tablet-guide-loading", TouchCanvas.TABLET)
+    }
+
+    @Test
     @Config(qualifiers = UPRIGHT)
     fun uprightOverview() {
         show(overviewFixture(upright = true))
@@ -139,6 +150,15 @@ class GuideScreenTest {
         compose.onNodeWithText("Sunday, November 15").assertIsDisplayed()
         compose.onNodeWithText("Overview").performClick()
         compose.onNodeWithText("Ridge Earth • 8:00 PM").assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = PHONE)
+    fun phoneFirstLoad() {
+        show(phoneOverviewFixture().copy(availability = GuideAvailability.Loading))
+        compose.onNodeWithText("Loading guide…").assertIsDisplayed()
+        compose.onNodeWithText("Overview").assertDoesNotExist()
+        capture("phone-guide-loading", TouchCanvas.PHONE)
     }
 
     @Test

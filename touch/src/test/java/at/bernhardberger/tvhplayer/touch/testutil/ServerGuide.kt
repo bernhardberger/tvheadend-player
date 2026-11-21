@@ -18,7 +18,8 @@ import kotlin.time.Instant
 
 /**
  * A server's channels and guide as the SDK hands them over: two channels, News tagging only the
- * first, and on the first four programs in a row around [now] (on now, next and two after).
+ * first, and on the first four programs in a row around [now] (on now, next and two after); the one on now has a
+ * description. The running recording and the scheduled one are linked to their programs.
  */
 internal class ServerGuide(val now: Instant) {
     val news = ChannelTag.create(ChannelTagId(NEWS_TAG), name = "News")
@@ -30,7 +31,10 @@ internal class ServerGuide(val now: Instant) {
     val snapshot = EpgSnapshot.create(
         programs.mapIndexed { index, title ->
             val start = now - 30.minutes + (index * 60).minutes
-            EpgEvent.create(EventId(index + 1L), first.id, start, start + 60.minutes, title = title)
+            EpgEvent.create(
+                EventId(index + 1L), first.id, start, start + 60.minutes, title = title,
+                description = "About $title".takeIf { index == 0 },
+            )
         },
     )
 
@@ -39,10 +43,11 @@ internal class ServerGuide(val now: Instant) {
      * days ago in Films, a finished watched one yesterday in Docs, and a scheduled one that the
      * archive never lists.
      */
-    val recordingNow = recording(RECORDING_NOW, "Evening News", first, now - 30.minutes, DvrEntryState.RECORDING)
+    val recordingNow =
+        recording(RECORDING_NOW, "Evening News", first, now - 30.minutes, DvrEntryState.RECORDING, event = 1)
     val film = recording(FILM, "Harbor Lights", first, now - 2.days, DvrEntryState.COMPLETED, folder = "Films")
     val diary = recording(DIARY, "Mountain Diary", second, now - 1.days, DvrEntryState.COMPLETED, "Docs", 1)
-    val scheduled = recording(SCHEDULED, "Late Film", first, now + 90.minutes, DvrEntryState.SCHEDULED)
+    val scheduled = recording(SCHEDULED, "Late Film", first, now + 90.minutes, DvrEntryState.SCHEDULED, event = 3)
     val dvr = DvrSnapshot.create(entries = listOf(recordingNow, film, diary, scheduled))
 
     private fun recording(
@@ -53,9 +58,10 @@ internal class ServerGuide(val now: Instant) {
         state: DvrEntryState,
         folder: String? = null,
         playCount: Long = 0,
+        event: Long? = null,
     ) = DvrEntry.create(
         id = DvrEntryId(id), channelId = channel.id, start = start, stop = start + 60.minutes, title = title,
-        state = state, folder = folder?.let(::listOf), playCount = playCount,
+        state = state, folder = folder?.let(::listOf), playCount = playCount, eventId = event?.let(::EventId),
     )
 
     private companion object {

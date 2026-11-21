@@ -155,13 +155,14 @@ internal fun ProgramDetailsColumn(
         ProgramPicture(details.art ?: details.picture, Modifier.fillMaxWidth(), strip = false)
         Lead(details, MaterialTheme.typography.headlineMedium, Modifier.padding(top = 16.dp))
         Timing(details, Modifier.padding(top = 16.dp))
+        val record = actions.onRecord
+        val recordOptions = actions.onRecordOptions
         if (inPlayer) {
-            RecordButton(
-                { actions.onRecord(details.id) },
-                { actions.onRecordOptions(details.id) },
-                Modifier.padding(top = 16.dp),
-                leads = true,
-            )
+            if (record != null && recordOptions != null) {
+                RecordButton(
+                    { record(details.id) }, { recordOptions(details.id) }, Modifier.padding(top = 16.dp), leads = true,
+                )
+            }
         } else {
             Actions(details, actions, Modifier.padding(top = 16.dp), equalWidth = true)
         }
@@ -252,22 +253,28 @@ private fun Timing(details: ProgramDetails, modifier: Modifier) {
 /** Watch (on now), Record with its series arrow, Show in Guide; the phone gives Show in Guide its own line. */
 @Composable
 private fun Actions(details: ProgramDetails, actions: GuideActions, modifier: Modifier, equalWidth: Boolean) {
-    val showInGuide: @Composable () -> Unit = {
-        TextButton(onClick = { actions.onShowInGuide(details.id) }) {
-            ChannelActionLabel(R.drawable.calendar_month_outline, stringResource(R.string.channels_show_in_guide))
+    val watch = actions.onWatch?.takeIf { details.onNow }
+    val record = actions.onRecord
+    val recordOptions = actions.onRecordOptions?.takeIf { record != null }
+    val showInGuide = actions.onShowInGuide
+    if (watch == null && recordOptions == null && showInGuide == null) return
+    val showInGuideButton: @Composable () -> Unit = {
+        if (showInGuide != null) {
+            TextButton(onClick = { showInGuide(details.id) }) {
+                ChannelActionLabel(R.drawable.calendar_month_outline, stringResource(R.string.channels_show_in_guide))
+            }
         }
     }
     if (equalWidth) {
         Column(modifier) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 val share = Modifier.weight(1f).heightIn(min = 48.dp)
-                if (details.onNow) WatchButton(share) { actions.onWatch(details.channelId) }
-                RecordButton(
-                    { actions.onRecord(details.id) }, { actions.onRecordOptions(details.id) }, share,
-                    leads = !details.onNow,
-                )
+                if (watch != null) WatchButton(share) { watch(details.channelId) }
+                if (record != null && recordOptions != null) {
+                    RecordButton({ record(details.id) }, { recordOptions(details.id) }, share, leads = watch == null)
+                }
             }
-            showInGuide()
+            showInGuideButton()
         }
     } else {
         FlowRow(
@@ -275,12 +282,11 @@ private fun Actions(details: ProgramDetails, actions: GuideActions, modifier: Mo
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            if (details.onNow) WatchButton { actions.onWatch(details.channelId) }
-            RecordButton(
-                { actions.onRecord(details.id) }, { actions.onRecordOptions(details.id) },
-                leads = !details.onNow,
-            )
-            showInGuide()
+            if (watch != null) WatchButton { watch(details.channelId) }
+            if (record != null && recordOptions != null) {
+                RecordButton({ record(details.id) }, { recordOptions(details.id) }, leads = watch == null)
+            }
+            showInGuideButton()
         }
     }
 }
@@ -309,21 +315,28 @@ private fun OtherAirings(details: ProgramDetails, actions: GuideActions) {
     DetailsSectionTitle(stringResource(R.string.guide_other_airings, details.title))
     Column(verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
         details.otherAirings.forEachIndexed { index, airing ->
-            ListItem(
-                onClick = { actions.onAiring(airing.id) },
-                shapes = ListItemDefaults.segmentedShapes(index, details.otherAirings.size),
-                colors = ListItemDefaults.segmentedColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-                leadingContent = {
-                    ChannelLogoTile(airing.logo, airing.logoTint, Modifier.size(64.dp, 36.dp), RoundedCornerShape(8.dp))
-                },
-                supportingContent = { PartsLine(airing.line) },
-                trailingContent = if (airing.scheduled) {
-                    { ScheduledIcon() }
-                } else {
-                    null
-                },
-            ) {
-                Text(airing.time, maxLines = 1)
+            val shapes = ListItemDefaults.segmentedShapes(index, details.otherAirings.size)
+            val colors = ListItemDefaults.segmentedColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+            val leading: @Composable () -> Unit = {
+                ChannelLogoTile(airing.logo, airing.logoTint, Modifier.size(64.dp, 36.dp), RoundedCornerShape(8.dp))
+            }
+            val supporting: @Composable () -> Unit = { PartsLine(airing.line) }
+            val trailing: (@Composable () -> Unit)? = if (airing.scheduled) {
+                { ScheduledIcon() }
+            } else {
+                null
+            }
+            val onAiring = actions.onAiring
+            if (onAiring != null) {
+                ListItem(
+                    onClick = { onAiring(airing.id) }, shapes = shapes, colors = colors, leadingContent = leading,
+                    supportingContent = supporting, trailingContent = trailing,
+                ) { Text(airing.time, maxLines = 1) }
+            } else {
+                ListItem(
+                    shapes = shapes, colors = colors, leadingContent = leading,
+                    supportingContent = supporting, trailingContent = trailing,
+                ) { Text(airing.time, maxLines = 1) }
             }
         }
     }

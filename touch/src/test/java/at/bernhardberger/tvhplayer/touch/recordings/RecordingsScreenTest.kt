@@ -122,6 +122,18 @@ class RecordingsScreenTest {
     }
 
     @Test
+    @Config(qualifiers = "en-rUS-w1280dp-h800dp-land-xhdpi")
+    fun tabletFirstLoad() {
+        state.value = flatFixture().copy(availability = RecordingsAvailability.Loading)
+        show()
+        compose.onNodeWithText("Loading recordings…").assertIsDisplayed()
+        // The view options and the pane's placeholder come with the list.
+        compose.onNodeWithContentDescription("View options").assertDoesNotExist()
+        compose.onNodeWithText("Pick a recording to see it here").assertDoesNotExist()
+        capture("tablet-recordings-loading", TouchCanvas.TABLET)
+    }
+
+    @Test
     @Config(qualifiers = "en-rUS-w800dp-h1280dp-port-xhdpi")
     fun uprightPickOpensAPage() {
         state.value = flatFixture(harborLights = true, glassHarbor = true)
@@ -163,6 +175,16 @@ class RecordingsScreenTest {
         compose.onNodeWithText("Week 46").assertDoesNotExist()
         compose.onNodeWithText("Watch from beginning").assertIsDisplayed()
         capture("phone-recording-details", TouchCanvas.PHONE)
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
+    fun phoneFirstLoad() {
+        state.value = flatFixture().copy(availability = RecordingsAvailability.Loading)
+        show()
+        compose.onNodeWithText("Loading recordings…").assertIsDisplayed()
+        compose.onNodeWithContentDescription("View options").assertDoesNotExist()
+        capture("phone-recordings-loading", TouchCanvas.PHONE)
     }
 
     @Test

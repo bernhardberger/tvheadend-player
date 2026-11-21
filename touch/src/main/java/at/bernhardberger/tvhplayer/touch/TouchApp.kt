@@ -35,6 +35,8 @@ import at.bernhardberger.tvhplayer.touch.connect.FirstRunFlow
 import at.bernhardberger.tvhplayer.touch.connect.connectionStatus
 import at.bernhardberger.tvhplayer.touch.ui.Destination
 import at.bernhardberger.tvhplayer.touch.ui.LocalFrameSelection
+import at.bernhardberger.tvhplayer.touch.guide.GuideDestination
+import at.bernhardberger.tvhplayer.touch.guide.GuideViewModel
 import at.bernhardberger.tvhplayer.touch.recordings.RecordingsDestination
 import at.bernhardberger.tvhplayer.touch.recordings.RecordingsViewModel
 import kotlinx.coroutines.flow.Flow
@@ -58,6 +60,7 @@ internal fun TouchApp(
     connection: AppConnectionViewModel,
     channels: ChannelsViewModel,
     recordings: RecordingsViewModel,
+    guide: GuideViewModel,
     discovery: () -> Flow<TvheadendDiscoveryState>,
 ) {
     val profile by owner.serverProfile.collectAsStateWithLifecycle()
@@ -101,7 +104,7 @@ internal fun TouchApp(
             )
         }
         else -> AppDestinations(
-            connection, channels, recordings,
+            connection, channels, recordings, guide,
             onOpenConnections = { page = Page.Connections },
             onSignIn = { page = Page.SignIn },
         )
@@ -182,11 +185,13 @@ private fun AppFrame(
 }
 
 /** Each destination's screen draws the frame, so the selection is kept here and picks the screen. */
+@Suppress("LongParameterList") // One view model per destination.
 @Composable
 private fun AppDestinations(
     connection: AppConnectionViewModel,
     channels: ChannelsViewModel,
     recordings: RecordingsViewModel,
+    guide: GuideViewModel,
     onOpenConnections: () -> Unit,
     onSignIn: () -> Unit,
 ) {
@@ -195,9 +200,11 @@ private fun AppDestinations(
         when (selection.value) {
             Destination.Recordings ->
                 RecordingsDestination(recordings, connection, AppDestinationList, onOpenConnections, onSignIn)
-            else -> AppFrame(connection, channels, onOpenConnections, onSignIn)
+            Destination.Guide ->
+                GuideDestination(guide, channels, connection, AppDestinationList, onOpenConnections, onSignIn)
+            Destination.Channels -> AppFrame(connection, channels, onOpenConnections, onSignIn)
         }
     }
 }
 
-private val AppDestinationList = listOf(Destination.Channels, Destination.Recordings)
+private val AppDestinationList = Destination.entries
