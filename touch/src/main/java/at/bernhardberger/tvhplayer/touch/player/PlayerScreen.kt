@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
@@ -118,7 +117,7 @@ internal fun PlayerScreen(
             if (!inWindow) {
                 PictureControls(state, layout, controls, preview, onAction, onBrightness, openOptions)
                 LandscapeFooter(
-                    state, layout, controls, sheet, preview, { preview = it }, onAction, panels, onSeek, notices,
+                    state, layout, controls, preview, { preview = it }, onAction, panels, onSeek, notices,
                 )
             }
         }
@@ -191,7 +190,6 @@ private fun BoxScope.LandscapeFooter(
     state: LivePlayerState,
     layout: PlayerLayout,
     controls: Boolean,
-    sheet: Boolean,
     preview: Int?,
     onPreview: (Int?) -> Unit,
     onAction: (PlayerAction) -> Unit,
@@ -205,12 +203,6 @@ private fun BoxScope.LandscapeFooter(
         LandscapePlayerContent(
             state, layout, preview, onAction, panels, onPreview, onSeek, Modifier.align(Alignment.BottomCenter),
             notice = notices,
-        )
-    } else if (!controls && !sheet) {
-        // Controls hidden: the thin line stays on the edge.
-        PlayerTimeline(
-            state.timeline, state.status, layout, false, null, {}, onSeek,
-            Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(28.dp).offset(y = 20.dp),
         )
     }
     if (!showFooter) {

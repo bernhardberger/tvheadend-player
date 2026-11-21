@@ -184,6 +184,7 @@ class PlayerScreenTest {
         chromeIsVisible()
 
         tapPicture()
+        timeline().assertDoesNotExist()
         capture("tablet-player-hidden", canvas)
         tapPicture()
         noticeOnlyOutsideTheWindow("tablet-player-notice", canvas)
@@ -561,6 +562,7 @@ class PlayerScreenTest {
             oneLine.overlaps(it) || twoLine.overlaps(it)
         })
         tapPicture()
+        timeline().assertDoesNotExist()
         val hidden = snackbar.fetchSemanticsNode().boundsInRoot
         assertEquals("Hidden notice uses the bottom margin", twoLine.left - picture.left, picture.bottom - hidden.bottom, 1f)
         tapPicture()
