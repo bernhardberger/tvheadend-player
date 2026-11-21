@@ -3,7 +3,6 @@
 
 package at.bernhardberger.tvhplayer.touch.ui
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -29,7 +28,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.painter.Painter
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -65,16 +63,21 @@ internal fun ChannelLogoTile(
         modifier.clip(shape).then(fill).border(1.dp, scheme.outlineVariant, shape),
         contentAlignment = Alignment.Center,
     ) {
-        // Whatever its shape, the logo is fitted into the same share of the tile (section 13).
-        val box = Modifier.fillMaxWidth(LOGO_WIDTH_SHARE).fillMaxHeight(LOGO_HEIGHT_SHARE)
-        if (logo == null) {
-            ArtworkImage(null, model, box) {
-                Icon(painterResource(R.drawable.play_tv_outline), null, tint = scheme.onSurfaceVariant)
-            }
-        } else {
-            Image(logo, null, box, contentScale = ContentScale.Fit)
+        ChannelLogoImage(logo, model) {
+            Icon(painterResource(R.drawable.play_tv_outline), null, tint = scheme.onSurfaceVariant)
         }
     }
+}
+
+/**
+ * A channel's logo fitted, whatever its shape, into the same share of the slot it stands in, centered by the
+ * caller's Box (section 13); [fallback] stands in while a server logo loads or when it fails.
+ */
+@Composable
+internal fun ChannelLogoImage(logo: Painter?, model: Any?, fallback: @Composable () -> Unit = {}) {
+    ArtworkImage(
+        logo, model, Modifier.fillMaxWidth(LOGO_WIDTH_SHARE).fillMaxHeight(LOGO_HEIGHT_SHARE), fallback = fallback,
+    )
 }
 
 /** The scrim over a page's top picture: it keeps the bar readable and fades the picture into the page. */
