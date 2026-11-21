@@ -175,7 +175,8 @@ class TouchAppTest {
         val guide = savedConnectionWithGuide()
         compose.onNodeWithText(guide.first.name!!).assertIsDisplayed()
         compose.onNodeWithText(guide.second.name!!).assertIsDisplayed()
-        compose.onNodeWithText(guide.programs[0]).assertIsDisplayed()
+        // The phone row writes what is left of the program on now beside its title.
+        compose.onNodeWithText(guide.programs[0], substring = true).assertIsDisplayed()
 
         // The open row offers nothing to play or record yet.
         compose.onNodeWithText(label(R.string.nav_epg)).assertIsDisplayed()

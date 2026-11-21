@@ -26,37 +26,31 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import at.bernhardberger.tvhplayer.touch.R
-import at.bernhardberger.tvhplayer.touch.channels.ChannelsActions
-import at.bernhardberger.tvhplayer.touch.channels.ChannelsFailure
-import at.bernhardberger.tvhplayer.touch.channels.ChannelsMessage
-import at.bernhardberger.tvhplayer.touch.channels.MessageKind
 import at.bernhardberger.tvhplayer.touch.ui.FirstLoadLine
 import at.bernhardberger.tvhplayer.touch.ui.FirstLoadList
+import at.bernhardberger.tvhplayer.touch.ui.ListFailure
+import at.bernhardberger.tvhplayer.touch.ui.ListMessage
+import at.bernhardberger.tvhplayer.touch.ui.MessageKind
 import at.bernhardberger.tvhplayer.touch.ui.OfflineBanner
 import at.bernhardberger.tvhplayer.touch.ui.OfflineTexts
 import at.bernhardberger.tvhplayer.touch.ui.SkeletonBlock
 import at.bernhardberger.tvhplayer.touch.ui.SkeletonLines
 import at.bernhardberger.tvhplayer.touch.ui.SkeletonRow
 
-/** Channels' message actions for the Guide's stand-ins: no channel plays from them. */
-internal fun GuideActions.messageActions() = ChannelsActions(
-    onPlay = null,
-    onTag = onTag,
-    onRetry = onRetry,
-    onOpenConnectionSettings = onOpenConnectionSettings,
-    onSignIn = onSignIn,
-)
-
 /**
- * What stands in for the Guide while there is no list: section 12's first-load form, and Channels'
+ * What stands in for the Guide while there is no list: section 12's first-load form, and the shared
  * message form for sign-in needed and for failures, in the catalog's words.
  */
 @Composable
 internal fun GuideStandIn(availability: GuideAvailability, layout: GuideLayout, actions: GuideActions) {
     when (availability) {
         GuideAvailability.Loading -> GuideFirstLoad(layout)
-        GuideAvailability.SignInNeeded -> ChannelsMessage(MessageKind.SignInNeeded, actions.messageActions())
-        is GuideAvailability.Failed -> ChannelsFailure(availability.error, actions.messageActions())
+        GuideAvailability.SignInNeeded -> ListMessage(
+            MessageKind.SignInNeeded, actions.onSignIn ?: actions.onOpenConnectionSettings,
+        )
+        is GuideAvailability.Failed -> ListFailure(
+            availability.error, actions.onRetry, actions.onOpenConnectionSettings,
+        )
         GuideAvailability.Current, GuideAvailability.Offline -> Unit
     }
 }

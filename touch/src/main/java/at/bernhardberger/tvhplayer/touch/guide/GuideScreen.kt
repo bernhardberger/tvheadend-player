@@ -50,10 +50,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.channels.ChannelActionLabel
-import at.bernhardberger.tvhplayer.touch.channels.ChannelsMessage
-import at.bernhardberger.tvhplayer.touch.channels.MessageKind
 import at.bernhardberger.tvhplayer.touch.ui.ChannelLogoTile
 import at.bernhardberger.tvhplayer.touch.ui.Destination
+import at.bernhardberger.tvhplayer.touch.ui.ListMessage
+import at.bernhardberger.tvhplayer.touch.ui.MessageKind
 import at.bernhardberger.tvhplayer.touch.ui.TouchFrame
 
 /**
@@ -143,8 +143,10 @@ private fun GuideList(state: GuideState, layout: GuideLayout, actions: GuideActi
     val body: @Composable () -> Unit = {
         when {
             state.channels.isNotEmpty() -> content()
-            state.selectedTagId != null -> ChannelsMessage(MessageKind.EmptyTag, actions.messageActions())
-            else -> ChannelsMessage(MessageKind.Empty, actions.messageActions())
+            state.selectedTagId != null -> ListMessage(MessageKind.EmptyTag, actions.onOpenConnectionSettings) {
+                actions.onTag(null)
+            }
+            else -> ListMessage(MessageKind.Empty, actions.onOpenConnectionSettings)
         }
     }
     if (state.availability != GuideAvailability.Offline) {

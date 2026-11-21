@@ -17,12 +17,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import at.bernhardberger.tvhplayer.touch.R
-import at.bernhardberger.tvhplayer.touch.channels.ChannelsActions
-import at.bernhardberger.tvhplayer.touch.channels.ChannelsFailure
-import at.bernhardberger.tvhplayer.touch.channels.ChannelsMessage
-import at.bernhardberger.tvhplayer.touch.channels.MessageKind
 import at.bernhardberger.tvhplayer.touch.ui.FirstLoadLine
 import at.bernhardberger.tvhplayer.touch.ui.FirstLoadList
+import at.bernhardberger.tvhplayer.touch.ui.ListFailure
+import at.bernhardberger.tvhplayer.touch.ui.ListMessage
+import at.bernhardberger.tvhplayer.touch.ui.MessageKind
 import at.bernhardberger.tvhplayer.touch.ui.OfflineBanner
 import at.bernhardberger.tvhplayer.touch.ui.OfflineTexts
 import at.bernhardberger.tvhplayer.touch.ui.SkeletonBlock
@@ -31,7 +30,7 @@ import at.bernhardberger.tvhplayer.touch.ui.SkeletonRow
 
 /**
  * What stands in for the list while there is none: section 12's first-load form (the loading line
- * and two-line skeleton rows; the tablet's pane stays empty), and Channels' message form for
+ * and two-line skeleton rows; the tablet's pane stays empty), and the shared message form for
  * sign-in needed and for failures, in the catalog's words.
  */
 @Composable
@@ -40,17 +39,14 @@ internal fun RecordingsStandIn(
     layout: RecordingsLayout,
     actions: RecordingsActions,
 ) {
-    val messageActions = ChannelsActions(
-        onPlay = null,
-        onTag = {},
-        onRetry = actions.onRetry,
-        onOpenConnectionSettings = actions.onOpenConnectionSettings,
-        onSignIn = actions.onSignIn,
-    )
     when (availability) {
         RecordingsAvailability.Loading -> RecordingsFirstLoad(layout)
-        RecordingsAvailability.SignInNeeded -> ChannelsMessage(MessageKind.SignInNeeded, messageActions)
-        is RecordingsAvailability.Failed -> ChannelsFailure(availability.error, messageActions)
+        RecordingsAvailability.SignInNeeded -> ListMessage(
+            MessageKind.SignInNeeded, actions.onSignIn ?: actions.onOpenConnectionSettings,
+        )
+        is RecordingsAvailability.Failed -> ListFailure(
+            availability.error, actions.onRetry, actions.onOpenConnectionSettings,
+        )
         RecordingsAvailability.Current, RecordingsAvailability.Offline -> Unit
     }
 }

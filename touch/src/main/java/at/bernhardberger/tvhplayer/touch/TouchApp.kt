@@ -24,6 +24,7 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsActions
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsScreen
 import at.bernhardberger.tvhplayer.touch.channels.channelsState
+import at.bernhardberger.tvhplayer.touch.channels.rememberChannelsTexts
 import at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import at.bernhardberger.tvhplayer.ui.common.rememberCurrentEpochSeconds
@@ -176,7 +177,10 @@ private fun AppFrame(
     val observation by channels.observation.collectAsStateWithLifecycle()
     val nowSec = rememberCurrentEpochSeconds()
     val now = Instant.fromEpochSeconds(nowSec())
-    val state = channelsState(scope, presentation.connection, presentation.degraded, observation, now, playingId)
+    val texts = rememberChannelsTexts()
+    val state = channelsState(
+        scope, presentation.connection, presentation.degraded, observation, now, texts, playingId,
+    )
     ChannelsScreen(
         state = state,
         actions = ChannelsActions(

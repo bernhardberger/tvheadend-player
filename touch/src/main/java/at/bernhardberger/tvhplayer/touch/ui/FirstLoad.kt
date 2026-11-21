@@ -100,7 +100,7 @@ internal fun SkeletonBlock(width: Dp, height: Dp, shape: Shape = RoundedCornerSh
 /**
  * Channels' offline line above saved content: the phone says the server is unreachable over
  * [OfflineTexts.saved] with a settings icon; the tablet says [OfflineTexts.offline] and that it is
- * reconnecting, with a settings button.
+ * reconnecting, in [retryIn] when the countdown is known, with a settings button.
  */
 @Composable
 internal fun OfflineBanner(
@@ -108,6 +108,7 @@ internal fun OfflineBanner(
     texts: OfflineTexts,
     onSettings: () -> Unit,
     modifier: Modifier = Modifier,
+    retryIn: String? = null,
 ) {
     Row(
         modifier.fillMaxWidth()
@@ -131,10 +132,12 @@ internal fun OfflineBanner(
         } else {
             FlowRow(Modifier.weight(1f).padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(stringResource(texts.offline), style = MaterialTheme.typography.bodySmall)
-                Text(
-                    stringResource(R.string.channels_reconnecting), style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.outline,
-                )
+                val reconnect = if (retryIn == null) {
+                    stringResource(R.string.channels_reconnecting)
+                } else {
+                    stringResource(R.string.channels_reconnect_in, retryIn)
+                }
+                Text(reconnect, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
             }
             TextButton(onClick = onSettings) { Text(stringResource(R.string.channels_connection_settings)) }
         }
