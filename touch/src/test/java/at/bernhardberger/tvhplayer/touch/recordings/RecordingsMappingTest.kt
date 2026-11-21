@@ -20,13 +20,16 @@ import at.bernhardberger.tvhplayer.touch.ui.ArtworkModels
 import java.time.ZoneOffset
 import java.util.Locale
 import kotlin.time.Instant
+import at.bernhardberger.tvhplayer.ui.common.formatClock
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 @OptIn(TvheadendTestingApi::class)
 class RecordingsMappingTest {
     private val guide = ServerGuide(Instant.fromEpochSeconds(NOW))
-    private val clock = RecordingClock(java.time.Instant.ofEpochSecond(NOW), ZoneOffset.UTC, Locale.US)
+    private val clock = RecordingClock(java.time.Instant.ofEpochSecond(NOW), ZoneOffset.UTC, Locale.US) {
+        formatClock(it, Locale.US, uses24Hour = false)
+    }
     private val texts = RecordingsTexts(
         noChannel = "No channel", noGenre = "No genre", recordingNow = "Recording now",
         genre = { null }, episode = { null }, section = { it.toString() }, size = { "$it B" },

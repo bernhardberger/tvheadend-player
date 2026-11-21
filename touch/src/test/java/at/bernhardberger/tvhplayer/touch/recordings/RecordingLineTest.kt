@@ -12,12 +12,15 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.Locale
+import at.bernhardberger.tvhplayer.ui.common.formatClock
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 // The first pure policy in :touch, so it has its own JVM test: the row-line rule of touch-design §8.
 class RecordingLineTest {
-    private val clock = RecordingClock(Instant.parse("2026-11-16T20:00:00Z"), ZoneId.of("Europe/Vienna"), Locale.US)
+    private val clock = RecordingClock(Instant.parse("2026-11-16T20:00:00Z"), ZoneId.of("Europe/Vienna"), Locale.US) {
+        formatClock(it, Locale.US, uses24Hour = false)
+    }
     private val underDay = RowContext(RowDates.DayLabel)
     private val inFolder = RowContext(RowDates.None)
 
@@ -76,10 +79,10 @@ class RecordingLineTest {
 
     private fun day(year: Int, month: Int, day: Int) = RecordingDay.On(LocalDate.of(year, month, day), withYear = false)
 
-    // The JDK writes "8:15 PM" with a narrow no-break space; the rule is about the parts.
+    // Clock texts write "8:15 PM" with a no-break space; the rule is about the parts.
     private fun spaced(part: RecordingLinePart) = when (part) {
-        is Time -> Time(part.time.replace(' ', ' '))
-        is Until -> Until(part.time.replace(' ', ' '))
+        is Time -> Time(part.time.replace('\u00a0', ' '))
+        is Until -> Until(part.time.replace('\u00a0', ' '))
         else -> part
     }
 

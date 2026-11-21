@@ -8,6 +8,8 @@ import java.time.Duration
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import java.util.Locale
 import at.bernhardberger.tvhplayer.core.DvrArchiveView
 import at.bernhardberger.tvhplayer.core.DvrArchiveShow
@@ -157,6 +159,8 @@ private fun extraTime(id: String, start: Instant, state: RecordingProgress) =
 /** The drawings' evening: Mon, Nov 16, during the live match. */
 internal val FixtureClock = RecordingClock(
     now = Instant.parse("2026-11-16T21:00:00Z"), zone = ZoneOffset.UTC, locale = Locale.US,
+    // The drawings' "8:30 PM", in the JDK's short style the captures were drawn with.
+    time = { DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).withLocale(Locale.US).format(it) },
 )
 
 private fun at(dayOfNovember: Int, hour: Int, minute: Int): Instant =
