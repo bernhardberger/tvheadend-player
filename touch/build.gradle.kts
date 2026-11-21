@@ -27,9 +27,9 @@ androidComponents.beforeVariants { variant ->
 }
 
 tasks.withType<Test>().configureEach {
-    val captureDir = layout.buildDirectory.dir("captures/slice0").get().asFile
+    val captureDir = layout.buildDirectory.dir("captures").get().asFile
     outputs.dir(captureDir)
-    systemProperty("touch.slice0.captureDir", captureDir.absolutePath)
+    systemProperty("touch.captureDir", captureDir.absolutePath)
 }
 
 dependencies {
@@ -41,4 +41,6 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation("org.robolectric:robolectric:4.17")
     testImplementation(libs.androidx.compose.ui.test.junit4)
+    // ComponentActivity for screen tests that compose a single screen on fixture state.
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
