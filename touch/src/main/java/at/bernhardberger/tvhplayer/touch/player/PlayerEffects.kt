@@ -22,7 +22,6 @@ internal fun PlayerEffects(
     session: TvheadendSession,
     runtime: AppPlaybackRuntime,
     notices: NoticeCenter,
-    window: Window,
 ) {
     FollowTimeshift(
         timeshift, shown, fast, liveStart,
@@ -30,7 +29,6 @@ internal fun PlayerEffects(
         nextAt = { session.observation.value.nextEvent(shown, it) },
     )
     ConsumePauseNotices(runtime, notices)
-    SystemBarsForOrientation(window)
 }
 
 /**
@@ -39,9 +37,10 @@ internal fun PlayerEffects(
  * (phone-player, tablet-upright-player).
  */
 @Composable
-private fun SystemBarsForOrientation(window: Window) {
+internal fun SystemBarsForOrientation(window: Window, inWindow: Boolean) {
     val landscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
-    LaunchedEffect(window, landscape) {
+    LaunchedEffect(window, landscape, inWindow) {
+        if (inWindow) return@LaunchedEffect
         val bars = WindowCompat.getInsetsController(window, window.decorView)
         bars.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         val systemBars = WindowInsetsCompat.Type.systemBars()

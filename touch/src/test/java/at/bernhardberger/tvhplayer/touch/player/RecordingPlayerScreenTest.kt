@@ -1,6 +1,10 @@
 package at.bernhardberger.tvhplayer.touch.player
 
 import androidx.activity.ComponentActivity
+import android.content.res.Configuration
+import android.os.Looper
+import android.view.WindowInsets
+import androidx.annotation.OptIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -26,25 +30,49 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.ExoPlayer
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi
+import at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider
+import at.bernhardberger.tvheadend.sdk.media3.createTvheadendPlaybackCoordinator
+import at.bernhardberger.tvhplayer.di.SdkRuntimeOwner
+import at.bernhardberger.tvhplayer.images.ChannelAccents
 import at.bernhardberger.tvhplayer.notices.Notice
+import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
+import at.bernhardberger.tvhplayer.playback.PlaybackAudioFocus
+import at.bernhardberger.tvhplayer.playback.PlaybackRuntimePolicy
 import at.bernhardberger.tvhplayer.settings.AdBreakMode
+import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
+import at.bernhardberger.tvhplayer.stores.ChannelAccentStore
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.recordings.RecordingProgress
+import at.bernhardberger.tvhplayer.touch.testutil.FakeConnection
 import at.bernhardberger.tvhplayer.touch.testutil.TouchCanvas
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouch
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouchWindows
 import at.bernhardberger.tvhplayer.touch.ui.TouchNotice
 import at.bernhardberger.tvhplayer.ui.MobileDarkColors
 import at.bernhardberger.tvhplayer.ui.notifications.NoticeFormatter
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.ErrorCollector
 import org.junit.runner.RunWith
+import org.koin.core.context.startKoin
+import org.koin.core.context.stopKoin
+import org.koin.dsl.module
+import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.util.ReflectionHelpers
+import java.time.Duration
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
 
 @RunWith(RobolectricTestRunner::class)
@@ -139,6 +167,62 @@ class RecordingPlayerScreenTest {
         button(R.string.player_markers).assertDoesNotExist()
         button(R.string.player_channels).assertDoesNotExist()
         button(R.string.player_record).assertDoesNotExist()
+        assertRecordingRouteHidesSystemBars()
+    }
+
+    @OptIn(UnstableApi::class)
+    @kotlin.OptIn(TvheadendTestingApi::class)
+    private fun assertRecordingRouteHidesSystemBars() {
+        val context = compose.activity.applicationContext
+        val connection = FakeConnection()
+        val player = ExoPlayer.Builder(context).build()
+        val coordinator = createTvheadendPlaybackCoordinator(player)
+        val settings = PlayerSettingsStore(context)
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        val runtime = AppPlaybackRuntime(
+            player, connection.session, coordinator, settings, connection.owner, scope,
+            TvheadendAudioOutputProvider(context), PlaybackAudioFocus.None, PlaybackRuntimePolicy.fromPlayerSettings(),
+            connection.noticeCenter,
+        )
+        val owner = SdkRuntimeOwner.create(connection.session, runtime, connection.owner, coordinator, player, scope)
+        startKoin {
+            modules(module {
+                single { owner }
+                single { connection.owner }
+                single { connection.noticeCenter }
+                single { connection.browseSession }
+                single { ChannelAccents(ChannelAccentStore(), connection.session.artwork::cacheKey) }
+            })
+        }
+        try {
+            val intent = RecordingRoute(DvrEntryId(1), recordingStart(false)).intent(context)
+            Robolectric.buildActivity(PlayerActivity::class.java, intent).setup().use { controller ->
+                val main = shadowOf(Looper.getMainLooper())
+                main.idleFor(Duration.ofMillis(32))
+                compose.waitForIdle()
+                val activity = controller.get()
+                assertEquals(Configuration.ORIENTATION_LANDSCAPE, activity.resources.configuration.orientation)
+                val insets = checkNotNull(activity.window.decorView.windowInsetsController)
+                val bars = WindowInsets.Type.systemBars()
+                fun requestedBars() = ReflectionHelpers.callInstanceMethod<Int>(insets, "getRequestedVisibleTypes") and bars
+                assertEquals("The landscape recording route should request hidden system bars", 0, requestedBars())
+
+                val configuration = activity.resources.configuration
+                activity.onPictureInPictureModeChanged(true, configuration)
+                main.idleFor(Duration.ofMillis(32))
+                compose.waitForIdle()
+                insets.show(bars)
+                activity.onPictureInPictureModeChanged(false, configuration)
+                main.idleFor(Duration.ofMillis(32))
+                compose.waitForIdle()
+                assertEquals("Expanding the recording should request hidden system bars again", 0, requestedBars())
+            }
+        } finally {
+            owner.requestClose()
+            shadowOf(Looper.getMainLooper()).idle()
+            stopKoin()
+            connection.close()
+        }
     }
 
     @Test
