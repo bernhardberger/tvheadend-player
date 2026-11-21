@@ -66,7 +66,9 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipe
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.runtime.snapshots.Snapshot
@@ -478,6 +480,12 @@ class PlayerScreenTest {
         tag("player-transport").assertIsDisplayed()
 
         infoSheet("phone-player", canvas, details = true)
+
+        button(R.string.player_info).performClick()
+        compose.onNode(SemanticsMatcher.keyIsDefined(SemanticsActions.Dismiss)).performTouchInput {
+            swipe(center, center + Offset(0f, 450f), durationMillis = 240)
+        }
+        compose.onNode(isDialog()).assertDoesNotExist()
     }
 
     private val seeks = mutableListOf<Int>()
