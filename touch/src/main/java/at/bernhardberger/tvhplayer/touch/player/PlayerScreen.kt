@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -35,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -145,22 +147,21 @@ private fun PlayerFace(
         // A sheet takes the controls off the picture; a menu keeps them, it belongs to a button.
         val sheet = activePanel?.let { !it.atButton(layout) } == true
         val controls = !inWindow && !sheet && (visible || !playing)
-        val toggle = if (playing && !inWindow) ({ visible = !visible }) else null
+        val toggle = ({ visible = !visible }).takeIf { playing && !inWindow }
+        val reveal = ({ visible = true }).takeIf { toggle != null && !sheet }
+        val opacity = playerMotion(controls, MaterialTheme.motionScheme.defaultEffectsSpec(), label = "Player controls")
         val latestShown by rememberUpdatedState(onControlsShown)
         LaunchedEffect(controls) { latestShown(controls) }
         if (layout.upright) {
             UprightPlayer(
                 state, layout, controls, toggle, video, inWindow, preview, { preview = it }, onAction,
-                onBrightness, openOptions, onSeek, panels, onChannel, notices,
+                onBrightness, openOptions, onSeek, panels, onChannel, notices, opacity, reveal,
             )
         } else {
-            Picture(state, layout, controls, toggle, video, inWindow)
-            if (!inWindow) {
-                PictureControls(state, layout, controls, preview, onAction, onBrightness, openOptions, panels.onChoice)
-                LandscapeFooter(
-                    state, layout, controls, sheet, preview, { preview = it }, onAction, panels, onSeek, notices,
-                )
-            }
+            LandscapePlayer(
+                state, layout, controls, toggle, video, inWindow, preview, { preview = it }, onAction,
+                onBrightness, openOptions, onSeek, panels, notices, opacity, reveal, sheet,
+            )
         }
         // On the upright phone a sheet rises only to the picture's foot, so the picture stays in view.
         val belowPicture = maxHeight - WindowInsets.statusBars.asPaddingValues().calculateTopPadding() -
@@ -171,6 +172,46 @@ private fun PlayerFace(
         )
     }
 }
+
+@Composable
+private fun BoxScope.LandscapePlayer(
+    state: PlayerFaceState,
+    layout: PlayerLayout,
+    controls: Boolean,
+    toggle: (() -> Unit)?,
+    video: (@Composable (Modifier) -> Unit)?,
+    inWindow: Boolean,
+    preview: Long?,
+    onPreview: (Long?) -> Unit,
+    onAction: (PlayerAction) -> Unit,
+    onBrightness: (Float) -> Unit,
+    openOptions: () -> Unit,
+    onSeek: (Long) -> Unit,
+    panels: PanelHost,
+    notices: @Composable (Modifier) -> Unit,
+    opacity: State<Float>,
+    reveal: (() -> Unit)?,
+    sheet: Boolean,
+) {
+    Picture(state, layout, controls, toggle, video, inWindow, opacity)
+    if (inWindow) return
+    val notice = remember(layout) { LandscapeNoticeAnchor() }
+    val footer = state.status !is LivePlayerStatus.Reconnecting && state.status != LivePlayerStatus.PauseEnded
+    PlayerChrome(controls, opacity, reveal) {
+        if (state.shouldShade(video != null)) PictureShade(layout)
+        PictureControls(state, layout, preview, onAction, onBrightness, openOptions, panels.onChoice)
+        if (footer) LandscapePlayerContent(
+            state, layout, preview, onAction, panels, onPreview, onSeek,
+            Modifier.align(Alignment.BottomCenter), notice,
+        )
+    }
+    if (controls && preview == null) PictureStatus(state, layout, onAction)
+    LandscapeNotice(notice, layout, controls && footer, notices)
+    if (state is RecordingPlayerState) LandscapeBareAdOffer(state, layout, !controls && !sheet, panels)
+}
+
+private fun PlayerFaceState.shouldShade(hasVideo: Boolean): Boolean =
+    status == LivePlayerStatus.Playing && (hasVideo || frame != null)
 
 private fun PlayerPanel?.infoPanel(stack: InfoStack): PlayerPanel? =
     if (this == PlayerPanel.InfoDetails && stack.shown == null) PlayerPanel.Info else this
@@ -200,21 +241,20 @@ private fun UprightPlayer(
     panels: PanelHost,
     onChannel: (String) -> Unit,
     notices: @Composable (Modifier) -> Unit,
+    opacity: State<Float>,
+    reveal: (() -> Unit)?,
 ) = Box(Modifier.fillMaxSize()) {
     Column(
         Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)
             .windowInsetsPadding(WindowInsets.statusBars),
     ) {
         Box(Modifier.fillMaxWidth().aspectRatio(16f / 9).background(Color.Black)) {
-            Picture(state, layout, controls, toggle, video, inWindow)
+            Picture(state, layout, controls, toggle, video, inWindow, opacity)
             if (!inWindow) {
-                PictureControls(state, layout, controls, preview, onAction, onBrightness, openOptions, panels.onChoice)
-                if (state.status.hasTimeline) {
-                    FaceTimeline(
-                        state, layout, controls, preview, onPreview, onSeek,
-                        Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(24.dp),
-                    )
-                }
+                UprightPictureChrome(
+                    state, layout, controls, video != null, preview, onPreview, onAction, onBrightness,
+                    openOptions, onSeek, panels.onChoice, opacity, reveal,
+                )
                 if (state is RecordingPlayerState) {
                     BareAdOffer(
                         state, !controls && panels.panel == null, panels.onChoice,
@@ -236,42 +276,49 @@ private fun UprightPlayer(
 }
 
 @Composable
-private fun BoxScope.LandscapeFooter(
+private fun BoxScope.UprightPictureChrome(
     state: PlayerFaceState,
     layout: PlayerLayout,
     controls: Boolean,
-    sheet: Boolean,
+    hasVideo: Boolean,
     preview: Long?,
     onPreview: (Long?) -> Unit,
     onAction: (PlayerAction) -> Unit,
-    panels: PanelHost,
+    onBrightness: (Float) -> Unit,
+    openOptions: () -> Unit,
     onSeek: (Long) -> Unit,
-    notices: @Composable (Modifier) -> Unit,
+    onChoice: (PlayerChoice) -> Unit,
+    opacity: State<Float>,
+    reveal: (() -> Unit)?,
 ) {
-    val showFooter = controls && state.status !is LivePlayerStatus.Reconnecting &&
-        state.status != LivePlayerStatus.PauseEnded
-    if (showFooter) {
-        LandscapePlayerContent(
-            state, layout, preview, onAction, panels, onPreview, onSeek, Modifier.align(Alignment.BottomCenter),
-            notice = notices,
+    val timeline = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(24.dp)
+    if (!controls && state.status.hasTimeline) {
+        FaceTimeline(state, layout, false, null, onPreview, onSeek, timeline)
+    }
+    PlayerChrome(controls, opacity, reveal) {
+        if (state.shouldShade(hasVideo)) PictureShade(layout)
+        PictureControls(state, layout, preview, onAction, onBrightness, openOptions, onChoice)
+        if (state.status.hasTimeline) FaceTimeline(state, layout, true, preview, onPreview, onSeek, timeline)
+    }
+    if (controls && preview == null) PictureStatus(state, layout, onAction)
+}
+
+@Composable
+private fun BoxScope.LandscapeBareAdOffer(
+    state: RecordingPlayerState,
+    layout: PlayerLayout,
+    visible: Boolean,
+    panels: PanelHost,
+) {
+    // On a tablet align the offer to the fitted picture, not the black band below it.
+    val picture = if (layout == PlayerLayout.Tablet) {
+        Modifier.align(Alignment.Center).fillMaxWidth().aspectRatio(16f / 9)
+    } else Modifier.matchParentSize()
+    Box(picture) {
+        BareAdOffer(
+            state, visible, panels.onChoice,
+            Modifier.align(Alignment.BottomEnd).padding(end = 40.dp, bottom = 8.dp),
         )
-    }
-    if (!showFooter) {
-        val margin = if (layout == PlayerLayout.Tablet) 40.dp else 48.dp
-        // TouchNotice adds 16dp at the sides and 12dp below the snackbar.
-        notices(Modifier.align(Alignment.BottomStart).padding(start = margin - 16.dp, bottom = margin - 12.dp))
-    }
-    if (state is RecordingPlayerState) {
-        // On a tablet align the offer to the fitted picture, not the black band below it.
-        val picture = if (layout == PlayerLayout.Tablet) {
-            Modifier.align(Alignment.Center).fillMaxWidth().aspectRatio(16f / 9)
-        } else Modifier.matchParentSize()
-        Box(picture) {
-            BareAdOffer(
-                state, !controls && !sheet, panels.onChoice,
-                Modifier.align(Alignment.BottomEnd).padding(end = 40.dp, bottom = 8.dp),
-            )
-        }
     }
 }
 
@@ -283,6 +330,7 @@ private fun BoxScope.Picture(
     toggle: (() -> Unit)?,
     video: (@Composable (Modifier) -> Unit)?,
     inWindow: Boolean,
+    opacity: State<Float>,
 ) {
     val playing = state.status == LivePlayerStatus.Playing
     val reconnecting = state.status is LivePlayerStatus.Reconnecting
@@ -298,10 +346,10 @@ private fun BoxScope.Picture(
         if (layout == PlayerLayout.PhoneLandscape) {
             BoxWithConstraints(frameModifier) {
                 val fitted = Modifier.align(Alignment.Center).width(maxHeight * (16f / 9)).height(maxHeight)
-                Frame(state, layout, controls, fitted, video, inWindow)
+                Frame(state, layout, controls, fitted, video, inWindow, opacity)
             }
         } else {
-            Frame(state, layout, controls, frameModifier.align(Alignment.Center), video, inWindow)
+            Frame(state, layout, controls, frameModifier.align(Alignment.Center), video, inWindow, opacity)
         }
     }
     if (toggle != null) {
@@ -321,16 +369,8 @@ private fun Frame(
     modifier: Modifier,
     video: (@Composable (Modifier) -> Unit)?,
     inWindow: Boolean,
+    opacity: State<Float>,
 ) {
-    val shades = when {
-        // The window shows the picture alone, without a scrim.
-        inWindow -> listOf(0f, 0f)
-        !controls -> listOf(0f, 0f, 0.05f)
-        layout == PlayerLayout.Tablet -> listOf(.66f, .45f, .25f, .20f, .22f, .39f, .54f, .70f, .77f, .84f, .90f)
-        layout == PlayerLayout.PhoneLandscape ->
-            listOf(.77f, .58f, .38f, .28f, .42f, .57f, .70f, .76f, .82f, .88f, .94f)
-        else -> listOf(.58f, .49f, .39f, .32f, .32f, .41f, .54f, .68f, .74f, .79f, .85f)
-    }
     val shown = state.status == LivePlayerStatus.Playing || state.status is LivePlayerStatus.Reconnecting
     Box(modifier) {
         if (video != null) {
@@ -341,15 +381,43 @@ private fun Frame(
         if (!shown) {
             // Tuning, unavailable and pause ended show no picture, as drawn; a kept frame is not the channel's.
             Box(Modifier.matchParentSize().background(Color.Black))
-        } else {
+        } else if (!inWindow) {
+            val reconnecting = state.status is LivePlayerStatus.Reconnecting
+            val shade = if (reconnecting && controls) chromeShade(layout) else bareShade
+            // The bare picture's light gradient gives way to the shade in the controls layer.
+            val blend = if (reconnecting) Modifier else Modifier.graphicsLayer {
+                alpha = 1f - opacity.value.coerceIn(0f, 1f)
+            }
             Box(
-                Modifier.matchParentSize()
-                    .background(Brush.verticalGradient(shades.map { Color.Black.copy(alpha = it) })),
+                Modifier.matchParentSize().then(blend).background(shade),
             )
-            if (state.status is LivePlayerStatus.Reconnecting) {
+            if (reconnecting) {
                 Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = .5f)))
             }
         }
+    }
+}
+
+private val bareShade = pictureGradient(listOf(0f, 0f, .05f))
+
+private fun pictureGradient(stops: List<Float>) = Brush.verticalGradient(stops.map { Color.Black.copy(alpha = it) })
+
+private fun chromeShade(layout: PlayerLayout) = pictureGradient(when (layout) {
+    PlayerLayout.Tablet -> listOf(.66f, .45f, .25f, .20f, .22f, .39f, .54f, .70f, .77f, .84f, .90f)
+    PlayerLayout.PhoneLandscape -> listOf(.77f, .58f, .38f, .28f, .42f, .57f, .70f, .76f, .82f, .88f, .94f)
+    else -> listOf(.58f, .49f, .39f, .32f, .32f, .41f, .54f, .68f, .74f, .79f, .85f)
+})
+
+@Composable
+private fun BoxScope.PictureShade(layout: PlayerLayout) {
+    val shade = remember(layout) { chromeShade(layout) }
+    when (layout) {
+        PlayerLayout.Tablet ->
+            Box(Modifier.align(Alignment.Center).fillMaxWidth().aspectRatio(16f / 9).background(shade))
+        PlayerLayout.PhoneLandscape -> BoxWithConstraints(Modifier.matchParentSize()) {
+            Box(Modifier.align(Alignment.Center).width(maxHeight * (16f / 9)).height(maxHeight).background(shade))
+        }
+        else -> Box(Modifier.matchParentSize().background(shade))
     }
 }
 

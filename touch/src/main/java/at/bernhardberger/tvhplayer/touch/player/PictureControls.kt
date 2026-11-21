@@ -66,24 +66,18 @@ private val DarkControl = Color(0xA82C2E2E)
 internal fun BoxScope.PictureControls(
     state: PlayerFaceState,
     layout: PlayerLayout,
-    visible: Boolean,
     preview: Long?,
     onAction: (PlayerAction) -> Unit,
     onBrightness: (Float) -> Unit,
     onSettings: () -> Unit,
     onChoice: (PlayerChoice) -> Unit = {},
 ) {
-    if (!visible) return
     val status = state.status
     val playing = status == LivePlayerStatus.Playing
     val tuning = status == LivePlayerStatus.Tuning
     if (preview == null) {
         PlayerTopBar(state, layout, onAction, onSettings, Modifier.align(Alignment.TopCenter))
-        if (playing || tuning) {
-            PictureCenter(state, layout, onAction, onBrightness)
-        } else {
-            StatusMessage(state, layout, onAction, Modifier.align(Alignment.Center))
-        }
+        if (playing || tuning) PictureCenter(state, layout, onAction, onBrightness)
     }
     if (layout.upright && (playing || tuning)) {
         val line = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
@@ -104,13 +98,8 @@ private fun BoxScope.PictureCenter(
     onAction: (PlayerAction) -> Unit,
     onBrightness: (Float) -> Unit,
 ) {
-    val centerOffset = when (layout) {
-        PlayerLayout.Tablet -> -30.dp
-        PlayerLayout.PhoneLandscape -> -64.dp
-        PlayerLayout.Phone -> -10.dp
-        else -> 0.dp
-    }
-    if (state.status == LivePlayerStatus.Tuning || PlayerControl.Timeshift in state.offered) {
+    val centerOffset = layout.transportOffset
+    if (state.status == LivePlayerStatus.Playing && PlayerControl.Timeshift in state.offered) {
         Transport(state, layout, onAction, Modifier.align(Alignment.Center).offset(y = centerOffset))
     }
     if (!layout.upright) {
@@ -119,6 +108,28 @@ private fun BoxScope.PictureCenter(
                 .padding(end = if (layout == PlayerLayout.Tablet) 34.dp else 29.dp),
             tablet = layout == PlayerLayout.Tablet,
         )
+    }
+}
+
+private val PlayerLayout.transportOffset get() = when (this) {
+    PlayerLayout.Tablet -> -30.dp
+    PlayerLayout.PhoneLandscape -> -64.dp
+    PlayerLayout.Phone -> -10.dp
+    else -> 0.dp
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+internal fun BoxScope.PictureStatus(state: PlayerFaceState, layout: PlayerLayout, onAction: (PlayerAction) -> Unit) {
+    if (state.status == LivePlayerStatus.Tuning) {
+        val loading = stringResource(R.string.player_tuning)
+        LoadingIndicator(
+            Modifier.align(Alignment.Center).offset(y = layout.transportOffset)
+                .size(if (layout == PlayerLayout.Tablet) 64.dp else 48.dp).semantics { contentDescription = loading },
+            color = OnPicture,
+        )
+    } else if (state.status != LivePlayerStatus.Playing) {
+        StatusMessage(state, layout, onAction, Modifier.align(Alignment.Center))
     }
 }
 
@@ -178,12 +189,6 @@ private fun Transport(
         PlayerLayout.PhoneLandscape -> 76.dp
         PlayerLayout.Upright -> 72.dp
         else -> 60.dp
-    }
-    if (state.status == LivePlayerStatus.Tuning) {
-        val loading = stringResource(R.string.player_tuning)
-        LoadingIndicator(modifier.size(if (layout == PlayerLayout.Tablet) 64.dp else 48.dp)
-            .semantics { contentDescription = loading }, color = OnPicture)
-        return
     }
     val canSeek by remember(state) { derivedStateOf { state.seekable } }
     val skipSize = if (layout == PlayerLayout.Tablet) 72.dp else 52.dp

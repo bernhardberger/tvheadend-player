@@ -139,6 +139,20 @@ class RecordingPlayerScreenTest {
         button(R.string.player_markers).assertDoesNotExist()
         button(R.string.player_channels).assertDoesNotExist()
         button(R.string.player_record).assertDoesNotExist()
+        val picture = tag("player-picture")
+        val point = Offset(58f, 95f)
+        val shown = picture.redAt(point)
+        compose.mainClock.autoAdvance = false
+        picture.performSemanticsAction(SemanticsActions.OnClick) { it() }
+        compose.mainClock.advanceTimeByFrame()
+        compose.waitForIdle()
+        compose.mainClock.advanceTimeBy(80)
+        val fading = picture.redAt(point)
+        tag("player-top").assertDoesNotExist()
+        compose.mainClock.autoAdvance = true
+        val hidden = picture.redAt(point)
+        assertTrue("Recording controls fade: $shown, $fading, $hidden", fading > minOf(shown, hidden) &&
+            fading < maxOf(shown, hidden))
     }
 
     @Test

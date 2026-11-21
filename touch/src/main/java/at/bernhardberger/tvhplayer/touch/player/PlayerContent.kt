@@ -46,7 +46,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -57,7 +57,6 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
@@ -67,7 +66,6 @@ import at.bernhardberger.tvhplayer.touch.ui.rememberStandalonePicture
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsLayout
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsState
 import at.bernhardberger.tvhplayer.touch.channels.TagFilter
-import kotlin.math.roundToInt
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
 
 internal const val DRAG_ALPHA = .38f
@@ -89,7 +87,7 @@ internal fun LandscapePlayerContent(
     onPreviewChange: (Long?) -> Unit,
     onSeek: (Long) -> Unit,
     modifier: Modifier,
-    notice: @Composable (Modifier) -> Unit,
+    notice: LandscapeNoticeAnchor,
 ) {
     val tablet = layout == PlayerLayout.Tablet
     val dragging = preview != null
@@ -105,14 +103,10 @@ internal fun LandscapePlayerContent(
     val offerGap = maxOf(if (tablet) 26.dp else 16.dp, hintInset + 8.dp)
     val footerHeight = landscapeFooterHeight(tablet, state)
     Box(modifier.fillMaxWidth().padding(horizontal = footerMargin).then(footerHeight)) {
-        val programSlot = Modifier.align(Alignment.BottomStart)
-            .padding(bottom = trackBottom + programGap)
-        // Keep the notice and its anchor in one layout so measuring the program never
-        // asks Compose to place unrelated footer siblings (including the drag label).
-        LandscapeProgramSlot(notice, tablet, programSlot.fillMaxWidth()) {
-            val programModifier = Modifier.fillMaxWidth(.62f).alpha(if (dragging) DRAG_ALPHA else 1f)
-            LandscapeProgram(state, layout, programModifier)
-        }
+        val programBottom = trackBottom + programGap
+        val programSlot = Modifier.align(Alignment.BottomStart).padding(bottom = programBottom)
+            .fillMaxWidth(.62f).noticeSlot(notice, tablet, programBottom)
+        LandscapeProgram(state, layout, programSlot.alpha(if (dragging) DRAG_ALPHA else 1f))
         if (state.status == LivePlayerStatus.Playing) {
             val offer = Modifier.align(Alignment.BottomEnd)
                 .padding(bottom = trackBottom + offerGap)
@@ -130,6 +124,16 @@ internal fun LandscapePlayerContent(
         )
     }
 }
+
+private fun Modifier.noticeSlot(anchor: LandscapeNoticeAnchor, tablet: Boolean, programBottom: Dp) =
+    layout { measurable, constraints ->
+        val program = measurable.measure(constraints)
+        anchor.programInset.intValue = programBottom.roundToPx() +
+            if (tablet) program.height + 8.dp.roundToPx() else 0
+        layout(program.width, program.height) {
+            if (tablet || anchor.messageHeight.intValue == 0) program.placeRelative(0, 0)
+        }
+    }
 
 private fun landscapeFooterHeight(tablet: Boolean, state: PlayerFaceState): Modifier = when {
     tablet -> Modifier.height(270.dp)
@@ -167,41 +171,6 @@ private fun BoxScope.LandscapeTimeline(
             RecordingClock(state, preview, clockModifier.align(Alignment.BottomStart))
             ClockText(formatPlaybackDuration(state.durationMs), clockModifier.align(Alignment.BottomEnd))
             FaceTimeline(state, layout, true, preview, onPreviewChange, onSeek, track)
-        }
-    }
-}
-
-/** On tablets the notice stands above the measured program; on phones it takes its place. */
-@Composable
-private fun LandscapeProgramSlot(
-    notice: @Composable (Modifier) -> Unit,
-    tablet: Boolean,
-    modifier: Modifier,
-    program: @Composable () -> Unit,
-) {
-    Layout(
-        modifier = modifier,
-        content = {
-            Box { program() }
-            Box { notice(Modifier) }
-        },
-    ) { (block, host), constraints ->
-        val side = 16.dp.roundToPx()
-        val bottom = 12.dp.roundToPx()
-        val width = constraints.maxWidth
-        val noticeWidth = if (tablet) width else (width * .62f).roundToInt()
-        val message = host.measure(Constraints(maxWidth = noticeWidth + 2 * side))
-        if (!tablet && message.height > 0) {
-            val height = (message.height - bottom).coerceAtMost(constraints.maxHeight)
-            layout(width, height) {
-                message.placeRelative(-side, height - message.height + bottom)
-            }
-        } else {
-            val programBlock = block.measure(constraints)
-            layout(width, programBlock.height) {
-                programBlock.placeRelative(0, 0)
-                if (message.height > 0) message.placeRelative(-side, bottom - message.height - 8.dp.roundToPx())
-            }
         }
     }
 }
