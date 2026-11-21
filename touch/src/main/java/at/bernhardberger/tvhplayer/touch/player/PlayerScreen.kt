@@ -253,7 +253,8 @@ private fun UprightPlayer(
             Picture(state, layout, controls, toggle, video, inWindow, opacity)
             if (!inWindow) {
                 UprightPictureChrome(
-                    state, layout, controls, video != null, preview, onPreview, onAction, onBrightness,
+                    state.withFullScreenOffer(layout, inWindow), layout, controls, video != null, preview, onPreview,
+                    onAction, onBrightness,
                     openOptions, onSeek, panels.onChoice, opacity, reveal,
                 )
                 if (state is RecordingPlayerState) {
@@ -431,9 +432,6 @@ private fun playerLayout(width: Dp, height: Dp) = when {
     width >= 600.dp -> PlayerLayout.Upright
     else -> PlayerLayout.Phone
 }
-
-private val LivePlayerStatus.hasTimeline: Boolean
-    get() = this == LivePlayerStatus.Playing || this == LivePlayerStatus.Tuning
 
 private val InfoStackSaver = listSaver<InfoStack, String?>(
     save = { listOf(it.followWatching.toString(), it.open) + it.details },

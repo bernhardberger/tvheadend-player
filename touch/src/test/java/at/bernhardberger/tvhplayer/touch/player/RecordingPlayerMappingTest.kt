@@ -75,7 +75,12 @@ class RecordingPlayerMappingTest {
                 assertEquals(current && audio > 1, PlayerControl.Audio in state.offered)
                 assertEquals(current, PlayerControl.Subtitles in state.offered)
                 assertTrue(PlayerControl.Settings in state.offered)
-                assertFalse(PlayerControl.FullScreen in state.offered)
+                for (layout in PlayerLayout.entries) {
+                    val face = state.withFullScreenOffer(layout, inWindow = false)
+                    assertEquals("$layout / ${state.status}", layout == PlayerLayout.Phone,
+                        PlayerControl.FullScreen in face.offered)
+                    assertFalse(PlayerControl.FullScreen in face.withFullScreenOffer(layout, inWindow = true).offered)
+                }
             }
         }
     }
