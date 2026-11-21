@@ -9,6 +9,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasProgressBarRangeInfo
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDisplayed
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
@@ -58,7 +59,9 @@ class GuideScreenTest {
         capture("tablet-guide-overview", TouchCanvas.TABLET)
 
         // A tap opens the program where it is and plays nothing; only on-air programs offer Watch.
-        compose.onAllNodesWithText("Coastal Miles")[0].performClick()
+        val row = compose.onAllNodesWithText("Coastal Miles")[0]
+        val titleTop = row.getBoundsInRoot().top
+        row.performClick()
         compose.onNodeWithText(COASTAL_MILES_SYNOPSIS_START, substring = true).assertIsDisplayed()
         compose.onAllNodes(hasText("Watch")).assertCountEquals(0)
         assertEquals(emptyList<String>(), watched)
@@ -66,6 +69,7 @@ class GuideScreenTest {
         val record = compose.onNodeWithText("Record").getBoundsInRoot()
         val detailsButton = compose.onNodeWithText("Details").assertIsDisplayed().getBoundsInRoot()
         assertTrue(detailsButton.top < record.bottom)
+        assertEquals("an already visible row stays put", titleTop, row.getBoundsInRoot().top)
         capture("tablet-guide-overview-open", TouchCanvas.TABLET)
 
         // Back folds it again.
@@ -75,6 +79,38 @@ class GuideScreenTest {
         compose.onNodeWithContentDescription("Ridge Earth, by channel").performClick()
         compose.onNodeWithText("Sunday, November 15").assertIsDisplayed()
         compose.onNodeWithText("Six Bridges and a River That Changed Its Mind").assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w1280dp-h560dp-land-xhdpi")
+    fun tabletOverviewRevealsActionsWhenTheLastVisibleProgramOpens() {
+        val fixture = overviewFixture()
+        val synopsis = fixture.channels[1].programs.firstNotNullOf { it.synopsis }.substringBefore(".")
+        val column = fixture.channels.first().let { channel ->
+            channel.copy(programs = channel.programs.take(5).map { it.copy(synopsis = synopsis) })
+        }
+        show(fixture.copy(channels = listOf(column)))
+
+        val lastVisible = column.programs.map { compose.onNodeWithText(it.title) }.last { it.isDisplayed() }
+        lastVisible.performClick()
+        compose.onNodeWithText("Details").assertIsDisplayed()
+        lastVisible.assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w412dp-h558dp-port-xhdpi")
+    fun phoneOverviewRevealsActionsWhenTheLastVisibleProgramOpens() {
+        val fixture = phoneOverviewFixture()
+        val synopsis = fixture.channels[1].programs.first().synopsis?.substringBefore(".")
+        val channels = fixture.channels.map { channel ->
+            channel.copy(programs = listOf(channel.programs.first().copy(synopsis = synopsis)))
+        }
+        show(fixture.copy(channels = channels))
+
+        val lastVisible = channels.map { compose.onNodeWithText(it.programs.first().title) }.last { it.isDisplayed() }
+        lastVisible.performClick()
+        compose.onNodeWithText("Details").assertIsDisplayed()
+        lastVisible.assertIsDisplayed()
     }
 
     @Test

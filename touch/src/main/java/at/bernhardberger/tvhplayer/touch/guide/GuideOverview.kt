@@ -22,6 +22,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -37,10 +39,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -50,6 +55,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.channels.ChannelRecording
 import at.bernhardberger.tvhplayer.touch.channels.RecordingBadge
@@ -179,6 +185,7 @@ private fun ColumnItem(
     val scheme = MaterialTheme.colorScheme
     Surface(
         onClick = { onOpen(if (open) null else program.id) },
+        modifier = rememberOpenedRowReveal(open),
         shape = shape,
         color = if (open) scheme.surfaceContainerHigh else scheme.surfaceContainer,
     ) {
@@ -299,6 +306,7 @@ internal fun OverviewRows(
             val shape = segmentShape(index, rows.size)
             val picture = rememberStandalonePicture(program.still, program.stillModel)
             Surface(
+                modifier = rememberOpenedRowReveal(open),
                 shape = shape,
                 color = MaterialTheme.colorScheme.run { if (open) surfaceContainerHigh else surfaceContainer },
             ) {
@@ -346,6 +354,23 @@ internal fun OverviewRows(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun rememberOpenedRowReveal(open: Boolean): Modifier {
+    if (!open) return Modifier
+    val requester = remember { BringIntoViewRequester() }
+    val scope = rememberCoroutineScope()
+    // Use the expanded bounds, not the closed row's bounds from before remeasurement.
+    return remember(requester, scope) {
+        var requested = false
+        Modifier.bringIntoViewRequester(requester).onGloballyPositioned {
+            if (!requested) {
+                requested = true
+                scope.launch { requester.bringIntoView() }
             }
         }
     }

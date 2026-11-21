@@ -48,6 +48,7 @@ import at.bernhardberger.tvhplayer.ui.MobileDarkColors
 import coil3.asImage
 import coil3.decode.DataSource
 import coil3.intercept.Interceptor
+import coil3.request.ErrorResult
 import coil3.request.SuccessResult
 import coil3.request.transformations
 import coil3.size.Size
@@ -200,6 +201,53 @@ class ChannelsScreenTest {
         }
         logos.indices.forEach { index ->
             compose.onNodeWithTag("tile-$index").captureToImage().toPixelMap().assertLogoFitsItsShare("logo $index")
+        }
+    }
+
+    @Test
+    fun serverLogoTilesShowTheirFallbackOnlyWhenTheLogoIsMissingOrFails() {
+        val failing = AppArtworkSource(null, ArtworkId(1))
+        val loading = AppArtworkSource(null, ArtworkId(2))
+        val loadedColor = Color.Magenta
+        val bitmap = Bitmap.createBitmap(30, 30, Bitmap.Config.ARGB_8888)
+            .apply { eraseColor(loadedColor.toArgb()) }
+        val release = CompletableDeferred<Unit>()
+        val images = ImageLoaderRule(Interceptor { chain ->
+            release.await()
+            if (chain.request.data == failing) ErrorResult(null, chain.request, IllegalStateException("Missing picon"))
+            else SuccessResult(bitmap.asImage(), chain.request, DataSource.MEMORY)
+        })
+        images.apply(object : Statement() {
+            override fun evaluate() {
+                compose.setContent {
+                    MaterialTheme(colorScheme = MobileDarkColors) {
+                        Column {
+                            listOf("missing" to null, "failing" to failing, "loading" to loading).forEach { (tag, model) ->
+                                ChannelLogoTile(null, null, Modifier.size(112.dp, 56.dp).testTag(tag), model = model)
+                            }
+                        }
+                    }
+                }
+                val ground = MobileDarkColors.surfaceContainerHigh
+                val missingCenter = tileCenter("missing")
+                assertNotEquals("an absent model shows the fallback icon", setOf(ground), missingCenter)
+                assertEquals(setOf(failing, loading), images.requested.toSet())
+                assertEquals("a pending logo shows only the ground", setOf(ground), tileCenter("loading"))
+                assertEquals("a pending failure shows only the ground", setOf(ground), tileCenter("failing"))
+
+                compose.runOnIdle { release.complete(Unit) }
+                assertEquals("a failed logo shows the same icon as an absent model", missingCenter, tileCenter("failing"))
+                assertEquals("a successful load shows the logo", setOf(loadedColor), tileCenter("loading"))
+            }
+        }, Description.EMPTY).evaluate()
+    }
+
+    private fun tileCenter(tag: String): Set<Color> {
+        val pixels = compose.onNodeWithTag(tag).captureToImage().toPixelMap()
+        return buildSet {
+            for (x in pixels.width / 2 - 4..pixels.width / 2 + 4) {
+                for (y in pixels.height / 2 - 4..pixels.height / 2 + 4) add(pixels[x, y])
+            }
         }
     }
 
