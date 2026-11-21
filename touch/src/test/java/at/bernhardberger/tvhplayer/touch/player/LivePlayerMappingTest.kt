@@ -273,6 +273,46 @@ class LivePlayerMappingTest {
     }
 
     @Test
+    fun controlsLeaveOnlyWhileThePictureMovesFreely() {
+        data class Case(
+            val name: String,
+            val status: LivePlayerStatus = LivePlayerStatus.Playing,
+            val shown: Boolean = true,
+            val paused: Boolean = false,
+            val progressing: Boolean = true,
+            val dragging: Boolean = false,
+            val fingerDown: Boolean = false,
+            val panelOpen: Boolean = false,
+            val inWindow: Boolean = false,
+            val leaves: Boolean = false,
+        )
+        listOf(
+            Case("playing", leaves = true),
+            Case("already hidden", shown = false),
+            Case("paused", paused = true),
+            Case("buffering", progressing = false),
+            Case("tuning", status = LivePlayerStatus.Tuning),
+            Case("reconnecting", status = LivePlayerStatus.Reconnecting(null)),
+            Case("pause ended", status = LivePlayerStatus.PauseEnded),
+            Case("unavailable", status = LivePlayerStatus.Unavailable()),
+            Case("drag on the bar", dragging = true),
+            Case("finger resting on the face", fingerDown = true),
+            Case("menu or sheet open", panelOpen = true),
+            Case("picture-in-picture window", inWindow = true),
+        ).forEach {
+            val after = controlsHideAfter(
+                it.shown, it.status, it.paused, it.progressing, it.dragging, it.fingerDown, it.panelOpen, it.inWindow,
+                5_000L,
+            )
+            assertEquals(it.name, if (it.leaves) 5_000L else null, after)
+        }
+        // The accessibility timeout stands; touch exploration keeps them for good.
+        assertEquals(12_000L, controlsTimeout(12_000, touchExploration = false))
+        assertEquals(null, controlsTimeout(12_000, touchExploration = true))
+        assertEquals(null, controlsHideAfter(true, LivePlayerStatus.Playing, false, true, false, false, false, false, null))
+    }
+
+    @Test
     fun brightnessSliderShowsTheSystemLevelOnTheSystemsCurve() {
         // A dim indoor backlight of about a tenth sits well up the slider, as on the system's own.
         assertTrue(brightnessSlider(0.1f) > 0.4f)
