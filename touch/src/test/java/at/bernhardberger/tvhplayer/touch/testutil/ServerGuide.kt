@@ -64,14 +64,20 @@ internal class ServerGuide(val now: Instant) {
     val scheduled = recording(SCHEDULED, "Late Film", first, now + 90.minutes, DvrEntryState.SCHEDULED, event = 3)
     val dvr = DvrSnapshot.create(entries = listOf(recordingNow, film, diary, scheduled))
 
-    /** The server signed in with everything current: the observation has a current session. */
-    fun connected() = SessionObservation.create(
+    /** The server signed in with everything current, with [entries] as its recordings: it has a current session. */
+    fun connected(entries: List<DvrEntry> = dvr.entries) = SessionObservation.create(
         sessionState = SessionState.Ready(
             ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED),
         ),
         channelState = ChannelRepositoryState.Current(catalog),
         epgState = EpgRepositoryState.Current(snapshot),
-        dvrState = DvrRepositoryState.Current(dvr),
+        dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = entries)),
+    )
+
+    /** The recording the server schedules for the program [event] on the first channel. */
+    fun scheduling(id: Long, event: Int) = recording(
+        id, programs[event - 1], first, snapshot.events.first { it.id == EventId(event.toLong()) }.start,
+        DvrEntryState.SCHEDULED, event = event.toLong(),
     )
 
     private fun recording(

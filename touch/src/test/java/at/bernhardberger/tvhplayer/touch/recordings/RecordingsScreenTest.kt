@@ -33,6 +33,12 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import at.bernhardberger.tvhplayer.touch.testutil.TouchCanvas
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouch
+import at.bernhardberger.tvhplayer.touch.testutil.captureTouchWindows
+import at.bernhardberger.tvhplayer.touch.ui.DvrChangeDialog
+import at.bernhardberger.tvhplayer.touch.ui.RecordingRemoveControl
+import at.bernhardberger.tvhplayer.presentation.R as SharedR
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import at.bernhardberger.tvhplayer.ui.MobileDarkColors
 import java.io.File
 import org.junit.Assert.assertEquals
@@ -53,6 +59,8 @@ class RecordingsScreenTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
 
     private val state = mutableStateOf(flatFixture())
+    private val deleted = mutableListOf<String>()
+    private var asking by mutableStateOf(false)
 
     @Test
     @Config(qualifiers = "en-rUS-w1280dp-h800dp-land-xhdpi")
@@ -68,6 +76,25 @@ class RecordingsScreenTest {
         compose.onNodeWithText("Resume").assertIsDisplayed()
         compose.onNodeWithText("All recordings").assertIsDisplayed()
         capture("tablet-recordings-picked", TouchCanvas.TABLET)
+
+        askToDelete()
+        compose.captureTouchWindows(GROUP, "tablet-recordings-delete-confirm", TouchCanvas.TABLET)
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w1280dp-h800dp-land-xhdpi")
+    fun aRecordingOffersOnlyItsOwnRemoveControl() {
+        state.value = flatFixture().withRemove(RecordingRemoveControl.RemoveEntry)
+        show()
+        pickTheHalfWatchedMatch()
+        compose.onNodeWithContentDescription("Delete").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Remove entry").performClick()
+        assertEquals(listOf(PickedId), deleted)
+
+        // A running recording, which only Stop would end, offers none rather than a dimmed Delete.
+        state.value = flatFixture().withRemove(null)
+        compose.onNodeWithContentDescription("Remove entry").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Delete").assertDoesNotExist()
     }
 
     @Test
@@ -181,6 +208,9 @@ class RecordingsScreenTest {
         compose.onNodeWithText("Week 46").assertDoesNotExist()
         compose.onNodeWithText("Watch from beginning").assertIsDisplayed()
         capture("phone-recording-details", TouchCanvas.PHONE)
+
+        askToDelete()
+        compose.captureTouchWindows(GROUP, "phone-recordings-delete-confirm", TouchCanvas.PHONE)
     }
 
     @Test
@@ -245,15 +275,35 @@ class RecordingsScreenTest {
                 state.value = regrouped.copy(view = view)
             },
             onPlay = { _, _ -> },
-            onDelete = {},
+            onDelete = { deleted += it },
             onMore = {},
         )
         compose.setContent {
             MaterialTheme(colorScheme = MobileDarkColors) {
                 RecordingsScreen(state.value, actions, initialPath = initialPath)
+                if (asking) {
+                    val control = RecordingRemoveControl.Delete
+                    DvrChangeDialog(
+                        control.confirmTitle, control.confirmBody, SharedR.string.cancel, control.confirmButton,
+                        {}, { asking = false },
+                    )
+                }
             }
         }
     }
+
+    /** Delete on the picked recording, and the app's question over the screen. */
+    private fun askToDelete() {
+        compose.onNodeWithContentDescription("Delete").performClick()
+        assertEquals(listOf(PickedId), deleted)
+        asking = true
+        compose.onNodeWithText("Delete this recording?").assertIsDisplayed()
+    }
+
+    /** The picked recording offering [remove], as the shared rule decides it. */
+    private fun RecordingsState.withRemove(remove: RecordingRemoveControl?) = copy(
+        root = root.copy(recordings = root.recordings.map { if (it.id == PickedId) it.copy(remove = remove) else it }),
+    )
 
     private fun pickTheHalfWatchedMatch() =
         compose.onNodeWithText("Westvale – Ridge Town", substring = true).performClick()

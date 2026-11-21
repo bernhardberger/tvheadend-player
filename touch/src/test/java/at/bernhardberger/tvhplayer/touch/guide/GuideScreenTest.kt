@@ -18,6 +18,14 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.text.TextLayoutResult
 import at.bernhardberger.tvhplayer.touch.testutil.TouchCanvas
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouch
+import at.bernhardberger.tvhplayer.touch.testutil.captureTouchWindows
+import at.bernhardberger.tvhplayer.touch.ui.DvrChangeDialog
+import at.bernhardberger.tvhplayer.touch.ui.ProgramRecordControl
+import at.bernhardberger.tvhplayer.presentation.R as SharedR
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import at.bernhardberger.tvhplayer.ui.MobileDarkColors
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -37,6 +45,7 @@ class GuideScreenTest {
 
     private val details = mutableListOf<String>()
     private val watched = mutableListOf<String>()
+    private val cancelled = mutableListOf<String>()
 
     @Test
     @Config(qualifiers = TABLET)
@@ -62,6 +71,37 @@ class GuideScreenTest {
         compose.onNodeWithContentDescription("Ridge Earth, by channel").performClick()
         compose.onNodeWithText("Sunday, November 15").assertIsDisplayed()
         compose.onNodeWithText("Six Bridges and a River That Changed Its Mind").assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = TABLET)
+    fun tabletProgramsOfferOnlyTheirOwnRecordingControl() {
+        var asking by mutableStateOf(false)
+        show(
+            overviewFixture().withRecordControls(
+                mapOf(SNOWLINE_ID to ProgramRecordControl.Cancel, COASTAL_MILES_ID to null),
+            ),
+        ) {
+            if (asking) {
+                DvrChangeDialog(
+                    SharedR.string.cancel_recording_confirm_title, SharedR.string.cancel_recording_confirm_body,
+                    SharedR.string.keep_recording, SharedR.string.cancel_recording, {}, { asking = false },
+                )
+            }
+        }
+        // A program whose only recording answer is Stop or Skip shows none, rather than a dimmed Record.
+        compose.onAllNodesWithText("Coastal Miles")[0].performClick()
+        compose.onNodeWithText(COASTAL_MILES_SYNOPSIS_START, substring = true).assertIsDisplayed()
+        listOf("Record", "Cancel recording").forEach { compose.onAllNodes(hasText(it)).assertCountEquals(0) }
+
+        compose.onNodeWithText("Snowline").performClick()
+        compose.onAllNodes(hasText("Record")).assertCountEquals(0)
+        compose.onNodeWithText("Cancel recording").performClick()
+        assertEquals(listOf(SNOWLINE_ID), cancelled)
+        asking = true
+        compose.onNodeWithText(compose.activity.getString(SharedR.string.cancel_recording_confirm_title))
+            .assertIsDisplayed()
+        compose.captureTouchWindows(GROUP, "tablet-guide-cancel-confirm", TouchCanvas.TABLET)
     }
 
     @Test
@@ -216,6 +256,7 @@ class GuideScreenTest {
         channel: String? = null,
         open: String? = null,
         detailsId: String? = null,
+        over: @Composable () -> Unit = {},
     ) {
         val actions = GuideActions(
             onWatch = { watched += it },
@@ -225,6 +266,7 @@ class GuideScreenTest {
             onDay = {},
             onJump = {},
             onTag = {},
+            onCancel = { cancelled += it },
         )
         compose.setContent {
             MaterialTheme(colorScheme = MobileDarkColors) {
@@ -232,6 +274,7 @@ class GuideScreenTest {
                     state, actions, initialView = view, initialChannelId = channel, initiallyOpen = open,
                     initialDetails = detailsId,
                 )
+                over()
             }
         }
     }

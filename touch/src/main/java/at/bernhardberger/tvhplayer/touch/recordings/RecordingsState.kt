@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.touch.recordings
 
+import at.bernhardberger.tvhplayer.touch.ui.RecordingRemoveControl
 import androidx.annotation.StringRes
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
@@ -128,6 +129,8 @@ internal data class RecordingItem(
     val channelLogoModel: Any? = null,
     /** The server image's model for the touch-level image composable; the fixture painter wins. */
     val pictureModel: Any? = null,
+    /** How it is removed; null offers no remove control. */
+    val remove: RecordingRemoveControl? = RecordingRemoveControl.Delete,
 ) {
     val hasPicture: Boolean get() = picture != null || pictureModel != null
     val hasLogo: Boolean get() = channelLogo != null || channelLogoModel != null

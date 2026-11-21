@@ -1,5 +1,8 @@
 package at.bernhardberger.tvhplayer.touch
 
+import at.bernhardberger.tvhplayer.touch.ui.ConfirmDvrChange
+import at.bernhardberger.tvhplayer.touch.ui.DvrControls
+import at.bernhardberger.tvhplayer.touch.ui.rememberDvrControls
 import androidx.compose.runtime.remember
 import at.bernhardberger.tvhplayer.touch.ui.LocalArtworkModels
 import at.bernhardberger.tvhplayer.touch.ui.ArtworkModels
@@ -103,7 +106,7 @@ internal fun TouchApp(
         }
         else -> FrameNotices(notices, owner, session) {
             AppDestinations(
-                session, connection, channels, recordings, guide, playingId, onWatch,
+                session, notices, connection, channels, recordings, guide, playingId, onWatch,
                 onOpenConnections = { page = Page.Connections },
                 onSignIn = { page = Page.SignIn },
             )
@@ -177,7 +180,7 @@ private fun ServerProfileSummary.uiState(status: ConnectionStatus) = ActiveConne
 
 /**
  * The frame with Channels and Recordings wired: the destinations without data are not offered yet,
- * and the row controls with nothing behind them (Record, Details, Show in Guide) are left out.
+ * and the row controls with nothing behind them (Details, Show in Guide) are left out.
  */
 @Composable
 private fun AppFrame(
@@ -185,6 +188,7 @@ private fun AppFrame(
     channels: ChannelsViewModel,
     playingId: String?,
     onWatch: ((String) -> Unit)?,
+    dvr: DvrControls,
     onOpenConnections: () -> Unit,
     onSignIn: () -> Unit,
 ) {
@@ -208,6 +212,8 @@ private fun AppFrame(
             // Until Home exists, connection settings open from the end of the Channels top bar.
             onOpenConnectionSettings = onOpenConnections,
             onSignIn = onSignIn,
+            onRecord = dvr::recordChannel,
+            onCancel = dvr::cancelChannel,
         ),
         destinations = AppDestinationList,
     )
@@ -218,6 +224,7 @@ private fun AppFrame(
 @Composable
 private fun AppDestinations(
     session: TvheadendSession,
+    notices: NoticeCenter,
     connection: AppConnectionViewModel,
     channels: ChannelsViewModel,
     recordings: RecordingsViewModel,
@@ -229,15 +236,19 @@ private fun AppDestinations(
 ) {
     val selection = rememberSaveable { mutableStateOf(Destination.Channels) }
     val artwork = remember(session) { ArtworkModels(session) }
+    val dvr = rememberDvrControls(session, notices)
+    ConfirmDvrChange(dvr)
     CompositionLocalProvider(LocalFrameSelection provides selection, LocalArtworkModels provides artwork) {
         when (selection.value) {
             Destination.Recordings ->
-                RecordingsDestination(recordings, connection, AppDestinationList, onOpenConnections, onSignIn)
+                RecordingsDestination(recordings, connection, AppDestinationList, dvr, onOpenConnections, onSignIn)
             Destination.Guide ->
                 GuideDestination(
-                    guide, channels, connection, AppDestinationList, playingId, onWatch, onOpenConnections, onSignIn,
+                    guide, channels, connection, AppDestinationList, playingId, onWatch, dvr,
+                    onOpenConnections, onSignIn,
                 )
-            Destination.Channels -> AppFrame(connection, channels, playingId, onWatch, onOpenConnections, onSignIn)
+            Destination.Channels ->
+                AppFrame(connection, channels, playingId, onWatch, dvr, onOpenConnections, onSignIn)
         }
     }
 }

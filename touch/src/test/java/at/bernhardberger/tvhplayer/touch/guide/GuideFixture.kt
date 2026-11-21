@@ -4,6 +4,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import at.bernhardberger.tvhplayer.touch.testutil.TouchFixtureArt
+import at.bernhardberger.tvhplayer.touch.ui.ProgramRecordControl
 
 // Round 37's Guide drawings: Sunday, November 15, a little after 8:45 PM.
 
@@ -170,6 +171,15 @@ internal fun GuideState.withoutSomePictures(): GuideState = copy(
 )
 
 private val BARE_CHANNELS = setOf(AmberStage.id, HarborSport.id, KiteKids.id)
+
+/** The overview with the programs [records] names offering their own recording control instead of Record. */
+internal fun GuideState.withRecordControls(records: Map<String, ProgramRecordControl?>): GuideState = copy(
+    channels = channels.map { channel ->
+        channel.copy(programs = channel.programs.map { if (it.id in records) it.copy(record = records[it.id]) else it })
+    },
+)
+
+internal const val SNOWLINE_ID = "ridge-earth-10:00 PM-Snowline"
 
 /** The phone's overview: what is on now, one row per channel. */
 internal fun phoneOverviewFixture() = base(
