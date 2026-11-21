@@ -4,6 +4,7 @@
 package at.bernhardberger.tvhplayer.touch.recordings
 
 import at.bernhardberger.tvhplayer.touch.ui.ArtworkImage
+import at.bernhardberger.tvhplayer.touch.ui.rememberStandalonePicture
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -41,6 +42,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -80,7 +82,9 @@ internal fun RecordingPane(item: RecordingItem, clock: RecordingClock, actions: 
                 DetailsEpisode(item.episode)
                 Facts(item)
             }
-            Picture(item, Modifier.width(240.dp).clip(RoundedCornerShape(16.dp)))
+            rememberStandalonePicture(item.picture, item.pictureModel)?.let {
+                Picture(it, Modifier.width(240.dp).clip(RoundedCornerShape(16.dp)))
+            }
         }
         Progress(item.state, clock, Modifier.padding(top = 16.dp))
         Row(Modifier.padding(top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -109,14 +113,18 @@ internal fun RecordingPage(
 @Composable
 private fun UprightPage(item: RecordingItem, clock: RecordingClock, actions: RecordingsActions, onBack: () -> Unit) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
+        val picture = rememberStandalonePicture(item.picture, item.pictureModel)
         val pictureHeight = maxWidth / PICTURE_RATIO
         Box(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
-            Box(Modifier.fillMaxWidth().height(pictureHeight)) {
-                Picture(item, Modifier.fillMaxSize())
-                DetailsPictureScrim(Modifier.fillMaxSize())
+            if (picture != null) {
+                Box(Modifier.fillMaxWidth().height(pictureHeight)) {
+                    Picture(picture, Modifier.fillMaxSize())
+                    DetailsPictureScrim(Modifier.fillMaxSize())
+                }
             }
-            // As drawn, the text starts over the lower quarter of the picture.
-            Column(Modifier.padding(top = pictureHeight * TITLE_OVER_PICTURE).padding(horizontal = 24.dp)) {
+            // As drawn, the text starts over the lower quarter of the picture; without one, under the bar.
+            val top = if (picture != null) pictureHeight * TITLE_OVER_PICTURE else BAR_HEIGHT + 32.dp
+            Column(Modifier.padding(top = top).padding(horizontal = 24.dp)) {
                 Column(Modifier.widthIn(max = TEXT_WIDTH)) {
                     Title(item, Modifier, MaterialTheme.typography.displaySmall)
                     DetailsEpisode(item.episode)
@@ -159,9 +167,10 @@ private fun PhonePage(item: RecordingItem, clock: RecordingClock, actions: Recor
             Modifier.fillMaxSize().verticalScroll(rememberScrollState())
                 .windowInsetsPadding(WindowInsets.navigationBars).padding(horizontal = 16.dp),
         ) {
-            Picture(item, Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)))
+            val picture = rememberStandalonePicture(item.picture, item.pictureModel)
+            picture?.let { Picture(it, Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))) }
             Text(
-                whenText(item, clock), Modifier.padding(top = 16.dp),
+                whenText(item, clock), if (picture != null) Modifier.padding(top = 16.dp) else Modifier,
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Title(item, Modifier.padding(top = 4.dp), MaterialTheme.typography.headlineMedium)
@@ -220,19 +229,12 @@ private fun ChannelTile(item: RecordingItem, modifier: Modifier) {
 }
 
 @Composable
-private fun Picture(item: RecordingItem, modifier: Modifier) {
-    val picture = item.picture
-    Box(
+private fun Picture(picture: Painter, modifier: Modifier) {
+    Image(
+        picture, null,
         modifier.aspectRatio(PICTURE_RATIO).background(MaterialTheme.colorScheme.surfaceContainerHighest),
-        contentAlignment = Alignment.Center,
-    ) {
-        ArtworkImage(picture, item.pictureModel, Modifier.fillMaxSize(), ContentScale.Crop) {
-            Icon(
-                painterResource(R.drawable.video_library_outline), null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
+        contentScale = ContentScale.Crop,
+    )
 }
 
 @Composable
@@ -330,3 +332,4 @@ private fun Facts(details: RecordingDetails, columns: Int, keyWidth: Dp) {
 private const val PICTURE_RATIO = 16f / 9f
 private val TEXT_WIDTH = 576.dp
 private const val TITLE_OVER_PICTURE = 0.75f
+private val BAR_HEIGHT = 64.dp

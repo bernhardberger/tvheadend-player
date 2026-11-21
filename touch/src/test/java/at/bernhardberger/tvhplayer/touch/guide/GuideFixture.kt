@@ -158,6 +158,19 @@ internal fun overviewFixture(upright: Boolean = false): GuideState {
     )
 }
 
+/**
+ * The overview as most of a server's guide sends it: Amber Stage, Harbor Sport (recording) and Kite Kids
+ * without pictures beside channels with theirs (section 13, "A program without a picture").
+ */
+internal fun GuideState.withoutSomePictures(): GuideState = copy(
+    channels = channels.map { channel ->
+        if (channel.id !in BARE_CHANNELS) return@map channel
+        channel.copy(programs = channel.programs.map { it.copy(still = null, art = null, stillModel = null) })
+    },
+)
+
+private val BARE_CHANNELS = setOf(AmberStage.id, HarborSport.id, KiteKids.id)
+
 /** The phone's overview: what is on now, one row per channel. */
 internal fun phoneOverviewFixture() = base(
     listOf(

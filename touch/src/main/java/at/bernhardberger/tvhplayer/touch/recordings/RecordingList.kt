@@ -4,6 +4,7 @@
 package at.bernhardberger.tvhplayer.touch.recordings
 
 import at.bernhardberger.tvhplayer.touch.ui.ArtworkImage
+import at.bernhardberger.tvhplayer.touch.ui.rememberStandalonePicture
 import android.icu.text.DateFormat
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -87,7 +88,9 @@ internal fun RecordingList(
                 val context = RowContext(section.label?.dates ?: RowDates.None, oneChannel)
                 group(section.items, key = { it.id }) { item, index, count ->
                     val line = recordingLine(item, context, clock)
-                    RecordingRow(item, line, item.id == pickedId, index, count) { onPick(item.id) }
+                    RecordingRow(item, line, level.showsThumbnails, item.id == pickedId, index, count) {
+                        onPick(item.id)
+                    }
                 }
             }
         }
@@ -275,6 +278,7 @@ private fun FolderTile(recordingNow: Boolean) {
 private fun RecordingRow(
     item: RecordingItem,
     line: List<RecordingLinePart>,
+    thumbnail: Boolean,
     selected: Boolean,
     index: Int,
     count: Int,
@@ -283,7 +287,7 @@ private fun RecordingRow(
     ListItem(
         selected = selected,
         onClick = onPick,
-        leadingContent = { Thumbnail(item) },
+        leadingContent = if (thumbnail) ({ Thumbnail(item) }) else null,
         trailingContent = when (item.state) {
             is RecordingProgress.Recording -> ({ RecPill() })
             RecordingProgress.Watched -> ({
@@ -332,19 +336,29 @@ internal fun dayText(day: RecordingDay): String = when (day) {
 internal fun durationText(duration: Duration): String =
     formatNarrowDuration(duration.seconds, LocalResources.current)
 
+/** The recording's picture; without one its channel's logo on the logo's tint, else the neutral tile (section 13). */
 @Composable
 private fun Thumbnail(item: RecordingItem) {
+    val picture = rememberStandalonePicture(item.picture, item.pictureModel)
+    val logo = picture == null && item.hasLogo
     Box(
-        Modifier.size(ThumbWidth, ThumbHeight).clip(ThumbShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+        Modifier.size(ThumbWidth, ThumbHeight).clip(ThumbShape).background(
+            item.logoTint.takeIf { logo } ?: MaterialTheme.colorScheme.surfaceContainerHighest,
+        ),
         contentAlignment = Alignment.Center,
     ) {
-        val picture = item.picture
-        ArtworkImage(picture, item.pictureModel, Modifier.fillMaxSize(), ContentScale.Crop) {
+        val icon = @Composable {
             Icon(
                 painterResource(R.drawable.video_library_outline), null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+        when {
+            picture != null -> Image(picture, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            logo -> ArtworkImage(
+                item.channelLogo, item.channelLogoModel, Modifier.fillMaxSize().padding(6.dp), fallback = icon,
+            )
+            else -> icon()
         }
         RecordingBar(item.state, Modifier.align(Alignment.BottomStart).fillMaxWidth().height(3.dp))
     }

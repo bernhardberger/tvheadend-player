@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -45,12 +46,16 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.touch.R
+import at.bernhardberger.tvhplayer.touch.channels.ChannelRecording
+import at.bernhardberger.tvhplayer.touch.channels.RecordingBadge
 import at.bernhardberger.tvhplayer.touch.ui.ChannelLogoTile
 import at.bernhardberger.tvhplayer.touch.ui.PartsLine
+import at.bernhardberger.tvhplayer.touch.ui.rememberStandalonePicture
 
 /** The day menu and the jump switch above the overview. */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -149,6 +154,18 @@ private fun ColumnHead(channel: GuideChannel, onClick: () -> Unit) {
     }
 }
 
+/** A program's title, and REC after it when no picture carries the recording's mark. */
+@Composable
+private fun TitleWithRecording(title: String, style: TextStyle, maxLines: Int, recording: Boolean) {
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            title, Modifier.weight(1f, fill = false), style = style, maxLines = maxLines,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (recording) RecordingBadge(ChannelRecording.Program)
+    }
+}
+
 @Composable
 private fun ColumnItem(
     program: GuideProgram,
@@ -166,10 +183,14 @@ private fun ColumnItem(
         color = if (open) scheme.surfaceContainerHigh else scheme.surfaceContainer,
     ) {
         Column {
-            if (lead && program.onNow) {
+            val leadNow = lead && program.onNow
+            val picture = if (leadNow) rememberStandalonePicture(program.still, program.stillModel) else null
+            // Without its picture the leading program keeps the bar and REC under and after its text (section 13).
+            val bare = leadNow && picture == null
+            if (picture != null) {
                 ProgramPicture(
-                    program.still, Modifier.padding(start = 10.dp, top = 10.dp, end = 10.dp).fillMaxWidth(),
-                    program.progress, program.recording, model = program.stillModel, watching = program.watching,
+                    picture, Modifier.padding(start = 10.dp, top = 10.dp, end = 10.dp).fillMaxWidth(),
+                    program.progress, program.recording, watching = program.watching,
                 )
             }
             Row(Modifier.padding(start = 12.dp, top = 8.dp, end = 10.dp, bottom = 8.dp)) {
@@ -179,9 +200,9 @@ private fun ColumnItem(
                 )
                 Column(Modifier.weight(1f)) {
                     val type = MaterialTheme.typography
-                    Text(
-                        program.title, style = if (lead) type.titleMedium else type.titleSmall,
-                        maxLines = 2, overflow = TextOverflow.Ellipsis,
+                    TitleWithRecording(
+                        program.title, if (lead) type.titleMedium else type.titleSmall, maxLines = 2,
+                        recording = bare && program.recording,
                     )
                     PartsLine(
                         if (open) program.openLine(phone = false) else program.rowLine(),
@@ -189,6 +210,13 @@ private fun ColumnItem(
                     )
                 }
                 if (program.scheduled) ScheduledIcon()
+            }
+            program.progress?.takeIf { bare }?.let {
+                ProgramBar(
+                    it, program.recording,
+                    Modifier.padding(start = 12.dp, end = 10.dp, bottom = 10.dp).fillMaxWidth().height(4.dp),
+                    program.watching,
+                )
             }
             if (open) OpenInColumn(program, actions, phone = false) { onDetails(program.id) }
         }
@@ -268,6 +296,7 @@ internal fun OverviewRows(
         itemsIndexed(rows, key = { _, (channel, _) -> channel.id }) { index, (channel, program) ->
             val open = program.id == openId
             val shape = segmentShape(index, rows.size)
+            val picture = rememberStandalonePicture(program.still, program.stillModel)
             Surface(
                 shape = shape,
                 color = MaterialTheme.colorScheme.run { if (open) surfaceContainerHigh else surfaceContainer },
@@ -285,20 +314,19 @@ internal fun OverviewRows(
                         supportingContent = {
                             PartsLine(program.rowLine(), style = MaterialTheme.typography.bodyMedium)
                         },
-                        trailingContent = if (program.hasStill) {
+                        trailingContent = picture?.let {
                             {
                                 ProgramPicture(
-                                    program.still, Modifier.width(96.dp), program.progress, program.recording,
-                                    model = program.stillModel, watching = program.watching,
+                                    it, Modifier.width(96.dp), program.progress, program.recording,
+                                    watching = program.watching,
                                 )
                             }
-                        } else {
-                            null
                         },
                     ) {
-                        Text(
-                            program.title, style = MaterialTheme.typography.titleMedium, maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
+                        // Without the thumbnail, REC stands after the title as in a Channels row.
+                        TitleWithRecording(
+                            program.title, MaterialTheme.typography.titleMedium, maxLines = 1,
+                            recording = picture == null && program.recording,
                         )
                     }
                     if (open) {

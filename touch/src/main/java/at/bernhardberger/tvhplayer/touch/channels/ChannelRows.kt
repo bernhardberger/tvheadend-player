@@ -383,8 +383,9 @@ private fun ChannelProgress(
     )
 }
 
+/** REC after a running recording's title; the Guide overview's leading program takes it too (section 13). */
 @Composable
-private fun RecordingBadge(recording: ChannelRecording, compact: Boolean = false) {
+internal fun RecordingBadge(recording: ChannelRecording, compact: Boolean = false) {
     val descriptionId = when (recording) {
         ChannelRecording.Channel -> R.string.channels_recording_on_channel
         ChannelRecording.Program -> R.string.channels_recording

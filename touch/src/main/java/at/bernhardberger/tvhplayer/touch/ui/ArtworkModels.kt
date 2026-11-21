@@ -42,6 +42,22 @@ internal class ArtworkModels(private val tvheadend: TvheadendSession?) {
 internal val LocalArtworkModels = staticCompositionLocalOf<ArtworkModels?> { null }
 
 /**
+ * The picture that stands on its own (section 13, "A program without a picture"): a fixture's
+ * [painter], else the server image of [model], else null, and the screen leaves the picture out for
+ * its text to take the place. Nothing stands in for a missing picture; this is the one place that
+ * decides so (the TV's logo-as-picture, not chosen, would be decided here). Whether a picture exists
+ * is known from the data, so the place stays while the server image loads; one that fails to load
+ * counts as none, and its place then goes once.
+ */
+@Composable
+internal fun rememberStandalonePicture(painter: Painter?, model: Any?): Painter? {
+    if (painter != null || model == null) return painter
+    val server = rememberAsyncImagePainter(model, contentScale = ContentScale.Crop)
+    val state by server.state.collectAsState()
+    return server.takeUnless { state is AsyncImagePainter.State.Error }
+}
+
+/**
  * A fixture's [painter], else the server image of [model] through the app's image loader, else
  * nothing; [fallback] shows until the server image has loaded, and stays when it fails.
  */

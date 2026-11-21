@@ -4,7 +4,7 @@
 
 package at.bernhardberger.tvhplayer.touch.guide
 
-import at.bernhardberger.tvhplayer.touch.ui.ArtworkImage
+import at.bernhardberger.tvhplayer.touch.ui.rememberStandalonePicture
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -79,9 +79,9 @@ internal fun ProgramDetailsPage(
 @Composable
 private fun WidePage(details: ProgramDetails, actions: GuideActions, onBack: () -> Unit) {
     Box(Modifier.fillMaxSize()) {
-        if (details.picture != null || details.pictureModel != null) {
+        rememberStandalonePicture(details.picture, details.pictureModel)?.let { picture ->
             Box(Modifier.align(Alignment.TopEnd).size(720.dp, 405.dp)) {
-                ArtworkImage(details.picture, details.pictureModel, Modifier.fillMaxSize(), ContentScale.Crop)
+                Image(picture, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                 DetailsPictureScrim(Modifier.fillMaxSize())
                 // As drawn, the picture also fades into the page on its start side.
                 Box(
@@ -109,14 +109,19 @@ private fun WidePage(details: ProgramDetails, actions: GuideActions, onBack: () 
 @Composable
 private fun UprightPage(details: ProgramDetails, actions: GuideActions, onBack: () -> Unit) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
+        val picture = rememberStandalonePicture(details.picture, details.pictureModel)
         val pictureHeight = maxWidth / PICTURE_RATIO
         Box(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
-            Box(Modifier.fillMaxWidth().height(pictureHeight)) {
-                ArtworkImage(details.picture, details.pictureModel, Modifier.fillMaxSize(), ContentScale.Crop)
-                DetailsPictureScrim(Modifier.fillMaxSize())
+            if (picture != null) {
+                Box(Modifier.fillMaxWidth().height(pictureHeight)) {
+                    Image(picture, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                    DetailsPictureScrim(Modifier.fillMaxSize())
+                }
             }
-            // As drawn, the title sits over the lower half of the picture.
-            Column(Modifier.padding(top = pictureHeight * TITLE_OVER_PICTURE).padding(horizontal = 24.dp)) {
+            // As drawn, the title sits over the lower half of the picture; without one it starts under the bar,
+            // as on the wide page.
+            val top = if (picture != null) pictureHeight * TITLE_OVER_PICTURE else PAGE_BAR_HEIGHT + 32.dp
+            Column(Modifier.padding(top = top).padding(horizontal = 24.dp)) {
                 Lead(details, MaterialTheme.typography.displayMedium)
                 Timing(details, Modifier.widthIn(max = 480.dp).padding(top = 20.dp))
                 Actions(details, actions, Modifier.padding(top = 20.dp), equalWidth = false)
@@ -153,10 +158,12 @@ internal fun ProgramDetailsColumn(
     inPlayer: Boolean = false,
 ) {
     Column(modifier) {
-        ProgramPicture(
-            details.art ?: details.picture, Modifier.fillMaxWidth(), strip = false, model = details.pictureModel,
+        val picture = rememberStandalonePicture(details.art ?: details.picture, details.pictureModel)
+        picture?.let { ProgramPicture(it, Modifier.fillMaxWidth(), strip = false) }
+        Lead(
+            details, MaterialTheme.typography.headlineMedium,
+            if (picture != null) Modifier.padding(top = 16.dp) else Modifier,
         )
-        Lead(details, MaterialTheme.typography.headlineMedium, Modifier.padding(top = 16.dp))
         Timing(details, Modifier.padding(top = 16.dp))
         val record = actions.onRecord
         val recordOptions = actions.onRecordOptions

@@ -39,6 +39,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.ui.PartsLine
+import at.bernhardberger.tvhplayer.touch.ui.rememberStandalonePicture
 
 /**
  * The programs of one channel's day in start order, with a date heading where the night crosses
@@ -118,11 +119,8 @@ private fun DayRow(
         trailingContent = {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (program.scheduled) ScheduledIcon()
-                if (program.hasStill) {
-                    ProgramPicture(
-                        program.still, Modifier.size(if (wide) 96.dp else 72.dp, if (wide) 54.dp else 40.dp),
-                        model = program.stillModel,
-                    )
+                rememberStandalonePicture(program.still, program.stillModel)?.let {
+                    ProgramPicture(it, Modifier.size(if (wide) 96.dp else 72.dp, if (wide) 54.dp else 40.dp))
                 }
                 Icon(painterResource(R.drawable.guide_expand_more), null)
             }
@@ -148,17 +146,9 @@ private fun OpenProgram(
         Box {
             Column(Modifier.padding(16.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    ProgramPicture(
-                        program.art ?: program.still,
-                        Modifier.width(
-                            when (layout) {
-                                GuideLayout.Wide -> 280.dp
-                                GuideLayout.Upright -> 148.dp
-                                GuideLayout.Phone -> 120.dp
-                            },
-                        ),
-                        strip = false,
-                    )
+                    rememberStandalonePicture(program.art ?: program.still, program.stillModel)?.let {
+                        ProgramPicture(it, Modifier.width(layout.openPictureWidth), strip = false)
+                    }
                     Column(Modifier.weight(1f)) {
                         OpenHead(program, layout)
                         // The phone writes the time line beside the picture and the bar below it.
@@ -200,6 +190,13 @@ private fun OpenProgram(
         }
     }
 }
+
+private val GuideLayout.openPictureWidth
+    get() = when (this) {
+        GuideLayout.Wide -> 280.dp
+        GuideLayout.Upright -> 148.dp
+        GuideLayout.Phone -> 120.dp
+    }
 
 @Composable
 private fun OpenHead(program: GuideProgram, layout: GuideLayout) {
