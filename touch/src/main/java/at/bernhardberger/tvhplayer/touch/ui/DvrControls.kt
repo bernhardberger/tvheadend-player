@@ -13,6 +13,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -20,11 +21,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.text
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.window.DialogWindowProvider
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
@@ -358,12 +364,13 @@ internal class DvrControls(
 
 /** Asks about the change [controls] wait on, if any. */
 @Composable
-internal fun ConfirmDvrChange(controls: DvrControls) {
+internal fun ConfirmDvrChange(controls: DvrControls, hideSystemBars: Boolean? = null) {
     val change = controls.pending ?: return
     DvrChangeDialog(
         change.title, change.body, change.dismiss, change.confirm, { controls.confirm(change) }, controls::dismiss,
         stopTimes = change.stopTimes,
         confirmEnabled = !controls.commandInFlight,
+        hideSystemBars = hideSystemBars,
     )
 }
 
@@ -378,10 +385,14 @@ internal fun DvrChangeDialog(
     onDismiss: () -> Unit,
     stopTimes: StopConfirmationTimes? = null,
     confirmEnabled: Boolean = true,
+    hideSystemBars: Boolean? = null,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(title)) },
+        title = {
+            if (hideSystemBars != null) DialogSystemBars(hideSystemBars)
+            Text(stringResource(title))
+        },
         text = {
             if (stopTimes == null) {
                 Text(stringResource(body))
@@ -397,4 +408,16 @@ internal fun DvrChangeDialog(
         confirmButton = { TextButton(onClick = onConfirm, enabled = confirmEnabled) { Text(stringResource(confirm)) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(dismiss)) } },
     )
+}
+
+@Composable
+private fun DialogSystemBars(hidden: Boolean) {
+    // This is the dialog window, not the activity window that is already immersive.
+    val window = (LocalView.current.parent as DialogWindowProvider).window
+    LaunchedEffect(window, hidden) {
+        val controller = WindowCompat.getInsetsController(window, window.decorView)
+        controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        val bars = WindowInsetsCompat.Type.systemBars()
+        if (hidden) controller.hide(bars) else controller.show(bars)
+    }
 }
