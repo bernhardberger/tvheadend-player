@@ -6,9 +6,11 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
@@ -23,49 +25,59 @@ import at.bernhardberger.tvhplayer.ui.TvTextColors
  * The header row of a top-level destination. The [title] is the row's pane title for accessibility;
  * the drawer says where you are, so it is drawn only with [showTitle], as a heading at the leading
  * edge. The [filter] narrowing the destination, if any, stays visible at the leading edge in the
- * secondary text tone instead, and [actions] end the row. [leading] content takes the leading edge
- * instead of either; the actions then fill the rest of the row themselves.
+ * secondary text tone instead, and [actions] follow. The [WallClock], reading [nowSec], ends the
+ * row on the content's end edge, [WallClockGap] after them. [leading] content takes the leading
+ * edge instead of title or filter; the actions then fill the rest of the row themselves.
  */
 @Composable
 fun TopLevelBrowseHeader(
     title: String,
+    nowSec: () -> Long,
     modifier: Modifier = Modifier,
     filter: String? = null,
     showTitle: Boolean = false,
     leading: (@Composable RowScope.() -> Unit)? = null,
     actions: (@Composable RowScope.() -> Unit)? = null,
 ) {
+    // The clock is measured first, so it always gets its reserved width on the end edge; the
+    // filter or leading content and the actions share what is left, as the header always laid out.
     Row(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = TvBrowseHeaderHeight)
             .semantics { paneTitle = title },
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(TvSpacing12),
     ) {
-        if (leading != null) {
-            leading()
-        } else if (filter != null) {
-            Text(
-                text = filter,
-                style = MaterialTheme.typography.headlineMedium,
-                color = TvTextColors.secondary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-        } else if (showTitle) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f).semantics { heading() },
-            )
-        } else {
-            Spacer(Modifier.weight(1f))
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(TvSpacing12),
+        ) {
+            if (leading != null) {
+                leading()
+            } else if (filter != null) {
+                Text(
+                    text = filter,
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = TvTextColors.secondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+            } else if (showTitle) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f).semantics { heading() },
+                )
+            } else {
+                Spacer(Modifier.weight(1f))
+            }
+            actions?.invoke(this)
         }
-        actions?.invoke(this)
+        WallClock(nowSec, Modifier.padding(start = WallClockGap).testTag(WALL_CLOCK_TAG))
     }
 }

@@ -40,7 +40,6 @@ import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import at.bernhardberger.tvhplayer.testutil.VisualCapture
 import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
 import at.bernhardberger.tvhplayer.ui.AppDestination
-import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.components.*
 import at.bernhardberger.tvhplayer.ui.player.*
 import at.bernhardberger.tvhplayer.ui.screens.home.HomeContent
@@ -438,7 +437,7 @@ class StatusMarksCaptureTest(
         val programme = current.first().takeUnless { noEpg }
         val following = next.first().takeUnless { noEpg }
         PlayerChrome(PlayerChromeMode.BANNER,
-            PlayerChromeContent(formatClock(captureNow),
+            PlayerChromeContent(captureNow,
                 liveInfoBarData(context().resources, channel.number, names.first(), programme, following,
                     scenario == "next-scheduled", captureNow, stringResource(R.string.no_epg),
                     observation.runningRecordingForEvent(programme), observation.runningRecordingForEvent(following)),

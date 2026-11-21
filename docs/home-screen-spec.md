@@ -39,9 +39,9 @@ Still open, to be decided with the mockup:
 ## 2. Header
 
 - No "Home" heading.
-- Top right: wall clock with the date below it (smaller, muted), then the channel
-  group button (shared with Channels and Guide), then View options at the far
-  right.
+- Top right: the channel group button (shared with Channels and Guide), View
+  options, then the shared wall clock (time over date, smaller muted date) at the
+  far right, 24dp after View options.
 - Use locale and the existing clock-format preference; no seconds.
 - **The header scrolls with the content. It is not fixed.**
 - View options is a working Home-context control, not a placeholder or a feature
@@ -211,7 +211,8 @@ measurements above where they differ):**
   Only ordinary focused rows get the larger heading.
 - While On now is expanded the header row (clock, buttons) and everything above
   have scrolled off the top; a small muted up chevron at the top centre shows
-  that more is above.
+  that more is above. The wall clock alone shows again at its top-right place
+  (owner 2026-11-21), fading in and out with the expanded view.
 - Down into On now: the rows above scroll up off the top as one page movement,
   fading as they leave (about 90 ms to clear), and the row moves up into its
   slot with them. The content block is anchored at its bottom just above the

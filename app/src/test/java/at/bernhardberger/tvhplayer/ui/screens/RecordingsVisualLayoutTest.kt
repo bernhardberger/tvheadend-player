@@ -13,6 +13,8 @@ import at.bernhardberger.tvhplayer.testutil.settleFrames
 
 import android.app.Application
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
+import at.bernhardberger.tvhplayer.ui.components.WallClockGap
+import at.bernhardberger.tvhplayer.ui.components.WALL_CLOCK_TAG
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
 import at.bernhardberger.tvhplayer.ui.components.ListBottomFadeHeight
 import at.bernhardberger.tvhplayer.ui.components.LocalWatchingIndicator
@@ -460,8 +462,9 @@ class RecordingsVisualLayoutTest {
         compose.onNodeWithTag("recordings-space").assertContentDescriptionContains("79% used", substring = true)
         focused("recordings-folder-Documentaries")
         val resting = bounds("recordings-space")
-        // It ends the tab line at the header's edge, centred on the tabs.
-        assertEquals(bounds("recordings-header").right, resting.right, .5f)
+        // It ends the tab line the clock's gap before the clock, centred on the tabs.
+        assertEquals(bounds(WALL_CLOCK_TAG).left - WallClockGap.value * compose.density.density, resting.right, .5f)
+        assertEquals(bounds("recordings-header").right, bounds(WALL_CLOCK_TAG).right, .5f)
         assertEquals(bounds("recordings-mode-tabs").center.y, resting.center.y, 2f)
         assertTrue(bounds("recordings-mode-tabs").right < resting.left)
         // Neither the options button, a folder nor another tab moves it.
@@ -513,7 +516,7 @@ class RecordingsVisualLayoutTest {
         compose.onNodeWithTag("recordings-space").assertExists()
         compose.onNodeWithTag("recordings-space-ring", useUnmergedTree = true).assertDoesNotExist()
         focused("recordings-folder-Documentaries")
-        assertEquals(bounds("recordings-header").right, bounds("recordings-space").right, .5f)
+        assertEquals(bounds(WALL_CLOCK_TAG).left - WallClockGap.value * compose.density.density, bounds("recordings-space").right, .5f)
         capture("header-no-space", 1f)
     }
 
@@ -1119,7 +1122,8 @@ class RecordingsVisualLayoutTest {
         presentationLibrary(firstRow = true, scale = 1.3f)
         val storage = bounds("recordings-space")
         assertTrue("Storage and tabs do not overlap", bounds("recordings-mode-tabs").right < storage.left)
-        assertEquals(bounds("recordings-header").right, storage.right, .5f)
+        assertEquals(bounds(WALL_CLOCK_TAG).left - WallClockGap.value * compose.density.density, storage.right, .5f)
+        assertEquals(bounds("recordings-header").right, bounds(WALL_CLOCK_TAG).right, .5f)
         val values = requireNotNull(valuesLine()).fetchSemanticsNode().boundsInRoot
         assertTrue("The values line ends before the button", values.right <= bounds(OPTIONS).left)
         assertButtonClearOf(firstListRow())

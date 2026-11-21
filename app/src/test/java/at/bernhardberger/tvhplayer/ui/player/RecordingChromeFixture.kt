@@ -103,7 +103,7 @@ internal fun RecordingChromeFixture(
     PlayerChrome(
         mode = mode,
         content = PlayerChromeContent(
-            clock = "20:15",
+            clockSec = PlayerChromeClockSec,
             info = info ?: fixtureRecordingInfo(growing = growing, positionMs = positionMs, durationMs = durationMs),
             state = playerStateCell(paused),
             badges = badges,

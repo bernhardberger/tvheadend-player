@@ -54,7 +54,6 @@ import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
-import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 import java.io.File
 import kotlin.time.Instant
@@ -136,7 +135,7 @@ class ChannelNumberEntryLayoutTest {
                         ProvideArtworkSession(session) { PlayerChrome(
                             mode = PlayerChromeMode.CONTROLS,
                             content = PlayerChromeContent(
-                                clock = formatClock(NOW),
+                                clockSec = NOW,
                                 info = liveInfoBarData(ApplicationProvider.getApplicationContext<Application>().resources,
                                     101, "Ridge Earth HD", programme, next, nextScheduled = true, nowSec = NOW,
                                     unavailableTitle = "No program information"),

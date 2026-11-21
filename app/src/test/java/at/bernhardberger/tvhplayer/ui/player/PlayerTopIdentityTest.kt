@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
@@ -81,7 +82,8 @@ class PlayerTopIdentityTest {
         }
     }
 
-    @Test fun theIdentityStandsAtTheTopStartOnTheStripsAnchor() {
+    @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun theIdentityStandsAtTheTopStartOnTheStripsAnchor() {
         chrome(PlayerChromeMode.CONTROLS)
         val name = compose.tagBounds("player-top-identity-name")
         val identity = compose.tagBounds(PlayerTopIdentityTag)
@@ -93,6 +95,13 @@ class PlayerTopIdentityTest {
         assertEquals("centred on the clock's line", clock.center.y, identity.center.y, 1f)
         assertTrue("it stands in the top band", identity.bottom < 120f)
         assertEquals("centred on the room's header band", TvGridVerticalMargin.value + 20f, identity.center.y, 1f)
+        // As on the browse screens, the time and date together are centred on that line.
+        val lines = compose.onAllNodes(hasAnyAncestor(hasTestTag("player-top-cluster")) and
+            SemanticsMatcher.keyIsDefined(SemanticsProperties.Text), useUnmergedTree = true)
+            .fetchSemanticsNodes().map { it.boundsInRoot }
+        assertEquals("time and date", 2, lines.size)
+        assertEquals("the clock's block is centred on the identity's line: $lines", identity.center.y,
+            (lines.minOf { it.top } + lines.maxOf { it.bottom }) / 2f, 1f)
     }
 
     @Test fun theNumberEntryStandsWhereTheIdentityStandsWithTheChromeShownOrHidden() {
@@ -407,7 +416,7 @@ class PlayerTopIdentityTest {
             TVHeadendPlayerTheme {
                 PlayerChrome(
                     mode = shownMode,
-                    content = PlayerChromeContent("20:15", info),
+                    content = PlayerChromeContent(PlayerChromeClockSec, info),
                     timeline = PlayerChromeTimeline.Live(this.timeshift, nowSec = 1_800),
                     actions = PlayerChromeActions(active = shownMode == PlayerChromeMode.CONTROLS, paused = false,
                         livePause = livePause, restoreFocus = restoreFocus),

@@ -1169,7 +1169,7 @@ class PlayerTimelineGeometryTest {
             Box(Modifier.fillMaxSize()) {
             PlayerChrome(
                 mode = frame.mode,
-                content = PlayerChromeContent("20:15", frame.info ?: liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 1, "One", airing, airing, false, now, "Programme"),
+                content = PlayerChromeContent(PlayerChromeClockSec, frame.info ?: liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 1, "One", airing, airing, false, now, "Programme"),
                     state = frame.cell),
                 timeline = frame.timeline,
                 actions = PlayerChromeActions(active = frame.mode == PlayerChromeMode.CONTROLS, paused = frame.cell == PlayerStateCell.PAUSED),
