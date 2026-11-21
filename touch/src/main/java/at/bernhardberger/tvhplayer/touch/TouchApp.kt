@@ -114,24 +114,31 @@ private fun ConnectionsPage(
     ConnectionsScreen(
         active = card,
         onBack = onBack,
-        onEdit = { editing = true },
+        onEdit = { if (!connect.removing) editing = true },
         onRemove = { if (active != null) connect.remove(active.id) },
     )
-    val editorShown = (editing || signIn) && active != null
+    val editorShown = (editing || signIn) && active != null && !connect.removing
     LaunchedEffect(editorShown) { if (!editorShown) connect.releaseEditor() }
     if (editorShown && active != null) {
         val restoreSaved = rememberSavedConnectionRestore(session, owner)
-        val setup = connect.editor(active.label.orEmpty(), requireSignIn = signIn, restoreSaved)
+        // An unreadable saved sign-in keeps a password connection one, whichever way the editor opened.
+        val requireSignIn = active.authenticationMode == ServerProfileAuthenticationMode.PASSWORD &&
+            !active.credentialsAvailable
+        val setup = connect.editor(active.id, active.label.orEmpty(), requireSignIn, restoreSaved)
         // The editor closes once the change and its name are saved.
         LaunchedEffect(setup, setup.finished) {
             if (setup.finished) {
+                connect.releaseEditor()
                 editing = false
                 onSaved()
             }
         }
         EditConnectionFlow(
             setup,
-            onClose = { if (signIn) onBack() else editing = false },
+            onClose = {
+                connect.releaseEditor()
+                if (signIn) onBack() else editing = false
+            },
             focusPassword = signIn,
         )
     }

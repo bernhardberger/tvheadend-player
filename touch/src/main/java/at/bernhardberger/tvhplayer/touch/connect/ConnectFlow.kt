@@ -2,7 +2,6 @@ package at.bernhardberger.tvhplayer.touch.connect
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import at.bernhardberger.tvhplayer.ui.screens.onboarding.ConnectionSetupState
 import at.bernhardberger.tvhplayer.ui.screens.onboarding.SetupMode
 import at.bernhardberger.tvhplayer.ui.screens.onboarding.SetupStep
 
@@ -32,7 +31,7 @@ internal fun FirstRunFlow(setup: ConnectionSetupHolder) {
             onBack = setup::backToSearch,
         )
     }
-    FailureDialog(state, SetupMode.FIRST_RUN)
+    FailureDialog(setup, SetupMode.FIRST_RUN)
 }
 
 /**
@@ -49,15 +48,17 @@ internal fun EditConnectionFlow(setup: ConnectionSetupHolder, onClose: () -> Uni
         original = setup.baseline,
         onFieldsChange = setup::update,
         onSave = { setup.submit() },
-        onCancel = onClose,
+        // Back, Cancel and the discard prompt all close here: never while a save is being written.
+        onCancel = { if (!setup.saving) onClose() },
         focusPassword = focusPassword,
     )
-    FailureDialog(setup.state, SetupMode.EDIT)
+    FailureDialog(setup, SetupMode.EDIT)
 }
 
 /** Cancel returns to the form with what was typed; the dialog's other button is the shared action. */
 @Composable
-private fun FailureDialog(state: ConnectionSetupState, mode: SetupMode) {
-    val failure = state.failure?.takeIf { state.step == SetupStep.FAILED && !state.saving && it.showsDialog }
+private fun FailureDialog(setup: ConnectionSetupHolder, mode: SetupMode) {
+    val state = setup.state
+    val failure = state.failure?.takeIf { state.step == SetupStep.FAILED && setup.showsFailureDialog && it.showsDialog }
     if (failure != null) ConnectionFailureDialog(failure, mode, onCancel = { state.back() }, onAction = state::onAction)
 }

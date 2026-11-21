@@ -41,9 +41,10 @@ internal class FakeConnection(
     val session = FakeTvheadendSession()
     val store = FakeServerProfileStore()
     val writesHeld = MutableStateFlow(false)
+    private val writes = HeldWrites(store, writesHeld)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     val owner = AppProfileOwner(
-        session, HeldWrites(store, writesHeld), PlayerSettingsStore(MemoryPreferences()), Dispatchers.Main,
+        session, writes, PlayerSettingsStore(MemoryPreferences()), Dispatchers.Main,
         { readForEditing },
     )
     private val notices = ConnectionNoticeSource(
@@ -67,6 +68,9 @@ internal class FakeConnection(
     /** The Recordings destination's state, as the composition root's view model gives it. */
     fun recordings() = RecordingsViewModel(session)
 
+    /** True when the last applied password write carried this sign-in; the values never leave the test. */
+    fun savedSignIn(username: String, password: String): Boolean = writes.lastSignIn == (username to password)
+
     fun close() = scope.cancel()
 }
 
@@ -74,6 +78,9 @@ private class HeldWrites(
     private val store: FakeServerProfileStore,
     private val held: MutableStateFlow<Boolean>,
 ) : ServerProfileStore by store {
+    var lastSignIn: Pair<String, String>? = null
+        private set
+
     private suspend fun <T> write(operation: suspend () -> T): T {
         held.first { !it }
         return operation()
@@ -85,6 +92,7 @@ private class HeldWrites(
     override suspend fun addPassword(
         host: String, port: Int, username: String, password: String, label: String?, activate: Boolean,
     ) = write { store.addPassword(host, port, username, password, label, activate) }
+        .also { if (it is ServerProfileWriteResult.Applied) lastSignIn = username to password }
 
     override suspend fun updateAnonymous(id: ServerProfileId, host: String, port: Int, label: String?) =
         write { store.updateAnonymous(id, host, port, label) }
@@ -92,6 +100,7 @@ private class HeldWrites(
     override suspend fun updatePassword(
         id: ServerProfileId, host: String, port: Int, username: String, password: String, label: String?,
     ) = write { store.updatePassword(id, host, port, username, password, label) }
+        .also { if (it is ServerProfileWriteResult.Applied) lastSignIn = username to password }
 
     override suspend fun updateLabel(id: ServerProfileId, label: String?): ServerProfileWriteResult =
         write { store.updateLabel(id, label) }

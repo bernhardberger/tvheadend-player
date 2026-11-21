@@ -29,9 +29,10 @@ class MainActivity : ComponentActivity() {
             statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
         )
+        val context = applicationContext
         setContent {
             MaterialTheme(colorScheme = MobileDarkColors) {
-                TouchApp(session, owner, connection, channels, recordings) { discoverServers(applicationContext) }
+                TouchApp(session, owner, connection, channels, recordings) { discoverServers(context) }
             }
         }
     }

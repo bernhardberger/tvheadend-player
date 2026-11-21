@@ -1,10 +1,12 @@
 package at.bernhardberger.tvhplayer.touch
 
+import android.os.Looper
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.annotation.StringRes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
@@ -37,6 +39,7 @@ import at.bernhardberger.tvheadend.sdk.core.SessionFailure
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi
+import at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStoreCall
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import at.bernhardberger.tvhplayer.touch.testutil.FakeConnection
 import at.bernhardberger.tvhplayer.touch.testutil.ServerGuide
@@ -51,6 +54,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 /** The app's pages on the SDK's fake session and profile store: first run, the frame and Connections. */
@@ -146,16 +150,28 @@ class TouchAppTest {
     @Test
     fun aFailedSaveSaysSoAndConnectTriesAgain() {
         connection.store.scriptMutationUnavailable()
-        signInToFoundServer()
+        show()
+        compose.onNode(hasClickAction() and hasText(server.name)).performClick()
+        field(SharedR.string.server_name_field).performTextInput("Living room")
+        compose.onNodeWithText(label(SharedR.string.onboarding_connect)).performClick()
         connection.session.publish(ready())
 
         compose.onNodeWithText(label(SharedR.string.connection_save_failed)).assertIsDisplayed()
+        // Nothing of the failed save is kept, neither the connection nor its name.
         connection.store.scriptMutationSuccess()
+        val failed = runBlocking { connection.store.profiles() } as ServerProfileListResult.Available
+        assertTrue(failed.profiles.isEmpty())
+        val retried = connection.store.calls.size
         compose.onNodeWithText(label(SharedR.string.onboarding_connect)).performClick()
 
         compose.onNode(heading and hasText(label(R.string.nav_channels))).assertIsDisplayed()
         val saved = runBlocking { connection.store.profiles() } as ServerProfileListResult.Available
-        assertEquals(listOf(server.host), saved.profiles.map { it.host })
+        assertEquals(listOf(server.host to "Living room"), saved.profiles.map { it.host to it.label })
+        // The retry writes the connection with its name at once: one mutation, no rename after it.
+        assertEquals(
+            listOf(FakeServerProfileStoreCall.ADD_ANONYMOUS),
+            connection.store.calls.drop(retried).filter { it in writes },
+        )
     }
 
     @Test
@@ -174,13 +190,23 @@ class TouchAppTest {
         compose.onNode(heading and hasText(label(R.string.nav_channels))).assertIsDisplayed()
         val saved = runBlocking { connection.store.profiles() } as ServerProfileListResult.Available
         assertEquals(listOf("Living room"), saved.profiles.map { it.label })
+        // The name goes with the connection in its one write.
+        assertEquals(listOf(FakeServerProfileStoreCall.ADD_ANONYMOUS), connection.store.calls.filter { it in writes })
     }
 
     @Test
     fun unreachableContinueAnywaySavesTheUntestedConnection() {
         signInToFoundServer()
         unavailable(SessionFailure.SERVER_UNREACHABLE)
+        connection.store.scriptMutationUnavailable()
         compose.onNodeWithText(label(SharedR.string.onboarding_continue_anyway)).performClick()
+
+        // A failed write says so on the form, without the network question again.
+        compose.onNodeWithText(label(SharedR.string.connection_save_failed)).assertIsDisplayed()
+        compose.onNode(isDialog()).assertDoesNotExist()
+        connection.store.scriptMutationSuccess()
+        // Connect writes again; a new test would wait for the server, which says nothing more here.
+        compose.onNodeWithText(label(SharedR.string.onboarding_connect)).performClick()
 
         compose.onNode(heading and hasText(label(R.string.nav_channels))).assertIsDisplayed()
         val saved = runBlocking { connection.store.profiles() } as ServerProfileListResult.Available
@@ -227,7 +253,17 @@ class TouchAppTest {
 
     @Test
     fun signInNeededWithoutTheUsernameDoesNotSaveWithoutSignIn() {
-        val id = openSignInNeeded(forgetUsername = true)
+        // Every way into the editor: Edit on the Connections page, then the sign-in action.
+        val id = unreadableSignIn(forgetUsername = true)
+        openEditor()
+        refusesToSaveWithoutSignIn(id)
+        compose.onNodeWithContentDescription(label(SharedR.string.close)).performClick()
+        back()
+        compose.onNode(hasClickAction() and hasText(label(R.string.channels_connection_settings))).performClick()
+        refusesToSaveWithoutSignIn(id)
+    }
+
+    private fun refusesToSaveWithoutSignIn(id: ServerProfileId) {
         field(SharedR.string.username).assert(hasText(""))
         compose.onNodeWithText(label(SharedR.string.server_name_save)).performClick()
 
@@ -240,17 +276,47 @@ class TouchAppTest {
     }
 
     @Test
+    fun aDiscardedSignInIsGoneWhenTheEditorOpensAgain() {
+        openSignInNeeded(forgetUsername = false)
+        field(SharedR.string.password).performTextInput("draft")
+        discard()
+
+        compose.onNode(hasClickAction() and hasText(label(R.string.channels_connection_settings))).performClick()
+        field(SharedR.string.username).assert(hasText("alex"))
+        compose.onNodeWithContentDescription(label(SharedR.string.show_password)).assertDoesNotExist()
+    }
+
+    @Test
+    fun aTestRunningWhenTheEditorIsDiscardedSavesNothing() {
+        openSignInNeeded(forgetUsername = false)
+        val seeded = connection.store.calls.size
+        field(SharedR.string.password).performTextInput("secret")
+        compose.onNodeWithText(label(SharedR.string.server_name_save)).performClick()
+        discard()
+
+        connection.session.publish(SessionObservation.create(sessionState = SessionState.Connecting))
+        connection.session.publish(ready())
+        compose.waitForIdle()
+        assertTrue(connection.store.calls.drop(seeded).none { it in writes })
+    }
+
+    @Test
     fun theEditorKeepsATypedSignInThroughRecreation() {
-        runBlocking { connection.store.addAnonymous(server.host, server.port, "Home server", true) }
+        // The fake's editing read gives the saved username but never a saved password.
+        connection = FakeConnection(readForEditing = ServerProfileEditReadResult.Unavailable)
+        runBlocking { connection.store.addPassword(server.host, server.port, "alex", "old", "Home server", true) }
         show()
         openEditor()
-        field(SharedR.string.username).performTextInput("alex")
-        field(SharedR.string.password).performTextInput("secret")
+        field(SharedR.string.username).performTextReplacement("sam")
+        field(SharedR.string.password).performTextInput("new")
 
         recreate()
+        compose.onNodeWithText(label(SharedR.string.server_name_save)).performClick()
+        connection.session.publish(SessionObservation.create(sessionState = SessionState.Connecting))
+        connection.session.publish(ready())
 
-        field(SharedR.string.username).assert(hasText("alex"))
-        compose.onNodeWithContentDescription(label(SharedR.string.show_password)).assertExists()
+        compose.onNode(heading and hasText(label(SharedR.string.server_list_title))).assertIsDisplayed()
+        assertTrue("The typed sign-in was not the one saved", connection.savedSignIn("sam", "new"))
     }
 
     @Test
@@ -268,6 +334,36 @@ class TouchAppTest {
         compose.onNodeWithText(label(SharedR.string.autorec_editor_discard)).assertDoesNotExist()
         connection.writesHeld.value = false
 
+        compose.onNode(heading and hasText(label(SharedR.string.server_list_title))).assertIsDisplayed()
+        compose.onNodeWithText("192.168.1.21").assertIsDisplayed()
+    }
+
+    @Test
+    fun aSaveThatStartsUnderTheDiscardPromptKeepsTheEditor() {
+        runBlocking { connection.store.addAnonymous(server.host, server.port, "Home server", true) }
+        show()
+        openEditor()
+        field(SharedR.string.onboarding_server_address).performTextReplacement("192.168.1.21")
+        compose.onNodeWithText(label(SharedR.string.server_name_save)).performClick()
+        compose.onNodeWithContentDescription(label(SharedR.string.close)).performClick()
+        val confirm = compose.onNode(hasClickAction() and hasText(label(SharedR.string.autorec_editor_discard)))
+            .fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
+        connection.writesHeld.value = true
+
+        // The test passes and its save starts; a tap on the prompt lands before the next frame removes it.
+        connection.session.publish(SessionObservation.create(sessionState = SessionState.Connecting))
+        compose.mainClock.autoAdvance = false
+        connection.session.publish(ready())
+        compose.runOnUiThread {
+            shadowOf(Looper.getMainLooper()).idle()
+            confirm()
+        }
+        compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+
+        // The editor stays, with the change being written, until the save ends.
+        field(SharedR.string.onboarding_server_address).assertExists()
+        connection.writesHeld.value = false
         compose.onNode(heading and hasText(label(SharedR.string.server_list_title))).assertIsDisplayed()
         compose.onNodeWithText("192.168.1.21").assertIsDisplayed()
     }
@@ -343,7 +439,8 @@ class TouchAppTest {
         compose.onNodeWithText(guide.film.title!!).assertExists()
     }
 
-    private fun openSignInNeeded(forgetUsername: Boolean): ServerProfileId {
+    /** A password connection whose saved sign-in can no longer be read; the frame asks for it. */
+    private fun unreadableSignIn(forgetUsername: Boolean): ServerProfileId {
         connection = FakeConnection(readForEditing = ServerProfileEditReadResult.Unavailable)
         val id = runBlocking {
             val id = (connection.store.addPassword(server.host, server.port, "alex", "•", "Home server", true)
@@ -353,8 +450,17 @@ class TouchAppTest {
         }
         show()
         compose.onNode(heading and hasText(label(SharedR.string.error_106_title))).assertIsDisplayed()
-        compose.onNode(hasClickAction() and hasText(label(R.string.channels_connection_settings))).performClick()
         return id
+    }
+
+    private fun openSignInNeeded(forgetUsername: Boolean): ServerProfileId = unreadableSignIn(forgetUsername).also {
+        compose.onNode(hasClickAction() and hasText(label(R.string.channels_connection_settings))).performClick()
+    }
+
+    private fun discard() {
+        compose.onNodeWithContentDescription(label(SharedR.string.close)).performClick()
+        compose.onNode(hasClickAction() and hasText(label(SharedR.string.autorec_editor_discard))).performClick()
+        compose.waitForIdle()
     }
 
     private fun openEditor() {
@@ -429,6 +535,13 @@ class TouchAppTest {
         connection.session.publish(SessionObservation.create(sessionState = SessionState.Unavailable(failure)))
         compose.waitForIdle()
     }
+
+    private val writes = setOf(
+        FakeServerProfileStoreCall.ADD_ANONYMOUS, FakeServerProfileStoreCall.ADD_PASSWORD,
+        FakeServerProfileStoreCall.UPDATE_ANONYMOUS, FakeServerProfileStoreCall.UPDATE_PASSWORD,
+        FakeServerProfileStoreCall.UPDATE_LABEL, FakeServerProfileStoreCall.SET_ACTIVE,
+        FakeServerProfileStoreCall.REMOVE,
+    )
 
     private fun ready() = SessionObservation.create(
         sessionState = SessionState.Ready(
