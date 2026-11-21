@@ -77,6 +77,10 @@
     <!-- The way down to a folder, as in "Recordings › Sport › Football". -->
     <string name="recordings_path">%1$s › %2$s</string>
     <string name="recordings_up">Back to %1$s</string>
+    <!-- TV: recordings_date_today -->
+    <string name="recordings_today">Today</string>
+    <!-- TV: recordings_date_yesterday -->
+    <string name="recordings_yesterday">Yesterday</string>
     <!-- TV: recordings_until -->
     <string name="recordings_until">until %1$s</string>
     <!-- TV: player_minutes_left -->

@@ -57,7 +57,7 @@ import at.bernhardberger.tvhplayer.touch.R
 
 /** The picked recording beside the tablet's list. */
 @Composable
-internal fun RecordingPane(item: RecordingItem, actions: RecordingsActions) {
+internal fun RecordingPane(item: RecordingItem, clock: RecordingClock, actions: RecordingsActions) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
             Column(Modifier.weight(1f)) {
@@ -66,7 +66,7 @@ internal fun RecordingPane(item: RecordingItem, actions: RecordingsActions) {
                     Column(Modifier.padding(start = 12.dp)) {
                         item.channel?.let { Text(it, style = MaterialTheme.typography.bodyLarge) }
                         Text(
-                            joinParts(listOf(item.day, item.time)), style = MaterialTheme.typography.bodyMedium,
+                            whenText(item, clock), style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
@@ -77,7 +77,7 @@ internal fun RecordingPane(item: RecordingItem, actions: RecordingsActions) {
             }
             Picture(item, Modifier.width(240.dp).clip(RoundedCornerShape(16.dp)))
         }
-        Progress(item.state, Modifier.padding(top = 16.dp))
+        Progress(item.state, clock, Modifier.padding(top = 16.dp))
         Row(Modifier.padding(top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
             PlayButtons(item, actions, equalWidth = false)
             Spacer(Modifier.weight(1f))
@@ -92,16 +92,17 @@ internal fun RecordingPane(item: RecordingItem, actions: RecordingsActions) {
 @Composable
 internal fun RecordingPage(
     item: RecordingItem,
+    clock: RecordingClock,
     layout: RecordingsLayout,
     actions: RecordingsActions,
     onBack: () -> Unit,
 ) {
-    if (layout.compact) PhonePage(item, actions, onBack) else UprightPage(item, actions, onBack)
+    if (layout.compact) PhonePage(item, clock, actions, onBack) else UprightPage(item, clock, actions, onBack)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun UprightPage(item: RecordingItem, actions: RecordingsActions, onBack: () -> Unit) {
+private fun UprightPage(item: RecordingItem, clock: RecordingClock, actions: RecordingsActions, onBack: () -> Unit) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val pictureHeight = maxWidth / PICTURE_RATIO
         Box(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
@@ -123,7 +124,7 @@ private fun UprightPage(item: RecordingItem, actions: RecordingsActions, onBack:
                     Title(item, Modifier, MaterialTheme.typography.displaySmall)
                     Episode(item)
                     Facts(item)
-                    Progress(item.state, Modifier.padding(top = 16.dp))
+                    Progress(item.state, clock, Modifier.padding(top = 16.dp))
                     Row(Modifier.padding(top = 16.dp)) { PlayButtons(item, actions, equalWidth = false) }
                     Synopsis(item, Modifier.padding(top = 20.dp))
                 }
@@ -134,7 +135,9 @@ private fun UprightPage(item: RecordingItem, actions: RecordingsActions, onBack:
         TopAppBar(
             navigationIcon = { BackButton(onBack) },
             title = {
-                PageChannel(item, Modifier.size(64.dp, 36.dp), MaterialTheme.typography.titleLarge, withDate = true)
+                PageChannel(
+                    item, clock, Modifier.size(64.dp, 36.dp), MaterialTheme.typography.titleLarge, withDate = true,
+                )
             },
             actions = { ItemIcons(item, actions) },
             colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
@@ -144,12 +147,14 @@ private fun UprightPage(item: RecordingItem, actions: RecordingsActions, onBack:
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun PhonePage(item: RecordingItem, actions: RecordingsActions, onBack: () -> Unit) {
+private fun PhonePage(item: RecordingItem, clock: RecordingClock, actions: RecordingsActions, onBack: () -> Unit) {
     Column(Modifier.fillMaxSize()) {
         TopAppBar(
             navigationIcon = { BackButton(onBack) },
             title = {
-                PageChannel(item, Modifier.size(56.dp, 32.dp), MaterialTheme.typography.titleMedium, withDate = false)
+                PageChannel(
+                    item, clock, Modifier.size(56.dp, 32.dp), MaterialTheme.typography.titleMedium, withDate = false,
+                )
             },
             actions = { ItemIcons(item, actions) },
         )
@@ -159,13 +164,13 @@ private fun PhonePage(item: RecordingItem, actions: RecordingsActions, onBack: (
         ) {
             Picture(item, Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)))
             Text(
-                joinParts(listOf(item.day, item.time)), Modifier.padding(top = 16.dp),
+                whenText(item, clock), Modifier.padding(top = 16.dp),
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Title(item, Modifier.padding(top = 4.dp), MaterialTheme.typography.headlineMedium)
             Episode(item)
             Facts(item)
-            Progress(item.state, Modifier.padding(top = 16.dp))
+            Progress(item.state, clock, Modifier.padding(top = 16.dp))
             Row(Modifier.padding(top = 16.dp)) { PlayButtons(item, actions, equalWidth = true) }
             Synopsis(item, Modifier.padding(top = 20.dp))
             Facts(item.details, columns = 1, keyWidth = 116.dp)
@@ -173,6 +178,11 @@ private fun PhonePage(item: RecordingItem, actions: RecordingsActions, onBack: (
         }
     }
 }
+
+/** The start in full for the pane and the page, "Wed, Nov 11 • 8:30 PM". */
+@Composable
+private fun whenText(item: RecordingItem, clock: RecordingClock): String =
+    joinParts(listOf(dayText(recordingDay(item.start, clock)), recordingTime(item.start, clock)))
 
 @Composable
 private fun BackButton(onBack: () -> Unit) {
@@ -182,7 +192,13 @@ private fun BackButton(onBack: () -> Unit) {
 }
 
 @Composable
-private fun PageChannel(item: RecordingItem, tile: Modifier, style: TextStyle, withDate: Boolean) {
+private fun PageChannel(
+    item: RecordingItem,
+    clock: RecordingClock,
+    tile: Modifier,
+    style: TextStyle,
+    withDate: Boolean,
+) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         ChannelTile(item, tile)
         item.channel?.let {
@@ -190,7 +206,7 @@ private fun PageChannel(item: RecordingItem, tile: Modifier, style: TextStyle, w
         }
         if (withDate) {
             Text(
-                joinParts(listOf(item.day, item.time)), Modifier.padding(start = 12.dp),
+                whenText(item, clock), Modifier.padding(start = 12.dp),
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
             )
@@ -248,7 +264,7 @@ private fun Episode(item: RecordingItem) {
 
 @Composable
 private fun Facts(item: RecordingItem) {
-    val facts = listOfNotNull(item.details.genre, item.length, item.details.size)
+    val facts = listOfNotNull(item.details.genre, durationText(item.length), item.details.size)
     Text(
         joinParts(facts), Modifier.padding(top = 8.dp), style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.outline,
@@ -256,10 +272,10 @@ private fun Facts(item: RecordingItem) {
 }
 
 @Composable
-private fun Progress(state: RecordingProgress, modifier: Modifier) {
+private fun Progress(state: RecordingProgress, clock: RecordingClock, modifier: Modifier) {
     val label = when (state) {
-        is RecordingProgress.PartlyWatched -> stringResource(R.string.recordings_time_left, state.left)
-        is RecordingProgress.Recording -> stringResource(R.string.recordings_until, state.until)
+        is RecordingProgress.PartlyWatched -> stringResource(R.string.recordings_time_left, durationText(state.left))
+        is RecordingProgress.Recording -> stringResource(R.string.recordings_until, recordingTime(state.until, clock))
         else -> return
     }
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {

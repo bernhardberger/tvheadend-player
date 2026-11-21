@@ -8,6 +8,9 @@ import androidx.activity.ComponentActivity
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.click
@@ -48,6 +51,9 @@ class RecordingsScreenTest {
     fun tabletPickShowsDetailsBesideTheList() {
         show()
         compose.onNodeWithText("Pick a recording to see it here").assertIsDisplayed()
+        // A wide row carries every part.
+        assertLine("Kingsbridge – Northport • 8:15 PM • 1h 45m • Harbor Sport")
+        assertLine("12:15 PM • 45m • Northline News")
         capture("tablet-recordings-root", TouchCanvas.TABLET)
 
         pickTheHalfWatchedMatch()
@@ -93,6 +99,7 @@ class RecordingsScreenTest {
 
         listOf("Sport", "Football", "Harbor Sport", "Week 46").forEach { compose.onNodeWithText(it).performClick() }
         compose.onNodeWithText("Recordings › Sport › Football › Harbor Sport").assertIsDisplayed()
+        assertLine("Kingsbridge – Northport • Sat, Nov 14 • 1h 45m • Harbor Sport")
         compose.onNodeWithText("Basketball").assertDoesNotExist()
         pickTheHalfWatchedMatch()
         compose.onNodeWithText("Resume").assertIsDisplayed()
@@ -115,7 +122,7 @@ class RecordingsScreenTest {
     @Test
     @Config(qualifiers = "en-rUS-w800dp-h1280dp-port-xhdpi")
     fun uprightPickOpensAPage() {
-        state.value = flatFixture(friday = true, tuesday = true)
+        state.value = flatFixture(harborLights = true, glassHarbor = true)
         show()
         capture("tablet-upright-recordings", TouchCanvas.TABLET_UPRIGHT)
 
@@ -131,8 +138,10 @@ class RecordingsScreenTest {
     @Test
     @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
     fun phoneListAndViewOptions() {
-        state.value = flatFixture(friday = true, phone = true)
+        state.value = flatFixture(harborLights = true)
         show()
+        // Too narrow for all four: the channel and then the length go, whole.
+        assertLine("Kingsbridge – Northport • 8:15 PM")
         capture("phone-recordings-all", TouchCanvas.PHONE)
 
         compose.onNodeWithContentDescription("View options").performClick()
@@ -143,7 +152,7 @@ class RecordingsScreenTest {
     @Test
     @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
     fun phonePickOpensADetailsPage() {
-        state.value = foldersFixture(phone = true)
+        state.value = foldersFixture()
         show(initialPath = WeekPath)
         compose.onNodeWithText("Week 46").assertIsDisplayed()
         capture("phone-recordings", TouchCanvas.PHONE)
@@ -185,6 +194,15 @@ class RecordingsScreenTest {
 
     private fun pickTheHalfWatchedMatch() =
         compose.onNodeWithText("Westvale – Ridge Town", substring = true).performClick()
+
+    // Times and lengths keep their parts together with (narrow) no-break spaces.
+    private fun assertLine(line: String) {
+        compose.onNode(
+            SemanticsMatcher("line \"$line\"") { node ->
+                node.config.getOrNull(SemanticsProperties.Text).orEmpty().any { it.text.replace('\u202F', ' ').replace('\u00A0', ' ') == line }
+            },
+        ).assertIsDisplayed()
+    }
 
     private fun openViewOptions() {
         compose.onNodeWithText("View options").performClick()

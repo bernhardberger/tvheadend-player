@@ -4,6 +4,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import at.bernhardberger.tvhplayer.touch.testutil.TouchFixtureArt
+import java.time.Duration
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneOffset
+import java.util.Locale
 
 // The round-37 drawings' recordings (mockups html27 flat/folders, html13 week rows, html33 upright list).
 
@@ -13,60 +18,49 @@ internal val FixtureSpace = RecordingSpace("1.2 TB", "4.0 TB", usedFraction = 0.
 internal const val PickedId = "kickoff-nov-11"
 
 /**
- * All recordings, newest first; [friday] and [tuesday] add the rows the taller canvases draw. Each
- * row's line is the drawing's text for its canvas ([phone] or tablet).
+ * All recordings, newest first, on the evening of Mon, Nov 16; [harborLights] and [glassHarbor] add the rows
+ * the taller canvases draw.
  */
 internal fun flatFixture(
-    friday: Boolean = false,
-    tuesday: Boolean = false,
+    harborLights: Boolean = false,
+    glassHarbor: Boolean = false,
     view: RecordingsView = RecordingsView(),
-    phone: Boolean = false,
 ) = RecordingsState(
         view = view,
+        clock = FixtureClock,
         space = FixtureSpace,
         root = RecordingFolder(
             id = "root", name = "Recordings", recordingCount = 116,
             recordings = listOfNotNull(
-                kickoffLive(
-                    if (phone) "Northport – Eastmoor" else "Northport – Eastmoor • Harbor Sport • until 10:15 PM",
-                ).copy(section = "Today"),
-                recording(
-                    "field-desk", "Field Desk", "still-field-desk-street", NorthlineNews, "Today", "12:15 PM", "45m",
-                    "Northline News • 12:15 PM • 45m",
-                ),
-                kickoffYesterday(
-                    if (phone) "Kingsbridge – Northport • 1h 45m" else "Kingsbridge – Northport • Harbor Sport • 1h 45m",
-                ).copy(section = "Yesterday"),
-                extraTime("extra-yesterday", "Yesterday", RecordingProgress.Watched, "Harbor Sport • 45m"),
+                kickoffLive().copy(section = day("Today")),
+                recording("field-desk", "Field Desk", "still-field-desk-street", NorthlineNews, at(16, 12, 15), 45),
+                extraTime("extra-yesterday", at(15, 22, 15), RecordingProgress.Watched).copy(section = day("Yesterday")),
                 recording(
                     "harbor-lights-live", "Harbor Lights Live", "still-harbor-lights-live", HarborLights,
-                    "Fri, Nov 13", "8:00 PM", "2h", "Harbor Lights • 8:00 PM • 2h",
-                ).copy(section = "Fri, Nov 13").takeIf { friday },
-                kickoffPicked(
-                    if (phone) "Westvale – Ridge Town • 52m left" else "Westvale – Ridge Town • Harbor Sport • 52m left",
-                ).copy(section = "Wed, Nov 11"),
-                extraTime("extra-nov-11", "Wed, Nov 11", RecordingProgress.Watched, "Harbor Sport • 45m"),
-                recording(
-                    "glass-harbor", "Glass Harbor", "still-glass-harbor", AmberStage, "Tue, Nov 10", "9:00 PM", "1h 27m",
-                    "S2 E3 • Amber Stage • 1h 2m left",
-                ).copy(
-                    episode = "S2 E3", section = "Tue, Nov 10",
-                    state = RecordingProgress.PartlyWatched("1h 2m", 0.29f),
-                ).takeIf { tuesday },
+                    at(15, 20, 0), 120,
+                ).takeIf { harborLights },
+                kickoffSaturday().copy(section = day("Sat, Nov 14")),
+                kickoffPicked().copy(section = day("Wed, Nov 11")),
+                extraTime("extra-nov-11", at(11, 22, 15), RecordingProgress.Watched),
+                recording("glass-harbor", "Glass Harbor", "still-glass-harbor", AmberStage, at(10, 21, 0), 87).copy(
+                    episode = "The Lantern Room", section = day("Tue, Nov 10"),
+                    state = RecordingProgress.PartlyWatched(Duration.ofMinutes(62), 0.29f),
+                ).takeIf { glassHarbor },
             ),
         ),
     )
 
 /** Grouped by folders, from the root down to Sport › Football › Harbor Sport › Week 46. */
-internal fun foldersFixture(phone: Boolean = false) = RecordingsState(
+internal fun foldersFixture() = RecordingsState(
     view = RecordingsView(grouping = RecordingsGrouping.Folders),
+    clock = FixtureClock,
     space = FixtureSpace,
     root = RecordingFolder(
         id = "root", name = "Recordings", recordingCount = 116,
         folders = listOf(
             RecordingFolder(
                 "now", "Recording now", recordingNow = true,
-                recordings = listOf(kickoffLive("Northport – Eastmoor • Harbor Sport • until 10:15 PM")),
+                recordings = listOf(kickoffLive()),
             ),
             filled("documentaries", "Documentaries", folders = 2, recordings = 14, size = "31 GB"),
             filled("drama", "Drama", folders = 3, recordings = 22, size = "58 GB"),
@@ -83,7 +77,7 @@ internal fun foldersFixture(phone: Boolean = false) = RecordingsState(
                             RecordingFolder(
                                 "harbor-sport", "Harbor Sport", recordingCount = 12, size = "54 GB",
                                 folders = listOf(
-                                    RecordingFolder("week-46", "Week 46", recordings = weekRows(phone), size = "27 GB"),
+                                    RecordingFolder("week-46", "Week 46", recordings = weekRows(), size = "27 GB"),
                                     filled("week-45", "Week 45", folders = 0, recordings = 6, size = "27 GB"),
                                 ),
                             ),
@@ -104,6 +98,7 @@ internal val WeekPath = listOf("sport", "football", "harbor-sport", "week-46")
 /** Nothing left under Show: Unwatched. */
 internal fun unwatchedEmptyFixture() = RecordingsState(
     view = RecordingsView(show = RecordingsShow.Unwatched),
+    clock = FixtureClock,
     space = FixtureSpace,
     root = RecordingFolder("root", "Recordings"),
 )
@@ -111,37 +106,34 @@ internal fun unwatchedEmptyFixture() = RecordingsState(
 /** No recordings on the server. */
 internal fun noRecordingsFixture() = RecordingsState(
     view = RecordingsView(),
+    clock = FixtureClock,
     space = RecordingSpace("4.0 TB", "4.0 TB", usedFraction = 0f),
     root = RecordingFolder("root", "Recordings"),
 )
 
-private fun weekRows(phone: Boolean) = listOf(
-    kickoffLive(if (phone) "Northport – Eastmoor • Today" else "Northport – Eastmoor • Today • until 10:15 PM")
-        .copy(id = "week-kickoff-live"),
-    kickoffYesterday(if (phone) "Kingsbridge – Northport • Sat, Nov 14" else "Kingsbridge – Northport • Sat, Nov 14 • 1h 45m")
-        .copy(id = "week-kickoff-14", day = "Sat, Nov 14"),
-    extraTime("week-extra-14", "Sat, Nov 14", RecordingProgress.Unwatched, "Sat, Nov 14 • 45m"),
-    kickoffPicked(if (phone) "Westvale – Ridge Town • 52m left" else "Westvale – Ridge Town • Wed, Nov 11 • 52m left"),
-    extraTime("week-extra-11", "Wed, Nov 11", RecordingProgress.Watched, "Wed, Nov 11 • 45m"),
-    recording(
-        "week-preview", "Harbor Kickoff", "harbor-kickoff", HarborSport, "Mon, Nov 9", "7:00 PM", "30m",
-        if (phone) "Cup preview • Mon, Nov 9" else "Cup preview • Mon, Nov 9 • 30m",
-    ).copy(episode = "Cup preview", state = RecordingProgress.Watched),
+private fun weekRows() = listOf(
+    kickoffLive().copy(id = "week-kickoff-live"),
+    kickoffSaturday().copy(id = "week-kickoff-14"),
+    extraTime("week-extra-14", at(14, 22, 15), RecordingProgress.Unwatched),
+    kickoffPicked(),
+    extraTime("week-extra-11", at(11, 22, 15), RecordingProgress.Watched),
+    recording("week-preview", "Harbor Kickoff", "harbor-kickoff", HarborSport, at(9, 19, 0), 30)
+        .copy(episode = "Cup preview", state = RecordingProgress.Watched),
 )
 
-private fun kickoffLive(line: String) =
-    recording("kickoff-live", "Harbor Kickoff", "still-harbor-kickoff", HarborSport, "Today", "8:30 PM", "1h 45m", line)
-        .copy(episode = "Northport – Eastmoor", state = RecordingProgress.Recording("10:15 PM", 0.16f))
+private fun kickoffLive() =
+    recording("kickoff-live", "Harbor Kickoff", "still-harbor-kickoff", HarborSport, at(16, 20, 30), 105)
+        .copy(episode = "Northport – Eastmoor", state = RecordingProgress.Recording(at(16, 22, 15), 0.16f))
 
-private fun kickoffYesterday(line: String) =
-    recording("kickoff-yesterday", "Harbor Kickoff", "harbor-kickoff", HarborSport, "Yesterday", "8:30 PM", "1h 45m", line)
+private fun kickoffSaturday() =
+    recording("kickoff-saturday", "Harbor Kickoff", "harbor-kickoff", HarborSport, at(14, 20, 15), 105)
         .copy(episode = "Kingsbridge – Northport")
 
-private fun kickoffPicked(line: String) =
-    recording(PickedId, "Harbor Kickoff", "still-harbor-kickoff", HarborSport, "Wed, Nov 11", "8:30 PM", "1h 45m", line)
+private fun kickoffPicked() =
+    recording(PickedId, "Harbor Kickoff", "still-harbor-kickoff", HarborSport, at(11, 20, 30), 105)
         .copy(
             episode = "Westvale – Ridge Town",
-            state = RecordingProgress.PartlyWatched("52m", 0.5f),
+            state = RecordingProgress.PartlyWatched(Duration.ofMinutes(52), 0.5f),
             details = RecordingDetails(
                 synopsis = "Westvale host Ridge Town under the lights with the league lead at stake. " +
                     "Full match with commentary from the Harbor Sport team.",
@@ -156,8 +148,18 @@ private fun kickoffPicked(line: String) =
             ),
         )
 
-private fun extraTime(id: String, day: String, state: RecordingProgress, line: String) =
-    recording(id, "Extra Time", "still-river-court", HarborSport, day, "10:15 PM", "45m", line).copy(state = state)
+private fun extraTime(id: String, start: Instant, state: RecordingProgress) =
+    recording(id, "Extra Time", "still-river-court", HarborSport, start, 45).copy(state = state)
+
+/** The drawings' evening: Mon, Nov 16, during the live match. */
+internal val FixtureClock = RecordingClock(
+    now = Instant.parse("2026-11-16T21:00:00Z"), zone = ZoneOffset.UTC, locale = Locale.US,
+)
+
+private fun at(dayOfNovember: Int, hour: Int, minute: Int): Instant =
+    LocalDateTime.of(2026, 11, dayOfNovember, hour, minute).toInstant(ZoneOffset.UTC)
+
+private fun day(label: String) = RecordingSection(label, RowDates.DayLabel)
 
 private class Channel(val id: String, val name: String, val tint: Color)
 
@@ -171,27 +173,17 @@ private val pictures = mutableMapOf<String, BitmapPainter>()
 private fun painter(path: String, decode: () -> android.graphics.Bitmap) =
     pictures.getOrPut(path) { BitmapPainter(decode().asImageBitmap()) }
 
-private fun recording(
-    id: String,
-    title: String,
-    art: String,
-    channel: Channel,
-    day: String,
-    time: String,
-    length: String,
-    line: String,
-) = RecordingItem(
-    id = id,
-    title = title,
-    channel = channel.name,
-    channelLogo = painter("picon:${channel.id}") { TouchFixtureArt.picon(channel.id) },
-    logoTint = channel.tint,
-    picture = painter("art:$art") { TouchFixtureArt.art(art) },
-    day = day,
-    time = time,
-    length = length,
-    line = line,
-)
+private fun recording(id: String, title: String, art: String, channel: Channel, start: Instant, minutes: Long) =
+    RecordingItem(
+        id = id,
+        title = title,
+        channel = channel.name,
+        channelLogo = painter("picon:${channel.id}") { TouchFixtureArt.picon(channel.id) },
+        logoTint = channel.tint,
+        picture = painter("art:$art") { TouchFixtureArt.art(art) },
+        start = start,
+        length = Duration.ofMinutes(minutes),
+    )
 
 /** A folder whose content no drawing opens: counted, with placeholders for its subfolders. */
 private fun filled(id: String, name: String, folders: Int, recordings: Int, size: String) = RecordingFolder(
