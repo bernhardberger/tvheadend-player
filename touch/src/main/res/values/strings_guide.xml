@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The Guide's two views, as tabs under the top bar. -->
+    <string name="guide_overview">Overview</string>
+    <string name="guide_by_channel">By channel</string>
+    <!-- TV: now. First choice of the jump switch. -->
+    <string name="guide_now">Now</string>
+    <!-- A gap in a channel's schedule; the line under it says when programs return. -->
+    <string name="guide_no_programs">No programs</string>
+    <!-- %1$s = start time of the next program after the gap, e.g. "6:00 AM". -->
+    <string name="guide_back_at">Back at %1$s</string>
+    <!-- A channel without guide data. -->
+    <string name="guide_no_schedule">No schedule</string>
+    <string name="guide_no_schedule_reason">Tvheadend has no guide data for this channel</string>
+    <!-- Content description of the Record split button's arrow: more ways to record (the series). Not drawn. -->
+    <string name="guide_record_options">Record options</string>
+    <!-- Content description of the chevron that folds an opened program back into its row. Not drawn. -->
+    <string name="guide_collapse">Collapse</string>
+    <!-- Content description of a channel head in the overview: opens that channel's day. Not drawn. -->
+    <string name="guide_open_channel">%1$s, by channel</string>
+
+    <!-- Program details. -->
+    <!-- TV: details_other_airings -->
+    <string name="guide_other_airings">Other airings of %1$s</string>
+    <!-- TV: details_cast_and_crew -->
+    <string name="guide_cast_and_crew">Cast &amp; crew</string>
+    <!-- TV: details_cast; the count is not shown. -->
+    <plurals name="guide_cast">
+        <item quantity="one">Cast</item>
+        <item quantity="other">Cast</item>
+    </plurals>
+    <!-- TV: details_directors -->
+    <plurals name="guide_directors">
+        <item quantity="one">Director</item>
+        <item quantity="other">Directors</item>
+    </plurals>
+    <!-- TV: details_writers -->
+    <plurals name="guide_writers">
+        <item quantity="one">Writer</item>
+        <item quantity="other">Writers</item>
+    </plurals>
+    <!-- TV: details_genre -->
+    <string name="guide_genre">Genre</string>
+    <!-- TV: details_age_rating -->
+    <string name="guide_age_rating">Age rating</string>
+    <!-- TV: details_season -->
+    <string name="guide_season">Season</string>
+    <!-- TV: details_first_aired -->
+    <string name="guide_first_aired">First aired</string>
+    <!-- TV: details_episode -->
+    <string name="guide_episode">Episode</string>
+    <!-- TV: details_broadcast -->
+    <string name="guide_broadcast">Broadcast</string>
+    <!-- TV: details_year -->
+    <string name="guide_year">Year</string>
+    <!-- TV: details_categories -->
+    <string name="guide_categories">Categories</string>
+</resources>
