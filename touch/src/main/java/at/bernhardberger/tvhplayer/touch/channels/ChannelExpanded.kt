@@ -2,7 +2,7 @@
 
 package at.bernhardberger.tvhplayer.touch.channels
 
-import at.bernhardberger.tvhplayer.touch.ui.ArtworkImage
+import at.bernhardberger.tvhplayer.touch.ui.rememberStandalonePicture
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
@@ -56,7 +56,7 @@ internal fun ChannelExpanded(
 @Composable
 private fun WideDetails(row: ChannelRow, details: ChannelDetails, actions: ChannelsActions) {
     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        if (details.hasArt) ProgramArt(details, Modifier.weight(2.8f))
+        rememberStandalonePicture(details.artwork, details.artworkModel)?.let { ProgramArt(it, Modifier.weight(2.8f)) }
         Column(Modifier.weight(3.8f)) {
             Episode(details)
             Synopsis(details)
@@ -71,7 +71,7 @@ private fun WideDetails(row: ChannelRow, details: ChannelDetails, actions: Chann
 @Composable
 private fun UprightDetails(row: ChannelRow, details: ChannelDetails, actions: ChannelsActions) {
     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        if (details.hasArt) ProgramArt(details, Modifier.weight(4f))
+        rememberStandalonePicture(details.artwork, details.artworkModel)?.let { ProgramArt(it, Modifier.weight(4f)) }
         Column(Modifier.weight(6f)) {
             Episode(details)
             Synopsis(details)
@@ -85,7 +85,7 @@ private fun UprightDetails(row: ChannelRow, details: ChannelDetails, actions: Ch
 @Composable
 private fun PhoneDetails(row: ChannelRow, details: ChannelDetails, actions: ChannelsActions) {
     Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-        if (details.hasArt) ProgramArt(details, Modifier.weight(2f))
+        rememberStandalonePicture(details.artwork, details.artworkModel)?.let { ProgramArt(it, Modifier.weight(2f)) }
         Column(Modifier.weight(3f)) { Episode(details, row.now?.timeRange, compact = true) }
     }
     Synopsis(details)
@@ -100,14 +100,12 @@ private fun CompactFollowing(row: ChannelRow, details: ChannelDetails, actions: 
 }
 
 @Composable
-private fun ProgramArt(details: ChannelDetails, modifier: Modifier) {
-    ArtworkImage(
-        details.artwork, details.artworkModel, modifier.aspectRatio(PROGRAM_ART_RATIO).clip(RoundedCornerShape(12.dp)),
+private fun ProgramArt(picture: Painter, modifier: Modifier) {
+    Image(
+        picture, null, modifier.aspectRatio(PROGRAM_ART_RATIO).clip(RoundedCornerShape(12.dp)),
         contentScale = ContentScale.Crop,
     )
 }
-
-private val ChannelDetails.hasArt: Boolean get() = artwork != null || artworkModel != null
 
 @Composable
 private fun Episode(details: ChannelDetails, timeRange: String? = null, compact: Boolean = false) {

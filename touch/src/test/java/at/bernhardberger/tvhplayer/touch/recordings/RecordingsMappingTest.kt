@@ -134,6 +134,22 @@ class RecordingsMappingTest {
         assertEquals(null, diary.pictureModel)
     }
 
+    @Test
+    fun rowsKeepTheirPictureSlotWhileOneRowHasSomethingToShow() {
+        fun item(logo: Any? = null, picture: Any? = null) =
+            RecordingItem("r", "Title", start = null, length = null, channelLogoModel = logo, pictureModel = picture)
+        val bare = item()
+        val cases = listOf(
+            "no row has a picture or a logo" to (RecordingFolder("root", "", recordings = listOf(bare, bare)) to false),
+            "one row has a logo" to (RecordingFolder("root", "", recordings = listOf(bare, item(logo = "logo"))) to true),
+            "one row has a picture" to (RecordingFolder("root", "", recordings = listOf(item(picture = "p"), bare)) to true),
+            "a folder tile" to (
+                RecordingFolder("root", "", folders = listOf(RecordingFolder("f", "Films")), recordings = listOf(bare)) to true
+                ),
+        )
+        cases.forEach { (name, case) -> assertEquals(name, case.second, case.first.showsThumbnails) }
+    }
+
     private fun RecordingsState.titles() = root.recordings.map { it.title }
 
     private companion object {

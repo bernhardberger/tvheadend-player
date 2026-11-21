@@ -99,7 +99,15 @@ internal data class RecordingFolder(
     val recordingCount: Int = recordings.size,
     val size: String? = null,
     val recordingNow: Boolean = false,
-)
+) {
+    /**
+     * Whether the rows keep their leading picture slot (section 13): a folder's tile, or one recording with a
+     * picture or a channel logo, keeps it for every row so the titles stay on one line; else rows start with
+     * the title.
+     */
+    val showsThumbnails: Boolean
+        get() = folders.isNotEmpty() || recordings.any { it.hasPicture || it.hasLogo }
+}
 
 internal data class RecordingItem(
     val id: String,
@@ -120,7 +128,10 @@ internal data class RecordingItem(
     val channelLogoModel: Any? = null,
     /** The server image's model for the touch-level image composable; the fixture painter wins. */
     val pictureModel: Any? = null,
-)
+) {
+    val hasPicture: Boolean get() = picture != null || pictureModel != null
+    val hasLogo: Boolean get() = channelLogo != null || channelLogoModel != null
+}
 
 /** A date label: a day's ("Today", "Wed, Nov 11") or a month's ("October"). */
 internal data class RecordingSection(val label: String, val dates: RowDates)

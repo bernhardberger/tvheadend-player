@@ -59,6 +59,15 @@ class ChannelsScreenTest {
     }
 
     @Test
+    @Config(qualifiers = "en-rUS-w1280dp-h800dp-land-xhdpi")
+    fun tabletOpenRowWithoutAPicture() {
+        val list = channelsFixture()
+        val rows = list.rows.map { if (it.id == "amber-stage") it.copy(details = it.details?.copy(artwork = null)) else it }
+        show(ChannelsState.Ready(list.copy(rows = rows)), open = "amber-stage")
+        capture("tablet-channels-no-picture", TouchCanvas.TABLET)
+    }
+
+    @Test
     @Config(qualifiers = "en-rUS-w800dp-h1280dp-port-xhdpi")
     fun uprightChannels() {
         show(ChannelsState.Ready(channelsFixture(playing = true)), open = "amber-stage")

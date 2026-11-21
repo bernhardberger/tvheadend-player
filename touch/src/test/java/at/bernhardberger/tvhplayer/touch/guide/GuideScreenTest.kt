@@ -101,6 +101,15 @@ class GuideScreenTest {
 
     @Test
     @Config(qualifiers = TABLET)
+    fun tabletOverviewWithoutSomePicturesLeadsWithTheText() {
+        show(overviewFixture().withoutSomePictures())
+        // Without its picture a running recording's REC stands after the title, as in a Channels row.
+        compose.onNodeWithContentDescription("Recording").assertIsDisplayed()
+        capture("tablet-guide-overview-no-picture", TouchCanvas.TABLET)
+    }
+
+    @Test
+    @Config(qualifiers = TABLET)
     fun tabletFirstLoad() {
         show(overviewFixture().copy(availability = GuideAvailability.Loading))
         compose.onNodeWithText("Loading guide…").assertIsDisplayed()
@@ -150,6 +159,15 @@ class GuideScreenTest {
         compose.onNodeWithText("Sunday, November 15").assertIsDisplayed()
         compose.onNodeWithText("Overview").performClick()
         compose.onNodeWithText("Ridge Earth • 8:00 PM").assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = PHONE)
+    fun phoneOverviewWithoutSomePictures() {
+        show(phoneOverviewFixture().withoutSomePictures())
+        // REC does not vanish with the thumbnail.
+        compose.onNodeWithContentDescription("Recording").assertIsDisplayed()
+        capture("phone-guide-overview-no-picture", TouchCanvas.PHONE)
     }
 
     @Test
