@@ -181,18 +181,15 @@ class ProgrammeArtworkPolicyTest {
         assertTrue(ranked.indexOf(ArtworkLogoCorner.BOTTOM_START) < ranked.indexOf(ArtworkLogoCorner.TOP_START))
     }
 
-    @Test fun busyCornerWithoutLetteringLosesToCalmCorners() {
+    @Test fun busyCornerWithoutLetteringLosesToCalmCornersInBothDirections() {
         val pixels = titlePixels(IntRange.EMPTY, textureRows = 106..143)
 
         assertTrue(artworkLettering(pixels, 96, 144).isEmpty())
-        assertEquals(ArtworkLogoCorner.BOTTOM_START, artworkLogoPlaces(pixels, 96, 144, logoShare = .42).last().corner)
-    }
-
-    @Test fun rightStartMirrorsWhichCornerContainsTexture() {
-        val pixels = titlePixels(IntRange.EMPTY, textureRows = 106..143)
-
-        assertEquals(ArtworkLogoCorner.BOTTOM_END,
-            artworkLogoPlaces(pixels, 96, 144, logoShare = .42, startAtRight = true).last().corner)
+        for ((startAtRight, busyCorner) in listOf(false to ArtworkLogoCorner.BOTTOM_START,
+            true to ArtworkLogoCorner.BOTTOM_END)) {
+            assertEquals(busyCorner,
+                artworkLogoPlaces(pixels, 96, 144, logoShare = .42, startAtRight = startAtRight).last().corner)
+        }
     }
 
     @Test fun onlyCalmLightOrDarkGroundsUseThePictureItself() {

@@ -3,6 +3,8 @@ package at.bernhardberger.tvhplayer.images
 import android.graphics.Bitmap
 import coil3.size.Size
 import coil3.transform.Transformation
+import java.util.Collections
+import java.util.WeakHashMap
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -13,22 +15,33 @@ import kotlin.math.roundToInt
  * drawn in. The rule reads the 400×240 picon; drawn straight from that size, a logo several times
  * smaller turns thin lines into dots, so it is halved step by step, each step averaging pixels.
  * With [trim], the picon's transparent margin goes first, so the logo's own shape is what fits.
+ * With [measureTone], note the tone of its original ink for a logo drawn on a picture.
  */
 internal class LogoInkTransformation(
     private val ground: Int, private val width: Int, private val height: Int, private val trim: Boolean = false,
+    private val measureTone: Boolean = false,
 ) : Transformation() {
-    override val cacheKey: String = "logoInk(${Integer.toHexString(ground)},${width}x$height${if (trim) ",trim" else ""})"
+    override val cacheKey: String = "logoInk(${Integer.toHexString(ground)},${width}x$height" +
+        "${if (trim) ",trim" else ""}${if (measureTone) ",tone" else ""})"
 
     override suspend fun transform(input: Bitmap, size: Size): Bitmap {
         val source = if (input.config == Bitmap.Config.ARGB_8888) input else input.copy(Bitmap.Config.ARGB_8888, false)
         val pixels = IntArray(source.width * source.height)
         source.getPixels(pixels, 0, source.width, 0, 0, source.width, source.height)
+        val needsLight = if (measureTone) logoNeedsLightGround(pixels) else null
         val inked = inkFadingLogoParts(pixels, source.width, source.height, ground)
         val logo = if (inked == null) source else Bitmap.createBitmap(inked, source.width, source.height, Bitmap.Config.ARGB_8888)
         val bounds = if (trim) visibleBounds(inked ?: pixels, source.width, source.height) else null
         val shape = if (bounds == null || bounds.width == source.width && bounds.height == source.height) logo
             else Bitmap.createBitmap(logo, bounds.left, bounds.top, bounds.width, bounds.height)
-        return shape.shrunkToFit(width, height)
+        return shape.shrunkToFit(width, height).also { if (needsLight != null) tones[it] = needsLight }
+    }
+
+    companion object {
+        // A memory-cache hit can skip the transformation, so keep the note as long as the bitmap.
+        private val tones = Collections.synchronizedMap(WeakHashMap<Bitmap, Boolean>())
+
+        fun needsLightGround(bitmap: Bitmap): Boolean? = tones[bitmap]
     }
 }
 

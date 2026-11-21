@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -17,6 +18,8 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -43,7 +46,6 @@ import at.bernhardberger.tvhplayer.images.ArtworkLogoCorner
 import at.bernhardberger.tvhplayer.images.ArtworkLogoGround
 import at.bernhardberger.tvhplayer.images.ArtworkLogoPlace
 import at.bernhardberger.tvhplayer.images.ArtworkLogoCornerTransformation
-import at.bernhardberger.tvhplayer.images.logoNeedsLightGround
 import coil3.BitmapImage
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -146,10 +148,11 @@ internal fun ProgrammeArtwork(
         if (image != null && session != null) programmeArtworkModel(image, session) else null
     }
     val load = rememberPictureLoad(model)
-    // Sized as on an airing card, which most of these pictures are.
     val request = rememberProgrammeImageRequest(model, avoidPlate = channelIcon != null,
-        logoShare = if (channelIcon != null) (ArtworkLogoPlateWidth / AiringCardWidth).toDouble() else 0.0)
-    Box(modifier.clip(MaterialTheme.shapes.small).background(TvSurfaceColors.containerLowest)) {
+        logoShare = if (channelIcon != null) ArtworkLogoShare else 0.0)
+    var widthPx by remember { mutableIntStateOf(0) }
+    Box(modifier.onSizeChanged { widthPx = it.width }
+        .clip(MaterialTheme.shapes.small).background(TvSurfaceColors.containerLowest)) {
         if (model == null || load.failed || (channelIcon != null && load.needsFallback)) {
             PiconBox(channelIcon, Modifier.align(Alignment.Center).size(100.dp, 45.dp))
         }
@@ -159,6 +162,7 @@ internal fun ProgrammeArtwork(
                 onSuccess = load::onSuccess, onError = { load.onError() })
             if (load.loaded && channelIcon != null) ArtworkCornerLogo(
                 channelIcon, load.logoPlace(takenCorners), plateModifier,
+                scale = widthPx / (LocalDensity.current.density * AiringCardWidth.value),
                 bottomEdge = if (progress != null) TvCardProgressStripHeight else 0.dp)
         }
         // Same embedded strip as the player's schedule tiles; card borders keep clear of it.
@@ -168,6 +172,7 @@ internal fun ProgrammeArtwork(
 }
 
 internal val ArtworkLogoPlateWidth = 56.dp
+internal val ArtworkLogoShare = (ArtworkLogoPlateWidth / AiringCardWidth).toDouble()
 
 /** The logo's distance from the picture's edges, measured to its visible shape. */
 internal val ArtworkLogoInset = 10.dp
@@ -185,15 +190,19 @@ private val ArtworkLogoShadeHeight = 70.dp
  */
 @Composable
 internal fun BoxScope.ArtworkCornerLogo(
-    picon: ChannelIcon, place: ArtworkLogoPlace, modifier: Modifier = Modifier, scale: Float = 1f,
+    picon: ChannelIcon, place: ArtworkLogoPlace, modifier: Modifier = Modifier, scale: Float,
     bottomEdge: Dp = 0.dp, onError: (() -> Unit)? = null,
 ) {
+    if (scale <= 0f) return
     val corner = place.corner
     val atBottom = corner == ArtworkLogoCorner.BOTTOM_START || corner == ArtworkLogoCorner.BOTTOM_END
     val atStart = corner == ArtworkLogoCorner.BOTTOM_START || corner == ArtworkLogoCorner.TOP_START
     // A dark logo stands on a light shade, and takes one on a calm dark picture too; every other
     // logo keeps the dark shade. Judged once per logo, and no shade shows before that.
-    var needsLight by remember(picon) { mutableStateOf(logoTones[picon]) }
+    val artwork = LocalArtworkContext.current
+    val source = requireNotNull(rememberPiconSource(artwork, picon))
+    val toneKey = remember(artwork, source) { artwork.logoToneKey(source) }
+    var needsLight by remember(source, toneKey) { mutableStateOf(toneKey?.let(logoTones::get)) }
     val light = needsLight == true
     val shaded = when (place.ground) {
         ArtworkLogoGround.SHADE -> needsLight != null
@@ -210,8 +219,8 @@ internal fun BoxScope.ArtworkCornerLogo(
         // Parts of the logo that would vanish on a light picture go dark, as on a focused row.
         ground = if (place.ground == ArtworkLogoGround.LIGHT_PICTURE || light) Color.White
             else MaterialTheme.colorScheme.background,
-        onLogo = { bitmap ->
-            if (needsLight == null) needsLight = logoTones.getOrPut(picon) { logoTone(bitmap) }
+        onLogoTone = { tone ->
+            if (needsLight == null) needsLight = toneKey?.let { logoTones.getOrPut(it) { tone } } ?: tone
         })
 }
 
@@ -239,17 +248,15 @@ private fun BoxScope.ArtworkCornerShade(atStart: Boolean, atBottom: Boolean, lig
     })
 }
 
-private fun logoTone(bitmap: android.graphics.Bitmap): Boolean {
-    val pixels = IntArray(bitmap.width * bitmap.height)
-    val readable = if (bitmap.config == android.graphics.Bitmap.Config.HARDWARE) {
-        bitmap.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
-    } else bitmap
-    readable.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
-    return logoNeedsLightGround(pixels)
+private fun ArtworkContext.logoToneKey(source: Any): String? = when (source) {
+    is AppArtworkSource -> source.currentSession?.let { tvheadend?.artwork?.cacheKey(it, source.id) }
+        ?: source.savedKey
+    is String -> "remote:$source"
+    else -> null
 }
 
-/** Each logo's tone, judged once: a logo looks the same on every picture. */
-private val logoTones = java.util.concurrent.ConcurrentHashMap<ChannelIcon, Boolean>()
+/** The first tone for each logo, with profile-stable keys that do not retain the source model. */
+private val logoTones = mutableMapOf<String, Boolean>()
 
 /**
  * A channel without a logo, named on its programme picture: its name on a scrim along the

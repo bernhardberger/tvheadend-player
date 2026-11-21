@@ -2,7 +2,9 @@ package at.bernhardberger.tvhplayer.ui.screens
 
 import android.app.Application
 import android.graphics.Bitmap
+import android.graphics.Color
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -13,6 +15,7 @@ import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
@@ -36,8 +39,12 @@ import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionObservation
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
+import at.bernhardberger.tvhplayer.images.ArtworkLogoCorner
+import at.bernhardberger.tvhplayer.images.ArtworkLogoGround
+import at.bernhardberger.tvhplayer.images.ArtworkLogoPlace
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
+import at.bernhardberger.tvhplayer.ui.components.ArtworkCornerLogo
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
@@ -48,6 +55,7 @@ import coil3.intercept.Interceptor
 import coil3.request.ErrorResult
 import coil3.request.ImageResult
 import coil3.request.SuccessResult
+import coil3.request.transformations
 import kotlin.time.Instant
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -119,6 +127,43 @@ class ChannelsRowCardPictureTest {
         show(programmePicture = false, logoFails = true)
 
         compose.onNodeWithTag("$CARD-picon", useUnmergedTree = true).assertTextEquals(CHANNEL_NAME)
+    }
+
+    @Test fun darkLogoKeepsItsInkOnAShadeRegardlessOfItsFirstGround() {
+        val lightFirstGround = mutableStateOf(ArtworkLogoGround.LIGHT_PICTURE)
+        val darkFirst = ArtworkId(21)
+        val lightFirst = ArtworkId(22)
+        val inkByLogo = mutableMapOf<ArtworkId, Int>()
+        val darkLogo = Bitmap.createBitmap(32, 18, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.BLACK) }
+        images.install(ImageLoader.Builder(ApplicationProvider.getApplicationContext<Application>())
+            .components {
+                add(Interceptor { chain ->
+                    val request = chain.request
+                    val logo = request.transformations.fold(darkLogo) { bitmap, transform ->
+                        transform.transform(bitmap, coil3.size.Size.ORIGINAL)
+                    }
+                    inkByLogo[(request.data as AppArtworkSource).id] = logo.getPixel(logo.width / 2, logo.height / 2)
+                    SuccessResult(logo.asImage(), request, DataSource.MEMORY_CACHE)
+                })
+            }
+            .coroutineContext(Dispatchers.Main.immediate)
+            .diskCache(null)
+            .build())
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                Box(Modifier.size(220.dp, 124.dp)) {
+                    ArtworkCornerLogo(ChannelIcon.ImageCache(darkFirst),
+                        ArtworkLogoPlace(ArtworkLogoCorner.BOTTOM_START, ArtworkLogoGround.SHADE), scale = 1f)
+                    ArtworkCornerLogo(ChannelIcon.ImageCache(lightFirst),
+                        ArtworkLogoPlace(ArtworkLogoCorner.TOP_END, lightFirstGround.value), scale = 1f)
+                }
+            }
+        }
+        compose.runOnIdle { lightFirstGround.value = ArtworkLogoGround.SHADE }
+        compose.runOnIdle {
+            assertEquals("dark ground first", Color.BLACK, inkByLogo[darkFirst])
+            assertEquals("white ground first", Color.BLACK, inkByLogo[lightFirst])
+        }
     }
 
     @Test fun aChannelOnlyRecordingUsesThePictureCornerWithoutAddingCardHeight() {

@@ -3,6 +3,7 @@ package at.bernhardberger.tvhplayer.images
 import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Color
+import at.bernhardberger.tvhplayer.ui.components.ArtworkLogoShare
 import coil3.size.Size
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -177,8 +178,8 @@ class BackdropTransformationTest {
             return input
         }
 
-        val card = artworkLogoPlaces(picture(356, 200), 356.0 / 200, .2, startAtRight = false).first()
-        val tile = artworkLogoPlaces(picture(392, 220), 392.0 / 220, .2, startAtRight = false).first()
+        val card = artworkLogoPlaces(picture(356, 200), 356.0 / 200, ArtworkLogoShare, startAtRight = false).first()
+        val tile = artworkLogoPlaces(picture(392, 220), 392.0 / 220, ArtworkLogoShare, startAtRight = false).first()
         assertNotEquals(ArtworkLogoCorner.BOTTOM_START, card.corner)
         assertEquals(card.corner, tile.corner)
     }

@@ -52,6 +52,8 @@ import at.bernhardberger.tvhplayer.ui.TvSpacing4
 import androidx.compose.ui.graphics.Color
 import at.bernhardberger.tvhplayer.ui.components.ArtworkLogoInset
 import at.bernhardberger.tvhplayer.ui.components.ArtworkLogoPlateWidth
+import at.bernhardberger.tvhplayer.ui.components.ArtworkLogoShare
+import at.bernhardberger.tvhplayer.ui.components.AiringCardWidth
 import androidx.compose.ui.graphics.drawscope.scale
 import kotlinx.coroutines.launch
 
@@ -332,13 +334,14 @@ private fun ProgrammeArtworkTile(
     }
     val load = rememberPictureLoad(model)
     val logo = picon.takeUnless { withoutChannel }
+    val logoScale = ArtworkTileWidth / AiringCardWidth
     val ratio = (ArtworkTileWidth / ArtworkTileHeight).toDouble()
     val request = rememberProgrammeImageRequest(
         model, ProgrammeArtworkMode.BOX, ratio = ratio,
         startPlateShare = if (logo != null) {
-            ((ArtworkLogoInset + ArtworkLogoPlateWidth) / ArtworkTileWidth).toDouble()
+            ((ArtworkLogoInset + ArtworkLogoPlateWidth) * logoScale / ArtworkTileWidth).toDouble()
         } else 0.0,
-        logoShare = if (logo != null) (ArtworkLogoPlateWidth / ArtworkTileWidth).toDouble() else 0.0,
+        logoShare = if (logo != null) ArtworkLogoShare else 0.0,
     )
     Box(modifier.size(ArtworkTileWidth, ArtworkTileHeight).clip(ArtworkTileShape)
         .focusProperties { canFocus = false }.testTag("player-info-artwork-tile")) {
@@ -350,7 +353,7 @@ private fun ProgrammeArtworkTile(
                 onSuccess = load::onSuccess, onError = { load.onError() })
             // Nothing else stands on this tile, so the picture's best corner is the logo's.
             if (load.loaded && logo != null) ArtworkCornerLogo(logo, load.logoPlace(),
-                Modifier.testTag("player-info-artwork-picon"))
+                Modifier.testTag("player-info-artwork-picon"), scale = logoScale)
         }
     }
 }

@@ -199,8 +199,8 @@ A programme picture carries its channel's logo in one of its corners (accepted
 recording menus and dialogs, Home's recording shelves and the player's artwork
 tile. The List's picture stays without it, since its headline names the channel
 right below. The logo has no plate. It is at most 56×24dp on an airing card's
-220dp picture and keeps that share on other sizes, and its visible shape sits
-10dp in from the picture's edges and from a progress strip along the bottom.
+220dp picture, with a 10dp inset from the picture's edges and from a progress
+strip along the bottom. Its size and inset keep those proportions on other pictures.
 - **Corner.** Chosen per picture, as the card shows it: the corner with the
   least detail in the space the logo needs. Lettering drawn into the picture
   (its title, a station's wordmark, a caption) weighs far more there than faces

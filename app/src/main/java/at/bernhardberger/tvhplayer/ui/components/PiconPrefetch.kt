@@ -25,8 +25,9 @@ internal fun inkedPiconRequest(
     size: IntSize,
     placeholder: MemoryCache.Key? = null,
     trim: Boolean = false,
+    measureTone: Boolean = false,
 ): ImageRequest = ImageRequest.Builder(context).data(data).size(400, 240)
-    .transformations(LogoInkTransformation(ground, size.width, size.height, trim))
+    .transformations(LogoInkTransformation(ground, size.width, size.height, trim, measureTone))
     .placeholderMemoryCacheKey(placeholder)
     .apply { if (placeholder != null) crossfade(false) }
     .build()

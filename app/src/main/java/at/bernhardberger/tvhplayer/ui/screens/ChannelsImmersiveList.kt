@@ -180,6 +180,7 @@ import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.ArtworkCornerLogo
 import at.bernhardberger.tvhplayer.ui.components.ArtworkChannelName
 import at.bernhardberger.tvhplayer.ui.components.AiringCardWidth
+import at.bernhardberger.tvhplayer.ui.components.ArtworkLogoShare
 import at.bernhardberger.tvhplayer.ui.components.ArtworkLogoPlateWidth
 
 /**
@@ -545,8 +546,7 @@ internal fun ChannelsRowCard(
     } else 0.0
     val artRequest = rememberProgrammeImageRequest(artModel, mode = ProgrammeArtworkMode.BOX,
         startPlateShare = plateShare, keepWideTitleCrop = true,
-        // The logo keeps an airing card's share of the picture at every card width.
-        logoShare = if (channel.icon != null) (ArtworkLogoPlateWidth / AiringCardWidth).toDouble() else 0.0)
+        logoShare = if (channel.icon != null) ArtworkLogoShare else 0.0)
     val showsArt = artModel != null && artLoad.loaded
     val recording = programmeRecording.takeIf { running != null }
     val showChannelMark = showChannelRecordingMark(
