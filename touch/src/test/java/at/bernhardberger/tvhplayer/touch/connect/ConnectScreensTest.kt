@@ -97,7 +97,7 @@ class ConnectScreensTest {
         listOf(R.string.connect_address, R.string.connect_port, R.string.connect_username, R.string.connect_password,
             R.string.connect_name).forEach { field(it).assertIsNotEnabled() }
         compose.onNodeWithText(compose.activity.getString(R.string.connect_connecting, fields.address))
-            .assertIsNotEnabled().assert(!hasClickAction())
+            .assertIsNotEnabled()
     }
 
     @Test
@@ -107,7 +107,10 @@ class ConnectScreensTest {
 
     @Test
     @Config(qualifiers = Tablet)
-    fun tabletRefused() = account("tablet-setup-rejected", TouchCanvas.TABLET, ConnectionPhase.Refused)
+    fun tabletRefusedMarksBothSignInFields() {
+        account("tablet-setup-rejected", TouchCanvas.TABLET, ConnectionPhase.Refused)
+        assertRefused()
+    }
 
     @Test
     @Config(qualifiers = Phone)
@@ -269,7 +272,8 @@ class ConnectScreensTest {
         val error = SemanticsMatcher.expectValue(SemanticsProperties.Error, message)
         field(R.string.connect_username).assert(error)
         field(R.string.connect_password).assert(error)
-        compose.onAllNodes(hasText(message), useUnmergedTree = true).assertCountEquals(2)
+        // Both fields carry the sentence as their error; it is written out once for the pair.
+        compose.onAllNodes(hasText(message), useUnmergedTree = true).assertCountEquals(1)
     }
 
     private fun capture(name: String, canvas: TouchCanvas) = compose.captureTouch("slice1", name, canvas)

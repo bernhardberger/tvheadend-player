@@ -23,10 +23,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -55,11 +54,8 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -269,10 +265,8 @@ private fun DiscoveredServers(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.labelLarge,
         )
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
             state.servers.forEachIndexed { index, server ->
-                val first = if (index == 0) 16.dp else 4.dp
-                val last = if (index == state.servers.lastIndex) 16.dp else 4.dp
                 ListItem(
                     onClick = { onServerPicked(server) },
                     supportingContent = {
@@ -285,7 +279,7 @@ private fun DiscoveredServers(
                         Icon(painterResource(R.drawable.connect_next_outline), contentDescription = null)
                     },
                     colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-                    shapes = ListItemDefaults.shapes(shape = RoundedCornerShape(first, first, last, last)),
+                    shapes = ListItemDefaults.segmentedShapes(index, state.servers.size),
                 ) {
                     Text(server.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
@@ -314,27 +308,19 @@ private fun DiscoveredServers(
 @Composable
 internal fun ConnectAction(phase: ConnectionPhase, onClick: () -> Unit, modifier: Modifier = Modifier) {
     if (phase is ConnectionPhase.Connecting) {
-        Surface(
-            modifier.heightIn(min = 48.dp).semantics(mergeDescendants = true) {
-                role = Role.Button
-                disabled()
-                liveRegion = LiveRegionMode.Polite
-            },
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary,
+        // While connecting the button is disabled but keeps its filled look, so the progress reads as the button's
+        // own state rather than a greyed-out control.
+        val scheme = MaterialTheme.colorScheme
+        Button(
+            onClick = {},
+            modifier = modifier.heightIn(min = 48.dp).semantics { liveRegion = LiveRegionMode.Polite },
+            enabled = false,
+            colors = ButtonDefaults.buttonColors(
+                disabledContainerColor = scheme.primary, disabledContentColor = scheme.onPrimary,
+            ),
         ) {
-            Row(
-                Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                LoadingIndicator(Modifier.size(24.dp), color = MaterialTheme.colorScheme.onPrimary)
-                Text(
-                    stringResource(R.string.connect_connecting, phase.address),
-                    style = MaterialTheme.typography.labelLarge,
-                )
-            }
+            LoadingIndicator(Modifier.size(24.dp), color = scheme.onPrimary)
+            Text(stringResource(R.string.connect_connecting, phase.address), Modifier.padding(start = 8.dp))
         }
     } else {
         Button(onClick = onClick, modifier = modifier.heightIn(min = 48.dp)) {
