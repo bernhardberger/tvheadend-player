@@ -131,6 +131,38 @@ class PlayerScreenTest {
 
     @Test
     @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
+    fun controlsLeaveByThemselvesWhilePlayingAndATouchRestartsTheCount() {
+        // Before composing: idling with the clock running would let the count run out unseen.
+        compose.mainClock.autoAdvance = false
+        show(hideAfterMs = hideMs)
+        compose.mainClock.advanceTimeBy(hideMs * 3 / 4)
+        // A finger resting on the bar holds them; lifting it starts the count anew.
+        timeline().performTouchInput { down(center) }
+        compose.mainClock.advanceTimeBy(hideMs * 2)
+        tag("player-transport").assertIsDisplayed()
+        timeline().performTouchInput { up() }
+        compose.mainClock.advanceTimeBy(hideMs * 3 / 4)
+        tag("player-transport").assertIsDisplayed()
+        compose.mainClock.advanceTimeBy(hideMs / 2)
+        tag("player-transport").assertDoesNotExist()
+        // Upright, only the layer over the picture leaves: the list below stays.
+        assertInlineChannels()
+        tapPicture()
+        compose.mainClock.advanceTimeByFrame()
+        paused.value = true
+        compose.mainClock.advanceTimeBy(hideMs * 2)
+        tag("player-transport").assertIsDisplayed()
+        // The end of the hold starts the count anew.
+        paused.value = false
+        compose.mainClock.advanceTimeBy(hideMs * 3 / 4)
+        tag("player-transport").assertIsDisplayed()
+        compose.mainClock.advanceTimeBy(hideMs / 2)
+        tag("player-transport").assertDoesNotExist()
+        compose.mainClock.autoAdvance = true
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
     fun phonePictureTapHidesControlsButKeepsThinProgress() {
         show()
         val canvas = TouchCanvas.PHONE
@@ -224,7 +256,10 @@ class PlayerScreenTest {
     private val played = mutableListOf<String>()
     private val status = mutableStateOf<LivePlayerStatus>(LivePlayerStatus.Playing)
 
-    private fun show() {
+    private val paused = mutableStateOf(false)
+    private val hideMs = 1_000L
+
+    private fun show(hideAfterMs: Long? = null) {
         val channels = channelsFixture(playing = true)
         val channel = channels.rows.first().copy(
             details = ChannelDetails(
@@ -264,8 +299,8 @@ class PlayerScreenTest {
         compose.setContent {
             MaterialTheme(colorScheme = MobileDarkColors) {
                 PlayerScreen(
-                    fixture.copy(status = status.value), { actions += it }, { seeks += it }, {}, { played += it },
-                    { choices += it },
+                    fixture.copy(status = status.value, paused = paused.value), { actions += it }, { seeks += it }, {},
+                    { played += it }, { choices += it }, hideAfterMs = hideAfterMs,
                 )
             }
         }

@@ -109,6 +109,14 @@ class PlayerActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
         )
         onBackPressedDispatcher.addCallback(this) { back() }
+        // The window's previous/next step through the channel order Channels shows, as the TV's player.
+        lifecycle.addObserver(
+            PlayerMediaSession(this, runtime, session.observation) { direction ->
+                val order = channels.scope.value.scope.visibleChannels.map { it.id }
+                adjacentChannel(order, requested.value.channelId, direction)
+                    ?.takeUnless { leaving }?.let { next -> requested.update { tuneTo(it, next) } }
+            },
+        )
         lifecycleScope.launch { requested.collectLatest { tune(runtime, session, it, requestFailed) } }
         lifecycleScope.launch { retuneOnNewSession(runtime, session) }
         lifecycleScope.launch { followConnection(runtime, session) }
@@ -246,12 +254,12 @@ class PlayerActivity : ComponentActivity() {
             onSeek = timeshift::seek,
             onBrightness = { brightness = it; applyBrightness(window, it) },
             onChannel = { id -> requested.update { tuneTo(it, ChannelId(id.toLong())) } },
-            onChoice = { choice ->
-                if (choice is PlayerChoice.ChannelTag) channels.selectTag(choice.id?.let { ChannelTagId(it.toLong()) })
-            },
+            onChoice = { channels.choose(it) },
             video = { modifier -> TouchVideoSurface(runtime.player, video.visible, modifier, pictureWindow::attach) },
             onControlsShown = { controlsShown = it },
             inWindow = inWindow,
+            hideAfterMs = rememberControlsTimeout(),
+            progressing = rememberPlayerProgressing(runtime.player).value,
         )
     }
 
@@ -273,6 +281,10 @@ class PlayerActivity : ComponentActivity() {
 private data class Tune(val channelId: ChannelId, val token: Int = 0)
 
 /** A newer tap replaces one still starting; the same channel again changes nothing. */
+private fun ChannelsViewModel.choose(choice: PlayerChoice) {
+    if (choice is PlayerChoice.ChannelTag) selectTag(choice.id?.let { ChannelTagId(it.toLong()) })
+}
+
 private fun tuneTo(current: Tune, channelId: ChannelId): Tune =
     if (current.channelId == channelId) current else Tune(channelId)
 

@@ -23,6 +23,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -33,6 +34,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -42,6 +46,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.touch.R
+import kotlinx.coroutines.delay
 
 @Composable
 internal fun PlayerScreen(
@@ -55,8 +60,12 @@ internal fun PlayerScreen(
     video: (@Composable (Modifier) -> Unit)? = null,
     onControlsShown: (Boolean) -> Unit = {},
     inWindow: Boolean = false,
+    hideAfterMs: Long? = null,
+    progressing: Boolean = true,
 ) {
     var visible by rememberSaveable(state.channel.id) { mutableStateOf(true) }
+    var touches by remember { mutableIntStateOf(0) }
+    var touching by remember { mutableStateOf(false) }
     var panel by rememberSaveable { mutableStateOf<PlayerPanel?>(null) }
     // Sheets and menus close on entering the picture-in-picture window; they don't come back.
     LaunchedEffect(inWindow) { if (inWindow) panel = null }
@@ -69,7 +78,13 @@ internal fun PlayerScreen(
     val panels = PanelHost(panel, showPanel, onChoice)
     val openOptions = { panel = PlayerPanel.Options }
     var preview by remember(state.channel.id, state.status) { mutableStateOf<Int?>(null) }
-    BoxWithConstraints(modifier.fillMaxSize().background(Color.Black)) {
+    val hideAfter = controlsHideAfter(
+        visible, state.status, state.paused, progressing, dragging = preview != null, fingerDown = touching,
+        panelOpen = panel != null, inWindow = inWindow, timeoutMs = hideAfterMs,
+    )
+    HideControlsAfter(hideAfter, touches) { visible = false }
+    val face = modifier.fillMaxSize().background(Color.Black)
+    BoxWithConstraints(face.followTouches { down -> touching = down; touches++ }) {
         // In the window the layout stays the one the player had, so the picture keeps its place in
         // the composition and its surface is never rebuilt across the transition.
         val held = remember { HeldLayout(playerLayout(maxWidth, maxHeight)) }
@@ -266,3 +281,31 @@ private val InfoStackSaver = listSaver<InfoStack, String?>(
     save = { listOf(it.open) + it.details },
     restore = { InfoStack(it.first(), it.drop(1).filterNotNull()) },
 )
+
+/** Every touch, and the end of whatever held the controls, starts the count anew. */
+@Composable
+private fun HideControlsAfter(hideAfter: Long?, touches: Int, onHide: () -> Unit) {
+    LaunchedEffect(hideAfter, touches) {
+        if (hideAfter != null) {
+            delay(hideAfter)
+            onHide()
+        }
+    }
+}
+
+/**
+ * Reports a finger going down and the last one lifting on the face, without taking the touch from
+ * the controls below: a finger held on the bar or the brightness slider holds the controls.
+ */
+private fun Modifier.followTouches(onTouching: (Boolean) -> Unit) = pointerInput(Unit) {
+    awaitPointerEventScope {
+        while (true) {
+            val event = awaitPointerEvent(PointerEventPass.Initial)
+            when (event.type) {
+                PointerEventType.Press -> onTouching(true)
+                PointerEventType.Release -> if (event.changes.none { it.pressed }) onTouching(false)
+                else -> Unit
+            }
+        }
+    }
+}
