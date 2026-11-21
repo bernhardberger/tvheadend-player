@@ -106,8 +106,8 @@ internal class FakeConnection(
         writes.failReadAfterNextWrite = true
     }
 
-    /** The Guide on Main, so a coverage request settles with the looper. */
-    fun guide() = GuideViewModel(session, EmptyCoroutineContext)
+    /** The Guide on the test looper, for both coverage and mapped state. */
+    fun guide() = GuideViewModel(session, EmptyCoroutineContext, mappingDispatcher = Dispatchers.Main.immediate)
 
     fun close() = scope.cancel()
 }

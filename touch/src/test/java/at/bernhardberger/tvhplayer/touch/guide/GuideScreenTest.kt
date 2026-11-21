@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.touch.guide
 
+import android.content.pm.ApplicationInfo
 import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.compose.material3.MaterialTheme
@@ -46,6 +47,7 @@ import java.util.TimeZone
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.time.Instant
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import org.junit.Assert.assertEquals
@@ -57,6 +59,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.shadows.ShadowLog
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -424,7 +427,75 @@ class GuideScreenTest {
         }
     }
 
-    private fun showDestination(connection: FakeConnection, onCoverage: suspend (Instant) -> Unit) {
+    @Test
+    @Config(instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.common.TimeConverterKt"])
+    fun unchangedGuideMapsOnceWithinAMinuteAndUpdatesAtTheBoundary() {
+        val connection = FakeConnection()
+        val noon = Instant.parse("2027-01-15T12:00:00Z")
+        val before = noon.toEpochMilliseconds() + 29 * 60_000 + 50_000
+        withMappingTrace {
+            try {
+                connection.session.publish(ServerGuide(noon).connected())
+                assertTrue(SystemClock.setCurrentTimeMillis(before))
+                showDestination(connection) {}
+                compose.onNodeWithText("Evening News").assertIsDisplayed()
+                assertTrue(SystemClock.setCurrentTimeMillis(before + 5_000))
+                compose.mainClock.advanceTimeBy(5_016)
+                compose.runOnIdle { assertEquals("No remap within the same minute", 1, guideMappings()) }
+                assertTrue(SystemClock.setCurrentTimeMillis(before + 10_000))
+                compose.mainClock.advanceTimeBy(5_016)
+                compose.onNodeWithText("Weather").assertIsDisplayed()
+                compose.onAllNodesWithText("Evening News").assertCountEquals(0)
+                compose.runOnIdle { assertEquals("The minute wakes the mapper", 2, guideMappings()) }
+            } finally {
+                connection.close()
+            }
+        }
+    }
+
+    @Test
+    @Config(instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.common.TimeConverterKt"])
+    fun returningToGuideShowsTheLastMappingWithoutDoingItAgain() {
+        val connection = FakeConnection()
+        val noon = Instant.parse("2027-01-15T12:00:00Z")
+        var shown by mutableStateOf(true)
+        withMappingTrace {
+            try {
+                assertTrue(SystemClock.setCurrentTimeMillis(noon.toEpochMilliseconds()))
+                connection.session.publish(ServerGuide(noon).connected())
+                showDestination(connection, shown = { shown }) {}
+                compose.onNodeWithText("Evening News").assertIsDisplayed()
+                compose.runOnIdle { shown = false }
+                compose.onAllNodesWithText("Evening News").assertCountEquals(0)
+                compose.runOnIdle { shown = true }
+                compose.onNodeWithText("Evening News").assertIsDisplayed()
+                compose.runOnIdle { assertEquals("Re-entry reuses the previous mapping", 1, guideMappings()) }
+            } finally {
+                connection.close()
+            }
+        }
+    }
+
+    private fun withMappingTrace(test: () -> Unit) {
+        val info = compose.activity.applicationInfo
+        val original = info.flags
+        info.flags = original or ApplicationInfo.FLAG_DEBUGGABLE
+        ShadowLog.clear()
+        try {
+            test()
+        } finally {
+            info.flags = original
+        }
+    }
+
+    private fun guideMappings() =
+        ShadowLog.getLogsForTag("TouchArtwork").count { it.msg.startsWith("mapped Guide ") }
+
+    private fun showDestination(
+        connection: FakeConnection,
+        shown: () -> Boolean = { true },
+        onCoverage: suspend (Instant) -> Unit,
+    ) {
         val fake = connection.session
         val session = object : TvheadendSession by fake {
             override val epgRepository = object : EpgRepository by fake.epgRepository {
@@ -437,13 +508,13 @@ class GuideScreenTest {
                 }
             }
         }
-        val guide = GuideViewModel(session, EmptyCoroutineContext)
+        val guide = GuideViewModel(session, EmptyCoroutineContext, mappingDispatcher = Dispatchers.Main.immediate)
         val channels = connection.channels()
         val presentation = connection.presentation()
         compose.setContent {
             MaterialTheme(colorScheme = MobileDarkColors) {
                 val dvr = viewModel { DvrControls(session, connection.noticeCenter) }
-                GuideDestination(
+                if (shown()) GuideDestination(
                     guide, channels, presentation, listOf(Destination.Guide), playingId = null, onWatch = null,
                     dvr = dvr, onOpenConnections = {}, onSignIn = {},
                 )
