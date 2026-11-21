@@ -25,8 +25,24 @@ enum class SkipLanding(val beforeEndMs: Long) { END(0), TWO_SECONDS_BEFORE(2_000
 /** Presentation while browsing; AUDIO_ONLY keeps the same player and video decoding. */
 enum class WarmPlaybackMode { ON, AUDIO_ONLY, OFF }
 
-/** Whether the TV switches to the video's frame rate: Always may blank the screen briefly. */
-enum class FrameRateSwitching { ALWAYS, SEAMLESS_ONLY, OFF }
+/** Whether the TV switches to the video's frame rate. Android 12+ sets the switching limit. */
+enum class FrameRateSwitching {
+    ALWAYS, SEAMLESS_ONLY, OFF;
+
+    /** Both enabled values mean On where Android sets the limit. The stored value is unchanged. */
+    fun choiceFor(sdkInt: Int): FrameRateSwitching =
+        if (usesSystemPreference(sdkInt) && this == SEAMLESS_ONLY) ALWAYS else this
+
+    companion object {
+        private const val ANDROID_S = 31
+        private val systemCappedChoices = listOf(ALWAYS, OFF)
+
+        fun usesSystemPreference(sdkInt: Int): Boolean = sdkInt >= ANDROID_S
+
+        fun choices(sdkInt: Int): List<FrameRateSwitching> =
+            if (usesSystemPreference(sdkInt)) systemCappedChoices else entries
+    }
+}
 
 val keepChannelMinuteChoices = listOf(0, 10, 20, 30, 60)
 

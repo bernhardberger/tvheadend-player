@@ -925,6 +925,10 @@
     <string name="frame_rate_switching_always">Zawsze</string>
     <string name="frame_rate_switching_seamless_only">Tylko bez zakłóceń</string>
     <string name="frame_rate_switching_off">Wyłączone</string>
+    <string name="frame_rate_switching_on">Włączone</string>
+    <string name="frame_rate_switching_never">Nigdy</string>
+    <string name="frame_rate_switching_system_summary">%1$s · Android: %2$s</string>
+    <string name="frame_rate_switching_on_help">Stosuje opcję „%1$s” z ustawień ekranu Androida</string>
     <string name="frame_rate_switching_always_help">Przełącza telewizor na liczbę klatek na sekundę zgodną z filmem, nawet jeśli ekran na chwilę zgaśnie</string>
     <string name="frame_rate_switching_seamless_help">Przełącza tylko wtedy, gdy telewizor może to zrobić bez wygaszania ekranu</string>
     <string name="frame_rate_switching_off_help">Zachowuje bieżący tryb wyświetlania telewizora</string>

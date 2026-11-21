@@ -855,6 +855,10 @@
     <string name="frame_rate_switching_always">Alltid</string>
     <string name="frame_rate_switching_seamless_only">Bara utan avbrott</string>
     <string name="frame_rate_switching_off">Av</string>
+    <string name="frame_rate_switching_on">På</string>
+    <string name="frame_rate_switching_never">Aldrig</string>
+    <string name="frame_rate_switching_system_summary">%1$s · Android: %2$s</string>
+    <string name="frame_rate_switching_on_help">Följer alternativet ”%1$s” i Androids skärminställningar</string>
     <string name="frame_rate_switching_always_help">Växlar tv:n till videons bildfrekvens, även om skärmen blir svart en stund</string>
     <string name="frame_rate_switching_seamless_help">Växlar bara när tv:n kan göra det utan att skärmen blir svart</string>
     <string name="frame_rate_switching_off_help">Behåller tv:ns nuvarande visningsläge</string>

@@ -81,6 +81,16 @@ internal fun matchFrameRatePreference(value: Int): MatchFrameRatePreference? = w
     else -> null
 }
 
+internal fun readMatchFrameRatePreference(manager: DisplayManager?): MatchFrameRatePreference? {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || manager == null) return null
+    return try {
+        matchFrameRatePreference(manager.matchContentFrameRateUserPreference)
+    } catch (_: RuntimeException) {
+        // A vendor may not expose the preference, or the display service may be unavailable.
+        null
+    }
+}
+
 private fun readDisplayOutput(view: View, context: Context): DisplayOutput? {
     val manager = context.getSystemService(DisplayManager::class.java) ?: return null
     val display = view.display ?: manager.getDisplay(Display.DEFAULT_DISPLAY) ?: return null
@@ -94,11 +104,7 @@ private fun readDisplayOutput(view: View, context: Context): DisplayOutput? {
         refreshRatesByResolution = refreshRatesByResolution(
             display.supportedModes.map { DisplayModeSpec(it.physicalWidth, it.physicalHeight, it.refreshRate) },
         ),
-        matchFrameRate = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            matchFrameRatePreference(manager.matchContentFrameRateUserPreference)
-        } else {
-            null
-        },
+        matchFrameRate = readMatchFrameRatePreference(manager),
     )
 }
 

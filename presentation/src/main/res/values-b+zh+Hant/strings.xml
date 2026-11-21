@@ -792,6 +792,10 @@
     <string name="frame_rate_switching_always">一律</string>
     <string name="frame_rate_switching_seamless_only">僅限無縫切換</string>
     <string name="frame_rate_switching_off">關閉</string>
+    <string name="frame_rate_switching_on">開啟</string>
+    <string name="frame_rate_switching_never">永不</string>
+    <string name="frame_rate_switching_system_summary">%1$s · Android：%2$s</string>
+    <string name="frame_rate_switching_on_help">依照 Android 顯示設定中的「%1$s」選項</string>
     <string name="frame_rate_switching_always_help">將電視切換為影片影格率，即使螢幕會短暫變黑</string>
     <string name="frame_rate_switching_seamless_help">僅在電視能不黑屏切換時切換</string>
     <string name="frame_rate_switching_off_help">維持電視目前的顯示模式</string>

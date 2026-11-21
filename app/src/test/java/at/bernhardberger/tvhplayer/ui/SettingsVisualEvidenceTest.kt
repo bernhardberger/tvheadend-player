@@ -258,7 +258,9 @@ class SettingsVisualEvidenceTest {
     }
 
     @Category(VisualCapture::class)
-    @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi") fun englishPlaybackPages() {
+    @Test
+    @Config(qualifiers = "en-w960dp-h540dp-land-mdpi", shadows = [FrameRateSettingsUiTest.SeamlessDisplayPreference::class])
+    fun englishPlaybackPages() {
         val ui = connectedPlaybackUi()
         lateinit var navigation: DepthNavigationState
         compose.setContent {
@@ -290,6 +292,13 @@ class SettingsVisualEvidenceTest {
         compose.pressKey(Key.Back)
         compose.pressKey(Key.DirectionDown)
         capture("en-font1.0-playback-middle-focus")
+        repeat(2) { compose.pressKey(Key.DirectionDown) }
+        compose.onNode(isFocused() and hasText("Match content frame rate")).assertExists()
+        capture("en-font1.0-playback-frame-rate-summary")
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNode(isFocused() and hasText("On")).assertIsSelected()
+        capture("en-font1.0-frame-rate")
+        compose.pressKey(Key.Back)
         compose.pressKey(Key.Back)
         compose.pressKey(Key.DirectionDown)
         compose.pressKey(Key.DirectionCenter)

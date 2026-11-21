@@ -855,6 +855,10 @@
     <string name="frame_rate_switching_always">Πάντα</string>
     <string name="frame_rate_switching_seamless_only">Μόνο χωρίς διακοπή</string>
     <string name="frame_rate_switching_off">Ανενεργή</string>
+    <string name="frame_rate_switching_on">Ενεργή</string>
+    <string name="frame_rate_switching_never">Ποτέ</string>
+    <string name="frame_rate_switching_system_summary">%1$s · Android: %2$s</string>
+    <string name="frame_rate_switching_on_help">Ακολουθεί την επιλογή «%1$s» στις ρυθμίσεις οθόνης του Android</string>
     <string name="frame_rate_switching_always_help">Αλλάζει τον ρυθμό καρέ της τηλεόρασης σε αυτόν του βίντεο, ακόμη κι αν η οθόνη μαυρίσει για λίγο</string>
     <string name="frame_rate_switching_seamless_help">Αλλάζει μόνο όταν η τηλεόραση μπορεί να το κάνει χωρίς να μαυρίσει η οθόνη</string>
     <string name="frame_rate_switching_off_help">Διατηρεί την τρέχουσα λειτουργία οθόνης της τηλεόρασης</string>

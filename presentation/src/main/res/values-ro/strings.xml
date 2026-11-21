@@ -890,6 +890,10 @@
     <string name="frame_rate_switching_always">Întotdeauna</string>
     <string name="frame_rate_switching_seamless_only">Doar fără întreruperi</string>
     <string name="frame_rate_switching_off">Dezactivat</string>
+    <string name="frame_rate_switching_on">Activat</string>
+    <string name="frame_rate_switching_never">Niciodată</string>
+    <string name="frame_rate_switching_system_summary">%1$s · Android: %2$s</string>
+    <string name="frame_rate_switching_on_help">Urmează opțiunea „%1$s” din setările de afișare ale Android</string>
     <string name="frame_rate_switching_always_help">Comută televizorul la frecvența cadrelor video, chiar dacă ecranul se întunecă pentru o clipă</string>
     <string name="frame_rate_switching_seamless_help">Comută doar dacă televizorul poate face asta fără ca ecranul să se întunece</string>
     <string name="frame_rate_switching_off_help">Păstrează modul de afișare curent al televizorului</string>

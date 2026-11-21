@@ -131,7 +131,7 @@ class VideoFrameRateTest {
     fun theSettingAndAndroidVersionDecideHowTheAppVotes() {
         assertEquals(SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.ALWAYS), surfaceFrameRateRequest(FrameRateSwitching.ALWAYS, 31, 50f))
         assertEquals(
-            SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.ONLY_IF_SEAMLESS),
+            SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.ALWAYS),
             surfaceFrameRateRequest(FrameRateSwitching.SEAMLESS_ONLY, 34, 50f),
         )
         // Before Android 12, Always requests a display mode, not a seamless surface vote.
@@ -192,9 +192,10 @@ class VideoFrameRateTest {
     @Test
     fun theSettingChangesHowTheDeclaredRateIsAskedFor() {
         val frameRate = PlaybackFrameRate(sdkInt = 31)
+        frameRate.setSwitching(FrameRateSwitching.OFF)
         frameRate.onDeclared(40.milliseconds)
         frameRate.setSwitching(FrameRateSwitching.SEAMLESS_ONLY)
-        assertEquals(SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.ONLY_IF_SEAMLESS), frameRate.requested.value)
+        assertEquals(SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.ALWAYS), frameRate.requested.value)
         frameRate.setSwitching(FrameRateSwitching.OFF)
         assertEquals(SurfaceFrameRateRequest(), frameRate.requested.value)
         frameRate.setSwitching(FrameRateSwitching.ALWAYS)
@@ -257,7 +258,7 @@ class VideoFrameRateTest {
         vote.surfaceCreated()
         assertEquals(SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.ALWAYS), vote.request(SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.ALWAYS)))
         // Same rate, seamless only now: the surface gets the new strategy.
-        val seamless = SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.ONLY_IF_SEAMLESS)
+        val seamless = SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.SEAMLESS_DEFAULT)
         assertEquals(seamless, vote.request(seamless))
         // Off: the app's earlier vote is cleared; nothing else votes on the surface.
         assertEquals(SurfaceFrameRateRequest(), vote.request(SurfaceFrameRateRequest()))

@@ -925,6 +925,10 @@
     <string name="frame_rate_switching_always">Vždy</string>
     <string name="frame_rate_switching_seamless_only">Jen plynule</string>
     <string name="frame_rate_switching_off">Vypnuto</string>
+    <string name="frame_rate_switching_on">Zapnuto</string>
+    <string name="frame_rate_switching_never">Nikdy</string>
+    <string name="frame_rate_switching_system_summary">%1$s · Android: %2$s</string>
+    <string name="frame_rate_switching_on_help">Řídí se volbou „%1$s“ v nastavení displeje Androidu</string>
     <string name="frame_rate_switching_always_help">Přepne televizor na snímkovou frekvenci videa, i když obrazovka na chvíli zčerná</string>
     <string name="frame_rate_switching_seamless_help">Přepne jen tehdy, když to televizor zvládne bez zčernání obrazovky</string>
     <string name="frame_rate_switching_off_help">Ponechá aktuální režim zobrazení televizoru</string>

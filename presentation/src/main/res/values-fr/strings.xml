@@ -890,6 +890,10 @@
     <string name="frame_rate_switching_always">Toujours</string>
     <string name="frame_rate_switching_seamless_only">Uniquement sans coupure</string>
     <string name="frame_rate_switching_off">Désactivé</string>
+    <string name="frame_rate_switching_on">Activé</string>
+    <string name="frame_rate_switching_never">Jamais</string>
+    <string name="frame_rate_switching_system_summary">%1$s · Android : %2$s</string>
+    <string name="frame_rate_switching_on_help">Suit l’option « %1$s » des paramètres d’affichage d’Android</string>
     <string name="frame_rate_switching_always_help">Adapte la fréquence d’affichage du téléviseur à celle de la vidéo, même si l’écran devient noir un instant</string>
     <string name="frame_rate_switching_seamless_help">Change uniquement si le téléviseur peut le faire sans écran noir</string>
     <string name="frame_rate_switching_off_help">Conserve le mode d’affichage actuel du téléviseur</string>

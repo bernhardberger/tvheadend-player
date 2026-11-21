@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Playback
+
+- On Android 12 and later, *Match content frame rate* offers On and Off. With On, Android's own *Match content frame rate* in its display settings decides whether the TV may go dark to switch, and Settings shows that choice next to it. With a *Display refresh rate* set, the TV keeps that rate during playback unless Android allows every switch. Android 9 to 11 keep Always, Only if seamless and Off.
+
 ## 0.5.3
 
 ### Live TV

@@ -128,10 +128,8 @@ internal fun declaredDisplayRate(duration: Duration): Float? {
 enum class SurfaceFrameRateChange {
     /** Before Android 12: preferredDisplayModeId permits non-seamless TV mode changes. */
     DISPLAY_MODE,
-    /** Android 12 or later: CHANGE_FRAME_RATE_ALWAYS, also when the switch is not seamless. */
+    /** Android 12 or later: CHANGE_FRAME_RATE_ALWAYS, subject to the Android preference. */
     ALWAYS,
-    /** Android 12 or later: CHANGE_FRAME_RATE_ONLY_IF_SEAMLESS. */
-    ONLY_IF_SEAMLESS,
     /** Android 11: the two-argument call, which switches only seamlessly. */
     SEAMLESS_DEFAULT,
 }
@@ -150,26 +148,26 @@ data class SurfaceFrameRateRequest(
 internal fun surfaceFrameRateRequest(switching: FrameRateSwitching, sdkInt: Int, rate: Float?): SurfaceFrameRateRequest =
     when {
         rate == null || switching == FrameRateSwitching.OFF -> SurfaceFrameRateRequest()
-        sdkInt < ANDROID_S && switching == FrameRateSwitching.ALWAYS ->
+        FrameRateSwitching.usesSystemPreference(sdkInt) ->
+            SurfaceFrameRateRequest(rate, SurfaceFrameRateChange.ALWAYS)
+        switching == FrameRateSwitching.ALWAYS ->
             SurfaceFrameRateRequest(rate, SurfaceFrameRateChange.DISPLAY_MODE)
         sdkInt < ANDROID_R -> SurfaceFrameRateRequest()
-        sdkInt < ANDROID_S -> SurfaceFrameRateRequest(rate, SurfaceFrameRateChange.SEAMLESS_DEFAULT)
-        switching == FrameRateSwitching.ALWAYS -> SurfaceFrameRateRequest(rate, SurfaceFrameRateChange.ALWAYS)
-        else -> SurfaceFrameRateRequest(rate, SurfaceFrameRateChange.ONLY_IF_SEAMLESS)
+        else -> SurfaceFrameRateRequest(rate, SurfaceFrameRateChange.SEAMLESS_DEFAULT)
     }
 
-/** Surface.setFrameRate needs Android 11; its change strategy argument needs Android 12. */
+/** Surface.setFrameRate needs Android 11. */
 internal const val ANDROID_R = 30
-internal const val ANDROID_S = 31
 
 /**
  * What one video surface carries: [request] and the surface callbacks return the request to set
  * now (one without a rate clears the vote), or null when the surface already carries it or cannot
- * take one. A recreated surface starts without a vote.
+ * take one. A recreated surface starts without a vote. When acknowledgement is required, the
+ * caller confirms what the platform accepted; older paths keep their optimistic bookkeeping.
  */
-class SurfaceFrameRateVote {
+class SurfaceFrameRateVote(private val requiresAcknowledgement: Boolean = false) {
     private var target = SurfaceFrameRateRequest()
-    private var applied = SurfaceFrameRateRequest()
+    private var applied: SurfaceFrameRateRequest? = SurfaceFrameRateRequest()
     private var surfaceValid = false
 
     fun request(request: SurfaceFrameRateRequest): SurfaceFrameRateRequest? {
@@ -183,9 +181,17 @@ class SurfaceFrameRateVote {
         return pending()
     }
 
+    /** A null acknowledgement means the live surface may still carry a vote after a failed clear. */
+    fun acknowledge(request: SurfaceFrameRateRequest?) {
+        applied = request
+    }
+
     /** The surface is about to go: clears a vote the app still has on it. */
     fun surfaceDestroyed(): SurfaceFrameRateRequest? {
-        val clear = SurfaceFrameRateRequest().takeIf { surfaceValid && applied.rate != null }
+        val lastApplied = applied
+        val clear = SurfaceFrameRateRequest().takeIf {
+            surfaceValid && (lastApplied == null || lastApplied.rate != null)
+        }
         surfaceValid = false
         applied = SurfaceFrameRateRequest()
         return clear
@@ -196,7 +202,7 @@ class SurfaceFrameRateVote {
 
     private fun pending(): SurfaceFrameRateRequest? {
         if (!surfaceValid || target == applied) return null
-        applied = target
+        if (!requiresAcknowledgement) applied = target
         return target
     }
 }

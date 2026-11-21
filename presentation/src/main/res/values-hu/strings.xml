@@ -855,6 +855,10 @@
     <string name="frame_rate_switching_always">Mindig</string>
     <string name="frame_rate_switching_seamless_only">Csak zökkenőmentesen</string>
     <string name="frame_rate_switching_off">Ki</string>
+    <string name="frame_rate_switching_on">Be</string>
+    <string name="frame_rate_switching_never">Soha</string>
+    <string name="frame_rate_switching_system_summary">%1$s · Android: %2$s</string>
+    <string name="frame_rate_switching_on_help">Az Android kijelzőbeállításaiban megadott „%1$s” beállítást követi</string>
     <string name="frame_rate_switching_always_help">A TV-t a videó képkockasebességére állítja, akkor is, ha a képernyő egy pillanatra elsötétül</string>
     <string name="frame_rate_switching_seamless_help">Csak akkor vált, ha a TV ezt elsötétülés nélkül meg tudja tenni</string>
     <string name="frame_rate_switching_off_help">Megtartja a TV jelenlegi megjelenítési módját</string>

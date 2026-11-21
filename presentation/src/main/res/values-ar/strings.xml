@@ -995,6 +995,10 @@
     <string name="frame_rate_switching_always">دائمًا</string>
     <string name="frame_rate_switching_seamless_only">دون انقطاع فقط</string>
     <string name="frame_rate_switching_off">إيقاف</string>
+    <string name="frame_rate_switching_on">تشغيل</string>
+    <string name="frame_rate_switching_never">أبدًا</string>
+    <string name="frame_rate_switching_system_summary">%1$s · Android: %2$s</string>
+    <string name="frame_rate_switching_on_help">يتبع خيار «%1$s» في إعدادات العرض في Android</string>
     <string name="frame_rate_switching_always_help">تبديل معدل إطارات التلفزيون لمطابقة الفيديو، حتى لو أظلمت الشاشة للحظة</string>
     <string name="frame_rate_switching_seamless_help">التبديل فقط عندما يستطيع التلفزيون إجراءه دون أن تظلم الشاشة</string>
     <string name="frame_rate_switching_off_help">الإبقاء على وضع العرض الحالي للتلفزيون</string>

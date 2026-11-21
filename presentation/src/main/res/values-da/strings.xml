@@ -855,6 +855,10 @@
     <string name="frame_rate_switching_always">Altid</string>
     <string name="frame_rate_switching_seamless_only">Kun uden afbrydelse</string>
     <string name="frame_rate_switching_off">Fra</string>
+    <string name="frame_rate_switching_on">Til</string>
+    <string name="frame_rate_switching_never">Aldrig</string>
+    <string name="frame_rate_switching_system_summary">%1$s · Android: %2$s</string>
+    <string name="frame_rate_switching_on_help">Følger valget “%1$s” i Androids skærmindstillinger</string>
     <string name="frame_rate_switching_always_help">Skifter tv’et til videoens billedfrekvens, selv hvis skærmen bliver sort et øjeblik</string>
     <string name="frame_rate_switching_seamless_help">Skifter kun, når tv’et kan gøre det uden sort skærm</string>
     <string name="frame_rate_switching_off_help">Beholder tv’ets nuværende visningstilstand</string>

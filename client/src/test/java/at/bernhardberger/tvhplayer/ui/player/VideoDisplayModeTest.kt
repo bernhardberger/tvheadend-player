@@ -21,11 +21,6 @@ class VideoDisplayModeTest {
     }
 
     @Test
-    fun seamlessOnlyRequestsDropInBrowse() {
-        assertFalse(keepVideoFrameRateInBrowse(SurfaceFrameRateChange.ONLY_IF_SEAMLESS, 24f, null))
-    }
-
-    @Test
     fun alwaysDropsWhenTheBaseOrItsAlternativeMatches() {
         assertFalse(keepVideoFrameRateInBrowse(SurfaceFrameRateChange.ALWAYS, 60f, current))
         val seamless = current.copy(alternativeRefreshRates = listOf(24f, 50f))
@@ -180,26 +175,25 @@ class VideoDisplayModeTest {
     }
 
     @Test
-    fun theWindowFollowsAnAlwaysRequestOnlyWithAnAppRate() {
-        assertEquals(50f, windowVideoRate(SurfaceFrameRateChange.DISPLAY_MODE, 50f, null))
-        assertNull(windowVideoRate(SurfaceFrameRateChange.ALWAYS, 50f, null))
-        assertEquals(50f, windowVideoRate(SurfaceFrameRateChange.ALWAYS, 50f, 60f))
-        assertNull(windowVideoRate(SurfaceFrameRateChange.ALWAYS, null, 60f))
-        for (seamless in listOf(SurfaceFrameRateChange.ONLY_IF_SEAMLESS, SurfaceFrameRateChange.SEAMLESS_DEFAULT)) {
-            assertNull(windowVideoRate(seamless, 50f, 60f))
-        }
-    }
-
-    @Test
     fun theWindowPrefersTheVideosModeAndFallsBackToTheAppRate() {
         val fifty = current.copy(refreshRate = 50f, modeId = 2)
         val film = current.copy(refreshRate = 24f, modeId = 3)
         val modes = listOf(current, fifty, film)
-        assertEquals(film, windowDisplayMode(24f, 50f, current, modes))
-        assertEquals(fifty, windowDisplayMode(null, 50f, current, modes))
+        fun select(change: SurfaceFrameRateChange?, rate: Float?, appRate: Float?, allowSwitch: Boolean = false) =
+            windowDisplayMode(change, rate, appRate, current, modes, systemAllowsAnySwitch = allowSwitch)
+
+        assertNull(select(SurfaceFrameRateChange.ALWAYS, 24f, 50f, allowSwitch = true))
+        assertEquals(fifty, select(SurfaceFrameRateChange.ALWAYS, 24f, 50f))
+        assertNull(select(SurfaceFrameRateChange.ALWAYS, 24f, null))
+        assertNull(select(SurfaceFrameRateChange.ALWAYS, 24f, null, allowSwitch = true))
+        assertEquals(fifty, select(SurfaceFrameRateChange.ALWAYS, null, 50f, allowSwitch = true))
+        assertEquals(fifty, select(null, null, 50f))
+        assertEquals(fifty, select(SurfaceFrameRateChange.SEAMLESS_DEFAULT, 24f, 50f))
+        assertEquals(film, select(SurfaceFrameRateChange.DISPLAY_MODE, 24f, null))
+        assertEquals(film, select(SurfaceFrameRateChange.DISPLAY_MODE, 24f, 50f))
         // A video rate the display lacks, and a stored rate another TV offered.
-        assertEquals(fifty, windowDisplayMode(25f, 50f, current, modes))
-        assertNull(windowDisplayMode(null, 120f, current, modes))
-        assertNull(windowDisplayMode(null, null, current, modes))
+        assertEquals(fifty, select(SurfaceFrameRateChange.DISPLAY_MODE, 25f, 50f))
+        assertNull(select(null, null, 120f))
+        assertNull(select(null, null, null))
     }
 }
