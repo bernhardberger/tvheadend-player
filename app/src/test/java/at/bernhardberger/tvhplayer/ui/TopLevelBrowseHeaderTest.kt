@@ -11,6 +11,8 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -44,6 +46,18 @@ class TopLevelBrowseHeaderTest {
         }
         compose.onNodeWithTag("header").assert(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "Channels"))
         compose.onNodeWithText("Channels").assertDoesNotExist()
+    }
+
+    @Test fun shownTitleIsAHeadingAtTheLeadingEdgeInThePrimaryTone() {
+        compose.setContent {
+            TVHeadendPlayerTheme { TopLevelBrowseHeader("Channels", Modifier.testTag("header"), showTitle = true) }
+        }
+        compose.onNodeWithTag("header").assert(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "Channels"))
+        val title = compose.onNode(hasText("Channels") and isHeading())
+        val layouts = mutableListOf<TextLayoutResult>()
+        title.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        assertEquals(TvTextColors.primary, layouts.single().layoutInput.style.color)
+        assertEquals(0f, title.fetchSemanticsNode().boundsInRoot.left, .1f)
     }
 
     @Test fun filterStaysVisibleAtTheLeadingEdgeInTheSecondaryTone() {
