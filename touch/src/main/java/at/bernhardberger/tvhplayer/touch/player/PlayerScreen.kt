@@ -24,6 +24,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -53,9 +54,9 @@ internal fun PlayerScreen(
     var visible by rememberSaveable(state.channel.id) { mutableStateOf(true) }
     var panel by rememberSaveable { mutableStateOf<PlayerPanel?>(null) }
     // Info opens on the program being watched each time; inside the sheet the viewer opens others.
-    var infoOpen by rememberSaveable { mutableStateOf<String?>(null) }
+    var infoStack by rememberSaveable(stateSaver = InfoStackSaver) { mutableStateOf(InfoStack()) }
     val showPanel: (PlayerPanel?) -> Unit = {
-        if (it == PlayerPanel.Info && panel?.button != PlayerPanel.Info) infoOpen = state.schedule?.watchingId
+        if (it == PlayerPanel.Info && panel?.button != it) infoStack = InfoStack(state.schedule?.watchingId)
         panel = it
     }
     val panels = PanelHost(panel, showPanel, onChoice)
@@ -107,7 +108,7 @@ internal fun PlayerScreen(
             maxWidth * (9f / 16)
         PlayerSheets(
             panel, state, layout, showPanel, onAction, onChoice, onChannel,
-            InfoPage(infoOpen) { infoOpen = it }, belowPicture,
+            InfoPage(infoStack) { infoStack = it }, belowPicture,
         )
     }
 }
@@ -173,3 +174,8 @@ private fun playerLayout(width: Dp, height: Dp) = when {
 
 private val LivePlayerStatus.hasTimeline: Boolean
     get() = this == LivePlayerStatus.Playing || this == LivePlayerStatus.Tuning
+
+private val InfoStackSaver = listSaver<InfoStack, String?>(
+    save = { listOf(it.open) + it.details },
+    restore = { InfoStack(it.first(), it.drop(1).filterNotNull()) },
+)

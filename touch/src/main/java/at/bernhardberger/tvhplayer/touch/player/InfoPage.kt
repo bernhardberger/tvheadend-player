@@ -8,7 +8,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.touch.guide.ChannelDay
 import at.bernhardberger.tvhplayer.touch.guide.DayBar
@@ -18,8 +21,22 @@ import at.bernhardberger.tvhplayer.touch.guide.GuideProgram
 import at.bernhardberger.tvhplayer.touch.guide.ProgramDetailsColumn
 import at.bernhardberger.tvhplayer.touch.ui.ChannelLogoTile
 
-/** The program opened in the Info sheet's day, which its details page also shows. */
-internal class InfoPage(val open: String?, val onOpen: (String?) -> Unit)
+/** The Info sheet's pages, hoisted in the player. */
+internal class InfoPage(val stack: InfoStack, val onStack: (InfoStack) -> Unit) {
+    /** Details of [id] over the current page, reported so the caller can load them. */
+    fun openDetails(id: String, onPanel: (PlayerPanel?) -> Unit, onChoice: (PlayerChoice) -> Unit) {
+        onStack(stack.push(id))
+        onPanel(PlayerPanel.InfoDetails)
+        onChoice(PlayerChoice.Details(id))
+    }
+
+    /** One page back: the previous Details, or the day list after the first. */
+    fun back(onPanel: (PlayerPanel?) -> Unit) {
+        val previous = stack.back()
+        onStack(previous)
+        if (previous.details.isEmpty()) onPanel(PlayerPanel.Info)
+    }
+}
 
 /**
  * Info: the watched channel's day as the Guide's By channel view shows it, opened on the program being
@@ -41,33 +58,34 @@ internal fun ColumnScope.InfoBody(
         onDay = { onChoice(PlayerChoice.Day(it)) },
         onJump = {},
         onTag = {},
+        onAiring = { info.openDetails(it, onPanel, onChoice) },
     )
     if (panel == PlayerPanel.InfoDetails) {
-        val details = schedule.details[info.open] ?: return
-        ProgramDetailsColumn(
-            details, actions,
-            Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
-            inPlayer = true,
-        )
+        val details = schedule.details[info.stack.shown] ?: return
+        // Each page starts at its top: an airing's Details is a new page, not the last one scrolled.
+        key(details.id) {
+            ProgramDetailsColumn(
+                details, actions,
+                Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+                inPlayer = true,
+            )
+        }
         return
     }
     DayBar(schedule.days, schedule.selectedDay, schedule.date) { onChoice(PlayerChoice.Day(it)) }
     ChannelDay(
-        schedule.programs, info.open, info.onOpen, GuideLayout.Phone, actions,
-        onDetails = {
-            info.onOpen(it)
-            onPanel(PlayerPanel.InfoDetails)
-        },
+        schedule.programs, info.stack.open, { info.onStack(InfoStack(it)) }, GuideLayout.Phone, actions,
+        onDetails = { info.openDetails(it, onPanel, onChoice) },
         modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
-        listState = rememberLazyListState(itemIndex(schedule.programs, info.open)),
+        listState = rememberLazyListState(itemIndex(schedule.programs, info.stack.open)),
         watch = false,
     )
 }
 
 /** The sheet head's channel logo, sized as the Guide's channel head draws it. */
 @Composable
-internal fun InfoLogo(state: LivePlayerState) {
-    ChannelLogoTile(state.channel.logo, state.channel.logoTint, Modifier.size(64.dp, 36.dp), RoundedCornerShape(8.dp))
+internal fun InfoLogo(logo: Painter?, tint: Color?) {
+    ChannelLogoTile(logo, tint, Modifier.size(64.dp, 36.dp), RoundedCornerShape(8.dp))
 }
 
 /** [ChannelDay]'s list index of the program [id]: each program is one item, a date heading one more. */

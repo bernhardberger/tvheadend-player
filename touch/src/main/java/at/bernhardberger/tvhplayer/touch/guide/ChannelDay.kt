@@ -173,7 +173,9 @@ private fun OpenProgram(
                     GuideLayout.Wide -> Unit
                     GuideLayout.Upright -> OpenFacts(program, Modifier.padding(top = 12.dp))
                     GuideLayout.Phone -> program.progress?.let {
-                        ProgramProgress(it, program.timeLeft, program.recording, Modifier.padding(top = 12.dp))
+                        ProgramProgress(
+                            it, program.timeLeft, program.recording, Modifier.padding(top = 12.dp), program.watching,
+                        )
                     }
                 }
                 program.synopsis?.let {
@@ -233,7 +235,9 @@ private fun OpenFacts(program: GuideProgram, modifier: Modifier) {
     Column(modifier.fillMaxWidth()) {
         OpenLine(program, Modifier)
         program.progress?.let {
-            ProgramProgress(it, program.timeLeft, program.recording, Modifier.padding(top = 12.dp))
+            ProgramProgress(
+                it, program.timeLeft, program.recording, Modifier.padding(top = 12.dp), program.watching,
+            )
         }
     }
 }

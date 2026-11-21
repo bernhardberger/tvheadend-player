@@ -82,6 +82,8 @@ internal data class GuideProgram(
     val scheduled: Boolean = false,
     /** The date heading a By channel day starts here, "Monday, November 16". */
     val section: String? = null,
+    /** The item playing in the player: its bar is orange wherever it shows (section 13). */
+    val watching: Boolean = false,
 ) {
     val onNow: Boolean get() = progress != null
 }
@@ -110,6 +112,8 @@ internal data class ProgramDetails(
     val otherAirings: List<ProgramAiring> = emptyList(),
     val credits: List<ProgramCredit> = emptyList(),
     val facts: List<ProgramFact> = emptyList(),
+    /** The item playing in the player: its bar is orange (section 13). */
+    val watching: Boolean = false,
 ) {
     val onNow: Boolean get() = progress != null
 }

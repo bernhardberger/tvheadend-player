@@ -160,6 +160,7 @@ internal fun ProgramDetailsColumn(
                 { actions.onRecord(details.id) },
                 { actions.onRecordOptions(details.id) },
                 Modifier.padding(top = 16.dp),
+                leads = true,
             )
         } else {
             Actions(details, actions, Modifier.padding(top = 16.dp), equalWidth = true)
@@ -242,7 +243,7 @@ private fun Timing(details: ProgramDetails, modifier: Modifier) {
             color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1,
         )
         details.progress?.let {
-            ProgramProgress(it, details.timeLeft, details.recording, Modifier.weight(1f))
+            ProgramProgress(it, details.timeLeft, details.recording, Modifier.weight(1f), details.watching)
         }
     }
 }
@@ -260,7 +261,10 @@ private fun Actions(details: ProgramDetails, actions: GuideActions, modifier: Mo
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 val share = Modifier.weight(1f).heightIn(min = 48.dp)
                 if (details.onNow) WatchButton(share) { actions.onWatch(details.channelId) }
-RecordButton({ actions.onRecord(details.id) }, { actions.onRecordOptions(details.id) }, share)
+                RecordButton(
+                    { actions.onRecord(details.id) }, { actions.onRecordOptions(details.id) }, share,
+                    leads = !details.onNow,
+                )
             }
             showInGuide()
         }
@@ -271,7 +275,10 @@ RecordButton({ actions.onRecord(details.id) }, { actions.onRecordOptions(details
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             if (details.onNow) WatchButton { actions.onWatch(details.channelId) }
-            RecordButton({ actions.onRecord(details.id) }, { actions.onRecordOptions(details.id) })
+            RecordButton(
+                { actions.onRecord(details.id) }, { actions.onRecordOptions(details.id) },
+                leads = !details.onNow,
+            )
             showInGuide()
         }
     }

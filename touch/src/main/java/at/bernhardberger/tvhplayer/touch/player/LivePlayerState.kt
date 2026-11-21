@@ -33,8 +33,21 @@ internal data class ChannelSchedule(
     val date: String,
     val details: Map<String, ProgramDetails> = emptyMap(),
 ) {
-    /** The program on air, which Info opens on. */
-    val watchingId: String? get() = programs.firstOrNull { it.onNow }?.id
+    /** The program marked as playing in the player, which Info opens on. */
+    val watchingId: String? get() = programs.firstOrNull { it.watching }?.id
+}
+
+/**
+ * The Info sheet's pages: [open] is the program opened in the day list, [details] the Details pages on
+ * top of it, newest last (a program's Details, then an airing's). Back takes one page off (section 9).
+ */
+internal data class InfoStack(val open: String? = null, val details: List<String> = emptyList()) {
+    val shown: String? get() = details.lastOrNull()
+
+    /** Details of [id] over the current page; from the day list it is the opened program. */
+    fun push(id: String): InfoStack = copy(open = if (details.isEmpty()) id else open, details = details + id)
+
+    fun back(): InfoStack = copy(details = details.dropLast(1))
 }
 
 /** A stream's audio or subtitle track, named by its language or role with layout and format below. */
@@ -89,6 +102,9 @@ internal sealed interface PlayerChoice {
     data class Day(val index: Int) : PlayerChoice
     data class Record(val programId: String) : PlayerChoice
     data class RecordOptions(val programId: String) : PlayerChoice
+
+    /** A Details page opened in the Info sheet, a program's or another airing's: its details may need loading. */
+    data class Details(val programId: String) : PlayerChoice
 }
 
 /** What the player shows over its face: a menu at a button, or a sheet and the page it is on. */

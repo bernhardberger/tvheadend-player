@@ -286,6 +286,10 @@ internal fun ridgeLightDetails() = ProgramDetails(
     otherAirings = listOf(
         ProgramAiring("rl-1", picon(RidgeEarth.id), RidgeEarth.tint, "Tomorrow 2:00 AM", parts("Ridge Earth • S2 E2 • The long autumn")),
         ProgramAiring("rl-2", picon(RidgeEarth.id), RidgeEarth.tint, "Sat 9:00 PM", parts("Ridge Earth • S2 E4 • First snow")),
+        ProgramAiring(
+            RIDGE_LIGHT_REPEAT_ID, picon(NorthlineWorld.id), NorthlineWorld.tint, "Sun 4:00 PM",
+            parts("Northline World • S2 E3 • Winter on the ridge"),
+        ),
     ),
     credits = listOf(ProgramCredit(CreditRole.Director, listOf("Morgan Vale"))),
     facts = listOf(
@@ -293,5 +297,22 @@ internal fun ridgeLightDetails() = ProgramDetails(
         ProgramFact(FactKey.Season, "2"),
         ProgramFact(FactKey.Episode, "3"),
         ProgramFact(FactKey.Year, "2024"),
+    ),
+)
+
+internal const val RIDGE_LIGHT_REPEAT_ID = "rl-northline"
+
+/** The same episode repeated on another channel: its Details names that channel. */
+internal fun ridgeLightRepeatDetails() = ridgeLightDetails().copy(
+    id = RIDGE_LIGHT_REPEAT_ID,
+    channelId = NorthlineWorld.id,
+    channel = NorthlineWorld.name,
+    channelLogo = picon(NorthlineWorld.id),
+    logoTint = NorthlineWorld.tint,
+    timeRange = "Sun 4:00–5:00 PM",
+    progress = null,
+    timeLeft = null,
+    otherAirings = listOf(
+        ProgramAiring(RIDGE_LIGHT_ID, picon(RidgeEarth.id), RidgeEarth.tint, "Today 8:00 PM", parts("Ridge Earth • S2 E3 • Winter on the ridge")),
     ),
 )

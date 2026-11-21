@@ -20,13 +20,16 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTouchInput
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.channels.ChannelDetails
 import at.bernhardberger.tvhplayer.touch.channels.channelsFixture
 import at.bernhardberger.tvhplayer.touch.guide.RIDGE_LIGHT_ID
+import at.bernhardberger.tvhplayer.touch.guide.RIDGE_LIGHT_REPEAT_ID
 import at.bernhardberger.tvhplayer.touch.guide.byChannelFixture
 import at.bernhardberger.tvhplayer.touch.guide.ridgeLightDetails
+import at.bernhardberger.tvhplayer.touch.guide.ridgeLightRepeatDetails
 import at.bernhardberger.tvhplayer.touch.testutil.TouchCanvas
 import at.bernhardberger.tvhplayer.touch.testutil.TouchFixtureArt
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouch
@@ -207,10 +210,15 @@ class PlayerScreenTest {
             options = PlaybackOptions(
                 profiles = listOf(StreamProfile("htsp", direct = true), StreamProfile("h264-720p"), StreamProfile("hevc-1080p")),
             ),
-            schedule = byChannelFixture(phone = true).let {
+            // The player marks Ridge Light, on now on the channel playing, as the item being watched.
+            schedule = byChannelFixture(phone = true).let { day ->
                 ChannelSchedule(
-                    it.channels.first().programs, it.days, it.selectedDay, it.date,
-                    details = mapOf(RIDGE_LIGHT_ID to ridgeLightDetails()),
+                    day.channels.first().programs.map { it.copy(watching = it.id == RIDGE_LIGHT_ID) },
+                    day.days, day.selectedDay, day.date,
+                    details = mapOf(
+                        RIDGE_LIGHT_ID to ridgeLightDetails().copy(watching = true),
+                        RIDGE_LIGHT_REPEAT_ID to ridgeLightRepeatDetails(),
+                    ),
                 )
             },
         )
@@ -287,6 +295,15 @@ class PlayerScreenTest {
             captureWindows("$prefix-info-details", canvas)
             compose.onNodeWithContentDescription(recordOptions).performClick()
             compose.runOnIdle { assertEquals(PlayerChoice.RecordOptions(RIDGE_LIGHT_ID), choices.last()) }
+            // A repeat on another channel opens its Details in the sheet, under that channel's name.
+            compose.onNodeWithText("Sun 4:00 PM").performScrollTo().performClick()
+            compose.runOnIdle { assertEquals(PlayerChoice.Details(RIDGE_LIGHT_REPEAT_ID), choices.last()) }
+            compose.onNodeWithText("Today 8:00 PM").assertExists()
+            compose.onNodeWithText("Northline World").assertIsDisplayed()
+            if (canvas == TouchCanvas.TABLET) captureWindows("$prefix-info-airing", canvas)
+            back()
+            compose.onNodeWithText("Tomorrow 2:00 AM").assertExists()
+            compose.onNodeWithText("Northline World").assertDoesNotExist()
             back()
             button(R.string.channels_details).assertIsDisplayed()
         }

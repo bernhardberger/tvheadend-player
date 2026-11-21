@@ -146,11 +146,11 @@ internal fun PlayerSheets(
 ) {
     if (panel == null || panel.atButton(layout)) return
     val close = { onPanel(null) }
-    val infoPanel = panel.button == PlayerPanel.Info
-    // Info is the channel's day, so the channel names it, as the Guide's channel head does.
-    val title = if (infoPanel) state.channel.name else stringResource(panel.title)
-    val back = panel.parent?.let { parent -> { onPanel(parent) } }
-    val leading: (@Composable () -> Unit)? = if (infoPanel) ({ InfoLogo(state) }) else null
+    val (title, leading) = sheetHead(panel, state, info)
+    val back = when {
+        panel == PlayerPanel.InfoDetails -> ({ info.back(onPanel) })
+        else -> panel.parent?.let { parent -> { onPanel(parent) } }
+    }
     val done = if (panel.optionsPage) ({ onPanel(PlayerPanel.Options) }) else close
     val body: @Composable ColumnScope.() -> Unit = {
         SheetBody(panel, state, onPanel, onAction, onChoice, onChannel, info, done)
@@ -170,13 +170,29 @@ internal fun PlayerSheets(
     }
 }
 
-// The page a sheet's Back returns to: Info's day list, or the Playback options rows.
-private val PlayerPanel.parent: PlayerPanel?
-    get() = when {
-        this == PlayerPanel.InfoDetails -> PlayerPanel.Info
-        optionsPage && this != PlayerPanel.Options -> PlayerPanel.Options
-        else -> null
+/**
+ * The sheet head's title and leading logo. Info names the channel of what it shows, as the Guide's channel
+ * head does: the watched channel's day, or the channel of the Details shown (an airing may be elsewhere).
+ */
+@Composable
+private fun sheetHead(
+    panel: PlayerPanel,
+    state: LivePlayerState,
+    info: InfoPage,
+): Pair<String, (@Composable () -> Unit)?> {
+    val shown = state.schedule?.details?.get(info.stack.shown)?.takeIf { panel == PlayerPanel.InfoDetails }
+    return when {
+        shown != null -> shown.channel to { InfoLogo(shown.channelLogo, shown.logoTint) }
+        panel.button == PlayerPanel.Info -> state.channel.name to {
+            InfoLogo(state.channel.logo, state.channel.logoTint)
+        }
+        else -> stringResource(panel.title) to null
     }
+}
+
+// The page a sheet's Back returns to: the Playback options rows (Info's pages keep their own stack).
+private val PlayerPanel.parent: PlayerPanel?
+    get() = if (optionsPage && this != PlayerPanel.Options) PlayerPanel.Options else null
 
 @Composable
 private fun ColumnScope.SheetBody(
