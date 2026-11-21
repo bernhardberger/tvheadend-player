@@ -24,7 +24,6 @@ import at.bernhardberger.tvhplayer.touch.testutil.ServerGuide
 import at.bernhardberger.tvhplayer.touch.ui.ArtworkModels
 import at.bernhardberger.tvhplayer.viewmodels.ChannelScopeState
 import java.time.LocalDate
-import java.time.LocalTime
 import java.time.ZoneOffset
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
@@ -37,20 +36,7 @@ import org.junit.Test
 class GuideMappingTest {
     private val guide = ServerGuide(Instant.fromEpochSeconds(NOW))
     private val clock = GuideClock(NOW, ZoneOffset.UTC)
-    private val texts = GuideTexts(
-        clock = { LocalTime.ofSecondOfDay(it % DAY_SEC).toString() },
-        timeRange = { start, stop -> "${LocalTime.ofSecondOfDay(start % DAY_SEC)}–${LocalTime.ofSecondOfDay(stop % DAY_SEC)}" },
-        duration = { "${it / 60}m" },
-        day = { date, today -> if (date == today) "Today" else date.toString() },
-        date = { it.toString() },
-        airing = { start, _ -> start.toString() },
-        number = { null },
-        episode = { null },
-        genre = { it.genre },
-        firstAired = { it.toString() },
-        count = { number, of -> if (of == null) "$number" else "$number of $of" },
-        broadcast = { if (it) "New" else "Repeat" },
-    )
+    private val texts = guide.texts
     private val unreachable = ConnectionUiState.Error(
         ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.EXPLICIT_RETRY,
     )

@@ -384,8 +384,7 @@ private fun PlayerActionRow(
             PlayerPanel.Subtitles,
         )
         Spacer(Modifier.weight(1f))
-        val hasInfo = state is RecordingPlayerState || (state as? LivePlayerState)?.schedule != null
-        MenuButton(menu, R.drawable.channels_info, R.string.player_info, !dragging && hasInfo, PlayerPanel.Info)
+        MenuButton(menu, R.drawable.channels_info, R.string.player_info, !dragging, PlayerPanel.Info)
         if (!layout.upright) BrowseButton(state, dragging, colors, panels)
     }
 }

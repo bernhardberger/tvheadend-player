@@ -12,7 +12,9 @@ import at.bernhardberger.tvhplayer.touch.channels.ChannelList
 import at.bernhardberger.tvhplayer.touch.channels.ChannelRow
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsState
 import at.bernhardberger.tvhplayer.touch.guide.GuideProgram
+import at.bernhardberger.tvhplayer.touch.guide.GuideAvailability
 import at.bernhardberger.tvhplayer.touch.guide.ProgramDetails
+import java.time.LocalDate
 import java.time.LocalTime
 
 internal data class LivePlayerState(
@@ -57,7 +59,10 @@ internal data class ChannelSchedule(
     val days: List<String>,
     val selectedDay: Int = 0,
     val date: String,
-    val details: Map<String, ProgramDetails> = emptyMap(),
+    val details: (String) -> ProgramDetails? = { null },
+    val availability: GuideAvailability = GuideAvailability.Current,
+    val dayLoading: Boolean = false,
+    val dayDates: List<LocalDate> = emptyList(),
 ) {
     /** The program marked as playing in the player, which Info opens on. */
     val watchingId: String? get() = programs.firstOrNull { it.watching }?.id
@@ -67,7 +72,11 @@ internal data class ChannelSchedule(
  * The Info sheet's pages: [open] is the program opened in the day list, [details] the Details pages on
  * top of it, newest last (a program's Details, then an airing's). Back takes one page off (section 9).
  */
-internal data class InfoStack(val open: String? = null, val details: List<String> = emptyList()) {
+internal data class InfoStack(
+    val open: String? = null,
+    val details: List<String> = emptyList(),
+    val followWatching: Boolean = false,
+) {
     val shown: String? get() = details.lastOrNull()
 
     /** Details of [id] over the current page; from the day list it is the opened program. */

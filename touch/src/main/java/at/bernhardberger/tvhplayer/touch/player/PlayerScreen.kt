@@ -60,13 +60,14 @@ internal fun PlayerScreen(
     modifier: Modifier = Modifier,
     video: (@Composable (Modifier) -> Unit)? = null,
     onControlsShown: (Boolean) -> Unit = {},
+    onInfoShown: (Boolean) -> Unit = {},
     inWindow: Boolean = false,
     hideAfterMs: Long? = null,
     progressing: Boolean = true,
     notices: @Composable (Modifier) -> Unit = {},
 ) = PlayerFace(
     state, onAction, { onSeek((it / 1_000).toInt()) }, onBrightness, onChannel, onChoice, modifier, video,
-    onControlsShown, inWindow, hideAfterMs, progressing, notices,
+    onControlsShown, onInfoShown, inWindow, hideAfterMs, progressing, notices,
 )
 
 @Composable
@@ -85,7 +86,7 @@ internal fun PlayerScreen(
     notices: @Composable (Modifier) -> Unit = {},
 ) = PlayerFace(
     state, onAction, onSeek, onBrightness, {}, onChoice, modifier, video,
-    onControlsShown, inWindow, hideAfterMs, progressing, notices,
+    onControlsShown, {}, inWindow, hideAfterMs, progressing, notices,
 )
 
 @Composable
@@ -99,6 +100,7 @@ private fun PlayerFace(
     modifier: Modifier,
     video: (@Composable (Modifier) -> Unit)?,
     onControlsShown: (Boolean) -> Unit,
+    onInfoShown: (Boolean) -> Unit,
     inWindow: Boolean,
     hideAfterMs: Long?,
     progressing: Boolean,
@@ -109,9 +111,11 @@ private fun PlayerFace(
     var touching by remember { mutableStateOf(false) }
     var panel by rememberSaveable { mutableStateOf<PlayerPanel?>(null) }
     // Info opens on the program being watched each time; inside the sheet the viewer opens others.
-    var infoStack by rememberSaveable(stateSaver = InfoStackSaver) { mutableStateOf(InfoStack()) }
+    var infoStack by rememberSaveable(state.key, stateSaver = InfoStackSaver) {
+        mutableStateOf(InfoStack(followWatching = true))
+    }
     val showPanel: (PlayerPanel?) -> Unit = {
-        if (opensInfo(it, panel)) infoStack = InfoStack((state as? LivePlayerState)?.schedule?.watchingId)
+        if (it == PlayerPanel.Info && panel?.button != it) infoStack = InfoStack(followWatching = true)
         panel = it
     }
     val openOptions = { panel = PlayerPanel.Options }
@@ -130,7 +134,10 @@ private fun PlayerFace(
         val layout = held.layout
         val panelGone = panelGone(panel, state, inWindow, layout)
         LaunchedEffect(panelGone) { if (panelGone) panel = null }
-        val activePanel = panel.takeUnless { panelGone }
+        val activePanel = panel.takeUnless { panelGone }.infoPanel(infoStack)
+        val latestInfoShown by rememberUpdatedState(onInfoShown)
+        val infoShown = activePanel?.button == PlayerPanel.Info
+        LaunchedEffect(infoShown) { latestInfoShown(infoShown) }
         val panels = PanelHost(activePanel, showPanel, onChoice)
         val playing = state.status == LivePlayerStatus.Playing
         // A sheet takes the controls off the picture; a menu keeps them, it belongs to a button.
@@ -163,15 +170,15 @@ private fun PlayerFace(
     }
 }
 
+private fun PlayerPanel?.infoPanel(stack: InfoStack): PlayerPanel? =
+    if (this == PlayerPanel.InfoDetails && stack.shown == null) PlayerPanel.Info else this
+
 private fun panelGone(panel: PlayerPanel?, state: PlayerFaceState, inWindow: Boolean, layout: PlayerLayout) = when {
     inWindow -> true
     panel == PlayerPanel.Channels && layout.upright -> true
     panel == PlayerPanel.Markers -> layout.upright || (state as? RecordingPlayerState)?.hasMarkers != true
     else -> panel?.button?.control?.let { it !in state.offered } == true
 }
-
-private fun opensInfo(target: PlayerPanel?, current: PlayerPanel?) =
-    target == PlayerPanel.Info && current?.button != target
 
 /** The upright layout: the picture on top with its controls, the program and the channel list below. */
 @Composable
@@ -358,8 +365,8 @@ private val LivePlayerStatus.hasTimeline: Boolean
     get() = this == LivePlayerStatus.Playing || this == LivePlayerStatus.Tuning
 
 private val InfoStackSaver = listSaver<InfoStack, String?>(
-    save = { listOf(it.open) + it.details },
-    restore = { InfoStack(it.first(), it.drop(1).filterNotNull()) },
+    save = { listOf(it.followWatching.toString(), it.open) + it.details },
+    restore = { InfoStack(it[1], it.drop(2).filterNotNull(), it.first().toBoolean()) },
 )
 
 /** Every touch, and the end of whatever held the controls, starts the count anew. */

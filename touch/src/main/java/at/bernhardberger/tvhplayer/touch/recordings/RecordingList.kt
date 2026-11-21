@@ -11,6 +11,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -30,6 +31,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -46,11 +48,11 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
-import at.bernhardberger.tvhplayer.touch.ui.PartsLine
 import at.bernhardberger.tvhplayer.touch.ui.joinParts
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 import at.bernhardberger.tvhplayer.ui.TvRecordingContainerColor
@@ -300,14 +302,45 @@ private fun RecordingRow(
             })
             else -> null
         },
-        supportingContent = {
-            PartsLine(line.map { partText(it) })
-        },
+        supportingContent = { RecordingLineText(line) },
         shapes = ListItemDefaults.segmentedShapes(index, count),
         colors = rowColors(),
         contentPadding = RowPadding,
     ) {
         Text(item.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+@Composable
+private fun RecordingLineText(line: List<RecordingLinePart>) {
+    val style = LocalTextStyle.current
+    val measurer = rememberTextMeasurer()
+    val texts = line.map { partText(it) }
+    val hasChannel = line.lastOrNull() is RecordingLinePart.Channel
+    val required = if (hasChannel) texts.dropLast(1) else texts
+    val episode = line.getOrNull(required.lastIndex) as? RecordingLinePart.Episode
+    val fullLine = joinParts(texts)
+    val requiredLine = if (hasChannel) joinParts(required) else fullLine
+    val facts = if (episode != null) joinParts(required.dropLast(1)) else requiredLine
+    val minimum = if (episode != null && facts.isNotEmpty()) joinParts(listOf(facts, "…")) else facts
+    BoxWithConstraints {
+        fun fits(text: String) =
+            measurer.measure(text, style, maxLines = 1, softWrap = false).size.width <= constraints.maxWidth
+
+        val showChannel = hasChannel && fits(fullLine)
+        if (showChannel || fits(minimum)) {
+            Text(
+                if (showChannel) fullLine else requiredLine,
+                maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis,
+            )
+        } else {
+            // Large font scales or very narrow windows can leave no room for even an ellipsis.
+            // Let the facts wrap rather than cutting them off.
+            Column {
+                Text(facts)
+                if (episode != null) Text(episode.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
     }
 }
 

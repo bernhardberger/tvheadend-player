@@ -63,7 +63,7 @@ internal fun GuideLoadingLine(availability: GuideAvailability, layout: GuideLayo
 
 /** The overview's shape: the phone's channel rows; the tablet's channel columns with their programs. */
 @Composable
-private fun GuideFirstLoad(layout: GuideLayout) {
+internal fun GuideFirstLoad(layout: GuideLayout) {
     val text = stringResource(SharedR.string.epg_loading)
     if (layout.compact) {
         FirstLoadList(text, Modifier.padding(horizontal = 12.dp)) {
@@ -107,7 +107,7 @@ private fun GuideFirstLoad(layout: GuideLayout) {
 
 /** Channels' offline line above the saved guide, in the Guide's words. */
 @Composable
-internal fun GuideOfflineBanner(layout: GuideLayout, onSettings: () -> Unit, modifier: Modifier = Modifier) {
+internal fun GuideOfflineBanner(layout: GuideLayout, onSettings: (() -> Unit)?, modifier: Modifier = Modifier) {
     OfflineBanner(layout.compact, OfflineTexts(R.string.guide_offline, R.string.guide_saved), onSettings, modifier)
 }
 

@@ -36,6 +36,7 @@ import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
@@ -175,8 +176,8 @@ internal fun PlayerSheets(
 }
 
 /**
- * The sheet head's title and leading logo. Info names the channel of what it shows, as the Guide's channel
- * head does: the watched channel's day, or the channel of the Details shown (an airing may be elsewhere).
+ * Info's title and leading logo follow the watched channel's day or the channel of the Details shown.
+ * An airing may be on another channel.
  */
 @Composable
 private fun sheetHead(
@@ -184,9 +185,12 @@ private fun sheetHead(
     state: PlayerFaceState,
     info: InfoPage,
 ): Pair<String, (@Composable () -> Unit)?> {
-    val shown = ((state as? LivePlayerState)?.schedule?.details?.get(info.stack.shown)
-        ?: (state as? RecordingPlayerState)?.info?.airingDetails?.get(info.stack.shown))
-        ?.takeIf { panel == PlayerPanel.InfoDetails }
+    val shown = info.stack.shown?.takeIf { panel == PlayerPanel.InfoDetails }?.let { id ->
+        when (state) {
+            is LivePlayerState -> state.schedule?.details?.invoke(id)
+            is RecordingPlayerState -> state.info?.airingDetails?.get(id)
+        }
+    }
     return when {
         shown != null -> shown.channel to { InfoLogo(shown.channelLogo, shown.logoTint, shown.channelLogoModel) }
         panel.button == PlayerPanel.Info && state is LivePlayerState -> state.channel.name to {
@@ -221,7 +225,9 @@ private fun ColumnScope.SheetBody(
         }
         PlayerPanel.Options -> OptionRows(state, onPanel)
         PlayerPanel.Info, PlayerPanel.InfoDetails -> when (state) {
-            is LivePlayerState -> state.schedule?.let { InfoBody(panel, it, info, onPanel, onChoice) }
+            is LivePlayerState -> key(state.channel.id) {
+                InfoBody(panel, state.schedule, info, onPanel, onChoice) { onAction(PlayerAction.RetryChannels) }
+            }
             is RecordingPlayerState -> state.info?.let { RecordingInfo(it, panel, info, onPanel, onChoice) }
         }
         PlayerPanel.Markers -> if (state is RecordingPlayerState) {

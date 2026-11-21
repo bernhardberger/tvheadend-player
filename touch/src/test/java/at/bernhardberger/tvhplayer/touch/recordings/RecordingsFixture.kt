@@ -38,7 +38,8 @@ internal fun flatFixture(
             id = "root", name = "Recordings", recordingCount = 116,
             recordings = listOfNotNull(
                 kickoffLive().copy(section = day("Today")),
-                recording("field-desk", "Field Desk", "still-field-desk-street", NorthlineNews, at(16, 12, 15), 45),
+                recording("field-desk", "Field Desk", "still-field-desk-street", NorthlineNews, at(16, 12, 15), 45)
+                    .copy(episode = FieldDeskEpisode),
                 extraTime("extra-yesterday", at(15, 22, 15), RecordingProgress.Watched).copy(section = day("Yesterday")),
                 recording(
                     "harbor-lights-live", "Harbor Lights Live", "still-harbor-lights-live", HarborLights,
@@ -54,6 +55,8 @@ internal fun flatFixture(
             ),
         ),
     )
+
+internal const val FieldDeskEpisode = "E91 • The Last Ferry from Northport: A Winter Crossing Beyond the Breakwater"
 
 /** Grouped by folders, from the root down to Sport › Football › Harbor Sport › Week 46. */
 internal fun foldersFixture() = RecordingsState(

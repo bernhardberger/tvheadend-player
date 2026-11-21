@@ -28,16 +28,16 @@ class RecordingLineTest {
     fun partsFollowTheListsContext() {
         val match = item(start = "2026-11-14T20:15", episode = "Kingsbridge – Northport")
         val cases = listOf(
-            Triple(match, underDay, listOf(Episode("Kingsbridge – Northport"), Time("8:15 PM"), Length(105), Channel)),
+            Triple(match, underDay, listOf(Time("8:15 PM"), Length(105), Episode("Kingsbridge – Northport"), Channel)),
             Triple(
                 match,
                 inFolder,
-                listOf(Episode("Kingsbridge – Northport"), Day(day(2026, 11, 14)), Length(105), Channel),
+                listOf(Day(day(2026, 11, 14)), Length(105), Episode("Kingsbridge – Northport"), Channel),
             ),
             // Under a month label the day is written, as in a list without labels.
-            Triple(match, RowContext(RowDates.MonthLabel), listOf(Episode("Kingsbridge – Northport"), Day(day(2026, 11, 14)), Length(105), Channel)),
+            Triple(match, RowContext(RowDates.MonthLabel), listOf(Day(day(2026, 11, 14)), Length(105), Episode("Kingsbridge – Northport"), Channel)),
             // One channel's list leaves the channel out.
-            Triple(match, RowContext(RowDates.None, oneChannel = true), listOf(Episode("Kingsbridge – Northport"), Day(day(2026, 11, 14)), Length(105))),
+            Triple(match, RowContext(RowDates.None, oneChannel = true), listOf(Day(day(2026, 11, 14)), Length(105), Episode("Kingsbridge – Northport"))),
             Triple(item(start = "2026-11-16T12:15", length = 45), underDay, listOf(Time("12:15 PM"), Length(45), Channel)),
             Triple(item(start = "2026-11-16T12:15"), inFolder, listOf(Day(RecordingDay.Today), Length(105), Channel)),
             Triple(item(start = "2026-11-15T23:30"), inFolder, listOf(Day(RecordingDay.Yesterday), Length(105), Channel)),
@@ -55,7 +55,7 @@ class RecordingLineTest {
                     state = RecordingProgress.Recording(at("2026-11-16T22:15"), 0.2f),
                 ),
                 inFolder,
-                listOf(Episode("Northport – Eastmoor"), Until("10:15 PM"), Channel),
+                listOf(Until("10:15 PM"), Episode("Northport – Eastmoor"), Channel),
             ),
         )
         cases.forEach { (item, context, expected) ->
