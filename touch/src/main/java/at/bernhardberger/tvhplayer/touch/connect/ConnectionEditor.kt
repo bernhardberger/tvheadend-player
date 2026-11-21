@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.touch.connect
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -38,6 +39,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.window.core.layout.WindowSizeClass
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import at.bernhardberger.tvhplayer.touch.R
+import at.bernhardberger.tvhplayer.touch.ui.BottomWindowNotices
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -68,7 +70,10 @@ internal fun ConnectionEditor(
             dismissOnClickOutside = false,
         ),
     ) {
-        ConnectionEditorContent(state, compact, onFieldsChange, onSave, close, focusPassword)
+        Box {
+            ConnectionEditorContent(state, compact, onFieldsChange, onSave, close, focusPassword)
+            BottomWindowNotices()
+        }
     }
     if (confirmDiscard && !state.saving) {
         AlertDialog(

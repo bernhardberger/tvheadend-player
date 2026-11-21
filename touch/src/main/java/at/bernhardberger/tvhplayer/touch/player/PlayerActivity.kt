@@ -18,22 +18,15 @@ import androidx.annotation.OptIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalResources
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.util.UnstableApi
@@ -238,7 +231,6 @@ class PlayerActivity : ComponentActivity() {
     }
 
     @Composable
-    @Suppress("LongMethod") // Keep runtime, Info and screen callbacks wired in one place.
     private fun Player() {
         val presentation by connection.uiState.collectAsStateWithLifecycle()
         val scope by channels.scope.collectAsStateWithLifecycle()
@@ -263,13 +255,10 @@ class PlayerActivity : ComponentActivity() {
         val paused = !livePlayWhenReady(pause, playWhenReady)
         val options = rememberPlayerOptions(runtime, settings, shown, status == LivePlayerStatus.Playing)
         SideEffect { pictureWindow.mode = options.aspect }
-        FollowTimeshift(
-            timeshift, shown, fast = controlsShown && !paused && !inWindow, liveStart = liveStart && !paused,
-            eventAt = { session.observation.value.eventAt(shown, it) },
-            nextAt = { session.observation.value.nextEvent(shown, it) },
+        PlayerEffects(
+            timeshift, shown, controlsShown && !paused && !inWindow, liveStart && !paused,
+            session, runtime, notices, window,
         )
-        ConsumePauseNotices(runtime, notices)
-        SystemBarsForOrientation(window)
         val now = Instant.fromEpochSeconds(minute * SECONDS_PER_MINUTE)
         val programs = timeshift.programs.value
         val state = livePlayerState(
@@ -277,34 +266,25 @@ class PlayerActivity : ComponentActivity() {
             timeshift.timeline, pause.availability, now, window = windowAvailable, artwork = artwork,
             texts = rememberChannelsTexts(),
         )
-        var infoShown by remember { mutableStateOf(false) }
-        var infoDay by rememberSaveable(shown.value) { mutableIntStateOf(0) }
-        val schedule = if (infoShown && !inWindow && PlayerControl.Info in state.offered) {
-            playerInfoSchedule(
-                guide, shown, scope.scope.allChannels, observation, programs,
-                GuideClock(now.epochSeconds, ZoneId.systemDefault()), infoDay, artwork, presentation,
-            )
-        } else {
-            null
-        }
+        val info = rememberPlayerInfo(
+            !inWindow && PlayerControl.Info in state.offered, guide, shown, scope.scope.allChannels, observation,
+            programs, GuideClock(now.epochSeconds, ZoneId.systemDefault()), artwork, presentation,
+        )
         PlayerScreen(
             state = state.copy(
                 channel = state.channel.withProgramTexts(programs, now, LocalResources.current),
                 brightness = brightness, paused = paused,
                 tracks = options.tracks, options = options.options, offered = state.offered + options.offered,
-                schedule = schedule,
+                schedule = info.schedule,
             ),
             onAction = { act(it, timeshift, paused) },
             onSeek = timeshift::seek,
             onBrightness = { brightness = it; applyBrightness(window, it) },
             onChannel = { id -> requested.update { tuneTo(it, ChannelId(id.toLong())) } },
             onChoice = {
-                if (it is PlayerChoice.Day) infoDay = it.index else if (!options.choose(it)) channels.choose(it)
+                if (it is PlayerChoice.Day) info.onDay(it.index) else if (!options.choose(it)) channels.choose(it)
             },
-            onInfoShown = { open ->
-                if (!open) infoDay = 0
-                infoShown = open
-            },
+            onInfoShown = info.onShown,
             video = { TouchVideoSurface(runtime.player, video.visible, it, pictureWindow::attach, options.aspect) },
             onControlsShown = { controlsShown = it },
             inWindow = inWindow,
@@ -406,22 +386,6 @@ private fun systemBrightness(context: Context): Float = Settings.System.getInt(
 private fun applyBrightness(window: Window, slider: Float) {
     window.attributes = window.attributes.apply {
         screenBrightness = brightnessLevel(slider).coerceIn(MIN_BRIGHTNESS, 1f)
-    }
-}
-
-/**
- * Landscape plays full screen without the system bars (the drawings tablet-player and
- * phone-player-landscape); a swipe from the edge shows them for a moment. Upright keeps them
- * (phone-player, tablet-upright-player).
- */
-@Composable
-private fun SystemBarsForOrientation(window: Window) {
-    val landscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
-    LaunchedEffect(window, landscape) {
-        val bars = WindowCompat.getInsetsController(window, window.decorView)
-        bars.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        val systemBars = WindowInsetsCompat.Type.systemBars()
-        if (landscape) bars.hide(systemBars) else bars.show(systemBars)
     }
 }
 

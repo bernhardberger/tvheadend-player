@@ -60,10 +60,10 @@ internal fun GuideDestination(
     val locale = LocalConfiguration.current.locales[0]
     val nowSec = rememberCurrentEpochSeconds()()
     val clock = GuideClock(nowSec, ZoneId.systemDefault())
-    val coverage = remember(scope, observation, selection.day, clock.zone, nowSec / DAY_SEC) {
+    val coverage = remember(scope, observation, selection.day, clock.zone, clock.today) {
         guideCoverage(scope, observation, selection, clock)
     }
-    LaunchedEffect(coverage, observation.currentSession) { coverage?.let(guide::request) }
+    LaunchedEffect(coverage, observation.currentSession?.generationIdentity) { coverage?.let(guide::request) }
     val texts = remember(context, locale) { guideTexts(context, locale) }
     val artwork = LocalArtworkModels.current
     val state = remember(
@@ -75,6 +75,14 @@ internal fun GuideDestination(
             artwork, playingId,
         )
     }
+    // Forget invalid choices, so they cannot silently return when a tag or the schedule changes again.
+    val available = selection.copy(
+        day = selection.day?.takeIf { it in state.dayDates },
+        jump = state.jumpTimes.getOrNull(state.selectedJump - 1),
+    )
+    if (state.listed && selection != available) {
+        LaunchedEffect(selection, available) { guide.reconcileSelection(selection, available) }
+    }
     GuideScreen(
         state = state,
         actions = GuideActions(
@@ -82,8 +90,8 @@ internal fun GuideDestination(
             onRecord = dvr::record,
             onRecordOptions = null,
             onDetails = guide::openDetails,
-            onDay = guide::selectDay,
-            onJump = guide::selectJump,
+            onDay = { state.dayDates.getOrNull(it)?.let(guide::selectDay) },
+            onJump = { guide.selectJump(state.jumpTimes.getOrNull(it - 1)) },
             onTag = { id -> channels.selectTag(id?.let { ChannelTagId(it.toLong()) }) },
             onShowInGuide = null,
             onAiring = null,
@@ -134,5 +142,3 @@ internal fun guideTexts(context: Context, locale: Locale): GuideTexts {
         },
     )
 }
-
-private const val DAY_SEC = 86_400L

@@ -125,7 +125,7 @@ private fun ColumnScope.InfoDay(
         schedule.dayLoading && schedule.programs.isEmpty() && schedule.availability == GuideAvailability.Current ->
             DayLoading(Modifier.weight(1f))
         schedule.programs.isEmpty() -> NoSchedule(onWatch = null)
-        else -> key(schedule.selectedDay) {
+        else -> key(schedule.dayDates.getOrNull(schedule.selectedDay) ?: schedule.selectedDay) {
             val open = if (info.stack.followWatching) schedule.watchingId else info.stack.open
             ChannelDay(
                 schedule.programs, open, { info.onStack(InfoStack(it)) }, GuideLayout.Phone, actions, onDetails,

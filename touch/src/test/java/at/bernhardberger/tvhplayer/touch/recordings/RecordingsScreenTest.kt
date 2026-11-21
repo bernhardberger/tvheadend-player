@@ -5,6 +5,7 @@ import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.view.ViewGroup
 import androidx.activity.ComponentActivity
+import androidx.activity.ComponentDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.geometry.Offset
@@ -17,10 +18,15 @@ import at.bernhardberger.tvhplayer.touch.testutil.markedLogos
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -31,6 +37,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.test.platform.app.InstrumentationRegistry
 import at.bernhardberger.tvhplayer.touch.testutil.TouchCanvas
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouch
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouchWindows
@@ -61,6 +68,7 @@ class RecordingsScreenTest {
     private val state = mutableStateOf(flatFixture())
     private val deleted = mutableListOf<String>()
     private val stopped = mutableListOf<String>()
+    private val played = mutableListOf<Pair<String, Boolean>>()
     private var asking by mutableStateOf(false)
 
     @Test
@@ -74,12 +82,11 @@ class RecordingsScreenTest {
         capture("tablet-recordings-root", TouchCanvas.TABLET)
 
         pickTheHalfWatchedMatch()
-        compose.onNodeWithText("Resume").assertIsDisplayed()
+        resumeButton().assertIsDisplayed()
         compose.onNodeWithText("All recordings").assertIsDisplayed()
         capture("tablet-recordings-picked", TouchCanvas.TABLET)
 
-        askToDelete()
-        compose.captureTouchWindows(GROUP, "tablet-recordings-delete-confirm", TouchCanvas.TABLET)
+        captureDeleteConfirmation("tablet-recordings-delete-confirm", TouchCanvas.TABLET)
     }
 
     @Test
@@ -91,7 +98,7 @@ class RecordingsScreenTest {
         compose.onNodeWithContentDescription("Delete").assertDoesNotExist()
         compose.onNodeWithText("Remove entry").performClick()
         assertEquals(listOf(PickedId), deleted)
-        compose.onNodeWithText("Resume").assertDoesNotExist()
+        resumeButton().assertDoesNotExist()
 
         state.value = flatFixture().withRemove(RecordingRemoveControl.Stop)
         compose.onNodeWithContentDescription("Delete").assertDoesNotExist()
@@ -106,29 +113,70 @@ class RecordingsScreenTest {
 
     @Test
     @Config(qualifiers = "en-rUS-w1280dp-h800dp-land-xhdpi")
-    fun tabletViewOptionsChangeTheGrouping() {
+    fun playButtonsFollowTheOfferedActionsNotTheBar() {
         show()
+        pickTheHalfWatchedMatch()
+        resumeButton().performClick()
+        compose.onNodeWithText("Watch from beginning").performClick()
+        assertEquals(listOf(PickedId to false, PickedId to true), played)
+
+        // The same half-watched bar doesn't confer permission to Resume or start over.
+        state.value = flatFixture().withPlay(emptyList())
+        resumeButton().assertDoesNotExist()
+        compose.onNodeWithText("Watch from beginning").assertDoesNotExist()
+        compose.onNodeWithText("Watch").assertDoesNotExist()
+        state.value = flatFixture().withPlay(listOf(RecordingPlayAction.Watch))
+        compose.onNodeWithText("Watch").performClick()
+        assertEquals(PickedId to false, played.last())
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w1280dp-h800dp-land-xhdpi")
+    fun tabletViewOptionsChangeTheGrouping() {
+        fun sheetBack() = compose.runOnUiThread {
+            (ShadowDialog.getLatestDialog() as ComponentDialog).onBackPressedDispatcher.onBackPressed()
+        }
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        instrumentation.setInTouchMode(true)
+        show()
+        compose.onNodeWithText("View options").assertIsDisplayed()
         openViewOptions()
-        capture("tablet-recordings-view", TouchCanvas.TABLET)
+        val sheet = hasAnyAncestor(isDialog())
+        compose.onNodeWithText("Group by").assert(sheet)
+        // The test harness still enumerates inactive windows; inspect the dialog's tree only.
+        compose.onNode(hasText("Recordings") and sheet).assertDoesNotExist()
+        compose.onNodeWithContentDescription("Close").assertIsNotFocused()
+        compose.captureTouchWindows(GROUP, "tablet-recordings-view", TouchCanvas.TABLET)
         compose.onNodeWithText("Group by").performClick()
         compose.onNodeWithText("The server’s folder tree").assertIsDisplayed()
-        capture("tablet-recordings-view-group", TouchCanvas.TABLET)
+        compose.captureTouchWindows(GROUP, "tablet-recordings-view-group", TouchCanvas.TABLET)
 
         // Back inside the sheet returns to its rows; a choice applies and returns there too.
-        back()
+        sheetBack()
         compose.onNodeWithText("Sort").assertIsDisplayed()
         compose.onNodeWithText("Group by").performClick()
         compose.onNodeWithText("Folders").performClick()
         assertEquals(DvrArchiveGrouping.FOLDERS, state.value.view.grouping)
         compose.onNodeWithText("Show").assertIsDisplayed()
 
-        // A tap outside closes the sheet; so does system Back.
-        compose.onRoot().performTouchInput { click(Offset(width * 0.3f, height * 0.5f)) }
+        // A tap outside closes the sheet without focusing the opener in touch mode.
+        compose.onNode(isDialog()).performTouchInput { click(Offset(width * 0.3f, height * 0.5f)) }
         assertSheetClosed()
+        compose.onNodeWithText("View options").assertIsNotFocused()
         compose.onNodeWithText("Recording now").assertIsDisplayed()
-        openViewOptions()
-        back()
-        assertSheetClosed()
+
+        instrumentation.setInTouchMode(false)
+        try {
+            // Robolectric's instrumentation flag seeds new windows, but the activity is already attached.
+            compose.runOnUiThread { compose.activity.window.decorView.requestFocusFromTouch() }
+            openViewOptions()
+            compose.onNodeWithContentDescription("Close").assertIsFocused()
+            sheetBack()
+            assertSheetClosed()
+            compose.onNodeWithText("View options").assertIsFocused()
+        } finally {
+            instrumentation.setInTouchMode(true)
+        }
     }
 
     @Test
@@ -144,7 +192,7 @@ class RecordingsScreenTest {
         assertLine("Kingsbridge – Northport • Sat, Nov 14 • 1h 45m • Harbor Sport")
         compose.onNodeWithText("Basketball").assertDoesNotExist()
         pickTheHalfWatchedMatch()
-        compose.onNodeWithText("Resume").assertIsDisplayed()
+        resumeButton().assertIsDisplayed()
         capture("tablet-recordings", TouchCanvas.TABLET)
 
         back()
@@ -182,7 +230,7 @@ class RecordingsScreenTest {
 
         pickTheHalfWatchedMatch()
         compose.onNodeWithText("All recordings").assertDoesNotExist()
-        compose.onNodeWithText("Resume").assertIsDisplayed()
+        resumeButton().assertIsDisplayed()
         capture("tablet-upright-recording", TouchCanvas.TABLET_UPRIGHT)
 
         back()
@@ -216,8 +264,7 @@ class RecordingsScreenTest {
         compose.onNodeWithText("Watch from beginning").assertIsDisplayed()
         capture("phone-recording-details", TouchCanvas.PHONE)
 
-        askToDelete()
-        compose.captureTouchWindows(GROUP, "phone-recordings-delete-confirm", TouchCanvas.PHONE)
+        captureDeleteConfirmation("phone-recordings-delete-confirm", TouchCanvas.PHONE)
     }
 
     @Test
@@ -281,7 +328,7 @@ class RecordingsScreenTest {
                 val regrouped = if (view.grouping == DvrArchiveGrouping.FOLDERS) foldersFixture() else flatFixture()
                 state.value = regrouped.copy(view = view)
             },
-            onPlay = { _, _ -> },
+            onPlay = { id, fromStart -> played += id to fromStart },
             onDelete = { deleted += it },
             onMore = {},
             onStop = { stopped += it },
@@ -300,12 +347,10 @@ class RecordingsScreenTest {
         }
     }
 
-    /** Delete on the picked recording, and the app's question over the screen. */
-    private fun askToDelete() {
-        compose.onNodeWithContentDescription("Delete").performClick()
-        assertEquals(listOf(PickedId), deleted)
+    /** Paint the shared dialog for capture only; TouchAppTest covers the Delete action and confirmation. */
+    private fun captureDeleteConfirmation(name: String, canvas: TouchCanvas) {
         asking = true
-        compose.onNodeWithText("Delete this recording?").assertIsDisplayed()
+        compose.captureTouchWindows(GROUP, name, canvas)
     }
 
     /** The picked recording offering [remove], as the shared rule decides it. */
@@ -313,8 +358,14 @@ class RecordingsScreenTest {
         root = root.copy(recordings = root.recordings.map { if (it.id == PickedId) it.copy(remove = remove) else it }),
     )
 
+    private fun RecordingsState.withPlay(play: List<RecordingPlayAction>) = copy(
+        root = root.copy(recordings = root.recordings.map { if (it.id == PickedId) it.copy(play = play) else it }),
+    )
+
     private fun pickTheHalfWatchedMatch() =
         compose.onNodeWithText("Westvale – Ridge Town", substring = true).performClick()
+
+    private fun resumeButton() = compose.onNodeWithContentDescription("Resume from", substring = true)
 
     // Times and lengths keep their parts together with (narrow) no-break spaces.
     private fun assertLine(line: String) {

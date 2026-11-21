@@ -67,7 +67,7 @@ internal fun rememberStandalonePicture(painter: Painter?, model: Any?): Painter?
 
 /**
  * A fixture's [painter], else the server image of [model] through the app's image loader, else
- * nothing; [fallback] shows until the server image has loaded, and stays when it fails.
+ * nothing. [fallback] shows only without an image model or after a load fails.
  */
 @Composable
 internal fun ArtworkImage(
@@ -83,7 +83,7 @@ internal fun ArtworkImage(
             val server = rememberAsyncImagePainter(model, contentScale = contentScale)
             val state by server.state.collectAsState()
             LogFailedLoad((model as? ImageRequest)?.data ?: model, state)
-            if (state !is AsyncImagePainter.State.Success) fallback()
+            if (state is AsyncImagePainter.State.Error) fallback()
             // Drawn while it loads too: the painter resolves its size when it draws.
             Image(server, null, modifier, contentScale = contentScale)
         }

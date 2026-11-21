@@ -1,8 +1,9 @@
 package at.bernhardberger.tvhplayer.touch.channels
 
+import androidx.compose.ui.graphics.Color
+import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvhplayer.touch.ui.ProgramRecordControl
 import at.bernhardberger.tvhplayer.touch.ui.RuleSchedule
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvhplayer.core.AppError
@@ -65,6 +66,8 @@ internal data class ChannelProgram(
     val ruleSchedule: RuleSchedule? = null,
     /** What its recording control does; null offers none. */
     val record: ProgramRecordControl? = ProgramRecordControl.Record,
+    /** The event drawn on this row, if the row can dispatch a recording action. */
+    val eventId: EventId? = null,
 )
 
 internal data class ChannelDetails(
@@ -87,13 +90,10 @@ internal class ChannelsActions(
     val onTag: (String?) -> Unit,
     val onRetry: () -> Unit,
     val onOpenConnectionSettings: () -> Unit,
-    val onRecord: ((String) -> Unit)? = null,
+    val onRecordControl: ((String, EventId, ProgramRecordControl) -> Unit)? = null,
     val onDetails: ((String) -> Unit)? = null,
     val onShowInGuide: ((String) -> Unit)? = null,
     val onSignIn: (() -> Unit)? = null,
-    /** Cancel of the scheduled recording of what is on now; it asks first. */
-    val onCancel: ((String) -> Unit)? = null,
-    val onStop: ((String) -> Unit)? = null,
 )
 
 /**

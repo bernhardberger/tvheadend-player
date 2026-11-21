@@ -12,6 +12,7 @@ import at.bernhardberger.tvhplayer.touch.channels.ChannelsState
 import at.bernhardberger.tvhplayer.touch.guide.GuideProgram
 import at.bernhardberger.tvhplayer.touch.guide.GuideAvailability
 import at.bernhardberger.tvhplayer.touch.guide.ProgramDetails
+import java.time.LocalDate
 import java.time.LocalTime
 
 internal data class LivePlayerState(
@@ -56,6 +57,7 @@ internal data class ChannelSchedule(
     val details: (String) -> ProgramDetails? = { null },
     val availability: GuideAvailability = GuideAvailability.Current,
     val dayLoading: Boolean = false,
+    val dayDates: List<LocalDate> = emptyList(),
 ) {
     /** The program marked as playing in the player, which Info opens on. */
     val watchingId: String? get() = programs.firstOrNull { it.watching }?.id

@@ -23,9 +23,11 @@ import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
 import at.bernhardberger.tvhplayer.touch.testutil.ServerGuide
 import at.bernhardberger.tvhplayer.touch.ui.ArtworkModels
 import at.bernhardberger.tvhplayer.viewmodels.ChannelScopeState
+import java.time.LocalDate
 import java.time.ZoneOffset
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -118,22 +120,58 @@ class GuideMappingTest {
         assertEquals(GuideGap("11:30", "13:00"), today.channels[0].gap)
         assertEquals(listOf("Today", "2027-01-16"), today.days)
 
-        val next = state(GuideSelection(day = 1), events)
+        val next = state(GuideSelection(day = LocalDate.parse("2027-01-16")), events)
         assertEquals(listOf("Tomorrow show"), next.channels[1].day?.map { it.title })
-        assertEquals(listOf("Tomorrow show"), next.channels[1].programs.map { it.title })
+        assertEquals(GuideGap("00:00", "08:00"), next.channels[1].gap)
     }
 
     @Test
     fun aJumpMovesTheOverviewAndDetailsCarryTheProgram() {
-        val evening = state(GuideSelection(jump = 1))
+        val selection = GuideSelection(jump = NOW + 12 * 3600 + 15 * 60)
+        val evening = state(selection)
         assertEquals(emptyList<GuideProgram>(), evening.channels[0].programs)
         assertEquals(1, evening.selectedJump)
+        val pastFirstJump = clock.copy(nowSec = NOW + 13 * 3600)
+        assertEquals("A passed jump returns to Now", 0, state(selection, at = pastFirstJump).selectedJump)
+        assertEquals("Yesterday's jump stays expired after midnight", 0, state(selection, at = clock.copy(nowSec = NOW + DAY_SEC)).selectedJump)
 
-        val details = state(GuideSelection(detailsId = "1")).details.getValue("1")
+        val details = checkNotNull(state(GuideSelection(detailsId = "1")).details)
         assertEquals("Channel One", details.channel)
         assertEquals("About ${guide.programs[0]}", details.synopsis)
         assertEquals("07:30–08:30", details.timeRange)
         assertEquals(true, details.recording)
+    }
+
+    @Test
+    fun aSelectedDateDoesNotMoveWhenAnEarlierDayAppearsOrTheDateDisappears() {
+        val later = event(EVENT_TOMORROW, guide.second, guide.now + 2.days)
+        val earlier = event(EVENT_LATE, guide.first, guide.now + 1.days)
+        val selectedDate = LocalDate.parse("2027-01-17")
+        val selection = GuideSelection(day = selectedDate)
+
+        assertEquals("An inserted tab does not change the chosen date", selectedDate.toString(), state(selection, listOf(later, earlier)).date)
+        val tomorrow = clock.copy(nowSec = NOW + DAY_SEC)
+        assertEquals("Midnight does not change the chosen date", selectedDate.toString(), state(selection, listOf(later, earlier), tomorrow).date)
+        assertEquals("A removed date returns to today", state(GuideSelection()).date, state(selection, listOf(earlier)).date)
+    }
+
+    @Test
+    fun anEventCrossingMidnightAddsItsOverlappingDayButNotTheDayItEndsAtMidnight() {
+        val late = event(EVENT_LATE, guide.first, guide.now + 15.hours + 30.minutes)
+        val endingAtMidnight = event(EVENT_TOMORROW, guide.first, guide.now + 39.hours)
+        assertEquals(listOf("Today", "2027-01-16"), state(GuideSelection(), listOf(late, endingAtMidnight)).days)
+        assertEquals(listOf("Today", "2027-01-16"), state(GuideSelection(), listOf(late)).days)
+        val next = state(GuideSelection(day = LocalDate.parse("2027-01-16")), listOf(late))
+        assertEquals(listOf("Late show"), next.channels[0].day?.map { it.title })
+        assertEquals(listOf("Late show"), next.channels[0].programs.map { it.title })
+    }
+
+    @Test
+    fun aLateJumpDoesNotLeadWithATomorrowProgram() {
+        val afterMidnight = event(EVENT_TOMORROW, guide.second, guide.now + 16.hours)
+        val second = state(GuideSelection(jump = NOW + 14 * 3600), listOf(afterMidnight)).channels[1]
+        assertEquals("Nothing overlaps the selected time on this channel", emptyList<GuideProgram>(), second.programs)
+        assertEquals(GuideGap("22:00", "00:00"), second.gap)
     }
 
     @Test
@@ -150,7 +188,7 @@ class GuideMappingTest {
         assertEquals(logo, first.logoModel)
         assertEquals(null, second.logoModel)
         assertEquals(listOf(picture, null, null, null), first.programs.map { it.stillModel })
-        val details = state.details.getValue("1")
+        val details = checkNotNull(state.details)
         assertEquals(logo, details.channelLogoModel)
         assertEquals(picture, details.pictureModel)
     }
@@ -180,7 +218,7 @@ class GuideMappingTest {
             observation(EpgSnapshot.create(events)), GuideSelection(detailsId = "1"), false, clock, texts,
             playing = playing,
         )
-        val details = shown(playing = guide.first.id.value.toString()).details.getValue("1")
+        val details = checkNotNull(shown(playing = guide.first.id.value.toString()).details)
         assertEquals(
             listOf(
                 FactKey.Genre to "News", FactKey.Season to "2 of 3", FactKey.Episode to "7",
@@ -199,14 +237,18 @@ class GuideMappingTest {
         assertEquals(true, details.watching)
         val overview = shown(playing = guide.first.id.value.toString()).channels.first().programs
         assertEquals(listOf(true, false, false, false), overview.map { it.watching })
-        assertEquals(false, shown(playing = guide.second.id.value.toString()).details.getValue("1").watching)
+        assertEquals(false, shown(playing = guide.second.id.value.toString()).details?.watching)
     }
 
-    private fun state(selection: GuideSelection, events: List<EpgEvent> = guide.snapshot.events): GuideState {
+    private fun state(
+        selection: GuideSelection,
+        events: List<EpgEvent> = guide.snapshot.events,
+        at: GuideClock = clock,
+    ): GuideState {
         val all = listOf(guide.first, guide.second)
         return guideState(
             scope(all, all, tagged = false, loaded = true), ConnectionUiState.Ready, false,
-            observation(EpgSnapshot.create(events)), selection, false, clock, texts,
+            observation(EpgSnapshot.create(events)), selection, false, at, texts,
         )
     }
 
@@ -233,6 +275,7 @@ class GuideMappingTest {
     private companion object {
         // 2027-01-15 08:00 UTC.
         const val NOW = 1_800_000_000L
+        const val DAY_SEC = 86_400L
         const val EVENT_LATE = 20L
         const val EVENT_TOMORROW = 21L
     }
