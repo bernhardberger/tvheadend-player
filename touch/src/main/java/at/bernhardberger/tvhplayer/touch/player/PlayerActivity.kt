@@ -148,7 +148,7 @@ class PlayerActivity : ComponentActivity() {
                 followConnection(runtime, session)
             }
         }
-        finishRecordingAtEof(lifecycleScope, runtime, requested, { lifecycle.currentState }, ::leave)
+        finishRecordingAtEof(lifecycleScope, runtime, requested)
         lifecycleScope.launch {
             runtime.sessionStops.first()
             leaving = true

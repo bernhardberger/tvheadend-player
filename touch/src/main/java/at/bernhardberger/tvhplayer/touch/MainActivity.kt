@@ -5,11 +5,18 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
 import androidx.annotation.OptIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.media3.common.util.UnstableApi
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
@@ -39,6 +46,7 @@ import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.viewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -51,7 +59,10 @@ class MainActivity : ComponentActivity() {
     private val recordings: RecordingsViewModel by viewModel()
     private val guide: GuideViewModel by viewModel()
     private val applicationScope: CoroutineScope by inject(Application)
-    private var watchRequest = 0
+    private val watchRequests: WatchRequests by viewModels { viewModelFactory { initializer { WatchRequests() } } }
+    private var watchRequest: Int
+        get() = watchRequests.latest
+        set(value) { watchRequests.latest = value }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -60,6 +71,17 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
         )
         val context = applicationContext
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                val requests = watchRequests
+                requests.completedRecording.collect { completed ->
+                    if (completed == null) return@collect
+                    requests.completedRecording.value = null
+                    val (request, route) = completed
+                    if (request == requests.latest) startActivity(route.intent(this@MainActivity))
+                }
+            }
+        }
         setContent {
             MaterialTheme(colorScheme = MobileDarkColors) {
                 val target by sdk.playbackRuntime.activeTarget.collectAsStateWithLifecycle()
@@ -95,19 +117,25 @@ class MainActivity : ComponentActivity() {
         val route = RecordingRoute(id, recordingStart(startOver))
         val runtime = sdk.playbackRuntime
         val request = ++watchRequest
-        if (startsRecording(id, runtime.activeTarget.value)) {
+        if (startsRecording(route, runtime.activeTarget.value, runtime.state.value)) {
             val selection = currentRecordingPlaybackSelection(session.observation.value, id) ?: return
+            val requests = watchRequests
             // Register the fresh playback request before the player's Stop guard runs. The
             // application owns the install even when this activity is covered by the player.
             applicationScope.launch(start = CoroutineStart.UNDISPATCHED) {
                 runtime.playRecording(selection, route.start)
-                // Like TV Browse, hand the route over after the result has been published.
-                if (request == watchRequest && !isDestroyed && !isFinishing) {
-                    startActivity(route.intent(this@MainActivity))
+                // Keep the result for the current browse activity, including across rotation.
+                if (request == requests.latest) {
+                    requests.completedRecording.value = request to route
                 }
             }
         } else {
             startActivity(route.intent(this))
         }
     }
+}
+
+private class WatchRequests : ViewModel() {
+    var latest = 0
+    val completedRecording = MutableStateFlow<Pair<Int, RecordingRoute>?>(null)
 }

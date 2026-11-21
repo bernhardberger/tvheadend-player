@@ -31,6 +31,9 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.C
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
@@ -51,14 +54,20 @@ import at.bernhardberger.tvhplayer.di.SdkRuntimeOwner
 import at.bernhardberger.tvhplayer.images.ChannelAccents
 import at.bernhardberger.tvhplayer.notices.Notice
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
+import at.bernhardberger.tvhplayer.playback.AppPlaybackState
+import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import at.bernhardberger.tvhplayer.playback.PlaybackAudioFocus
 import at.bernhardberger.tvhplayer.playback.PlaybackRuntimePolicy
+import at.bernhardberger.tvhplayer.playback.currentRecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.settings.AdBreakMode
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.stores.ChannelAccentStore
 import at.bernhardberger.tvhplayer.touch.R
+import at.bernhardberger.tvhplayer.touch.MainActivity
+import at.bernhardberger.tvhplayer.touch.di.Application
 import at.bernhardberger.tvhplayer.touch.recordings.RecordingProgress
 import at.bernhardberger.tvhplayer.touch.testutil.FakeConnection
+import at.bernhardberger.tvhplayer.touch.testutil.MemoryPreferences
 import at.bernhardberger.tvhplayer.touch.testutil.ServerGuide
 import at.bernhardberger.tvhplayer.touch.testutil.TouchCanvas
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouch
@@ -69,6 +78,11 @@ import at.bernhardberger.tvhplayer.ui.notifications.NoticeFormatter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.launch
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -78,6 +92,7 @@ import org.junit.runner.RunWith
 import org.koin.core.context.startKoin
 import org.koin.core.context.stopKoin
 import org.koin.dsl.module
+import org.koin.core.module.dsl.viewModel
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
@@ -139,6 +154,7 @@ class RecordingPlayerScreenTest {
         show(info = recordingInfoFixture(running = true))
         button(R.string.player_info).performClick()
         tag("recording-info").assertIsDisplayed()
+        button(R.string.side_sheet_close).assertDoesNotExist()
         captureWindows("phone-recording-info", TouchCanvas.PHONE)
     }
 
@@ -148,6 +164,7 @@ class RecordingPlayerScreenTest {
         show(info = recordingInfoFixture(running = false))
         button(R.string.player_info).performClick()
         tag("recording-info").assertIsDisplayed()
+        button(R.string.side_sheet_close).assertIsDisplayed()
         captureWindows("phone-recording-landscape-info", TouchCanvas.PHONE_LANDSCAPE)
     }
 
@@ -216,6 +233,7 @@ class RecordingPlayerScreenTest {
     private fun withRecordingRoute(
         marked: Boolean,
         twoAudioTracks: Boolean = false,
+        holdSettings: MutableStateFlow<Boolean>? = null,
         exercise: (PlayerActivity, AppPlaybackRuntime) -> Unit,
     ) {
         val context = compose.activity.applicationContext
@@ -227,7 +245,7 @@ class RecordingPlayerScreenTest {
             if (marked) offlinePlayer(player, twoAudioTracks) else player,
             workDispatcher = Dispatchers.Main.immediate,
         )
-        val settings = PlayerSettingsStore(context)
+        val settings = holdSettings?.let { PlayerSettingsStore(heldSettings(it)) } ?: PlayerSettingsStore(context)
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
         val runtime = AppPlaybackRuntime(
             player, session, coordinator, settings, connection.owner, scope,
@@ -243,6 +261,11 @@ class RecordingPlayerScreenTest {
                 single { connection.noticeCenter }
                 single { connection.browseSession }
                 single { ChannelAccents(ChannelAccentStore(), connection.session.artwork::cacheKey) }
+                single(Application) { scope }
+                single { connection.channels() }
+                viewModel { connection.presentation() }
+                viewModel { connection.recordings() }
+                viewModel { connection.guide() }
             })
         }
         try {
@@ -257,6 +280,81 @@ class RecordingPlayerScreenTest {
             shadowOf(Looper.getMainLooper()).idle()
             stopKoin()
             connection.close()
+        }
+    }
+
+    private fun heldSettings(hold: MutableStateFlow<Boolean>): DataStore<Preferences> {
+        val store = MemoryPreferences()
+        return object : DataStore<Preferences> by store {
+            override val data = combine(store.data, hold) { prefs, held -> prefs.takeUnless { held } }.filterNotNull()
+        }
+    }
+
+    private fun MainActivity.watchRecording(id: DvrEntryId, startOver: Boolean = false) {
+        ReflectionHelpers.callInstanceMethod<Unit>(
+            this, "watchRecording",
+            ReflectionHelpers.ClassParameter.from(String::class.java, id.value.toString()),
+            ReflectionHelpers.ClassParameter.from(Boolean::class.javaPrimitiveType, startOver),
+        )
+    }
+
+    @Test
+    @OptIn(UnstableApi::class)
+    fun browseRecreationStillHandsOffThePendingRecording() {
+        val hold = MutableStateFlow(false)
+        withRecordingRoute(marked = true, holdSettings = hold) { _, runtime ->
+            val replacement = ServerGuide(Instant.parse("2026-11-11T21:00:00Z")).diary.id
+            Robolectric.buildActivity(MainActivity::class.java).setup().use { browse ->
+                hold.value = true
+                browse.get().watchRecording(replacement, startOver = true)
+                settleRoute(runtime.player)
+                assertTrue(runtime.activeTarget.value != AppPlaybackTarget.Recording(replacement))
+                browse.recreate()
+                hold.value = false
+                settleRoute(runtime.player)
+                assertEquals(AppPlaybackTarget.Recording(replacement), runtime.activeTarget.value)
+                val intent = shadowOf(browse.get().application).nextStartedActivity
+                assertEquals(replacement, intent?.recordingRoute()?.id)
+            }
+        }
+    }
+
+    @Test
+    @OptIn(UnstableApi::class)
+    fun recordingEofDoesNotStopAQueuedReplacement() {
+        val hold = MutableStateFlow(false)
+        withRecordingRoute(marked = true, holdSettings = hold) { activity, runtime ->
+            val replacement = ServerGuide(Instant.parse("2026-11-11T21:00:00Z")).diary.id
+            val session = org.koin.core.context.GlobalContext.get().get<TvheadendSession>()
+            val selection = checkNotNull(currentRecordingPlaybackSelection(session.observation.value, replacement))
+            hold.value = true
+            activity.lifecycleScope.launch(start = CoroutineStart.UNDISPATCHED) {
+                runtime.playRecording(selection, recordingStart(true))
+            }
+            runtime.player.seekTo(runtime.player.duration)
+            settleRoute(runtime.player)
+            assertEquals(AppPlaybackState.Finished, runtime.state.value)
+            hold.value = false
+            settleRoute(runtime.player)
+            assertEquals(AppPlaybackTarget.Recording(replacement), runtime.activeTarget.value)
+            assertTrue(!activity.isFinishing)
+        }
+    }
+
+    @Test
+    @OptIn(UnstableApi::class)
+    fun browseWatchFromBeginningRestartsTheActiveRecording() = withRecordingRoute(marked = true) { _, runtime ->
+        val active = runtime.activeTarget.value as AppPlaybackTarget.Recording
+        runtime.pause()
+        runtime.seekTo(24_000L)
+        settleRoute(runtime.player)
+        Robolectric.buildActivity(MainActivity::class.java).setup().use { browse ->
+            browse.get().watchRecording(active.recordingId)
+            settleRoute(runtime.player)
+            assertEquals("Resume must not restart the active recording", 24_000L, runtime.player.currentPosition)
+            browse.get().watchRecording(active.recordingId, startOver = true)
+            settleRoute(runtime.player)
+            assertTrue("Watch from beginning must restart playback", runtime.player.currentPosition in 0L..999L)
         }
     }
 
@@ -316,7 +414,7 @@ class RecordingPlayerScreenTest {
     @Test
     @Config(qualifiers = "en-rUS-w1280dp-h800dp-land-xhdpi")
     @OptIn(UnstableApi::class)
-    fun recordingRouteMarkerSeeksWithoutResumingOrClosingTheSheet() = withRecordingRoute(marked = true) { _, runtime ->
+    fun recordingRouteMarkerSeeksWithoutResumingOrClosingTheSheet() = withRecordingRoute(marked = true) { activity, runtime ->
         runtime.pause()
         settleRoute(runtime.player)
         val symbol = compose.onNode(hasTestTag("recording-marker-symbol") and hasClickAction())
@@ -327,11 +425,28 @@ class RecordingPlayerScreenTest {
         runtime.player.seekTo(0)
         settleRoute(runtime.player)
         button(R.string.player_markers).performClick()
-        tag("recording-marker-10000").performTouchInput { click() }
+        val row = tag("recording-marker-10000")
+        val staleRevision = checkNotNull(runtime.recordingMarkerRevision.value)
+        row.performTouchInput { click() }
         settleRoute(runtime.player)
         assertEquals(10_000L, runtime.player.currentPosition)
         assertTrue(!runtime.player.playWhenReady)
         tag("recording-markers").assertIsDisplayed()
+        val replacement = ServerGuide(Instant.parse("2026-11-11T21:00:00Z")).diary.id
+        val session = org.koin.core.context.GlobalContext.get().get<TvheadendSession>()
+        val selection = checkNotNull(currentRecordingPlaybackSelection(session.observation.value, replacement))
+        activity.lifecycleScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            runtime.playRecording(selection, recordingStart(true))
+        }
+        settleRoute(runtime.player)
+        runtime.pause()
+        runtime.seekTo(30_000L)
+        settleRoute(runtime.player)
+        assertEquals(AppPlaybackTarget.Recording(replacement), runtime.activeTarget.value)
+        assertTrue(staleRevision != runtime.recordingMarkerRevision.value)
+        runtime.seekRecordingMarker(10_000L, staleRevision)
+        settleRoute(runtime.player)
+        assertEquals("A marker action from the previous recording must not seek", 30_000L, runtime.player.currentPosition)
     }
 
     @Test

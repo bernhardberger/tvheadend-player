@@ -55,9 +55,12 @@ class RecordingPlayerMappingTest {
     fun `recording watch starts a new target unless that recording is already playing`() {
         assertEquals(RecordingPlaybackStart.RESUME, recordingStart(false))
         assertEquals(RecordingPlaybackStart.START_OVER, recordingStart(true))
-        assertFalse(startsRecording(target.recordingId, target))
+        val resume = RecordingRoute(target.recordingId, recordingStart(false))
+        assertFalse(startsRecording(resume, target, AppPlaybackState.Playing))
+        assertTrue(startsRecording(resume.copy(start = recordingStart(true)), target, AppPlaybackState.Playing))
+        assertTrue(startsRecording(resume, target, AppPlaybackState.Failed(AppPlaybackFailureReason.OTHER)))
         for (other in listOf(null, AppPlaybackTarget.Live(server.first.id), AppPlaybackTarget.Recording(server.film.id))) {
-            assertTrue(startsRecording(target.recordingId, other))
+            assertTrue(startsRecording(resume, other, AppPlaybackState.Playing))
         }
     }
 
@@ -72,6 +75,7 @@ class RecordingPlayerMappingTest {
                 assertEquals(current && audio > 1, PlayerControl.Audio in state.offered)
                 assertEquals(current, PlayerControl.Subtitles in state.offered)
                 assertTrue(PlayerControl.Settings in state.offered)
+                assertFalse(PlayerControl.FullScreen in state.offered)
             }
         }
     }
@@ -142,7 +146,7 @@ class RecordingPlayerMappingTest {
     }
 
     @Test
-    fun `shared failure replaces playback controls and rejects stale actions`() {
+    fun `shared failure replaces playback controls and hides skip actions`() {
         val state = map(AppPlaybackState.Failed(AppPlaybackFailureReason.OTHER), true,
             RecordingPlaybackAdmission.GrowingDeferred)
         assertEquals(LivePlayerStatus.Unavailable(AppErrorCondition.RECORDING_DEFERRED), state.status)

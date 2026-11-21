@@ -182,7 +182,6 @@ private fun recordingControls(
     ownsMarkers: Boolean,
     allowPictureInPicture: Boolean,
 ): Set<PlayerControl> = buildSet {
-    add(PlayerControl.FullScreen)
     if (hasInfo) add(PlayerControl.Info)
     if (presented) {
         add(PlayerControl.Timeshift)

@@ -3,7 +3,6 @@ package at.bernhardberger.tvhplayer.touch.player
 import android.content.Context
 import android.content.Intent
 import androidx.annotation.OptIn
-import androidx.lifecycle.Lifecycle
 import androidx.media3.common.util.UnstableApi
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
@@ -36,8 +35,8 @@ internal fun Intent.recordingRoute(): RecordingRoute? =
 internal fun recordingStart(startOver: Boolean): RecordingPlaybackStart =
     if (startOver) RecordingPlaybackStart.START_OVER else RecordingPlaybackStart.RESUME
 
-internal fun startsRecording(id: DvrEntryId, active: AppPlaybackTarget?): Boolean =
-    active != AppPlaybackTarget.Recording(id)
+internal fun startsRecording(route: RecordingRoute, active: AppPlaybackTarget?, playback: AppPlaybackState): Boolean =
+    route.start == RecordingPlaybackStart.START_OVER || playingRecordingId(active, playback) != route.id
 
 @OptIn(UnstableApi::class)
 internal suspend fun restoreRecording(
@@ -62,21 +61,23 @@ internal fun finishRecordingAtEof(
     scope: CoroutineScope,
     runtime: AppPlaybackRuntime,
     route: StateFlow<PlayerRoute>,
-    state: () -> Lifecycle.State,
-    stopAndClose: () -> Unit,
 ) = scope.launch {
     combine(runtime.state, runtime.activeTarget) { playback, target -> playback to target }
         .collect { (playback, target) ->
             if (runtime.state.value !== playback || runtime.activeTarget.value != target) return@collect
             val id = (target as? AppPlaybackTarget.Recording)?.recordingId
-            when (recordingFinishedAction(
-                playback is AppPlaybackState.Finished,
-                id,
-                (route.value as? RecordingRoute)?.id == id && state().isAtLeast(Lifecycle.State.STARTED),
-            )) {
-                RecordingFinishedAction.NONE -> Unit
-                RecordingFinishedAction.STOP -> runtime.stop()
-                RecordingFinishedAction.STOP_AND_CLOSE_PLAYER -> stopAndClose()
+            if (recordingFinishedAction(playback == AppPlaybackState.Finished, id, false) ==
+                RecordingFinishedAction.NONE
+            ) return@collect
+            val epoch = runtime.videoPresentation.value.epoch
+            val endedRoute = route.value
+            // A replacement can own the serializer while this EOF is delivered. Recheck ownership
+            // there, before stopping playback or letting sessionStops close the player.
+            runtime.stopFromSession {
+                runtime.activeTarget.value == target &&
+                    runtime.state.value == AppPlaybackState.Finished &&
+                    runtime.videoPresentation.value.epoch == epoch &&
+                    route.value == endedRoute
             }
         }
 }

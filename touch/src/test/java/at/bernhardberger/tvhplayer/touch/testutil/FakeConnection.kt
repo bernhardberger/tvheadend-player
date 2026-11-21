@@ -159,7 +159,7 @@ private class HeldWrites(
     override suspend fun remove(id: ServerProfileId): ServerProfileWriteResult = write { store.remove(id) }
 }
 
-private class MemoryPreferences : DataStore<Preferences> {
+internal class MemoryPreferences : DataStore<Preferences> {
     override val data = MutableStateFlow(emptyPreferences())
 
     override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences =
