@@ -243,16 +243,17 @@ internal fun DragLabel(
     trackWidth: Dp,
     markerName: String? = null,
     markerSymbol: (@Composable () -> Unit)? = null,
+    minimumGap: Dp = 0.dp,
 ) {
     val colors = MaterialTheme.colorScheme
     val type = MaterialTheme.typography
-    val gap = if (compact) 42.dp else 28.dp
+    val gap = maxOf(if (compact) 42.dp else 28.dp, minimumGap)
     Surface(
         modifier = Modifier.layout { measurable, _ ->
             val label = measurable.measure(Constraints())
             val x = (markerX.roundToPx() - label.width / 2).coerceIn(0, max(0, trackWidth.roundToPx() - label.width))
             layout(0, 0) { label.place(x, (trackY - gap).roundToPx() - label.height) }
-        }.heightIn(min = 44.dp),
+        }.heightIn(min = 44.dp).then(if (markerName != null) Modifier.testTag("recording-drag-label") else Modifier),
         shape = RoundedCornerShape(14.dp), color = colors.inverseSurface, contentColor = colors.inverseOnSurface,
     ) {
         Column(

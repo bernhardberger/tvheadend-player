@@ -4,6 +4,7 @@ package at.bernhardberger.tvhplayer.touch.player
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -22,6 +23,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
@@ -83,11 +85,11 @@ internal fun RecordingTimeline(
         val trackY = maxHeight - if (layout.upright) 2.dp else 24.dp
         val markerX = maxWidth * fraction(position, duration)
         val thickness = if (controls) layout.trackThickness else 2.dp
+        val hintInset = recordingHintInset(layout, marks)
         RecordingTrack(marks, duration, current, position, trackY, thickness, preview != null, Modifier.fillMaxSize())
         if (controls) {
-            if (!layout.upright) {
-                val lift = if (layout == PlayerLayout.Tablet) 18.dp else 14.dp
-                RecordingHints(marks, duration, trackY - lift, Modifier.fillMaxSize())
+            if (hintInset > 0.dp) {
+                RecordingHints(marks, duration, trackY - layout.recordingHintLift, Modifier.fillMaxSize())
             }
             PositionThumb(markerX, trackY, layout, preview != null)
         }
@@ -98,6 +100,7 @@ internal fun RecordingTimeline(
                 formatPlaybackDuration(position), false, layout.upright, markerX, trackY, maxWidth,
                 markerName = recordingMarkName(stop).takeIf { kind != null },
                 markerSymbol = kind?.let { { RecordingSymbol(it) } },
+                minimumGap = if (hintInset > 0.dp) hintInset + 4.dp else 0.dp,
             )
         }
     }
@@ -197,13 +200,32 @@ private fun RecordingTrack(
     }
 }
 
+private val PlayerLayout.recordingHintLift: Dp
+    get() = if (this == PlayerLayout.Tablet) 18.dp else 14.dp
+
+/** The space from the track centre to the top of its symbol row. */
+@Composable
+internal fun recordingHintInset(layout: PlayerLayout, marks: List<RecordingMark>): Dp {
+    if (layout.upright || marks.isEmpty()) return 0.dp
+    val badgeLine = if (marks.any { it.kind == RecordingMarkKind.AD_BREAK }) {
+        with(LocalDensity.current) { MaterialTheme.typography.labelSmall.lineHeight.toDp() }
+    } else 0.dp
+    return layout.recordingHintLift + maxOf(16.dp, badgeLine)
+}
+
 /** Measure the actual Material symbols (including localized badges), then apply the TV collision rule. */
 @Composable
 private fun RecordingHints(marks: List<RecordingMark>, duration: Long, y: Dp, modifier: Modifier) {
     val ink = MaterialTheme.colorScheme.onSurface
     Layout(
-        content = { marks.forEach { RecordingSymbol(it.kind, ink) } },
-        modifier = modifier.clearAndSetSemantics {},
+        content = {
+            marks.forEach {
+                Box(Modifier.clearAndSetSemantics { testTag = "recording-marker-symbol" }) {
+                    RecordingSymbol(it.kind, ink)
+                }
+            }
+        },
+        modifier = modifier,
     ) { measurables, constraints ->
         val items = measurables.map { it.measure(Constraints()) }
         val width = constraints.maxWidth.toFloat()

@@ -7,12 +7,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
@@ -29,6 +31,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.ErrorCollector
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -40,6 +43,7 @@ import at.bernhardberger.tvhplayer.presentation.R as SharedR
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class RecordingPlayerScreenTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
+    @get:Rule val overlapErrors = ErrorCollector()
 
     private val position = mutableLongStateOf(RECORDING_BEFORE_AD)
     private val hasMarks = mutableStateOf(true)
@@ -66,8 +70,10 @@ class RecordingPlayerScreenTest {
             down(Offset(width / 2f, center.y))
             moveTo(Offset(width * (3_432_000f / RECORDING_LENGTH), center.y))
         }
+        assertAboveMarkers(tag("recording-drag-label"), "tablet drag label")
         capture("tablet-recording-drag", canvas)
         bar.performTouchInput { moveTo(Offset(width * (3_744_000f / RECORDING_LENGTH), center.y)) }
+        assertAboveMarkers(tag("recording-drag-label"), "tablet snapped drag label")
         capture("tablet-recording-drag-snap", canvas)
         compose.runOnIdle { assertTrue(seeks.isEmpty()) }
         bar.performTouchInput { up() }
@@ -85,8 +91,10 @@ class RecordingPlayerScreenTest {
         show()
         val canvas = TouchCanvas.TABLET
         compose.runOnIdle { position.longValue = RECORDING_INSIDE_AD }
+        assertAboveMarkers(button(SharedR.string.skip_ad_break), "tablet Skip ad break", clearanceDp = 8)
         capture("tablet-recording-ad", canvas)
         tapPicture()
+        assertNoLandscapeTimeline()
         capture("tablet-recording-skip", canvas)
         compose.runOnIdle { position.longValue = fixtureAd.endMs - 1L }
         tag("recording-ad-prompt").assertIsDisplayed()
@@ -127,13 +135,17 @@ class RecordingPlayerScreenTest {
     fun landscapePhoneKeepsMarkersInASideSheet() {
         show()
         val canvas = TouchCanvas.PHONE_LANDSCAPE
+        assertAboveMarkers(tag("player-program"), "landscape phone program")
         capture("phone-recording-landscape", canvas)
         button(R.string.player_markers).performClick()
         captureWindows("phone-recording-landscape-markers", canvas)
         back()
         compose.runOnIdle { position.longValue = RECORDING_INSIDE_AD }
+        assertAboveMarkers(tag("player-program"), "landscape phone program during ads")
+        assertAboveMarkers(button(SharedR.string.skip_ad_break), "landscape phone Skip ad break", clearanceDp = 8)
         capture("phone-recording-landscape-ad", canvas)
         tapPicture()
+        assertNoLandscapeTimeline()
         capture("phone-recording-landscape-skip", canvas)
     }
 
@@ -168,6 +180,22 @@ class RecordingPlayerScreenTest {
     }
 
     private fun tapPicture() = tag("player-picture").performTouchInput { click(Offset(width * .25f, height * .28f)) }
+
+    private fun assertAboveMarkers(node: SemanticsNodeInteraction, label: String, clearanceDp: Int = 0) {
+        val end = node.fetchSemanticsNode().boundsInRoot.bottom
+        val start = compose.onAllNodesWithTag("recording-marker-symbol", useUnmergedTree = true)
+            .fetchSemanticsNodes().map { it.boundsInRoot }.filterNot { it.isEmpty }.minOf { it.top }
+        val gapDp = (start - end) / compose.activity.resources.displayMetrics.density
+        if (gapDp <= 0 || gapDp < clearanceDp) {
+            overlapErrors.addError(AssertionError("$label must clear marker symbols by $clearanceDp dp (gap=$gapDp dp)"))
+        }
+    }
+
+    private fun assertNoLandscapeTimeline() {
+        if (compose.onAllNodesWithTag("player-timeline").fetchSemanticsNodes().isNotEmpty()) {
+            overlapErrors.addError(AssertionError("Hidden landscape recording controls must remove the timeline"))
+        }
+    }
     private fun back() = compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
     private fun tag(name: String) = compose.onNodeWithTag(name)
     private fun button(id: Int) = compose.activity.getString(id).let {
