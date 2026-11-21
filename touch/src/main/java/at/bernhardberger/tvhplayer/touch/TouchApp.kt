@@ -1,9 +1,6 @@
 package at.bernhardberger.tvhplayer.touch
 
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -13,9 +10,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import at.bernhardberger.tvheadend.sdk.android.TvheadendDiscoveryState
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileAuthenticationMode
@@ -25,10 +19,13 @@ import at.bernhardberger.tvheadend.sdk.core.ServerProfileSummary
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.serverProfileDisplayName
-import at.bernhardberger.tvhplayer.core.ConnectionUiState
+import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsActions
-import at.bernhardberger.tvhplayer.touch.channels.ChannelsMessage
-import at.bernhardberger.tvhplayer.touch.channels.MessageKind
+import at.bernhardberger.tvhplayer.touch.channels.ChannelsScreen
+import at.bernhardberger.tvhplayer.touch.channels.channelsState
+import at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel
+import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
+import kotlin.time.Clock
 import at.bernhardberger.tvhplayer.touch.connect.ActiveConnectionUiState
 import at.bernhardberger.tvhplayer.touch.connect.ConnectionStatus
 import at.bernhardberger.tvhplayer.touch.connect.ConnectionsScreen
@@ -36,10 +33,7 @@ import at.bernhardberger.tvhplayer.touch.connect.EditConnectionFlow
 import at.bernhardberger.tvhplayer.touch.connect.FirstRunFlow
 import at.bernhardberger.tvhplayer.touch.connect.connectionStatus
 import at.bernhardberger.tvhplayer.touch.ui.Destination
-import at.bernhardberger.tvhplayer.touch.ui.TouchFrame
-import at.bernhardberger.tvhplayer.viewmodels.AppConnectionPresentation
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.launch
@@ -56,12 +50,13 @@ private enum class Page { Frame, Connections, SignIn }
 internal fun TouchApp(
     session: TvheadendSession,
     owner: AppProfileOwner,
-    connection: StateFlow<AppConnectionPresentation>,
+    connection: AppConnectionViewModel,
+    channels: ChannelsViewModel,
     discovery: () -> Flow<TvheadendDiscoveryState>,
 ) {
     val profile by owner.serverProfile.collectAsStateWithLifecycle()
     val profiles by owner.profiles.collectAsStateWithLifecycle()
-    val presentation by connection.collectAsStateWithLifecycle()
+    val presentation by connection.uiState.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     var firstRun by rememberSaveable { mutableStateOf(false) }
     var page by rememberSaveable { mutableStateOf(Page.Frame) }
@@ -100,7 +95,7 @@ internal fun TouchApp(
             )
         }
         else -> AppFrame(
-            signInNeeded = presentation.connection == ConnectionUiState.CredentialUnavailable,
+            connection, channels,
             onOpenConnections = { page = Page.Connections },
             onSignIn = { page = Page.SignIn },
         )
@@ -150,28 +145,32 @@ private fun ServerProfileSummary.uiState(status: ConnectionStatus) = ActiveConne
     status = status,
 )
 
+/**
+ * The frame with only Channels wired: the destinations without data are not offered yet, and the
+ * row controls with nothing behind them (Watch, Record, Details, Show in Guide) are left out.
+ */
 @Composable
-private fun AppFrame(signInNeeded: Boolean, onOpenConnections: () -> Unit, onSignIn: () -> Unit) {
-    TouchFrame(
-        actions = { destination ->
+private fun AppFrame(
+    connection: AppConnectionViewModel,
+    channels: ChannelsViewModel,
+    onOpenConnections: () -> Unit,
+    onSignIn: () -> Unit,
+) {
+    val presentation by connection.uiState.collectAsStateWithLifecycle()
+    val scope by channels.scope.collectAsStateWithLifecycle()
+    // The scope is republished for channel changes only; the guide comes with every observation.
+    val observation by channels.observation.collectAsStateWithLifecycle()
+    val state = channelsState(scope, presentation.connection, presentation.degraded, observation, Clock.System.now())
+    ChannelsScreen(
+        state = state,
+        actions = ChannelsActions(
+            onPlay = null,
+            onTag = { id -> channels.selectTag(id?.let { ChannelTagId(it.toLong()) }) },
+            onRetry = { connection.reconnectNow() },
             // Until Home exists, connection settings open from the end of the Channels top bar.
-            if (destination == Destination.Channels) {
-                IconButton(onClick = onOpenConnections, modifier = Modifier.padding(end = 4.dp)) {
-                    Icon(
-                        painterResource(R.drawable.channels_settings),
-                        stringResource(R.string.channels_connection_settings),
-                    )
-                }
-            }
-        },
-        content = {
-            // The content's place; until the destinations are wired they show nothing else.
-            if (signInNeeded) {
-                ChannelsMessage(
-                    MessageKind.SignInNeeded,
-                    ChannelsActions(onPlay = {}, onTag = {}, onRetry = {}, onOpenConnectionSettings = onSignIn),
-                )
-            }
-        },
+            onOpenConnectionSettings = onOpenConnections,
+            onSignIn = onSignIn,
+        ),
+        destinations = listOf(Destination.Channels),
     )
 }

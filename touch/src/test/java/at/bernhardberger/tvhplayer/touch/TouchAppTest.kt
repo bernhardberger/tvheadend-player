@@ -20,6 +20,8 @@ import at.bernhardberger.tvheadend.sdk.android.DiscoveredTvheadendServer
 import at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult
 import at.bernhardberger.tvheadend.sdk.android.TvheadendDiscoveryTestFactory
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
+import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
+import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileListResult
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileWriteResult
@@ -29,7 +31,9 @@ import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import at.bernhardberger.tvhplayer.touch.testutil.FakeConnection
+import at.bernhardberger.tvhplayer.touch.testutil.ServerGuide
 import at.bernhardberger.tvhplayer.ui.MobileDarkColors
+import kotlin.time.Clock
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -165,6 +169,63 @@ class TouchAppTest {
         compose.onNode(heading and hasText(label(R.string.nav_channels))).assertIsDisplayed()
     }
 
+    @Test
+    fun channelsAppearAfterConnectingWithoutUnwiredControls() {
+        val guide = savedConnectionWithGuide()
+        compose.onNodeWithText(guide.first.name!!).assertIsDisplayed()
+        compose.onNodeWithText(guide.second.name!!).assertIsDisplayed()
+        compose.onNodeWithText(guide.programs[0]).assertIsDisplayed()
+
+        // Only Channels is wired: the phone has no bar, and the open row offers nothing to play or record.
+        compose.onNodeWithText(label(R.string.nav_epg)).assertDoesNotExist()
+        compose.onNodeWithText(label(R.string.nav_recordings)).assertDoesNotExist()
+        compose.onNodeWithContentDescription(compose.activity.getString(R.string.channels_expand, guide.first.name))
+            .performClick()
+        compose.onNodeWithText(guide.programs[2]).assertIsDisplayed()
+        listOf(R.string.channels_watch, R.string.channels_record, R.string.channels_details, R.string.channels_show_in_guide)
+            .forEach { compose.onNodeWithText(label(it)).assertDoesNotExist() }
+    }
+
+    @Test
+    fun aTagFiltersTheChannels() {
+        val guide = savedConnectionWithGuide()
+        compose.onNode(hasClickAction() and hasText(label(R.string.channels_all))).performClick()
+        compose.onNode(hasClickAction() and hasText(guide.news.name!!)).performClick()
+
+        compose.onNodeWithText(guide.first.name!!).assertIsDisplayed()
+        compose.onNodeWithText(guide.second.name!!).assertDoesNotExist()
+    }
+
+    @Test
+    fun offlineKeepsTheLastListUnderTheBanner() {
+        val guide = savedConnectionWithGuide()
+        connection.session.publish(
+            SessionObservation.create(
+                sessionState = SessionState.Unavailable(SessionFailure.SERVER_UNREACHABLE),
+                channelState = ChannelRepositoryState.Stale(guide.catalog),
+            ),
+        )
+
+        compose.onNodeWithText(label(R.string.channels_saved)).assertIsDisplayed()
+        compose.onNodeWithText(guide.first.name!!).assertIsDisplayed()
+        compose.onNodeWithText(guide.second.name!!).assertIsDisplayed()
+    }
+
+    private fun savedConnectionWithGuide(): ServerGuide {
+        runBlocking { connection.store.addAnonymous(server.host, server.port, "Home server", true) }
+        show()
+        val guide = ServerGuide(Clock.System.now())
+        connection.session.publish(
+            SessionObservation.create(
+                sessionState = ready().sessionState,
+                channelState = ChannelRepositoryState.Current(guide.catalog),
+                epgState = EpgRepositoryState.Current(guide.snapshot),
+            ),
+        )
+        compose.waitForIdle()
+        return guide
+    }
+
     private fun signInToFoundServer() {
         show()
         compose.onNode(hasClickAction() and hasText(server.name)).performClick()
@@ -174,10 +235,11 @@ class TouchAppTest {
 
     private fun show() {
         connection.start()
-        val presentation = connection.presentation().uiState
+        val presentation = connection.presentation()
+        val channels = connection.channels()
         compose.setContent {
             MaterialTheme(colorScheme = MobileDarkColors) {
-                TouchApp(connection.session, connection.owner, presentation) {
+                TouchApp(connection.session, connection.owner, presentation, channels) {
                     flowOf(TvheadendDiscoveryTestFactory.discovering(listOf(server)))
                 }
             }

@@ -11,8 +11,10 @@ import at.bernhardberger.tvhplayer.notices.ConnectionNoticeSource
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.notices.NoticeContext
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
+import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel
+import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -51,6 +53,9 @@ internal class FakeConnection(
 
     /** The connection state the app shows, as the composition root's view model gives it. */
     fun presentation() = AppConnectionViewModel(session, owner, notices)
+
+    /** The Channels destination's state, as the composition root's view model gives it. */
+    fun channels() = ChannelsViewModel(session, ChannelTagSettingsStore(MemoryPreferences()), owner.liveProfile)
 
     fun close() = scope.cancel()
 }

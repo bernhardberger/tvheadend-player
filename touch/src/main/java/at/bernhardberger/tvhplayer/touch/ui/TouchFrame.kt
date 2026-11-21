@@ -61,6 +61,11 @@ internal enum class Destination(
 internal fun TouchFrame(
     modifier: Modifier = Modifier,
     initialDestination: Destination = Destination.Channels,
+    /**
+     * The destinations offered. With only one the phone's navigation bar is left out, as Material
+     * asks for three to five; the tablet's rail keeps its single item beside the content.
+     */
+    destinations: List<Destination> = Destination.entries,
     // A destination's page can draw its own top bar, or take the whole window (then it handles the insets).
     showTopBar: (Destination) -> Boolean = { true },
     showNavigation: (Destination) -> Boolean = { true },
@@ -81,7 +86,7 @@ internal fun TouchFrame(
     val topBar = showTopBar(selected)
     val navigation = showNavigation(selected)
     Row(modifier.fillMaxSize()) {
-        if (expanded && navigation) DestinationRail(selected, select)
+        if (expanded && navigation) DestinationRail(destinations, selected, select)
         Scaffold(
             modifier = Modifier.weight(1f),
             topBar = {
@@ -93,7 +98,9 @@ internal fun TouchFrame(
                 }
             },
             bottomBar = {
-                if (!expanded && navigation) DestinationBar(selected, mediumOrWider, select)
+                if (!expanded && navigation && destinations.size > 1) {
+                    DestinationBar(destinations, selected, mediumOrWider, select)
+                }
             },
             contentWindowInsets = if (topBar) ScaffoldDefaults.contentWindowInsets else WindowInsets(0, 0, 0, 0),
         ) { innerPadding ->
@@ -130,7 +137,11 @@ private fun DestinationTopBar(
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun DestinationRail(selected: Destination, onSelect: (Destination) -> Unit) {
+private fun DestinationRail(
+    destinations: List<Destination>,
+    selected: Destination,
+    onSelect: (Destination) -> Unit,
+) {
     WideNavigationRail(
         header = {
             Box(Modifier.size(width = 96.dp, height = 64.dp), contentAlignment = Alignment.Center) {
@@ -144,7 +155,7 @@ private fun DestinationRail(selected: Destination, onSelect: (Destination) -> Un
         arrangement = Arrangement.Center,
         contentPadding = PaddingValues(0.dp),
     ) {
-        Destination.entries.forEach { destination ->
+        destinations.forEach { destination ->
             WideNavigationRailItem(
                 selected = destination == selected,
                 onClick = { onSelect(destination) },
@@ -159,11 +170,16 @@ private fun DestinationRail(selected: Destination, onSelect: (Destination) -> Un
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun DestinationBar(selected: Destination, medium: Boolean, onSelect: (Destination) -> Unit) {
+private fun DestinationBar(
+    destinations: List<Destination>,
+    selected: Destination,
+    medium: Boolean,
+    onSelect: (Destination) -> Unit,
+) {
     ShortNavigationBar(
         arrangement = if (medium) ShortNavigationBarArrangement.Centered else ShortNavigationBarArrangement.EqualWeight,
     ) {
-        Destination.entries.forEach { destination ->
+        destinations.forEach { destination ->
             ShortNavigationBarItem(
                 selected = destination == selected,
                 onClick = { onSelect(destination) },

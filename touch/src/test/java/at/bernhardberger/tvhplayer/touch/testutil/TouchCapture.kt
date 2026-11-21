@@ -7,7 +7,9 @@ import androidx.activity.ComponentActivity
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.AndroidComposeTestRule
-import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.hasAnyDescendant
+import androidx.compose.ui.test.isDialog
+import androidx.compose.ui.test.isRoot
 import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -40,7 +42,11 @@ fun AndroidComposeTestRule<*, out ComponentActivity>.captureTouch(group: String,
                 .build(),
         )
     }
-    val bitmap = onRoot().captureToImage().asAndroidBitmap()
+    // With a dialog open, onRoot() matches the dialog's root too, and a capture of several roots takes
+    // Robolectric's screenshot of all windows, which draws each at its origin rather than where its
+    // gravity puts it. The frame is the activity's window alone; a test draws a dialog over it once.
+    val frame = isRoot() and !isDialog() and !hasAnyDescendant(isDialog())
+    val bitmap = onNode(frame).captureToImage().asAndroidBitmap()
     assertEquals(canvas.width to canvas.height, bitmap.width to bitmap.height)
     val directory = File(checkNotNull(System.getProperty("touch.captureDir")), group)
     directory.mkdirs()

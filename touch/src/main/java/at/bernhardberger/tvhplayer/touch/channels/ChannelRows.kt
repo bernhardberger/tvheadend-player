@@ -163,7 +163,7 @@ private fun ChannelHeader(
     offline: Boolean,
     container: Color,
     shapes: ListItemShapes,
-    onPlay: (String) -> Unit,
+    onPlay: ((String) -> Unit)?,
     toggle: () -> Unit,
 ) {
     val recording = row.recording.takeUnless { offline }
@@ -171,13 +171,14 @@ private fun ChannelHeader(
     val segmented = ListItemDefaults.segmentedColors()
     val watch = stringResource(R.string.channels_watch)
     SegmentedListItem(
-        onClick = { onPlay(row.id) },
+        onClick = if (onPlay != null) ({ onPlay(row.id) }) else toggle,
         shapes = shapes,
         modifier = Modifier.fillMaxWidth().alpha(if (offline) SAVED_ROW_ALPHA else 1f)
             .heightIn(min = layout.rowHeight)
             .semantics {
                 role = Role.Button
-                onClick(label = watch, action = null)
+                // Without Watch the tap is the expand button's, which already says what it does.
+                if (onPlay != null) onClick(label = watch, action = null)
             },
         enabled = !offline,
         leadingContent = if (listHasLogos) ({ ChannelLogo(row, layout) }) else null,
@@ -357,7 +358,7 @@ private fun NextProgram(program: ChannelProgram?, showMarks: Boolean, modifier: 
                 )
             }
         }
-        program?.let { SupportingLine(it.start, Modifier.padding(top = 3.dp)) }
+        program?.start?.let { SupportingLine(it, Modifier.padding(top = 3.dp)) }
     }
 }
 

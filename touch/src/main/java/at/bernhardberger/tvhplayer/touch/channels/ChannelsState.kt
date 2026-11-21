@@ -2,11 +2,18 @@ package at.bernhardberger.tvhplayer.touch.channels
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
+import at.bernhardberger.tvhplayer.core.AppError
 
 internal sealed interface ChannelsState {
     data object Loading : ChannelsState
     data object Unreachable : ChannelsState
     data object SignInFailed : ChannelsState
+
+    /** The saved password can't be read; the message opens the editor on Password. */
+    data object SignInNeeded : ChannelsState
+
+    /** No channels to show and a catalog failure to say why, in the message form. */
+    data class Failed(val error: AppError) : ChannelsState
 
     data class Ready(val list: ChannelList) : ChannelsState
     data class Offline(val list: ChannelList, val retryIn: String? = null) : ChannelsState
@@ -43,7 +50,8 @@ internal enum class ChannelRecording { Program, Channel }
 
 internal data class ChannelProgram(
     val title: String,
-    val start: String,
+    /** Null while the start's clock text has no shared formatter; the line is then left out. */
+    val start: String?,
     val timeRange: String? = null,
     val progress: Float? = null,
     val timeLeft: String? = null,
@@ -58,12 +66,18 @@ internal data class ChannelDetails(
     val following: List<ChannelProgram> = emptyList(),
 )
 
+/**
+ * A null callback leaves its control out. Without [onPlay] a tap on a row opens or closes it, and
+ * Watch is not offered. [onSignIn] is what the sign-in-needed message's button does, else
+ * [onOpenConnectionSettings].
+ */
 internal class ChannelsActions(
-    val onPlay: (String) -> Unit,
+    val onPlay: ((String) -> Unit)?,
     val onTag: (String?) -> Unit,
     val onRetry: () -> Unit,
     val onOpenConnectionSettings: () -> Unit,
     val onRecord: ((String) -> Unit)? = null,
     val onDetails: ((String) -> Unit)? = null,
     val onShowInGuide: ((String) -> Unit)? = null,
+    val onSignIn: (() -> Unit)? = null,
 )

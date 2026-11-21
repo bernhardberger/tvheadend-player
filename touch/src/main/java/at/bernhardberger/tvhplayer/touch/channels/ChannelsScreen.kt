@@ -37,6 +37,7 @@ internal fun ChannelsScreen(
     actions: ChannelsActions,
     modifier: Modifier = Modifier,
     initiallyOpenChannelId: String? = null,
+    destinations: List<Destination> = Destination.entries,
 ) {
     val window = currentWindowAdaptiveInfoV2().windowSizeClass
     val layout = when {
@@ -51,6 +52,7 @@ internal fun ChannelsScreen(
     }
     TouchFrame(
         modifier = modifier,
+        destinations = destinations,
         actions = { destination ->
             if (destination == Destination.Channels) {
                 if (layout.tablet && list != null && list.canFilter) {
@@ -96,6 +98,8 @@ private fun ChannelsContent(
         ChannelsState.Loading -> ChannelsSkeleton(layout)
         ChannelsState.Unreachable -> ChannelsMessage(MessageKind.Unreachable, actions)
         ChannelsState.SignInFailed -> ChannelsMessage(MessageKind.SignInFailed, actions)
+        ChannelsState.SignInNeeded -> ChannelsMessage(MessageKind.SignInNeeded, actions)
+        is ChannelsState.Failed -> ChannelsFailure(state.error, actions)
         is ChannelsState.Offline -> {
             Column(Modifier.fillMaxSize().padding(horizontal = layout.margin)) {
                 OfflineBanner(layout, state.retryIn, actions.onOpenConnectionSettings)

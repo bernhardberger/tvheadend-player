@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.FlowRowScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -30,6 +31,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -39,8 +41,14 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import at.bernhardberger.tvhplayer.core.AppError
+import at.bernhardberger.tvhplayer.core.AppErrorAction
+import at.bernhardberger.tvhplayer.core.AppErrorCondition
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import at.bernhardberger.tvhplayer.touch.R
+import at.bernhardberger.tvhplayer.touch.connect.touchHintRes
+import at.bernhardberger.tvhplayer.touch.connect.touchTitleRes
+import at.bernhardberger.tvhplayer.ui.common.AppErrorText
 
 internal enum class MessageKind(
     @param:DrawableRes val icon: Int,
@@ -65,49 +73,86 @@ internal enum class MessageKind(
 
 @Composable
 internal fun ChannelsMessage(kind: MessageKind, actions: ChannelsActions) {
+    val reason = stringResource(kind.reason)
+    val hint = kind.hint?.let { stringResource(it) }
+    MessageLayout(kind.icon, stringResource(kind.title), if (hint == null) reason else "$reason $hint") {
+        MessageActions(kind, actions)
+    }
+}
+
+/** A catalog failure in the same form, with the catalog's words and its actions in order. */
+@Composable
+internal fun ChannelsFailure(error: AppError, actions: ChannelsActions) {
+    val condition = error.condition
+    val text = AppErrorText(LocalContext.current)
+    val hint = condition.touchHintRes()?.let { stringResource(it) }
+    val icon = when (condition) {
+        AppErrorCondition.AUTHENTICATION_REJECTED, AppErrorCondition.PERMISSION_DENIED,
+        AppErrorCondition.CREDENTIAL_UNAVAILABLE,
+        -> R.drawable.channels_lock
+        else -> R.drawable.channels_cloud_off
+    }
+    MessageLayout(
+        icon, stringResource(condition.touchTitleRes()),
+        listOfNotNull(text.reason(condition), hint).joinToString(" "),
+    ) {
+        error.actions.filter { it != AppErrorAction.CLOSE }.forEachIndexed { index, action ->
+            val onClick = if (action == AppErrorAction.RETRY) actions.onRetry else actions.onOpenConnectionSettings
+            if (index == 0) {
+                Button(onClick = onClick) { Text(text.label(action)) }
+            } else {
+                OutlinedButton(onClick = onClick) { Text(text.label(action)) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MessageLayout(
+    @DrawableRes icon: Int,
+    title: String,
+    paragraph: String,
+    buttons: @Composable FlowRowScope.() -> Unit,
+) {
     Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
         Column(
             Modifier.widthIn(max = 340.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Icon(
-                painterResource(kind.icon), null, Modifier.size(48.dp),
-                tint = MaterialTheme.colorScheme.outline,
-            )
+            Icon(painterResource(icon), null, Modifier.size(48.dp), tint = MaterialTheme.colorScheme.outline)
             Text(
-                stringResource(kind.title), Modifier.semantics { heading() },
+                title, Modifier.semantics { heading() },
                 style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center,
             )
-            val reason = stringResource(kind.reason)
-            val hint = kind.hint?.let { stringResource(it) }
             Text(
-                if (hint == null) reason else "$reason $hint", style = MaterialTheme.typography.bodyMedium,
+                paragraph, style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center,
             )
-            MessageActions(kind, actions)
+            FlowRow(
+                Modifier.padding(top = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                content = buttons,
+            )
         }
     }
 }
 
 @Composable
-private fun MessageActions(kind: MessageKind, actions: ChannelsActions) {
+private fun FlowRowScope.MessageActions(kind: MessageKind, actions: ChannelsActions) {
     val settings = stringResource(R.string.channels_connection_settings)
-    FlowRow(
-        Modifier.padding(top = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-    ) {
-        when (kind) {
-            MessageKind.Unreachable -> {
-                Button(onClick = actions.onRetry) { Text(stringResource(R.string.channels_retry)) }
-                OutlinedButton(onClick = actions.onOpenConnectionSettings) { Text(settings) }
-            }
-            MessageKind.SignInFailed, MessageKind.SignInNeeded ->
-                Button(onClick = actions.onOpenConnectionSettings) { Text(settings) }
-            MessageKind.Empty -> Unit
-            MessageKind.EmptyTag -> Button(onClick = { actions.onTag(null) }) {
-                Text(stringResource(R.string.channels_all))
-            }
+    when (kind) {
+        MessageKind.Unreachable -> {
+            Button(onClick = actions.onRetry) { Text(stringResource(R.string.channels_retry)) }
+            OutlinedButton(onClick = actions.onOpenConnectionSettings) { Text(settings) }
+        }
+        MessageKind.SignInFailed -> Button(onClick = actions.onOpenConnectionSettings) { Text(settings) }
+        MessageKind.SignInNeeded -> Button(onClick = actions.onSignIn ?: actions.onOpenConnectionSettings) {
+            Text(settings)
+        }
+        MessageKind.Empty -> Unit
+        MessageKind.EmptyTag -> Button(onClick = { actions.onTag(null) }) {
+            Text(stringResource(R.string.channels_all))
         }
     }
 }

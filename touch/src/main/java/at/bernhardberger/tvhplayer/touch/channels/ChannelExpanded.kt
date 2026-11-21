@@ -129,8 +129,10 @@ private fun Synopsis(details: ChannelDetails) {
 @Composable
 private fun ProgramActions(id: String, actions: ChannelsActions) {
     FlowRow(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Button(onClick = { actions.onPlay(id) }) {
-            ChannelActionLabel(R.drawable.channels_play, stringResource(R.string.channels_watch))
+        actions.onPlay?.let { play ->
+            Button(onClick = { play(id) }) {
+                ChannelActionLabel(R.drawable.channels_play, stringResource(R.string.channels_watch))
+            }
         }
         actions.onRecord?.let { record ->
             FilledTonalButton(onClick = { record(id) }) {
@@ -150,10 +152,12 @@ private fun Following(programs: List<ChannelProgram>, onShowInGuide: (() -> Unit
     Column(Modifier.padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         programs.forEach { program ->
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    program.start, Modifier.widthIn(min = 84.dp),
-                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline,
-                )
+                program.start?.let {
+                    Text(
+                        it, Modifier.widthIn(min = 84.dp),
+                        style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline,
+                    )
+                }
                 Text(
                     program.title, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

@@ -32,6 +32,7 @@ import at.bernhardberger.tvhplayer.playback.StartupBufferController
 import at.bernhardberger.tvhplayer.playback.startupBufferIdentity
 import at.bernhardberger.tvhplayer.profiling.ProfilePlaybackTrace
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
+import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CoroutineDispatcher
@@ -42,6 +43,7 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
 import at.bernhardberger.tvhplayer.notices.ConnectionNoticeSource
 import at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel
+import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.dsl.viewModel
 import org.koin.core.qualifier.named
@@ -156,4 +158,8 @@ val touchModule = module {
         ).also { source -> get<CoroutineScope>(qualifier = Application).launch { source.run() } }
     }
     viewModel { AppConnectionViewModel(session = get(), profileOwner = get(), connectionNotices = get()) }
+    single { ChannelTagSettingsStore(androidContext()) }
+    viewModel {
+        ChannelsViewModel(session = get(), tagSettings = get(), liveProfile = get<AppProfileOwner>().liveProfile)
+    }
 }
