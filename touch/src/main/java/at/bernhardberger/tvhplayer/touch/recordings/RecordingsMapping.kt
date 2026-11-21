@@ -1,11 +1,15 @@
 package at.bernhardberger.tvhplayer.touch.recordings
 
-import at.bernhardberger.tvhplayer.touch.ui.RecordingRemoveControl
 import at.bernhardberger.tvhplayer.touch.ui.recordingRemoveControl
 import at.bernhardberger.tvhplayer.core.recordingArtwork
 import at.bernhardberger.tvhplayer.touch.ui.ArtworkModels
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
+import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
+import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
+import at.bernhardberger.tvheadend.sdk.playback.SubscriptionStreamType
+import at.bernhardberger.tvhplayer.core.BrowseContextAction
 import at.bernhardberger.tvhplayer.core.DvrArchiveFolder
 import at.bernhardberger.tvhplayer.core.DvrArchiveGrouping
 import at.bernhardberger.tvhplayer.core.DvrArchiveNaming
@@ -17,20 +21,44 @@ import at.bernhardberger.tvhplayer.core.RecordingWatchState
 import at.bernhardberger.tvhplayer.core.allRecordings
 import at.bernhardberger.tvhplayer.core.browseAppError
 import at.bernhardberger.tvhplayer.core.buildDvrArchive
+import at.bernhardberger.tvhplayer.core.deleteRemovesEntryOnly
 import at.bernhardberger.tvhplayer.core.dvrDateSectionStarts
+import at.bernhardberger.tvhplayer.core.offeredResumePosition
 import at.bernhardberger.tvhplayer.core.partitionDvrLibrary
+import at.bernhardberger.tvhplayer.core.recordingContextActions
 import at.bernhardberger.tvhplayer.core.recordingElapsedProgress
+import at.bernhardberger.tvhplayer.core.recordingErrorCount
 import at.bernhardberger.tvhplayer.core.recordingIsRunning
 import at.bernhardberger.tvhplayer.core.recordingLengthSeconds
 import at.bernhardberger.tvhplayer.core.recordingNowEntries
+import at.bernhardberger.tvhplayer.core.recordingPaddedStart
 import at.bernhardberger.tvhplayer.core.recordingPaddedStop
-import at.bernhardberger.tvhplayer.core.recordingPlannedSeconds
+import at.bernhardberger.tvhplayer.core.recordingPicture
+import at.bernhardberger.tvhplayer.core.recordingRecordedSpan
 import at.bernhardberger.tvhplayer.core.recordingSizeBytes
 import at.bernhardberger.tvhplayer.core.recordingSpaceIndicator
+import at.bernhardberger.tvhplayer.core.recordingTimeLeft
 import at.bernhardberger.tvhplayer.core.recordingWatchState
 import at.bernhardberger.tvhplayer.core.summarizeDvrFolder
 import java.time.Duration
 import java.time.Instant
+import kotlin.time.toJavaDuration
+
+internal fun recordingPlayActions(
+    entry: DvrEntry,
+    admission: RecordingPlaybackAdmission?,
+): List<RecordingPlayAction> {
+    // A Remove entry action stands alone; all other play actions follow shared admission.
+    if (deleteRemovesEntryOnly(entry)) return emptyList()
+    return recordingContextActions(entry, admission, canModifyRecordings = false).mapNotNull { action ->
+        when (action) {
+            BrowseContextAction.PLAY, BrowseContextAction.WATCH -> RecordingPlayAction.Watch
+            BrowseContextAction.RESUME -> offeredResumePosition(admission)?.let { RecordingPlayAction.Resume(it) }
+            BrowseContextAction.START_OVER -> RecordingPlayAction.StartOver
+            else -> null
+        }
+    }
+}
 
 /**
  * Recordings > Browse from the session, as the TV's archive builds it: the finished recordings and
@@ -38,9 +66,10 @@ import java.time.Instant
  *
  * In this order: an unreadable password asks for sign-in; with no list from the server yet a
  * failure says so in the catalog's words and anything else waits; a list while the connection is
- * degraded is the saved one; otherwise the current one. Watched progress is left out until the
- * recording player reads resume points, so the Show filter knows watched and unwatched only.
+ * degraded is the saved one; otherwise the current one. The list and its Show filter use the
+ * same admitted resume position.
  */
+@OptIn(ExperimentalTvheadendApi::class)
 @Suppress("LongParameterList")
 internal fun recordingsState(
     observation: SessionObservation,
@@ -79,9 +108,9 @@ internal fun recordingsState(
     )
     val archive = partitionDvrLibrary(entries).archive + entries.filter(::recordingIsRunning)
     val folder = buildDvrArchive(archive.distinctBy { it.id }, view.grouping, naming, view.sort, view.show) {
-        recordingWatchState(it, null, nowSec)
+        recordingWatchState(it, offeredResumePosition(observation.recordingPlaybackAdmission(it)), nowSec)
     }
-    val rows = RowMapper(naming, texts, clock, observation::recordingRemoveControl) { entry ->
+    val rows = RowMapper(naming, texts, clock, observation, availability) { entry ->
         val logo = entry.channelId?.let(icons::get)
         RowArtwork(artwork?.logo(logo, observation), artwork?.picture(recordingArtwork(entry), observation))
     }
@@ -109,10 +138,12 @@ private class RowMapper(
     val naming: DvrArchiveNaming,
     val texts: RecordingsTexts,
     val clock: RecordingClock,
-    val remove: (DvrEntry) -> RecordingRemoveControl?,
+    val observation: SessionObservation,
+    val availability: RecordingsAvailability,
     val artwork: (DvrEntry) -> RowArtwork,
 ) {
     private val nowSec = clock.now.epochSecond
+    private val canOfferPlayback = availability == RecordingsAvailability.Current && observation.currentSession != null
 
     fun folder(folder: DvrArchiveFolder, sections: Boolean): RecordingFolder {
         val starts = if (sections) {
@@ -132,39 +163,91 @@ private class RowMapper(
 
     fun item(entry: DvrEntry, section: DvrDateSection?): RecordingItem = item(entry, section, artwork(entry))
 
-    private fun item(entry: DvrEntry, section: DvrDateSection?, art: RowArtwork) = RecordingItem(
-        id = entry.id.value.toString(),
-        channelLogoModel = art.logo,
-        pictureModel = art.picture,
-        title = entry.title.orEmpty(),
-        episode = texts.episode(entry),
-        channel = naming.channelName(entry)?.takeIf { it.isNotBlank() },
-        section = section?.let { RecordingSection(texts.section(it), it.rowDates) },
-        start = entry.start?.let { Instant.ofEpochSecond(it.epochSeconds) },
-        length = (recordingLengthSeconds(entry, nowSec) ?: recordingPlannedSeconds(entry))
-            ?.takeIf { it > 0 }?.let(Duration::ofSeconds),
-        state = progress(entry),
-        details = RecordingDetails(
-            synopsis = entry.description?.takeIf { it.isNotBlank() } ?: entry.summary?.takeIf { it.isNotBlank() },
-            genre = texts.genre(entry),
-            size = recordingSizeBytes(entry)?.takeIf { it > 0 }?.let(texts.size),
-            retention = texts.keepUntil(entry, nowSec),
-        ),
-        remove = remove(entry),
-    )
+    @OptIn(ExperimentalTvheadendApi::class)
+    private fun item(entry: DvrEntry, section: DvrDateSection?, art: RowArtwork): RecordingItem {
+        val admission = observation.recordingPlaybackAdmission(entry)
+        return RecordingItem(
+            id = entry.id.value.toString(),
+            channelLogoModel = art.logo,
+            pictureModel = art.picture,
+            title = entry.title.orEmpty(),
+            episode = texts.episode(entry),
+            channel = naming.channelName(entry)?.takeIf { it.isNotBlank() },
+            section = section?.let { RecordingSection(texts.section(it), it.rowDates) },
+            start = entry.start?.let { Instant.ofEpochSecond(it.epochSeconds) },
+            length = recordingLengthSeconds(entry, nowSec)?.takeIf { it > 0 }?.let(Duration::ofSeconds),
+            state = progress(entry, admission),
+            details = recordingDetails(entry, texts, nowSec),
+            remove = observation.recordingRemoveControl(entry),
+            play = if (canOfferPlayback) recordingPlayActions(entry, admission) else emptyList(),
+        )
+    }
 
-    private fun progress(entry: DvrEntry): RecordingProgress {
+    /**
+     * Saved watch state and time left follow
+     * `app/src/main/java/at/bernhardberger/tvhplayer/ui/screens/recordings/RecordingsContent.kt:489-505`.
+     * Touch has no active viewer position to overlay.
+     */
+    private fun progress(entry: DvrEntry, admission: RecordingPlaybackAdmission?): RecordingProgress {
         val stop = recordingPaddedStop(entry)
-        return when {
-            recordingIsRunning(entry) && stop != null -> RecordingProgress.Recording(
+        if (recordingIsRunning(entry) && stop != null) {
+            return RecordingProgress.Recording(
                 until = Instant.ofEpochSecond(stop.epochSeconds),
                 progress = recordingElapsedProgress(entry, nowSec) ?: 0f,
             )
-            recordingWatchState(entry, null, nowSec) == RecordingWatchState.Watched -> RecordingProgress.Watched
-            else -> RecordingProgress.Unwatched
+        }
+        return when (val watched = recordingWatchState(entry, offeredResumePosition(admission), nowSec)) {
+            RecordingWatchState.Watched -> RecordingProgress.Watched
+            RecordingWatchState.Unwatched -> RecordingProgress.Unwatched
+            is RecordingWatchState.PartlyWatched -> {
+                val left = recordingTimeLeft(entry, admission)
+                val fraction = watched.fraction
+                if (left != null && fraction != null) {
+                    RecordingProgress.PartlyWatched(left.toJavaDuration(), fraction.toFloat())
+                } else RecordingProgress.Unwatched
+            }
         }
     }
 }
+
+/**
+ * File facts, stream types and recorded/scheduled span follow
+ * `app/src/main/java/at/bernhardberger/tvhplayer/ui/components/ProgrammeDetailsPage.kt:1230-1260`.
+ */
+@OptIn(ExperimentalTvheadendApi::class)
+private fun recordingDetails(entry: DvrEntry, texts: RecordingsTexts, nowSec: Long): RecordingDetails {
+    val neverRecorded = entry.state == DvrEntryState.MISSED || entry.state == DvrEntryState.INVALID
+    val span = recordingRecordedSpan(entry, nowSec)?.takeUnless { neverRecorded }
+        ?: recordingPaddedStart(entry)?.let { start -> recordingPaddedStop(entry)?.let { start to it } }
+    val streams = entry.files.orEmpty().flatMap { it.streams.orEmpty() }
+    fun languages(types: Set<SubscriptionStreamType>): String? = streams.asSequence()
+        .filter { it.type in types }
+        .mapNotNull { texts.language(it.language) }
+        .distinct().joinToString(", ").ifBlank { null }
+    return RecordingDetails(
+        synopsis = entry.description?.takeIf { it.isNotBlank() } ?: entry.summary?.takeIf { it.isNotBlank() },
+        genre = texts.genre(entry),
+        size = recordingSizeBytes(entry)?.let(texts.size),
+        picture = recordingPicture(entry),
+        audio = languages(AudioTypes),
+        subtitles = languages(SubtitleTypes),
+        errors = recordingErrorCount(entry)?.let(texts.errors),
+        recorded = span?.let { (start, stop) -> texts.recorded(start.epochSeconds, stop.epochSeconds, nowSec) },
+        recordedIsScheduled = neverRecorded,
+        retention = texts.keepUntil(entry, nowSec),
+    )
+}
+
+@OptIn(ExperimentalTvheadendApi::class)
+private val AudioTypes = setOf(
+    SubscriptionStreamType.AAC, SubscriptionStreamType.AC3, SubscriptionStreamType.EAC3,
+    SubscriptionStreamType.MPEG2_AUDIO,
+)
+
+@OptIn(ExperimentalTvheadendApi::class)
+private val SubtitleTypes = setOf(
+    SubscriptionStreamType.DVB_SUBTITLE, SubscriptionStreamType.TEXT_SUBTITLE, SubscriptionStreamType.TELETEXT,
+)
 
 private val DvrDateSection.rowDates: RowDates
     get() = when (this) {

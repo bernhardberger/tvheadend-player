@@ -131,9 +131,16 @@ internal data class RecordingItem(
     val pictureModel: Any? = null,
     /** How it is removed; null offers no remove control. */
     val remove: RecordingRemoveControl? = RecordingRemoveControl.Delete,
+    val play: List<RecordingPlayAction> = emptyList(),
 ) {
     val hasPicture: Boolean get() = picture != null || pictureModel != null
     val hasLogo: Boolean get() = channelLogo != null || channelLogoModel != null
+}
+
+internal sealed interface RecordingPlayAction {
+    data object Watch : RecordingPlayAction
+    data class Resume(val position: kotlin.time.Duration) : RecordingPlayAction
+    data object StartOver : RecordingPlayAction
 }
 
 /** A date label: a day's ("Today", "Wed, Nov 11") or a month's ("October"). */
@@ -159,6 +166,7 @@ internal data class RecordingDetails(
     val subtitles: String? = null,
     val errors: String? = null,
     val retention: String? = null,
+    val recordedIsScheduled: Boolean = false,
 )
 
 /** A null action has nothing behind it yet: its control is left out. */
@@ -187,4 +195,7 @@ internal class RecordingsTexts(
     val section: (DvrDateSection) -> String,
     val size: (Long) -> String,
     val keepUntil: (DvrEntry, nowSec: Long) -> String?,
+    val recorded: (startSec: Long, stopSec: Long, nowSec: Long) -> String,
+    val errors: (Long) -> String,
+    val language: (String?) -> String?,
 )

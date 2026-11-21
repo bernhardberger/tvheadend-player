@@ -22,6 +22,8 @@ import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
+import at.bernhardberger.tvheadend.sdk.core.TvheadendTestResultFactory
+import at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
@@ -64,6 +66,15 @@ internal class ServerGuide(val now: Instant) {
     val diary = recording(DIARY, "Mountain Diary", second, now - 1.days, DvrEntryState.COMPLETED, "Docs", 1)
     val scheduled = recording(SCHEDULED, "Late Film", first, now + 90.minutes, DvrEntryState.SCHEDULED, event = 3)
     val dvr = DvrSnapshot.create(entries = listOf(recordingNow, film, diary, scheduled))
+
+    @OptIn(TvheadendTestingApi::class)
+    fun filmWithErrors(hasFile: Boolean) = DvrEntry.create(
+        film.id, channelId = first.id, start = film.start, stop = film.stop, title = film.title,
+        state = DvrEntryState.COMPLETED_ERROR,
+        files = if (hasFile) listOf(
+            TvheadendTestResultFactory.recordingFile(fileId = 1, serverPath = "synthetic.ts", start = film.start),
+        ) else null,
+    )
 
     /** The server signed in with everything current, with [entries] as its recordings: it has a current session. */
     fun connected(entries: List<DvrEntry> = dvr.entries) = SessionObservation.create(

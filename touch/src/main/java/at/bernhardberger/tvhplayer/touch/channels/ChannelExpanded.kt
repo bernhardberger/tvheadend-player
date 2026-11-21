@@ -3,7 +3,6 @@
 package at.bernhardberger.tvhplayer.touch.channels
 
 import at.bernhardberger.tvhplayer.touch.guide.RecordControlButton
-import at.bernhardberger.tvhplayer.touch.ui.ProgramRecordControl
 import at.bernhardberger.tvhplayer.touch.ui.RuleScheduleState
 import at.bernhardberger.tvhplayer.touch.ui.rememberStandalonePicture
 import androidx.annotation.DrawableRes
@@ -139,17 +138,13 @@ private fun ProgramActions(id: String, now: ChannelProgram?, actions: ChannelsAc
             }
         }
         val record = now?.record
-        val onControl = when (record) {
-            ProgramRecordControl.Record -> actions.onRecord
-            ProgramRecordControl.Cancel -> actions.onCancel
-            ProgramRecordControl.Stop -> actions.onStop
-            null -> null
-        }
+        val eventId = now?.eventId
+        val onControl = actions.onRecordControl
         val ruleSchedule = now?.ruleSchedule
         if (ruleSchedule != null) {
             RuleScheduleState(ruleSchedule)
-        } else if (record != null && onControl != null) {
-            RecordControlButton(record) { onControl(id) }
+        } else if (record != null && eventId != null && onControl != null) {
+            RecordControlButton(record) { onControl(id, eventId, record) }
         }
         actions.onDetails?.let { details ->
             TextButton(onClick = { details(id) }) {

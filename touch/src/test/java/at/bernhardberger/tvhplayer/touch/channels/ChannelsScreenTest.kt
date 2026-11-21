@@ -6,6 +6,7 @@ import android.graphics.Paint
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -15,9 +16,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.hasProgressBarRangeInfo
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -48,6 +51,7 @@ import at.bernhardberger.tvhplayer.ui.MobileDarkColors
 import coil3.asImage
 import coil3.decode.DataSource
 import coil3.intercept.Interceptor
+import coil3.request.ErrorResult
 import coil3.request.SuccessResult
 import coil3.request.transformations
 import coil3.size.Size
@@ -115,9 +119,26 @@ class ChannelsScreenTest {
     @Test
     @Config(qualifiers = "en-rUS-w800dp-h1280dp-port-xhdpi")
     fun uprightChannels() {
-        show(ChannelsState.Ready(channelsFixture(playing = true)), open = "amber-stage")
+        val state = ChannelsState.Ready(channelsFixture(playing = true))
+        val width = mutableStateOf(800.dp)
+        compose.setContent {
+            MaterialTheme(colorScheme = MobileDarkColors) {
+                ChannelsScreen(state, fixtureActions(), Modifier.width(width.value), initiallyOpenChannelId = "amber-stage")
+            }
+        }
         assertCompactFollowing()
         capture("tablet-upright-channels", TouchCanvas.TABLET_UPRIGHT)
+
+        // The wide canvas can hit the old track's upper cap for both labels and hide the defect.
+        compose.runOnIdle { width.value = 700.dp }
+        val shortTimeLeft = compose.onNode(
+            hasProgressBarRangeInfo(ProgressBarRangeInfo(0.66f, 0f..1f)), useUnmergedTree = true,
+        ).fetchSemanticsNode().boundsInRoot
+        val longTimeLeft = compose.onNode(
+            hasProgressBarRangeInfo(ProgressBarRangeInfo(0.16f, 0f..1f)), useUnmergedTree = true,
+        ).fetchSemanticsNode().boundsInRoot
+        assertEquals("Progress starts align for 30m and 1h 28m left", shortTimeLeft.left, longTimeLeft.left, 0f)
+        assertEquals("Progress ends align for 30m and 1h 28m left", shortTimeLeft.right, longTimeLeft.right, 0f)
     }
 
     @Test
@@ -200,6 +221,53 @@ class ChannelsScreenTest {
         }
         logos.indices.forEach { index ->
             compose.onNodeWithTag("tile-$index").captureToImage().toPixelMap().assertLogoFitsItsShare("logo $index")
+        }
+    }
+
+    @Test
+    fun serverLogoTilesShowTheirFallbackOnlyWhenTheLogoIsMissingOrFails() {
+        val failing = AppArtworkSource(null, ArtworkId(1))
+        val loading = AppArtworkSource(null, ArtworkId(2))
+        val loadedColor = Color.Magenta
+        val bitmap = Bitmap.createBitmap(30, 30, Bitmap.Config.ARGB_8888)
+            .apply { eraseColor(loadedColor.toArgb()) }
+        val release = CompletableDeferred<Unit>()
+        val images = ImageLoaderRule(Interceptor { chain ->
+            release.await()
+            if (chain.request.data == failing) ErrorResult(null, chain.request, IllegalStateException("Missing picon"))
+            else SuccessResult(bitmap.asImage(), chain.request, DataSource.MEMORY)
+        })
+        images.apply(object : Statement() {
+            override fun evaluate() {
+                compose.setContent {
+                    MaterialTheme(colorScheme = MobileDarkColors) {
+                        Column {
+                            listOf("missing" to null, "failing" to failing, "loading" to loading).forEach { (tag, model) ->
+                                ChannelLogoTile(null, null, Modifier.size(112.dp, 56.dp).testTag(tag), model = model)
+                            }
+                        }
+                    }
+                }
+                val ground = MobileDarkColors.surfaceContainerHigh
+                val missingCenter = tileCenter("missing")
+                assertNotEquals("an absent model shows the fallback icon", setOf(ground), missingCenter)
+                assertEquals(setOf(failing, loading), images.requested.toSet())
+                assertEquals("a pending logo shows only the ground", setOf(ground), tileCenter("loading"))
+                assertEquals("a pending failure shows only the ground", setOf(ground), tileCenter("failing"))
+
+                compose.runOnIdle { release.complete(Unit) }
+                assertEquals("a failed logo shows the same icon as an absent model", missingCenter, tileCenter("failing"))
+                assertEquals("a successful load shows the logo", setOf(loadedColor), tileCenter("loading"))
+            }
+        }, Description.EMPTY).evaluate()
+    }
+
+    private fun tileCenter(tag: String): Set<Color> {
+        val pixels = compose.onNodeWithTag(tag).captureToImage().toPixelMap()
+        return buildSet {
+            for (x in pixels.width / 2 - 4..pixels.width / 2 + 4) {
+                for (y in pixels.height / 2 - 4..pixels.height / 2 + 4) add(pixels[x, y])
+            }
         }
     }
 
@@ -289,7 +357,7 @@ class ChannelsScreenTest {
             compose.mainClock.advanceTimeBy(48)
             val slot = compose.onNodeWithTag("fresh").captureToImage()
             fun inkKey(ground: Color): String = LogoInkTransformation(
-                ground.toArgb(), (slot.width * 0.76f).roundToInt(), (slot.height * 0.62f).roundToInt(), trim = true,
+                ground.toArgb(), (slot.width * 0.64f).roundToInt(), (slot.height * 0.50f).roundToInt(), trim = true,
             ).cacheKey
             fun ground(tag: String): Color {
                 val pixels = compose.onNodeWithTag(tag).captureToImage().toPixelMap()
@@ -348,7 +416,7 @@ class ChannelsScreenTest {
         onTag = {},
         onRetry = {},
         onOpenConnectionSettings = {},
-        onRecord = if (optional) ({}) else null,
+        onRecordControl = if (optional) ({ _, _, _ -> }) else null,
         onDetails = if (optional) ({}) else null,
         onShowInGuide = if (optional) ({}) else null,
     )

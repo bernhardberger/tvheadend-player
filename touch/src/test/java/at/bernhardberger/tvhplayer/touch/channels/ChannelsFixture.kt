@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.touch.channels
 
+import at.bernhardberger.tvheadend.sdk.core.EventId
+
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
@@ -63,6 +65,6 @@ private fun channel(id: String, name: String, tint: Color, now: ChannelProgram? 
 )
 
 private fun now(title: String, range: String, progress: Float, timeLeft: String) =
-    ChannelProgram(title, start = "", timeRange = range, progress = progress, timeLeft = timeLeft)
+    ChannelProgram(title, start = "", timeRange = range, progress = progress, timeLeft = timeLeft, eventId = EventId(1))
 
 private fun next(title: String, start: String) = ChannelProgram(title, start)

@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -29,8 +31,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
@@ -41,6 +46,7 @@ import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.ui.PartsLine
 import at.bernhardberger.tvhplayer.touch.ui.rememberStandalonePicture
 import at.bernhardberger.tvhplayer.touch.ui.RuleSchedule
+import kotlinx.coroutines.launch
 
 /**
  * The programs of one channel's day in start order, with a date heading where the night crosses
@@ -61,6 +67,17 @@ internal fun ChannelDay(
     contentPadding: PaddingValues = PaddingValues(bottom = 16.dp),
     watch: Boolean = true,
 ) {
+    val scope = rememberCoroutineScope()
+    val reveal = remember(openId, scope) {
+        val requester = BringIntoViewRequester()
+        var requested = false
+        Modifier.bringIntoViewRequester(requester).onGloballyPositioned {
+            if (!requested) {
+                requested = true
+                scope.launch { requester.bringIntoView() }
+            }
+        }
+    }
     LazyColumn(
         modifier, state = listState, contentPadding = contentPadding,
         verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
@@ -76,7 +93,7 @@ internal fun ChannelDay(
             }
             item(key = program.id) {
                 if (program.id == openId) {
-                    OpenProgram(program, layout, actions, watch, onCollapse = { onOpen(null) }) {
+                    OpenProgram(program, layout, actions, watch, reveal, onCollapse = { onOpen(null) }) {
                         onDetails(program.id)
                     }
                 } else {
@@ -138,12 +155,13 @@ private fun OpenProgram(
     layout: GuideLayout,
     actions: GuideActions,
     watch: Boolean,
+    modifier: Modifier,
     onCollapse: () -> Unit,
     onDetails: () -> Unit,
 ) {
     val onNow = program.onNow && watch
     val wide = layout == GuideLayout.Wide
-    Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+    Surface(modifier, shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
         Box {
             Column(Modifier.padding(16.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {

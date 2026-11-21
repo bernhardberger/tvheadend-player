@@ -1,12 +1,20 @@
 package at.bernhardberger.tvhplayer.touch.ui
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.isImeVisible
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Text
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -14,6 +22,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalAccessibilityManager
 import androidx.compose.ui.platform.LocalContext
@@ -25,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.window.core.layout.WindowSizeClass
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.notices.NoticeContext
@@ -43,7 +53,7 @@ import kotlinx.coroutines.delay
  */
 internal val LocalFrameNotices = compositionLocalOf<@Composable (Modifier) -> Unit> { {} }
 
-/** The frames inside [content] show the app's notices from [queue], for the connection in use. */
+/** The active page inside [content] shows notices from [queue], for the connection in use. */
 @Composable
 internal fun FrameNotices(
     queue: NoticeCenter,
@@ -58,6 +68,19 @@ internal fun FrameNotices(
         @Composable { modifier: Modifier -> TouchNoticeHost(queue, context, modifier) }
     }
     CompositionLocalProvider(LocalFrameNotices provides host, content)
+}
+
+/** The frame's notice host on a page with no Scaffold snackbar slot. Does not size the page. */
+@Composable
+internal fun BoxScope.BottomWindowNotices() {
+    val wide = currentWindowAdaptiveInfoV2().windowSizeClass
+        .isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND)
+    Box(
+        Modifier.matchParentSize().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)),
+        contentAlignment = if (wide) Alignment.BottomStart else Alignment.BottomCenter,
+    ) {
+        LocalFrameNotices.current(if (wide) Modifier else Modifier.fillMaxWidth())
+    }
 }
 
 /**

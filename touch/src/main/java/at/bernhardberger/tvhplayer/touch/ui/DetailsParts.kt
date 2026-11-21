@@ -62,7 +62,7 @@ internal fun ChannelLogoTile(
     tint: Color?,
     modifier: Modifier,
     shape: RoundedCornerShape = LogoShape,
-    /** The server logo's image model, drawn when [logo] is null; the no-logo icon stands in until it loads. */
+    /** The server logo's image model, drawn when [logo] is null; only a missing or failed logo shows an icon. */
     model: Any? = null,
 ) {
     val scheme = MaterialTheme.colorScheme
@@ -88,7 +88,7 @@ internal fun ChannelLogoTile(
 
 /**
  * A channel's logo fitted, whatever its shape, into the same share of the slot it stands in, centered by the
- * caller's Box (section 13); [fallback] stands in while a server logo loads or when it fails.
+ * caller's Box (section 13); [fallback] stands in when a logo is missing or fails to load.
  */
 @Composable
 internal fun ChannelLogoImage(logo: Painter?, model: Any?, ground: Color, fallback: @Composable () -> Unit = {}) {
@@ -100,7 +100,6 @@ internal fun ChannelLogoImage(logo: Painter?, model: Any?, ground: Color, fallba
     var size by remember { mutableStateOf(IntSize.Zero) }
     val measuredBounds = bounds.onSizeChanged { size = it }
     if (size.width <= 0 || size.height <= 0) {
-        fallback()
         Spacer(measuredBounds)
         return
     }
@@ -183,5 +182,5 @@ private fun Fact(key: String, value: String, keyWidth: Dp) {
 
 private val LogoShape = RoundedCornerShape(12.dp)
 private const val LOGO_SHADE = 0.35f
-private const val LOGO_WIDTH_SHARE = 0.76f
-private const val LOGO_HEIGHT_SHARE = 0.62f
+private const val LOGO_WIDTH_SHARE = 0.64f
+private const val LOGO_HEIGHT_SHARE = 0.50f
