@@ -179,7 +179,7 @@ private fun SideSheetContent(
             Column(Modifier.fillMaxSize()) {
                 SheetHead(
                     title, onBack, leading, closeLabel, hide, actions,
-                    if (scrim) Modifier.focusRequester(focus).focusProperties { canFocus = true } else Modifier,
+                    if (scrim) Modifier.focusRequester(focus) else Modifier,
                 )
                 content()
             }

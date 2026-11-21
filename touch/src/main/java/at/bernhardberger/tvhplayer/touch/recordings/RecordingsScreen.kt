@@ -30,7 +30,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
@@ -179,7 +178,7 @@ private fun TitleActions(
             openViewOptions()
         },
         modifier = Modifier.padding(start = 16.dp, end = 12.dp)
-            .focusRequester(viewOptionsFocus).focusProperties { canFocus = true },
+            .focusRequester(viewOptionsFocus),
         colors = ButtonDefaults.filledTonalButtonColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             contentColor = MaterialTheme.colorScheme.onSurface,

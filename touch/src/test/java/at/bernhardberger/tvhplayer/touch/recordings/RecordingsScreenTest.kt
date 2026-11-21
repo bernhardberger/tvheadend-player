@@ -21,6 +21,7 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasAnyAncestor
@@ -36,6 +37,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.test.platform.app.InstrumentationRegistry
 import at.bernhardberger.tvhplayer.touch.testutil.TouchCanvas
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouch
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouchWindows
@@ -134,6 +136,8 @@ class RecordingsScreenTest {
         fun sheetBack() = compose.runOnUiThread {
             (ShadowDialog.getLatestDialog() as ComponentDialog).onBackPressedDispatcher.onBackPressed()
         }
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        instrumentation.setInTouchMode(true)
         show()
         compose.onNodeWithText("View options").assertIsDisplayed()
         openViewOptions()
@@ -141,7 +145,7 @@ class RecordingsScreenTest {
         compose.onNodeWithText("Group by").assert(sheet)
         // The test harness still enumerates inactive windows; inspect the dialog's tree only.
         compose.onNode(hasText("Recordings") and sheet).assertDoesNotExist()
-        compose.onNodeWithContentDescription("Close").assertIsFocused()
+        compose.onNodeWithContentDescription("Close").assertIsNotFocused()
         compose.captureTouchWindows(GROUP, "tablet-recordings-view", TouchCanvas.TABLET)
         compose.onNodeWithText("Group by").performClick()
         compose.onNodeWithText("The server’s folder tree").assertIsDisplayed()
@@ -155,15 +159,24 @@ class RecordingsScreenTest {
         assertEquals(DvrArchiveGrouping.FOLDERS, state.value.view.grouping)
         compose.onNodeWithText("Show").assertIsDisplayed()
 
-        // A tap outside closes the sheet; so does system Back.
+        // A tap outside closes the sheet without focusing the opener in touch mode.
         compose.onNode(isDialog()).performTouchInput { click(Offset(width * 0.3f, height * 0.5f)) }
         assertSheetClosed()
-        compose.onNodeWithText("View options").assertIsFocused()
+        compose.onNodeWithText("View options").assertIsNotFocused()
         compose.onNodeWithText("Recording now").assertIsDisplayed()
-        openViewOptions()
-        sheetBack()
-        assertSheetClosed()
-        compose.onNodeWithText("View options").assertIsFocused()
+
+        instrumentation.setInTouchMode(false)
+        try {
+            // Robolectric's instrumentation flag seeds new windows, but the activity is already attached.
+            compose.runOnUiThread { compose.activity.window.decorView.requestFocusFromTouch() }
+            openViewOptions()
+            compose.onNodeWithContentDescription("Close").assertIsFocused()
+            sheetBack()
+            assertSheetClosed()
+            compose.onNodeWithText("View options").assertIsFocused()
+        } finally {
+            instrumentation.setInTouchMode(true)
+        }
     }
 
     @Test
