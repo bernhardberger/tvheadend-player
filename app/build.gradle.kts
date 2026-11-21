@@ -451,7 +451,7 @@ tasks.register("verifyExternalSdkConsumption") {
                 when (dependency) {
                     is ProjectDependency -> "$classpathName:${configuration.name}:project:${dependency.path}"
                         .takeIf {
-                            !(classpathName.startsWith(":app:") && dependency.path == clientProjectPath) &&
+                            !((classpathName.startsWith(":app:") || classpathName.startsWith(":presentation:")) && dependency.path == clientProjectPath) &&
                                 !((classpathName.startsWith(":app:") || classpathName.startsWith(":appliance:")) && dependency.path == brandProjectPath) &&
                                 !(classpathName.startsWith(":app:") && dependency.path == presentationProjectPath) &&
                                 !(classpathName.startsWith(":app:") && dependency.path == decoderProjectPath)
@@ -545,9 +545,10 @@ tasks.register("verifyExternalSdkConsumption") {
             ":app:profileImplementation:sdk-testing:$sdkVersion",
             ":client:implementation:sdk-android:$sdkVersion",
             ":client:implementation:sdk-media3:$sdkVersion",
+            ":presentation:implementation:sdk-android:$sdkVersion",
         )
         check(directSdkDependencies == expectedDirectSdkDependencies) {
-            "App/client SDK declarations $directSdkDependencies do not match $expectedDirectSdkDependencies"
+            "Player SDK declarations $directSdkDependencies do not match $expectedDirectSdkDependencies"
         }
         check(forbiddenLocalDependencies.isEmpty()) {
             "App/client dependencies contain local fallbacks: $forbiddenLocalDependencies"
@@ -593,7 +594,7 @@ tasks.register("verifyExternalSdkConsumption") {
                     module to version
                 }
             val expectedModules = if (variant.startsWith(":decoder-ffmpeg:") || variant.startsWith(":brand:") ||
-                variant.startsWith(":presentation:") || variant.startsWith(":appliance:")) {
+                variant.startsWith(":appliance:")) {
                 emptyMap()
             } else if (variant == ":app:playProfile") {
                 expectedTvheadendModules + ("sdk-testing" to sdkVersion)
@@ -610,9 +611,8 @@ tasks.register("verifyExternalSdkConsumption") {
                 "HTSP must remain runtime-only but $variant compile graph contains $compileTvheadendModules"
             }
 
-            // The shared theme, texts and companion have no playback stack; check their empty SDK graphs.
-            if (variant.startsWith(":brand:") || variant.startsWith(":presentation:") ||
-                variant.startsWith(":appliance:")) return@forEach
+            // The shared theme and companion have no playback stack; check their empty SDK graphs.
+            if (variant.startsWith(":brand:") || variant.startsWith(":appliance:")) return@forEach
 
             val media3Versions = runtimeGraph.filter { it.startsWith("media3=") }
                 .map { it.removePrefix("media3=") }

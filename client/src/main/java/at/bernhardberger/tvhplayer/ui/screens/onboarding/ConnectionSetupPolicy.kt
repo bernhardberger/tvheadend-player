@@ -11,7 +11,7 @@ import kotlin.time.Duration.Companion.seconds
  * outcome in place. The server stage has a second screen for the network search, opened from its
  * first. First run has an unnumbered welcome before these screens; editing skips it.
  */
-internal enum class SetupStep {
+enum class SetupStep {
     WELCOME,
     ADDRESS,
     FIND_SERVER,
@@ -25,7 +25,7 @@ internal enum class SetupStep {
  * The same wizard: empty on first run, prefilled from a stored server to edit it, empty to add
  * another server from Settings, or on Account alone to enter a password that can't be read.
  */
-internal enum class SetupMode {
+enum class SetupMode {
     FIRST_RUN,
     EDIT,
     ADD,
@@ -44,7 +44,7 @@ internal enum class SetupMode {
 }
 
 /** Null leaves the wizard. Test cancellation and results return to the Account screen. */
-internal fun SetupStep.previous(mode: SetupMode = SetupMode.FIRST_RUN): SetupStep? = when (this) {
+fun SetupStep.previous(mode: SetupMode = SetupMode.FIRST_RUN): SetupStep? = when (this) {
     SetupStep.WELCOME -> null
     SetupStep.ADDRESS -> if (mode == SetupMode.FIRST_RUN) SetupStep.WELCOME else null
     SetupStep.SIGN_IN -> if (mode == SetupMode.PASSWORD) null else SetupStep.ADDRESS
@@ -56,21 +56,21 @@ internal fun SetupStep.previous(mode: SetupMode = SetupMode.FIRST_RUN): SetupSte
  * How long a search looks for announcing servers. Discovery itself never ends, and most servers
  * that announce themselves answer within a few seconds, so "No servers found" follows this.
  */
-internal val DiscoveryWindow = 10.seconds
+val DiscoveryWindow = 10.seconds
 
 /**
  * The step a recreated flow resumes on. The test and its result belong to a session the saved
  * state cannot restore, and the password is never saved, so those resume on Account.
  */
-internal fun SetupStep.resumable(): SetupStep = when (this) {
+fun SetupStep.resumable(): SetupStep = when (this) {
     SetupStep.CONNECTING, SetupStep.FAILED, SetupStep.DONE -> SetupStep.SIGN_IN
     else -> this
 }
 
 /** The steps the step line shows: 1 Server, 2 Account, 3 Connect. */
-internal enum class SetupStage { SERVER, SIGN_IN, CONNECT }
+enum class SetupStage { SERVER, SIGN_IN, CONNECT }
 
-internal val SetupStep.stage: SetupStage?
+val SetupStep.stage: SetupStage?
     get() = when (this) {
         SetupStep.WELCOME -> null
         SetupStep.ADDRESS, SetupStep.FIND_SERVER -> SetupStage.SERVER
@@ -78,7 +78,7 @@ internal val SetupStep.stage: SetupStage?
         SetupStep.CONNECTING, SetupStep.FAILED, SetupStep.DONE -> SetupStage.CONNECT
     }
 
-internal enum class SetupAction {
+enum class SetupAction {
     TRY_AGAIN,
     CHANGE_ADDRESS,
     CHANGE_SIGN_IN,
@@ -92,7 +92,7 @@ internal enum class SetupAction {
  * A failed connection test. Its wording is the catalog [condition]'s; [actions] are in screen
  * order and the first one takes the initial focus.
  */
-internal enum class SetupFailure(
+enum class SetupFailure(
     val condition: AppErrorCondition,
     val actions: List<SetupAction>,
     /** False where the catalog hint sends the user to Connection settings, which this flow is. */
@@ -130,7 +130,7 @@ internal enum class SetupFailure(
  * The failure's actions in [mode]; editing a stored server saves anyway instead of continuing
  * anyway. Entering a password changes neither the address nor the account name.
  */
-internal fun SetupFailure.actionsFor(mode: SetupMode): List<SetupAction> =
+fun SetupFailure.actionsFor(mode: SetupMode): List<SetupAction> =
     if (mode == SetupMode.PASSWORD) {
         actions.filter { it != SetupAction.CHANGE_ADDRESS }
             .map { if (it == SetupAction.CONTINUE_ANYWAY) SetupAction.SAVE_ANYWAY else it }
@@ -140,7 +140,7 @@ internal fun SetupFailure.actionsFor(mode: SetupMode): List<SetupAction> =
         actions
     }
 
-internal fun SessionFailure.toSetupFailure(): SetupFailure = when (kind) {
+fun SessionFailure.toSetupFailure(): SetupFailure = when (kind) {
     SessionFailureKind.SERVER_UNREACHABLE,
     SessionFailureKind.TRANSPORT_UNAVAILABLE -> SetupFailure.UNREACHABLE
     SessionFailureKind.NETWORK_UNAVAILABLE -> SetupFailure.NETWORK
@@ -156,7 +156,3 @@ internal fun SessionFailure.toSetupFailure(): SetupFailure = when (kind) {
     }
     else -> SetupFailure.OTHER
 }
-
-internal enum class AddressFocus { SEARCH, HOST, PORT, CONTINUE }
-
-internal enum class SignInFocus { USERNAME, PASSWORD, CONNECT }
