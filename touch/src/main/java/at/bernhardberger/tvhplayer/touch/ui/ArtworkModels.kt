@@ -20,6 +20,7 @@ import at.bernhardberger.tvhplayer.core.channelLogoModel
 import at.bernhardberger.tvhplayer.core.programmeArtworkModel
 import coil3.compose.AsyncImagePainter
 import coil3.compose.rememberAsyncImagePainter
+import coil3.request.ImageRequest
 import java.net.URI
 
 /**
@@ -81,7 +82,7 @@ internal fun ArtworkImage(
         model != null -> {
             val server = rememberAsyncImagePainter(model, contentScale = contentScale)
             val state by server.state.collectAsState()
-            LogFailedLoad(model, state)
+            LogFailedLoad((model as? ImageRequest)?.data ?: model, state)
             if (state !is AsyncImagePainter.State.Success) fallback()
             // Drawn while it loads too: the painter resolves its size when it draws.
             Image(server, null, modifier, contentScale = contentScale)

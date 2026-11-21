@@ -168,7 +168,7 @@ internal fun ProgramDetailsColumn(
         if (inPlayer) {
             ProgramRecordAction(
                 details.record, details.id, actions, Modifier.padding(top = 16.dp), leads = true,
-                scheduledByRule = details.scheduledByRule,
+                ruleSchedule = details.ruleSchedule,
             )
         } else {
             Actions(details, actions, Modifier.padding(top = 16.dp), equalWidth = true)
@@ -262,7 +262,7 @@ private fun Timing(details: ProgramDetails, modifier: Modifier) {
 @Composable
 private fun Actions(details: ProgramDetails, actions: GuideActions, modifier: Modifier, equalWidth: Boolean) {
     val watch = actions.onWatch?.takeIf { details.onNow }
-    val record = details.scheduledByRule || actions.offers(details.record)
+    val record = details.ruleSchedule != null || actions.offers(details.record)
     val showInGuide = actions.onShowInGuide
     if (watch == null && !record && showInGuide == null) return
     val showInGuideButton: @Composable () -> Unit = {
@@ -280,7 +280,7 @@ private fun Actions(details: ProgramDetails, actions: GuideActions, modifier: Mo
                 if (record) {
                     ProgramRecordAction(
                         details.record, details.id, actions, share, leads = watch == null,
-                        scheduledByRule = details.scheduledByRule,
+                        ruleSchedule = details.ruleSchedule,
                     )
                 }
             }
@@ -296,7 +296,7 @@ private fun Actions(details: ProgramDetails, actions: GuideActions, modifier: Mo
             if (record) {
                 ProgramRecordAction(
                     details.record, details.id, actions, leads = watch == null,
-                    scheduledByRule = details.scheduledByRule,
+                    ruleSchedule = details.ruleSchedule,
                 )
             }
             showInGuideButton()
@@ -338,7 +338,7 @@ private fun OtherAirings(details: ProgramDetails, actions: GuideActions) {
             }
             val supporting: @Composable () -> Unit = { PartsLine(airing.line) }
             val trailing: (@Composable () -> Unit)? = if (airing.scheduled) {
-                { ScheduledIcon(airing.scheduledByRule) }
+                { ScheduledIcon(airing.ruleSchedule) }
             } else {
                 null
             }

@@ -304,7 +304,6 @@
     <ID>MagicNumber:LogoGlowPolicy.kt:8</ID>
     <ID>MagicNumber:LogoHaloTransformation.kt:LogoHaloTransformation$24</ID>
     <ID>MagicNumber:LogoHaloTransformation.kt:LogoHaloTransformation$3</ID>
-    <ID>MagicNumber:LogoInkTransformation.kt:24</ID>
     <ID>MagicNumber:SessionArtworkLoader.kt:100</ID>
     <ID>MagicNumber:SessionArtworkLoader.kt:1024</ID>
     <ID>MagicNumber:SessionArtworkLoader.kt:256</ID>
@@ -573,8 +572,6 @@
     <ID>MaxLineLength:LivePlayerLayerState.kt:LivePlayerLayerState$foregroundLayer: PlayerForegroundLayer = at.bernhardberger.tvhplayer.core.playerForegroundLayer(foregroundContext())</ID>
     <ID>MaxLineLength:LivePlayerServerWait.kt:LivePlayerServerWaitState$AndroidKeyEvent.ACTION_DOWN -&gt; if (native.repeatCount == 0) layerState.core.beginOpeningKeyCycle(native.keyCode)</ID>
     <ID>MaxLineLength:LivePlayerServerWait.kt:val state = remember(close) { LivePlayerServerWaitState(hasSession, latest, connection, close, reconnect, connectionSettings) }</ID>
-    <ID>MaxLineLength:LogoInkTransformation.kt:LogoInkTransformation$override val cacheKey: String = "logoInk(${Integer.toHexString(ground)},${width}x$height${if (trim) ",trim" else ""})"</ID>
-    <ID>MaxLineLength:LogoInkTransformation.kt:LogoInkTransformation$val logo = if (inked == null) source else Bitmap.createBitmap(inked, source.width, source.height, Bitmap.Config.ARGB_8888)</ID>
     <ID>MaxLineLength:MainActivity.kt:ActivityMediaSessionLifecycle$Intent(context, MainActivity::class.java).setAction(ACTION_SESSION_ACTIVITY).setPackage(context.packageName)</ID>
     <ID>MaxLineLength:MainActivity.kt:ActivityMediaSessionLifecycle.&lt;no name provided&gt;$com.google.common.util.concurrent.Futures.immediateFailedFuture(UnsupportedOperationException("Session artwork uses bytes only"))</ID>
     <ID>MaxLineLength:MainActivity.kt:ActivityMediaSessionLifecycle.&lt;no name provided&gt;$override</ID>

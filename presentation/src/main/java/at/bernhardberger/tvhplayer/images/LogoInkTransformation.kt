@@ -17,7 +17,7 @@ import kotlin.math.roundToInt
  * With [trim], the picon's transparent margin goes first, so the logo's own shape is what fits.
  * With [measureTone], note the tone of its original ink for a logo drawn on a picture.
  */
-internal class LogoInkTransformation(
+class LogoInkTransformation(
     private val ground: Int, private val width: Int, private val height: Int, private val trim: Boolean = false,
     private val measureTone: Boolean = false,
 ) : Transformation() {
@@ -45,10 +45,10 @@ internal class LogoInkTransformation(
     }
 }
 
-internal data class LogoBounds(val left: Int, val top: Int, val width: Int, val height: Int)
+data class LogoBounds(val left: Int, val top: Int, val width: Int, val height: Int)
 
 /** The smallest rectangle holding every pixel at least [minAlpha] opaque; null when there is none. */
-internal fun visibleBounds(pixels: IntArray, width: Int, height: Int, minAlpha: Int = 16): LogoBounds? {
+fun visibleBounds(pixels: IntArray, width: Int, height: Int, minAlpha: Int = 16): LogoBounds? {
     var left = width; var top = height; var right = -1; var bottom = -1
     for (y in 0 until height) for (x in 0 until width) {
         if (pixels[y * width + x] ushr 24 < minAlpha) continue

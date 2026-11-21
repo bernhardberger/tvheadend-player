@@ -60,6 +60,7 @@ class RecordingsScreenTest {
 
     private val state = mutableStateOf(flatFixture())
     private val deleted = mutableListOf<String>()
+    private val stopped = mutableListOf<String>()
     private var asking by mutableStateOf(false)
 
     @Test
@@ -88,12 +89,18 @@ class RecordingsScreenTest {
         show()
         pickTheHalfWatchedMatch()
         compose.onNodeWithContentDescription("Delete").assertDoesNotExist()
-        compose.onNodeWithContentDescription("Remove entry").performClick()
+        compose.onNodeWithText("Remove entry").performClick()
         assertEquals(listOf(PickedId), deleted)
+        compose.onNodeWithText("Resume").assertDoesNotExist()
 
-        // A running recording, which only Stop would end, offers none rather than a dimmed Delete.
+        state.value = flatFixture().withRemove(RecordingRemoveControl.Stop)
+        compose.onNodeWithContentDescription("Delete").assertDoesNotExist()
+        compose.onNodeWithText(compose.activity.getString(SharedR.string.stop_recording)).performClick()
+        assertEquals(listOf(PickedId), stopped)
+
+        // Without an action, the row does not show a disabled substitute.
         state.value = flatFixture().withRemove(null)
-        compose.onNodeWithContentDescription("Remove entry").assertDoesNotExist()
+        compose.onNodeWithText("Remove entry").assertDoesNotExist()
         compose.onNodeWithContentDescription("Delete").assertDoesNotExist()
     }
 
@@ -277,6 +284,7 @@ class RecordingsScreenTest {
             onPlay = { _, _ -> },
             onDelete = { deleted += it },
             onMore = {},
+            onStop = { stopped += it },
         )
         compose.setContent {
             MaterialTheme(colorScheme = MobileDarkColors) {
