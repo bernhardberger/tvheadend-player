@@ -35,6 +35,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -99,12 +102,16 @@ internal fun LandscapePlayerContent(
             )
         }
         // Without a program running there is no window to draw: the footer keeps its program and actions.
-        state.timeline?.let { timeline ->
+        // The clocks follow the program only, so a position sample does not recompose the footer.
+        val program by remember(state.timeline) {
+            derivedStateOf { state.timeline.value?.let { it.programStart to it.duration } }
+        }
+        program?.let { (start, duration) ->
             val clockModifier = Modifier.padding(bottom = trackBottom - 8.dp)
-            ClockText(playerClock(timeline, 0), clockModifier.align(Alignment.BottomStart))
-            ClockText(playerClock(timeline, timeline.duration), clockModifier.align(Alignment.BottomEnd))
+            ClockText(playerClock(start, 0), clockModifier.align(Alignment.BottomStart))
+            ClockText(playerClock(start, duration), clockModifier.align(Alignment.BottomEnd))
             PlayerTimeline(
-                timeline, state.status, layout, true, preview, onPreviewChange, onSeek,
+                state.timeline, state.status, layout, true, preview, onPreviewChange, onSeek,
                 Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = trackGutter)
                     .padding(bottom = trackBottom - 24.dp).height(44.dp),
             )

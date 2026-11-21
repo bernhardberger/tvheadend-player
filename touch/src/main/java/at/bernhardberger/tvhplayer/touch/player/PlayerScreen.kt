@@ -21,9 +21,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -51,6 +53,7 @@ internal fun PlayerScreen(
     onChoice: (PlayerChoice) -> Unit,
     modifier: Modifier = Modifier,
     video: (@Composable (Modifier) -> Unit)? = null,
+    onControlsShown: (Boolean) -> Unit = {},
 ) {
     var visible by rememberSaveable(state.channel.id) { mutableStateOf(true) }
     var panel by rememberSaveable { mutableStateOf<PlayerPanel?>(null) }
@@ -70,6 +73,8 @@ internal fun PlayerScreen(
         val sheet = panel?.let { !it.atButton(layout) } == true
         val controls = !sheet && (visible || !playing)
         val toggle = if (playing) ({ visible = !visible }) else null
+        val latestShown by rememberUpdatedState(onControlsShown)
+        LaunchedEffect(controls) { latestShown(controls) }
         if (layout.upright) {
             Column(
                 Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)
@@ -78,10 +83,9 @@ internal fun PlayerScreen(
                 Box(Modifier.fillMaxWidth().aspectRatio(16f / 9).background(Color.Black)) {
                     Picture(state, layout, controls, toggle, video)
                     PictureControls(state, layout, controls, preview, onAction, onBrightness, openOptions)
-                    val timeline = state.timeline
-                    if (state.status.hasTimeline && timeline != null) {
+                    if (state.status.hasTimeline) {
                         PlayerTimeline(
-                            timeline, state.status, layout, controls, preview, { preview = it }, onSeek,
+                            state.timeline, state.status, layout, controls, preview, { preview = it }, onSeek,
                             Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(24.dp),
                         )
                     }
@@ -115,17 +119,16 @@ private fun BoxScope.LandscapeFooter(
     panels: PanelHost,
     onSeek: (Int) -> Unit,
 ) {
-    val timeline = state.timeline
     val showFooter = controls && state.status !is LivePlayerStatus.Reconnecting &&
         state.status != LivePlayerStatus.PauseEnded
     if (showFooter) {
         LandscapePlayerContent(
             state, layout, preview, onAction, panels, onPreview, onSeek, Modifier.align(Alignment.BottomCenter),
         )
-    } else if (!controls && !sheet && timeline != null) {
+    } else if (!controls && !sheet) {
         // Controls hidden: the thin line stays on the edge.
         PlayerTimeline(
-            timeline, state.status, layout, false, null, {}, onSeek,
+            state.timeline, state.status, layout, false, null, {}, onSeek,
             Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(28.dp).offset(y = 20.dp),
         )
     }

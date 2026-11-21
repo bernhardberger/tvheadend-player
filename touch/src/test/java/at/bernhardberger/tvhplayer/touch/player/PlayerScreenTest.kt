@@ -197,7 +197,7 @@ class PlayerScreenTest {
         val fixture = LivePlayerState(
             channel = channel, channels = channels,
             frame = BitmapPainter(TouchFixtureArt.art("still-ridge-light").asImageBitmap()),
-            timeline = LiveTimeline(LocalTime.of(20, 0), 3600, 1510, 2568, 2820),
+            timeline = mutableStateOf(LiveTimeline(LocalTime.of(20, 0), 3600, 1510, 2568, 2820)),
             tracks = PlayerTracks(
                 audio = listOf(
                     PlayerTrack("English", "MPEG-1 Layer II", "Stereo"),

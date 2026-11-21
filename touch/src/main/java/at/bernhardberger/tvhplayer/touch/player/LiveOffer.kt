@@ -14,6 +14,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -25,7 +26,7 @@ import at.bernhardberger.tvhplayer.touch.R
 
 @Composable
 internal fun LiveOffer(
-    timeline: LiveTimeline?,
+    source: State<LiveTimeline?>,
     offered: Set<PlayerControl>,
     preview: Int?,
     onAction: (PlayerAction) -> Unit,
@@ -34,8 +35,10 @@ internal fun LiveOffer(
     live: Boolean = true,
 ) {
     // The distance behind live and Go live belong to timeshift; without it the row keeps Full screen only.
+    // Only this row reads the sampled distance, so a sample recomposes it and not the face around it.
+    val timeline = source.value
     val showLive = live && timeline != null && PlayerControl.Timeshift in offered
-    val behind = timeline?.let { it.live - (preview ?: it.position) } ?: 0
+    val behind = timeline?.let { it.behindAt(preview ?: it.position) } ?: 0
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
         if (showLive && (behind > 0 || preview == null)) {
             Text(

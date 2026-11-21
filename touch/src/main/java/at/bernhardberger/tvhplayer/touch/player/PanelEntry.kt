@@ -55,7 +55,9 @@ internal fun panelEntries(
 private fun EntryMaker.record(state: LivePlayerState) = listOf(
     command(
         stringResource(R.string.player_record),
-        state.timeline?.let { stringResource(R.string.player_record_program_detail, playerClock(it, it.duration)) },
+        state.timeline.value?.let {
+            stringResource(R.string.player_record_program_detail, playerClock(it.programStart, it.duration))
+        },
         PlayerAction.RecordProgram,
     ),
     command(
