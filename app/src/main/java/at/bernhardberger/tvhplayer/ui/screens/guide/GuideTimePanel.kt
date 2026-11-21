@@ -39,7 +39,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.GuideWindowBounds
 import at.bernhardberger.tvhplayer.core.floorGuideWindowToHour
 import at.bernhardberger.tvhplayer.core.moveGuideWindowByDays

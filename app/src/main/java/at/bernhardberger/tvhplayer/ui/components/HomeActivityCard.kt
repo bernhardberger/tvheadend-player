@@ -44,7 +44,8 @@ import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.programmeArtwork
 import at.bernhardberger.tvhplayer.core.recordingArtwork
 import at.bernhardberger.tvhplayer.core.programmeArtworkModel
@@ -223,7 +224,7 @@ internal fun HomeActivityCard(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         val hintColor = if (focused) TvTextColors.primary else TvTextColors.secondary
-                        Icon(painterResource(if (playing) R.drawable.ic_fullscreen else R.drawable.ic_play_arrow),
+                        Icon(painterResource(if (playing) AppR.drawable.ic_fullscreen else AppR.drawable.ic_play_arrow),
                             contentDescription = null, modifier = Modifier.size(18.dp), tint = hintColor)
                         Text(stringResource(when {
                             !playing -> R.string.watch

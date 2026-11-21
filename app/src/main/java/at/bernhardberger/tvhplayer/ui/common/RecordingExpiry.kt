@@ -3,7 +3,7 @@ package at.bernhardberger.tvhplayer.ui.common
 import android.content.res.Resources
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrRemoval
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.RecordingExpiryTimeLeft
 import at.bernhardberger.tvhplayer.core.RecordingExpiryUnit
 import at.bernhardberger.tvhplayer.core.recordingExpiryTimeLeft

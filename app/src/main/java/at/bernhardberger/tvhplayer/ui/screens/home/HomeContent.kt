@@ -95,7 +95,8 @@ import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvhplayer.core.runningRecordingForEvent
 import at.bernhardberger.tvhplayer.core.activeRecordingChannelIds
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.HomeFocusKey
 import at.bernhardberger.tvhplayer.core.recordingArtwork
 import at.bernhardberger.tvhplayer.core.HomeInput
@@ -870,7 +871,7 @@ internal fun HomeContent(
             }
         }
         if (focusedSection == HomeSectionKind.ON_NOW) {
-            androidx.tv.material3.Icon(painterResource(R.drawable.ic_expand_less), null,
+            androidx.tv.material3.Icon(painterResource(AppR.drawable.ic_expand_less), null,
                 Modifier.align(Alignment.TopCenter).padding(top = 8.dp).size(30.dp)
                     .testTag("home-up-hint").semantics { hideFromAccessibility() },
                 tint = TvTextColors.secondary.copy(alpha = 0.5f))
@@ -914,7 +915,7 @@ private fun HomeHeader(
     ) {
         if (updateHintShown) {
             RoundIconButton(
-                icon = painterResource(R.drawable.ic_auto_awesome),
+                icon = painterResource(AppR.drawable.ic_auto_awesome),
                 label = stringResource(R.string.whats_new),
                 value = stringResource(R.string.whats_new_hint, at.bernhardberger.tvhplayer.BuildConfig.VERSION_NAME),
                 active = false,
@@ -938,7 +939,7 @@ private fun HomeHeader(
         Text(formatRecordingDate(nowSec, dateOnly = true, locale = locale),
             style = MaterialTheme.typography.bodySmall, color = TvTextColors.secondary, maxLines = 1)
         }
-        RoundIconButton(icon = painterResource(R.drawable.ic_sell),
+        RoundIconButton(icon = painterResource(AppR.drawable.ic_sell),
             label = stringResource(R.string.browse_tags), value = tag ?: stringResource(R.string.all_channels),
             active = tag != null, onClick = onTags, focusRequester = tagsRequester, onFocused = onFocused,
             modifier = Modifier.focusProperties {
@@ -948,7 +949,7 @@ private fun HomeHeader(
                 if (ltr) { left = leading; right = viewRequester } else { right = leading; left = viewRequester }
             }.testTag("home-tags-button"))
         RoundIconButton(
-            icon = painterResource(R.drawable.ic_tune),
+            icon = painterResource(AppR.drawable.ic_tune),
             label = stringResource(R.string.channels_view_options),
             onClick = onViewOptions,
             focusRequester = viewRequester,
@@ -1544,7 +1545,7 @@ private fun HomeShelfRow(
                         StatusBadge(
                             text = formatRecordingExpiry(it, resources, compact = true),
                             tone = StatusBadgeTone.NEUTRAL,
-                            icon = R.drawable.ic_hourglass_bottom,
+                            icon = AppR.drawable.ic_hourglass_bottom,
                             contentDescription = expiryDescription,
                             modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp),
                         )
@@ -1589,7 +1590,11 @@ private fun HomeUpcomingRow(
     ) { index, item, modifier ->
         if (item == null) HomeTextCard(stringResource(R.string.home_all_scheduled),
             containerColor = TvSurfaceColors.containerHigh,
-            leading = { androidx.tv.material3.Icon(painterResource(R.drawable.ic_event), null, Modifier.size(36.dp), tint = TvTextColors.secondary) },
+            leading = {
+                androidx.tv.material3.Icon(
+                    painterResource(AppR.drawable.ic_event), null, Modifier.size(36.dp), tint = TvTextColors.secondary,
+                )
+            },
             onClick = { onActivate(items.size, "all-scheduled") },
             modifier = modifier.testTag("home-all-scheduled").onFocusChanged {
                 if (it.isFocused) onCardFocus(items.size, "all-scheduled")

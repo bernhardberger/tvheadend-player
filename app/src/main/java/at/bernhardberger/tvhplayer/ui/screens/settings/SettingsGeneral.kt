@@ -12,7 +12,8 @@ import androidx.core.app.LocaleManagerCompat
 import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import at.bernhardberger.tvheadend.sdk.core.CacheStatistics
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.cacheSizeMegabytes
 import at.bernhardberger.tvhplayer.settings.AppLanguage
 import at.bernhardberger.tvhplayer.settings.ClockFormat
@@ -104,7 +105,7 @@ internal fun settingsGeneralLevels(
             settingsRow("clear-cache", stringResource(R.string.clear_cache),
                 supporting = usage, announcement = announcement,
                 busy = clearState == CacheClearState.CLEARING,
-                trailingIcon = R.drawable.ic_delete_outlined,
+                trailingIcon = AppR.drawable.ic_delete_outlined,
                 onClick = { if (clearState != CacheClearState.CLEARING) onClearCache() }),
         )),
         settingsLevel(LANGUAGE_LEVEL, languageTitle, languages.map { (language, label) ->

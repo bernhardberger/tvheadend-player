@@ -4,7 +4,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.DvrConfiguration
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.RecordingDraftField
 import at.bernhardberger.tvhplayer.ui.components.GuidedStepAction
 
@@ -72,7 +73,7 @@ private fun TimerRecordingMore(state: TimerRecordingEditorState, configurations:
         stringResource(R.string.context_delete),
         { state.navigation.confirmation = AutomaticRecordingEditorConfirmation.DELETE },
         editorRowModifier(state.navigation, "delete"),
-        icon = R.drawable.ic_delete_outlined,
+        icon = AppR.drawable.ic_delete_outlined,
     )
 }
 

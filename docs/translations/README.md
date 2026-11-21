@@ -1,7 +1,7 @@
 # Translation workflow
 
 The [approved plan](../translations-plan.md) defines the release slate. English
-resources in `app/src/main/res/values/strings.xml` are the source of truth. Keep
+resources in `presentation/src/main/res/values/strings.xml` are the source of truth. Keep
 accepted German and human corrections; do not regenerate them for style.
 
 The Appliance companion screen stays en-US only to keep maintenance low;

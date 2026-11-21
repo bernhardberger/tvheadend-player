@@ -24,7 +24,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.LayoutDirection
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.ui.TvGridGutter
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.components.RoundIconButton
@@ -104,7 +105,7 @@ internal fun ChannelsHeader(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     if (tagsShown) RoundIconButton(
-                        icon = painterResource(R.drawable.ic_sell),
+                        icon = painterResource(AppR.drawable.ic_sell),
                         label = stringResource(R.string.browse_tags),
                         value = tag ?: stringResource(R.string.all_channels),
                         active = tag != null,
@@ -117,7 +118,7 @@ internal fun ChannelsHeader(
                             .testTag("channels-tags-button"),
                     )
                     if (filterShown) RoundIconButton(
-                        icon = painterResource(R.drawable.ic_filter_list),
+                        icon = painterResource(AppR.drawable.ic_filter_list),
                         label = stringResource(R.string.guide_filter),
                         value = filter,
                         dot = filterDot,
@@ -131,7 +132,7 @@ internal fun ChannelsHeader(
                     )
                 }
                 RoundIconButton(
-                    icon = painterResource(R.drawable.ic_tune),
+                    icon = painterResource(AppR.drawable.ic_tune),
                     label = stringResource(R.string.channels_view_options),
                     onClick = { onOpen(ChannelsPanel.VIEW_OPTIONS) },
                     focusRequester = focus.view,

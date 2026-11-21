@@ -5,7 +5,8 @@ import android.content.res.Configuration
 import android.os.LocaleList
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvhplayer.BuildConfig
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
@@ -32,7 +33,7 @@ class AppLanguageTest {
     @Test
     fun generatedLocaleConfig_namesExactlyThePickersLanguages() {
         val context = ApplicationProvider.getApplicationContext<Application>()
-        val parser = context.resources.getXml(R.xml.locales_config)
+        val parser = context.resources.getXml(AppR.xml.locales_config)
         val names = mutableListOf<String>()
         while (parser.next() != XmlPullParser.END_DOCUMENT) {
             if (parser.eventType == XmlPullParser.START_TAG && parser.name == "locale") {

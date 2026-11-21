@@ -30,7 +30,8 @@ import at.bernhardberger.tvheadend.sdk.core.DvrConfigId
 import at.bernhardberger.tvheadend.sdk.core.DvrConfiguration
 import at.bernhardberger.tvheadend.sdk.core.DvrPriority
 import at.bernhardberger.tvheadend.sdk.core.DvrRemoval
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.orderBrowseChannels
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.components.GuidedStepAction
@@ -182,7 +183,8 @@ internal fun RecordingEditorHour(
 ) {
     GuidedStepAction(
         formatClock(LocalTime.of(hour, 0)), onClick,
-        modifier.then(editorRowModifier(navigation, "hour-$hour")), trailingIcon = R.drawable.ic_keyboard_arrow_right,
+        modifier.then(editorRowModifier(navigation, "hour-$hour")),
+        trailingIcon = AppR.drawable.ic_keyboard_arrow_right,
         enabled = enabled && navigation.canNavigate(),
     )
 }

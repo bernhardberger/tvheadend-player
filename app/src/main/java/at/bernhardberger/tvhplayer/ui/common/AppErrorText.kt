@@ -2,7 +2,7 @@ package at.bernhardberger.tvhplayer.ui.common
 
 import android.content.Context
 import androidx.annotation.StringRes
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.AppErrorAction
 import at.bernhardberger.tvhplayer.core.AppErrorCondition
 

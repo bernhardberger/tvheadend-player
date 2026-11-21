@@ -25,7 +25,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.rememberTextMeasurer
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.DvrArchiveGrouping
 import at.bernhardberger.tvhplayer.core.DvrArchiveShow
 import at.bernhardberger.tvhplayer.core.DvrArchiveSort
@@ -131,7 +132,7 @@ internal fun ArchiveViewOptionsButton(
     val label = stringResource(R.string.channels_view_options)
     val values = view.nonDefaultValues()
     RecordingsHeadlineButton(
-        icon = R.drawable.ic_tune,
+        icon = AppR.drawable.ic_tune,
         label = label,
         description = if (values.isEmpty()) label else stringResource(
             R.string.header_button_value_description, label, values.joinToString(", "),

@@ -24,7 +24,8 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.ui.TvOnRecordingContainerColor
 import at.bernhardberger.tvhplayer.ui.TvRecordingContainerColor
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
@@ -121,10 +122,10 @@ fun RecordingBadge(
             Row(modifier.testTag("recording-badge").clearAndSetSemantics { contentDescription = description },
                 horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
                 StatusBadge(stringResource(R.string.player_status_rec), StatusBadgeTone.RECORDING, compact = compact,
-                    icon = R.drawable.ic_fiber_smart_record.takeIf { rule != null })
+                    icon = AppR.drawable.ic_fiber_smart_record.takeIf { rule != null })
                 if (state == DvrEntryState.RECORDING_ERROR) {
                     StatusBadge(stringResource(R.string.recording_badge_errors), StatusBadgeTone.ERROR,
-                        icon = R.drawable.ic_error_outlined, compact = compact)
+                        icon = AppR.drawable.ic_error_outlined, compact = compact)
                 }
             }
         }
@@ -139,21 +140,21 @@ fun RecordingBadge(
         }
         DvrEntryState.COMPLETED_ERROR ->
             StatusBadge(stringResource(R.string.recording_state_failed), StatusBadgeTone.ERROR,
-                modifier.testTag("recording-badge-failed"), icon = R.drawable.ic_error_outlined,
+                modifier.testTag("recording-badge-failed"), icon = AppR.drawable.ic_error_outlined,
                 contentDescription = stringResource(R.string.details_status_failed))
         DvrEntryState.MISSED ->
             StatusBadge(stringResource(R.string.recording_state_missed), StatusBadgeTone.ERROR,
-                modifier.testTag("recording-badge-missed"), icon = R.drawable.ic_error_outlined,
+                modifier.testTag("recording-badge-missed"), icon = AppR.drawable.ic_error_outlined,
                 contentDescription = stringResource(R.string.recording_notice_missed))
         DvrEntryState.INVALID ->
             StatusBadge(stringResource(R.string.recording_state_cancelled), StatusBadgeTone.NEUTRAL,
-                modifier.testTag("recording-badge-cancelled"), icon = R.drawable.ic_cancel_outlined)
+                modifier.testTag("recording-badge-cancelled"), icon = AppR.drawable.ic_cancel_outlined)
         else -> Unit
     }
 }
 
 private fun scheduledRecordingBadgeIcon(skipped: Boolean, rule: RecordingRule?): Int = when {
-    skipped -> R.drawable.ic_event_busy
-    rule != null -> R.drawable.ic_schedule_rule
-    else -> R.drawable.ic_schedule
+    skipped -> AppR.drawable.ic_event_busy
+    rule != null -> AppR.drawable.ic_schedule_rule
+    else -> AppR.drawable.ic_schedule
 }

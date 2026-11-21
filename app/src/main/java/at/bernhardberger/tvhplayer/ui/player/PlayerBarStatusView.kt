@@ -38,7 +38,8 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.PlayerBarDistance
 import at.bernhardberger.tvhplayer.core.PlayerBarEnd
 import at.bernhardberger.tvhplayer.core.PlayerEndAnnouncement
@@ -81,8 +82,10 @@ private fun stateAnnouncement(state: PlayerStateCell): String = stringResource(w
 @Composable
 internal fun PlayerStateGlyph(state: PlayerStateCell, size: Dp, color: Color) {
     when (state) {
-        PlayerStateCell.PLAYING -> Icon(painterResource(R.drawable.ic_play_arrow), null, Modifier.size(size), tint = color)
-        PlayerStateCell.PAUSED -> Icon(painterResource(R.drawable.ic_pause), null, Modifier.size(size), tint = color)
+        PlayerStateCell.PLAYING -> Icon(
+            painterResource(AppR.drawable.ic_play_arrow), null, Modifier.size(size), tint = color,
+        )
+        PlayerStateCell.PAUSED -> Icon(painterResource(AppR.drawable.ic_pause), null, Modifier.size(size), tint = color)
     }
 }
 

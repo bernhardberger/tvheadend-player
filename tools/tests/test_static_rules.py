@@ -99,15 +99,12 @@ class StaticRulesTest(unittest.TestCase):
         self.assertEqual(2, sum("uses testConnection" in item for item in violations))
 
     def test_finds_connection_probe_resource_declarations(self):
-        self.write(
-            "app/src/main/res/values/strings.xml",
-            '<resources><string name="test_connection">Test</string></resources>',
-        )
-
-        violations = find_static_rule_violations(self.root)
-
-        self.assertTrue(any("NoConnectionProbe" in violation for violation in violations))
-        self.assertTrue(any("strings.xml" in violation for violation in violations))
+        for module in ("app", "presentation"):
+            with self.subTest(module=module):
+                path = f"{module}/src/main/res/values/strings.xml"
+                self.write(path, '<resources><string name="test_connection">Test</string></resources>')
+                violations = find_static_rule_violations(self.root)
+                self.assertTrue(any(f"NoConnectionProbe: {path}" in violation for violation in violations))
 
     def test_ignores_connection_probe_words_in_xml_comments(self):
         self.write(

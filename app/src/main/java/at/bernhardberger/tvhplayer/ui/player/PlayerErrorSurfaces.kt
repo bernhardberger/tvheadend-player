@@ -31,7 +31,8 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.AppErrorAction
 import at.bernhardberger.tvhplayer.core.AppErrorCondition
 import at.bernhardberger.tvhplayer.core.LivePlayerAlert
@@ -85,7 +86,7 @@ internal fun PlayerChannelMessage(
                 .testTag(PlayerChannelMessageTag),
         ) {
             Icon(
-                painter = painterResource(R.drawable.ic_error_outlined),
+                painter = painterResource(AppR.drawable.ic_error_outlined),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.padding(bottom = 16.dp).size(40.dp),
@@ -165,7 +166,7 @@ internal fun LivePlayerAlertOverlay(
         },
         status = seconds?.takeIf { shown is LivePlayerAlert.Recovering }?.let(text::nextAttempt),
         detail = condition?.let { text.paragraph(it, (shown as? LivePlayerAlert.Error)?.startsAt?.let(::alertStart)) },
-        icon = painterResource(R.drawable.ic_error_outlined).takeIf { condition != null },
+        icon = painterResource(AppR.drawable.ic_error_outlined).takeIf { condition != null },
         // Whatever retries by itself shows the ring; the error icon is for alerts that need the viewer.
         busy = shown is LivePlayerAlert.Recovering || condition == AppErrorCondition.RECONNECTING,
         footnote = last?.second,

@@ -3,7 +3,8 @@ package at.bernhardberger.tvhplayer.ui.screens
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.AutomaticRecordingKind
 import at.bernhardberger.tvhplayer.core.AutorecPreviewState
 import at.bernhardberger.tvhplayer.ui.components.GuidedStepAction
@@ -36,7 +37,7 @@ internal fun AutomaticRecordingWords(state: AutomaticRecordingEditorState) {
                 subtitle = if (raw)
                     stringResource(R.string.autorec_editor_raw_value, state.draft.pattern.words)
                 else state.draft.pattern.words.ifBlank { stringResource(R.string.autorec_editor_enter_words) },
-                trailingIcon = R.drawable.ic_edit.takeUnless { raw },
+                trailingIcon = AppR.drawable.ic_edit.takeUnless { raw },
             )
             if (state.draft.kind == AutomaticRecordingKind.KEYWORD) GuidedStepAction(
                 stringResource(R.string.autorec_editor_search_in),
@@ -44,7 +45,7 @@ internal fun AutomaticRecordingWords(state: AutomaticRecordingEditorState) {
                 editorRowModifier(state.navigation, "search-in"),
                 subtitleMaxLines = 2,
                 subtitle = automaticRecordingSearchInLabel(state.draft.fullText),
-                trailingIcon = R.drawable.ic_keyboard_arrow_right,
+                trailingIcon = AppR.drawable.ic_keyboard_arrow_right,
             )
             AutomaticRecordingEpisodeRows(state)
         }

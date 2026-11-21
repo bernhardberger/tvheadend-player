@@ -3,7 +3,7 @@ package at.bernhardberger.tvhplayer.ui.common
 import android.app.Application
 import android.content.res.Configuration
 import androidx.test.core.app.ApplicationProvider
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.ui.components.recordingMetadataFacts
 import at.bernhardberger.tvhplayer.ui.screens.recordings.recordingDateTime
 import at.bernhardberger.tvhplayer.ui.screens.recordings.recordingTimeRange

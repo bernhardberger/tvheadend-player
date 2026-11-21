@@ -72,6 +72,7 @@ import at.bernhardberger.tvhplayer.core.DvrArchiveGrouping
 import at.bernhardberger.tvhplayer.core.DvrArchiveView
 import at.bernhardberger.tvhplayer.core.DvrArchiveSort
 import at.bernhardberger.tvhplayer.core.DvrArchiveShow
+import at.bernhardberger.tvhplayer.core.DvrLibraryMode
 import at.bernhardberger.tvhplayer.core.partitionDvrLibrary
 import at.bernhardberger.tvhplayer.core.groupDvrSchedule
 import at.bernhardberger.tvhplayer.ui.screens.recordings.PROBLEMS_CLEAR_TAG
@@ -87,7 +88,7 @@ import at.bernhardberger.tvhplayer.ui.screens.recordings.ArchiveLevelHeading
 import at.bernhardberger.tvhplayer.ui.common.formatFileSize
 import at.bernhardberger.tvhplayer.ui.common.formatRecordedDuration
 import at.bernhardberger.tvhplayer.ui.common.formatRecordingDate
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.ui.components.SideRail
 import java.io.File
 import java.util.Locale
@@ -169,7 +170,7 @@ class RecordingsVisualLayoutTest {
         val now = System.currentTimeMillis() / 1000L
         val resources = ApplicationProvider.getApplicationContext<Application>().resources
         val relative = resources.getQuantityString(
-            at.bernhardberger.tvhplayer.R.plurals.recording_expiry_minutes, 45, 45)
+            at.bernhardberger.tvhplayer.presentation.R.plurals.recording_expiry_minutes, 45, 45)
         val row = compose.onNodeWithTag("recording-list-metadata-1", useUnmergedTree = true)
             .fetchSemanticsNode().config[SemanticsProperties.Text].single().text
         assertTrue("Expiry is the final overline segment", row.substringAfterLast(" • ").endsWith(relative))
@@ -653,6 +654,11 @@ class RecordingsVisualLayoutTest {
         compose.runOnIdle { assertEquals(listOf("Documentaries"), screenState.archivePath) }
         key(Key.Back)
         compose.runOnIdle { assertTrue(screenState.archivePath.isEmpty()) }
+        focused("recordings-folder-Documentaries")
+        upToOptions()
+        compose.pressKey(Key.Back)
+        focused(BROWSE_TAB)
+        downToList()
         focused("recordings-folder-Documentaries")
         upToOptions()
         key(Key.DirectionLeft)
@@ -1508,6 +1514,8 @@ class RecordingsVisualLayoutTest {
         focused("recording-list-entry-1")
         key(Key.Back)
         focused("recordings-folder-Documentaries")
+        key(Key.Back)
+        compose.onNodeWithTag("recordings-mode-archive").assertIsFocused()
         assertNoCommands()
     }
 
@@ -2310,6 +2318,56 @@ class RecordingsVisualLayoutTest {
         assertNoCommands()
     }
 
+    @Test fun scheduleKeepsThePendingPageWhenItsFocusedRecordingIsRemoved() =
+        assertPagingAfterFocusedRemoval(DvrLibraryMode.SCHEDULE)
+
+    @Test fun archiveKeepsThePendingPageWhenItsFocusedRecordingIsRemoved() =
+        assertPagingAfterFocusedRemoval(DvrLibraryMode.ARCHIVE)
+
+    @Test fun selectedScheduleTabTakesFocusFromAPageSurvivingRemoval() =
+        assertPagingAfterFocusedRemoval(DvrLibraryMode.SCHEDULE, leaveForTab = true)
+
+    @Test fun selectedArchiveTabTakesFocusFromAPageSurvivingRemoval() =
+        assertPagingAfterFocusedRemoval(DvrLibraryMode.ARCHIVE, leaveForTab = true)
+
+    private fun assertPagingAfterFocusedRemoval(mode: DvrLibraryMode, leaveForTab: Boolean = false) {
+        val schedule = mode == DvrLibraryMode.SCHEDULE
+        if (!schedule) startView = DvrArchiveView()
+        val entries = (20L..35L).map {
+            if (schedule) recording(it, "Scheduled programme $it", null, DvrEntryState.SCHEDULED)
+            else recording(it, "Recorded programme $it", "recording-$it.ts")
+        }
+        show(entries = entries)
+        if (schedule) openScheduleScreen()
+        fun focusedRowTag() = compose.onNode(isFocused()).fetchSemanticsNode().config[SemanticsProperties.TestTag]
+        val first = focusedRowTag()
+        val origin = entries.single { "recording-list-entry-${it.id.value}" == first }
+        val pageDown = Key(android.view.KeyEvent.KEYCODE_CHANNEL_DOWN)
+        compose.pressKey(pageDown)
+        val destination = focusedRowTag()
+        assertTrue(destination.startsWith("recording-list-entry-"))
+        assertTrue(destination != first)
+        reopenRecordings(mode)
+        focused(first)
+        val tab = compose.onNodeWithTag(if (schedule) "recordings-mode-schedule" else BROWSE_TAB)
+        compose.mainClock.autoAdvance = false
+        try {
+            compose.pressKey(pageDown)
+            publish(entries.filterNot { it.id == origin.id }, awaitPreparation = false)
+            gone(first)
+            compose.onNodeWithTag(first).assertDoesNotExist()
+            if (leaveForTab) {
+                compose.onNodeWithTag(destination).assertIsNotFocused()
+                compose.pressKey(Key.DirectionUp)
+                tab.assertIsFocused()
+            }
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+        if (leaveForTab) tab.assertIsFocused() else compose.onNodeWithTag(destination).assertIsFocused()
+        assertNoCommands()
+    }
+
     @Test @Category(VisualCapture::class) @Config(qualifiers = "en-rUS-w960dp-h540dp-land-xhdpi",
         instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
     fun scheduleAutomaticPhase3Captures() {
@@ -2791,7 +2849,7 @@ class RecordingsVisualLayoutTest {
             val preparing = hasTestTag("recordings-skeleton") and hasAnyAncestor(hasTestTag("browse-preparing"))
             val skeleton = compose.onNode(preparing, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
             compose.onAllNodesWithText(ApplicationProvider.getApplicationContext<android.content.Context>()
-                .getString(at.bernhardberger.tvhplayer.R.string.loading)).assertCountEquals(0)
+                .getString(at.bernhardberger.tvhplayer.presentation.R.string.loading)).assertCountEquals(0)
             assertEquals("The preparing skeleton stands where the syncing one does at font $scale", syncing, skeleton)
         } finally {
             compose.mainClock.autoAdvance = true
@@ -2914,6 +2972,22 @@ class RecordingsVisualLayoutTest {
         key(Key.Back)
         focused("recording-list-entry-3")
         assertNoCommands()
+    }
+
+    @Test fun removedFlatArchiveRowRestoresItsNeighborAfterMovingUp() {
+        startView = DvrArchiveView()
+        val entries = (1L..3L).map { recording(it, "Recording $it", "recording-$it.ts", startEpochSeconds = it) }
+        show(entries = entries)
+        focused("recording-list-entry-3")
+        key(Key.DirectionDown)
+        key(Key.DirectionDown)
+        focused("recording-list-entry-1")
+        key(Key.DirectionUp)
+        focused("recording-list-entry-2")
+        publish(entries.filterNot { it.id == DvrEntryId(2) })
+        compose.onNodeWithTag("recording-list-entry-2").assertDoesNotExist()
+        assertEquals("The surviving row at the removed row's index should take focus",
+            "recording-list-entry-1", compose.onNode(isFocused()).fetchSemanticsNode().config[SemanticsProperties.TestTag])
     }
 
     @Test fun replacementSessionCannotConfirmAnArchiveDeletionWithCollidingId() {
@@ -3479,13 +3553,17 @@ class RecordingsVisualLayoutTest {
 
     /** Reopens the screen on its Schedule tab, as Home's upcoming card does. */
     private fun openScheduleScreen() {
+        reopenRecordings(DvrLibraryMode.SCHEDULE)
+        gone(OPTIONS)
+    }
+
+    private fun reopenRecordings(mode: DvrLibraryMode) {
         compose.runOnIdle { screenShown.value = false }
         compose.waitForIdle()
-        screenState = RecordingsScreenState(at.bernhardberger.tvhplayer.core.DvrLibraryMode.SCHEDULE)
+        screenState = RecordingsScreenState(mode)
         compose.runOnIdle { screenShown.value = true }
         compose.mainClock.advanceTimeUntil { tabFocused() || listRowFocused() || tagFocused("schedule-new-timer") }
         compose.waitForIdle()
-        gone(OPTIONS)
     }
 
     /** As [openScheduleScreen], then Up from the first entry to the tabs. */

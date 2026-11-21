@@ -11,7 +11,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.nextOccurrences
 import at.bernhardberger.tvhplayer.core.resolveOccurrenceOn
 import at.bernhardberger.tvhplayer.ui.TvTextSecondaryAlpha

@@ -871,4 +871,4 @@ open:
 | `docs/defect-ledger.md` D22 | Channels-down hint removed | `downHint = Channels` still passed (`ui/player/VideoPlayerScreen.kt:1775`); D22 reopened |
 | `docs/archive/browse-cohesion-proposal.md:199-215`, `:260` | Header actions, 396/360 dp trial, typography trial | None in code |
 | `AGENTS.md:1` and other engineering docs | "TVHeadend Player" in prose | Public name is "Tvheadend Player" (`docs/product-identity-plan.md`); `docs/` prose corrected 2026-10-18, `AGENTS.md` is outside the docs batch |
-| `app/src/main/res/values/strings.xml:358` | "Playback never starts directly from the guide" | Watch exists; the string is also unused |
+| `presentation/src/main/res/values/strings.xml:358` | "Playback never starts directly from the guide" | Watch exists; the string is also unused |

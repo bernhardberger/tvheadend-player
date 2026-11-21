@@ -12,7 +12,7 @@ import coil3.EventListener
 import coil3.request.ImageRequest
 import coil3.request.transformations
 import kotlinx.coroutines.Dispatchers
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.presentation.R
 import androidx.compose.runtime.remember
 import org.koin.compose.KoinIsolatedContext
 import org.koin.dsl.koinApplication
@@ -286,7 +286,7 @@ class AutomaticRecordingEditorTest {
         compose.onNodeWithTag("timer-recording-leave-main").assertIsEnabled()
         compose.onNode(hasAnyAncestor(hasTestTag("centred-dialog-card")) and
             androidx.compose.ui.test.hasText(RuntimeEnvironment.getApplication().getString(
-                at.bernhardberger.tvhplayer.R.string.timer_editor_repeat_required))).assertExists()
+                at.bernhardberger.tvhplayer.presentation.R.string.timer_editor_repeat_required))).assertExists()
         compose.pressKey(Key.DirectionLeft)
         compose.pressKey(Key.DirectionRight)
         compose.onNodeWithTag("timer-recording-keep-editing").assertIsFocused()
@@ -598,7 +598,7 @@ class AutomaticRecordingEditorTest {
         compose.onNodeWithTag("timer-recording-main").assertIsEnabled()
         compose.onNodeWithTag("timer-recording-channel-time").assertIsFocused()
         compose.onNodeWithText(org.robolectric.RuntimeEnvironment.getApplication().getString(
-            at.bernhardberger.tvhplayer.R.string.timer_editor_time_passed,
+            at.bernhardberger.tvhplayer.presentation.R.string.timer_editor_time_passed,
         )).assertExists()
     }
 

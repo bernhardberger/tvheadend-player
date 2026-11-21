@@ -29,7 +29,8 @@ import androidx.tv.material3.CardContainerDefaults
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.TvTextColors
 
@@ -86,7 +87,9 @@ internal fun HomeAllRecordingsCard(
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    painterResource(if (allChannels) R.drawable.ic_live_tv_outlined else R.drawable.ic_video_library),
+                    painterResource(
+                        if (allChannels) AppR.drawable.ic_live_tv_outlined else AppR.drawable.ic_video_library,
+                    ),
                     null,
                     Modifier.size(36.dp),
                     tint = TvTextColors.secondary,
@@ -131,7 +134,7 @@ internal fun HomeUpcomingCard(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Icon(
-                painterResource(R.drawable.ic_event),
+                painterResource(AppR.drawable.ic_event),
                 null,
                 Modifier.size(24.dp),
                 tint = TvTextColors.secondary,

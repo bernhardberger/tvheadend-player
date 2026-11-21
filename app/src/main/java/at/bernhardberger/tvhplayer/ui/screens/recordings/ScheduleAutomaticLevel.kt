@@ -17,7 +17,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.AutomaticRecordingList
 import at.bernhardberger.tvhplayer.core.AutomaticRecordingListItem
 import at.bernhardberger.tvhplayer.ui.TvSpacing48
@@ -53,8 +54,8 @@ internal fun scheduleAutomaticLevels(
                 Column {
                     ScheduleManagementRow(
                         SCHEDULE_NEW_AUTOMATIC, stringResource(R.string.automatic_recording_new_title),
-                        stringResource(R.string.schedule_automatic_new_help), R.drawable.ic_fiber_smart_record,
-                        R.drawable.ic_add, modifier, activate, enabled = canAdd)
+                        stringResource(R.string.schedule_automatic_new_help), AppR.drawable.ic_fiber_smart_record,
+                        AppR.drawable.ic_add, modifier, activate, enabled = canAdd)
                     HorizontalDivider(Modifier.padding(vertical = TvSpacing8))
                     if (automatic.items.isEmpty()) Column(Modifier.padding(vertical = TvSpacing48)) {
                         ModeEmptyState(R.string.schedule_automatic_empty)

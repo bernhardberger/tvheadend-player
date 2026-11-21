@@ -522,7 +522,7 @@ class BrowseContextMenuScreenTest {
     fun runningGuideMenuUsesGermanTimeAndWatchLabels() {
         show(recordings = false, guideMenu = true)
         val resources = ApplicationProvider.getApplicationContext<Application>().resources
-        compose.onNodeWithText(resources.getString(at.bernhardberger.tvhplayer.R.string.context_watch)).assertExists()
+        compose.onNodeWithText(resources.getString(at.bernhardberger.tvhplayer.presentation.R.string.context_watch)).assertExists()
         compose.onNodeWithText("Läuft • bis ", substring = true).assertExists()
         compose.onNodeWithTag("browse-context-progress").assertIsDisplayed()
     }

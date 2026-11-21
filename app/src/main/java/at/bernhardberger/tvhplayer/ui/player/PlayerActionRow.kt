@@ -40,7 +40,8 @@ import androidx.tv.material3.Button
 import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.R as AppR
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.ui.TvOverlayActionGap
 import at.bernhardberger.tvhplayer.ui.components.recordingMarkColor
 import at.bernhardberger.tvhplayer.ui.components.recordingStatusSpoken
@@ -90,20 +91,20 @@ internal fun PlayerActionRow(
 ) {
     val playPause = stringResource(if (paused) R.string.play else R.string.pause)
     val settings = stringResource(R.string.nav_settings)
-    val stop = stringResource(R.string.stop_playback)
     val audio = stringResource(R.string.audio_quick_list)
     val actions = listOfNotNull(
         PlayerAction("player-pause", playPause,
-            if (paused) R.drawable.ic_play_arrow else R.drawable.ic_pause, onTogglePause, pauseFocus),
-        PlayerAction("player-stop", stop, R.drawable.ic_stop, onStop, stopFocus),
+            if (paused) AppR.drawable.ic_play_arrow else AppR.drawable.ic_pause, onTogglePause, pauseFocus),
+        PlayerAction("player-stop", stringResource(R.string.stop_playback), AppR.drawable.ic_stop, onStop, stopFocus),
         onRecord?.let { PlayerAction("player-record", stringResource(R.string.record),
-            R.drawable.ic_fiber_manual_record, it, recordFocus, recordingStatusSpoken(recordState, rule = null)) },
+            AppR.drawable.ic_fiber_manual_record, it, recordFocus, recordingStatusSpoken(recordState, rule = null)) },
         tracks.audio?.let {
-            PlayerAction("player-audio", audio, R.drawable.ic_audiotrack, onAudioList, audioFocus, it)
+            PlayerAction("player-audio", audio, AppR.drawable.ic_audiotrack, onAudioList, audioFocus, it)
         },
-        PlayerAction("player-info", stringResource(R.string.details_program), R.drawable.ic_info, onInfo, infoFocus),
-        onSchedule?.let { PlayerAction("player-schedule", stringResource(R.string.channel_schedule), R.drawable.ic_event_list, it, scheduleFocus) },
-        PlayerAction("player-settings", settings, R.drawable.ic_settings, onSettings, settingsFocus),
+        PlayerAction("player-info", stringResource(R.string.details_program), AppR.drawable.ic_info, onInfo, infoFocus),
+        onSchedule?.let { PlayerAction("player-schedule", stringResource(R.string.channel_schedule),
+            AppR.drawable.ic_event_list, it, scheduleFocus) },
+        PlayerAction("player-settings", settings, AppR.drawable.ic_settings, onSettings, settingsFocus),
     )
     // Playback actions stand at the start; track lists, details and Settings at the end.
     val playbackEnd = if (onRecord == null) 2 else 3
@@ -252,7 +253,7 @@ private fun PlayerRowSkipButton(
             },
     ) {
         Icon(
-            painterResource(R.drawable.ic_skip_next),
+            painterResource(AppR.drawable.ic_skip_next),
             contentDescription = null,
             modifier = Modifier.size(IconButtonDefaults.MediumIconSize),
         )
