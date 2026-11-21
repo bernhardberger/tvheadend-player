@@ -76,8 +76,6 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.tv.material3.MaterialTheme
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
-import at.bernhardberger.tvheadend.sdk.core.DvrConfiguration
-import at.bernhardberger.tvheadend.sdk.core.DvrConfigurationsState
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
 import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
@@ -101,7 +99,6 @@ import at.bernhardberger.tvhplayer.core.GuidePendingNavigationAction
 import at.bernhardberger.tvhplayer.core.GuidePreparationNavigation
 import at.bernhardberger.tvhplayer.core.guidePendingNavigationAction
 import at.bernhardberger.tvhplayer.core.ProgrammeCategory
-import at.bernhardberger.tvhplayer.core.ProgrammeRecordingTarget
 import at.bernhardberger.tvhplayer.core.browsingFocusChannelId
 import at.bernhardberger.tvhplayer.core.currentEpgSnapshot
 import at.bernhardberger.tvhplayer.core.firstUnsettledGuidePageIndex
@@ -1952,7 +1949,8 @@ fun EpgGridScreen(
                                 current.currentSession?.let { capability ->
                                     dvrMutationActions.launchMutation(DvrMutationAction.CreateProgramme(
                                         programme.programmeRecordingTarget(capability), null),
-                                        current, { observationState.value }, nowSecProvider, recordSettings, notices,
+                                        current, { observationState.value }, nowSecProvider,
+                                        { recordSettings.settings.first().recordingProfileId }, notices,
                                         coroutineScope, detailsMutationInFlight)
                                 }
                             } else if (action in programmeRecordingRecordKeyActions) {
@@ -2221,31 +2219,6 @@ fun EpgGridScreen(
     }
     }
 }
-
-internal fun currentDvrMutation(
-    mutation: DvrMutationAction?,
-    sourceObservation: SessionObservation?,
-    currentObservation: SessionObservation,
-): DvrMutationAction? = mutation?.takeIf {
-    currentObservation.currentSession != null && sourceObservation?.currentSession === currentObservation.currentSession &&
-        it.recordingStateIsCurrent(currentObservation) &&
-        (it !is DvrMutationAction.CreateProgramme || currentGuideRecordingTarget(it.target, currentObservation) != null)
-}
-
-internal fun currentGuideRecordingTarget(target: ProgrammeRecordingTarget?, observation: SessionObservation): ProgrammeRecordingTarget? =
-    target?.takeIf { selected ->
-        observation.currentSession === selected.currentSession &&
-            observation.event(selected.eventId)?.programmeRecordingTarget(selected.currentSession) == selected
-    }
-
-internal fun SessionObservation.currentDvrConfigurations(): List<DvrConfiguration> =
-    when (val state = dvrConfigurationsState) {
-        is DvrConfigurationsState.Current -> state.configurations
-        is DvrConfigurationsState.Stale,
-        is DvrConfigurationsState.Synchronizing,
-        DvrConfigurationsState.Denied,
-        DvrConfigurationsState.Unknown -> emptyList()
-    }
 
 /** The Guide's 1xx alert, shown only while it has no channels to draw: the connection's failure, or 108 when Ready has none. */
 /** The first programme of [genre] in channel order, for a Guide opened from a Home genre card. */

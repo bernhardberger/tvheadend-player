@@ -188,7 +188,7 @@ class RemoteLogoCacheTest {
     @Test fun cancelledStaleRequestStillRemovesItsDiskAndMemoryVariants() = runTest {
         val entered = CompletableDeferred<String>()
         val image = Bitmap.createBitmap(8, 4, Bitmap.Config.ARGB_8888).asImage()
-        val memory = requireNotNull(buildImageLoader(app, session, cache).also { loader = it }.memoryCache)
+        val memory = requireNotNull(buildImageLoader(app, session, cache, userAgent = "RemoteLogoCacheTest", crossfadeMillis = 0).also { loader = it }.memoryCache)
         val staleLoader = loader!!.newBuilder().components {
             add(cache)
             add(Interceptor { chain ->
@@ -317,7 +317,7 @@ class RemoteLogoCacheTest {
         }.build()
         // Replace only the component registry to use a no-network HTTP client. The production
         // disk/memory configuration and clearing interceptor stay in use.
-        return buildImageLoader(app, session, cache).newBuilder().components {
+        return buildImageLoader(app, session, cache, userAgent = "RemoteLogoCacheTest", crossfadeMillis = 0).newBuilder().components {
             add(cache)
             addTvheadendArtwork()
             add(OkHttpNetworkFetcherFactory(callFactory = { client }))

@@ -34,7 +34,7 @@ object AppClock {
 
 /** Browse clocks share a five-second cadence; only readers subscribe to changes. */
 @Composable
-internal fun rememberCurrentEpochSeconds(): () -> Long {
+fun rememberCurrentEpochSeconds(): () -> Long {
     val nowSec = remember { mutableLongStateOf(System.currentTimeMillis() / 1000L) }
     LaunchedEffect(nowSec) {
         while (true) {
@@ -47,7 +47,7 @@ internal fun rememberCurrentEpochSeconds(): () -> Long {
 
 /** Details refresh on minute boundaries independently of the Guide's five-second now line. */
 @Composable
-internal fun rememberDetailsEpochSeconds(
+fun rememberDetailsEpochSeconds(
     nowSecProvider: () -> Long = { System.currentTimeMillis() / 1000L },
 ): Long {
     val clock by rememberUpdatedState(nowSecProvider)

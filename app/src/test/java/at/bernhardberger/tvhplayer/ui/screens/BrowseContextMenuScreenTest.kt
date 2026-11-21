@@ -5,6 +5,7 @@ import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore
 import at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.flow.first
 import at.bernhardberger.tvhplayer.testutil.settleFrames
 
 import at.bernhardberger.tvhplayer.testutil.pressKey
@@ -1841,7 +1842,7 @@ class BrowseContextMenuScreenTest {
                                  val recordScope = androidx.compose.runtime.rememberCoroutineScope()
                                  val recordInFlight = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<DvrMutationAction?>(null) }
                                  val handler: (ChannelId) -> at.bernhardberger.tvhplayer.core.BrowseContextAction? = { id -> DvrMutationActions(screenSession.dvrRepository).recordChannelProgramme(id,
-                                     { session.observation.value }, { now.epochSeconds }, settings, notices, recordScope, recordInFlight) }
+                                     { session.observation.value }, { now.epochSeconds }, { settings.settings.first().recordingProfileId }, notices, recordScope, recordInFlight) }
                                  handler
                              },
                              view = ChannelsView(ChannelsLayout.LIST),

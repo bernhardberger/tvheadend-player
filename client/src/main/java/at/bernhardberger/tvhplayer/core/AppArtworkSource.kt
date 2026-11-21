@@ -30,20 +30,20 @@ data class AppArtworkSource(
 }
 
 /** Reuse the SDK's cache-or-remote selector for programme pictures as well as logos. */
-internal fun programmeArtwork(event: EpgEvent): ChannelIcon? =
+fun programmeArtwork(event: EpgEvent): ChannelIcon? =
     event.image?.let(ChannelIcon::ImageCache) ?: ChannelIcon.parse(event.remoteImage?.url)
 
-internal fun recordingArtwork(entry: DvrEntry): ChannelIcon? =
+fun recordingArtwork(entry: DvrEntry): ChannelIcon? =
     (entry.image ?: entry.fanartImage)?.let(ChannelIcon::ImageCache)
         ?: ChannelIcon.parse((entry.remoteImage ?: entry.remoteFanartImage)?.url)
 
 /** Remote pictures follow the same unauthenticated Coil path as remote channel logos. */
-internal fun programmeArtworkModel(art: ChannelIcon, session: CurrentSessionObservation?): Any =
+fun programmeArtworkModel(art: ChannelIcon, session: CurrentSessionObservation?): Any =
     channelLogoModel(art, session, null, null)
 
 /** Shared logo model resolution for Compose and non-UI consumers. */
 @OptIn(ExperimentalTvheadendApi::class)
-internal fun channelLogoModel(
+fun channelLogoModel(
     icon: ChannelIcon,
     current: CurrentSessionObservation?,
     tvheadend: TvheadendSession?,
@@ -64,7 +64,7 @@ internal fun channelLogoModel(
  * arrives with `&amp;` (or `&amp;amp;` from a double-escaping grabber) between its parameters
  * (tvheadend/tvheadend#2316). The image host then ignores every parameter after the first.
  */
-internal fun String.withXmlAmpersandsDecoded(): String {
+fun String.withXmlAmpersandsDecoded(): String {
     var url = this
     while ("&amp;" in url) url = url.replace("&amp;", "&")
     return url
