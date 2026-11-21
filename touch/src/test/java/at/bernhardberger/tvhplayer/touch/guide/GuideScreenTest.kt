@@ -2,18 +2,23 @@ package at.bernhardberger.tvhplayer.touch.guide
 
 import androidx.activity.ComponentActivity
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.text.TextLayoutResult
 import at.bernhardberger.tvhplayer.touch.testutil.TouchCanvas
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouch
 import at.bernhardberger.tvhplayer.ui.MobileDarkColors
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -41,6 +46,10 @@ class GuideScreenTest {
         compose.onNodeWithText(COASTAL_MILES_SYNOPSIS_START, substring = true).assertIsDisplayed()
         compose.onAllNodes(hasText("Watch")).assertCountEquals(0)
         assertEquals(emptyList<String>(), watched)
+        // Details always stays: on Record's line where the column has room for both, as here.
+        val record = compose.onNodeWithText("Record").getBoundsInRoot()
+        val detailsButton = compose.onNodeWithText("Details").assertIsDisplayed().getBoundsInRoot()
+        assertTrue(detailsButton.top < record.bottom)
         capture("tablet-guide-overview-open", TouchCanvas.TABLET)
 
         // Back folds it again.
@@ -93,6 +102,7 @@ class GuideScreenTest {
     @Config(qualifiers = UPRIGHT)
     fun uprightOverview() {
         show(overviewFixture(upright = true))
+        assertPartLinesWhole()
         capture("tablet-upright-guide-overview", TouchCanvas.TABLET_UPRIGHT)
     }
 
@@ -100,6 +110,7 @@ class GuideScreenTest {
     @Config(qualifiers = UPRIGHT)
     fun uprightChannelDay() {
         show(byChannelFixture(upright = true), GuideView.ByChannel, open = RIDGE_LIGHT_ID)
+        assertPartLinesWhole()
         capture("tablet-upright-guide-channel", TouchCanvas.TABLET_UPRIGHT)
     }
 
@@ -114,6 +125,7 @@ class GuideScreenTest {
     @Config(qualifiers = PHONE)
     fun phoneOverviewOpensInPlaceAndTabsSwitchTheView() {
         show(phoneOverviewFixture())
+        assertPartLinesWhole()
         capture("phone-guide-overview", TouchCanvas.PHONE)
 
         compose.onNodeWithText("Glass Harbor").performClick()
@@ -170,6 +182,19 @@ class GuideScreenTest {
                     initialDetails = detailsId,
                 )
             }
+        }
+    }
+
+    /** A line of parts too narrow for all of them drops whole parts from its end; none is cut by an ellipsis. */
+    private fun assertPartLinesWhole() {
+        val lines = compose.onAllNodes(hasText(" • ", substring = true), useUnmergedTree = true)
+            .fetchSemanticsNodes()
+        assertTrue(lines.isNotEmpty())
+        lines.forEach { node ->
+            val layouts = mutableListOf<TextLayoutResult>()
+            node.config[SemanticsActions.GetTextLayoutResult].action?.invoke(layouts)
+            val layout = layouts.single()
+            assertFalse(layout.layoutInput.text.text, (0 until layout.lineCount).any(layout::isLineEllipsized))
         }
     }
 

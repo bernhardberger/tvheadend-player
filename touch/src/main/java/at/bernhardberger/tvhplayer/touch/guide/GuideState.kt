@@ -63,10 +63,10 @@ internal data class GuideProgram(
     val title: String,
     /** "8:00 PM". */
     val start: String,
-    /** The closed row's line, e.g. "S1 E6 • Documentary". */
-    val line: String,
-    /** The opened program's line, e.g. "60m • Documentary • 2024". */
-    val openLine: String? = null,
+    /** The closed row's line as parts, e.g. "S1 E6", "Documentary"; a narrow row drops whole parts from the end. */
+    val line: List<String>,
+    /** The opened program's line as parts, e.g. "60m", "Documentary", "2024". */
+    val openLine: List<String>? = null,
     /** "8:00–9:00 PM". */
     val timeRange: String? = null,
     val episode: String? = null,
@@ -95,8 +95,8 @@ internal data class ProgramDetails(
     val logoTint: Color? = null,
     val title: String,
     val episode: String? = null,
-    /** "Drama • 2024 • 1h 27m". */
-    val metadata: String? = null,
+    /** As parts: "Drama", "2024", "1h 27m". */
+    val metadata: List<String> = emptyList(),
     val ageRating: String? = null,
     val timeRange: String,
     val progress: Float? = null,
@@ -120,8 +120,8 @@ internal data class ProgramAiring(
     val logoTint: Color? = null,
     /** "Tomorrow 7:50 PM". */
     val time: String,
-    /** "Amber Stage • S2 E5 • Low Water". */
-    val line: String,
+    /** As parts: "Amber Stage", "S2 E5", "Low Water". */
+    val line: List<String>,
     val scheduled: Boolean = false,
 )
 

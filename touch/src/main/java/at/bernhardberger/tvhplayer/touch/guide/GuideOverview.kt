@@ -9,8 +9,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -49,8 +49,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.touch.R
-import at.bernhardberger.tvhplayer.touch.recordings.joinParts
 import at.bernhardberger.tvhplayer.touch.ui.ChannelLogoTile
+import at.bernhardberger.tvhplayer.touch.ui.PartsLine
 
 /** The day menu and the jump switch above the overview. */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -181,10 +181,9 @@ private fun ColumnItem(
                         program.title, style = if (lead) type.titleMedium else type.titleSmall,
                         maxLines = 2, overflow = TextOverflow.Ellipsis,
                     )
-                    Text(
+                    PartsLine(
                         if (open) program.openLine ?: program.line else program.line,
                         style = if (lead) type.bodyMedium else type.bodySmall, color = scheme.onSurfaceVariant,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis,
                     )
                 }
                 if (program.scheduled) ScheduledIcon()
@@ -207,10 +206,11 @@ private fun OpenInColumn(program: GuideProgram, actions: GuideActions, phone: Bo
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        // The tablet column writes Details as text beside Record; the phone row keeps its icon, tighter, as drawn.
+        // The tablet column writes Details as text beside Record, the phone row keeps its icon, as drawn; both
+        // need the tighter padding for Details to share Record's line, and it wraps under Record where it cannot.
         ProgramActions(
             program.channelId, program.id, program.onNow, actions, Modifier.padding(top = 12.dp), onDetails,
-            detailsIcon = phone, compact = phone,
+            detailsIcon = phone, compact = true,
         )
     }
 }
@@ -277,12 +277,9 @@ internal fun OverviewRows(
                         leadingContent = {
                             ChannelLogoTile(channel.logo, channel.logoTint, Modifier.size(88.dp, 48.dp))
                         },
-                        overlineContent = { Text(joinParts(listOf(channel.name, program.start)), maxLines = 1) },
+                        overlineContent = { PartsLine(listOf(channel.name, program.start)) },
                         supportingContent = {
-                            Text(
-                                program.line, style = MaterialTheme.typography.bodyMedium, maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
+                            PartsLine(program.line, style = MaterialTheme.typography.bodyMedium)
                         },
                         trailingContent = program.still?.let {
                             { ProgramPicture(it, Modifier.width(96.dp), program.progress, program.recording) }

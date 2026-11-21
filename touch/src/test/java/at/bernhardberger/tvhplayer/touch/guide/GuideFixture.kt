@@ -45,9 +45,12 @@ private fun program(
     still: String? = null,
     progress: Float? = null,
 ) = GuideProgram(
-    id = "${c.id}-$start-$title", channelId = c.id, title = title, start = start, line = line,
+    id = "${c.id}-$start-$title", channelId = c.id, title = title, start = start, line = parts(line),
     still = still?.let(::art), progress = progress,
 )
+
+/** A drawn " • " line as its parts. */
+private fun parts(line: String) = line.split(" • ")
 
 /** Several start-time/title pairs sharing one line. */
 private fun same(c: Channel, line: String, vararg rows: Pair<String, String>) =
@@ -88,7 +91,7 @@ internal fun overviewFixture(upright: Boolean = false): GuideState {
         }
     val amber = listOf(glassHarborLead()) + same(AmberStage, "Talk show", "9:17 PM" to "The Kettle Hour") +
         program(AmberStage, "10:05 PM", "Coastal Miles", "Travel").copy(
-            openLine = "Travel • 50m", synopsis = COASTAL_MILES_SYNOPSIS,
+            openLine = parts("Travel • 50m"), synopsis = COASTAL_MILES_SYNOPSIS,
         ) +
         same(AmberStage, "Talk show", "10:55 PM" to "Amber Late") +
         same(AmberStage, "S2 E4 • Drama", "11:40 PM" to "Glass Harbor") +
@@ -190,7 +193,7 @@ internal fun byChannelFixture(phone: Boolean = false, upright: Boolean = false):
     val ridgeLight = program(RidgeEarth, "8:00 PM", "Ridge Light", "S2 E3 • 60m", "still-ridge-light", 0.78f).copy(
         art = art("ridge-light"),
         episode = "S2 E3 • Winter on the ridge",
-        openLine = if (phone) "8:00–9:00 PM • 60m" else "60m • Documentary • 2024",
+        openLine = parts(if (phone) "8:00–9:00 PM • 60m" else "60m • Documentary • 2024"),
         timeRange = "8:00–9:00 PM",
         timeLeft = "13m",
         synopsis = if (phone) "$RIDGE_LIGHT_SYNOPSIS." else "$RIDGE_LIGHT_SYNOPSIS while the valley holds on to the last warm days.",
@@ -229,7 +232,7 @@ internal fun glassHarborDetails() = ProgramDetails(
     logoTint = AmberStage.tint,
     title = "Glass Harbor",
     episode = "S2 E4 • The Long Tide",
-    metadata = "Drama • 2024 • 1h 27m",
+    metadata = parts("Drama • 2024 • 1h 27m"),
     ageRating = "12+",
     timeRange = "7:50–9:17 PM",
     progress = 0.66f,
@@ -239,12 +242,12 @@ internal fun glassHarborDetails() = ProgramDetails(
     synopsis = "$GLASS_HARBOR_SYNOPSIS Ines takes the night ferry to Northport with the only copy of the ledger, " +
         "and the pilot who knows the channel has not been seen since the morning tide.",
     otherAirings = listOf(
-        ProgramAiring("gh-1", picon(AmberStage.id), AmberStage.tint, "Today 11:40 PM", "Amber Stage • S2 E4 • The Long Tide"),
+        ProgramAiring("gh-1", picon(AmberStage.id), AmberStage.tint, "Today 11:40 PM", parts("Amber Stage • S2 E4 • The Long Tide")),
         ProgramAiring(
-            "gh-2", picon(AmberStage.id), AmberStage.tint, "Tomorrow 7:50 PM", "Amber Stage • S2 E5 • Low Water",
+            "gh-2", picon(AmberStage.id), AmberStage.tint, "Tomorrow 7:50 PM", parts("Amber Stage • S2 E5 • Low Water"),
             scheduled = true,
         ),
-        ProgramAiring("gh-3", picon(GlassDrama.id), GlassDrama.tint, "Tue 1:15 PM", "Glass Drama • S2 E4 • The Long Tide"),
+        ProgramAiring("gh-3", picon(GlassDrama.id), GlassDrama.tint, "Tue 1:15 PM", parts("Glass Drama • S2 E4 • The Long Tide")),
     ),
     credits = listOf(
         ProgramCredit(CreditRole.Cast, listOf("Rowan Frost", "Avery Lake", "Morgan Vale")),

@@ -59,6 +59,7 @@ import at.bernhardberger.tvhplayer.touch.ui.DetailsFacts
 import at.bernhardberger.tvhplayer.touch.ui.DetailsPictureScrim
 import at.bernhardberger.tvhplayer.touch.ui.DetailsSectionTitle
 import at.bernhardberger.tvhplayer.touch.ui.DetailsSynopsis
+import at.bernhardberger.tvhplayer.touch.ui.PartsLine
 
 @Composable
 internal fun ProgramDetailsPage(
@@ -181,13 +182,16 @@ private fun Lead(
     Column(modifier) {
         Text(details.title, Modifier.semantics { heading() }, style = titleStyle)
         DetailsEpisode(details.episode)
-        if (details.metadata != null || details.ageRating != null) {
+        if (details.metadata.isNotEmpty() || details.ageRating != null) {
             Row(
                 Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                details.metadata?.let {
-                    Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
+                if (details.metadata.isNotEmpty()) {
+                    PartsLine(
+                        details.metadata, Modifier.weight(1f, fill = false),
+                        style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline,
+                    )
                 }
                 details.ageRating?.let { AgeRating(it) }
             }
@@ -281,7 +285,7 @@ private fun OtherAirings(details: ProgramDetails, actions: GuideActions) {
                 leadingContent = {
                     ChannelLogoTile(airing.logo, airing.logoTint, Modifier.size(64.dp, 36.dp), RoundedCornerShape(8.dp))
                 },
-                supportingContent = { Text(airing.line, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                supportingContent = { PartsLine(airing.line) },
                 trailingContent = if (airing.scheduled) {
                     { ScheduledIcon() }
                 } else {

@@ -57,6 +57,7 @@ import at.bernhardberger.tvhplayer.touch.ui.DetailsEpisode
 import at.bernhardberger.tvhplayer.touch.ui.DetailsFacts
 import at.bernhardberger.tvhplayer.touch.ui.DetailsPictureScrim
 import at.bernhardberger.tvhplayer.touch.ui.DetailsSynopsis
+import at.bernhardberger.tvhplayer.touch.ui.joinParts
 
 /** The picked recording beside the tablet's list. */
 @Composable

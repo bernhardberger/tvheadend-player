@@ -37,6 +37,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.touch.R
+import at.bernhardberger.tvhplayer.touch.ui.PartsLine
 
 /**
  * The programs of one channel's day in start order, with a date heading where the night crosses
@@ -109,7 +110,7 @@ private fun DayRow(
                 maxLines = 1,
             )
         },
-        supportingContent = { Text(program.line, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        supportingContent = { PartsLine(program.line) },
         trailingContent = {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (program.scheduled) ScheduledIcon()
@@ -234,7 +235,7 @@ private fun OpenFacts(program: GuideProgram, modifier: Modifier) {
 @Composable
 private fun OpenLine(program: GuideProgram, modifier: Modifier) {
     program.openLine?.let {
-        Text(it, modifier, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
+        PartsLine(it, modifier, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
     }
 }
 
