@@ -9,12 +9,20 @@ import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.performClick
+import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
+import at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi
+import at.bernhardberger.tvhplayer.touch.testutil.FakeConnection
 import at.bernhardberger.tvhplayer.touch.testutil.TouchCanvas
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouch
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.ExternalResource
 import org.junit.runner.RunWith
+import org.koin.core.context.startKoin
+import org.koin.core.context.stopKoin
+import org.koin.dsl.module
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
@@ -22,8 +30,32 @@ import org.robolectric.annotation.GraphicsMode
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
+@OptIn(TvheadendTestingApi::class)
 class TouchFrameTest {
-    @get:Rule val compose = createAndroidComposeRule<MainActivity>()
+    // MainActivity takes its session from Koin; a saved connection opens the frame directly.
+    @get:Rule(order = 0) val graph = object : ExternalResource() {
+        private val connection = FakeConnection()
+
+        override fun before() {
+            runBlocking { connection.store.addAnonymous("192.168.1.20", 9982, "Home server", true) }
+            connection.start()
+            startKoin {
+                modules(
+                    module {
+                        single<TvheadendSession> { connection.session }
+                        single { connection.owner }
+                    },
+                )
+            }
+        }
+
+        override fun after() {
+            stopKoin()
+            connection.close()
+        }
+    }
+
+    @get:Rule(order = 1) val compose = createAndroidComposeRule<MainActivity>()
 
     private val destination = hasClickAction() and SemanticsMatcher.keyIsDefined(SemanticsProperties.Selected)
     private val heading = SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading)
