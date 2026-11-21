@@ -33,6 +33,7 @@ import at.bernhardberger.tvhplayer.ui.TvTextTertiaryAlpha
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.ui.components.LocalArtworkContext
 import at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers
@@ -93,6 +94,8 @@ internal fun PlayerChrome(
     onAudioList: () -> Unit = {},
     onSchedule: (() -> Unit)? = null,
     scheduleAvailable: Boolean = true,
+    onRecord: (() -> Unit)? = null,
+    recordState: DvrEntryState? = null,
     /** Any control that takes focus, the timeline included: where focus returns after number entry. */
     onControlFocused: (String) -> Unit = {},
     onFocusRestored: () -> Unit = {},
@@ -172,6 +175,8 @@ internal fun PlayerChrome(
                 onInfo = onInfo,
                 onSchedule = onSchedule,
                 scheduleAvailable = scheduleAvailable,
+                onRecord = onRecord.takeIf { timeline is PlayerChromeTimeline.Live },
+                recordState = recordState,
                 onOptions = onOptions,
                 onAudioList = onAudioList,
                 onInteraction = onInteraction,

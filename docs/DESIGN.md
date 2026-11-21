@@ -1124,7 +1124,8 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
   playback options decide; each opens that short list (§10 Modal side panel),
   is announced with its name and current choice, and closing the list returns
   focus to it. Info opens the programme details, and closing them returns focus
-  to Info, also when the INFO key opened them. There is no Record button.
+  to Info, also when the INFO key opened them.
+  Live TV adds Record after Stop. When red (scheduled or recording), it asks before canceling or stopping when allowed, and otherwise opens its details.
   Controls focus starts on Play/Pause. Seekbar: Left/Right scrub, Down to the
   last focused action. Actions: Left/Right along the row without wrapping, Up to
   the seekbar; in live TV Down opens the channel rail. Center toggles pause on Play/Pause

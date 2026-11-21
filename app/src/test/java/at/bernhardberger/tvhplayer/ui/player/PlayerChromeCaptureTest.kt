@@ -320,7 +320,7 @@ class PlayerChromeCaptureTest {
         PROGRAMME_INFO_NO_EPG, PROGRAMME_INFO_NO_ART_RECORDING, PROGRAMME_AIRINGS, PROGRAMME_OPENED,
         PROGRAMME_MORE_INFO, RAIL_PROGRAMME_OPENED, RAIL_PEEK, PROGRAMME_CONFIRM_STOP,
         // English at font scale 1.0 only (EN_ONLY).
-        BANNER_LIVE, CONTROLS_BUFFERING, BANNER_PAUSED, BANNER_NO_EPG_BEHIND, HIDDEN_PAUSED, HIDDEN_BUFFERING, STEP_NEAR_END, STEP_NEAR_END_NO_ICON,
+        BANNER_LIVE, CONTROLS_LIVE_RECORDING, CONTROLS_BUFFERING, BANNER_PAUSED, BANNER_NO_EPG_BEHIND, HIDDEN_PAUSED, HIDDEN_BUFFERING, STEP_NEAR_END, STEP_NEAR_END_NO_ICON,
         STEP_REACHING_LIVE, RECORDING_BANNER, RECORDING_STEP, RECORDING_CONTROLS, RECORDING_GROWING, RECORDING_HIDDEN_PAUSED,
         CONTROLS_STEP, RECORDING_CONTROLS_STEP, BANNER_NO_EPG_LIVE, CONTROLS_NO_EPG, BANNER_NO_EPG_NO_TIMESHIFT, CONTROLS_REVEAL_MID,
         BANNER_STEP_OVER_DISTANCE, CONTROLS_STEP_OVER_DISTANCE, BANNER_STEP_FORWARD, CONTROLS_STEP_FORWARD, RECORDING_STEP_FORWARD, RECORDING_CONTROLS_STEP_FORWARD,
@@ -603,8 +603,11 @@ class PlayerChromeCaptureTest {
         when (scene) {
             // As the player shows them: the closed rail peeks under the controls; with a logo the
             // programme also offers an audio choice beside Info.
-            Scene.CONTROLS_LIVE, Scene.CONTROLS_NO_LOGO -> Controls(timeshift, behind, paused, content, peek = true,
-                tracks = if (scene == Scene.CONTROLS_LIVE) PlayerTrackButtons(audio = "English") else PlayerTrackButtons())
+            Scene.CONTROLS_LIVE, Scene.CONTROLS_LIVE_RECORDING, Scene.CONTROLS_NO_LOGO -> Controls(
+                timeshift, behind, paused, content, peek = true,
+                tracks = if (scene == Scene.CONTROLS_NO_LOGO) PlayerTrackButtons() else PlayerTrackButtons(audio = "English"),
+                recordState = DvrEntryState.RECORDING.takeIf { scene == Scene.CONTROLS_LIVE_RECORDING },
+            )
             Scene.CONTROLS_BEHIND, Scene.CONTROLS_PAUSED, Scene.CONTROLS_BUFFERING ->
                 Controls(timeshift, behind, paused, content)
             Scene.INFO_FOCUSED -> Controls(timeshift, false, false, content, focus = "player-info")
@@ -877,6 +880,7 @@ class PlayerChromeCaptureTest {
         /** The closed rail's rows peek under the controls, as the player composes them. */
         peek: Boolean = false,
         tracks: PlayerTrackButtons = PlayerTrackButtons(),
+        recordState: DvrEntryState? = null,
         nowSec: Long = NOW,
         /** The peeking rail's channels and their programmes on air, when not the default line-up. */
         peekChannels: List<Channel> = channels,
@@ -903,6 +907,8 @@ class PlayerChromeCaptureTest {
             actions = PlayerChromeActions(active = !numberEntryShown, paused = paused, restoreFocus = focus ?: "player-seekbar".takeIf { step != null },
                 tracks = tracks),
             onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {}, onInteraction = {},
+            onRecord = {},
+            recordState = recordState,
             downHint = androidx.compose.ui.res.stringResource(at.bernhardberger.tvhplayer.R.string.nav_channels),
             decorationCoversControls = tray != null,
             numberEntryShown = numberEntryShown,

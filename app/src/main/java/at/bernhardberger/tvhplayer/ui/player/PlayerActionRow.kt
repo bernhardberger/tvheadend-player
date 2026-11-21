@@ -27,8 +27,11 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.IconButton
 import androidx.tv.material3.IconButtonDefaults
 import androidx.tv.material3.MaterialTheme
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.TvOverlayActionGap
+import at.bernhardberger.tvhplayer.ui.components.recordingMarkColor
+import at.bernhardberger.tvhplayer.ui.components.recordingStatusSpoken
 
 /** Material disabled content alpha, used for a pause control that stays focusable. */
 internal const val PauseUnavailableIconAlpha = TvTextDisabledAlpha
@@ -39,7 +42,7 @@ private data class PlayerAction(
     @DrawableRes val icon: Int,
     val onClick: (() -> Unit)?,
     val focus: FocusRequester?,
-    /** The current choice a track button announces after its label. */
+    /** The current state announced after the label. */
     val state: String? = null,
 )
 
@@ -55,6 +58,9 @@ internal fun PlayerActionRow(
     modifier: Modifier = Modifier,
     paused: Boolean = false,
     stopFocus: FocusRequester? = null,
+    onRecord: (() -> Unit)? = null,
+    recordFocus: FocusRequester? = null,
+    recordState: DvrEntryState? = null,
     onActionFocused: (String) -> Unit = {},
     /** Dims the pause control, which stays focusable and clickable, and announces why it cannot pause. */
     pauseUnavailableReason: String? = null,
@@ -76,6 +82,8 @@ internal fun PlayerActionRow(
         PlayerAction("player-pause", playPause,
             if (paused) R.drawable.ic_play_arrow else R.drawable.ic_pause, onTogglePause, pauseFocus),
         PlayerAction("player-stop", stop, R.drawable.ic_stop, onStop, stopFocus),
+        onRecord?.let { PlayerAction("player-record", stringResource(R.string.record),
+            R.drawable.ic_fiber_manual_record, it, recordFocus, recordingStatusSpoken(recordState, rule = null)) },
         tracks.audio?.let {
             PlayerAction("player-audio", audio, R.drawable.ic_audiotrack, onAudioList, audioFocus, it)
         },
@@ -84,7 +92,7 @@ internal fun PlayerActionRow(
         PlayerAction("player-settings", settings, R.drawable.ic_settings, onSettings, settingsFocus),
     )
     // Playback actions stand at the start; track lists, details and Settings at the end.
-    val endStart = actions[2].tag
+    val endStart = actions[if (onRecord == null) 2 else 3].tag
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -96,6 +104,7 @@ internal fun PlayerActionRow(
             key(tag) {
                 if (tag == endStart) Spacer(Modifier.weight(1f))
                 if (action != null) {
+                    val recording = tag == "player-record" && recordState != null
                     val actionModifier = Modifier
                         .testTag(tag)
                         .then(focus?.let { Modifier.focusRequester(it) } ?: Modifier)
@@ -108,7 +117,11 @@ internal fun PlayerActionRow(
                         .then(if (state != null) Modifier.semantics { stateDescription = state } else Modifier)
                     IconButton(
                         onClick = { onInteraction(); action() },
-                        colors = IconButtonDefaults.colors(
+                        colors = if (recording) IconButtonDefaults.colors(
+                            containerColor = Color.Transparent,
+                            contentColor = recordingMarkColor(focused = false),
+                            focusedContentColor = recordingMarkColor(focused = true),
+                        ) else IconButtonDefaults.colors(
                             containerColor = Color.Transparent,
                             contentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = if (tag == "player-pause") 1f else 0.88f),
                         ),
