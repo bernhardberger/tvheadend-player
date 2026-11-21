@@ -11,7 +11,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -31,7 +30,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
-import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -47,10 +45,11 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.touch.R
+import at.bernhardberger.tvhplayer.touch.ui.PartsLine
+import at.bernhardberger.tvhplayer.touch.ui.joinParts
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 import at.bernhardberger.tvhplayer.ui.TvRecordingContainerColor
 import java.time.Duration
@@ -220,14 +219,6 @@ private fun levelCounts(view: RecordingsView, level: RecordingFolder, root: Bool
 /** Folders the viewer files into; Recording now stands above them and is not counted. */
 internal val RecordingFolder.folderCount: Int get() = folders.count { !it.recordingNow }
 
-/** "A • B • C" with the localized separator. */
-@Composable
-internal fun joinParts(parts: List<String>): String {
-    if (parts.isEmpty()) return ""
-    val pattern = stringResource(R.string.recordings_parts)
-    return parts.reduce { a, b -> pattern.format(a, b) }
-}
-
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun FolderRow(folder: RecordingFolder, index: Int, count: Int, onOpen: () -> Unit) {
@@ -300,34 +291,13 @@ private fun RecordingRow(
             else -> null
         },
         supportingContent = {
-            RecordingLineText(line)
+            PartsLine(line.map { partText(it) })
         },
         shapes = ListItemDefaults.segmentedShapes(index, count),
         colors = rowColors(),
         contentPadding = RowPadding,
     ) {
         Text(item.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
-    }
-}
-
-/**
- * The line with as many whole parts as fit, longest first, so it never cuts inside a part; only a
- * first part wider than the row is ellipsized.
- */
-@Composable
-private fun RecordingLineText(parts: List<RecordingLinePart>) {
-    val texts = parts.map { partText(it) }
-    val pattern = stringResource(R.string.recordings_parts)
-    val measurer = rememberTextMeasurer()
-    val style = LocalTextStyle.current
-    BoxWithConstraints {
-        val candidates = (texts.size downTo 1).map { count ->
-            texts.take(count).reduce { line, part -> pattern.format(line, part) }
-        }
-        val line = candidates.firstOrNull {
-            measurer.measure(it, style, maxLines = 1, softWrap = false).size.width <= constraints.maxWidth
-        } ?: candidates.lastOrNull().orEmpty()
-        Text(line, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 

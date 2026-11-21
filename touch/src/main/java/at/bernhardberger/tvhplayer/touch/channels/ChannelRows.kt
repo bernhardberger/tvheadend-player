@@ -10,9 +10,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -54,10 +52,8 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -71,6 +67,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import at.bernhardberger.tvhplayer.touch.R
+import at.bernhardberger.tvhplayer.touch.ui.ChannelLogoTile
 import at.bernhardberger.tvhplayer.ui.TvOnRecordingContainerColor
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 import at.bernhardberger.tvhplayer.ui.TvRecordingContainerColor
@@ -294,29 +291,11 @@ private fun ChannelName(name: String, modifier: Modifier) {
 
 @Composable
 private fun ChannelLogo(row: ChannelRow, layout: ChannelsLayout) {
-    val shape = RoundedCornerShape(12.dp)
     val size = when (layout) {
         ChannelsLayout.Wide, ChannelsLayout.Upright -> Modifier.size(112.dp, 56.dp)
         ChannelsLayout.Phone -> Modifier.size(88.dp, 48.dp)
     }
-    val scheme = MaterialTheme.colorScheme
-    val tint = row.logoTint.takeIf { row.logo != null }
-    val fill = if (tint == null) {
-        Modifier.background(scheme.surfaceContainerHigh)
-    } else {
-        Modifier.background(Brush.linearGradient(listOf(tint, lerp(tint, Color.Black, LOGO_SHADE))))
-    }
-    Box(
-        size.clip(shape).then(fill)
-            .border(1.dp, scheme.outlineVariant, shape).padding(4.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (row.logo == null) {
-            Icon(painterResource(R.drawable.play_tv_outline), null, tint = scheme.onSurfaceVariant)
-        } else {
-            Image(row.logo, null)
-        }
-    }
+    ChannelLogoTile(row.logo, row.logoTint, size)
 }
 
 // The logo sits in the list item's leading slot, so these weights split what remains after it; they keep the
@@ -336,7 +315,6 @@ private val ItemSpacing = 12.dp
 private val ExpandTarget = 48.dp
 private val RowInset = 10.dp
 private val PlayingSlot = 30.dp
-private const val LOGO_SHADE = 0.35f
 private const val SAVED_ROW_ALPHA = 0.58f
 
 @Composable
