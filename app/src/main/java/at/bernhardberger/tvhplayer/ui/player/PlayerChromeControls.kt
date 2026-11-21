@@ -49,6 +49,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Text
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvhplayer.core.programmeTimingDescribesPlayback
 import at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation
 import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
@@ -102,6 +103,8 @@ internal fun PlayerChromeControls(
     downHint: String? = null,
     onSchedule: (() -> Unit)? = null,
     scheduleAvailable: Boolean = true,
+    onRecord: (() -> Unit)? = null,
+    recordState: DvrEntryState? = null,
     /**
      * The passive top identity, drawn over the header.
      */
@@ -115,6 +118,7 @@ internal fun PlayerChromeControls(
     val livePause = actions.livePause
     val restoreFocus = actions.restoreFocus
     val pauseFocus = remember { FocusRequester() }
+    val recordFocus = remember { FocusRequester() }
     val infoFocus = remember { FocusRequester() }
     val scheduleFocus = remember { FocusRequester() }
     val audioFocus = remember { FocusRequester() }
@@ -197,6 +201,7 @@ internal fun PlayerChromeControls(
                 "player-settings" -> settingsFocus
                 "player-stop" -> stopFocus
                 "recording-skip" -> if (skipShown) skipFocus else initialFocus
+                "player-record" -> if (onRecord != null) recordFocus else pauseFocus
                 "player-seekbar" -> timelineFocus.takeIf { timelineFocusable }
                 else -> initialFocus
             } ?: when {
@@ -234,6 +239,7 @@ internal fun PlayerChromeControls(
     var lastAction by remember { mutableStateOf("player-pause") }
     val actionFocus = when (lastAction) {
         "player-stop" -> stopFocus
+        "player-record" -> if (onRecord != null) recordFocus else pauseFocus
         "player-settings" -> settingsFocus
         "player-info" -> infoFocus
         "player-schedule" -> scheduleFocus
@@ -441,6 +447,9 @@ internal fun PlayerChromeControls(
             onSettings = onOptions,
             onStop = onStop,
             stopFocus = stopFocus,
+            onRecord = onRecord,
+            recordFocus = recordFocus,
+            recordState = recordState,
             skip = actions.skip,
             skipFocus = skipFocus,
             onInfo = onInfo,

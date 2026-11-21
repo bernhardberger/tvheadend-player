@@ -23,7 +23,7 @@ private const val LIVE_PLAYER_AUTO_HIDE_MS = 5_000L
 
 /** Actions Back from the rail returns to: every action-row button the rail can be entered from. */
 private val RailReturnActions = setOf(
-    "player-pause", "player-stop", "player-audio", "player-info", "player-schedule", "player-settings",
+    "player-pause", "player-stop", "player-record", "player-audio", "player-info", "player-schedule", "player-settings",
 )
 
 /**
@@ -54,7 +54,7 @@ internal class LivePlayerLayerState(
         bannerTimeoutMillis = bannerTimeoutMillis,
         // Over the full menu, focus returns to the gear the menu belongs to.
         quickListOverMenuReturn = "player-settings",
-        screenLayerOpen = { channelDrawerOpen || scheduleOpen },
+        screenLayerOpen = { channelDrawerOpen || scheduleOpen || recordingConfirmationVisible },
         closeScreenLayers = {
             channelDrawerOpen = false
             recordingConfirmationVisible = false
@@ -212,7 +212,8 @@ internal class LivePlayerLayerState(
     }
 
     fun showRecordingConfirmation() {
-        if (core.infoOpen) recordingConfirmationVisible = true
+        recordingConfirmationVisible = true
+        core.chrome.yieldToLayer()
     }
 
     fun dismissRecordingConfirmation() {
@@ -238,7 +239,7 @@ internal class LivePlayerLayerState(
         terminalErrorVisible: Boolean = false,
         seekPreviewPhase: PlayerSeekPreviewPhase = PlayerSeekPreviewPhase.NONE,
     ) = PlayerForegroundContext(
-        confirmationVisible = core.infoOpen && recordingConfirmationVisible,
+        confirmationVisible = recordingConfirmationVisible,
         infoVisible = core.infoOpen && !recordingConfirmationVisible,
         optionsPage = core.optionsPage,
         optionsQuickList = core.optionsQuickList && core.optionsPage != null,

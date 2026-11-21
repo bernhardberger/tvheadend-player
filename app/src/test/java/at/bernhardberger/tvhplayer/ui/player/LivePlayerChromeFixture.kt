@@ -709,13 +709,16 @@ abstract class LivePlayerChromeFixture {
         eventId: EventId = EventId(11),
         linked: Boolean = true,
         eventOverride: EpgEvent? = null,
+        autorecRuleId: at.bernhardberger.tvheadend.sdk.core.AutorecRuleId? = null,
+        dvrWrite: CapabilityAccess = CapabilityAccess.ALLOWED,
     ) {
         val current = session.observation.value.epgState as EpgRepositoryState.Current
         val event = eventOverride ?: current.snapshot.events.firstOrNull { it.id == eventId }
         val events = eventOverride?.let { listOf(it) } ?: current.snapshot.events
         session.publish(observation(System.currentTimeMillis() / 1_000, events,
+            dvrWrite = dvrWrite,
             recordings = listOf(DvrEntry.create(DvrEntryId(7), eventId = (eventOverride?.id ?: eventId).takeIf { linked }, state = state,
-                channelId = event?.channelId, start = event?.start, stop = event?.stop))))
+                channelId = event?.channelId, start = event?.start, stop = event?.stop, autorecRuleId = autorecRuleId))))
         settle()
     }
 
@@ -846,9 +849,10 @@ abstract class LivePlayerChromeFixture {
         recordings: List<DvrEntry> = emptyList(),
         missingRequestedChannel: Boolean = false,
         recordingProfiles: List<DvrConfiguration> = emptyList(),
+        dvrWrite: CapabilityAccess = CapabilityAccess.ALLOWED,
     ) =
         SessionObservation.create(
-            sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
+            sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = dvrWrite)),
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create(
                 (if (missingRequestedChannel) 2..3L else 1..3L).map { Channel.create(ChannelId(it), name = "Name $it", number = it) },
             )),

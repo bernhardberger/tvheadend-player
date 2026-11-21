@@ -17,16 +17,11 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.focusProperties
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -37,19 +32,30 @@ import androidx.compose.ui.res.painterResource
 import at.bernhardberger.tvhplayer.ui.TvTextTertiaryAlpha
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
-import at.bernhardberger.tvhplayer.ui.components.channelTitleText
 import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.ui.components.LocalArtworkContext
 import at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers
 import at.bernhardberger.tvhplayer.core.programmeArtworkModel
 import at.bernhardberger.tvhplayer.core.PlayerStateCell
-import at.bernhardberger.tvhplayer.core.timeshiftSeekbarRange
 import at.bernhardberger.tvhplayer.ui.TvOverlayFooterGradientRunout
-import at.bernhardberger.tvhplayer.ui.TvSpacing4
 import coil3.compose.AsyncImage
 import at.bernhardberger.tvhplayer.images.ProgrammeArtworkMode
 import at.bernhardberger.tvhplayer.ui.components.rememberProgrammeImageRequest
+import at.bernhardberger.tvhplayer.ui.components.rememberPictureLoad
+import at.bernhardberger.tvhplayer.ui.components.ArtworkCornerLogo
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.stringResource
+import at.bernhardberger.tvhplayer.ui.components.channelTitleText
+import at.bernhardberger.tvhplayer.core.timeshiftSeekbarRange
+import at.bernhardberger.tvhplayer.ui.TvSpacing4
+import androidx.compose.ui.graphics.Color
+import at.bernhardberger.tvhplayer.ui.components.ArtworkLogoInset
+import at.bernhardberger.tvhplayer.ui.components.ArtworkLogoPlateWidth
+import at.bernhardberger.tvhplayer.ui.components.ArtworkLogoShare
+import at.bernhardberger.tvhplayer.ui.components.AiringCardWidth
+import androidx.compose.ui.graphics.drawscope.scale
 import kotlinx.coroutines.launch
 
 /**
@@ -88,6 +94,8 @@ internal fun PlayerChrome(
     onAudioList: () -> Unit = {},
     onSchedule: (() -> Unit)? = null,
     scheduleAvailable: Boolean = true,
+    onRecord: (() -> Unit)? = null,
+    recordState: DvrEntryState? = null,
     /** Any control that takes focus, the timeline included: where focus returns after number entry. */
     onControlFocused: (String) -> Unit = {},
     onFocusRestored: () -> Unit = {},
@@ -167,6 +175,8 @@ internal fun PlayerChrome(
                 onInfo = onInfo,
                 onSchedule = onSchedule,
                 scheduleAvailable = scheduleAvailable,
+                onRecord = onRecord.takeIf { timeline is PlayerChromeTimeline.Live },
+                recordState = recordState,
                 onOptions = onOptions,
                 onAudioList = onAudioList,
                 onInteraction = onInteraction,
@@ -309,8 +319,10 @@ internal fun PlayerPresentedLiveTimeline(
 /**
  * The info bar's programme artwork: the programme's 16:9 image, or without it the channel's [picon]
  * (or [channelNumber]) on the channel's own ground, as the details hero falls back to, so the bar
- * keeps its shape on every channel. It takes no focus and has no description; the info bar speaks
- * for the programme.
+ * keeps its shape on every channel. A loaded image carries the picon in a corner, so the bar names
+ * the channel with or without a picture. [artworkLogoPlaces] picks the corner per picture, because
+ * artwork with its title drawn in has it in a different place each time.
+ * It takes no focus and has no description; the info bar speaks for the programme.
  */
 @Composable
 private fun ProgrammeArtworkTile(
@@ -321,20 +333,32 @@ private fun ProgrammeArtworkTile(
     modifier: Modifier,
     withoutChannel: Boolean,
 ) {
-    val id = artwork
     val currentSession = LocalArtworkContext.current.currentSession
-    var failed by remember(id, currentSession) { mutableStateOf(false) }
+    val model = remember(artwork, currentSession) {
+        if (artwork != null && currentSession != null) programmeArtworkModel(artwork, currentSession) else null
+    }
+    val load = rememberPictureLoad(model)
+    val logo = picon.takeUnless { withoutChannel }
+    val logoScale = ArtworkTileWidth / AiringCardWidth
+    val ratio = (ArtworkTileWidth / ArtworkTileHeight).toDouble()
     val request = rememberProgrammeImageRequest(
-        if (id != null && currentSession != null) programmeArtworkModel(id, currentSession) else null,
-        ProgrammeArtworkMode.BOX, ratio = (ArtworkTileWidth / ArtworkTileHeight).toDouble(),
+        model, ProgrammeArtworkMode.BOX, ratio = ratio,
+        startPlateShare = if (logo != null) {
+            ((ArtworkLogoInset + ArtworkLogoPlateWidth) * logoScale / ArtworkTileWidth).toDouble()
+        } else 0.0,
+        logoShare = if (logo != null) ArtworkLogoShare else 0.0,
     )
     Box(modifier.size(ArtworkTileWidth, ArtworkTileHeight).clip(ArtworkTileShape)
         .focusProperties { canFocus = false }.testTag("player-info-artwork-tile")) {
         // Under the picture too, so loading shows the same channel ground as a missing picture.
         if (withoutChannel) RecordingArtworkFallback() else ChannelArtworkFallback(picon, channelId, channelNumber)
-        if (id != null && currentSession != null && !failed) {
+        if (model != null && !load.failed) {
             AsyncImage(request, null,
-                Modifier.fillMaxSize().testTag("player-info-artwork"), contentScale = ContentScale.Crop, onError = { failed = true })
+                Modifier.fillMaxSize().testTag("player-info-artwork"), contentScale = ContentScale.Crop,
+                onSuccess = load::onSuccess, onError = { load.onError() })
+            // Nothing else stands on this tile, so the picture's best corner is the logo's.
+            if (load.loaded && logo != null) ArtworkCornerLogo(logo, load.logoPlace(),
+                Modifier.testTag("player-info-artwork-picon"), scale = logoScale)
         }
     }
 }

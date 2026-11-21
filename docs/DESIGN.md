@@ -194,6 +194,33 @@ colour so a crossfade does not re-ink it. A logo with its own treatment
 logo on their own colour) is left alone.
 When the ground changes, the logo shown last stays until the new copy is ready.
 
+A programme picture carries its channel's logo in one of its corners (accepted
+2026-11-21): on Channels and On-now cards, airing cards, the programme and
+recording menus and dialogs, Home's recording shelves and the player's artwork
+tile. The List's picture stays without it, since its headline names the channel
+right below. The logo has no plate. It is at most 56×24dp on an airing card's
+220dp picture, with a 10dp inset from the picture's edges and from a progress
+strip along the bottom. Its size and inset keep those proportions on other pictures.
+- **Corner.** Chosen per picture, as the card shows it: the corner with the
+  least detail in the space the logo needs. Lettering drawn into the picture
+  (its title, a station's wordmark, a caption) weighs far more there than faces
+  or scenery, and still counts close beside that space. Nearly equal corners go
+  to the bottom start, then top start, bottom end, top end; no corner is
+  preferred otherwise. A card's own marks keep their corners (section 9) and the
+  logo takes its next best one.
+- **Ground.** A busy or mid-toned corner gets a soft shade that tones only that
+  corner: dark for most logos, light for a dark logo without a light part of
+  its own. That is judged once per logo, so a channel's logo looks the same on
+  every picture. A calm, clearly light or clearly dark corner carries the logo
+  unshaded, inked for that ground; a dark logo takes its light shade there too.
+- **Limits.** The rule reads shapes, not text or faces. Lettering in every
+  corner still clashes, a row of windows can pass for a word, and the logo can
+  land on a face.
+- **No logo.** A channel without a logo, or whose logo cannot be loaded, is
+  named on Channels and On-now cards instead: its name in `labelLarge` on a
+  scrim along the picture's bottom, or in place of the placeholder icon on a
+  card without a picture. The name shows once the failed load is known.
+
 Passive text steps down in three tones (accepted 2026-10-21), as the kit's
 immersive list and dialog do: the title and its subtitle, which names the
 episode, in `onSurface`; descriptions in `onSurfaceVariant` at 80%; metadata (channel, times, facts,
@@ -320,6 +347,7 @@ Paths below are relative to `app/src/main/java/at/bernhardberger/tvhplayer/ui/`.
 | Channel title | `components/ChannelTitle.kt` — `channelTitleText` |
 | Picon | `components/PiconBox.kt` — dimmed TV icon while loading, normal-strength TV icon when there is no logo or it fails |
 | Focused card's info above a row | `components/FocusedInfo.kt` — on Home's On now, Channels Immersive and List (with the List's picture), the Guide's headline and the zap rail: a 300 ms linear swap in which old and new text meet faintly, the List's picture crossfading over the same 300 ms; while a direction is held, Home, Channels Immersive/List and the Guide keep the last text and picture until focus rests (300 ms, with the backdrop), and the zap rail hides its info and brings it back 250 ms after release; a new programme on the same card updates in place |
+| Channel logo on a programme picture | `components/ProgrammeArtwork.kt` — `ArtworkCornerLogo` and `ArtworkChannelName`; the corner and ground come from `artworkLogoPlaces` in `../images/ProgrammeArtworkPolicy.kt`, noted with the decoded picture by `ArtworkLogoCornerTransformation` |
 | Now-playing plate | `player/NowPlayingStrip.kt` — `NowPlayingPlate`: 48×27 picon plate (channel number without a logo) with the 2dp viewer-position strip, shared by the player strip and the rail's playing slot |
 | Image load fade | `../images/TvheadendArtworkLoader.kt` — the shared loader fades every logo and programme picture in over 200 ms when actually loaded; memory-cache hits show at once |
 | Reading box | `components/ProgrammeDetailsLayout.kt` — `ProgrammeDetailsFullDescription` |
@@ -688,7 +716,8 @@ tuner loss and interruption are failures, limit expiry is informational.
   now-playing strip). Rows show it in their end column after the recording
   mark; picture cards and zap rail cards show it on a small plate in the
   picture's top-start corner, opposite the `● REC` badge (the Right now card
-  keeps the two side by side, section 2); the Guide shows it
+  keeps the two side by side, section 2); a channel's logo on the picture keeps
+  out of both corners while their marks show (section 2); the Guide shows it
   after the title of the watched programme's cell, which follows the viewer's
   position under time-shift. It never goes on text that describes the focused
   item: Guide headline, Channels headline, Home On-now block, Recordings side
@@ -786,8 +815,8 @@ only.
   in every state, so nothing moves or resizes when playback starts or stops. At
   its top, level with the first row (y100), a 268×151 picture (the kit's
   four-column card; the headline below keeps to its width, so picture and text
-  form one column) shows the focused programme's 16:9 artwork without its logo
-  plate. Without artwork, it is a logo card's picture: the
+  form one column) shows the focused programme's 16:9 artwork without the
+  channel's logo. Without artwork, it is a logo card's picture: the
   logo on the logo cards' ambient colour from the logo, which here keeps its
   strength to the bottom, since no text sits on it. The headline that Immersive also
   uses hangs 20dp below it, start-aligned and at most 480dp wide. In the details
@@ -1013,7 +1042,9 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
 - The wall clock stands alone at the top right over its scrim; there are no status
   tags. The info bar holds the identity card and the programme block.
 - The info bar's artwork tile is 196×110dp (three grid columns), 8dp corners, and
-  takes no focus. It shows the programme's artwork; without one, and while it
+  takes no focus. It shows the programme's artwork with the channel's logo in
+  the picture's own corner (section 2), so the channel reads beside the
+  programme as well as in the top identity; without one, and while it
   loads or fails, the picon stands centred on the channel's own colour fading down
   to the darkest surface, the same ground as the rail preview's hero
   (`ui/player/ProgrammeHero.kt`). Without a picon the fade is neutral and holds the
@@ -1094,7 +1125,8 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
   playback options decide; each opens that short list (§10 Modal side panel),
   is announced with its name and current choice, and closing the list returns
   focus to it. Info opens the programme details, and closing them returns focus
-  to Info, also when the INFO key opened them. There is no Record button.
+  to Info, also when the INFO key opened them.
+  Live TV adds Record after Stop. When red (scheduled or recording), it asks before canceling or stopping when allowed, and otherwise opens its details.
   Controls focus starts on Play/Pause. Seekbar: Left/Right scrub, Down to the
   last focused action. Actions: Left/Right along the row without wrapping, Up to
   the seekbar; in live TV Down opens the channel rail. Center toggles pause on Play/Pause

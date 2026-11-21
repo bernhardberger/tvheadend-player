@@ -114,4 +114,57 @@ internal class ProgrammeArtworkTransformation(
     }
 }
 
+/** [artworkLogoPlaces] of [bitmap] as a view of [ratio] shows it, centre-cropped. */
+internal fun artworkLogoPlaces(
+    bitmap: Bitmap, ratio: Double, logoShare: Double, startAtRight: Boolean,
+): List<ArtworkLogoPlace> {
+    val source = if (bitmap.config == Bitmap.Config.HARDWARE) bitmap.copy(Bitmap.Config.ARGB_8888, false) else bitmap
+    val cropWidth = minOf(source.width, (source.height * ratio).roundToInt()).coerceAtLeast(1)
+    val cropHeight = minOf(source.height, (source.width / ratio).roundToInt()).coerceAtLeast(1)
+    val left = (source.width - cropWidth) / 2
+    val top = (source.height - cropHeight) / 2
+    // Whole-pixel blocks averaged with integers: one read and one pass, nothing allocated per pixel.
+    val block = ((cropWidth + LOGO_CORNER_ANALYSIS_WIDTH - 1) / LOGO_CORNER_ANALYSIS_WIDTH).coerceAtLeast(1)
+    val sampleWidth = (cropWidth / block).coerceAtLeast(1)
+    val sampleHeight = (cropHeight / block).coerceAtLeast(1)
+    val read = IntArray(cropWidth * cropHeight)
+    source.getPixels(read, 0, cropWidth, left, top, cropWidth, cropHeight)
+    val pixels = if (block == 1) read else IntArray(sampleWidth * sampleHeight) { index ->
+        val x0 = index % sampleWidth * block; val y0 = index / sampleWidth * block
+        var r = 0; var g = 0; var b = 0; var n = 0
+        for (y in y0 until minOf(y0 + block, cropHeight)) for (x in x0 until minOf(x0 + block, cropWidth)) {
+            val p = read[y * cropWidth + x]
+            r += p shr 16 and 255; g += p shr 8 and 255; b += p and 255; n++
+        }
+        (0xff shl 24) or (r / n shl 16) or (g / n shl 8) or (b / n)
+    }
+    val width = if (block == 1) cropWidth else sampleWidth
+    val height = if (block == 1) cropHeight else sampleHeight
+    return artworkLogoPlaces(pixels, width, height, logoShare, startAtRight)
+}
+
+/**
+ * Leaves the picture as it is and notes its [artworkLogoPlaces] with the decode, off the main
+ * thread, so the logo can stand in its corner in the frame the picture arrives.
+ */
+internal class ArtworkLogoCornerTransformation(
+    private val ratio: Double,
+    private val logoShare: Double,
+    private val startAtRight: Boolean,
+) : Transformation() {
+    override val cacheKey = "artworkLogoPlace-v2($ratio;$logoShare;$startAtRight)"
+
+    override suspend fun transform(input: Bitmap, size: Size): Bitmap {
+        val found = artworkLogoPlaces(input, ratio, logoShare, startAtRight)
+        synchronized(places) { places[input] = found }
+        return input
+    }
+
+    companion object {
+        // Keyed by the delivered bitmap itself, which the memory cache hands out again unchanged.
+        private val places = java.util.WeakHashMap<Bitmap, List<ArtworkLogoPlace>>()
+        fun of(bitmap: Bitmap): List<ArtworkLogoPlace>? = synchronized(places) { places[bitmap] }
+    }
+}
+
 internal class NoProgrammeBackdropException : IllegalStateException("Programme cover has no backdrop scene")

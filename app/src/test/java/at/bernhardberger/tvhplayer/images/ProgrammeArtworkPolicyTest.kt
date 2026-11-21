@@ -150,4 +150,91 @@ class ProgrammeArtworkPolicyTest {
         assertTrue(window.y <= 65 && window.y + window.height >= 79)
         assertTrue(window.y + window.height * 0.64 > 78)
     }
+
+    @Test fun plainPictureRanksEqualCornersFromBottomStart() {
+        val places = artworkLogoPlaces(IntArray(96 * 144) { neutral }, 96, 144, logoShare = .42)
+        assertEquals(listOf(ArtworkLogoCorner.BOTTOM_START, ArtworkLogoCorner.TOP_START,
+            ArtworkLogoCorner.BOTTOM_END, ArtworkLogoCorner.TOP_END), places.map { it.corner })
+    }
+
+    @Test fun logoKeepsOffLetteringDrawnIntoThePicture() {
+        val pixels = titlePixels(IntRange.EMPTY).apply { drawLettering(top = 121) }
+
+        assertTrue(artworkLettering(pixels, 96, 144).any { it.left < 48 && it.bottom > 108 })
+        assertNotEquals(ArtworkLogoCorner.BOTTOM_START,
+            artworkLogoPlaces(pixels, 96, 144, logoShare = .42).first().corner)
+    }
+
+    @Test fun aCompactLineWithATallCapitalNeedsAtLeastFiveLetters() {
+        fun lettering(count: Int): List<ArtworkLettering> {
+            val pixels = titlePixels(IntRange.EMPTY)
+            // Keep both words as wide as each other, with the capital making the box tall.
+            for (letter in 0 until count) {
+                val left = 6 + letter * 36 / (count - 1)
+                val top = if (letter == 0) 16 else 26
+                for (y in top..40) for (x in 0..5) {
+                    if (x == 0 || x == 5 || y == 32) pixels[y * 96 + left + x] = 0xffffffff.toInt()
+                }
+            }
+            return artworkLettering(pixels, 96, 144)
+        }
+
+        assertEquals("five letters make a line", 1, lettering(5).size)
+        assertTrue("four letters with the same proportions do not", lettering(4).isEmpty())
+    }
+
+    @Test fun logoLeavesSpaceBesideDrawnInLettering() {
+        // The lettering ends above the logo's own space, but still crowds it.
+        val pixels = titlePixels(IntRange.EMPTY).apply { drawLettering(top = 98) }
+
+        assertTrue(artworkLettering(pixels, 96, 144).isNotEmpty())
+        assertNotEquals(ArtworkLogoCorner.BOTTOM_START,
+            artworkLogoPlaces(pixels, 96, 144, logoShare = .42).first().corner)
+    }
+
+    @Test fun drawnInLetteringCostsMoreThanBusyTexture() {
+        val pixels = titlePixels(IntRange.EMPTY, textureRows = 106..143).apply { drawLettering(top = 8) }
+
+        val ranked = artworkLogoPlaces(pixels, 96, 144, logoShare = .42).map { it.corner }
+        assertTrue(ranked.indexOf(ArtworkLogoCorner.BOTTOM_START) < ranked.indexOf(ArtworkLogoCorner.TOP_START))
+    }
+
+    @Test fun busyCornerWithoutLetteringLosesToCalmCornersInBothDirections() {
+        val pixels = titlePixels(IntRange.EMPTY, textureRows = 106..143)
+
+        assertTrue(artworkLettering(pixels, 96, 144).isEmpty())
+        for ((startAtRight, busyCorner) in listOf(false to ArtworkLogoCorner.BOTTOM_START,
+            true to ArtworkLogoCorner.BOTTOM_END)) {
+            assertEquals(busyCorner,
+                artworkLogoPlaces(pixels, 96, 144, logoShare = .42, startAtRight = startAtRight).last().corner)
+        }
+    }
+
+    @Test fun onlyCalmLightOrDarkGroundsUseThePictureItself() {
+        val light = IntArray(96 * 144) { 0xffeeeeee.toInt() }
+        val dark = IntArray(96 * 144) { neutral }
+        // Keep the busy corner bright enough that brightness alone would choose the picture.
+        val busy = titlePixels(IntRange.EMPTY, textureRows = 106..143)
+        for (i in busy.indices) if (busy[i] != 0xffffffff.toInt()) busy[i] = 0xffaaaaaa.toInt()
+        for ((pixels, expected) in listOf(light to ArtworkLogoGround.LIGHT_PICTURE,
+            dark to ArtworkLogoGround.DARK_PICTURE, busy to ArtworkLogoGround.SHADE)) {
+            val corner = artworkLogoPlaces(pixels, 96, 144, logoShare = .42)
+                .single { it.corner == ArtworkLogoCorner.BOTTOM_START }
+            assertEquals(expected, corner.ground)
+        }
+    }
+
+    @Test fun onlyDarkLogoInkWithoutALightPartNeedsLightGround() {
+        val white = 0xffffffff.toInt()
+        val clear = 0x00ffffff
+        assertTrue(logoNeedsLightGround(intArrayOf(neutral, neutral, clear, clear)))
+        assertFalse(logoNeedsLightGround(intArrayOf(white, white, clear, clear)))
+        assertFalse(logoNeedsLightGround(intArrayOf(neutral, neutral, white)))
+    }
+
+    private fun IntArray.drawLettering(top: Int) {
+        for (left in listOf(6, 20, 34)) for (y in 0..12) for (x in 0..9) {
+            if (x == 0 || x == 9 || y == 6) this[(top + y) * 96 + left + x] = 0xffffffff.toInt()
+        }
+    }
 }

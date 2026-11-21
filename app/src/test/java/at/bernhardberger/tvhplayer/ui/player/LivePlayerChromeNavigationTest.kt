@@ -388,12 +388,12 @@ class LivePlayerChromeNavigationTest : LivePlayerChromeFixture() {
         screen()
         key(Key.DirectionDown)
         assertEquals(listOf("player-pause"), focused())
-        for (close in listOf(Key.DirectionUp, Key.Back)) {
+        for ((close, origin) in listOf(Key.DirectionUp to "player-settings", Key.Back to "player-record")) {
             key(Key.DirectionRight)
             key(Key.DirectionRight)
-            key(Key.DirectionRight)
-            key(Key.DirectionRight)
-            assertEquals(listOf("player-settings"), focused())
+            assertEquals(listOf("player-record"), focused())
+            if (origin == "player-settings") repeat(3) { key(Key.DirectionRight) }
+            assertEquals(listOf(origin), focused())
             key(Key.DirectionDown)
             assertEquals("browser opens on the playing channel", listOf("player-channel-card-1"), focused())
             assertTrue("the now-playing strip stands above the rows", exists("player-now-playing"))
@@ -408,9 +408,9 @@ class LivePlayerChromeNavigationTest : LivePlayerChromeFixture() {
             }
             key(close)
             assertFalse(railOpen())
-            assertEquals(listOf("player-settings"), focused())
-            key(Key.DirectionLeft)
-            key(Key.DirectionLeft)
+            assertEquals(listOf(origin), focused())
+            if (origin == "player-settings") repeat(3) { key(Key.DirectionLeft) }
+            assertEquals(listOf("player-record"), focused())
             key(Key.DirectionLeft)
             key(Key.DirectionLeft)
         }

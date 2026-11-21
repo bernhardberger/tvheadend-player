@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvhplayer.images.ArtworkLogoCorner
 import at.bernhardberger.tvhplayer.images.ProgrammeArtworkMode
 
 import at.bernhardberger.tvhplayer.ui.components.programmeMinutesLeft
@@ -68,6 +69,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -175,8 +177,10 @@ import at.bernhardberger.tvhplayer.ui.components.rememberPictureLoad
 import at.bernhardberger.tvhplayer.ui.components.ChannelAccentFill
 import at.bernhardberger.tvhplayer.ui.components.channelAccentGround
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
-import at.bernhardberger.tvhplayer.ui.components.ArtworkLogoPlate
+import at.bernhardberger.tvhplayer.ui.components.ArtworkCornerLogo
+import at.bernhardberger.tvhplayer.ui.components.ArtworkChannelName
 import at.bernhardberger.tvhplayer.ui.components.AiringCardWidth
+import at.bernhardberger.tvhplayer.ui.components.ArtworkLogoShare
 import at.bernhardberger.tvhplayer.ui.components.ArtworkLogoPlateWidth
 
 /**
@@ -527,6 +531,7 @@ internal fun ChannelsRowCard(
     val programme = running?.title?.takeIf { it.isNotBlank() }
     val tag = "$tagPrefix-${channel.id.value}"
     val session = LocalArtworkContext.current.currentSession
+    var logoFailed by remember(channel.icon, session) { mutableStateOf(false) }
     val art = running?.let(::programmeArtwork)?.takeIf { programmePicture && session != null }
     val context = LocalPlatformContext.current
     val textHeight = with(LocalDensity.current) { MaterialTheme.typography.titleSmall.lineHeight.toDp() } +
@@ -540,7 +545,8 @@ internal fun ChannelsRowCard(
         ((ImmersiveCardEmbedInset + ArtworkLogoPlateWidth * (width / AiringCardWidth)) / width).toDouble()
     } else 0.0
     val artRequest = rememberProgrammeImageRequest(artModel, mode = ProgrammeArtworkMode.BOX,
-        startPlateShare = plateShare, keepWideTitleCrop = true)
+        startPlateShare = plateShare, keepWideTitleCrop = true,
+        logoShare = if (channel.icon != null) ArtworkLogoShare else 0.0)
     val showsArt = artModel != null && artLoad.loaded
     val recording = programmeRecording.takeIf { running != null }
     val showChannelMark = showChannelRecordingMark(
@@ -555,6 +561,10 @@ internal fun ChannelsRowCard(
         art = art.takeUnless { artLoad.failed },
         picon = channel.icon,
         picture = {
+            // Without a usable logo, the picture names the channel unless the card names it below.
+            val name = channel.name?.takeIf { !channelName && it.isNotBlank() }
+            val pictureLogo = channel.icon.takeUnless { logoFailed && name != null }
+            val onLogoError = { logoFailed = true }
             if (artLoad.needsFallback) {
                 ChannelAccentFill(channel.icon, channel.id, Modifier.fillMaxSize())
                 Box(Modifier.fillMaxSize().padding(top = ImmersiveCardLogoInset, bottom = textHeight + ImmersiveCardLogoInset),
@@ -565,7 +575,10 @@ internal fun ChannelsRowCard(
                     )
                     val logo = Modifier.fillMaxWidth(ImmersiveCardLogoWidthFraction)
                         .fillMaxHeight().testTag("$tag-picon")
-                    PiconBox(channel.icon, logo, ground = ground)
+                    if (pictureLogo == null && name != null) Text(name, logo.wrapContentHeight(),
+                        style = MaterialTheme.typography.titleMedium, color = TvTextColors.primary,
+                        textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    else PiconBox(pictureLogo, logo, ground = ground, onError = onLogoError)
                 }
             }
             val lineModifier = Modifier.align(Alignment.BottomStart).fillMaxWidth()
@@ -593,9 +606,18 @@ internal fun ChannelsRowCard(
                 contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().testTag("$tag-art"),
                 onSuccess = artLoad::onSuccess, onError = { artLoad.onError() })
             // The picture carries the channel's logo in its embed corner, like the airing cards.
-            if (showsArt && channel.icon != null) ArtworkLogoPlate(channel.icon,
-                Modifier.align(Alignment.BottomStart).padding(ImmersiveCardEmbedInset).testTag("$tag-art-picon"),
-                scale = width / AiringCardWidth)
+            // In the picture's own corner; the top end is the recording mark's and the top start
+            // the playing mark's, each only while it shows.
+            val progress = programmeProgress(running, nowSec)
+            val bottomEdge = if (progress != null) TvCardProgressStripHeight else 0.dp
+            if (showsArt && pictureLogo != null) ArtworkCornerLogo(pictureLogo,
+                artLoad.logoPlace(setOfNotNull(
+                    ArtworkLogoCorner.TOP_END.takeIf { recording != null || showChannelMark },
+                    ArtworkLogoCorner.TOP_START.takeIf { playbackIndicator != ChannelPlaybackIndicator.NONE })),
+                Modifier.testTag("$tag-art-picon"), scale = width / AiringCardWidth, bottomEdge = bottomEdge,
+                onError = onLogoError)
+            else if (showsArt && name != null) ArtworkChannelName(
+                name, Modifier.testTag("$tag-art-name"), scale = width / AiringCardWidth, bottomEdge = bottomEdge)
             if (playbackIndicator != ChannelPlaybackIndicator.NONE) {
                 CardPlaybackPlate(Modifier.align(Alignment.TopStart).padding(ImmersiveCardEmbedInset)) {
                     ChannelPlaybackMarker(playbackIndicator)
@@ -607,7 +629,6 @@ internal fun ChannelsRowCard(
                 recordingDescription = if (showChannelMark) stringResource(R.string.channel_recording_spoken) else null)
             // Same embedded strip as the airing cards; the card's border keeps clear of it.
             // The playing channel's strip follows the viewer, like the other channel cards.
-            val progress = programmeProgress(running, nowSec)
             if (progress != null) ProgressStrip(progress,
                 Modifier.align(Alignment.BottomStart).fillMaxWidth().testTag("$tag-progress"),
                 color = progressColor(watchingIndicator(running, nowSec).isPlayingItem, recording != null),

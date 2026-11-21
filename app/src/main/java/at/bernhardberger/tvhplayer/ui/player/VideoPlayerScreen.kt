@@ -108,6 +108,7 @@ import at.bernhardberger.tvhplayer.core.playerKeyAction
 import at.bernhardberger.tvhplayer.core.playerKeyActionStartsOpeningCycle
 import at.bernhardberger.tvhplayer.core.programmeRecordingTarget
 import at.bernhardberger.tvhplayer.core.BrowseContextAction
+import at.bernhardberger.tvhplayer.core.ProgrammeAction
 import at.bernhardberger.tvhplayer.core.programmeDetailsActions
 import at.bernhardberger.tvhplayer.core.chooseDvrConfig
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
@@ -156,7 +157,11 @@ import at.bernhardberger.tvhplayer.ui.screens.isScheduled
 import at.bernhardberger.tvhplayer.ui.screens.DvrMutationAction
 import at.bernhardberger.tvhplayer.ui.screens.DvrMutationActions
 import at.bernhardberger.tvhplayer.ui.screens.currentDvrMutation
+import at.bernhardberger.tvhplayer.ui.screens.launchMutation
 import at.bernhardberger.tvhplayer.ui.screens.guide.ConfirmProgrammeActionDialog
+import at.bernhardberger.tvhplayer.settings.AppProfileOwner
+import at.bernhardberger.tvhplayer.ui.screens.settings.activeProfile
+import at.bernhardberger.tvhplayer.ui.screens.settings.accountName
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import at.bernhardberger.tvhplayer.viewmodels.VideoPlayerViewModel
 import kotlinx.coroutines.CoroutineScope
@@ -808,11 +813,12 @@ fun VideoPlayerScreen(
 
     PersistConfirmedChannel(confirmedPlayingChannelId, channelScope, observation, lastPlayedChannelStore)
 
-    fun openInfo(fromKey: Boolean = false) {
+    fun openInfo(fromKey: Boolean = false, returnAction: String = "player-info") {
         infoPinnedEventId = null
         remoteKeys.infoInitialAction = null
         remoteKeys.infoRailChannelId = null
-        remoteKeys.infoReturnAction = if (fromKey && !layerState.core.chrome.controlsVisible) null else "player-info"
+        remoteKeys.infoReturnOrigin = returnAction
+        remoteKeys.infoReturnAction = null
         layerState.core.restoreInfoFocus = false
         layerState.openInfo(fromKey)
     }
@@ -824,8 +830,12 @@ fun VideoPlayerScreen(
         remoteKeys.infoReturnAction = null
     }
 
+    var recordConfirmation by remember(currentChannelId) { mutableStateOf<LiveRecordConfirmation?>(null) }
+    val recordInFlight = remember { mutableStateOf<DvrMutationAction?>(null) }
     fun dismissRecordingDialog() {
+        recordConfirmation = null
         layerState.dismissRecordingConfirmation()
+        layerState.core.restoreControl = "player-record"
     }
 
     fun closeInfo() {
@@ -835,7 +845,7 @@ fun VideoPlayerScreen(
         layerState.closeInfo(returnToRail = returnToRail)
         remoteKeys.infoRailChannelId = null
         remoteKeys.infoReturnAction =
-            if (returnToRail || !layerState.core.chrome.controlsVisible) null else "player-info"
+            if (returnToRail || !layerState.core.chrome.controlsVisible) null else remoteKeys.infoReturnOrigin
     }
 
     /**
@@ -985,6 +995,7 @@ fun VideoPlayerScreen(
 
         val playbackSelection = currentLivePlaybackSelection(observation, channelId)
             ?: return true
+        if (recordConfirmation != null) dismissRecordingDialog()
         timeshiftCommandToken += 1L
         timelineState.invalidateForSourceChange()
         liveRequestToken += 1L
@@ -1158,40 +1169,75 @@ fun VideoPlayerScreen(
     } else null
     val infoEvent = displayedProgrammeEvent(visibleSeekPreview != null, displayedWindow,
         committedWindow, effectiveTimeshiftState, nowEvent, liveStart)
+    val recordState = infoEvent?.let(observation::dvrEntryForEvent)?.takeUnless(::recordingWasRemoved)
+        ?.state?.takeIf { it in LiveRecordStates }
 
-    fun recordProgramme(programme: EpgEventEntry?) {
-        if (remoteKeys.recordKeyInFlight) return
+    fun recordActions(programme: EpgEventEntry, recording: DvrEntry?, observation: SessionObservation): List<BrowseContextAction> {
+        val canModify = observation.dvrState is DvrRepositoryState.Current &&
+            (observation.sessionState as? SessionState.Ready)?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
+        return programmeDetailsActions(programme, nowSec, recording,
+            recording?.let(observation::recordingPlaybackAdmission), canModify,
+            programme.channelId?.let(observation::channel) != null, liveProgramme = observation.event(programme.id) != null)
+    }
+
+    fun recordingConfirmationIsCurrent(confirmation: LiveRecordConfirmation, current: SessionObservation): Boolean {
+        if (confirmation.channelId != currentChannelId ||
+            currentDvrMutation(confirmation.mutation, confirmation.opening, current) == null) return false
+        val (recordingId, action) = when (val mutation = confirmation.mutation) {
+            is DvrMutationAction.Stop -> mutation.recordingId to BrowseContextAction.STOP
+            is DvrMutationAction.Cancel -> mutation.recordingId to BrowseContextAction.CANCEL
+            else -> return false
+        }
+        val programme = current.event(confirmation.programme.id) ?: confirmation.programme
+        val recording = current.dvrEntryForEvent(programme)?.takeUnless(::recordingWasRemoved)
+        return recording?.id == recordingId && action in recordActions(programme, recording, current)
+    }
+
+    fun recordProgramme(programme: EpgEventEntry?, fromControl: Boolean = false) {
+        if (recordInFlight.value != null || recordConfirmation != null) return
         val opening = observation
         val capability = opening.currentSession
-        if (programme == null || capability == null) {
+        if (programme == null) {
             notices.postRecordUnavailable(programme, opening, nowSec)
             return
         }
         val recording = opening.dvrEntryForEvent(programme)?.takeUnless(::recordingWasRemoved)
-        val canModify = opening.dvrState is DvrRepositoryState.Current &&
-            (opening.sessionState as? SessionState.Ready)?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
-        val actions = programmeDetailsActions(programme, nowSec, recording,
-            recording?.let(opening::recordingPlaybackAdmission), canModify,
-            programme.channelId?.let(opening::channel) != null, liveProgramme = opening.event(programme.id) != null)
-        if (BrowseContextAction.RECORD !in actions) {
+        val actions = recordActions(programme, recording, opening)
+        if (fromControl && recording != null && recording.state in LiveRecordStates) {
+            val mutation = when {
+                capability == null -> null
+                BrowseContextAction.STOP in actions -> DvrMutationAction.Stop(capability, recording.id)
+                BrowseContextAction.CANCEL in actions -> DvrMutationAction.Cancel(capability, recording.id)
+                else -> null
+            }
+            if (mutation == null) {
+                // Rule-created schedules, for example, offer Skip in Details instead of Cancel.
+                openInfo(returnAction = "player-record")
+                infoPinnedEventId = programme.id.takeIf { opening.event(it) != null }
+            } else {
+                recordConfirmation = LiveRecordConfirmation(programme, mutation, opening, currentChannelId)
+                layerState.showRecordingConfirmation()
+            }
+            return
+        }
+        if (capability == null || BrowseContextAction.RECORD !in actions) {
             notices.postRecordUnavailable(programme, opening, nowSec)
         } else {
             val mutation = DvrMutationAction.CreateProgramme(programme.programmeRecordingTarget(capability), null)
-            remoteKeys.recordKeyInFlight = true
+            recordInFlight.value = mutation
             scope.launch {
                 try {
                     val preferred = uiSettingsStore.settings.first().recordingProfileId
                     val current = session.observation.value
                     val request = currentDvrMutation(mutation, opening, current) as? DvrMutationAction.CreateProgramme
                         ?: return@launch
-                    if (current.dvrEntryForEvent(programme)?.state in listOf(DvrEntryState.SCHEDULED,
-                            DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR)) return@launch
+                    if (current.dvrEntryForEvent(programme)?.state in LiveRecordStates) return@launch
                     val configured = request.copy(
                         configId = chooseDvrConfig(current.currentDvrConfigurations(), preferred))
                     val context = notices.context()
                     notices.postDvrFailure(configured, dvrMutationActions.execute(configured), context)
                 } finally {
-                    remoteKeys.recordKeyInFlight = false
+                    recordInFlight.value = null
                 }
             }
         }
@@ -1252,6 +1298,11 @@ fun VideoPlayerScreen(
         )
     val foregroundContext = currentPlayerForegroundContext()
     val confirmationVisible = foregroundContext.confirmationVisible
+    val validRecordConfirmation = recordConfirmation?.takeIf { recordingConfirmationIsCurrent(it, observation) }
+    LaunchedEffect(confirmationVisible, validRecordConfirmation) {
+        if (confirmationVisible && validRecordConfirmation == null) dismissRecordingDialog()
+        else if (!confirmationVisible) recordConfirmation = null
+    }
     val infoVisible = foregroundContext.infoVisible
     val showDrawer = foregroundContext.channelDrawerVisible
     val seekPreviewPhase = foregroundContext.seekPreviewPhase
@@ -1279,6 +1330,7 @@ fun VideoPlayerScreen(
             seekPending = timelineState.seekPending,
             modalVisible = layerState.core.optionsPage != null ||
                 layerState.core.infoOpen ||
+                confirmationVisible ||
                 showDrawer ||
                 channelNumberInput.isNotEmpty(),
             recoveryVisible = recoveryVisible,
@@ -1529,7 +1581,7 @@ fun VideoPlayerScreen(
                 if (serverWait.consumesKey(event, layerState)) return@onPreviewKeyEvent true
                 val keyCode = event.nativeKeyEvent.keyCode
                 layerState.handleScheduleKey(event, foregroundLayer, ::prepareSchedule)?.let { return@onPreviewKeyEvent it }
-                if (layerState.core.infoOpen) {
+                if (layerState.core.infoOpen || confirmationVisible) {
                     if (layerState.core.consumesRevealingKey(event)) return@onPreviewKeyEvent true
                     // Details owns navigation; no playback or options key
                     // (including Left-as-Back in the other panels) reaches the player underneath.
@@ -1560,8 +1612,7 @@ fun VideoPlayerScreen(
                     confirmationOpen = foregroundLayer == PlayerForegroundLayer.CONFIRMATION,
                     livePause = livePauseAvailability,
                     scrubbing = timelineState.scrubSpeed != 0,
-                    programmeRecording = infoEvent?.let(observation::dvrEntryForEvent)?.state in
-                        listOf(DvrEntryState.SCHEDULED, DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR),
+                    programmeRecording = infoEvent?.let(observation::dvrEntryForEvent)?.state in LiveRecordStates,
                 )
                 val dedicatedAction = playerKeyAction(keyContext, keyCode)
                 if (keyCode == AndroidKeyEvent.KEYCODE_MEDIA_RECORD && dedicatedAction == PlayerKeyAction.CONSUME) {
@@ -1849,7 +1900,7 @@ fun VideoPlayerScreen(
         val channelRailOpen = foregroundLayer == PlayerForegroundLayer.CHANNEL_DRAWER
         // The channel drawer opens with the controls; the page's own Info never holds them here (no details).
         val controlsLayerShown = chromeLayer == PlayerForegroundLayer.CONTROLS || channelRailOpen
-        val chromePanelOpen = layerState.core.optionsPage != null || layerState.core.infoOpen || layerState.scheduleOpen
+        val chromePanelOpen = layerState.core.optionsPage != null || layerState.core.infoOpen || layerState.scheduleOpen || confirmationVisible
         // The lower chrome's mode, for the chrome itself and for the Stats card under it.
         fun lowerChromeMode(keepControls: Boolean) = playerChromeMode(
             controls = controlsLayerShown || keepControls,
@@ -1929,7 +1980,7 @@ fun VideoPlayerScreen(
             actions = PlayerChromeActions(
                 // Under number entry the controls stay up, but the root takes the keys.
                 active = layerState.core.chrome.controlsVisible && layerState.core.optionsPage == null && !layerState.core.infoOpen &&
-                    !numberEntryUp,
+                    !numberEntryUp && !confirmationVisible,
                 paused = !livePlayWhenReady(livePauseState, playWhenReady),
                 livePause = livePauseAvailability,
                 restoreFocus = when {
@@ -1950,6 +2001,8 @@ fun VideoPlayerScreen(
             onSeek = onSeek,
             onCommitSeek = timelineState::commitPendingSeek,
             onStop = stopAndClose,
+            onRecord = { recordProgramme(infoEvent, fromControl = true) },
+            recordState = recordState,
             onInfo = {
                 openInfo()
             },
@@ -2083,6 +2136,30 @@ fun VideoPlayerScreen(
                 onPlayRecording = onPlayRecording,
             )
         }
+        if (confirmationVisible && validRecordConfirmation != null) {
+            val (programme, mutation, opening) = validRecordConfirmation
+            ConfirmProgrammeActionDialog(
+                action = if (mutation is DvrMutationAction.Stop) ProgrammeAction.STOP_RECORDING else ProgrammeAction.CANCEL_RECORDING,
+                event = programme,
+                channel = programme.channelId?.let(observation::channel),
+                nowSec = nowSec,
+                currentSession = currentSession,
+                observation = observation,
+                entries = opening.dvrEntriesForEvent(programme),
+                configurations = observation.currentDvrConfigurations(),
+                signedInUsername = koinInject<AppProfileOwner>().profiles.collectAsStateWithLifecycle()
+                    .value.activeProfile()?.accountName(),
+                onDismiss = ::dismissRecordingDialog,
+                onConfirm = confirm@{
+                    if (recordConfirmation !== validRecordConfirmation) return@confirm
+                    val stillCurrent = recordingConfirmationIsCurrent(validRecordConfirmation, session.observation.value)
+                    dismissRecordingDialog()
+                    if (stillCurrent) dvrMutationActions.launchMutation(
+                        mutation, opening, { session.observation.value }, { nowSec }, uiSettingsStore, notices, scope, recordInFlight,
+                    )
+                },
+            )
+        }
 
         PlayerPanelVisibility(
             value = layerState.core.optionsPage?.let { it to layerState.core.optionsQuickList },
@@ -2167,13 +2244,22 @@ fun VideoPlayerScreen(
     }
 }
 
+private val LiveRecordStates = setOf(DvrEntryState.SCHEDULED, DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR)
+
+private data class LiveRecordConfirmation(
+    val programme: EpgEventEntry,
+    val mutation: DvrMutationAction,
+    val opening: SessionObservation,
+    val channelId: ChannelId,
+)
+
 private class LivePlayerRemoteKeyState {
     var infoRailChannelId by mutableStateOf<ChannelId?>(null)
+    var infoReturnOrigin = "player-info"
     var infoReturnAction by mutableStateOf<String?>(null)
     // The control focused before number entry took over the controls.
     var numberEntryReturnAction by mutableStateOf<String?>(null)
     var infoInitialAction by mutableStateOf<BrowseContextAction?>(null)
-    var recordKeyInFlight by mutableStateOf(false)
     var lastChromeControl by mutableStateOf<String?>(null)
     var scrubKeyHeld by mutableStateOf(false)
     var scrubKeyCode by mutableStateOf<Int?>(null)

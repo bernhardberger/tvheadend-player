@@ -3,6 +3,7 @@ package at.bernhardberger.tvhplayer.images
 import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Color
+import at.bernhardberger.tvhplayer.ui.components.ArtworkLogoShare
 import coil3.size.Size
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -156,6 +157,31 @@ class BackdropTransformationTest {
             val output = runBlocking { blur.transform(input, Size(32, 18)) }
             assertEquals("grey $grey", meanRed(input), meanRed(output), 2f)
         }
+    }
+
+    @Test
+    fun thinLetteringKeepsTheSameLogoCornerAtCardAndPlayerTileSizes() {
+        fun picture(width: Int, height: Int): Bitmap {
+            val input = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            input.eraseColor(Color.rgb(160, 160, 160))
+            // The same thin wordmark in the lower left at both delivery sizes.
+            val glyphWidth = width / 40
+            val glyphHeight = height / 16
+            for (letter in 0..2) {
+                val left = width / 32 + letter * (glyphWidth + width / 64)
+                for (y in 0 until glyphHeight) for (x in 0 until glyphWidth) {
+                    if (x == 0 || x == glyphWidth - 1 || y == glyphHeight / 2) {
+                        input.setPixel(left + x, height * 5 / 6 + y, Color.rgb(224, 224, 224))
+                    }
+                }
+            }
+            return input
+        }
+
+        val card = artworkLogoPlaces(picture(356, 200), 356.0 / 200, ArtworkLogoShare, startAtRight = false).first()
+        val tile = artworkLogoPlaces(picture(392, 220), 392.0 / 220, ArtworkLogoShare, startAtRight = false).first()
+        assertNotEquals(ArtworkLogoCorner.BOTTOM_START, card.corner)
+        assertEquals(card.corner, tile.corner)
     }
 
     private fun meanRed(bitmap: Bitmap): Float {

@@ -29,6 +29,8 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.res.painterResource
 import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
+import at.bernhardberger.tvhplayer.images.LogoInkTransformation
+import coil3.BitmapImage
 import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.memory.MemoryCache
@@ -63,13 +65,13 @@ fun PiconBox(
     trim: Boolean = false,
     /** The loaded logo's own size, before [contentScale]; a trimmed logo's is its visible shape. */
     onLogoSize: ((Size) -> Unit)? = null,
+    /** For a logo drawn on a picture: whether its original ink needs a light shade. */
+    onLogoTone: ((Boolean) -> Unit)? = null,
 ) = profileTrace("P1:compose:picon") {
     require(ground == null || transformation == null) { "a logo is either inked for its ground or transformed" }
     val artwork = LocalArtworkContext.current
     val currentSession = artwork.currentSession
-    // Before a current session the saved copy is tried, so logos show at startup and offline.
-    // Derived, so an observation of the same profile leaves the logo alone.
-    val piconUrl by remember(artwork, piconPath) { derivedStateOf { piconPath?.let(artwork::logo) } }
+    val piconUrl = rememberPiconSource(artwork, piconPath)
 
     val icon = painterResource(R.drawable.ic_live_tv_outlined)
     // Keep the placeholder painters stable across focus changes; only their draw tint changes.
@@ -99,14 +101,15 @@ fun PiconBox(
             // Rounded up, so a box a pixel larger or smaller reuses the logo already inked.
             val inkSize = drawn.takeIf { it.width > 0 && it.height > 0 }
                 ?.let { IntSize(it.width.roundUpTo(INK_SIZE_STEP), it.height.roundUpTo(INK_SIZE_STEP)) }
-            val model = remember(piconUrl, transformation, groundArgb, inkSize, trim) {
+            val measureTone = onLogoTone != null
+            val model = remember(piconUrl, transformation, groundArgb, inkSize, trim, measureTone) {
                 when {
                     transformation != null ->
                         ImageRequest.Builder(context).data(piconUrl).transformations(transformation).build()
                     groundArgb == null -> piconUrl
                     inkSize == null -> null
                     // The ink rule is tuned on the server's 400×240 picons, so it reads that size, not the view's.
-                    else -> inkedPiconRequest(context, source, groundArgb, inkSize, shown[0], trim)
+                    else -> inkedPiconRequest(context, source, groundArgb, inkSize, shown[0], trim, measureTone)
                 }
             }
             if (loaded && transformation == null && groundArgb != null && inkSize != null && prefetchGround != null) {
@@ -127,6 +130,8 @@ fun PiconBox(
                 onSuccess = {
                     shown[0] = it.result.memoryCacheKey
                     onLogoSize?.invoke(it.painter.intrinsicSize)
+                    if (onLogoTone != null) (it.result.image as? BitmapImage)?.bitmap
+                        ?.let(LogoInkTransformation::needsLightGround)?.let(onLogoTone)
                     if (prefetchGround != null) loaded = true
                 },
                 onError = { if (!waitingForSession) onError?.invoke() },
@@ -134,6 +139,11 @@ fun PiconBox(
         }
     }
 }
+
+@Composable
+internal fun rememberPiconSource(artwork: ArtworkContext, picon: ChannelIcon?): Any? =
+    // Before Ready try the saved copy. An observation of the same profile leaves that logo alone.
+    remember(artwork, picon) { derivedStateOf { picon?.let(artwork::logo) } }.value
 
 private class PiconPlaceholderPainter(
     private val icon: Painter,

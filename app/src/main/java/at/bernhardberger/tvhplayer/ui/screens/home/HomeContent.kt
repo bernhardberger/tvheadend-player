@@ -1525,12 +1525,20 @@ private fun HomeShelfRow(
                     focusedContentColor = TvTextColors.primary,
                 ),
                 picture = {
+                    // Only a recording that is still running carries the red mark; a finished one has none.
+                    val runningState = recording.state?.takeIf { recordingIsRunning(recording) }
                     ProgrammeArtwork(
                         image = recordingArtwork(recording),
                         channelIcon = channel?.icon,
                         progress = progress,
                         modifier = Modifier.fillMaxSize(),
                         progressColor = progressColor(watching = true),
+                        // The corners this card's own marks stand in right now.
+                        takenCorners = setOfNotNull(
+                            at.bernhardberger.tvhplayer.images.ArtworkLogoCorner.TOP_END
+                                .takeIf { runningState != null },
+                            at.bernhardberger.tvhplayer.images.ArtworkLogoCorner.BOTTOM_END.takeIf { expiry != null },
+                        ),
                     )
                     expiry?.let {
                         StatusBadge(
@@ -1541,8 +1549,6 @@ private fun HomeShelfRow(
                             modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp),
                         )
                     }
-                    // Only a recording that is still running carries the red mark; a finished one has none.
-                    val runningState = recording.state?.takeIf { recordingIsRunning(recording) }
                     if (runningState != null) Box(
                         Modifier.align(Alignment.TopEnd).padding(8.dp)
                             .background(TvLogoPlateColor, MaterialTheme.shapes.extraSmall)

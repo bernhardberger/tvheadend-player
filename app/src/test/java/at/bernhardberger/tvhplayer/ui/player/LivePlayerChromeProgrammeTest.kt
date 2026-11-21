@@ -8,6 +8,9 @@ import android.app.Application
 import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertTextEquals
@@ -15,6 +18,9 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.pressKey
+import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvheadend.sdk.core.AutorecRuleId
+import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
@@ -22,6 +28,7 @@ import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvhplayer.notices.NoticeSeverity
 import at.bernhardberger.tvhplayer.notices.Notice
 import at.bernhardberger.tvhplayer.notices.DvrMutationFeedback
+import at.bernhardberger.tvhplayer.notices.RecordUnavailableReason
 import at.bernhardberger.tvheadend.sdk.core.DvrMutationKind
 import at.bernhardberger.tvheadend.sdk.core.DvrMutationResult
 import at.bernhardberger.tvheadend.sdk.core.DvrConfigId
@@ -88,6 +95,12 @@ class LivePlayerChromeProgrammeTest : LivePlayerChromeFixture() {
         assertFalse(exists("programme-details-page"))
         assertTrue(exists("player-actions"))
         assertEquals(listOf("player-info"), focused())
+        key(Key.DirectionLeft)
+        assertEquals(listOf("player-record"), focused())
+        key(Key.DirectionCenter)
+        assertEquals(Notice.RecordUnavailable(RecordUnavailableReason.NO_PROGRAMME),
+            notices.state.value.pending.single().notice)
+        assertEquals(listOf("player-record"), focused())
     }
 
     @Test fun playerInfoOffersCancelAfterContinueWatchingWhenAlreadyScheduled() {
@@ -148,6 +161,73 @@ class LivePlayerChromeProgrammeTest : LivePlayerChromeFixture() {
         assertEquals(0, session.calls.count { it == FakeSessionCall.DVR_STOP_ENTRY })
         key(Key.Back)
         assertEquals(listOf("details-stop"), focused())
+    }
+
+    @Test fun recordControlSchedulesAndRequiresConfirmationToStop() {
+        screen(recordingProfile = DvrConfigId("archive"))
+        session.dvrRepository.scriptScheduleEntry(DvrMutationResult.Confirmed(DvrEntryId(7)))
+        key(Key.DirectionDown)
+        assertEquals(listOf("player-pause"), focused())
+        key(Key.DirectionRight)
+        assertEquals(listOf("player-stop"), focused())
+        key(Key.DirectionRight)
+        assertEquals(listOf("player-record"), focused())
+        val record = compose.onNodeWithTag("player-record")
+        record.assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.StateDescription))
+        key(Key.DirectionCenter)
+        assertFalse(exists("two-column-first"))
+        assertEquals(DvrConfigId("archive"), scheduleRequests.single().configId)
+        assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_SCHEDULE_ENTRY })
+
+        listOf(
+            DvrEntryState.SCHEDULED to AutorecRuleId("series"),
+            DvrEntryState.RECORDING to null,
+        ).forEach { (state, rule) ->
+            publishInfoRecording(DvrEntryState.SCHEDULED)
+            record.assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription,
+                context.getString(R.string.recording_state_scheduled)))
+            key(Key.DirectionCenter)
+            compose.onNodeWithTag("two-column-first").assertIsFocused()
+            publishInfoRecording(state, autorecRuleId = rule)
+            assertFalse("Cancel is stale after refresh to $state (rule=$rule)", exists("two-column-first"))
+            record.assertIsFocused()
+            assertEquals(0, session.calls.count { it == FakeSessionCall.DVR_CANCEL_ENTRY })
+        }
+
+        record.assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription,
+            context.getString(R.string.recording_state_recording)))
+        session.dvrRepository.scriptStopEntry(DvrMutationResult.Confirmed(Unit))
+        key(Key.DirectionCenter)
+        compose.onNodeWithTag("two-column-first").assertIsFocused()
+        assertEquals(0, session.calls.count { it == FakeSessionCall.DVR_STOP_ENTRY })
+        compose.onNode(isDialog()).performKeyInput { pressKey(Key.Back) }
+        settle()
+        assertEquals(listOf("player-record"), focused())
+        assertEquals(0, session.calls.count { it == FakeSessionCall.DVR_STOP_ENTRY })
+        key(Key.DirectionCenter)
+        confirmInfoAction(destructive = true)
+        assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_STOP_ENTRY })
+
+        publishInfoRecording(DvrEntryState.SCHEDULED, autorecRuleId = AutorecRuleId("series"))
+        record.assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription,
+            context.getString(R.string.recording_state_scheduled)))
+        key(Key.DirectionCenter)
+        assertTrue(exists("details-skip"))
+        assertFalse(exists("two-column-first"))
+        assertEquals(0, session.calls.count { it == FakeSessionCall.DVR_CANCEL_ENTRY })
+        assertTrue(notices.state.value.pending.isEmpty())
+        key(Key.Guide)
+        assertTrue(exists("channel-schedule-panel"))
+        key(Key.Back)
+        assertTrue(exists("details-skip"))
+        key(Key.Back)
+        record.assertIsFocused()
+
+        publishInfoRecording(DvrEntryState.RECORDING, dvrWrite = CapabilityAccess.DENIED)
+        key(Key.DirectionCenter)
+        assertTrue(exists("programme-details-page"))
+        assertFalse(exists("details-stop") || exists("two-column-first"))
+        assertTrue(notices.state.value.pending.isEmpty())
     }
 
     @Test fun playerInfoRecordsDirectlyThenOffersStopFromObservedState() {
