@@ -180,7 +180,7 @@ import at.bernhardberger.tvhplayer.ui.components.ProgrammePanePicture
 import at.bernhardberger.tvhplayer.ui.components.ProgrammePanePictureGap
 import at.bernhardberger.tvhplayer.ui.components.ProgrammePaneWidth
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeStatusLine
-import at.bernhardberger.tvhplayer.ui.components.programmeAboutFacts
+import at.bernhardberger.tvhplayer.ui.common.programmeAboutFacts
 import at.bernhardberger.tvhplayer.ui.components.programmeHeaderMetadata
 import at.bernhardberger.tvhplayer.ui.components.programmeSynopsis
 import kotlinx.coroutines.Job

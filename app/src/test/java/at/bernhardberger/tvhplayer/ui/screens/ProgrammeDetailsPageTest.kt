@@ -46,14 +46,13 @@ import at.bernhardberger.tvhplayer.testutil.changeState
 import at.bernhardberger.tvhplayer.ui.AppDestination
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.common.AppClock
+import at.bernhardberger.tvhplayer.ui.common.programmeAboutFacts
 import at.bernhardberger.tvhplayer.ui.components.LocalChannelAccents
 import at.bernhardberger.tvhplayer.ui.components.ListBottomFadeVisible
 import at.bernhardberger.tvhplayer.ui.components.ListTopFadeVisible
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeDetailsPage
 import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 import at.bernhardberger.tvhplayer.ui.components.RowChangeMs
-import at.bernhardberger.tvhplayer.ui.components.programmeAboutFacts
-import at.bernhardberger.tvhplayer.ui.components.programmeAboutText
 import coil3.compose.AsyncImage
 import java.io.File
 import java.util.Locale
@@ -884,49 +883,11 @@ class ProgrammeDetailsPageTest {
         compose.onNodeWithTag("details-show_guide").assertIsFocused().assertIsDisplayed()
     }
 
-    @Test fun aboutFactsListOnlyFieldsThatArePresent() {
-        val resources = ApplicationProvider.getApplicationContext<Application>().resources
-        val rich = EpgEvent.create(event.id, event.channelId, event.start, event.stop, genre = "Documentary",
-            episode = EpgEpisode(null, null, 2, 5, 3, 10, 1, 2, "S2 E3"),
-            rating = EpgRating(12, "XMLTV:FSK:12", null, null, null, 4), copyrightYear = 2024,
-            firstAired = Instant.parse("2024-01-01T12:00:00Z"), isNew = false,
-            categories = listOf("Nature", " ", "Nature"), keywords = listOf("Mountain", "Winter"))
-        Assert.assertEquals(listOf("Genre" to "Documentary", "Season" to "2 of 5", "Episode" to "3 of 10", "Part" to "1 of 2",
-            "Year" to "2024", "Age rating" to "FSK 12", "Star rating" to "4", "First aired" to "Jan 1, 2024",
-            "Broadcast" to "Repeat", "Categories" to "Nature", "Keywords" to "Mountain • Winter"),
-             programmeAboutFacts(rich, null, resources, Locale.US))
-        Assert.assertEquals(listOf("Documentary", "2024", "S2 E3 • Part 1"),
-            at.bernhardberger.tvhplayer.ui.components.programmeHeaderMetadata(programmeAboutFacts(rich, null, resources, Locale.US), resources, rich.episode))
-        val sparse = EpgEvent.create(event.id, event.channelId, event.start, event.stop,
-            episode = EpgEpisode(null, null, null, null, null, null, null, null, "Pilot"), isNew = true,
-            contentGenre = ContentGenre.fromContentType(0x90))
-        Assert.assertEquals(listOf("Genre" to "Education & factual", "Episode" to "Pilot", "Broadcast" to "New"),
-            programmeAboutFacts(sparse, null, resources, Locale.US))
-        Assert.assertEquals(listOf("Education & factual", "Pilot"),
-            at.bernhardberger.tvhplayer.ui.components.programmeHeaderMetadata(programmeAboutFacts(sparse, null, resources, Locale.US), resources, sparse.episode))
-        // XMLTV guides mostly send categories without a genre: the first two stand in for it.
-        val categoriesOnly = EpgEvent.create(event.id, event.channelId, event.start, event.stop, copyrightYear = 2021,
-            categories = listOf("Sitcom", "Comedy", "Series"))
-        Assert.assertEquals(listOf("Sitcom", "Comedy", "2021"),
-            at.bernhardberger.tvhplayer.ui.components.programmeHeaderMetadata(programmeAboutFacts(categoriesOnly, null, resources, Locale.US), resources, categoriesOnly.episode))
-        val bare = EpgEvent.create(event.id, event.channelId, event.start, event.stop, title = "Ridge Light")
-        Assert.assertEquals(emptyList<Pair<String, String>>(), programmeAboutFacts(bare, null, resources, Locale.US))
-        Assert.assertEquals(listOf("Short", "Long\ntext"), programmeAboutText("Short", "Long\\ntext", synopsisShownInFull = false))
-        Assert.assertEquals(listOf("Long\ntext"), programmeAboutText("Short", "Long\\ntext", synopsisShownInFull = true))
-        Assert.assertEquals(emptyList<String>(), programmeAboutText(" Same", "Same ", synopsisShownInFull = true))
-        Assert.assertEquals(listOf("Same"), programmeAboutText(" Same", "Same ", synopsisShownInFull = false))
-        // A description that opens with the summary already says it: the summary is not repeated.
-        Assert.assertEquals(listOf("A courier follows a signal.\nThe city lights up."),
-            programmeAboutText("A courier follows a signal. ", "A courier follows a signal.\\nThe city lights up.",
-                synopsisShownInFull = false))
-        Assert.assertEquals(emptyList<String>(), programmeAboutText(" ", null, synopsisShownInFull = false))
-    }
-
     @Test fun headlineLeadsWithTheGenreFamilyAndKeepsADifferentServerGenre() {
         val resources = ApplicationProvider.getApplicationContext<Application>().resources
-        fun header(genre: String?, contentType: Long?, categories: List<String> = emptyList()): List<String> {
+        fun header(genre: String?, contentType: Long?, categories: List<String> = emptyList(), year: Long? = null): List<String> {
             val coded = EpgEvent.create(event.id, event.channelId, event.start, event.stop, genre = genre,
-                contentGenre = ContentGenre.fromContentType(contentType), categories = categories)
+                contentGenre = ContentGenre.fromContentType(contentType), categories = categories, copyrightYear = year)
             return at.bernhardberger.tvhplayer.ui.components.programmeHeaderMetadata(
                 programmeAboutFacts(coded, null, resources, Locale.US), resources, null, contentGenre = coded.contentGenre)
         }
@@ -934,7 +895,8 @@ class ProgrammeDetailsPageTest {
         Assert.assertEquals("Same text shows once", listOf("Sport"), header(" sport", 0x40))
         Assert.assertEquals(listOf("Sport"), header(null, 0x40, listOf("Football")))
         Assert.assertEquals("Without a code the server text leads as before", listOf("Football"), header("Football", null))
-        Assert.assertEquals(listOf("Sitcom", "Comedy"), header(null, null, listOf("Sitcom", "Comedy", "Series")))
+        // XMLTV guides mostly send categories without a genre: the first two stand in for it.
+        Assert.assertEquals(listOf("Sitcom", "Comedy", "2021"), header(null, null, listOf("Sitcom", "Comedy", "Series"), year = 2021))
     }
 
     @Test fun episodeHeaderUsesLocaleNumericPremiereInsteadOfCopyrightYear() {
@@ -951,6 +913,13 @@ class ProgrammeDetailsPageTest {
         Assert.assertEquals(listOf("2005", "S5 E10"), header(episode, null))
         Assert.assertEquals(listOf("S5 E10"), header(episode, null, emptyList()))
         Assert.assertEquals(emptyList<String>(), header(null, null, emptyList()))
+        val genreLabel = resources.getString(at.bernhardberger.tvhplayer.presentation.R.string.details_genre)
+        val withPart = EpgEpisode(null, null, 2, null, 3, null, 1, null, "S2 E3")
+        val pilot = EpgEpisode(null, null, null, null, null, null, null, null, "Pilot")
+        Assert.assertEquals(listOf("Documentary", "2005", "S2 E3 • Part 1"),
+            header(withPart, null, facts + (genreLabel to "Documentary")))
+        Assert.assertEquals(listOf("Education & factual", "Pilot"),
+            header(pilot, null, listOf(genreLabel to "Education & factual")))
     }
 
     @Test fun airingEpisodeShowsOnlyWhatDiffersFromThePage() {
@@ -1374,31 +1343,6 @@ class ProgrammeDetailsPageTest {
         compose.pressKey(Key.DirectionDown)
         compose.onNodeWithTag("details-more").assertIsFocused()
         compose.runOnIdle { back.onBackPressed() }
-    }
-
-    @OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)
-    @Test fun recordingFactsReuseTrackLanguagesAndHideUnknownAndDefaultProfile() {
-        val context = ApplicationProvider.getApplicationContext<Application>()
-        val profile = DvrConfiguration(DvrConfigId("default"), "", "")
-        val entry = DvrEntry.create(DvrEntryId(1), configId = profile.id,
-            removal = DvrRemoval.UntilSpaceNeeded,
-            files = listOf(DvrRecordingFile.create(streams = listOf("deu", "ger", "eng").map {
-                DvrRecordingStream(at.bernhardberger.tvheadend.sdk.playback.SubscriptionStreamType.AAC, language = it)
-            })))
-        fun facts(locale: Locale) = at.bernhardberger.tvhplayer.ui.components.recordingMetadataFacts(
-            entry, listOf(profile), context, locale, start.epochSeconds).toMap()
-        Assert.assertEquals("German, English", facts(Locale.US)["Audio"])
-        Assert.assertEquals("Deutsch, Englisch", facts(Locale.GERMAN)["Audio"])
-        Assert.assertEquals("Kept until space is needed", facts(Locale.US)["Retention"])
-        Assert.assertFalse(facts(Locale.US).containsKey("Errors"))
-        Assert.assertFalse(facts(Locale.US).containsKey("Recording profile"))
-        Assert.assertTrue(at.bernhardberger.tvhplayer.ui.components.programmeCreditFacts(null, context.resources).isEmpty())
-        val credited = EpgEvent.create(event.id, channel.id, start, event.stop, credits = listOf(
-            EpgCredit("Director One", EpgCreditRole.DIRECTOR), EpgCredit("Actor One", EpgCreditRole.ACTOR),
-            EpgCredit("Actor Two", EpgCreditRole.ACTOR), EpgCredit("Actor Two", EpgCreditRole.ACTOR),
-            EpgCredit("Actor One", EpgCreditRole.DIRECTOR), EpgCredit("Director Two", EpgCreditRole.DIRECTOR)))
-        Assert.assertEquals(listOf("Cast" to listOf("Actor One", "Actor Two"), "Directors" to listOf("Director One", "Actor One", "Director Two")),
-            at.bernhardberger.tvhplayer.ui.components.programmeCreditFacts(credited, context.resources))
     }
 
     @Test fun castHasItsOwnSectionAndEveryNameIsFullOnPage() {
