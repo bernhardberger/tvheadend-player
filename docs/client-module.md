@@ -12,8 +12,8 @@ can reuse it without inheriting this app's UI or UX. `:app` depends on
 The separate `:brand` library owns the shared Compose theme and layout tokens; `:client` stays UI-free and does not depend on it.
 
 Package names stay `at.bernhardberger.tvhplayer.*` (move-only extraction).
-Kotlin `internal` is module-scoped, so declarations `:app` uses across the
-boundary are `public`; keep everything else `internal`.
+Kotlin `internal` is module-scoped, so declarations used across module
+boundaries are `public`; keep everything else `internal`.
 
 ## Dependency rules
 
@@ -54,32 +54,45 @@ directly. `:client` mirrors the app build types (`debug`, `release`, `profile`,
   growing timeline end, last-played channel, live-info recording, metadata
   cache, programme actions and recording targets, recording markers, seekbar,
   timeline EPG, timeshift presentation and channel scope visibility.
+- `ui/screens/onboarding/ConnectionSetupPolicy`: resource- and Compose-free
+  setup steps, transitions and failure actions; retains its existing package.
+
+## What lives in `:presentation`
+
+Shared player texts and the connection setup presentation: `ConnectionSetupState`,
+`ConnectionFormState`, `AppConnectionViewModel` and `AppErrorText` (including
+its localized seconds formatter).
+This library depends on `:client` and uses lifecycle ViewModel and Compose state
+and saveable APIs, not TV widgets or dependencies. The variant-specific launcher
+label stays in `:app`.
 
 ## What stays app-owned and why
 
-- Compose UI, screens, view models, notice formatting/presentation, theme and non-text resources: UI.
-  Shared player texts live in `:presentation`; the variant-specific launcher label stays in `:app`.
+- TV screens, TV-specific view models, notice formatting/presentation and app UI resources.
 - `di/AppModule` (Koin wiring) and `profiling/ProfileLayout` (Compose).
 - Key, focus, Back, navigation, appliance, accent, label, formatting and
   presentation policies: TV interaction and product UX.
-- `settings/UiSettings`, `AppLanguage`, `ConnectionFormState` and
-  `stores/GuidePositionStore`: app UI preferences, Compose state or Guide UI
-  state. `core/StartupBootstrapPolicy` depends on `UiSettings`, so it stays too.
+- `settings/UiSettings`, `AppLanguage` and `stores/GuidePositionStore`: app UI
+  preferences or Guide UI state. `core/StartupBootstrapPolicy` depends on
+  `UiSettings`; the startup view model and presentation coordinate TV appliance
+  launch and stay in `:app` too.
 
 ## Placement rule
 
 New UI-free runtime, persistence or domain code goes to `:client`.
 Tvheadend-generic protocol, catalog, EPG, DVR or playback knowledge goes to the
-SDK. Anything that needs Compose, `R`, views, Koin or TV interaction stays in `:app`.
+SDK. Shared connection setup state and text formatting go to `:presentation`;
+TV interaction, screens and dependency injection stay in `:app`.
 
 ## Tooling
 
-`tools/static_rules.py` applies the connection-probe and transient-feedback rules to `client/src/main`
-as well; theme rules stay app-only. `:app:verifyExternalSdkConsumption` checks
-both modules' debug, release, profile and profileServer compile/runtime classpaths
-and inherited dependency declarations. Only the in-repo `:client` project
-dependency is allowed; local file dependencies and substituted SDK components
-are rejected. Both modules must declare the released SDK with strict version
+`tools/static_rules.py` applies the connection-probe and transient-feedback rules to
+`client/src/main` and `presentation/src/main` as well; theme rules stay app-only.
+`:app:verifyExternalSdkConsumption` checks the production variant compile/runtime
+classpaths and inherited dependency declarations. Among the permitted in-repo
+dependencies are `:app` → `:presentation` and `:presentation` → `:client`; local
+file dependencies and substituted SDK components are rejected.
+SDK consumers must declare the released SDK with strict version
 pins, resolve the expected release graph, and use only the settings-owned public
 repositories (project repositories are forbidden). The app's offline profile
 variant additionally permits the strictly pinned released `sdk-testing` artifact.
