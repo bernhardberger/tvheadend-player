@@ -21,7 +21,6 @@ import at.bernhardberger.tvhplayer.touch.guide.ProgramDetailsColumn
 import at.bernhardberger.tvhplayer.touch.recordings.RecordingDetailsBody
 import at.bernhardberger.tvhplayer.touch.recordings.RecordingProgress
 import at.bernhardberger.tvhplayer.touch.recordings.dayText
-import at.bernhardberger.tvhplayer.touch.recordings.partText
 import at.bernhardberger.tvhplayer.touch.recordings.recordingDay
 import at.bernhardberger.tvhplayer.touch.recordings.recordingTime
 import at.bernhardberger.tvhplayer.touch.ui.DetailsFacts
@@ -69,8 +68,8 @@ internal fun ColumnScope.RecordingInfo(
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun RecordingInfoSections(details: RecordingPlayerInfo, openAiring: (String) -> Unit) {
-    val program = details.program ?: return
-    if (program.otherAirings.isNotEmpty()) {
+    val program = details.program
+    if (program != null && program.otherAirings.isNotEmpty()) {
         DetailsSectionTitle(stringResource(SharedR.string.details_other_airings, details.item.title))
         program.otherAirings.forEach { airing ->
             ListItem(
@@ -81,7 +80,10 @@ private fun RecordingInfoSections(details: RecordingPlayerInfo, openAiring: (Str
     }
     DetailsFacts(
         stringResource(SharedR.string.details_cast_and_crew),
-        program.credits.map { pluralStringResource(it.role.label, it.names.size) to it.names.joinToString(", ") },
+        details.credits.map { (label, names) -> label to names.joinToString(", ") } +
+            program?.credits.orEmpty().map {
+                pluralStringResource(it.role.label, it.names.size) to it.names.joinToString(", ")
+            },
         columns = 1, keyWidth = 116.dp,
     )
 }
@@ -90,13 +92,13 @@ private fun RecordingInfoSections(details: RecordingPlayerInfo, openAiring: (Str
 private fun recordingInfoWhenLine(details: RecordingPlayerInfo): String {
     val clock = details.clock
     val running = details.item.state as? RecordingProgress.Recording
-        ?: return joinParts(recordingInfoWhen(details.item, clock).map { partText(it) })
-    val ends = recordingTime(running.until, clock)
     val start = details.item.start
-    return if (start == null) {
-        stringResource(SharedR.string.recording_ends_at, ends)
-    } else {
-        val recorded = joinParts(listOf(dayText(recordingDay(start, clock)), recordingTime(start, clock)))
-        stringResource(SharedR.string.player_recorded_ends, recorded, ends)
+    val recorded = start?.let { joinParts(listOf(dayText(recordingDay(it, clock)), recordingTime(it, clock))) }
+    return when {
+        recorded != null && running != null ->
+            stringResource(SharedR.string.player_recorded_ends, recorded, recordingTime(running.until, clock))
+        recorded != null -> stringResource(SharedR.string.player_recorded_on, recorded)
+        running != null -> stringResource(SharedR.string.recording_ends_at, recordingTime(running.until, clock))
+        else -> ""
     }
 }

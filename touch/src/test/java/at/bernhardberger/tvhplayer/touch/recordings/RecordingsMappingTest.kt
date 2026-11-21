@@ -180,16 +180,11 @@ class RecordingsMappingTest {
     }
 
     @Test
-    fun detailsUseRecordedFileFactsAndCountBothKindsOfErrors() {
+    fun detailsExposeWatchAndFileSummaryForACompletedRecording() {
         val item = mapped(watchEntry())
         assertEquals(listOf(RecordingPlayAction.Watch), item.play)
         assertEquals(Duration.ofMinutes(60), item.length)
-        assertEquals("${NOW - 3600} to $NOW", item.details.recorded)
         assertEquals("64 B", item.details.size)
-        assertEquals("HD 1080", item.details.picture)
-        assertEquals("English", item.details.audio)
-        assertEquals("English", item.details.subtitles)
-        assertEquals("3 errors", item.details.errors)
     }
 
     private fun mapped(entry: DvrEntry): RecordingItem = recordingsState(

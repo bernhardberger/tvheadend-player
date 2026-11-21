@@ -39,6 +39,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -50,8 +51,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.DpSize
 import at.bernhardberger.tvhplayer.core.AppErrorCondition
+import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.ui.common.hintRes
+import at.bernhardberger.tvhplayer.ui.common.AppErrorText
 import at.bernhardberger.tvhplayer.ui.common.titleRes
 import at.bernhardberger.tvhplayer.touch.channels.ChannelRow
 import at.bernhardberger.tvhplayer.touch.ui.ChannelLogoTile
@@ -79,7 +82,7 @@ internal fun BoxScope.PictureControls(
         if (playing || tuning) {
             PictureCenter(state, layout, onAction, onBrightness)
         } else {
-            StatusMessage(status, layout, onAction, Modifier.align(Alignment.Center))
+            StatusMessage(state, layout, onAction, Modifier.align(Alignment.Center))
         }
     }
     if (layout.upright && (playing || tuning)) {
@@ -256,12 +259,16 @@ private fun Brightness(value: Float, onBrightness: (Float) -> Unit, modifier: Mo
 
 @Composable
 private fun StatusMessage(
-    status: LivePlayerStatus,
+    state: PlayerFaceState,
     layout: PlayerLayout,
     onAction: (PlayerAction) -> Unit,
     modifier: Modifier,
 ) {
-    val (icon, heading, message) = statusText(status) ?: return
+    val status = state.status
+    val (icon, heading, message) = if (state is RecordingPlayerState && status is LivePlayerStatus.Unavailable) {
+        val reason = status.condition?.let { AppErrorText(LocalContext.current).reason(it) }
+        Triple(R.drawable.player_no_video, SharedR.string.error_306_title, reason)
+    } else statusText(status) ?: return
     val compact = layout.upright
     val type = MaterialTheme.typography
     Column(
@@ -279,6 +286,10 @@ private fun StatusMessage(
                 it, color = OnPicture.copy(alpha = .75f),
                 style = if (compact) type.bodySmall else type.bodyMedium, textAlign = TextAlign.Center,
             )
+        }
+        (state as? RecordingPlayerState)?.failureDetail?.let {
+            Text(it, color = OnPicture.copy(alpha = .75f),
+                style = if (compact) type.bodySmall else type.bodyMedium, textAlign = TextAlign.Center)
         }
         if (status == LivePlayerStatus.PauseEnded) {
             Button(

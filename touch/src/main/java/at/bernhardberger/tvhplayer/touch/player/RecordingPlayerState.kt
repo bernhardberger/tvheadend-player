@@ -71,4 +71,5 @@ internal data class RecordingPlayerInfo(
     val clock: RecordingClock,
     val program: ProgramDetails? = null,
     val airingDetails: Map<String, ProgramDetails> = emptyMap(),
+    val credits: List<Pair<String, List<String>>> = emptyList(),
 )

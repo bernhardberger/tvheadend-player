@@ -28,12 +28,8 @@ import at.bernhardberger.tvhplayer.touch.channels.channelRow
 import at.bernhardberger.tvhplayer.touch.guide.ProgramDetails
 import at.bernhardberger.tvhplayer.touch.recordings.RecordingClock
 import at.bernhardberger.tvhplayer.touch.recordings.RecordingItem
-import at.bernhardberger.tvhplayer.touch.recordings.RecordingLinePart
 import at.bernhardberger.tvhplayer.touch.recordings.RecordingsTexts
-import at.bernhardberger.tvhplayer.touch.recordings.RowContext
-import at.bernhardberger.tvhplayer.touch.recordings.RowDates
 import at.bernhardberger.tvhplayer.touch.recordings.recordingItem
-import at.bernhardberger.tvhplayer.touch.recordings.recordingLine
 import at.bernhardberger.tvhplayer.touch.ui.ArtworkModels
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
@@ -128,11 +124,6 @@ internal fun recordingPlayerInfo(
     recordingItem(entry, admission, entry.channelName, texts, clock.now.epochSecond),
     clock, program, airingDetails,
 )
-
-/** Finished recordings keep the archive row's date and duration (or remaining time). */
-internal fun recordingInfoWhen(item: RecordingItem, clock: RecordingClock): List<RecordingLinePart> =
-    recordingLine(item, RowContext(RowDates.None, oneChannel = true), clock)
-        .filterNot { it is RecordingLinePart.Episode }
 
 @OptIn(UnstableApi::class)
 private fun recordingStatus(

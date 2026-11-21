@@ -192,10 +192,8 @@ private fun sheetHead(
         }
     }
     return when {
-        shown != null -> shown.channel to { InfoLogo(shown.channelLogo, shown.logoTint, shown.channelLogoModel) }
-        panel.button == PlayerPanel.Info && state is LivePlayerState -> state.channel.name to {
-            InfoLogo(state.channel.logo, state.channel.logoTint, state.channel.logoModel)
-        }
+        shown != null -> shown.channel to infoLogoSlot(shown.channelLogo, shown.logoTint, shown.channelLogoModel)
+        panel.button == PlayerPanel.Info -> state.channel.run { name to infoLogoSlot(logo, logoTint, logoModel) }
         else -> stringResource(panel.title) to null
     }
 }

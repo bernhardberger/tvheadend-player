@@ -67,6 +67,7 @@ class RecordingPlayerScreenTest {
     fun recordingInfoOpensAnAiringAndBackReturnsBeforeClosing() {
         show(info = recordingInfoFixture(running = false))
         button(R.string.player_info).performClick()
+        val channelHead = hasText("Harbor Sport") and SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading)
         val airing = compose.onNode(hasText("Sat, Nov 14 • 8:15 PM") and hasClickAction())
         airing.assertIsDisplayed()
         val inInfo = hasAnyAncestor(hasTestTag("recording-info"))
@@ -78,9 +79,12 @@ class RecordingPlayerScreenTest {
         airing.performClick()
         compose.runOnIdle { assertEquals(listOf(PlayerChoice.Details("kickoff-saturday")), choices) }
         compose.onNodeWithText("Kingsbridge – Northport").assertIsDisplayed()
+        compose.onNode(channelHead).assertIsDisplayed()
+        compose.onNodeWithTag("player-info-logo", useUnmergedTree = true).assertDoesNotExist()
         captureWindows("tablet-recording-info-airing", TouchCanvas.TABLET)
         back()
         airing.assertIsDisplayed()
+        compose.onNode(channelHead).assertIsDisplayed()
         back()
         airing.assertDoesNotExist()
         button(R.string.player_info).assertIsDisplayed()

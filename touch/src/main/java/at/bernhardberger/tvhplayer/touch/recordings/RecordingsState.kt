@@ -159,14 +159,8 @@ internal sealed interface RecordingProgress {
 internal data class RecordingDetails(
     val synopsis: String? = null,
     val genre: String? = null,
-    val recorded: String? = null,
     val size: String? = null,
-    val picture: String? = null,
-    val audio: String? = null,
-    val subtitles: String? = null,
-    val errors: String? = null,
-    val retention: String? = null,
-    val recordedIsScheduled: Boolean = false,
+    val facts: List<Pair<String, String>> = emptyList(),
 )
 
 /** A null action has nothing behind it yet: its control is left out. */
@@ -194,8 +188,5 @@ internal class RecordingsTexts(
     val episode: (DvrEntry) -> String?,
     val section: (DvrDateSection) -> String,
     val size: (Long) -> String,
-    val keepUntil: (DvrEntry, nowSec: Long) -> String?,
-    val recorded: (startSec: Long, stopSec: Long, nowSec: Long) -> String,
-    val errors: (Long) -> String,
-    val language: (String?) -> String?,
+    val facts: (DvrEntry, nowSec: Long) -> List<Pair<String, String>>,
 )

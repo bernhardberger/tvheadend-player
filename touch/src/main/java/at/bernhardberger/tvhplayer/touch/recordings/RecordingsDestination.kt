@@ -10,17 +10,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.media3.common.util.UnstableApi
-import androidx.media3.common.util.Util
+import at.bernhardberger.tvheadend.sdk.core.DvrConfigurationsState
+import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvhplayer.core.DvrDateSection
-import at.bernhardberger.tvhplayer.core.humanLanguageName
 import at.bernhardberger.tvhplayer.core.programmeCategory
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import at.bernhardberger.tvhplayer.touch.ui.Destination
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.common.formatFileSize
-import at.bernhardberger.tvhplayer.ui.common.formatRecordingKeepUntil
-import at.bernhardberger.tvhplayer.ui.common.formatTimeInterval
+import at.bernhardberger.tvhplayer.ui.common.programmeAboutFacts
+import at.bernhardberger.tvhplayer.ui.common.recordingMetadataFacts
 import at.bernhardberger.tvhplayer.ui.common.programmeCategoryLabelRes
 import at.bernhardberger.tvhplayer.ui.common.programmeEpisodeLine
 import at.bernhardberger.tvhplayer.ui.common.rememberCurrentEpochSeconds
@@ -32,8 +31,7 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * The Recordings destination of the app. Delete goes through [dvr]; Play, Resume and More are left out
- * until the recording player and the other changes are wired.
+ * The Recordings destination of the app. Delete goes through [dvr]; viewing opens the shared player.
  */
 @Composable
 internal fun RecordingsDestination(
@@ -43,6 +41,7 @@ internal fun RecordingsDestination(
     dvr: DvrControls,
     onOpenConnections: () -> Unit,
     onSignIn: () -> Unit,
+    onPlay: ((String, Boolean) -> Unit)?,
 ) {
     val presentation by connection.uiState.collectAsStateWithLifecycle()
     val observation by recordings.observation.collectAsStateWithLifecycle()
@@ -50,7 +49,9 @@ internal fun RecordingsDestination(
     val context = LocalContext.current
     val locale = LocalConfiguration.current.locales[0]
     val nowSec = rememberCurrentEpochSeconds()()
-    val texts = remember(context, locale) { recordingsTexts(context, locale) }
+    val texts = remember(context, locale, observation.dvrConfigurationsState) {
+        recordingsTexts(context, locale, observation)
+    }
     val artwork = LocalArtworkModels.current
     val state = remember(observation, view, presentation, nowSec, texts, artwork) {
         val clock = RecordingClock(Instant.ofEpochSecond(nowSec), ZoneId.systemDefault(), locale) {
@@ -62,7 +63,7 @@ internal fun RecordingsDestination(
         state = state,
         actions = RecordingsActions(
             onView = recordings::setView,
-            onPlay = null,
+            onPlay = onPlay,
             onDelete = dvr::delete,
             onStop = dvr::stopRecording,
             onMore = null,
@@ -74,13 +75,13 @@ internal fun RecordingsDestination(
     )
 }
 
-@androidx.annotation.OptIn(UnstableApi::class)
-/**
- * Fact formatting follows
- * `app/src/main/java/at/bernhardberger/tvhplayer/ui/components/ProgrammeDetailsPage.kt:1236-1260`.
- */
-private fun recordingsTexts(context: android.content.Context, locale: Locale): RecordingsTexts {
+internal fun recordingsTexts(
+    context: android.content.Context,
+    locale: Locale,
+    observation: SessionObservation,
+): RecordingsTexts {
     val resources: Resources = context.resources
+    val configs = (observation.dvrConfigurationsState as? DvrConfigurationsState.Current)?.configurations.orEmpty()
     return RecordingsTexts(
         noChannel = resources.getString(SharedR.string.recordings_group_no_channel),
         noGenre = resources.getString(SharedR.string.recordings_group_no_genre),
@@ -93,23 +94,9 @@ private fun recordingsTexts(context: android.content.Context, locale: Locale): R
         },
         section = { section -> sectionLabel(section, resources, locale) },
         size = { bytes -> formatFileSize(bytes, context) },
-        keepUntil = { entry, nowSec -> formatRecordingKeepUntil(entry, nowSec, resources, locale) },
-        recorded = { start, stop, nowSec -> formatTimeInterval(start, stop, true, locale, nowSec) },
-        errors = { errors ->
-            if (errors == 0L) {
-                resources.getString(SharedR.string.details_no_errors)
-            } else {
-                val quantity = errors.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
-                resources.getQuantityString(SharedR.plurals.details_error_count, quantity, errors)
-            }
-        },
-        language = { language ->
-            humanLanguageName(
-                language?.let(Util::normalizeLanguageCode),
-                resources.getString(SharedR.string.track_unknown_language),
-                resources.getString(SharedR.string.track_multiple_languages),
-                locale,
-            )
+        facts = { entry, nowSec ->
+            programmeAboutFacts(null, entry, resources, locale) +
+                recordingMetadataFacts(entry, configs, context, locale, nowSec)
         },
     )
 }

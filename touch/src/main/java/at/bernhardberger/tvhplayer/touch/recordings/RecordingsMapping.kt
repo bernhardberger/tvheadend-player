@@ -4,11 +4,9 @@ import at.bernhardberger.tvhplayer.touch.ui.recordingRemoveControl
 import at.bernhardberger.tvhplayer.core.recordingArtwork
 import at.bernhardberger.tvhplayer.touch.ui.ArtworkModels
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
-import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
-import at.bernhardberger.tvheadend.sdk.playback.SubscriptionStreamType
 import at.bernhardberger.tvhplayer.core.BrowseContextAction
 import at.bernhardberger.tvhplayer.core.DvrArchiveFolder
 import at.bernhardberger.tvhplayer.core.DvrArchiveGrouping
@@ -27,14 +25,10 @@ import at.bernhardberger.tvhplayer.core.offeredResumePosition
 import at.bernhardberger.tvhplayer.core.partitionDvrLibrary
 import at.bernhardberger.tvhplayer.core.recordingContextActions
 import at.bernhardberger.tvhplayer.core.recordingElapsedProgress
-import at.bernhardberger.tvhplayer.core.recordingErrorCount
 import at.bernhardberger.tvhplayer.core.recordingIsRunning
 import at.bernhardberger.tvhplayer.core.recordingLengthSeconds
 import at.bernhardberger.tvhplayer.core.recordingNowEntries
-import at.bernhardberger.tvhplayer.core.recordingPaddedStart
 import at.bernhardberger.tvhplayer.core.recordingPaddedStop
-import at.bernhardberger.tvhplayer.core.recordingPicture
-import at.bernhardberger.tvhplayer.core.recordingRecordedSpan
 import at.bernhardberger.tvhplayer.core.recordingSizeBytes
 import at.bernhardberger.tvhplayer.core.recordingSpaceIndicator
 import at.bernhardberger.tvhplayer.core.recordingTimeLeft
@@ -189,7 +183,12 @@ internal fun recordingItem(
     start = entry.start?.let { Instant.ofEpochSecond(it.epochSeconds) },
     length = recordingLengthSeconds(entry, nowSec)?.takeIf { it > 0 }?.let(Duration::ofSeconds),
     state = recordingProgress(entry, admission, nowSec),
-    details = recordingDetails(entry, texts, nowSec),
+    details = RecordingDetails(
+        synopsis = entry.description?.takeIf { it.isNotBlank() } ?: entry.summary?.takeIf { it.isNotBlank() },
+        genre = texts.genre(entry),
+        size = recordingSizeBytes(entry)?.let(texts.size),
+        facts = texts.facts(entry, nowSec),
+    ),
     remove = null,
 )
 
@@ -222,45 +221,6 @@ private fun recordingProgress(
         }
     }
 }
-
-/**
- * File facts, stream types and recorded/scheduled span follow
- * `app/src/main/java/at/bernhardberger/tvhplayer/ui/components/ProgrammeDetailsPage.kt:1230-1260`.
- */
-@OptIn(ExperimentalTvheadendApi::class)
-private fun recordingDetails(entry: DvrEntry, texts: RecordingsTexts, nowSec: Long): RecordingDetails {
-    val neverRecorded = entry.state == DvrEntryState.MISSED || entry.state == DvrEntryState.INVALID
-    val span = recordingRecordedSpan(entry, nowSec)?.takeUnless { neverRecorded }
-        ?: recordingPaddedStart(entry)?.let { start -> recordingPaddedStop(entry)?.let { start to it } }
-    val streams = entry.files.orEmpty().flatMap { it.streams.orEmpty() }
-    fun languages(types: Set<SubscriptionStreamType>): String? = streams.asSequence()
-        .filter { it.type in types }
-        .mapNotNull { texts.language(it.language) }
-        .distinct().joinToString(", ").ifBlank { null }
-    return RecordingDetails(
-        synopsis = entry.description?.takeIf { it.isNotBlank() } ?: entry.summary?.takeIf { it.isNotBlank() },
-        genre = texts.genre(entry),
-        size = recordingSizeBytes(entry)?.let(texts.size),
-        picture = recordingPicture(entry),
-        audio = languages(AudioTypes),
-        subtitles = languages(SubtitleTypes),
-        errors = recordingErrorCount(entry)?.let(texts.errors),
-        recorded = span?.let { (start, stop) -> texts.recorded(start.epochSeconds, stop.epochSeconds, nowSec) },
-        recordedIsScheduled = neverRecorded,
-        retention = texts.keepUntil(entry, nowSec),
-    )
-}
-
-@OptIn(ExperimentalTvheadendApi::class)
-private val AudioTypes = setOf(
-    SubscriptionStreamType.AAC, SubscriptionStreamType.AC3, SubscriptionStreamType.EAC3,
-    SubscriptionStreamType.MPEG2_AUDIO,
-)
-
-@OptIn(ExperimentalTvheadendApi::class)
-private val SubtitleTypes = setOf(
-    SubscriptionStreamType.DVB_SUBTITLE, SubscriptionStreamType.TEXT_SUBTITLE, SubscriptionStreamType.TELETEXT,
-)
 
 private val DvrDateSection.rowDates: RowDates
     get() = when (this) {

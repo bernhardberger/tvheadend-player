@@ -9,6 +9,7 @@ import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
 import at.bernhardberger.tvheadend.sdk.core.RecordingProgressCapability
 import at.bernhardberger.tvheadend.sdk.core.TvheadendTestResultFactory
 import at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi
+import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvhplayer.core.AppErrorCondition
 import at.bernhardberger.tvhplayer.core.GrowingTimelineDisplayEnd
@@ -20,11 +21,10 @@ import at.bernhardberger.tvhplayer.playback.AppPlaybackFailureReason
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import at.bernhardberger.tvhplayer.playback.RecordingSkipAction
+import at.bernhardberger.tvhplayer.playback.currentRecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.settings.AdBreakMode
 import at.bernhardberger.tvhplayer.touch.recordings.FixtureClock
 import at.bernhardberger.tvhplayer.touch.recordings.FixtureRecordingsTexts
-import at.bernhardberger.tvhplayer.touch.recordings.RecordingDay
-import at.bernhardberger.tvhplayer.touch.recordings.RecordingLinePart
 import at.bernhardberger.tvhplayer.touch.recordings.RecordingProgress
 import at.bernhardberger.tvhplayer.touch.testutil.ServerGuide
 import org.junit.Assert.assertEquals
@@ -33,7 +33,6 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 import kotlin.time.toJavaInstant
@@ -47,6 +46,42 @@ class RecordingPlayerMappingTest {
     private val token = RecordingSkipAction(fixtureAd, fixtureAd.endMs)
     private val clock = FixtureClock.copy(now = now.toJavaInstant())
     private val info = recordingPlayerInfo(server.recordingNow, null, clock, FixtureRecordingsTexts)
+
+    @Test
+    fun `recording watch starts a new target unless that recording is already playing`() {
+        assertEquals(RecordingPlaybackStart.RESUME, recordingStart(false))
+        assertEquals(RecordingPlaybackStart.START_OVER, recordingStart(true))
+        assertFalse(startsRecording(target.recordingId, target))
+        for (other in listOf(null, AppPlaybackTarget.Live(server.first.id), AppPlaybackTarget.Recording(server.film.id))) {
+            assertTrue(startsRecording(target.recordingId, other))
+        }
+    }
+
+    @Test
+    fun `runtime exposes only wired recording actions`() {
+        val offered = map(AppPlaybackState.Playing, true).offered + PlayerControl.PictureInPicture
+        assertEquals(
+            setOf(PlayerControl.FullScreen, PlayerControl.Info, PlayerControl.Timeshift, PlayerControl.PictureInPicture),
+            recordingRuntimeControls(offered),
+        )
+        assertEquals(emptySet<PlayerControl>(), recordingRuntimeControls(emptySet()))
+    }
+
+    @Test
+    fun `growing requires current session and fresh growing admission`() {
+        val entry = DvrEntry.create(
+            id = target.recordingId, start = now - 30.minutes, stop = now + 30.minutes,
+            state = DvrEntryState.RECORDING,
+            files = listOf(TvheadendTestResultFactory.recordingFile(fileId = 1, serverPath = "fixture.ts")),
+        )
+        val observation = server.connected(listOf(entry))
+        val selection = requireNotNull(currentRecordingPlaybackSelection(observation, entry.id))
+        val installed = observation.recordingPlaybackAdmission(entry)
+        assertTrue(recordingIsCurrentlyGrowing(observation, selection, installed))
+        assertFalse(recordingIsCurrentlyGrowing(observation, selection, null))
+        assertFalse(recordingIsCurrentlyGrowing(observation, selection.copy(recordingId = server.film.id), installed))
+        assertFalse(recordingIsCurrentlyGrowing(server.connected(listOf(entry)), selection, installed))
+    }
 
     @Test
     fun `runtime face owns metadata status offered controls and exact skip tokens`() {
@@ -77,7 +112,7 @@ class RecordingPlayerMappingTest {
     }
 
     @Test
-    fun `info projects a running recording to its padded stop and a finished one to the archive when and length`() {
+    fun `info projects a running recording to its padded stop and rejects another recording's details`() {
         val start = now - 30.minutes
         val stop = now + 30.minutes
         val running = DvrEntry.create(
@@ -92,9 +127,6 @@ class RecordingPlayerMappingTest {
         assertTrue(playing.item.play.isEmpty())
 
         val completed = recordingPlayerInfo(server.film, null, clock, FixtureRecordingsTexts)
-        val whenAndLength = recordingInfoWhen(completed.item, clock)
-        assertTrue((whenAndLength.first() as RecordingLinePart.Day).day is RecordingDay.On)
-        assertEquals(RecordingLinePart.Length(Duration.ofHours(1)), whenAndLength.last())
         val other = map(AppPlaybackState.Playing, playWhenReady = true, info = completed)
         assertNull(other.info)
         assertFalse(PlayerControl.Info in other.offered)

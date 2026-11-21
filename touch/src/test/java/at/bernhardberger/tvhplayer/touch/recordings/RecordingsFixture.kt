@@ -147,13 +147,12 @@ internal fun kickoffPicked() =
                 synopsis = "Westvale host Ridge Town under the lights with the league lead at stake. " +
                     "Full match with commentary from the Harbor Sport team.",
                 genre = "Football",
-                recorded = "Wed, Nov 11 • 8:30–10:15 PM",
                 size = "5.1 GB",
-                picture = "1080i • H.264",
-                audio = "English",
-                subtitles = "English",
-                errors = "No errors",
-                retention = "Kept until space is needed",
+                facts = listOf(
+                    "Genre" to "Football", "Size" to "5.1 GB", "Picture" to "1080i • H.264",
+                    "Audio" to "English", "Subtitles" to "English", "Errors" to "No errors",
+                    "Recorded" to "Wed, Nov 11 • 8:30–10:15 PM", "Retention" to "Kept until space is needed",
+                ),
             ),
         )
 
@@ -170,10 +169,7 @@ internal val FixtureClock = RecordingClock(
 internal val FixtureRecordingsTexts = RecordingsTexts(
     noChannel = "No channel", noGenre = "No genre", recordingNow = "Recording now",
     genre = { null }, episode = { null }, section = { it.toString() }, size = { "$it B" },
-    keepUntil = { _, _ -> null },
-    recorded = { start, stop, _ -> "$start to $stop" },
-    errors = { "$it errors" },
-    language = { if (it == "eng") "English" else null },
+    facts = { _, _ -> emptyList() },
 )
 
 private fun at(dayOfNovember: Int, hour: Int, minute: Int): Instant =

@@ -75,6 +75,7 @@ internal fun TouchApp(
     notices: NoticeCenter,
     playingId: String? = null,
     onWatch: ((String) -> Unit)? = null,
+    onPlayRecording: ((String, Boolean) -> Unit)? = null,
     discovery: () -> Flow<TvheadendDiscoveryState>,
 ) {
     val profile by owner.serverProfile.collectAsStateWithLifecycle()
@@ -111,7 +112,7 @@ internal fun TouchApp(
                 )
             }
             else -> AppDestinations(
-                session, dvr, connection, channels, recordings, guide, playingId, onWatch,
+                session, dvr, connection, channels, recordings, guide, playingId, onWatch, onPlayRecording,
                 onOpenConnections = { page = Page.Connections },
                 onSignIn = { page = Page.SignIn },
             )
@@ -239,6 +240,7 @@ private fun AppDestinations(
     guide: GuideViewModel,
     playingId: String?,
     onWatch: ((String) -> Unit)?,
+    onPlayRecording: ((String, Boolean) -> Unit)?,
     onOpenConnections: () -> Unit,
     onSignIn: () -> Unit,
 ) {
@@ -248,7 +250,9 @@ private fun AppDestinations(
     CompositionLocalProvider(LocalFrameSelection provides selection, LocalArtworkModels provides artwork) {
         when (selection.value) {
             Destination.Recordings ->
-                RecordingsDestination(recordings, connection, AppDestinationList, dvr, onOpenConnections, onSignIn)
+                RecordingsDestination(
+                    recordings, connection, AppDestinationList, dvr, onOpenConnections, onSignIn, onPlayRecording,
+                )
             Destination.Guide ->
                 GuideDestination(
                     guide, channels, connection, AppDestinationList, playingId, onWatch, dvr,

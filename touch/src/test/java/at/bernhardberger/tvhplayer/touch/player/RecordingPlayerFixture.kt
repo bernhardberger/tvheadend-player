@@ -80,7 +80,9 @@ internal fun recordingInfoFixture(running: Boolean): RecordingPlayerInfo {
     )
     val showing = if (running) item.copy(
         state = RecordingProgress.Recording(Instant.parse("2026-11-11T21:40:00Z"), .6f),
-        details = item.details.copy(recorded = "Wed, Nov 11 • 8:30–9:23 PM"),
+        details = item.details.copy(facts = item.details.facts.map {
+            if (it.first == "Recorded") it.first to "Wed, Nov 11 • 8:30–9:23 PM" else it
+        }),
     ) else item
     val clock = if (running) FixtureClock.copy(now = Instant.parse("2026-11-11T21:23:00Z")) else FixtureClock
     return RecordingPlayerInfo(showing, clock, program, mapOf(next.id to next))

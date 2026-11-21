@@ -267,7 +267,7 @@ private fun Title(item: RecordingItem, modifier: Modifier, style: TextStyle) {
 
 @Composable
 private fun Facts(item: RecordingItem) {
-    val facts = listOfNotNull(item.details.genre, item.length?.let { durationText(it) }, item.details.size)
+    val facts = listOfNotNull(item.length?.let { durationText(it) }, item.details.size, item.details.genre)
     Text(
         joinParts(facts), Modifier.padding(top = 8.dp), style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.outline,
@@ -387,25 +387,8 @@ private fun Facts(
     keyWidth: Dp,
     programmeFacts: List<Pair<String, String>> = emptyList(),
 ) = DetailsFacts(
-    stringResource(R.string.recordings_details), programmeFacts + recordingFactRows(details), columns, keyWidth,
+    stringResource(R.string.recordings_details), programmeFacts + details.facts, columns, keyWidth,
 )
-
-@Composable
-private fun recordingFactRows(details: RecordingDetails): List<Pair<String, String>> =
-    listOfNotNull(
-        details.genre?.let { SharedR.string.details_genre to it },
-        details.size?.let { SharedR.string.details_size to it },
-        details.picture?.let { SharedR.string.details_picture to it },
-        details.audio?.let { SharedR.string.details_audio to it },
-        details.subtitles?.let { SharedR.string.subtitles to it },
-        details.errors?.let { SharedR.string.details_errors to it },
-        details.recorded?.let {
-            val label = if (details.recordedIsScheduled) SharedR.string.recording_state_scheduled
-            else SharedR.string.details_recorded
-            label to it
-        },
-        details.retention?.let { SharedR.string.details_retention to it },
-    ).map { (key, value) -> stringResource(key) to value }
 
 private const val PICTURE_RATIO = 16f / 9f
 private val TEXT_WIDTH = 576.dp
