@@ -15,5 +15,11 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <!-- Rotation and resizing keep the activity, so playback and its surface carry on. -->
+        <activity
+            android:name=".player.PlayerActivity"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation"
+            android:exported="false"
+            android:launchMode="singleTask" />
     </application>
 </manifest>

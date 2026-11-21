@@ -43,6 +43,7 @@ dependencies {
         version { strictly(libs.versions.tvheadend.sdk.get()) }
     }
     implementation(libs.androidx.media3.exoplayer)
+    implementation(libs.androidx.media3.ui)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.koin.android)

@@ -50,7 +50,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.DpSize
+import at.bernhardberger.tvhplayer.core.AppErrorCondition
 import at.bernhardberger.tvhplayer.touch.R
+import at.bernhardberger.tvhplayer.ui.common.hintRes
+import at.bernhardberger.tvhplayer.ui.common.titleRes
 import at.bernhardberger.tvhplayer.touch.channels.ChannelRow
 
 private val OnPicture = Color.White
@@ -70,32 +73,44 @@ internal fun BoxScope.PictureControls(
     val status = state.status
     val playing = status == LivePlayerStatus.Playing
     val tuning = status == LivePlayerStatus.Tuning
-    val centerOffset = when (layout) {
-        PlayerLayout.Tablet -> -30.dp
-        PlayerLayout.PhoneLandscape -> -64.dp
-        PlayerLayout.Phone -> -10.dp
-        else -> 0.dp
-    }
     if (preview == null) {
         PlayerTopBar(state, layout, onAction, onSettings, Modifier.align(Alignment.TopCenter))
         if (playing || tuning) {
-            Transport(state, layout, onAction, Modifier.align(Alignment.Center).offset(y = centerOffset))
-            if (!layout.upright) {
-                Brightness(
-                    state.brightness, onBrightness, Modifier.align(Alignment.CenterEnd).offset(y = centerOffset)
-                        .padding(end = if (layout == PlayerLayout.Tablet) 34.dp else 29.dp),
-                    tablet = layout == PlayerLayout.Tablet,
-                )
-            }
+            PictureCenter(state, layout, onAction, onBrightness)
         } else {
             StatusMessage(status, layout, onAction, Modifier.align(Alignment.Center))
         }
     }
     if (layout.upright && (playing || tuning)) {
         LiveOffer(
-            state.timeline, preview, onAction, layout, showLive = playing,
+            state.timeline, state.offered, preview, onAction, layout, live = playing,
             modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                 .padding(start = 16.dp, end = 10.dp, bottom = 22.dp),
+        )
+    }
+}
+
+@Composable
+private fun BoxScope.PictureCenter(
+    state: LivePlayerState,
+    layout: PlayerLayout,
+    onAction: (PlayerAction) -> Unit,
+    onBrightness: (Float) -> Unit,
+) {
+    val centerOffset = when (layout) {
+        PlayerLayout.Tablet -> -30.dp
+        PlayerLayout.PhoneLandscape -> -64.dp
+        PlayerLayout.Phone -> -10.dp
+        else -> 0.dp
+    }
+    if (state.status == LivePlayerStatus.Tuning || PlayerControl.Timeshift in state.offered) {
+        Transport(state, layout, onAction, Modifier.align(Alignment.Center).offset(y = centerOffset))
+    }
+    if (!layout.upright) {
+        Brightness(
+            state.brightness, onBrightness, Modifier.align(Alignment.CenterEnd).offset(y = centerOffset)
+                .padding(end = if (layout == PlayerLayout.Tablet) 34.dp else 29.dp),
+            tablet = layout == PlayerLayout.Tablet,
         )
     }
 }
@@ -131,11 +146,15 @@ private fun PlayerTopBar(
         } else {
             Spacer(Modifier.weight(1f))
         }
-        PlayerIconButton(R.drawable.channels_settings, R.string.player_settings, onSettings)
-        PlayerIconButton(
-            R.drawable.player_pip, R.string.player_picture_in_picture, { onAction(PlayerAction.PictureInPicture) },
-            enabled = state.status != LivePlayerStatus.Unavailable,
-        )
+        if (PlayerControl.Settings in state.offered) {
+            PlayerIconButton(R.drawable.channels_settings, R.string.player_settings, onSettings)
+        }
+        if (PlayerControl.PictureInPicture in state.offered) {
+            PlayerIconButton(
+                R.drawable.player_pip, R.string.player_picture_in_picture, { onAction(PlayerAction.PictureInPicture) },
+                enabled = state.status !is LivePlayerStatus.Unavailable,
+            )
+        }
     }
 }
 
@@ -159,7 +178,7 @@ private fun Transport(
             .semantics { contentDescription = loading }, color = OnPicture)
         return
     }
-    val canSeek = state.timeline.bufferStart?.let { it < state.timeline.live } == true
+    val canSeek = state.timeline?.let { timeline -> timeline.bufferStart?.let { it < timeline.live } } == true
     val skipSize = if (layout == PlayerLayout.Tablet) 72.dp else 52.dp
     val skipColors = IconButtonDefaults.filledTonalIconButtonColors(
         containerColor = DarkControl, contentColor = OnPicture,
@@ -238,21 +257,7 @@ private fun StatusMessage(
     onAction: (PlayerAction) -> Unit,
     modifier: Modifier,
 ) {
-    val (icon, heading, message) = when (status) {
-        is LivePlayerStatus.Reconnecting -> Triple(
-            R.drawable.channels_cloud_off,
-            R.string.player_disconnected,
-            status.nextAttemptSeconds?.let { stringResource(R.string.player_reconnect_in, it) }
-                ?: stringResource(R.string.player_reconnecting),
-        )
-        LivePlayerStatus.PauseEnded -> Triple(
-            R.drawable.player_pause_ended, R.string.player_pause_ended, stringResource(R.string.player_pause_expired),
-        )
-        LivePlayerStatus.Unavailable -> Triple(
-            R.drawable.player_no_video, R.string.player_no_tuner, stringResource(R.string.player_no_tuner_reason),
-        )
-        else -> return
-    }
+    val (icon, heading, message) = statusText(status) ?: return
     val compact = layout.upright
     val type = MaterialTheme.typography
     Column(
@@ -265,10 +270,12 @@ private fun StatusMessage(
             stringResource(heading), color = OnPicture,
             style = if (compact) type.titleMedium else type.titleLarge, textAlign = TextAlign.Center,
         )
-        Text(
-            message, color = OnPicture.copy(alpha = .75f),
-            style = if (compact) type.bodySmall else type.bodyMedium, textAlign = TextAlign.Center,
-        )
+        message?.let {
+            Text(
+                it, color = OnPicture.copy(alpha = .75f),
+                style = if (compact) type.bodySmall else type.bodyMedium, textAlign = TextAlign.Center,
+            )
+        }
         if (status == LivePlayerStatus.PauseEnded) {
             Button(
                 onClick = { onAction(PlayerAction.WatchLive) },
@@ -276,6 +283,29 @@ private fun StatusMessage(
             ) { Text(stringResource(R.string.player_watch_live)) }
         }
     }
+}
+
+@Composable
+private fun statusText(status: LivePlayerStatus): Triple<Int, Int, String?>? = when (status) {
+    is LivePlayerStatus.Reconnecting -> Triple(
+        R.drawable.channels_cloud_off,
+        R.string.player_disconnected,
+        status.nextAttemptSeconds?.let { stringResource(R.string.player_reconnect_in, it) }
+            ?: stringResource(R.string.player_reconnecting),
+    )
+    LivePlayerStatus.PauseEnded -> Triple(
+        R.drawable.player_pause_ended, R.string.player_pause_ended, stringResource(R.string.player_pause_expired),
+    )
+    is LivePlayerStatus.Unavailable -> when (val condition = status.condition) {
+        // The drawn message is the busy-tuner one; any other cause says what the TV app says for it.
+        null, AppErrorCondition.NO_FREE_ADAPTER -> Triple(
+            R.drawable.player_no_video, R.string.player_no_tuner, stringResource(R.string.player_no_tuner_reason),
+        )
+        else -> Triple(
+            R.drawable.player_no_video, condition.titleRes(), condition.hintRes()?.let { stringResource(it) },
+        )
+    }
+    else -> null
 }
 
 @Composable

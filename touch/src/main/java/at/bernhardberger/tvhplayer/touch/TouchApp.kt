@@ -25,7 +25,8 @@ import at.bernhardberger.tvhplayer.touch.channels.ChannelsScreen
 import at.bernhardberger.tvhplayer.touch.channels.channelsState
 import at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
-import kotlin.time.Clock
+import at.bernhardberger.tvhplayer.ui.common.rememberCurrentEpochSeconds
+import kotlin.time.Instant
 import at.bernhardberger.tvhplayer.touch.connect.ActiveConnectionUiState
 import at.bernhardberger.tvhplayer.touch.connect.ConnectionStatus
 import at.bernhardberger.tvhplayer.touch.connect.ConnectionsScreen
@@ -52,6 +53,8 @@ internal fun TouchApp(
     owner: AppProfileOwner,
     connection: AppConnectionViewModel,
     channels: ChannelsViewModel,
+    playingId: String? = null,
+    onWatch: ((String) -> Unit)? = null,
     discovery: () -> Flow<TvheadendDiscoveryState>,
 ) {
     val profile by owner.serverProfile.collectAsStateWithLifecycle()
@@ -95,7 +98,7 @@ internal fun TouchApp(
             )
         }
         else -> AppFrame(
-            connection, channels,
+            connection, channels, playingId, onWatch,
             onOpenConnections = { page = Page.Connections },
             onSignIn = { page = Page.SignIn },
         )
@@ -147,12 +150,14 @@ private fun ServerProfileSummary.uiState(status: ConnectionStatus) = ActiveConne
 
 /**
  * The frame with only Channels wired: the destinations without data are not offered yet, and the
- * row controls with nothing behind them (Watch, Record, Details, Show in Guide) are left out.
+ * row controls with nothing behind them (Record, Details, Show in Guide) are left out.
  */
 @Composable
 private fun AppFrame(
     connection: AppConnectionViewModel,
     channels: ChannelsViewModel,
+    playingId: String?,
+    onWatch: ((String) -> Unit)?,
     onOpenConnections: () -> Unit,
     onSignIn: () -> Unit,
 ) {
@@ -160,11 +165,13 @@ private fun AppFrame(
     val scope by channels.scope.collectAsStateWithLifecycle()
     // The scope is republished for channel changes only; the guide comes with every observation.
     val observation by channels.observation.collectAsStateWithLifecycle()
-    val state = channelsState(scope, presentation.connection, presentation.degraded, observation, Clock.System.now())
+    val nowSec = rememberCurrentEpochSeconds()
+    val now = Instant.fromEpochSeconds(nowSec())
+    val state = channelsState(scope, presentation.connection, presentation.degraded, observation, now, playingId)
     ChannelsScreen(
         state = state,
         actions = ChannelsActions(
-            onPlay = null,
+            onPlay = onWatch,
             onTag = { id -> channels.selectTag(id?.let { ChannelTagId(it.toLong()) }) },
             onRetry = { connection.reconnectNow() },
             // Until Home exists, connection settings open from the end of the Channels top bar.

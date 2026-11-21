@@ -7,6 +7,7 @@ import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.browseAppError
 import at.bernhardberger.tvhplayer.core.forEmptyChannelPresentation
 import at.bernhardberger.tvhplayer.core.shouldPresentEmptyTag
+import at.bernhardberger.tvhplayer.ui.common.progress
 import at.bernhardberger.tvhplayer.viewmodels.ChannelScopeState
 import kotlin.time.Instant
 
@@ -16,7 +17,8 @@ import kotlin.time.Instant
  *
  * Left empty until their shared helpers exist outside the TV app: the clock texts (start, time
  * range, time left), the on-air progress, the episode line and the synopsis. Rows carry no logo;
- * [ChannelList.hasLogos] keeps the no-logo tile in its place.
+ * [ChannelList.hasLogos] keeps the no-logo tile in its place. The row of [playingId] is the
+ * channel the player plays, with the running program's progress.
  */
 internal fun channelsState(
     scope: ChannelScopeState,
@@ -24,6 +26,7 @@ internal fun channelsState(
     degraded: Boolean,
     observation: SessionObservation,
     now: Instant,
+    playingId: String? = null,
 ): ChannelsState {
     val browsing = scope.scope
     val current = scope.channelCatalogCurrent
@@ -45,14 +48,22 @@ internal fun channelsState(
             else -> connection.browseAppError()?.let(ChannelsState::Failed) ?: ChannelsState.Loading
         }
         else -> {
-            val rows = browsing.visibleChannels.map { channelRow(it, observation, now) }
+            val rows = browsing.visibleChannels.map {
+                channelRow(it, observation, now, playing = it.id.value.toString() == playingId)
+            }
             val list = ChannelList(rows, tags, selectedTagId, hasLogos = true)
             if (degraded) ChannelsState.Offline(list) else ChannelsState.Ready(list)
         }
     }
 }
 
-private fun channelRow(channel: Channel, observation: SessionObservation, now: Instant): ChannelRow {
+internal fun channelRow(
+    channel: Channel,
+    observation: SessionObservation,
+    now: Instant,
+    playing: Boolean = false,
+): ChannelRow {
+    val running = observation.eventAt(channel.id, now)
     val next = observation.nextEvent(channel.id, now)
     // Each later program is the one after the program running at the previous one's start.
     val following = generateSequence(next) { observation.nextEvent(channel.id, it.start) }
@@ -63,8 +74,9 @@ private fun channelRow(channel: Channel, observation: SessionObservation, now: I
     return ChannelRow(
         id = channel.id.value.toString(),
         name = channel.name.orEmpty(),
-        now = observation.eventAt(channel.id, now)?.program(),
+        now = running?.program(),
         next = next?.program(),
+        playback = if (playing) ChannelPlayback(running?.progress(now.epochSeconds)) else null,
         details = following.takeIf { it.isNotEmpty() }?.let { ChannelDetails(following = it) },
     )
 }
