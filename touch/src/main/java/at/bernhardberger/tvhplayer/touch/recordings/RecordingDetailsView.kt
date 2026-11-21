@@ -302,9 +302,11 @@ private fun PlayButtons(item: RecordingItem, actions: RecordingsActions, equalWi
 
 @Composable
 private fun ItemIcons(item: RecordingItem, actions: RecordingsActions) {
-    actions.onDelete?.let { onDelete ->
+    val remove = item.remove
+    val onDelete = actions.onDelete
+    if (remove != null && onDelete != null) {
         IconButton(onClick = { onDelete(item.id) }) {
-            Icon(painterResource(R.drawable.connect_delete_outline), stringResource(R.string.recordings_delete))
+            Icon(painterResource(remove.icon), stringResource(remove.label))
         }
     }
     actions.onMore?.let { onMore ->

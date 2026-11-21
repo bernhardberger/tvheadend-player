@@ -239,7 +239,8 @@ private fun OpenInColumn(program: GuideProgram, actions: GuideActions, phone: Bo
         // The tablet column writes Details as text beside Record, the phone row keeps its icon, as drawn; both
         // need the tighter padding for Details to share Record's line, and it wraps under Record where it cannot.
         ProgramActions(
-            program.channelId, program.id, program.onNow, actions, Modifier.padding(top = 12.dp), onDetails,
+            program.channelId, program.id, program.onNow, program.record, actions, Modifier.padding(top = 12.dp),
+            onDetails,
             detailsIcon = phone, compact = true,
         )
     }

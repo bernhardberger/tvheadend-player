@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.touch.guide
 
+import at.bernhardberger.tvhplayer.touch.ui.programRecordControl
+import at.bernhardberger.tvhplayer.ui.screens.programmeRecordKeyAction
 import at.bernhardberger.tvhplayer.core.programmeArtwork
 import at.bernhardberger.tvhplayer.touch.ui.ArtworkModels
 import at.bernhardberger.tvheadend.sdk.core.Channel
@@ -246,6 +248,7 @@ private class GuideMapper(
             timeLeft = texts.duration(event.stop.epochSeconds - clock.nowSec).takeIf { running },
             recording = observation.runningRecordingForEvent(event) != null,
             scheduled = observation.isScheduled(event),
+            record = programRecordControl(programmeRecordKeyAction(event, observation, clock.nowSec)),
             watching = running && channelId == playing,
         )
     }
@@ -268,6 +271,7 @@ private class GuideMapper(
             progress = program.progress,
             timeLeft = program.timeLeft,
             recording = program.recording,
+            record = program.record,
             pictureModel = program.stillModel,
             watching = program.watching,
             synopsis = program.synopsis,

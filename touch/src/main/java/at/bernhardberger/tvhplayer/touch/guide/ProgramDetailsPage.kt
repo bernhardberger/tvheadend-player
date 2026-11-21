@@ -165,14 +165,8 @@ internal fun ProgramDetailsColumn(
             if (picture != null) Modifier.padding(top = 16.dp) else Modifier,
         )
         Timing(details, Modifier.padding(top = 16.dp))
-        val record = actions.onRecord
-        val recordOptions = actions.onRecordOptions
         if (inPlayer) {
-            if (record != null && recordOptions != null) {
-                RecordButton(
-                    { record(details.id) }, { recordOptions(details.id) }, Modifier.padding(top = 16.dp), leads = true,
-                )
-            }
+            ProgramRecordAction(details.record, details.id, actions, Modifier.padding(top = 16.dp), leads = true)
         } else {
             Actions(details, actions, Modifier.padding(top = 16.dp), equalWidth = true)
         }
@@ -265,10 +259,9 @@ private fun Timing(details: ProgramDetails, modifier: Modifier) {
 @Composable
 private fun Actions(details: ProgramDetails, actions: GuideActions, modifier: Modifier, equalWidth: Boolean) {
     val watch = actions.onWatch?.takeIf { details.onNow }
-    val record = actions.onRecord
-    val recordOptions = actions.onRecordOptions?.takeIf { record != null }
+    val record = actions.offers(details.record)
     val showInGuide = actions.onShowInGuide
-    if (watch == null && recordOptions == null && showInGuide == null) return
+    if (watch == null && !record && showInGuide == null) return
     val showInGuideButton: @Composable () -> Unit = {
         if (showInGuide != null) {
             TextButton(onClick = { showInGuide(details.id) }) {
@@ -281,9 +274,7 @@ private fun Actions(details: ProgramDetails, actions: GuideActions, modifier: Mo
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 val share = Modifier.weight(1f).heightIn(min = 48.dp)
                 if (watch != null) WatchButton(share) { watch(details.channelId) }
-                if (record != null && recordOptions != null) {
-                    RecordButton({ record(details.id) }, { recordOptions(details.id) }, share, leads = watch == null)
-                }
+                if (record) ProgramRecordAction(details.record, details.id, actions, share, leads = watch == null)
             }
             showInGuideButton()
         }
@@ -294,9 +285,7 @@ private fun Actions(details: ProgramDetails, actions: GuideActions, modifier: Mo
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             if (watch != null) WatchButton { watch(details.channelId) }
-            if (record != null && recordOptions != null) {
-                RecordButton({ record(details.id) }, { recordOptions(details.id) }, leads = watch == null)
-            }
+            if (record) ProgramRecordAction(details.record, details.id, actions, leads = watch == null)
             showInGuideButton()
         }
     }

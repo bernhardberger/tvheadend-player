@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.touch.recordings
 
+import at.bernhardberger.tvhplayer.touch.ui.DvrControls
 import at.bernhardberger.tvhplayer.touch.ui.LocalArtworkModels
 import android.content.res.Resources
 import android.icu.text.DateFormat
@@ -27,14 +28,15 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * The Recordings destination of the app. Play, Resume, Delete and More are left out until the
- * recording player and the server's changes are wired.
+ * The Recordings destination of the app. Delete goes through [dvr]; Play, Resume and More are left out
+ * until the recording player and the other changes are wired.
  */
 @Composable
 internal fun RecordingsDestination(
     recordings: RecordingsViewModel,
     connection: AppConnectionViewModel,
     destinations: List<Destination>,
+    dvr: DvrControls,
     onOpenConnections: () -> Unit,
     onSignIn: () -> Unit,
 ) {
@@ -57,7 +59,7 @@ internal fun RecordingsDestination(
         actions = RecordingsActions(
             onView = recordings::setView,
             onPlay = null,
-            onDelete = null,
+            onDelete = dvr::delete,
             onMore = null,
             onRetry = { connection.reconnectNow() },
             onOpenConnectionSettings = onOpenConnections,

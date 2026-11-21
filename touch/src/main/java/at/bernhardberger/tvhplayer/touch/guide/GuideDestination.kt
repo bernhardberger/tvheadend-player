@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.touch.guide
 
+import at.bernhardberger.tvhplayer.touch.ui.DvrControls
 import at.bernhardberger.tvhplayer.touch.ui.LocalArtworkModels
 import android.content.Context
 import androidx.compose.runtime.Composable
@@ -34,8 +35,8 @@ import java.util.Locale
 /**
  * The Guide destination of the app over the shared channel scope and the session's guide. Watch
  * plays a program on now through [onWatch], and the one on now on the [playingId] channel shows as
- * watched; Record, Show in Guide and the other airings' links are left out until the server's
- * changes are wired.
+ * watched. Record and Cancel go through [dvr]; Record's options, Show in Guide and the other airings'
+ * links are left out until they are wired.
  */
 @Suppress("LongParameterList") // The app's connection, its player and its pages.
 @Composable
@@ -46,6 +47,7 @@ internal fun GuideDestination(
     destinations: List<Destination>,
     playingId: String?,
     onWatch: ((String) -> Unit)?,
+    dvr: DvrControls,
     onOpenConnections: () -> Unit,
     onSignIn: () -> Unit,
 ) {
@@ -77,7 +79,7 @@ internal fun GuideDestination(
         state = state,
         actions = GuideActions(
             onWatch = onWatch,
-            onRecord = null,
+            onRecord = dvr::record,
             onRecordOptions = null,
             onDetails = guide::openDetails,
             onDay = guide::selectDay,
@@ -88,6 +90,7 @@ internal fun GuideDestination(
             onRetry = { connection.reconnectNow() },
             onOpenConnectionSettings = onOpenConnections,
             onSignIn = onSignIn,
+            onCancel = dvr::cancel,
         ),
         destinations = destinations,
     )

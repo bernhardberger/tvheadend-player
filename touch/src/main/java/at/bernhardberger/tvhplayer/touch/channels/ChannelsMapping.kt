@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.touch.channels
 
+import at.bernhardberger.tvhplayer.touch.ui.programRecordControl
+import at.bernhardberger.tvhplayer.ui.screens.programmeRecordKeyAction
 import at.bernhardberger.tvhplayer.core.programmeArtwork
 import at.bernhardberger.tvhplayer.touch.ui.ArtworkModels
 import at.bernhardberger.tvheadend.sdk.core.Channel
@@ -135,6 +137,7 @@ private class RowMapper(
             progress = progress(nowSec).takeIf { running },
             timeLeft = if (running) texts.duration(stop.epochSeconds - nowSec) else null,
             scheduled = !running && observation.isScheduled(this),
+            record = programRecordControl(programmeRecordKeyAction(this, observation, nowSec)),
         )
     }
 

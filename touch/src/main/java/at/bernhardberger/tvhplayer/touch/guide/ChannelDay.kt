@@ -156,8 +156,8 @@ private fun OpenProgram(
                         if (wide) {
                             OpenFacts(program, Modifier.padding(top = 4.dp))
                             ProgramActions(
-                                program.channelId, program.id, onNow, actions, Modifier.padding(top = 16.dp),
-                                onDetails,
+                                program.channelId, program.id, onNow, program.record, actions,
+                                Modifier.padding(top = 16.dp), onDetails,
                             )
                         }
                     }
@@ -179,8 +179,8 @@ private fun OpenProgram(
                 }
                 if (!wide) {
                     ProgramActions(
-                        program.channelId, program.id, onNow, actions, Modifier.padding(top = 16.dp), onDetails,
-                        compact = true,
+                        program.channelId, program.id, onNow, program.record, actions, Modifier.padding(top = 16.dp),
+                        onDetails, compact = true,
                     )
                 }
             }
