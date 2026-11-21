@@ -40,11 +40,13 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.DecoderReuseEvaluation
 import androidx.media3.exoplayer.analytics.AnalyticsListener
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.media3.VideoScanType
 import at.bernhardberger.tvheadend.sdk.media3.videoScanType
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvhplayer.core.GlanceBadge
 import at.bernhardberger.tvhplayer.core.VideoScan
+import at.bernhardberger.tvhplayer.core.recordingIsRunning
 import at.bernhardberger.tvhplayer.core.glanceBadges
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -81,6 +83,8 @@ internal fun liveInfoBarData(
     nextScheduled: Boolean,
     nowSec: Long,
     unavailableTitle: String,
+    nowRecording: DvrEntry? = null,
+    nextRecording: DvrEntry? = null,
 ): PlayerInfoBarData = PlayerInfoBarData(
     channelNumber = channelNumber?.toString().orEmpty(),
     channelName = channelName,
@@ -93,6 +97,8 @@ internal fun liveInfoBarData(
         ?.let { ((it.stop.epochSeconds - nowSec + 59) / 60).toInt() },
     next = next?.title?.takeIf(String::isNotBlank)?.let { "${formatClock(next.start.epochSeconds)} $it" },
     nextScheduled = nextScheduled && next != null,
+    nowRecording = nowRecording,
+    nextRecording = nextRecording,
 )
 
 /** Positively audio-only: the player reports audio tracks and no video track. */
@@ -185,6 +191,8 @@ internal data class QuickZapPreviewSnapshot(
     val image: ChannelIcon?,
     val subtitle: String? = null,
     val nextScheduled: Boolean = false,
+    val nextRecording: DvrEntry? = null,
+    val nowRecording: DvrEntry? = null,
 )
 
 /**
@@ -204,18 +212,23 @@ internal fun QuickZapTrayPreview(
     scrolling: Boolean = false,
     /** A recording is scheduled for [next]. */
     nextScheduled: Boolean = false,
+    nextRecording: DvrEntry? = null,
+    nowRecording: DvrEntry? = null,
 ) {
     val settledId = rememberUnlessHeld(channel?.id, scrolling)
     val snapshot = channel?.takeIf { it.id == settledId }?.let {
+        val programmeTitle = event?.title?.takeIf(String::isNotBlank)
         QuickZapPreviewSnapshot(
             channelId = it.id,
-            title = event?.title?.takeIf(String::isNotBlank) ?: it.name.orEmpty(),
+            title = programmeTitle ?: it.name.orEmpty(),
             metadata = trayPreviewMetadata(event, nowSec),
             summary = if (compact) null else event?.summary?.takeIf(String::isNotBlank) ?: event?.description?.takeIf(String::isNotBlank),
             subtitle = event?.subtitle?.takeIf(String::isNotBlank),
             next = next?.title?.takeIf(String::isNotBlank)?.let { title -> "${formatClock(next.start.epochSeconds)} $title" },
             image = if (compact) null else event?.let(::programmeArtwork),
             nextScheduled = nextScheduled && next != null,
+            nextRecording = nextRecording,
+            nowRecording = nowRecording.takeIf { programmeTitle != null },
         )
     }
     Box(modifier, contentAlignment = Alignment.BottomStart) {
@@ -229,6 +242,8 @@ internal fun QuickZapTrayPreview(
                 image = it.image,
                 subtitle = it.subtitle,
                 nextScheduled = it.nextScheduled,
+                nextRecording = it.nextRecording,
+                nowRecording = it.nowRecording,
             )
         }
     }
@@ -301,5 +316,7 @@ internal fun recordingInfoBarData(
         },
         subtitle = entry.subtitle,
         recordedDate = recordedDate,
+        nowRecording = entry.takeIf { growing },
+        nowRecordingStateOverride = DvrEntryState.RECORDING.takeIf { growing && !recordingIsRunning(entry) },
     )
 }

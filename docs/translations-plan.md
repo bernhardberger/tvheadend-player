@@ -17,7 +17,7 @@ and for the overnight string changes before reconciling the existing drafts.
   `values-xx/strings.xml` files. No Weblate or Crowdin for now. Weblate becomes
   worth it once human volunteers show up; the glossary format below keeps that
   door open.
-- **Who drafts:** GPT-6.1 Sol at medium effort, with string notes, glossary and
+- **Who drafts:** GPT-6.2 Sol at medium effort, with string notes, glossary and
   language page as context. Automated checks precede Sonnet 5.5 at medium effort
   as the second-family reviewer. Findings are adjudicated, not applied blindly.
 - **DeepL:** tested as a baseline; not selected for the workflow.

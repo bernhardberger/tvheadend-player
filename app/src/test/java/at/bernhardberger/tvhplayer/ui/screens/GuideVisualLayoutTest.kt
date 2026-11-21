@@ -43,6 +43,7 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.test.*
 import at.bernhardberger.tvhplayer.ui.components.StatusIconSize
+import at.bernhardberger.tvhplayer.ui.components.LiveViewerPosition
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
@@ -1444,20 +1445,51 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
     }
 
     @Test fun aServerDeletedRecordingHasNoGuideCellMarkOrHeadlineBadge() {
+        val live = title(1, 0)
         show(headline = true, recordings = listOf(
             DvrEntry.create(DvrEntryId(1), eventId = EventId(110),
                 state = DvrEntryState.REMOVED, files = emptyList()),
         ))
         key(Key.DirectionDown)
-        focused(title(1, 0))
+        focused(live)
         compose.mainClock.advanceTimeBy(GuideHeadlineSettleMs + 300)
         compose.waitForIdle()
         compose.onNodeWithTag("guide-cell-failed-mark", useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithTag("recording-badge-failed", useUnmergedTree = true).assertDoesNotExist()
-        val description = compose.onNode(hasContentDescription(title(1, 0), substring = true))
+        val description = compose.onNode(hasContentDescription(live, substring = true))
             .fetchSemanticsNode().config.getOrElseNullable(SemanticsProperties.ContentDescription) { null }
             .orEmpty().joinToString()
         assertFalse(description, description.contains(context().getString(R.string.recording_state_failed)))
+    }
+
+    @Test fun guidePlaybackMarkFollowsTheViewerPositionAndHidesWhenItIsUnknown() {
+        val watched = ChannelId(1)
+        val viewer = mutableStateOf<LiveViewerPosition?>(null)
+        val earlier = "Earlier coverage"
+        val live = "On air"
+        val handoff = hour + 10 * 60
+        show(headline = true, watching = watched, viewerPosition = viewer, events = listOf(
+            EpgEvent.create(EventId(109), watched, Instant.fromEpochSeconds(hour),
+                Instant.fromEpochSeconds(handoff), title = earlier),
+            EpgEvent.create(EventId(110), watched, Instant.fromEpochSeconds(handoff),
+                Instant.fromEpochSeconds(hour + 3600), title = live),
+        ))
+        key(Key.DirectionDown)
+        focused(live)
+        val playing = hasTestTag("channel-playing-indicator")
+        compose.onAllNodes(playing, useUnmergedTree = true).assertCountEquals(1)
+        compose.onNode(playing and hasAnyAncestor(hasTestTag("epg-channel-header-1")), useUnmergedTree = true)
+            .assertDoesNotExist()
+        compose.onNode(playing and hasAnyAncestor(hasContentDescription(live, substring = true)),
+            useUnmergedTree = true).assertExists()
+        compose.runOnIdle {
+            viewer.value = LiveViewerPosition(watched, handoff - 1)
+        }
+        compose.onAllNodes(playing, useUnmergedTree = true).assertCountEquals(1)
+        compose.onNode(playing and hasAnyAncestor(hasContentDescription(earlier, substring = true)),
+            useUnmergedTree = true).assertExists()
+        compose.runOnIdle { viewer.value = viewer.value?.copy(epochSec = null) }
+        compose.onNode(playing, useUnmergedTree = true).assertDoesNotExist()
     }
 
     @Test fun aRemovedEntryDoesNotHideTheScheduledMarkForTheSameEvent() {
@@ -1465,6 +1497,8 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
             DvrEntry.create(DvrEntryId(1), eventId = EventId(110),
                 state = DvrEntryState.REMOVED, files = emptyList()),
             DvrEntry.create(DvrEntryId(2), eventId = EventId(110), state = DvrEntryState.SCHEDULED),
+            DvrEntry.create(DvrEntryId(3), channelId = ChannelId(2), state = DvrEntryState.RECORDING,
+                start = Instant.fromEpochSeconds(hour), stop = Instant.fromEpochSeconds(hour + 3600)),
         ))
         key(Key.DirectionDown)
         focused(title(1, 0))
@@ -1475,7 +1509,17 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
         compose.mainClock.advanceTimeBy(GuideHeadlineSettleMs + 300)
         compose.waitForIdle()
         compose.onNode(
-            hasTestTag("recording-badge-scheduled") and hasAnyAncestor(hasTestTag("guide-headline")),
+            hasTestTag("recording-badge-scheduled") and hasAnyAncestor(hasTestTag("guide-headline-channel")),
+            useUnmergedTree = true,
+        ).assertIsDisplayed()
+
+        key(Key.DirectionDown)
+        focused(title(2, 0))
+        compose.mainClock.advanceTimeBy(GuideHeadlineSettleMs + 300)
+        compose.waitForIdle()
+        compose.onNode(
+            hasTestTag("recording-badge") and hasAnyAncestor(hasTestTag("guide-headline-channel")) and
+                hasContentDescription(context().getString(R.string.channel_recording_spoken)),
             useUnmergedTree = true,
         ).assertIsDisplayed()
     }
@@ -1497,11 +1541,14 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
         ).fetchSemanticsNodes().size
         fun description(channel: Int, offset: Int) = compose.onNode(hasContentDescription(title(channel, offset), substring = true))
             .fetchSemanticsNode().config.getOrElseNullable(SemanticsProperties.ContentDescription) { null }.orEmpty().joinToString()
-        fun headlineBadge(tag: String) {
+        fun headlineMark(spoken: Int) {
             compose.mainClock.advanceTimeBy(GuideHeadlineSettleMs + 300)
             compose.waitForIdle()
-            compose.onNode(hasTestTag(tag) and hasAnyAncestor(hasTestTag("guide-headline")), useUnmergedTree = true)
+            val description = hasContentDescription(context().getString(spoken))
+            compose.onNode(description and hasAnyAncestor(hasTestTag("guide-headline-channel")), useUnmergedTree = true)
                 .assertIsDisplayed()
+            compose.onNode(description and hasAnyAncestor(hasTestTag("guide-headline-metadata")), useUnmergedTree = true)
+                .assertDoesNotExist()
         }
 
         key(Key.DirectionDown)
@@ -1511,18 +1558,19 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
         val running = description(1, 0)
         assertTrue(running, running.contains(context().getString(R.string.recording_state_recording_errors)))
         assertFalse("The dot already names the errors", running.contains(context().getString(R.string.recording_state_failed)))
+        headlineMark(R.string.recording_state_recording_errors)
         key(Key.DirectionLeft)
         focused(title(1, -1))
         assertEquals(1, mark("guide-cell-recording-mark", 1, -1))
         assertEquals(0, mark("guide-cell-failed-mark", 1, -1))
         assertTrue(description(1, -1), description(1, -1).contains(context().getString(R.string.details_recorded)))
-        headlineBadge("recording-badge-recorded")
+        headlineMark(R.string.details_recorded)
         key(Key.DirectionDown)
         focused(title(2, -1))
         assertEquals(0, mark("guide-cell-recording-mark", 2, -1))
         assertEquals(1, mark("guide-cell-failed-mark", 2, -1))
         assertTrue(description(2, -1), description(2, -1).contains(context().getString(R.string.recording_state_failed)))
-        headlineBadge("recording-badge-failed")
+        headlineMark(R.string.recording_state_failed)
         // Channel 3 has no guide data, so Down passes it.
         key(Key.DirectionDown)
         focused(title(4, -1))
@@ -1530,7 +1578,7 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
         assertEquals(1, mark("guide-cell-failed-mark", 4, -1))
         assertTrue(description(4, -1), description(4, -1).contains(context().getString(R.string.recording_notice_missed)))
         assertFalse(description(4, -1), description(4, -1).contains(context().getString(R.string.recording_state_failed)))
-        headlineBadge("recording-badge-missed")
+        headlineMark(R.string.recording_notice_missed)
         assertNoPlayback()
     }
 

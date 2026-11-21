@@ -891,6 +891,7 @@
     <string name="rail_now_playing_description">Spelas nu: %1$s, %2$s, %3$s.</string>
     <string name="rail_now_playing_description_channel">Spelas nu: %1$s, %2$s.</string>
     <string name="player_recording">Spelas in nu</string>
+    <string name="channel_recording_spoken">Spelas in på den här kanalen</string>
     <string name="player_recorded_on">Inspelat %1$s</string>
     <string name="player_recorded_ends">Inspelat %1$s • Slutar %2$s</string>
     <string name="player_recording_until">Spelas in till %1$s</string>
@@ -906,9 +907,6 @@
     <string name="player_recorded_spoken">%1$s, inspelat %2$s, %3$s</string>
     <string name="player_channel">Kanal</string>
     <string name="player_row_recent">Senaste kanaler</string>
-    <string name="player_channel_card_hint">Vänster eller höger byter kanal, OK visar senaste kanaler</string>
-    <string name="player_identity_info_hint">OK visar programinformationen</string>
-    <string name="player_channel_card_hint_no_recents">Vänster eller höger byter kanal</string>
     <string name="player_rail_watching">Tittar på</string>
     <string name="details_read_more">Mer info</string>
     <string name="details_important_information">Detaljer</string>
@@ -1105,8 +1103,6 @@
     <string name="home_recording_starts_at">Börjar %1$s</string>
     <string name="home_all_recordings">Alla inspelningar</string>
     <string name="home_activity_watching_live">Tittar direkt</string>
-    <string name="home_activity_recording">Spelar in</string>
-    <string name="home_activity_watching_and_recording">Tittar och spelar in</string>
     <string name="home_upcoming_summary">Härnäst: %1$s • %2$s</string>
     <plurals name="home_upcoming_more">
         <item quantity="one">%1$d till schemalagd</item>
@@ -1164,4 +1160,5 @@
     <string name="server_none_in_use">Ingen anslutning används</string>
     <string name="server_list_unavailable">De sparade anslutningarna kan inte läsas på den här tv:n just nu</string>
     <string name="server_none_in_use_description">Ingen anslutning används. Välj en för att titta på tv igen.</string>
+    <string name="return_to_full_screen">Tillbaka till helskärm</string>
 </resources>

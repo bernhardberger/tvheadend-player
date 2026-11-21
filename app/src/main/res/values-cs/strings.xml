@@ -961,6 +961,7 @@
     <string name="rail_now_playing_description">Právě se přehrává: %1$s, %2$s, %3$s.</string>
     <string name="rail_now_playing_description_channel">Právě se přehrává: %1$s, %2$s.</string>
     <string name="player_recording">Právě se nahrává</string>
+    <string name="channel_recording_spoken">Na tomto kanálu se právě nahrává</string>
     <string name="player_recorded_on">Nahráno %1$s</string>
     <string name="player_recorded_ends">Nahráno %1$s • Končí %2$s</string>
     <string name="player_recording_until">Nahrávání do %1$s</string>
@@ -976,9 +977,6 @@
     <string name="player_recorded_spoken">%1$s, nahráno %2$s, %3$s</string>
     <string name="player_channel">Kanál</string>
     <string name="player_row_recent">Poslední kanály</string>
-    <string name="player_channel_card_hint">Vlevo nebo vpravo přepne kanál, OK zobrazí poslední kanály</string>
-    <string name="player_identity_info_hint">OK zobrazí informace o pořadu</string>
-    <string name="player_channel_card_hint_no_recents">Vlevo nebo vpravo přepne kanál</string>
     <string name="player_rail_watching">Sleduješ</string>
     <string name="details_read_more">Více informací</string>
     <string name="details_important_information">Podrobnosti</string>
@@ -1193,8 +1191,6 @@
     <string name="home_recording_starts_at">Začíná v %1$s</string>
     <string name="home_all_recordings">Všechny nahrávky</string>
     <string name="home_activity_watching_live">Sledování živě</string>
-    <string name="home_activity_recording">Nahrávání</string>
-    <string name="home_activity_watching_and_recording">Sledování a nahrávání</string>
     <string name="home_upcoming_summary">Následuje: %1$s • %2$s</string>
     <plurals name="home_upcoming_more">
         <item quantity="one">Ještě %1$d plánované nahrávání</item>
@@ -1254,4 +1250,5 @@
     <string name="server_none_in_use">Žádné připojení se nepoužívá</string>
     <string name="server_list_unavailable">Uložená připojení teď na této TV nelze přečíst</string>
     <string name="server_none_in_use_description">Žádné připojení se nepoužívá. Vyber si nějaké a sleduj znovu TV.</string>
+    <string name="return_to_full_screen">Návrat na celou obrazovku</string>
 </resources>

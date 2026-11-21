@@ -48,7 +48,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/** Live's top identity: its anchor, its place in the controls' focus graph, its keys and its Recent row. */
+/** Live's passive top identity, its anchor, and the controls around it. */
 @OptIn(ExperimentalTestApi::class)
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi")
@@ -179,7 +179,6 @@ class PlayerTopIdentityTest {
         val node = compose.onNodeWithTag(PlayerTopIdentityTag, useUnmergedTree = true).fetchSemanticsNode().config
         assertEquals(listOf("Channel 1 One"), node.getOrNull(SemanticsProperties.ContentDescription))
         assertEquals(null, node.getOrNull(SemanticsProperties.Focused))
-        assertFalse("no channel-zap arrows", compose.tagExists("player-top-identity-previous") || compose.tagExists("player-top-identity-next"))
         compose.pressKey(Key.DirectionUp, settleFrames = 20)
         assertEquals("Up has nowhere to go", listOf("player-seekbar"), compose.focusedTags())
         compose.pressKey(Key.DirectionDown, settleFrames = 20)
@@ -188,12 +187,11 @@ class PlayerTopIdentityTest {
         assertEquals(0, downs)
     }
 
-    @Test fun rightFromDetailsReachesSettingsWithoutZapping() {
+    @Test fun rightFromDetailsReachesSettings() {
         chrome(PlayerChromeMode.CONTROLS, restore = "player-info")
         assertEquals(listOf("player-info"), compose.focusedTags())
         compose.onRoot().performKeyInput { withKeyDown(Key.DirectionRight) { advanceEventTime(1_200) } }
         compose.settleFrames(20)
-        assertTrue("the press and its repeats never zap: $zaps", zaps.isEmpty())
         assertEquals(listOf("player-settings"), compose.focusedTags())
         assertEquals("nothing opens", 0, downs)
     }
@@ -219,16 +217,13 @@ class PlayerTopIdentityTest {
         assertEquals("the restore is acknowledged once", 1, restores)
     }
 
-    @Test fun oldRecentInputsCannotMakeTheHeaderInteractive() {
-        chrome(PlayerChromeMode.CONTROLS, restore = "player-info", recents = recentChannels)
+    @Test fun theControlsIdentityIsPassiveWhileDetailsOwnsFocus() {
+        chrome(PlayerChromeMode.CONTROLS, restore = "player-info")
         val node = compose.onNodeWithTag(PlayerTopIdentityTag, useUnmergedTree = true).fetchSemanticsNode().config
         assertEquals(null, node.getOrNull(SemanticsProperties.Focused))
+        assertEquals(null, node.getOrNull(androidx.compose.ui.semantics.SemanticsActions.OnClick))
         compose.pressKey(Key.DirectionCenter, settleFrames = 20)
-        assertFalse(recentOpen)
-        assertFalse(compose.tagExists("player-identity-recent-row"))
-        assertEquals(emptyList<Int>(), picks)
         assertEquals(listOf("player-info"), compose.focusedTags())
-        assertEquals(emptyList<Int>(), zaps)
     }
 
     @Test fun theInfoBarLeadsWithANonFocusableArtworkTileAndLeavesTheChannelToTheTop() {
@@ -379,7 +374,6 @@ class PlayerTopIdentityTest {
     private var timeshift by mutableStateOf(
         AppTimeshiftState(available = true, bufferStartMs = -600_000, positionMs = -203_000, liveEdgeMs = 0, timingKnown = true))
     private var restoreFocus by mutableStateOf<String?>(null)
-    private var recentOpen by mutableStateOf(false)
     private var shownMode by mutableStateOf(PlayerChromeMode.CONTROLS)
     private var numberEntry by mutableStateOf("")
     private var fontScale by mutableStateOf(1f)
@@ -391,21 +385,13 @@ class PlayerTopIdentityTest {
     private var restores = 0
     private var toggles = 0
     private var downs = 0
-    private val zaps = mutableListOf<Int>()
-    private val picks = mutableListOf<Int>()
     private val reported = mutableListOf<String>()
-
-    private val recentChannels = listOf(
-        RecentChannelPeek(null, "2", "Two", now = "Second"),
-        RecentChannelPeek(null, "3", "Three", now = "Third"),
-    )
 
     private fun chrome(
         mode: PlayerChromeMode,
         timeshift: AppTimeshiftState = this.timeshift,
         livePause: LivePauseAvailability? = null,
         restore: String? = null,
-        recents: List<RecentChannelPeek> = emptyList(),
         info: PlayerInfoBarData = liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 1, "One", null, null, false, 1_800, "Programme"),
         /** Composed beside the chrome. */
         extra: @androidx.compose.runtime.Composable () -> Unit = {},
@@ -431,11 +417,6 @@ class PlayerTopIdentityTest {
                     onActionFocused = { reported += it },
                     onFocusRestored = { restores++; restoreFocus = null },
                     onDownFromActions = { downs++ },
-                    onChannelZap = { direction, _, _ -> zaps += direction },
-                    recents = recents,
-                    onRecentPick = { picks += it },
-                    recentRowOpen = recentOpen,
-                    onRecentRowOpenChange = { recentOpen = it },
                     numberEntryShown = numberEntry.isNotEmpty(),
                 )
                 extra()

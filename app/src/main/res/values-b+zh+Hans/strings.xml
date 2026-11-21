@@ -828,6 +828,7 @@
     <string name="rail_now_playing_description">正在播放：%1$s，%2$s，%3$s。</string>
     <string name="rail_now_playing_description_channel">正在播放：%1$s，%2$s。</string>
     <string name="player_recording">正在录制</string>
+    <string name="channel_recording_spoken">此频道正在录制</string>
     <string name="player_recorded_on">录制于%1$s</string>
     <string name="player_recorded_ends">录制于%1$s • %2$s结束</string>
     <string name="player_recording_until">录制至%1$s</string>
@@ -843,9 +844,6 @@
     <string name="player_recorded_spoken">%1$s，录制于%2$s，%3$s</string>
     <string name="player_channel">频道</string>
     <string name="player_row_recent">最近观看的频道</string>
-    <string name="player_channel_card_hint">按左或右切换频道，按OK显示最近观看的频道</string>
-    <string name="player_identity_info_hint">按OK显示节目信息</string>
-    <string name="player_channel_card_hint_no_recents">按左或右切换频道</string>
     <string name="player_rail_watching">正在观看</string>
     <string name="details_read_more">更多信息</string>
     <string name="details_important_information">详情</string>
@@ -1021,8 +1019,6 @@
     <string name="home_recording_starts_at">%1$s 开始</string>
     <string name="home_all_recordings">全部录制内容</string>
     <string name="home_activity_watching_live">正在观看直播</string>
-    <string name="home_activity_recording">正在录制</string>
-    <string name="home_activity_watching_and_recording">正在观看并录制</string>
     <string name="home_upcoming_summary">接下来：%1$s • %2$s</string>
     <plurals name="home_upcoming_more">
         <item quantity="other">另有 %1$d 项录制计划</item>
@@ -1079,4 +1075,5 @@
     <string name="server_none_in_use">没有正在使用的连接</string>
     <string name="server_list_unavailable">目前无法读取此电视上保存的连接</string>
     <string name="server_none_in_use_description">没有正在使用的连接。请选择连接以继续观看电视。</string>
+    <string name="return_to_full_screen">返回全屏</string>
 </resources>

@@ -224,7 +224,11 @@ class GuideRenderingCostContractTest {
         assertTrue(clock.contains("return remember(nowSec) { { nowSec.longValue } }"))
         assertEquals(1, channels.count("val nowSec = rememberCurrentEpochSeconds()"))
         assertFalse(channels.contains("var nowSec by remember"))
-        assertFalse(channels.contains("nowSec()"))
+        // Recording-window changes may read the clock in derived state, not directly
+        // in screen composition. Other time reads still belong to consumers.
+        val recordingWindow = "derivedStateOf { activeRecordingChannelIds(dvrEntries, nowSec()) }"
+        assertEquals(1, channels.count(recordingWindow))
+        assertFalse(Regex("""\bnowSec\s*\(\s*\)""").containsMatchIn(channels.replace(recordingWindow, "")))
     }
 
     private fun String.section(start: String, end: String): String {

@@ -1,38 +1,32 @@
 package at.bernhardberger.tvhplayer.ui.components
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.testTag
-import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
-import at.bernhardberger.tvhplayer.ui.TvSpacing8
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
+import androidx.tv.material3.LocalContentColor
+import androidx.tv.material3.MaterialTheme
+import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.ui.TvLogoPlateColor
+import at.bernhardberger.tvhplayer.ui.TvTextColors
 
 @Composable
-fun ChannelNowIndicators(
-    playingNow: Boolean,
-    recordingNow: Boolean,
-    modifier: Modifier = Modifier,
-    announceState: Boolean = true,
-    focused: Boolean = false,
-    playbackIndicator: ChannelPlaybackIndicator = if (playingNow) ChannelPlaybackIndicator.PLAYING else ChannelPlaybackIndicator.NONE,
-) {
-    if (playbackIndicator == ChannelPlaybackIndicator.NONE && !recordingNow) return
+internal fun Modifier.returnToFullScreenAction(returnsToPlayback: Boolean): Modifier {
+    if (!returnsToPlayback) return this
+    val label = stringResource(R.string.return_to_full_screen)
+    // The enclosing TV Material item supplies the actual click callback.
+    return semantics { onClick(label = label, action = null) }
+}
 
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(TvSpacing8),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        ChannelPlaybackMarker(playbackIndicator, announceState = announceState)
-        if (recordingNow) {
-            RecordingStatusIndicator(
-                state = DvrEntryState.RECORDING,
-                announceState = announceState,
-                focused = focused,
-                modifier = Modifier.testTag("channel-recording-indicator"),
-            )
-        }
+@Composable
+internal fun CardPlaybackPlate(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    Box(modifier.background(TvLogoPlateColor, MaterialTheme.shapes.extraSmall).padding(3.dp)) {
+        CompositionLocalProvider(LocalContentColor provides TvTextColors.primary, content = content)
     }
 }

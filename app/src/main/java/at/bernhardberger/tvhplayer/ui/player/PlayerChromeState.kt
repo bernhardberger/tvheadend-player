@@ -4,7 +4,6 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import at.bernhardberger.tvhplayer.core.playerControlsAutoHideTimeoutMillis
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -45,7 +44,6 @@ internal class PlayerChromeState(
     private var bannerHeld = false
 
     private var autoHideEligible = false
-    private var channelCardFocused = false
     private var autoHideJob: Job? = null
     private var disposed = false
 
@@ -120,16 +118,6 @@ internal class PlayerChromeState(
     }
 
     /**
-     * Focus arrived on, or left, the channel card or its recent row, where the controls wait longer
-     * before hiding; the timeout restarts with the move.
-     */
-    fun onChannelCardFocusChanged(focused: Boolean) {
-        if (channelCardFocused == focused) return
-        channelCardFocused = focused
-        restartAutoHideIfEligible()
-    }
-
-    /**
      * A covering layer takes over: the Banner hides, the controls stop auto-hiding and a
      * later reveal travels in. [controls] shows or hides the controls with it; null keeps them.
      */
@@ -159,7 +147,6 @@ internal class PlayerChromeState(
 
     private fun suspendAutoHide() {
         autoHideEligible = false
-        channelCardFocused = false
         cancelAutoHide()
     }
 
@@ -170,10 +157,9 @@ internal class PlayerChromeState(
     private fun restartAutoHide() {
         cancelAutoHide()
         autoHideJob = scope.launch {
-            delay(playerControlsAutoHideTimeoutMillis(autoHideTimeoutMillis, channelCardFocused))
+            delay(autoHideTimeoutMillis)
             autoHideJob = null
             autoHideEligible = false
-            channelCardFocused = false
             controlsVisible = false
         }
     }

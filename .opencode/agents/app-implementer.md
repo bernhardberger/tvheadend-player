@@ -1,7 +1,7 @@
 ---
 description: Writable TVHeadend Player implementer for one delegated, bounded code slice with tests and a build gate; never commits, releases, or touches devices
 mode: subagent
-model: openai/gpt-6.1-sol
+model: openai/gpt-6.2-sol
 variant: medium
 steps: 300
 permission:

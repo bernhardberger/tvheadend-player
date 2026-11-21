@@ -218,10 +218,16 @@ private fun rememberArchiveLevels(
                             item, latestAdmissionForEntry, latestOnOpenFolderMenu, latestPiconForEntry,
                         )
                         is ArchiveListItem.Recording -> {
-                            val previewId = "metadata:${item.entry.id.value}"
+                            val previewId = "metadata:$id:${item.entry.id.value}"
                             levels[previewId] = recordingPreviewLevel(
                                 previewId, item.entry, contentPadding, latestPiconForEntry, latestAdmissionForEntry,
-                            )
+                            ) {
+                                val values = valuesLine.value.takeUnless { id == RECORDING_NOW_LEVEL_ID }
+                                ArchiveLevelHeading(
+                                    if (values == null) "" else heading(), { 1f }, values,
+                                    atRoot = id == rootId, measureOnly = true,
+                                )
+                            }
                             archiveRecordingRow(
                                 item, previewId,
                                 // Only the root list carries the date cuts.
@@ -335,6 +341,7 @@ internal fun ArchiveLevelHeading(
     valuesLine: String?,
     atRoot: Boolean = true,
     endReserve: Dp = ValuesLineEndReserve,
+    measureOnly: Boolean = false,
 ) {
     val style = RecordingsHeadlineStyle
     val direction = LocalLayoutDirection.current
@@ -378,8 +385,10 @@ internal fun ArchiveLevelHeading(
         val withValues = values?.let { valuesTop + it.height + ValuesLineBottomGap.roundToPx() } ?: bandPx
         val height = lerp(bandPx.toFloat(), maxOf(bandPx, withValues).toFloat(), emphasis()).roundToInt()
         layout(constraints.maxWidth, height) {
-            title?.placeRelative(0, 0)
-            values?.placeRelative(0, valuesTop)
+            if (!measureOnly) {
+                title?.placeRelative(0, 0)
+                values?.placeRelative(0, valuesTop)
+            }
         }
     }
 }

@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvhplayer.R
@@ -41,18 +42,20 @@ import at.bernhardberger.tvhplayer.settings.GuideRows
 import at.bernhardberger.tvhplayer.ui.TvSpacing4
 import at.bernhardberger.tvhplayer.core.EpgFocusColumn
 import at.bernhardberger.tvhplayer.core.EpgFocusTarget
+import at.bernhardberger.tvhplayer.core.activeRecordingChannelIds
 import at.bernhardberger.tvhplayer.core.programmeAgeRating
 import at.bernhardberger.tvhplayer.core.programmeArtwork
+import at.bernhardberger.tvhplayer.core.linkedRecordingForEvent
 import at.bernhardberger.tvhplayer.core.recordingIsRunning
-import at.bernhardberger.tvhplayer.core.recordingWasRemoved
 import at.bernhardberger.tvhplayer.core.visibleChannelNumber
 import at.bernhardberger.tvhplayer.ui.common.formatTimeInterval
 import at.bernhardberger.tvhplayer.ui.common.isRunning
 import at.bernhardberger.tvhplayer.ui.common.progress
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeEyebrow
-import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
-import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackMarker
-import at.bernhardberger.tvhplayer.ui.TvTextColors
+import at.bernhardberger.tvhplayer.ui.components.RecordingBadge
+import at.bernhardberger.tvhplayer.ui.components.StatusBadge
+import at.bernhardberger.tvhplayer.ui.components.StatusBadgeTone
+import at.bernhardberger.tvhplayer.ui.components.recordingStatusSpoken
 import at.bernhardberger.tvhplayer.ui.components.rule
 import at.bernhardberger.tvhplayer.ui.components.watchingIndicator
 import at.bernhardberger.tvhplayer.ui.components.progressColor
@@ -64,9 +67,6 @@ import at.bernhardberger.tvhplayer.ui.components.ProgrammeHeadlineGroupGap
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeHeadlineLineGap
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeHeadlineTitleGap
 import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
-import at.bernhardberger.tvhplayer.ui.components.RecordingBadge
-import at.bernhardberger.tvhplayer.ui.components.StatusBadge
-import at.bernhardberger.tvhplayer.ui.components.StatusBadgeTone
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
 import at.bernhardberger.tvhplayer.ui.components.programmeAboutFacts
 import at.bernhardberger.tvhplayer.ui.components.programmeHeaderMetadata
@@ -171,7 +171,8 @@ internal fun GuideHeadlineBackground(
             picture = { id -> programme()?.event?.takeIf { it.channelId == id }?.let(::programmeArtwork) },
             pictureHeight = logoTop + headlineDrop + guideHeadlineHeight() + GuideHeadlineRulerGap + GuideHeadlinePictureReach,
             // Together with the 12dp ruler gap, this reserves at least 20dp above the timeline.
-            logoMaxHeight = guideHeadlineLogoMaxHeight(),
+            // Starts 24dp below the header; ends 8dp above the headline's bottom.
+            logoMaxHeight = guideHeadlineHeight() - 24.dp - 8.dp,
         )
     }
 }
@@ -200,10 +201,6 @@ internal fun guideHeadlineHeight(): Dp {
 internal fun guideHeadlineEyebrowHeight(): Dp = with(LocalDensity.current) {
     maxOf(GuideHeadlinePiconHeight, MaterialTheme.typography.labelMedium.lineHeight.toDp())
 }
-
-/** A fallback logo's height beside the headline: it starts 24dp below the header and ends 8dp above the headline's bottom. */
-@Composable
-internal fun guideHeadlineLogoMaxHeight(): Dp = guideHeadlineHeight() - 24.dp - 8.dp
 
 /** The room between the headline and the time ruler below it. */
 internal val GuideHeadlineRulerGap = 12.dp
@@ -296,7 +293,6 @@ internal fun GuideHeadline(
  * on another day names its day, and only one on air has progress. Without a programme the
  * channel's missing guide data takes the title.
  */
-@OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)
 @Composable
 private fun GuideHeadlineContent(
     programme: GuideHeadlineProgramme?,
@@ -316,31 +312,29 @@ private fun GuideHeadlineContent(
     }
     val now = nowSec()
     val indicator = watchingIndicator(event, now)
-    // The rows' marks as badges: a running recording or a scheduled one, a failed one as details
-    // names it, and, beyond details, a finished one and a missed one.
     // The held event, as the cells pass it: the ID lookup only knows the current snapshot, not history.
-    val recording = event?.let { observation.dvrEntryForEvent(it) }?.takeUnless(::recordingWasRemoved)
-    val mark = recording?.state?.takeIf {
-        recordingIsRunning(recording) || it == DvrEntryState.SCHEDULED || it == DvrEntryState.COMPLETED ||
-            it == DvrEntryState.COMPLETED_ERROR || it == DvrEntryState.MISSED
+    val linkedEntry = observation.linkedRecordingForEvent(event)
+    val runningRecording = linkedEntry?.let(::recordingIsRunning) == true
+    val entry = linkedEntry?.takeIf {
+        when (it.state) {
+            DvrEntryState.SCHEDULED, DvrEntryState.COMPLETED,
+            DvrEntryState.COMPLETED_ERROR, DvrEntryState.MISSED -> true
+            else -> runningRecording
+        }
     }
+    val dvrEntries = observation.dvrSnapshotForDisplay?.entries.orEmpty()
+    val recordingIds = remember(dvrEntries, now) { activeRecordingChannelIds(dvrEntries, now) }
     ProgrammeHeadline(
         eyebrow = {
             if (programme != null) {
                 val channel = programme.channel
                 ProgrammeEyebrow(channel.icon, channelTitleText(channel.visibleChannelNumber, channel.name.orEmpty()),
                     Modifier.semantics(mergeDescendants = true) {}.testTag("guide-headline-channel")) {
-                    androidx.compose.runtime.CompositionLocalProvider(
-                        androidx.tv.material3.LocalContentColor provides TvTextColors.secondary,
-                    ) { ChannelPlaybackMarker(indicator) }
-                    when (mark) {
-                        DvrEntryState.COMPLETED -> StatusBadge(stringResource(R.string.details_recorded), StatusBadgeTone.NEUTRAL,
-                            Modifier.testTag("recording-badge-recorded"), icon = R.drawable.ic_video_library)
-                        DvrEntryState.MISSED -> StatusBadge(stringResource(R.string.recording_state_missed), StatusBadgeTone.ERROR,
-                            Modifier.testTag("recording-badge-missed"), icon = R.drawable.ic_error_outlined,
-                            contentDescription = stringResource(R.string.recording_notice_missed))
-                        else -> RecordingBadge(mark, rule = recording?.rule)
-                    }
+                    if (entry != null) GuideHeadlineRecordingBadge(entry)
+                    else if (channel.id in recordingIds) RecordingBadge(
+                        DvrEntryState.RECORDING,
+                        recordingDescription = stringResource(R.string.channel_recording_spoken),
+                    )
                 }
             }
         },
@@ -353,12 +347,39 @@ private fun GuideHeadlineContent(
         rating = event?.rating?.let { programmeAgeRating(it.label, it.age) },
         timing = event?.let { guideHeadlineTiming(it, now) },
         progress = programmeProgress(event, now),
-        progressColor = progressColor(indicator.isPlayingItem, recording?.let(::recordingIsRunning) == true),
+        progressColor = progressColor(indicator.isPlayingItem, runningRecording),
         minutesLeft = programmeMinutesLeft(event, now),
         // No synopsis: in the Guide the grid below carries the weight.
         loading = event == null && loading,
         titleStyle = titleStyle,
     )
+}
+
+@Composable
+private fun GuideHeadlineRecordingBadge(entry: DvrEntry) {
+    when (entry.state) {
+        DvrEntryState.COMPLETED -> StatusBadge(
+            stringResource(R.string.details_recorded), StatusBadgeTone.NEUTRAL,
+            Modifier.testTag("recording-badge-recorded"), icon = R.drawable.ic_video_library,
+        )
+        DvrEntryState.MISSED -> StatusBadge(
+            stringResource(R.string.recording_state_missed), StatusBadgeTone.ERROR,
+            Modifier.testTag("recording-badge-missed"), icon = R.drawable.ic_error_outlined,
+            contentDescription = stringResource(R.string.recording_notice_missed),
+        )
+        DvrEntryState.COMPLETED_ERROR -> StatusBadge(
+            stringResource(R.string.recording_state_failed), StatusBadgeTone.ERROR,
+            Modifier.testTag("recording-badge-failed"), icon = R.drawable.ic_error_outlined,
+        )
+        DvrEntryState.SCHEDULED if entry.rule == null && entry.enabled != false -> StatusBadge(
+            stringResource(R.string.recording_state_scheduled), StatusBadgeTone.NEUTRAL,
+            Modifier.testTag("recording-badge-scheduled"), icon = R.drawable.ic_schedule,
+        )
+        else -> RecordingBadge(
+            entry.state, rule = entry.rule, skipped = entry.enabled == false,
+            recordingDescription = recordingStatusSpoken(entry.state, entry.rule),
+        )
+    }
 }
 
 /** The programme's times, after its day as the details page names it when that is not today. */

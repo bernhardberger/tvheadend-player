@@ -926,6 +926,7 @@
     <string name="rail_now_playing_description">Se redă acum: %1$s, %2$s, %3$s.</string>
     <string name="rail_now_playing_description_channel">Se redă acum: %1$s, %2$s.</string>
     <string name="player_recording">Se înregistrează</string>
+    <string name="channel_recording_spoken">Se înregistrează pe acest canal</string>
     <string name="player_recorded_on">Înregistrat %1$s</string>
     <string name="player_recorded_ends">Înregistrat %1$s • Se termină %2$s</string>
     <string name="player_recording_until">Se înregistrează până la %1$s</string>
@@ -941,9 +942,6 @@
     <string name="player_recorded_spoken">%1$s, înregistrat %2$s, %3$s</string>
     <string name="player_channel">Canal</string>
     <string name="player_row_recent">Canale recente</string>
-    <string name="player_channel_card_hint">Stânga sau dreapta schimbă canalul, OK arată canalele recente</string>
-    <string name="player_identity_info_hint">OK arată informațiile emisiunii</string>
-    <string name="player_channel_card_hint_no_recents">Stânga sau dreapta schimbă canalul</string>
     <string name="player_rail_watching">În vizionare</string>
     <string name="details_read_more">Mai multe informații</string>
     <string name="details_important_information">Detalii</string>
@@ -1149,8 +1147,6 @@
     <string name="home_recording_starts_at">Începe la %1$s</string>
     <string name="home_all_recordings">Toate înregistrările</string>
     <string name="home_activity_watching_live">Vizionare în direct</string>
-    <string name="home_activity_recording">Înregistrare în curs</string>
-    <string name="home_activity_watching_and_recording">Vizionare și înregistrare</string>
     <string name="home_upcoming_summary">Urmează: %1$s • %2$s</string>
     <plurals name="home_upcoming_more">
         <item quantity="one">Încă %1$d înregistrare programată</item>
@@ -1209,4 +1205,5 @@
     <string name="server_none_in_use">Nicio conexiune în uz</string>
     <string name="server_list_unavailable">Conexiunile salvate nu pot fi citite pe acest televizor momentan</string>
     <string name="server_none_in_use_description">Nicio conexiune în uz. Alege una pentru a viziona din nou TV.</string>
+    <string name="return_to_full_screen">Revino la ecran complet</string>
 </resources>

@@ -926,6 +926,7 @@
     <string name="rail_now_playing_description">Sada se reproducira: %1$s, %2$s, %3$s.</string>
     <string name="rail_now_playing_description_channel">Sada se reproducira: %1$s, %2$s.</string>
     <string name="player_recording">Snimanje u tijeku</string>
+    <string name="channel_recording_spoken">Snimanje u tijeku na ovom kanalu</string>
     <string name="player_recorded_on">Snimljeno %1$s</string>
     <string name="player_recorded_ends">Snimljeno %1$s • Završava %2$s</string>
     <string name="player_recording_until">Snimanje do %1$s</string>
@@ -941,9 +942,6 @@
     <string name="player_recorded_spoken">%1$s, snimljeno %2$s, %3$s</string>
     <string name="player_channel">Kanal</string>
     <string name="player_row_recent">Nedavni kanali</string>
-    <string name="player_channel_card_hint">Lijevo ili desno mijenja kanal, OK prikazuje nedavne kanale</string>
-    <string name="player_identity_info_hint">OK prikazuje podatke o emisiji</string>
-    <string name="player_channel_card_hint_no_recents">Lijevo ili desno mijenja kanal</string>
     <string name="player_rail_watching">Gledaš</string>
     <string name="details_read_more">Više informacija</string>
     <string name="details_important_information">Pojedinosti</string>
@@ -1150,8 +1148,6 @@
     <string name="home_recording_starts_at">Počinje u %1$s</string>
     <string name="home_all_recordings">Sve snimke</string>
     <string name="home_activity_watching_live">Gledanje uživo</string>
-    <string name="home_activity_recording">Snimanje</string>
-    <string name="home_activity_watching_and_recording">Gledanje i snimanje</string>
     <string name="home_upcoming_summary">Sljedeće: %1$s • %2$s</string>
     <plurals name="home_upcoming_more">
         <item quantity="one">Još %1$d zakazano snimanje</item>
@@ -1210,4 +1206,5 @@
     <string name="server_none_in_use">Nijedna veza nije u upotrebi</string>
     <string name="server_list_unavailable">Spremljene veze trenutačno se ne mogu pročitati na ovom TV-u</string>
     <string name="server_none_in_use_description">Nijedna veza nije u upotrebi. Odaberi jednu za ponovno gledanje TV-a.</string>
+    <string name="return_to_full_screen">Povratak na cijeli zaslon</string>
 </resources>

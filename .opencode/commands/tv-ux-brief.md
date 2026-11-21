@@ -6,7 +6,7 @@ agent: build
 Before dispatching `tv-ux-brief`, run
 `./review-provider-route.sh select eligible`. Only successful stdout `opus`
 permits its configured Opus model. Otherwise dispatch the same `tv-ux-brief`
-role with an Astra model override (`openai/gpt-6-astra#xhigh`) as documented in
+role with an Astra model override (`openai/gpt-6.2-astra#xhigh`) as documented in
 `docs/ai-engineering-harness.md`; preserve any explicit non-substitutable gate.
 Pass the design contract below to that read-only role.
 

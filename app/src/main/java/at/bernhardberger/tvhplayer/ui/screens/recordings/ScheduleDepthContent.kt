@@ -139,12 +139,7 @@ private fun rememberScheduleLevels(
                 ) { rowModifier, activate ->
                     Column {
                         if (entryIndex == 0) {
-                            if (!canModify && automatic.items.isEmpty() && sectionIndex == 0) {
-                                ArchiveLevelHeading(
-                                    stringResource(R.string.schedule_upcoming), { 1f }, null, atRoot = false)
-                            }
-                            RecordingSectionHeader(scheduleSectionLabel(section), first = sectionIndex == 0)
-                            if (sectionIndex != 0) Spacer(Modifier.height(4.dp))
+                            ArchiveDateDivider(scheduleSectionLabel(section), first = sectionIndex == 0)
                         }
                         RecordingListRow(
                             entry = entry,
@@ -165,7 +160,11 @@ private fun rememberScheduleLevels(
         levels[SCHEDULE_ROOT_LEVEL] = DepthLevel(
             id = SCHEDULE_ROOT_LEVEL,
             rows = rows,
-            heading = {},
+            heading = { emphasis ->
+                if (rows.isNotEmpty()) Column(Modifier.testTag("schedule-upcoming-heading")) {
+                    ArchiveLevelHeading(stringResource(R.string.schedule_upcoming), emphasis, null, atRoot = false)
+                }
+            },
             initialItemId = groups.firstOrNull()?.entries?.firstOrNull()?.takeIf { initial }
                 ?.let { "recording:${recordingItemKey(it.id)}" },
             emptyContent = { ModeEmptyState(R.string.recordings_schedule_empty) },

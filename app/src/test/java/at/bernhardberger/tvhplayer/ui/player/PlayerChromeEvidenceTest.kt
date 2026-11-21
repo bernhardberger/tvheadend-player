@@ -389,8 +389,10 @@ class PlayerChromeEvidenceTest {
             InfoBar(info(false), Modifier.fillMaxWidth())
         } }
         val marker = compose.onNodeWithTag("player-scheduled-marker", useUnmergedTree = true)
-            .assertWidthIsEqualTo(16.dp).assertHeightIsEqualTo(16.dp)
             .fetchSemanticsNode().boundsInRoot
+        val next = compose.onNodeWithTag("player-info-last-text", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        assertTrue(marker.left >= next.right)
+        assertEquals(next.center.y, marker.center.y, 1f)
         val bitmap = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
         compose.runOnIdle { view.draw(Canvas(bitmap)) }
         fun red(pixel: Int) = android.graphics.Color.red(pixel) > 120 &&
@@ -464,12 +466,12 @@ class PlayerChromeEvidenceTest {
             ProvideArtworkSession(session) { QuickZapPreview("Absent title", "Absent metadata", null, "21:00 Absent next", null) }
         } } }
         compose.waitForIdle()
-        // A scheduled Next carries the info bar's clock, leading its line at the text's middle; another has none.
+        // A scheduled Next carries a clock after its title; another has none.
         val marker = compose.onAllNodesWithTag("player-scheduled-marker", useUnmergedTree = true)
-            .assertCountEquals(1).onFirst().assertWidthIsEqualTo(16.dp).assertHeightIsEqualTo(16.dp)
+            .assertCountEquals(1).onFirst()
             .fetchSemanticsNode().boundsInRoot
         val scheduledNext = compose.onNodeWithText("Next • 21:00 Failed next", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        assertTrue("$marker leads $scheduledNext", marker.right <= scheduledNext.left)
+        assertTrue("$marker follows $scheduledNext", marker.left >= scheduledNext.right)
         assertEquals(scheduledNext.center.y, marker.center.y, 1f)
         compose.onNode(hasText("Next • 21:00 Failed next", substring = true) and hasContentDescription(
             ApplicationProvider.getApplicationContext<Application>().getString(at.bernhardberger.tvhplayer.R.string.player_scheduled), substring = true))

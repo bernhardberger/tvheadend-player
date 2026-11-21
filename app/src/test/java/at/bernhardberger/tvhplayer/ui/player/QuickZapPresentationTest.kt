@@ -41,12 +41,14 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
@@ -68,8 +70,12 @@ import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.EpgSnapshot
 import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.DvrSnapshot
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionObservation
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
+import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
@@ -154,6 +160,7 @@ class QuickZapPresentationTest {
         card(2).assertIsFocused()
         val playingBounds = compose.onNodeWithTag("channel-playing-indicator", useUnmergedTree = true)
             .fetchSemanticsNode().boundsInRoot
+        val cardHeight = card(2).fetchSemanticsNode().boundsInRoot.height
         compose.runOnIdle { indicator = ChannelPlaybackIndicator.PAUSED }
         assertEquals(playingBounds, compose.onNodeWithTag("channel-paused-indicator", useUnmergedTree = true)
             .fetchSemanticsNode().boundsInRoot)
@@ -177,6 +184,7 @@ class QuickZapPresentationTest {
         compose.mainClock.advanceTimeBy(96)
         assertEquals(playingBounds, compose.onNodeWithTag("channel-tuning-indicator", useUnmergedTree = true)
             .fetchSemanticsNode().boundsInRoot)
+        assertEquals(cardHeight, card(2).fetchSemanticsNode().boundsInRoot.height)
         compose.runOnIdle { indicator = ChannelPlaybackIndicator.NONE }
         compose.waitForIdle()
         compose.mainClock.advanceTimeByFrame()
@@ -291,6 +299,28 @@ class QuickZapPresentationTest {
             icon = line.picon?.let { _ -> ChannelIcon.ImageCache(ArtworkId(it.toInt())) })
     }
     private var catalog by mutableStateOf(channels)
+
+    @Test fun recordingMarkDoesNotFollowTheChannelNameFallback() {
+        val channel = channels.first()
+        val entry = DvrEntry.create(DvrEntryId(1), channelId = channel.id, eventId = EventId(1),
+            state = DvrEntryState.RECORDING)
+        val title = mutableStateOf(programme(1, 0).title)
+        val recording = ApplicationProvider.getApplicationContext<Application>().getString(R.string.recording_state_recording)
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                val event = EpgEvent.create(EventId(1), channel.id, Instant.fromEpochSeconds(0),
+                    Instant.fromEpochSeconds(3600), title = title.value)
+                QuickZapTrayPreview(channel, event, null, 1800, compact = true, nowRecording = entry)
+            }
+        }
+        compose.onNode(hasContentDescription(recording)).assertExists()
+        val badge = compose.onNodeWithTag("quick-zap-timing-mark", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val timing = compose.onNodeWithTag("quick-zap-timing", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        assertTrue(badge.right < timing.left && badge.center.y in timing.top..timing.bottom)
+        compose.runOnIdle { title.value = " " }
+        compose.onNodeWithText(channel.name.orEmpty()).assertExists()
+        compose.onNode(hasContentDescription(recording)).assertDoesNotExist()
+    }
 
     @Test fun nativeCardCornerGapIsUniformFocusedAndPressed() = cornerGeometry()
 

@@ -7,7 +7,6 @@ import at.bernhardberger.tvhplayer.settings.ChannelsLayout
 import at.bernhardberger.tvhplayer.settings.ChannelsView
 import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
-import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
@@ -36,6 +35,7 @@ import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.text.TextLayoutResult
@@ -91,6 +91,7 @@ import coil3.request.Options
 import kotlinx.coroutines.Dispatchers
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -99,7 +100,6 @@ import org.junit.experimental.categories.Category
 import at.bernhardberger.tvhplayer.testutil.VisualCapture
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.ByteArrayOutputStream
@@ -109,6 +109,7 @@ import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.time.Instant
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
+import at.bernhardberger.tvhplayer.testutil.LeanbackFeature
 
 /**
  * Standard Channels evidence: the production [ChannelsScreenContent] on the real
@@ -127,11 +128,11 @@ import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 class ChannelsListLayoutTest {
     @get:Rule val images = ImageLoaderRule { testImageLoader(ApplicationProvider.getApplicationContext<Application>()) }
     @get:Rule val compose = createComposeRule()
+    @get:Rule val leanback = LeanbackFeature()
     private lateinit var view: View
     private var videoColor by mutableStateOf(Color.White)
     private var playbackIndicator by mutableStateOf(ChannelPlaybackIndicator.PLAYING)
     private var defaultZone: TimeZone? = null
-    private var previousLeanbackFeature: Boolean? = null
 
     @Before fun pinClock() {
         defaultZone = TimeZone.getDefault()
@@ -140,18 +141,25 @@ class ChannelsListLayoutTest {
 
     @After fun restoreClock() {
         defaultZone?.let(TimeZone::setDefault)
-        previousLeanbackFeature?.let {
-            val packageManager = ApplicationProvider.getApplicationContext<Application>().packageManager
-            shadowOf(packageManager).setSystemFeature(PackageManager.FEATURE_LEANBACK, it)
-        }
     }
 
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
     fun playbackMarkerSlotAndRecordingStayStableAcrossPauseAndTune() {
         channelsShell(1f)
+        inRow(PLAYING, "channel-playing-indicator").assertExists()
         enterAndFocus(PLAYING)
         val slot = inRow(PLAYING, "channel-playing-indicator").bounds()
+        val logo = inRow(PLAYING, "channel-picon").bounds()
+        val name = inRow(PLAYING, "channel-title").bounds()
+        assertTrue("Playback mark is not on the logo", slot.left >= logo.right)
+        assertEquals(name.center.y, slot.center.y, 1f)
+        assertEquals(inRow(PLAYING, "channel-progress").bounds().right, slot.right, .5f)
+        val action = row(PLAYING).fetchSemanticsNode().config[SemanticsActions.OnClick]
+        val returnLabel = ApplicationProvider.getApplicationContext<Application>().getString(R.string.return_to_full_screen)
+        assertEquals(returnLabel, action.label)
+        assertTrue(action.action != null)
         val recording = inRow(PLAYING, "channel-recording-indicator").bounds()
+        assertEquals("The trailing status marks have equal slots", slot.width, recording.width, .5f)
         val title = inRow(PLAYING, "channel-title").bounds()
         compose.runOnIdle { playbackIndicator = ChannelPlaybackIndicator.PAUSED }
         assertEquals(slot, inRow(PLAYING, "channel-paused-indicator").bounds())
@@ -163,7 +171,9 @@ class ChannelsListLayoutTest {
         compose.mainClock.advanceTimeByFrame()
         compose.mainClock.advanceTimeBy(96)
         assertEquals(slot, inRow(PLAYING, "channel-tuning-indicator").bounds())
-        assertEquals(recording, inRow(PLAYING, "channel-recording-indicator").bounds())
+        assertNotEquals(returnLabel, row(PLAYING).fetchSemanticsNode().config[SemanticsActions.OnClick].label)
+        assertTrue(inRow(PLAYING, "channel-recording-indicator").bounds().left >
+            inRow(PLAYING, "channel-title").bounds().right)
         compose.runOnIdle { playbackIndicator = ChannelPlaybackIndicator.NONE }
         compose.waitForIdle()
         compose.mainClock.advanceTimeByFrame()
@@ -247,13 +257,12 @@ class ChannelsListLayoutTest {
         assertEquals("list column width", 364f, list.width, .5f)
         assertEquals("list runs to the screen bottom", 540f, list.bottom, .5f)
 
-        // Rows: 340dp wide at x130, first at y32 after the list's top reserve, 4dp gaps. Height is the
-        // library's standard two-line minimum and grows with text scale rather than clipping.
+        // Rows: 340dp wide at x130, starting alongside the picture, with 4dp gaps.
+        // Height is the library's two-line minimum and grows with text scale rather than clipping.
         val first = row(1).bounds()
         val second = row(2).bounds()
         assertEquals("row x", 130f, first.left, .5f)
-        assertEquals("row y", 32f, first.top, .5f)
-        assertTrue("seven rows show in full", row(7).bounds().bottom <= list.bottom)
+        assertEquals("the first row starts alongside the picture", detail("channels-list-art").bounds().top, first.top, .5f)
         assertEquals("row width", 340f, first.width, .5f)
         assertTrue("row respects the library standard minimum (${first.height})", first.height >= 64f)
         assertEquals("row stride", first.height + 4f, second.top - first.top, .5f)
@@ -276,19 +285,16 @@ class ChannelsListLayoutTest {
         assertEquals("progress 3dp under the programme line", subtitle.bottom + 3f, progress.top, .5f)
         assertTrue("programme line under the title", subtitle.top >= title.bottom - .5f)
 
-        // Markers sit beside the title and appear only when they apply, so the
+        // The recording dot sits beside the title, so the
         // programme line and progress keep one width on every row.
         val playing = inRow(PLAYING, "channel-playing-indicator").bounds()
         val recording = inRow(PLAYING, "channel-recording-indicator").bounds()
-        assertTrue("markers inside the row", recording.right <= row(PLAYING).bounds().right - 16f + .5f)
-        assertTrue("markers beside the headline", playing.center.y in inRow(PLAYING, "channel-title").bounds().top..inRow(PLAYING, "channel-title").bounds().bottom)
-        assertTrue("playing marker precedes the recording dot", playing.right <= recording.left + .5f)
+        val markedTitle = inRow(PLAYING, "channel-title").bounds()
+        assertTrue("the channel recording dot comes before playback", recording.right < playing.left)
+        assertEquals("playback and progress share the end keyline", progress.right, playing.right, .5f)
+        assertEquals(markedTitle.center.y, recording.center.y, .5f)
+        assertTrue("the recording dot follows the name", markedTitle.right <= recording.left + .5f)
         assertEquals(progress.width, inRow(PLAYING, "channel-progress").bounds().width, .5f)
-        val plainTitle = inRow(1, "channel-title").bounds()
-        assertTrue(
-            "a status marker shortens only the title line",
-            inRow(PLAYING, "channel-title").bounds().right < plainTitle.right,
-        )
 
         // The focused row keeps the library's own focus scale, uncancelled, and the
         // list reserves it horizontally instead of clipping.
@@ -305,7 +311,6 @@ class ChannelsListLayoutTest {
         // The preview pane runs beside the rows, 92dp after them, and its headline rests on the safe inset.
         val details = compose.onNodeWithTag("channels-details").bounds()
         assertEquals("details x", 562f, details.left, .5f)
-        assertEquals("details stay below the header", 76f, details.top, .5f)
         assertEquals("details width", 340f, details.width, .5f)
         assertEquals("visual gap", 92f, details.left - first.right, .5f)
         assertEquals("details bottom inset", 512f, details.bottom, .5f)
@@ -369,6 +374,7 @@ class ChannelsListLayoutTest {
     @Test
     @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
     fun focusedRowStaysAboveTheFadeWhileLaterRowsRunOutBeneathIt() {
+        leanback.enable()
         channelsShell(1f)
         enterAndFocus(PLAYING)
 
@@ -380,8 +386,9 @@ class ChannelsListLayoutTest {
         repeat(CHANNEL_COUNT) { compose.pressKey(Key.DirectionDown) }
         row(CHANNEL_COUNT).assertIsFocused()
         val last = row(CHANNEL_COUNT).bounds()
-        assertTrue("focused last row bottom ${last.bottom} must clear the fade with 8dp room", last.bottom <= 540f - ListBottomReserve.value + 2f)
-        assertEquals("list still runs to the bottom", 540f, compose.onNodeWithTag("channels-list").bounds().bottom, .5f)
+        val viewport = detail("channels-list").bounds()
+        assertEquals("last row leaves only the existing end padding", ListBottomReserve.value, viewport.bottom - last.bottom, 2f)
+        assertEquals("list still runs to the bottom", 540f, viewport.bottom, .5f)
     }
 
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
@@ -397,9 +404,7 @@ class ChannelsListLayoutTest {
     fun enlargedNativeTvPivotSettlesAcrossTheTopFadeBoundaryAndRestoration() = checkNativeTvPivot(1.3f)
 
     private fun checkNativeTvPivot(fontScale: Float) {
-        val packageManager = ApplicationProvider.getApplicationContext<Application>().packageManager
-        previousLeanbackFeature = packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
-        shadowOf(packageManager).setSystemFeature(PackageManager.FEATURE_LEANBACK, true)
+        leanback.enable()
         // Never auto-wait for an animation that the regression could keep alive forever.
         compose.mainClock.autoAdvance = false
         channelsShell(fontScale)
@@ -426,15 +431,14 @@ class ChannelsListLayoutTest {
         assertSettled(1)
         move(Key.DirectionDown)
         assertSettled(2)
+        assertEquals("moving within the boundary hold leaves the first row in place", originalFirst, row(1).bounds())
         move(Key.DirectionDown)
-        assertSettled(3) // At font scale 1.0 the third row is inside the former oscillation window.
-        if (fontScale == 1f) {
-            assertEquals("small pivot request does not leave the boundary", originalFirst, row(1).bounds())
-        }
+        assertSettled(3)
 
         move(Key.DirectionDown)
         val scrolledPosition = assertSettled(4)
-        assertTrue("genuine forward focus scroll still moves the list", scrolledPosition.top < originalFirst.top + 3 * (rowHeight + 4f))
+        val viewport = detail("channels-list").bounds()
+        assertEquals("scrolled focus uses the whole viewport", viewport.top + .3f * viewport.height, scrolledPosition.top, 2f)
         assertFocusedShapePixels(4, rowHeight, scrolled = true)
         move(Key.DirectionLeft)
         compose.onNodeWithTag("nav-channels").assertIsFocused()
@@ -457,6 +461,7 @@ class ChannelsListLayoutTest {
     }
 
     private fun checkTopFadeScroll(fontScale: Float) {
+        leanback.enable()
         channelsShell(fontScale)
         val rowHeight = row(1).bounds().height
         val noEpgRowHeight = row(NO_EPG).bounds().height
@@ -468,8 +473,6 @@ class ChannelsListLayoutTest {
         assertFocusedShapePixels(1, rowHeight, scrolled = false)
         capture("en-font$fontScale-top-fade-initial-bright-video")
 
-        // The list column reaching up beside the header settles the down walk with the topmost
-        // logos just clear of the fade at both scales, so the Up walk below proves it.
         val downTarget = if (fontScale == 1f) 8 else 12
         repeat(downTarget - 1) { compose.pressKey(Key.DirectionDown) }
         row(downTarget).assertIsFocused()
@@ -484,14 +487,15 @@ class ChannelsListLayoutTest {
         )
         capture("en-font$fontScale-top-fade-down-scrolled-bright-video")
 
+        val fadeTarget = topFadeFocusTarget(fontScale)
         repeat(CHANNEL_COUNT - downTarget) { compose.pressKey(Key.DirectionDown) }
-        repeat(CHANNEL_COUNT - 8) { compose.pressKey(Key.DirectionUp) }
-        row(8).assertIsFocused()
-        assertFocusedShapePixels(8, rowHeight, scrolled = true)
-        assertTopFadePixels(7)
+        repeat(CHANNEL_COUNT - fadeTarget) { compose.pressKey(Key.DirectionUp) }
+        row(fadeTarget).assertIsFocused()
+        assertFocusedShapePixels(fadeTarget, rowHeight, scrolled = true)
+        assertTopFadePixels(7, initial)
         capture("en-font$fontScale-top-fade-up-scrolled-bright-video")
 
-        for (channel in 7 downTo 1) {
+        for (channel in fadeTarget - 1 downTo 1) {
             compose.pressKey(Key.DirectionUp)
             row(channel).assertIsFocused()
             assertFocusedShapePixels(channel, if (channel == NO_EPG) noEpgRowHeight else rowHeight, scrolled = channel != 1)
@@ -499,7 +503,7 @@ class ChannelsListLayoutTest {
         assertEquals("top return restores the original first-row position", firstPosition, row(1).bounds())
         val returned = drawShell()
         val list = detail("channels-list").bounds()
-        val band = Rect(list.left, list.top, list.right, detail("channels-list-column").bounds().top + 48f)
+        val band = Rect(list.left, list.top, list.right, list.top + ListBottomFadeHeight.value)
         assertSamePixels(initial, returned, band)
         compose.mainClock.advanceTimeBy(500)
         compose.waitForIdle()
@@ -517,6 +521,7 @@ class ChannelsListLayoutTest {
     fun enlargedTopFadeKeepsPlayerReturnScopeAndDrawerRestorationClear() = checkTopFadeRestoration(1.3f)
 
     private fun checkTopFadeRestoration(fontScale: Float) {
+        leanback.enable()
         channelsShell(
             fontScale,
             playerReturn = PlayerReturnFocus(ChannelId(CHANNEL_COUNT.toLong()), ChannelId(1)),
@@ -525,22 +530,23 @@ class ChannelsListLayoutTest {
         // A non-focused neighbor gives the native unscaled height after offscreen restoration.
         val rowHeight = row(CHANNEL_COUNT - 1).bounds().height
         assertFocusedShapePixels(CHANNEL_COUNT, rowHeight, scrolled = true)
-        repeat(CHANNEL_COUNT - 8) { compose.pressKey(Key.DirectionUp) }
-        row(8).assertIsFocused()
-        assertFocusedShapePixels(8, rowHeight, scrolled = true)
+        val fadeTarget = topFadeFocusTarget(fontScale)
+        repeat(CHANNEL_COUNT - fadeTarget) { compose.pressKey(Key.DirectionUp) }
+        row(fadeTarget).assertIsFocused()
+        assertFocusedShapePixels(fadeTarget, rowHeight, scrolled = true)
         assertTopFadePixels(7)
-        val position = row(8).bounds()
+        val position = row(fadeTarget).bounds()
 
         compose.pressKey(Key.DirectionLeft)
         compose.onNodeWithTag("nav-channels").assertIsFocused()
         compose.pressKey(Key.DirectionRight)
-        row(8).assertIsFocused()
-        assertEquals("drawer re-entry preserves the scrolled anchor", position, row(8).bounds())
-        assertFocusedShapePixels(8, rowHeight, scrolled = true)
+        row(fadeTarget).assertIsFocused()
+        assertEquals("drawer re-entry preserves the scrolled anchor", position, row(fadeTarget).bounds())
+        assertFocusedShapePixels(fadeTarget, rowHeight, scrolled = true)
 
         compose.pressKey(Key.ChannelDown)
         val pageDownChannel = requireNotNull(selected).value.toInt()
-        assertTrue("Channel Down still pages forward", pageDownChannel > 8)
+        assertTrue("Channel Down still pages forward", pageDownChannel > fadeTarget)
         assertFocusedShapePixels(pageDownChannel, rowHeight, scrolled = true)
         compose.pressKey(Key.ChannelUp)
         val pageUpChannel = requireNotNull(selected).value.toInt()
@@ -556,7 +562,7 @@ class ChannelsListLayoutTest {
         compose.waitForIdle()
         row(7).assertIsFocused()
         assertFocusedShapePixels(7, rowHeight, scrolled = false)
-        assertEquals("new scope's first row keeps the original top reserve", detail("channels-list-column").bounds().top + 4f, row(7).bounds().top, .5f)
+        assertEquals("new scope's first row starts alongside the picture", detail("channels-list-art").bounds().top, row(7).bounds().top, .5f)
         // A change while the rail has focus only previews the group's anchor.
         compose.pressKey(Key.DirectionLeft)
         compose.onNodeWithTag("nav-channels").assertIsFocused()
@@ -566,7 +572,7 @@ class ChannelsListLayoutTest {
         // A short scope may clamp at its bottom before the anchor reaches the inset.
         assertTrue(
             "scope preview clears the destination's fade even when leaving the top boundary",
-            previewTop >= detail("channels-list-column").bounds().top + 56f,
+            previewTop >= detail("channels-list").bounds().top + with(compose.density) { ListBottomFadeHeight.toPx() },
         )
         compose.pressKey(Key.DirectionRight)
         row(PLAYING).assertIsFocused()
@@ -598,7 +604,8 @@ class ChannelsListLayoutTest {
         }
         assertEquals("complete native 1.05 pill width", 340f * 1.05f, (right - left + 1).toFloat(), 2f)
         assertEquals("complete native 1.05 pill height", rowHeight * 1.05f, (bottom - top + 1).toFloat(), 2f)
-        assertTrue("opaque focus top $top must clear the top fade", top >= list.top + if (scrolled) 48f else 0f)
+        assertTrue("opaque focus top $top must clear the top fade",
+            top >= list.top + if (scrolled) ListBottomFadeHeight.value else 0f)
         assertTrue("opaque focus bottom $bottom must clear the bottom fade", bottom < list.bottom - ListBottomFadeHeight.value)
         // The straight upper/lower edges must retain the exact native fill, not a dimmed cap.
         for (y in top..bottom) {
@@ -608,22 +615,32 @@ class ChannelsListLayoutTest {
         }
     }
 
+    // The platform pivot puts row 7's 5:3 logo inside the fade at these focus positions.
+    private fun topFadeFocusTarget(fontScale: Float): Int = if (fontScale == 1f) 10 else 9
+
     /**
      * The fixture's 5:3 picon has a uniform bright right-hand stripe through the fade; fitted 4dp
      * inside its 72x40 tile, the logo spans 53x32 in the tile's middle.
      */
-    private fun assertTopFadePixels(channel: Int) {
+    private fun assertTopFadePixels(channel: Int, unfadedBackdrop: Bitmap? = null) {
         val list = detail("channels-list").bounds()
-        val picon = inRow(channel, "channel-picon").bounds()
-        val x = (picon.right - 14f).toInt()
-        val firstY = ceil(maxOf(list.top + 2f, picon.top + 6f)).toInt()
-        val lastY = floor(minOf(list.top + 46f, picon.bottom - 7f)).toInt()
+        val picon = inRow(channel, "channel-picon").getUnclippedBoundsInRoot()
+        val x = (picon.right.value - 14f).toInt()
+        val firstY = ceil(maxOf(list.top + 2f, picon.top.value + 6f)).toInt()
+        val lastY = floor(minOf(list.top + ListBottomFadeHeight.value - 2f, picon.bottom.value - 7f)).toInt()
         assertTrue("picon $channel crosses the top fade: $picon / $list", lastY > firstY)
         val bitmap = drawShell()
         val first = android.graphics.Color.red(bitmap.getPixel(x, firstY))
         val last = android.graphics.Color.red(bitmap.getPixel(x, lastY))
         assertTrue("top fade attenuates real picon pixels ($first, $last), not only a flag", last < 228)
         assertTrue("top fade reveals more of the picon downward ($first -> $last)", last > first + (lastY - firstY))
+        if (unfadedBackdrop != null) {
+            val backdrop = android.graphics.Color.red(unfadedBackdrop.getPixel(x, lastY))
+            val alpha = (lastY + .5f - list.top) / ListBottomFadeHeight.value
+            // The picon's solid stripe is #E8F1F5. The top uses the bottom's linear fade length.
+            assertEquals("top fade has the same length and linear ramp as the bottom fade",
+                backdrop + (0xE8 - backdrop) * alpha, last.toFloat(), 4f)
+        }
     }
 
     private fun assertSamePixels(before: Bitmap, after: Bitmap, bounds: Rect) {
@@ -643,7 +660,6 @@ class ChannelsListLayoutTest {
         assertTrue("Tags keeps its whole label", label.left >= group.left && label.right <= group.right)
         assertTrue("Tags stays inside the header", group.top >= header().bounds().top - .5f && group.bottom <= header().bounds().bottom + .5f)
         assertTrue("rows stay beside the enlarged header's buttons", row(1).bounds().right <= group.left)
-        enterAndFocus(PLAYING)
 
         val first = row(1).bounds()
         val second = row(2).bounds()
@@ -658,11 +674,11 @@ class ChannelsListLayoutTest {
     }
 
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
-    fun enlargedLongProgrammeKeepsWholeLinesUnderThePicture() {
+    fun enlargedLongProgrammeMakesRoomForNextInsteadOfClippingSynopsis() {
         channelsShell(1.3f)
         enterAndFocus(LONG_TEXT)
-        // The picture keeps its size; the synopsis gives up lines rather than cutting one.
-        assertDescriptionFits(1)
+        detail("channels-immersive-synopsis").assertDoesNotExist()
+        assertTrue("Next stays above the safe bottom", detail("channels-immersive-next").bounds().bottom <= 512.5f)
     }
 
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
@@ -674,12 +690,13 @@ class ChannelsListLayoutTest {
     private fun checkDetailAnchors(fontScale: Float) {
         channelsShell(fontScale)
         enterAndFocus(1)
+        val pictureTop = row(1).bounds().top
         for (channel in 1..NO_EPG) {
             if (channel > 1) compose.pressKey(Key.DirectionDown)
             row(channel).assertIsFocused()
-            if (channel == 1 && fontScale == 1f) assertDescriptionFits(3)
+            if (channel == 1 && fontScale == 1f) assertDescriptionFits()
             val picture = detail("channels-list-art").bounds()
-            assertEquals("the picture keeps the pane's top", 80f, picture.top, .5f)
+            assertEquals("the picture stays on the resting line", pictureTop, picture.top, .5f)
             assertEquals("the kit's four-column card", 268f, picture.width, .5f)
             assertEquals("at 16:9", 150.75f, picture.height, .5f)
             assertEquals("the headline hangs from the picture", picture.bottom + 20f, headlineChannel().bounds().top, .5f)
@@ -695,14 +712,14 @@ class ChannelsListLayoutTest {
         }
     }
 
-    private fun assertDescriptionFits(expectedLines: Int) {
+    private fun assertDescriptionFits() {
         val description = detail("channels-immersive-synopsis")
         val subtitle = detail("channels-immersive-subtitle").bounds()
         val time = detail("channels-immersive-metadata").bounds()
         val next = detail("channels-immersive-next").bounds()
         val layout = description.textLayout()
-        assertEquals("actual rendered synopsis lines", expectedLines, layout.lineCount)
-        assertTrue("last line remains inside the measured text", layout.getLineBottom(expectedLines - 1) <= description.bounds().height + .5f)
+        assertTrue("last line remains inside the measured text",
+            layout.getLineBottom(layout.lineCount - 1) <= description.bounds().height + .5f)
         assertTrue("next programme is below the description", next.top >= description.bounds().bottom + 19f)
         assertTrue("description below the programme's time", description.bounds().top >= time.bottom + 19f)
         assertTrue("time below the supplied subtitle", time.top >= subtitle.bottom + 7f)
@@ -722,6 +739,7 @@ class ChannelsListLayoutTest {
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi") fun captureEnglishNormal() = captureSet()
 
     private fun captureSet() {
+        leanback.enable()
         channelsShell(1f)
         val prefix = "en-font1.0"
         row(1).assertIsFocused()
@@ -736,16 +754,27 @@ class ChannelsListLayoutTest {
 
         compose.pressKey(Key.DirectionDown)
         row(LONG_TEXT).assertIsFocused()
-        // The long programme keeps three whole synopsis lines.
-        assertDescriptionFits(3)
+        assertDescriptionFits()
         captureBackgrounds("$prefix-long-programme")
 
         compose.pressKey(Key.DirectionDown)
         row(NO_EPG).assertIsFocused()
         captureBackgrounds("$prefix-missing-epg")
 
+        repeat(3) { compose.pressKey(Key.DirectionDown) }
+        row(8).assertIsFocused()
+        val viewport = detail("channels-list").bounds()
+        val focusedTop = row(8).bounds().top
+        val previousTitle = inRow(7, "channel-title").bounds()
+        assertEquals("scrolled focus uses the whole viewport", viewport.top + .3f * viewport.height, focusedTop, 2f)
+        capture("$prefix-scrolled-bright-video",
+            "pivotDp: viewportTop=${viewport.top}; viewportHeight=${viewport.height}; focusedTop=$focusedTop; " +
+                "previousTitle=${previousTitle.top}..${previousTitle.bottom}; fadeEnd=${viewport.top + ListBottomFadeHeight.value}")
+
         repeat(CHANNEL_COUNT) { compose.pressKey(Key.DirectionDown) }
         row(CHANNEL_COUNT).assertIsFocused()
+        assertEquals("last row leaves only the existing end padding", ListBottomReserve.value,
+            viewport.bottom - row(CHANNEL_COUNT).bounds().bottom, 2f)
         captureBackgrounds("$prefix-bottom-row-focused")
 
         compose.pressKey(Key.DirectionLeft)
@@ -776,7 +805,7 @@ class ChannelsListLayoutTest {
         val observation = observation()
         compose.setContent {
             CompositionLocalProvider(LocalDensity provides Density(1f, fontScale)) {
-                if (previousLeanbackFeature != null) {
+                if (leanback.isEnabled) {
                     assertEquals("Foundation's real leanback pivot is active", 15.2f,
                         LocalBringIntoViewSpec.current.calculateScrollDistance(140f, 64f, 416f), .001f)
                 }
@@ -1001,15 +1030,8 @@ class ChannelsListLayoutTest {
     private fun title(n: Int) = channelTitleText(n.toLong(), name(n))
 
     /** Unmerged descendant [tag] of channel row [n]; rows merge their semantics. */
-    private fun inRow(n: Int, tag: String): SemanticsNodeInteraction {
-        val rowBounds = row(n).bounds()
-        val all = compose.onAllNodesWithTag(tag, useUnmergedTree = true)
-        val indices = all.fetchSemanticsNodes().withIndex()
-            .filter { it.value.boundsInRoot.center.y in rowBounds.top..rowBounds.bottom }
-            .map { it.index }
-        check(indices.size == 1) { "expected one '$tag' in row $n, found ${indices.size}" }
-        return all[indices.single()]
-    }
+    private fun inRow(n: Int, tag: String): SemanticsNodeInteraction =
+        compose.onNode(hasTestTag(tag) and hasAnyAncestor(hasTestTag("channel-row-$n")), useUnmergedTree = true)
 
     private fun SemanticsNodeInteraction.bounds(): Rect = fetchSemanticsNode().boundsInRoot
 
@@ -1028,7 +1050,7 @@ class ChannelsListLayoutTest {
         return bitmap
     }
 
-    private fun capture(name: String) {
+    private fun capture(name: String, pivot: String? = null) {
         val bitmap = drawShell()
         compose.waitForIdle()
         assertTrue("$name was captured mid-animation", bitmap.sameAs(drawShell()))
@@ -1038,17 +1060,21 @@ class ChannelsListLayoutTest {
         val next = compose.onAllNodesWithTag("channels-immersive-next", useUnmergedTree = true).fetchSemanticsNodes().singleOrNull()
         val synopsisLines = if (compose.onAllNodesWithTag("channels-immersive-synopsis", useUnmergedTree = true).fetchSemanticsNodes().isEmpty()) 0 else
             detail("channels-immersive-synopsis").textLayout().lineCount
+        val restingRows = if ("entry-first-row-focused" in name) {
+            "row1LayoutTop=${row(1).getUnclippedBoundsInRoot().top.value}; row7VisibleHeight=${row(7).bounds().height}; "
+        } else ""
         val sidecar = (
             "canvas=960x540 logical; pixels=${bitmap.width}x${bitmap.height}; density=1.0; " +
                 "locale=${name.substringBefore("-font")}; fontScale=${name.substringAfter("-font").substringBefore("-")}; " +
                 "focus/scenario=${name.substringAfter("-font").substringAfter("-").removeSuffix("-bright-video").removeSuffix("-dark-video")}; " +
                 "background=${if (name.endsWith("bright-video")) "white #FFFFFF" else "dark #182330"}; " +
                 "picture=${picture?.boundsInRoot ?: "absent"}; headlineTop=${headlineChannel().bounds().top}; " +
+                restingRows +
                 "nextBottom=${next?.boundsInRoot?.bottom ?: "absent"}; synopsisLines=$synopsisLines; " +
                 "production=MainStartupComposition+SideRail+ChannelsScreenContent; " +
                 "synthetic video; static offline composition only\n"
             )
-        CaptureOutput.writeText(File(directory, "$name.txt")) { sidecar }
+        CaptureOutput.writeText(File(directory, "$name.txt")) { sidecar + (pivot?.let { "$it\n" } ?: "") }
     }
 
     private companion object {

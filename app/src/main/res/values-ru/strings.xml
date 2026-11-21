@@ -961,6 +961,7 @@
     <string name="rail_now_playing_description">Сейчас воспроизводится: %1$s, %2$s, %3$s.</string>
     <string name="rail_now_playing_description_channel">Сейчас воспроизводится: %1$s, %2$s.</string>
     <string name="player_recording">Идёт запись</string>
+    <string name="channel_recording_spoken">На этом канале идёт запись</string>
     <string name="player_recorded_on">Записано %1$s</string>
     <string name="player_recorded_ends">Записано %1$s • Конец %2$s</string>
     <string name="player_recording_until">Запись до %1$s</string>
@@ -976,9 +977,6 @@
     <string name="player_recorded_spoken">%1$s, записано %2$s, %3$s</string>
     <string name="player_channel">Канал</string>
     <string name="player_row_recent">Недавние каналы</string>
-    <string name="player_channel_card_hint">Влево или вправо — смена канала, OK — недавние каналы</string>
-    <string name="player_identity_info_hint">OK — сведения о передаче</string>
-    <string name="player_channel_card_hint_no_recents">Влево или вправо — смена канала</string>
     <string name="player_rail_watching">Просмотр</string>
     <string name="details_read_more">Подробнее</string>
     <string name="details_important_information">Сведения</string>
@@ -1194,8 +1192,6 @@
     <string name="home_recording_starts_at">Начало в %1$s</string>
     <string name="home_all_recordings">Все записи</string>
     <string name="home_activity_watching_live">Просмотр прямого эфира</string>
-    <string name="home_activity_recording">Идёт запись</string>
-    <string name="home_activity_watching_and_recording">Просмотр и запись</string>
     <string name="home_upcoming_summary">Далее: %1$s • %2$s</string>
     <plurals name="home_upcoming_more">
         <item quantity="one">Ещё %1$d запланированная запись</item>
@@ -1255,4 +1251,5 @@
     <string name="server_none_in_use">Нет используемого подключения</string>
     <string name="server_list_unavailable">Сейчас не удаётся прочитать сохранённые подключения на этом телевизоре</string>
     <string name="server_none_in_use_description">Ни одно подключение не используется. Выберите подключение, чтобы снова смотреть ТВ.</string>
+    <string name="return_to_full_screen">Вернуться в полноэкранный режим</string>
 </resources>

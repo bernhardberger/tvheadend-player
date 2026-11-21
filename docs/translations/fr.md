@@ -61,7 +61,7 @@ Reconciled to frozen source `6d80a8ff` for 0.3.0 by GPT-6.1 Sol (medium), retain
 
 - Check TTS pronunciation of `player_scrub_*` speed multipliers.
 
-- *Mode téléviseur* and the retained English key labels in `player_channel_card_hint` need review.
+- *Mode téléviseur* (`settings_appliance`) needs review.
 - `guide_time_prime_time` (24 characters) exceeds the old soft limit; fit unchecked.
 - Skipping one episode or recording uses *Ignorer* (`context_skip_*`), playback skips use *Passer*; check that the split reads as intended.
 - `schedule_automatic_keep` puts the Keep until heading before its value, which reads awkwardly with the Forever value (*Conserver jusqu’à : Pour toujours*); check for a label that fits every value.

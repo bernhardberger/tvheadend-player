@@ -15,6 +15,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.ui.components.ScheduledIndicator
+import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
+import at.bernhardberger.tvhplayer.ui.components.RecordingBadge
+import at.bernhardberger.tvhplayer.ui.components.recordingStatusSpoken
+import at.bernhardberger.tvhplayer.ui.components.rule
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.ui.components.LocalArtworkContext
@@ -24,6 +28,7 @@ import at.bernhardberger.tvhplayer.ui.TvTextSecondaryAlpha
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.programmeArtworkModel
 import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import coil3.compose.AsyncImage
 import at.bernhardberger.tvhplayer.ui.components.rememberProgrammeImageRequest
 
@@ -41,8 +46,10 @@ fun QuickZapPreview(
     image: ChannelIcon?,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
-    /** A recording is scheduled for Next; its line leads with the info bar's clock. */
+    /** A recording is scheduled for Next; its title is followed by the info bar's clock. */
     nextScheduled: Boolean = false,
+    nextRecording: DvrEntry? = null,
+    nowRecording: DvrEntry? = null,
 ) {
     val artwork = image
     val currentSession = LocalArtworkContext.current.currentSession
@@ -59,10 +66,17 @@ fun QuickZapPreview(
         verticalAlignment = Alignment.Bottom,
     ) {
         Column(Modifier.weight(1f)) {
-            Text(metadata, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis, color = tertiary)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (nowRecording != null) RecordingBadge(nowRecording.state,
+                    Modifier.testTag("quick-zap-timing-mark"), compact = true, rule = nowRecording.rule,
+                    recordingDescription = recordingStatusSpoken(nowRecording.state, nowRecording.rule))
+                Text(metadata, Modifier.weight(1f, fill = false).testTag("quick-zap-timing"),
+                    style = MaterialTheme.typography.labelLarge, maxLines = 1,
+                    overflow = TextOverflow.Ellipsis, color = tertiary)
+            }
             Spacer(Modifier.height(4.dp))
-            Text(title, style = MaterialTheme.typography.headlineMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                color = MaterialTheme.colorScheme.onSurface)
+            Text(title, style = MaterialTheme.typography.headlineMedium, maxLines = 1,
+                overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurface)
             // A sports title says which event; its subtitle says which session.
             subtitle?.let {
                 Spacer(Modifier.height(2.dp))
@@ -76,11 +90,16 @@ fun QuickZapPreview(
                 Spacer(Modifier.height(PreviewNextGap))
                 Row(verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(stringResource(R.string.player_next, it), Modifier.weight(1f, fill = false),
+                        style = MaterialTheme.typography.labelLarge, maxLines = 1,
+                        overflow = TextOverflow.Ellipsis, color = tertiary)
                     // As the info bar's Next line: centred on the text without adding to its height.
-                    if (nextScheduled) ScheduledIndicator(Modifier.noHeight().testTag("player-scheduled-marker"),
-                        tint = tertiary, contentDescription = stringResource(R.string.player_scheduled))
-                    Text(stringResource(R.string.player_next, it), style = MaterialTheme.typography.labelLarge,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis, color = tertiary)
+                    if (nextRecording != null) RecordingStatusIndicator(
+                        nextRecording.state, Modifier.noHeight(), rule = nextRecording.rule,
+                        textStyle = MaterialTheme.typography.labelLarge)
+                    else if (nextScheduled) ScheduledIndicator(Modifier.noHeight().testTag("player-scheduled-marker"),
+                        tint = tertiary, contentDescription = stringResource(R.string.player_scheduled),
+                        textStyle = MaterialTheme.typography.labelLarge)
                 }
             }
         }

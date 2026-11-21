@@ -122,7 +122,10 @@ import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
 import at.bernhardberger.tvhplayer.ui.components.channelTitleNumber
 import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
-import at.bernhardberger.tvhplayer.ui.components.StatusIconSize
+import at.bernhardberger.tvhplayer.ui.components.recordingMarkSize
+import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
+import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackMarker
+import at.bernhardberger.tvhplayer.ui.components.liveViewerPosition
 import at.bernhardberger.tvhplayer.ui.screens.formatDateTime
 import at.bernhardberger.tvhplayer.ui.screens.guideEmptyMessageRes
 
@@ -322,8 +325,15 @@ internal fun TimelineChannelRow(
     genre: ProgrammeCategory = ProgrammeCategory.ALL,
     genreColors: Boolean = true,
     coverage: EpgCoverage? = null,
+    channelPlayback: ChannelPlaybackIndicator = ChannelPlaybackIndicator.NONE,
 ) {
     val nowSec = nowSecProvider()
+    // The row already reads the clock. Resolve once and give only the matching cell an indicator.
+    val viewerPosition = if (channelPlayback != ChannelPlaybackIndicator.NONE) liveViewerPosition(channel.id) else null
+    val viewerTime = if (viewerPosition == null) nowSec else viewerPosition.epochSec
+    val playingEventId = viewerTime?.takeIf { channelPlayback != ChannelPlaybackIndicator.NONE }?.let { at ->
+        events.firstOrNull { at >= it.start.epochSeconds && at < it.stop.epochSeconds }?.id
+    }
     // One state for the row's cells outside the chosen genre.
     val outsideGenre = if (genre == ProgrammeCategory.ALL) null else {
         stringResource(R.string.epg_cell_not_genre, programmeCategoryLabel(genre))
@@ -419,6 +429,7 @@ internal fun TimelineChannelRow(
                         genreColors = genreColors,
                         outsideGenre = outsideGenre,
                         contentStartInset = contentInset,
+                        playback = if (event.id == playingEventId) channelPlayback else ChannelPlaybackIndicator.NONE,
                         modifier = Modifier
                             .align(AbsoluteAlignment.TopLeft)
                             .absoluteOffset(x = start)
@@ -468,6 +479,8 @@ internal fun TimelineChannelHeader(
     val currentSession = LocalArtworkContext.current.currentSession
     var logoFailed by remember(channel.icon, currentSession) { mutableStateOf(false) }
     val titleNumber = channelTitleNumber(number, channel.name.orEmpty())
+    val showLogo = channel.icon != null && !logoFailed &&
+        (currentSession != null || channel.icon is ChannelIcon.RemoteUrl)
     Surface(
         modifier = Modifier
             .width(LocalGuideChannelWidth.current)
@@ -502,7 +515,7 @@ internal fun TimelineChannelHeader(
                     maxLines = 1,
                 )
             }
-            if (channel.icon != null && (currentSession != null || channel.icon is ChannelIcon.RemoteUrl) && !logoFailed) {
+            if (showLogo) {
                 PiconBox(
                     piconPath = channel.icon,
                     modifier = Modifier
@@ -513,25 +526,30 @@ internal fun TimelineChannelHeader(
                     onError = { logoFailed = true },
                 )
             } else {
-                Text(
-                    text = channel.name.orEmpty(),
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
+                GuideChannelName(channel.name.orEmpty(), Modifier.weight(1f))
             }
         }
     }
 }
 
+@Composable
+private fun GuideChannelName(name: String, modifier: Modifier) {
+    Text(
+        text = name,
+        style = MaterialTheme.typography.titleSmall,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = modifier,
+    )
+}
+
 /**
- * A title-line mark after a gap, always at [StatusIconSize]: a cell too narrow for it leaves it
+ * A title-line mark after a gap: a cell too narrow for it leaves it
  * out rather than shrinking it beside full-size marks in wider cells.
  */
-private fun Modifier.markAtFullSizeOrNone(): Modifier = layout { measurable, constraints ->
+private fun Modifier.markAtFullSizeOrNone(markSize: Dp): Modifier = layout { measurable, constraints ->
     val gap = TvSpacing4.roundToPx()
-    val size = StatusIconSize.roundToPx()
+    val size = markSize.roundToPx()
     if (constraints.maxWidth < gap + size || constraints.maxHeight < size) {
         layout(0, 0) {}
     } else {
@@ -560,6 +578,7 @@ internal fun TimelineProgrammeCell(
     outsideGenre: String? = null,
     /** How far the cell runs under the channel column's edge; its content starts past that. */
     contentStartInset: Dp = 0.dp,
+    playback: ChannelPlaybackIndicator = ChannelPlaybackIndicator.NONE,
 ) {
     val contextMenu = at.bernhardberger.tvhplayer.ui.components.rememberBrowseContextMenuTrigger(onOpenContextMenu)
     val stateText = when {
@@ -595,6 +614,8 @@ internal fun TimelineProgrammeCell(
     val outsideState = outsideGenre?.takeIf { outside }
     val contentAlpha = if (dimmed) Modifier.alpha(GuideOutsideGenreAlpha) else Modifier
 
+    val titleStyle = MaterialTheme.typography.titleSmall
+    val markSize = recordingMarkSize(titleStyle)
     val markState = recording?.state?.takeIf {
         recordingIsRunning(recording) || it == DvrEntryState.SCHEDULED || it == DvrEntryState.COMPLETED
     }
@@ -619,15 +640,17 @@ internal fun TimelineProgrammeCell(
                     text = event.title.orEmpty(),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.titleSmall,
+                    style = titleStyle,
                     modifier = Modifier.weight(1f, fill = false),
                 )
+                ChannelPlaybackMarker(playback, Modifier.markAtFullSizeOrNone(markSize), size = markSize)
                 // Focus keeps the cell's dark fill, so both marks keep their unfocused colors.
                 if (markState != null) {
                     RecordingStatusIndicator(
                         state = markState,
                         rule = recording?.rule,
-                        modifier = Modifier.markAtFullSizeOrNone().testTag("guide-cell-recording-mark"),
+                        modifier = Modifier.markAtFullSizeOrNone(markSize).testTag("guide-cell-recording-mark"),
+                        textStyle = titleStyle,
                     )
                 }
                 if (failed != null) {
@@ -635,7 +658,8 @@ internal fun TimelineProgrammeCell(
                         painter = painterResource(R.drawable.ic_error_outlined),
                         // The dot of a running recording already names its errors.
                         contentDescription = stringResource(failed).takeIf { markState == null },
-                        modifier = Modifier.markAtFullSizeOrNone().size(StatusIconSize).testTag("guide-cell-failed-mark"),
+                        modifier = Modifier.markAtFullSizeOrNone(markSize)
+                            .size(markSize).testTag("guide-cell-failed-mark"),
                         tint = MaterialTheme.colorScheme.error,
                     )
                 }

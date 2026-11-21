@@ -88,6 +88,36 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi")
 class LivePlayerChromePlaybackTest : LivePlayerChromeFixture() {
+    @Test fun liveBannerAnnouncesNextProgrammeRecordingDuringPrePadding() = timeshiftPlaying {
+        publishInfoRecording(DvrEntryState.RECORDING, EventId(12))
+        assertTrue("Next announces its own running entry before airtime",
+            description("player-info-bar").substringAfter("Later", "")
+                .contains(context.getString(R.string.recording_state_recording)))
+        assertFalse(description(PlayerTopIdentityTag).contains(context.getString(R.string.channel_recording_spoken)))
+    }
+
+    @Test fun liveBannerUsesTheProgrammeMarkInsteadOfTheChannelMarkWhenLinked() = timeshiftPlaying {
+        val channelRecording = context.getString(R.string.channel_recording_spoken)
+        val programmeRecording = context.getString(R.string.recording_state_recording)
+        publishInfoRecording(DvrEntryState.RECORDING, linked = false)
+        assertTrue(description(PlayerTopIdentityTag).contains(channelRecording))
+        assertFalse(description("player-info-bar").contains(programmeRecording))
+        assertTrue(exists("player-identity-recording-mark"))
+        assertFalse(exists("player-info-timing-mark"))
+
+        val now = System.currentTimeMillis() / 1_000
+        val untitled = EpgEvent.create(EventId(11), ChannelId(1), Instant.fromEpochSeconds(now - 1_800),
+            Instant.fromEpochSeconds(now + 3_600), title = "")
+        publishInfoRecording(DvrEntryState.RECORDING, eventOverride = untitled)
+        assertTrue(description("player-info-bar").contains(context.getString(R.string.no_epg)))
+        val mark = compose.onNodeWithTag("player-info-timing-mark", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val time = compose.onNodeWithTag("player-info-programme", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        assertTrue("the programme placeholder keeps its own timing badge", mark.right < time.left)
+        assertFalse(description(PlayerTopIdentityTag).contains(channelRecording))
+        assertTrue(description("player-info-bar").contains(programmeRecording))
+        assertFalse(exists("player-identity-recording-mark"))
+    }
+
     @Test fun liveScrubTicksAndCommitsAtLiveEdge() = timeshiftPlaying(mapPosition = true) { pauses ->
         fun descriptionOrNull(tag: String) = if (exists(tag)) description(tag) else null
         key(Key.MediaPause)

@@ -96,7 +96,9 @@ class CardGlowRoomTest {
         fixture.show(ChannelsView(ChannelsLayout.GRID, setOf(ChannelsLayout.GRID)), fixture.fixtureArt())
         channels("grid-1-first-card", 1, Side.TOP, Side.START)
         repeat(ChannelsGridColumns - 1) { fixture.key(Key.DirectionRight) }
-        channels("grid-2-last-column", ChannelsGridColumns, Side.TOP, Side.END)
+        // The header buttons sit above the last column; their pixels are not the card's glow.
+        val headerGap = bounds(card(ChannelsGridColumns)).top - bounds(hasTestTag("channels-header")).bottom
+        channels("grid-2-last-column", ChannelsGridColumns, Side.TOP, Side.END, rowAbove = headerGap)
         repeat(ChannelsGridColumns - 1) { fixture.key(Key.DirectionLeft) }
         scrolledGrid()
     }
@@ -380,8 +382,8 @@ class CardGlowRoomTest {
 
     /**
      * On every [sides] the glow's brightness falls without a step from just past the ring to
-     * [Reach]. A clip inside that reach shows as one jump from glow to background. Content of a
-     * row ending [rowAbove] pixels above the card is left out of the profile.
+     * [Reach]. A clip inside that reach shows as one jump from glow to background. Other content
+     * ending [rowAbove] pixels above the card is left out of the profile.
      */
     private fun check(name: String, card: Rect, sides: Array<out Side>, rowAbove: Float? = null) {
         val bitmap = draw()
@@ -397,7 +399,7 @@ class CardGlowRoomTest {
             val glow = profile.first() - profile.last()
             report.append("$side: step=${"%.1f".format(step)} glow=${"%.1f".format(glow)} profile=${profile.joinToString(",") { "%.0f".format(it) }}\n")
             if (failure == null && step > MaxStep) failure = "$name: the glow is cut on its $side side (a step of $step)"
-            // Above a scrolled grid only the glow's first pixels stand clear of the row above.
+            // Where other content limits the profile, it may end before the glow has fully faded.
             val minGlow = if (side == Side.TOP && rowAbove != null) MinGlow / 2 else MinGlow
             if (failure == null && glow < minGlow) failure = "$name: no glow reaches past the $side side ($glow)"
         }
@@ -412,7 +414,7 @@ class CardGlowRoomTest {
 
     /**
      * Mean brightness at each pixel from just past the lifted ring out to [Reach] beyond [side],
-     * over the middle half of that edge, stopping short of the [rowAbove]'s bottom edge.
+     * over the middle half of that edge, stopping short of any content above the card.
      */
     private fun profile(bitmap: Bitmap, card: Rect, side: Side, rowAbove: Float? = null): List<Float> {
         val vertical = side == Side.TOP || side == Side.BOTTOM
@@ -420,7 +422,7 @@ class CardGlowRoomTest {
             else (card.top + card.height / 4).toInt() until (card.bottom - card.height / 4).toInt() step 4
         // The ring's outer edge, lifted 5% with the card about its centre.
         val ring = ((4.25f + 1.25f) * 1.05f + 0.025f * (if (vertical) card.height else card.width)).toInt() + 1
-        val last = rowAbove?.let { it.toInt() - 2 } ?: Reach
+        val last = rowAbove?.let { minOf(it.toInt() - 2, Reach) } ?: Reach
         return (ring..last).map { distance ->
             lines.map { along ->
                 val (x, y) = when (side) {

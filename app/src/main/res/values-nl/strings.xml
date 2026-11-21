@@ -891,6 +891,7 @@
     <string name="rail_now_playing_description">Speelt nu: %1$s, %2$s, %3$s.</string>
     <string name="rail_now_playing_description_channel">Speelt nu: %1$s, %2$s.</string>
     <string name="player_recording">Wordt opgenomen</string>
+    <string name="channel_recording_spoken">Er wordt opgenomen op deze zender</string>
     <string name="player_recorded_on">Opgenomen %1$s</string>
     <string name="player_recorded_ends">Opgenomen %1$s • Eindigt %2$s</string>
     <string name="player_recording_until">Opname tot %1$s</string>
@@ -906,9 +907,6 @@
     <string name="player_recorded_spoken">%1$s, opgenomen %2$s, %3$s</string>
     <string name="player_channel">Zender</string>
     <string name="player_row_recent">Recente zenders</string>
-    <string name="player_channel_card_hint">Links of rechts wisselt van zender, OK toont recente zenders</string>
-    <string name="player_identity_info_hint">OK toont de programma-info</string>
-    <string name="player_channel_card_hint_no_recents">Links of rechts wisselt van zender</string>
     <string name="player_rail_watching">Je kijkt naar</string>
     <string name="details_read_more">Meer info</string>
     <string name="details_important_information">Details</string>
@@ -1105,8 +1103,6 @@
     <string name="home_recording_starts_at">Begint om %1$s</string>
     <string name="home_all_recordings">Alle opnamen</string>
     <string name="home_activity_watching_live">Live kijken</string>
-    <string name="home_activity_recording">Opname bezig</string>
-    <string name="home_activity_watching_and_recording">Kijken en opnemen</string>
     <string name="home_upcoming_summary">Hierna: %1$s • %2$s</string>
     <plurals name="home_upcoming_more">
         <item quantity="one">Nog %1$d gepland</item>
@@ -1164,4 +1160,5 @@
     <string name="server_none_in_use">Geen verbinding in gebruik</string>
     <string name="server_list_unavailable">De opgeslagen verbindingen kunnen op dit moment niet worden gelezen op deze tv</string>
     <string name="server_none_in_use_description">Geen verbinding in gebruik. Kies er een om weer tv te kijken.</string>
+    <string name="return_to_full_screen">Terug naar volledig scherm</string>
 </resources>

@@ -99,7 +99,6 @@ class PlayerIdentityCardTest {
         compose.pressKey(Key.DirectionRight, settleFrames = 20)
         assertEquals(listOf("player-info"), compose.focusedTags())
         assertEquals(listOf("Program details"), description())
-        assertFalse("no channel to change: no arrows", compose.tagExists("player-top-identity-previous"))
         compose.pressKey(Key.DirectionRight, settleFrames = 20)
         assertEquals(listOf("player-settings"), compose.focusedTags())
         compose.pressKey(Key.DirectionLeft, settleFrames = 20)
@@ -172,7 +171,6 @@ class PlayerIdentityCardTest {
             actions = PlayerChromeActions(active = mode == PlayerChromeMode.CONTROLS, paused = false),
             onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {}, onInteraction = {},
             onPauseUnavailable = {}, onActionFocused = {}, onFocusRestored = {}, onDownFromActions = {},
-            onChannelZap = { _, _, _ -> }, onRecentPick = {},
         )
     }
 

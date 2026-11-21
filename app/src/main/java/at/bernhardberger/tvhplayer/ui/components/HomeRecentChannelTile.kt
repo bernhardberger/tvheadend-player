@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -16,6 +17,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -24,6 +26,8 @@ import androidx.tv.material3.Card
 import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.MaterialTheme
 import at.bernhardberger.tvheadend.sdk.core.Channel
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
+import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.visibleChannelNumber
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.TvTextColors
@@ -45,6 +49,7 @@ internal fun HomeRecentChannelTile(
     modifier: Modifier = Modifier,
     onLongClick: (() -> Unit)? = null,
     width: Dp = HomeRecentTileSize,
+    channelRecording: Boolean = false,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val ring = rememberCardFocusRing(interaction)
@@ -78,6 +83,9 @@ internal fun HomeRecentChannelTile(
                         ground = channelAccentGround(channel.icon, channel.id, depth = 0.5f),
                     )
                 }
+                if (channelRecording) RecordingBadge(DvrEntryState.RECORDING,
+                    Modifier.align(Alignment.TopEnd).padding(4.dp), compact = true,
+                    recordingDescription = stringResource(R.string.channel_recording_spoken))
             }
         }
         AnimatedVisibility(visible = nameShown, enter = RowTextEnter, exit = RowTextExit) {

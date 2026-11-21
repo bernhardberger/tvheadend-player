@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
 import android.app.Application
+import android.os.SystemClock
 import android.graphics.Bitmap
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -17,6 +18,7 @@ import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isFocused
@@ -127,15 +129,31 @@ class ChannelsLayoutFocusTest {
     }
 
     @Test fun gridWallScrollsTheHeaderAwayAndRestoresItWithFirstRowReachability() {
-        gridWallScrollsTheHeaderAwayAndRestoresItWithFirstRowReachability(1f)
+        val firstTop = gridWallScrollsTheHeaderAwayAndRestoresItWithFirstRowReachability(1f)
+        fixture.key(Key.DirectionUp)
+        fixture.key(Key.DirectionRight)
+        fixture.awaitFocus(viewButton)
+        fixture.key(Key.DirectionCenter)
+        fixture.awaitFocus(option("layout-grid"))
+        fixture.key(Key.DirectionUp)
+        fixture.awaitFocus(option("layout-list"))
+        fixture.key(Key.DirectionCenter)
+        fixture.key(Key.Back)
+        fixture.awaitFocus(viewButton)
+        fixture.key(Key.DirectionDown)
+        fixture.awaitFocus(row(1))
+        val listTop = compose.onNode(row(1)).getUnclippedBoundsInRoot().top.value
+        assertEquals("List and Grid start on the same line", firstTop, listTop, 1f)
+        assertEquals("the List picture starts alongside the first row", listTop,
+            compose.onNodeWithTag("channels-list-art").getUnclippedBoundsInRoot().top.value, 1f)
     }
 
-    private fun gridWallScrollsTheHeaderAwayAndRestoresItWithFirstRowReachability(scale: Float) {
+    private fun gridWallScrollsTheHeaderAwayAndRestoresItWithFirstRowReachability(scale: Float): Float {
         fixture.show(grid, scale = scale, channelCount = 30)
         fixture.awaitFocus(card(1))
         val headerTop = compose.onNodeWithTag("channels-header").getUnclippedBoundsInRoot().top
         val firstTop = compose.onNode(card(1)).getUnclippedBoundsInRoot().top.value
-        assertEquals("resting first row", 116f, firstTop, 1f)
+        assertEquals("resting first row", 100f, firstTop, 1f)
         if (scale == 1.3f) {
             val headerBottom = compose.onNode(tagsButton).getUnclippedBoundsInRoot().bottom.value
             assertTrue("cards clear the enlarged header: first row $firstTop, controls bottom $headerBottom",
@@ -166,6 +184,7 @@ class ChannelsLayoutFocusTest {
         awaitRail()
         fixture.key(Key.DirectionRight)
         fixture.awaitFocus(card(1))
+        return firstTop
     }
 
     @Test @GraphicsMode(GraphicsMode.Mode.NATIVE) fun gridWallDoesNotFadeThePrecedingRowAtTheScreenEdge() {
@@ -195,7 +214,7 @@ class ChannelsLayoutFocusTest {
         assertEquals(48f, compose.onNode(card(5)).getUnclippedBoundsInRoot().top.value, 1f)
         fixture.key(Key.DirectionUp)
         fixture.awaitFocus(card(1))
-        assertEquals(116f, compose.onNode(card(1)).getUnclippedBoundsInRoot().top.value, 1f)
+        assertEquals(100f, compose.onNode(card(1)).getUnclippedBoundsInRoot().top.value, 1f)
     }
 
     @Test fun gridWallKeepsANoticeClearOfTheHeader() {
@@ -434,15 +453,14 @@ class ChannelsLayoutFocusTest {
     @Test fun gridCardsNameTheirChannelBelowOnlyWithChannelNamesOn() {
         val playing = hasTestTag("channel-playing-indicator")
         fixture.show(grid, imageLoader = fixture.fixtureArt(), playerReturn = PlayerReturnFocus(ChannelId(1), ChannelId(1)),
-            warmPlayback = true)
+            warmPlayback = true, playingLive = ChannelId(1))
         fixture.awaitFocus(card(1))
-        // The grid starts without names: the picture's logo plate names the channel and the mark sits opposite it.
+        // The grid starts without names; toggling names must not move the mark out of the picture.
         compose.onNodeWithTag("channels-grid-1-identity", useUnmergedTree = true).assertDoesNotExist()
-        compose.onNodeWithTag("channels-grid-1-art-playing", useUnmergedTree = true).assertExists()
+        assertPlaybackAtPictureStart("channels-grid-1", playing)
         compose.runOnIdle { fixture.channelsView = grid.toggledChannelNames() }
         compose.onNodeWithTag("channels-grid-1-identity", useUnmergedTree = true).assertTextEquals("1 Ridge Earth")
-        compose.onNodeWithTag("channels-grid-1-art-playing", useUnmergedTree = true).assertDoesNotExist()
-        compose.onNode(playing, useUnmergedTree = true).assertExists()
+        assertPlaybackAtPictureStart("channels-grid-1", playing)
         // Logo cards name their channel below too once names are on.
         compose.runOnIdle { fixture.channelsView = grid.toggledProgramArt().toggledChannelNames() }
         compose.onNodeWithTag("channels-grid-1-identity", useUnmergedTree = true).assertTextEquals("1 Ridge Earth")
@@ -552,38 +570,75 @@ class ChannelsLayoutFocusTest {
         assertEquals("Up holds the place too", focusLine, compose.onNode(card(5)).fetchSemanticsNode().positionInRoot.y, .5f)
     }
 
-    private fun recordingBadge(id: Int) = hasTestTag("recording-badge") and hasAnyAncestor(card(id))
-
-    /** A grid card follows the rule of the other layouts: watched orange, passive recording red, otherwise cyan. */
-    @Test @GraphicsMode(GraphicsMode.Mode.NATIVE) fun gridCardsShowARunningRecordingAsRedWithItsBadge() {
-        // Channel 2 records, channel 3 is watched, channel 4 only airs.
-        fixture.show(grid, recordingNow = 2, playingLive = ChannelId(3))
+    /** A strip follows the displayed programme, not another entry on the same channel. */
+    @Test @GraphicsMode(GraphicsMode.Mode.NATIVE) fun gridStripsOnlyShowTheProgrammesOwnRunningRecordingAsRed() {
+        fixture.show(grid, recordingNow = 2, playingLive = ChannelId(3), channelOnlyRecording = 4)
         fixture.awaitFocus(card(1))
         compose.mainClock.advanceTimeBy(1_500)
         compose.waitForIdle()
-        compose.onNode(recordingBadge(2), useUnmergedTree = true).assertExists()
-        compose.onAllNodes(recordingBadge(3), useUnmergedTree = true).assertCountEquals(0)
-        compose.onAllNodes(recordingBadge(4), useUnmergedTree = true).assertCountEquals(0)
         val pixels = compose.onRoot().captureToImage().toPixelMap()
         fun stripColor(id: Int): androidx.compose.ui.graphics.Color {
             val strip = compose.onNodeWithTag("channels-grid-$id-progress", useUnmergedTree = true).getUnclippedBoundsInRoot()
-            return pixels[strip.left.value.toInt() + 2, ((strip.top.value + strip.bottom.value) / 2).toInt()]
+            return pixels[(strip.left.value + (strip.right.value - strip.left.value) * 0.1f).toInt(),
+                ((strip.top.value + strip.bottom.value) / 2).toInt()]
         }
         val recording = stripColor(2)
         val watched = stripColor(3)
         val onAir = stripColor(4)
+        compose.onNode(hasTestTag("recording-badge") and hasAnyAncestor(card(4)), useUnmergedTree = true)
+            .assert(hasContentDescription(fixture.context.getString(R.string.channel_recording_spoken)))
         assertTrue("recording $recording is red", recording.red > recording.blue)
-        assertTrue("on air $onAir is cyan", onAir.blue > onAir.red)
+        assertTrue("channel-only recording leaves the displayed programme strip cyan ($onAir)", onAir.blue > onAir.red)
         assertNotEquals(recording, watched)
         assertNotEquals(watched, onAir)
         assertNotEquals(recording, onAir)
     }
 
-    /** A recording the viewer also watches keeps its badge; the bar follows the viewer. */
-    @Test fun gridCardKeepsItsRecordingBadgeWhileWatched() {
+    @Test
+    @Config(instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun headlinePutsAnInWindowChannelOnlyRecordingInTheEyebrow() {
+        fixture.show(immersive, channelOnlyRecording = 1)
+        fixture.awaitFocus(card(1))
+        val channelMark = compose.onNode(
+            hasTestTag("channel-recording-indicator") and hasAnyAncestor(hasTestTag("channels-headline-channel")),
+            useUnmergedTree = true,
+        )
+        channelMark.assertDoesNotExist()
+        val eyebrowBadge = compose.onNode(
+            hasTestTag("recording-badge") and hasAnyAncestor(hasTestTag("channels-headline-channel")), useUnmergedTree = true,
+        )
+        eyebrowBadge.assert(hasContentDescription(fixture.context.getString(R.string.channel_recording_spoken)))
+        compose.onNode(hasTestTag("recording-badge") and hasAnyAncestor(hasTestTag("channels-immersive-metadata")),
+            useUnmergedTree = true).assertDoesNotExist()
+
+        // The same DVR snapshot still says RECORDING during post-padding.
+        val stop = requireNotNull(fixture.shownObservation.dvrSnapshotForDisplay?.entries?.single()?.stop)
+        assertTrue(SystemClock.setCurrentTimeMillis(stop.toEpochMilliseconds() + 1_000))
+        compose.mainClock.advanceTimeBy(5_000)
+        compose.mainClock.advanceTimeByFrame()
+        compose.mainClock.advanceTimeByFrame()
+        compose.waitForIdle()
+        eyebrowBadge.assertDoesNotExist()
+    }
+
+    @Test fun headlineBadgesItsOwnRunningRecordingInTheEyebrow() {
+        fixture.show(immersive, recordingNow = 1)
+        fixture.awaitFocus(card(1))
+        compose.onNode(hasTestTag("recording-badge") and hasAnyAncestor(hasTestTag("channels-headline-channel")),
+            useUnmergedTree = true).assert(hasContentDescription(fixture.context.getString(R.string.recording_state_recording)))
+        compose.onNode(hasTestTag("recording-badge") and hasAnyAncestor(hasTestTag("channels-immersive-metadata")),
+            useUnmergedTree = true).assertDoesNotExist()
+        compose.onNode(hasTestTag("channel-recording-indicator") and hasAnyAncestor(hasTestTag("channels-headline-channel")),
+            useUnmergedTree = true).assertDoesNotExist()
+    }
+
+    @Test fun gridCardKeepsItsProgrammeRecordingMarkWhileWatched() {
         fixture.show(grid, recordingNow = 3, playingLive = ChannelId(3))
         fixture.awaitFocus(card(1))
-        compose.onNode(recordingBadge(3), useUnmergedTree = true).assertExists()
+        compose.onNode(hasContentDescription(fixture.context.getString(R.string.recording_state_recording)) and
+            hasAnyAncestor(card(3)), useUnmergedTree = true).assertExists()
+        compose.onNode(hasContentDescription(fixture.context.getString(R.string.channel_recording_spoken)) and
+            hasAnyAncestor(card(3)), useUnmergedTree = true).assertDoesNotExist()
     }
 
     @Test fun gridWallLastRowKeepsTheFocusedCardAndItsOutlineClearOfTheBottomSafeInset() {
@@ -988,7 +1043,7 @@ class ChannelsLayoutFocusTest {
     @Test fun logoCardsMarkThePlayingChannelFocusedOrNot() {
         val playing = hasTestTag("channel-playing-indicator") and hasAnyAncestor(card(1))
         fixture.show(ChannelsView(ChannelsLayout.IMMERSIVE, programArt = emptySet()),
-            playerReturn = PlayerReturnFocus(ChannelId(1), ChannelId(1)), warmPlayback = true)
+            playerReturn = PlayerReturnFocus(ChannelId(1), ChannelId(1)), warmPlayback = true, playingLive = ChannelId(1))
         fixture.awaitFocus(card(1))
         compose.onNode(playing, useUnmergedTree = true).assertExists()
         fixture.key(Key.DirectionRight)
@@ -1004,23 +1059,29 @@ class ChannelsLayoutFocusTest {
         // The name line sits below the card's own surface, so the mark is found by itself: only channel 1 plays.
         val playing = hasTestTag("channel-playing-indicator")
         fixture.show(immersive, imageLoader = fixture.fixtureArt(), playerReturn = PlayerReturnFocus(ChannelId(1), ChannelId(1)),
-            warmPlayback = true)
+            warmPlayback = true, playingLive = ChannelId(1))
         fixture.awaitFocus(card(1))
         compose.onNodeWithTag("channels-immersive-background").assertDoesNotExist()
         compose.onNodeWithTag("channels-immersive-art").assertDoesNotExist()
         // By default the picture card's logo plate names the channel and nothing goes below.
         compose.onNodeWithTag("channels-immersive-1-art-picon", useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("channels-immersive-1-identity", useUnmergedTree = true).assertDoesNotExist()
-        compose.onNodeWithTag("channels-immersive-1-art-playing", useUnmergedTree = true).assertExists()
-        compose.onNode(playing, useUnmergedTree = true).assertExists()
+        assertPlaybackAtPictureStart("channels-immersive-1", playing)
         compose.runOnIdle { fixture.channelsView = immersive.toggledChannelNames() }
         compose.onNodeWithTag("channels-immersive-1-identity", useUnmergedTree = true).assertTextEquals("1 Ridge Earth")
-        compose.onNodeWithTag("channels-immersive-1-art-playing", useUnmergedTree = true).assertDoesNotExist()
-        compose.onNode(playing, useUnmergedTree = true).assertExists()
+        assertPlaybackAtPictureStart("channels-immersive-1", playing)
         // Logo cards name their channel below too once names are on.
         compose.runOnIdle { fixture.channelsView = immersive.toggledProgramArt().toggledChannelNames() }
         compose.onNodeWithTag("channels-immersive-1-identity", useUnmergedTree = true).assertTextEquals("1 Ridge Earth")
         compose.onNode(playing, useUnmergedTree = true).assertExists()
+    }
+
+    private fun assertPlaybackAtPictureStart(tag: String, playing: SemanticsMatcher) {
+        val mark = compose.onNode(playing, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val picture = compose.onNodeWithTag("$tag-art", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        assertTrue("status is at the picture's top start",
+            mark.left >= picture.left && mark.right <= picture.center.x &&
+                mark.top >= picture.top && mark.bottom <= picture.center.y)
     }
 
 }

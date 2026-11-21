@@ -381,10 +381,9 @@ class PlayerTimelineGeometryTest {
                 val texts = compose.onAllNodes(androidx.compose.ui.test.hasAnyAncestor(hasTestTag("player-timeline-labels")), useUnmergedTree = true)
                     .fetchSemanticsNodes().flatMap { it.config.getOrElse(SemanticsProperties.Text) { emptyList() } }.joinToString(" ") { it.text }
                 assertFalse("$case: no recording dot in the row: $texts", texts.contains("●"))
-                // The badge beside the top identity's name, not the bar row, says the recording still runs.
-                assertEquals("$case: the badge", stillRecording, compose.tagExists("recording-badge"))
-                assertEquals("$case: the identity speaks it: ${identitySpeech(compose)}", stillRecording,
-                    identitySpeech(compose).contains("Recording now"))
+                assertEquals("$case: the entry timing line carries the mark",
+                    stillRecording, compose.tagExists("player-info-timing-mark"))
+                assertFalse("$case: the channel identity does not announce an entry's mark", identitySpeech(compose).contains("Recording now"))
             }
             assertEquals("${if (stillRecording) "growing" else "finished"} recording, $layer: a paused row was shown", 1, pausedFrames)
         }

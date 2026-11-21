@@ -891,6 +891,7 @@
     <string name="rail_now_playing_description">Afspilles nu: %1$s, %2$s, %3$s.</string>
     <string name="rail_now_playing_description_channel">Afspilles nu: %1$s, %2$s.</string>
     <string name="player_recording">Optager nu</string>
+    <string name="channel_recording_spoken">Optager på denne kanal</string>
     <string name="player_recorded_on">Optaget %1$s</string>
     <string name="player_recorded_ends">Optaget %1$s • Slutter %2$s</string>
     <string name="player_recording_until">Optager indtil %1$s</string>
@@ -906,9 +907,6 @@
     <string name="player_recorded_spoken">%1$s, optaget %2$s, %3$s</string>
     <string name="player_channel">Kanal</string>
     <string name="player_row_recent">Seneste kanaler</string>
-    <string name="player_channel_card_hint">Venstre eller højre skifter kanal, OK viser seneste kanaler</string>
-    <string name="player_identity_info_hint">OK viser programoplysningerne</string>
-    <string name="player_channel_card_hint_no_recents">Venstre eller højre skifter kanal</string>
     <string name="player_rail_watching">Ser</string>
     <string name="details_read_more">Mere info</string>
     <string name="details_important_information">Detaljer</string>
@@ -1105,8 +1103,6 @@
     <string name="home_recording_starts_at">Starter kl. %1$s</string>
     <string name="home_all_recordings">Alle optagelser</string>
     <string name="home_activity_watching_live">Ser live-tv</string>
-    <string name="home_activity_recording">Optager</string>
-    <string name="home_activity_watching_and_recording">Ser og optager</string>
     <string name="home_upcoming_summary">Næste: %1$s • %2$s</string>
     <plurals name="home_upcoming_more">
         <item quantity="one">%1$d mere planlagt</item>
@@ -1164,4 +1160,5 @@
     <string name="server_none_in_use">Ingen forbindelse i brug</string>
     <string name="server_list_unavailable">De gemte forbindelser kan ikke læses på dette tv lige nu</string>
     <string name="server_none_in_use_description">Ingen forbindelse i brug. Vælg en for at se tv igen.</string>
+    <string name="return_to_full_screen">Tilbage til fuld skærm</string>
 </resources>

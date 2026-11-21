@@ -736,7 +736,6 @@ fun RecordingPlayerScreen(
                     info = recordingInfoBarData(entry, channel?.number, nowSec, timelineState.playbackPositionMs,
                         recordedLengthMs, growing),
                     state = chromeState,
-                    recordingNow = growing,
                     badges = trackGlance.badges,
                     picon = channel?.icon,
                     artwork = recordingArtwork(entry),

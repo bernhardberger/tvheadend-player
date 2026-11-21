@@ -1066,6 +1066,8 @@
     <string name="rail_now_playing_description">Now playing: %1$s, %2$s, %3$s.</string>
     <string name="rail_now_playing_description_channel">Now playing: %1$s, %2$s.</string>
     <string name="player_recording">Recording now</string>
+    <!-- Spoken description of a channel-level recording mark, not a mark for a specific programme. -->
+    <string name="channel_recording_spoken">Recording on this channel</string>
     <string name="player_recorded_on">Recorded %1$s</string>
     <string name="player_recorded_ends">Recorded %1$s • Ends %2$s</string>
     <string name="player_recording_until">Recording until %1$s</string>
@@ -1081,9 +1083,6 @@
     <string name="player_recorded_spoken">%1$s, recorded %2$s, %3$s</string>
     <string name="player_channel">Channel</string>
     <string name="player_row_recent">Recent channels</string>
-    <string name="player_channel_card_hint">Left or right changes channel, OK shows recent channels</string>
-    <string name="player_identity_info_hint">OK shows the program info</string>
-    <string name="player_channel_card_hint_no_recents">Left or right changes channel</string>
     <string name="player_rail_watching">Watching</string>
     <!-- Trial: program details -->
     <string name="details_read_more">More info</string>
@@ -1322,8 +1321,6 @@
     <string name="home_recording_starts_at">Starts at %1$s</string>
     <string name="home_all_recordings">All recordings</string>
     <string name="home_activity_watching_live">Watching live</string>
-    <string name="home_activity_recording">Recording</string>
-    <string name="home_activity_watching_and_recording">Watching and recording</string>
     <string name="home_upcoming_summary">Next: %1$s • %2$s</string>
     <plurals name="home_upcoming_more">
         <item quantity="one">%1$d more scheduled</item>
@@ -1339,4 +1336,5 @@
     <string name="whats_new_badge">New</string>
     <string name="whats_new_hint">What\'s new in %1$s</string>
     <string name="settings_about_version_summary">Version %1$s</string>
+    <string name="return_to_full_screen">Return to full screen</string>
 </resources>

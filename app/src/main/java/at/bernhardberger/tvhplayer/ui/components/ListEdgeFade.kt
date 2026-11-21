@@ -27,25 +27,19 @@ import androidx.compose.ui.unit.offset
 // Browse lists run to the bottom edge of the screen and fade out where rows continue.
 // The fade keeps to the last row's height or so, so the row cut by the edge still reads
 // as the list going on, as Google TV's lists do. Rows that scrolled away above fade
-// under a shorter band, shown only while there are any.
+// under an equally deep band, shown only while there are any.
 
 /** Fade where rows continue past the bottom edge of the screen. */
 internal val ListBottomFadeHeight = 80.dp
 
-/** Fade where rows have scrolled away above the list. */
-internal val ListTopFadeHeight = 48.dp
-
 /** Extra room between the top fade and the focused row's native scale. */
-internal val ListFocusBreathingRoom = 8.dp
+private val ListFocusBreathingRoom = 8.dp
 
 /**
  * Bottom band kept clear of focused rows, and the list's bottom content padding: deeper than
  * the fade, so the rows after the focused one stay in view above it.
  */
 internal val ListBottomReserve = 148.dp
-
-/** Top band kept clear of focused rows while earlier rows exist. */
-internal val ListScrolledTopReserve = ListTopFadeHeight + ListFocusBreathingRoom
 
 /** Shared readable bands for player and browse modal side-panel lists. */
 internal val PanelListTopFade = 24.dp
@@ -87,8 +81,8 @@ internal fun PanelListEdges(
 /**
  * Focus scrolling for a list drawn with [listEdgeFades]: [topReserve] is the list's own top
  * content padding, kept until earlier rows exist; its bottom content padding is
- * [ListBottomReserve]. A viewport reaching [topOverflow] above the list's band, padded by that
- * much more at the top, keeps both top reserves measured from the band.
+ * [ListBottomReserve]. [topOverflow] extends the viewport above the band. Once scrolled,
+ * browse lists use the real viewport; the player's schedule keeps its date-strip insets.
  */
 @Composable
 @OptIn(ExperimentalFoundationApi::class)
@@ -96,16 +90,20 @@ internal fun rememberListEdgeBringIntoView(
     listState: LazyListState,
     topReserve: Dp,
     topOverflow: Dp = 0.dp,
+    keepScrolledInsets: Boolean = false,
 ): InsetBringIntoViewSpec {
     val platform = LocalBringIntoViewSpec.current
     val density = LocalDensity.current
-    return remember(platform, density, listState, topReserve, topOverflow) {
+    return remember(platform, density, listState, topReserve, topOverflow, keepScrolledInsets) {
         with(density) {
             InsetBringIntoViewSpec(
                 delegate = platform,
                 topInsetPx = (topOverflow + topReserve).toPx(),
-                scrolledTopInsetPx = (topOverflow + ListScrolledTopReserve).toPx(),
                 bottomInsetPx = ListBottomReserve.toPx(),
+                scrolledTopInsetPx = if (keepScrolledInsets) {
+                    (topOverflow + PlayerScheduleTopFadeHeight + ListFocusBreathingRoom).toPx()
+                } else 0f,
+                scrolledBottomInsetPx = if (keepScrolledInsets) ListBottomReserve.toPx() else 0f,
                 scrollBackAvailablePx = {
                     if (listState.firstVisibleItemIndex == 0) {
                         listState.firstVisibleItemScrollOffset.toFloat()
@@ -122,16 +120,20 @@ private val ListFocusOverhang = 24.dp
 /**
  * Fades a list's edges only while rows continue past them; read during drawing. The mask's
  * offscreen layer reaches [ListFocusOverhang] past both sides of the list without changing its
- * layout, so a scaled focused row keeps its rounded ends. Without [topFade], a list that starts
- * at a whole row shows it unfaded.
+ * layout, so a scaled focused row keeps its rounded ends. Set [topFade] to false to disable
+ * the top mask, or set [topFadeHeight] for a surface with a different top band.
  */
-internal fun Modifier.listEdgeFades(listState: LazyListState, topFade: Boolean = true): Modifier = this
+internal fun Modifier.listEdgeFades(
+    listState: LazyListState,
+    topFade: Boolean = true,
+    topFadeHeight: Dp = ListBottomFadeHeight,
+): Modifier = this
     .layout { measurable, constraints ->
         val overhang = ListFocusOverhang.roundToPx()
         val placeable = measurable.measure(constraints.offset(horizontal = 2 * overhang))
         layout(placeable.width - 2 * overhang, placeable.height) { placeable.placeRelative(-overhang, 0) }
     }
-    .listEdgeFadeMask(ListTopFadeHeight, ListBottomFadeHeight, { topFade && listState.canScrollBackward },
+    .listEdgeFadeMask(topFadeHeight, ListBottomFadeHeight, { topFade && listState.canScrollBackward },
         { listState.canScrollForward })
     .layout { measurable, constraints ->
         val overhang = ListFocusOverhang.roundToPx()

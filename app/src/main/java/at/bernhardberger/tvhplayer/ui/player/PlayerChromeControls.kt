@@ -99,15 +99,13 @@ internal fun PlayerChromeControls(
     decoration: @Composable (emphasisAlpha: () -> Float, controls: @Composable () -> Unit) -> Unit,
     markerNavigation: RecordingMarkerNavigation,
     onSeekMarker: (Long) -> Unit,
-    /** Retained trial caller input; the passive top identity does not handle keys. */
-    onChannelZap: ((direction: Int, keyTimeMs: Long, repeat: Boolean) -> Unit)? = null,
     downHint: String? = null,
     onSchedule: (() -> Unit)? = null,
     scheduleAvailable: Boolean = true,
     /**
-     * The passive top identity, drawn over the header. Legacy focus slots receive no focus target.
+     * The passive top identity, drawn over the header.
      */
-    topIdentity: (@Composable (placed: Modifier, focus: Modifier, onRecentDown: () -> Unit) -> Unit)? = null,
+    topIdentity: (@Composable (placed: Modifier) -> Unit)? = null,
 ) {
     val live = timeline as? PlayerChromeTimeline.Live
     val recording = timeline as? PlayerChromeTimeline.Recording
@@ -243,11 +241,6 @@ internal fun PlayerChromeControls(
         "recording-skip" -> if (skipShown) skipFocus else pauseFocus
         else -> pauseFocus
     }
-    val belowIdentity = if (timelineFocusable) timelineFocus else actionFocus
-    val recentDown: () -> Unit = {
-        relocatingKey = Key.DirectionDown
-        belowIdentity.requestFocus()
-    }
     // The decoration follows the action row, which fades in last when taken over from the Banner.
     CompositionLocalProvider(LocalTimelinePositionSpec provides positionSpec) {
     decoration({ actionsAlpha() * chromeAlpha.value }) {
@@ -263,7 +256,7 @@ internal fun PlayerChromeControls(
         }
     }, headerContent = { placed ->
         header(placed)
-        topIdentity?.invoke(placed, Modifier, recentDown)
+        topIdentity?.invoke(placed)
     }) {
         val timelineModifier = Modifier.testTag("player-seekbar").focusRequester(timelineFocus)
                     .focusProperties { canFocus = !covered }

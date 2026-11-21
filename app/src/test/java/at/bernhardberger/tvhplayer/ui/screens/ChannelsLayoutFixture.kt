@@ -90,6 +90,7 @@ import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 import at.bernhardberger.tvhplayer.ui.components.railNowPlaying
 import at.bernhardberger.tvhplayer.viewmodels.resolveChannelScopeState
 import coil3.ImageLoader
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
 /**
@@ -137,8 +138,11 @@ internal class ChannelsLayoutFixture(
         channelCount: Int = LINE_UP.size,
         tagNotice: Boolean = false,
         portrait: Boolean = false,
+        channelOnlyRecording: Int? = null,
+        captureObservation: SessionObservation? = null,
     ) {
-        val observation = observation(tags, manyTags, emptyGroup, recordingNow, scheduledNext, guidePending, firstTitle, presentation, channelCount, portrait)
+        val observation = captureObservation ?: observation(tags, manyTags, emptyGroup, recordingNow, scheduledNext, guidePending, firstTitle,
+            presentation, channelCount, portrait, channelOnlyRecording)
         shownObservation = observation
         // All channels is opt-in under Settings: hiding it shows the tags only.
         val visibility = if (allChannels) ChannelScopeVisibility() else ChannelScopeVisibility(
@@ -233,6 +237,8 @@ internal class ChannelsLayoutFixture(
         tagNotice: Boolean,
     ) {
         var activeTag by remember { mutableStateOf<ChannelTagId?>(null) }
+        val playbackChannelId = LocalWatchingChannel.current
+        val playbackIndicator = if (playbackChannelId != null) LocalWatchingIndicator.current else ChannelPlaybackIndicator.NONE
         ChannelsScreenContent(
             onRecordKey = { null },
             contentPadding = padding,
@@ -242,6 +248,8 @@ internal class ChannelsLayoutFixture(
             tagNotice = tagNotice,
             selectedId = { selected },
             playingChannelId = playerReturn?.playingChannelId,
+            playbackChannelId = playbackChannelId,
+            playbackIndicator = playbackIndicator,
             playerReturn = playerReturn,
             view = channelsView,
             onViewChange = { channelsView = it },
@@ -279,7 +287,7 @@ internal class ChannelsLayoutFixture(
     private fun observation(
         tags: Boolean, manyTags: Boolean, emptyGroup: Boolean, recordingNow: Int?, scheduledNext: Int?,
         guidePending: Boolean, firstTitle: String?, presentation: Boolean,
-        channelCount: Int, portrait: Boolean,
+        channelCount: Int, portrait: Boolean, channelOnlyRecording: Int?,
     ): SessionObservation {
         // Longer wall scenes repeat the fictional networks as additional channel numbers,
         // reusing their picons; the extra channels deliberately have no programme data.
@@ -363,6 +371,12 @@ internal class ChannelsLayoutFixture(
             ),
             // Channel n's current programme is event n00, its next n01.
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = listOfNotNull(
+                channelOnlyRecording?.let {
+                    DvrEntry.create(DvrEntryId(3), channelId = ChannelId(it.toLong()), eventId = EventId(it * 100L + 2),
+                        state = DvrEntryState.RECORDING, start = Instant.fromEpochSeconds(now - 3_600),
+                        stop = Instant.fromEpochSeconds(now + 600),
+                        stopExtraMinutes = 5.minutes)
+                },
                 recordingNow?.let {
                     DvrEntry.create(DvrEntryId(1), channelId = ChannelId(it.toLong()), eventId = EventId(it * 100L),
                         state = DvrEntryState.RECORDING)

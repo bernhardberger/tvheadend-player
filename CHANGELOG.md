@@ -2,8 +2,18 @@
 
 ## Unreleased
 
+### Recordings
+
+- The live player's info bar shows a red *REC* badge when the program you're watching is being recorded. Its *Next* line shows the red dot as soon as the recording of the next program has started (#47).
+- A recording mark on a program now means that this program is being recorded. Cards and progress bars in Channels, on Home and in the player's channel list no longer turn red because a recording of the program before or after is still running through its padding.
+- A timer that isn't tied to a program marks its channel, not a program, while it runs. Home's recent channels show *REC* on a channel that's recording.
+- On Home, *Right now* shows live TV and a recording as one card only when the recording is of the program you're watching. Another recording on the same channel gets its own card.
+- In the Recordings list, the recording, playing and watched marks sit together at the end of the row. The watched mark is hidden while that recording plays.
+- TalkBack says *Recording on this channel* when the mark is about the channel and not the program, and offers *Return to full screen* on the channel or recording that's playing.
+
 ### Guide
 
+- The program you're watching carries the playing mark in its Guide cell instead of in the headline above the grid.
 - A square channel logo, such as PULS 4's, no longer runs into the channel name in the header of a programme's details. The logo sits at the start of the line with a gap before the name (#45).
 
 ## 0.5.2

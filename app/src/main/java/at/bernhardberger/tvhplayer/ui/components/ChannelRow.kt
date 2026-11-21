@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.components
 
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 
 import androidx.compose.ui.input.key.Key
@@ -27,13 +29,16 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.ListItem
 import androidx.tv.material3.ListItemDefaults
 import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
 import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvhplayer.BuildConfig
+import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.profiling.profileLayout
 import at.bernhardberger.tvhplayer.profiling.profileTrace
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
@@ -82,7 +87,7 @@ fun ChannelRow(
     nowSec: Long,
     piconPath: ChannelIcon?,
     programStartSec: Long? = null,
-    recordingNow: Boolean = false,
+    channelRecording: Boolean = false,
     playingNow: Boolean = false,
     playbackIndicator: ChannelPlaybackIndicator = if (playingNow) ChannelPlaybackIndicator.PLAYING else ChannelPlaybackIndicator.NONE,
     onFocus: () -> Unit,
@@ -90,6 +95,7 @@ fun ChannelRow(
     onOpenContextMenu: (() -> Unit)? = null,
     /** The programme is still on its way: a [SkeletonLine] holds its line instead of [programTitle]. */
     programmeLoading: Boolean = false,
+    programmeRecording: DvrEntry? = null,
 ) = profileTrace("P1:compose:channelRow") {
     var focused by remember { mutableStateOf(false) }
     val contextMenu = rememberBrowseContextMenuTrigger(onOpenContextMenu)
@@ -124,20 +130,24 @@ fun ChannelRow(
             } else {
                 Modifier
             }
-            Row(modifier = drawProbe, verticalAlignment = Alignment.CenterVertically) {
-                ChannelTitle(
-                    number = number,
-                    name = name,
-                    modifier = Modifier.weight(1f).testTag("channel-title"),
-                )
-                if (playbackIndicator != ChannelPlaybackIndicator.NONE || recordingNow) {
+            Row(modifier = drawProbe.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                ChannelTitle(number, name, Modifier.weight(1f).testTag("channel-title"))
+                if (programmeRecording != null || channelRecording) {
                     Spacer(Modifier.width(TvSpacing8))
-                    ChannelNowIndicators(
-                        playingNow = playingNow,
-                        recordingNow = recordingNow,
-                        playbackIndicator = playbackIndicator,
+                    RecordingStatusIndicator(
+                        state = programmeRecording?.state ?: DvrEntryState.RECORDING,
+                        rule = programmeRecording?.rule,
                         focused = focused,
+                        modifier = Modifier.testTag("channel-recording-indicator"),
+                        descriptionOverride = if (programmeRecording == null) {
+                            stringResource(R.string.channel_recording_spoken)
+                        } else null,
+                        size = StatusIconSize,
                     )
+                }
+                if (playbackIndicator != ChannelPlaybackIndicator.NONE) {
+                    Spacer(Modifier.width(TvSpacing8))
+                    ChannelPlaybackMarker(playbackIndicator, size = StatusIconSize)
                 }
             }
         },
@@ -158,7 +168,9 @@ fun ChannelRow(
                     Spacer(Modifier.height(ChannelProgressGap))
                     ProgressStrip(
                         progress = progress,
-                        color = progressColor(watchingIndicator(programme, nowSec).isPlayingItem, recordingNow, focused),
+                        color = progressColor(
+                            watchingIndicator(programme, nowSec).isPlayingItem, programmeRecording != null, focused,
+                        ),
                         height = ChannelRowProgressHeight,
                         trackColor = if (focused) {
                             MaterialTheme.colorScheme.inverseOnSurface.copy(
@@ -195,13 +207,13 @@ fun ChannelRow(
                     playingNow -> colors.selectedContainerColor
                     else -> colors.containerColor
                 }.compositeOver(MaterialTheme.colorScheme.background),
-                modifier = Modifier
-                    .testTag("channel-picon")
+                modifier = Modifier.testTag("channel-picon")
                     .size(width = ChannelPiconWidth, height = ChannelPiconHeight)
                     .padding(ChannelPiconInset),
             )
         },
         modifier = modifier.then(contextMenu.modifier)
+            .returnToFullScreenAction(playbackIndicator.isPlayingItem)
             .profileLayout("channels:row")
             .fillMaxWidth()
             .onFocusChanged {

@@ -99,7 +99,9 @@ internal fun ChannelSchedule(
     val initialIndex = events.indexOfFirst { it.id == initialEvent?.id }.coerceAtLeast(0)
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialIndex)
     // The band starts a row lower, so the row above the focused one stays clear of the top fade.
-    val bringIntoView = rememberListEdgeBringIntoView(listState, 0.dp, topOverflow = rememberScheduleRowHeight())
+    val bringIntoView = rememberListEdgeBringIntoView(
+        listState, 0.dp, topOverflow = rememberScheduleRowHeight(), keepScrolledInsets = true,
+    )
     val scope = rememberCoroutineScope()
     val rowFocus = remember(events.map { it.id }) { events.associate { it.id to FocusRequester() } }
     val selectedTabFocus = remember { FocusRequester() }
@@ -180,7 +182,8 @@ internal fun ChannelSchedule(
                 }
                 val skeleton = rememberLazyListState()
                 LazyColumn(state = skeleton, userScrollEnabled = false, contentPadding = ScheduleListPadding,
-                    modifier = Modifier.fillMaxSize().listEdgeFades(skeleton)) {
+                    modifier = Modifier.fillMaxSize()
+                        .listEdgeFades(skeleton, topFadeHeight = PlayerScheduleTopFadeHeight)) {
                     items(ScheduleSkeletonRows) { ScheduleSkeletonRow(timeWidth) }
                 }
             }
@@ -271,7 +274,9 @@ internal fun ChannelSchedule(
             }
             CompositionLocalProvider(LocalBringIntoViewSpec provides bringIntoView) {
                 LazyColumn(state = listState, contentPadding = ScheduleListPadding,
-                    modifier = Modifier.weight(1f).listEdgeFades(listState).testTag("channel-schedule-list")) {
+                    modifier = Modifier.weight(1f)
+                        .listEdgeFades(listState, topFadeHeight = PlayerScheduleTopFadeHeight)
+                        .testTag("channel-schedule-list")) {
                     itemsIndexed(events, key = { _, event -> event.id.value }) { index, event ->
                         val day = date(event)
                         val previous = events.getOrNull(index - 1)
@@ -310,6 +315,7 @@ internal fun ChannelSchedule(
 
 /** The text keyline of the panel: its padding plus a list row's own text inset. */
 private val ScheduleTextKeyline = PlaybackPanelPadding + PlaybackRowTextInset
+internal val PlayerScheduleTopFadeHeight = 48.dp
 
 /** Rows sit inside the panel's padding and run to its bottom edge behind the shared fade. */
 private val ScheduleListPadding = PaddingValues(start = PlaybackPanelPadding, end = PlaybackPanelPadding, bottom = ListBottomReserve)
@@ -465,7 +471,8 @@ private fun ChannelScheduleRow(
             val headlineColor = LocalContentColor.current.let { if (ended) it.copy(alpha = TvTextSecondaryAlpha) else it }
             CompositionLocalProvider(LocalContentColor provides headlineColor) {
                 ScheduleHeadline(formatHm(start), timeWidth) {
-                    Text(event.title.orEmpty(), Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(event.title.orEmpty(), Modifier.weight(1f, fill = recording == null),
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
                     if (recording != null && !failed) {
                         Spacer(Modifier.width(TvSpacing8))
                         RecordingStatusIndicator(recording, rule = entry.rule, focused = focused)
@@ -473,7 +480,7 @@ private fun ChannelScheduleRow(
                     if (failed) {
                         Spacer(Modifier.width(TvSpacing8))
                         Icon(painterResource(R.drawable.ic_error_outlined), contentDescription = null,
-                            modifier = Modifier.size(StatusIconSize), tint = errorMarkColor(focused))
+                            modifier = Modifier.size(recordingMarkSize()), tint = errorMarkColor(focused))
                     }
                 }
             }

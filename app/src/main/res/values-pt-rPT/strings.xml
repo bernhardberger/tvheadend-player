@@ -870,6 +870,7 @@
     <string name="rail_now_playing_description">A reproduzir: %1$s, %2$s, %3$s.</string>
     <string name="rail_now_playing_description_channel">A reproduzir: %1$s, %2$s.</string>
     <string name="player_recording">A gravar</string>
+    <string name="channel_recording_spoken">A gravar neste canal</string>
     <string name="player_recorded_on">Gravado em %1$s</string>
     <string name="player_recorded_ends">Gravado em %1$s • Termina às %2$s</string>
     <string name="player_recording_until">A gravar até %1$s</string>
@@ -885,9 +886,6 @@
     <string name="player_recorded_spoken">%1$s, gravado em %2$s, %3$s</string>
     <string name="player_channel">Canal</string>
     <string name="player_row_recent">Canais recentes</string>
-    <string name="player_channel_card_hint">Esquerda ou direita muda de canal, OK mostra os canais recentes</string>
-    <string name="player_identity_info_hint">OK mostra as informações do programa</string>
-    <string name="player_channel_card_hint_no_recents">Esquerda ou direita muda de canal</string>
     <string name="player_rail_watching">A ver</string>
     <string name="details_read_more">Mais informações</string>
     <string name="details_important_information">Detalhes</string>
@@ -1070,8 +1068,6 @@
     <string name="home_recording_starts_at">Começa às %1$s</string>
     <string name="home_all_recordings">Todas as gravações</string>
     <string name="home_activity_watching_live">A ver em direto</string>
-    <string name="home_activity_recording">A gravar</string>
-    <string name="home_activity_watching_and_recording">A ver e a gravar</string>
     <string name="home_upcoming_summary">A seguir: %1$s • %2$s</string>
     <plurals name="home_upcoming_more">
         <item quantity="one">Mais %1$d agendada</item>
@@ -1130,4 +1126,5 @@
     <string name="server_none_in_use">Nenhuma ligação em utilização</string>
     <string name="server_list_unavailable">Neste momento, não é possível ler as ligações guardadas nesta TV</string>
     <string name="server_none_in_use_description">Nenhuma ligação em utilização. Escolhe uma para voltares a ver TV.</string>
+    <string name="return_to_full_screen">Voltar ao ecrã inteiro</string>
 </resources>

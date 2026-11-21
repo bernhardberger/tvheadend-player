@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui
 
 import at.bernhardberger.tvhplayer.testutil.pressKey
+import at.bernhardberger.tvhplayer.testutil.LeanbackFeature
 import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -26,6 +27,7 @@ import androidx.compose.ui.unit.Density
 import at.bernhardberger.tvheadend.sdk.core.CacheStatistics
 import at.bernhardberger.tvhplayer.settings.AppLanguage
 import at.bernhardberger.tvhplayer.settings.UiSettings
+import at.bernhardberger.tvhplayer.ui.components.ListBottomFadeHeight
 import at.bernhardberger.tvhplayer.ui.components.SideRail
 import at.bernhardberger.tvhplayer.ui.components.depth.*
 import at.bernhardberger.tvhplayer.ui.player.DebugVideoBackdrop
@@ -51,6 +53,7 @@ import java.io.File
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class SettingsVisualEvidenceTest {
     @get:Rule val compose = createComposeRule()
+    @get:Rule val leanback = LeanbackFeature()
     private lateinit var view: View
 
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi") fun warmPlaybackChoice() {
@@ -297,6 +300,7 @@ class SettingsVisualEvidenceTest {
     /** Playback with the Recording marks group focused on Ad breaks, then the Ad breaks choice. */
     @Category(VisualCapture::class)
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi") fun englishRecordingMarksPages() {
+        leanback.enable()
         val ui = connectedPlaybackUi()
         lateinit var navigation: DepthNavigationState
         compose.setContent {
@@ -318,8 +322,14 @@ class SettingsVisualEvidenceTest {
         }
         compose.pressKey(Key.DirectionCenter)
         repeat(4) { compose.pressKey(Key.DirectionDown) }
-        compose.onNode(isFocused() and hasText("Ad breaks")).assertExists()
-        capture("en-font1.0-playback-recording-marks")
+        val focused = compose.onNode(isFocused()).fetchSemanticsNode().boundsInRoot
+        val top = compose.onNodeWithTag("depth-heading").fetchSemanticsNode().boundsInRoot.bottom
+        val height = compose.onNodeWithTag("depth-active").fetchSemanticsNode().boundsInRoot.bottom - top
+        val pivot = with(compose.density) {
+            "pivotDp: viewportTop=${top.toDp()}; viewportHeight=${height.toDp()}; focusedTop=${focused.top.toDp()}; " +
+                "fadeEnd=${top.toDp() + ListBottomFadeHeight}"
+        }
+        capture("en-font1.0-playback-recording-marks", pivotGeometry = pivot)
         compose.pressKey(Key.DirectionCenter)
         compose.onNode(isFocused() and hasText("Ask")).assertIsSelected()
         capture("en-font1.0-ad-breaks")
@@ -390,7 +400,8 @@ class SettingsVisualEvidenceTest {
         tops.zip(rows).forEach { (top, row) -> assertEquals(top, row.top, .5f) }
     }
 
-    private fun capture(name: String, middleFocus: Boolean = false, reader: Boolean = false, writeImages: Boolean = true) {
+    private fun capture(name: String, middleFocus: Boolean = false, reader: Boolean = false,
+        writeImages: Boolean = true, pivotGeometry: String? = null) {
         val activeColumn = (if (reader) compose.onNodeWithTag("player-info-reading") else compose.onNodeWithTag("depth-active"))
             .fetchSemanticsNode().boundsInRoot
         val rows = if (reader) emptyList() else activeRows()
@@ -441,6 +452,7 @@ class SettingsVisualEvidenceTest {
                     "activeColumn=$activeColumn; " +
                     "rows=$rows; " +
                     focusEvidence +
+                    (pivotGeometry?.let { "\n$it\n" } ?: "") +
                     "static offline composition only\n",
             )
         }

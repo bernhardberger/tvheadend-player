@@ -926,6 +926,7 @@
     <string name="rail_now_playing_description">מתנגן כעת: %1$s, %2$s, %3$s.</string>
     <string name="rail_now_playing_description_channel">מתנגן כעת: %1$s, %2$s.</string>
     <string name="player_recording">הקלטה פעילה</string>
+    <string name="channel_recording_spoken">הקלטה פעילה בערוץ הזה</string>
     <string name="player_recorded_on">הקלטת %1$s</string>
     <string name="player_recorded_ends">הקלטת %1$s • מסתיימת ב-%2$s</string>
     <string name="player_recording_until">הקלטה עד %1$s</string>
@@ -941,9 +942,6 @@
     <string name="player_recorded_spoken">%1$s, הקלטת %2$s, %3$s</string>
     <string name="player_channel">ערוץ</string>
     <string name="player_row_recent">ערוצים אחרונים</string>
-    <string name="player_channel_card_hint">שמאלה או ימינה להחלפת ערוץ, OK להצגת ערוצים אחרונים</string>
-    <string name="player_identity_info_hint">OK להצגת מידע על התוכנית</string>
-    <string name="player_channel_card_hint_no_recents">שמאלה או ימינה להחלפת ערוץ</string>
     <string name="player_rail_watching">כעת בצפייה</string>
     <string name="details_read_more">מידע נוסף</string>
     <string name="details_important_information">פרטים</string>
@@ -1149,8 +1147,6 @@
     <string name="home_recording_starts_at">התחלה ב־%1$s</string>
     <string name="home_all_recordings">כל ההקלטות</string>
     <string name="home_activity_watching_live">צפייה בשידור חי</string>
-    <string name="home_activity_recording">הקלטה פעילה</string>
-    <string name="home_activity_watching_and_recording">צפייה והקלטה</string>
     <string name="home_upcoming_summary">הבא: %1$s • %2$s</string>
     <plurals name="home_upcoming_more">
         <item quantity="one">עוד %1$d הקלטה מתוזמנת</item>
@@ -1209,4 +1205,5 @@
     <string name="server_none_in_use">אין חיבור בשימוש</string>
     <string name="server_list_unavailable">לא ניתן לקרוא כרגע את החיבורים השמורים בטלוויזיה הזו</string>
     <string name="server_none_in_use_description">אין חיבור בשימוש. יש לבחור חיבור כדי לצפות שוב בטלוויזיה.</string>
+    <string name="return_to_full_screen">חזרה למסך מלא</string>
 </resources>

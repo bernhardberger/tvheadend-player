@@ -926,6 +926,7 @@
     <string name="rail_now_playing_description">In riproduzione: %1$s, %2$s, %3$s.</string>
     <string name="rail_now_playing_description_channel">In riproduzione: %1$s, %2$s.</string>
     <string name="player_recording">Registrazione in corso</string>
+    <string name="channel_recording_spoken">Registrazione in corso su questo canale</string>
     <string name="player_recorded_on">Registrato il %1$s</string>
     <string name="player_recorded_ends">Registrato il %1$s • Termina alle %2$s</string>
     <string name="player_recording_until">Registrazione fino alle %1$s</string>
@@ -941,9 +942,6 @@
     <string name="player_recorded_spoken">%1$s, registrato il %2$s, %3$s</string>
     <string name="player_channel">Canale</string>
     <string name="player_row_recent">Canali recenti</string>
-    <string name="player_channel_card_hint">Left o Right cambia canale, OK mostra i canali recenti</string>
-    <string name="player_identity_info_hint">OK mostra le informazioni sul programma</string>
-    <string name="player_channel_card_hint_no_recents">Left o Right cambia canale</string>
     <string name="player_rail_watching">In visione</string>
     <string name="details_read_more">Altre informazioni</string>
     <string name="details_important_information">Dettagli</string>
@@ -1149,8 +1147,6 @@
     <string name="home_recording_starts_at">Inizio alle %1$s</string>
     <string name="home_all_recordings">Tutte le registrazioni</string>
     <string name="home_activity_watching_live">Visione in diretta</string>
-    <string name="home_activity_recording">Registrazione in corso</string>
-    <string name="home_activity_watching_and_recording">Visione e registrazione</string>
     <string name="home_upcoming_summary">A seguire: %1$s • %2$s</string>
     <plurals name="home_upcoming_more">
         <item quantity="one">%1$d altra programmata</item>
@@ -1209,4 +1205,5 @@
     <string name="server_none_in_use">Nessuna connessione in uso</string>
     <string name="server_list_unavailable">Al momento non è possibile leggere le connessioni salvate su questo televisore</string>
     <string name="server_none_in_use_description">Nessuna connessione in uso. Scegline una per tornare a guardare la TV.</string>
+    <string name="return_to_full_screen">Torna a schermo intero</string>
 </resources>

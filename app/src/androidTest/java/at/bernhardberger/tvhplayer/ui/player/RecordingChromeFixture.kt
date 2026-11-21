@@ -14,7 +14,7 @@ import at.bernhardberger.tvhplayer.core.playerStateCell
 import androidx.media3.common.C
 import kotlin.time.Instant
 
-/** A finished recording's info bar data, as the recording screen derives it from its entry. */
+/** A recording's info bar data, including its title mark while the entry grows. */
 @Composable
 internal fun fixtureRecordingInfo(
     title: String = "Zeit im Bild",
@@ -83,7 +83,6 @@ internal fun RecordingChromeFixture(
             info = info ?: fixtureRecordingInfo(growing = growing, positionMs = positionMs,
                 durationMs = durationMs.takeIf { it != C.TIME_UNSET && it > 0L }),
             state = playerStateCell(paused),
-            recordingNow = growing,
             picon = picon?.let { ChannelIcon.ImageCache(it) },
         ),
         timeline = PlayerChromeTimeline.Recording(

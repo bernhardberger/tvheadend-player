@@ -14,7 +14,7 @@ permission:
   skill: deny
   question: deny
   publish_artifact: deny
-model: openai/gpt-6-astra
+model: openai/gpt-6.2-astra
 variant: high
 ---
 

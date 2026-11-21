@@ -317,8 +317,10 @@ keep their existing height. Running recording menus (Home and Recordings)
 offer **Watch live**, with the live-TV icon, after the play/resume actions.
 It uses the choice dialog's channel-tune path, including channels outside the
 Home scope; finished and scheduled recordings do not offer it.
-Right now uses only the REC badge's dot as its running-recording mark, alongside
-the animated playback icon when playing. Recording-only cards also use one REC;
+Right now merges watching and recording into one card only when the running entry
+is the shown programme's own; its REC badge sits beside the animated playback icon.
+A channel's other running entry (padding, an unlinked timer) gets its own
+recording card with that entry's title, picture and one REC;
 finished recording playback has the neutral Recording badge, not REC or a red dot.
 
 ## 4. Data

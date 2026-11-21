@@ -856,6 +856,7 @@
     <string name="rail_now_playing_description">현재 재생 중: %1$s, %2$s, %3$s.</string>
     <string name="rail_now_playing_description_channel">현재 재생 중: %1$s, %2$s.</string>
     <string name="player_recording">녹화 중</string>
+    <string name="channel_recording_spoken">이 채널에서 녹화 중</string>
     <string name="player_recorded_on">%1$s 녹화</string>
     <string name="player_recorded_ends">%1$s 녹화 • %2$s 종료</string>
     <string name="player_recording_until">%1$s까지 녹화</string>
@@ -871,9 +872,6 @@
     <string name="player_recorded_spoken">%1$s, %2$s 녹화, %3$s</string>
     <string name="player_channel">채널</string>
     <string name="player_row_recent">최근 채널</string>
-    <string name="player_channel_card_hint">왼쪽 또는 오른쪽으로 채널을 바꾸고, OK로 최근 채널을 표시합니다</string>
-    <string name="player_identity_info_hint">OK로 프로그램 정보를 표시합니다</string>
-    <string name="player_channel_card_hint_no_recents">왼쪽 또는 오른쪽으로 채널을 바꿉니다</string>
     <string name="player_rail_watching">시청 중</string>
     <string name="details_read_more">추가 정보</string>
     <string name="details_important_information">상세 정보</string>
@@ -1061,8 +1059,6 @@
     <string name="home_recording_starts_at">%1$s에 시작</string>
     <string name="home_all_recordings">모든 녹화</string>
     <string name="home_activity_watching_live">실시간 시청 중</string>
-    <string name="home_activity_recording">녹화 중</string>
-    <string name="home_activity_watching_and_recording">시청 및 녹화 중</string>
     <string name="home_upcoming_summary">다음: %1$s • %2$s</string>
     <plurals name="home_upcoming_more">
         <item quantity="other">예약 %1$d개 더 있음</item>
@@ -1119,4 +1115,5 @@
     <string name="server_none_in_use">사용 중인 연결 없음</string>
     <string name="server_list_unavailable">현재 이 TV에 저장된 연결을 읽을 수 없습니다</string>
     <string name="server_none_in_use_description">사용 중인 연결이 없습니다. TV를 다시 시청하려면 연결을 선택해 주세요.</string>
+    <string name="return_to_full_screen">전체 화면으로 돌아가기</string>
 </resources>

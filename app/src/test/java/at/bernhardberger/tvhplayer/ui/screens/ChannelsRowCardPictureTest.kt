@@ -3,8 +3,13 @@ package at.bernhardberger.tvhplayer.ui.screens
 import android.app.Application
 import android.graphics.Bitmap
 import androidx.compose.foundation.layout.Box
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.test.core.app.ApplicationProvider
@@ -16,6 +21,9 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.DvrSnapshot
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
@@ -25,6 +33,7 @@ import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionObservation
+import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
@@ -43,6 +52,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import org.junit.Rule
 import org.junit.Test
+import org.junit.Assert.assertEquals
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -57,6 +67,8 @@ class ChannelsRowCardPictureTest {
     @get:Rule val compose = createComposeRule()
 
     private val picture = CompletableDeferred<(coil3.request.ImageRequest) -> ImageResult>()
+    private val channelOnlyRecording = mutableStateOf(false)
+    private val programmeRecording = mutableStateOf(false)
 
     @Test fun aCardKeepsItsLogoAndProgrammeWhileThePictureLoads() {
         show()
@@ -65,7 +77,12 @@ class ChannelsRowCardPictureTest {
     }
 
     @Test fun aPictureFadesInOverTheLogoAndProgrammeBeforeTheyLeave() {
-        show()
+        show(recording = true)
+        compose.onNodeWithTag("recording-badge", useUnmergedTree = true).assertIsDisplayed()
+        val recordingDescription = ApplicationProvider.getApplicationContext<Application>()
+            .getString(R.string.recording_state_recording)
+        compose.onNode(hasContentDescription(recordingDescription), useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("channel-recording-indicator", useUnmergedTree = true).assertDoesNotExist()
         compose.mainClock.autoAdvance = false
         picture.complete { SuccessResult(bitmap(), it, DataSource.DISK) }
         compose.waitForIdle()
@@ -73,6 +90,8 @@ class ChannelsRowCardPictureTest {
         compose.waitForIdle()
         compose.onNodeWithTag("$CARD-art-picon", useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("$CARD-now", useUnmergedTree = true).assertExists()
+        compose.onNode(hasContentDescription(recordingDescription), useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("channel-recording-indicator", useUnmergedTree = true).assertDoesNotExist()
         compose.mainClock.advanceTimeBy(PlayerMotion.MediumMs + 100L)
         compose.waitForIdle()
         compose.onNodeWithTag("$CARD-now", useUnmergedTree = true).assertDoesNotExist()
@@ -86,12 +105,48 @@ class ChannelsRowCardPictureTest {
         compose.onNodeWithTag("$CARD-art-picon", useUnmergedTree = true).assertExists()
     }
 
+    @Test fun aChannelOnlyRecordingUsesThePictureCornerWithoutAddingCardHeight() {
+        picture.complete { SuccessResult(bitmap(), it, DataSource.MEMORY_CACHE) }
+        show()
+        val card = compose.onNodeWithTag(CARD, useUnmergedTree = true)
+        val bounds = card.getUnclippedBoundsInRoot()
+        compose.runOnIdle { channelOnlyRecording.value = true }
+        assertEquals(bounds, card.getUnclippedBoundsInRoot())
+        compose.onNodeWithTag("$CARD-identity", useUnmergedTree = true).assertDoesNotExist()
+        val badge = assertChannelBadge()
+        val position = badge.getUnclippedBoundsInRoot()
+        compose.runOnIdle { programmeRecording.value = true }
+        badge.assert(hasContentDescription(ApplicationProvider.getApplicationContext<Application>()
+            .getString(R.string.recording_state_recording)))
+        assertEquals(position, badge.getUnclippedBoundsInRoot())
+        assertEquals(bounds, card.getUnclippedBoundsInRoot())
+    }
+
+    @Test fun aLogoLedCardUsesAChannelBadgeWithoutChangingItsLayout() {
+        show(programmePicture = false)
+        val card = compose.onNodeWithTag(CARD, useUnmergedTree = true)
+        val logo = compose.onNodeWithTag("$CARD-picon", useUnmergedTree = true)
+        val cardBounds = card.getUnclippedBoundsInRoot()
+        val logoBounds = logo.getUnclippedBoundsInRoot()
+        val badge = compose.onNodeWithTag("recording-badge", useUnmergedTree = true)
+        badge.assertDoesNotExist()
+
+        compose.runOnIdle { channelOnlyRecording.value = true }
+
+        assertChannelBadge()
+        assertEquals(cardBounds, card.getUnclippedBoundsInRoot())
+        assertEquals(logoBounds, logo.getUnclippedBoundsInRoot())
+    }
+
     @Test fun aFailedPictureLeavesTheLogoAndProgramme() {
+        channelOnlyRecording.value = true
         show()
         picture.complete { ErrorResult(null, it, IllegalStateException("Synthetic picture failure")) }
         compose.mainClock.advanceTimeBy(PlayerMotion.MediumMs + 100L)
         compose.waitForIdle()
         assertFallback()
+        assertChannelBadge()
+        compose.onNodeWithTag("$CARD-identity", useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithTag("$CARD-art", useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithTag("$CARD-art-picon", useUnmergedTree = true).assertDoesNotExist()
     }
@@ -101,7 +156,13 @@ class ChannelsRowCardPictureTest {
         compose.onNodeWithTag("$CARD-now", useUnmergedTree = true).assertIsDisplayed()
     }
 
-    private fun show() {
+    private fun assertChannelBadge() = compose.onNodeWithTag("recording-badge", useUnmergedTree = true)
+        .assertIsDisplayed().assert(hasContentDescription(ApplicationProvider.getApplicationContext<Application>()
+            .getString(R.string.channel_recording_spoken))).also {
+            compose.onNodeWithTag("channel-recording-indicator", useUnmergedTree = true).assertDoesNotExist()
+        }
+
+    private fun show(recording: Boolean = false, programmePicture: Boolean = true) {
         val session = FakeSessionObservation(SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(
                 streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED,
@@ -128,19 +189,21 @@ class ChannelsRowCardPictureTest {
         compose.setContent {
             TVHeadendPlayerTheme {
                 ProvideArtworkSession(session) {
-                    Box {
+                    Box(Modifier.testTag(CARD)) {
                         ChannelsRowCard(
                             channel = channel,
                             event = event,
                             nowSec = NOW,
                             playbackIndicator = ChannelPlaybackIndicator.NONE,
-                            recording = false,
+                            channelRecording = recording || channelOnlyRecording.value,
                             onClick = {},
                             onLongClick = {},
                             programmeLoading = false,
-                            programmePicture = true,
+                            programmePicture = programmePicture,
                             modifier = Modifier,
                             channelName = false,
+                            programmeRecording = if (recording || programmeRecording.value) DvrEntry.create(DvrEntryId(1),
+                                eventId = event.id, state = DvrEntryState.RECORDING) else null,
                         )
                     }
                 }

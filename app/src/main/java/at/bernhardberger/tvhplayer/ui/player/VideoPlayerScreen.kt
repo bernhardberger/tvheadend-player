@@ -72,6 +72,7 @@ import at.bernhardberger.tvhplayer.core.ChannelNumberEntryReadiness
 import at.bernhardberger.tvhplayer.profiling.profileTrace
 import at.bernhardberger.tvhplayer.core.visibleChannelNumber
 import at.bernhardberger.tvhplayer.core.activeRecordingChannelIds
+import at.bernhardberger.tvhplayer.core.runningRecordingForEvent
 import at.bernhardberger.tvhplayer.core.ChannelKeyAction
 import at.bernhardberger.tvhplayer.core.ChannelPickAction
 import at.bernhardberger.tvhplayer.core.browsingFocusChannelId
@@ -1793,7 +1794,7 @@ fun VideoPlayerScreen(
     val numberEntry = channelNumberInput.takeIf { foregroundLayer == PlayerForegroundLayer.NUMBER_ENTRY }.orEmpty()
     val compactTuning = busyStatus == PlayerBusyStatus.TUNING && statusPresentation == PlaybackStatusPresentation.COMPACT_TUNING
     val dvrEntries = observation.dvrEntries()
-    val recordingChannelIds = remember(dvrEntries) { activeRecordingChannelIds(dvrEntries) }
+    val recordingChannelIds = remember(dvrEntries, nowSec) { activeRecordingChannelIds(dvrEntries, nowSec) }
     val chromeState = playerStateCell(paused = livePaused)
     val currentChannel = remember(observation, currentChannelId) {
         observation.channel(currentChannelId)
@@ -1822,12 +1823,13 @@ fun VideoPlayerScreen(
             channelName = currentChannelName,
             event = controlsEvent,
             next = controlsNext,
-            nextScheduled = controlsNext?.let { observation.dvrEntryForEvent(it) }?.state ==
-                DvrEntryState.SCHEDULED,
+            nextScheduled = observation.isScheduled(controlsNext),
             nowSec = nowSec,
             unavailableTitle = unavailableTitle,
+            nowRecording = observation.runningRecordingForEvent(controlsEvent),
+            nextRecording = observation.runningRecordingForEvent(controlsNext),
         ),
-        recordingNow = currentChannelId in recordingChannelIds,
+        channelRecording = currentChannelId in recordingChannelIds,
         badges = trackGlance.badges,
         picon = currentChannel?.icon,
         // The info bar's artwork tile.
@@ -1968,7 +1970,6 @@ fun VideoPlayerScreen(
             },
             onDownFromActions = openRailFromActions,
             downHint = stringResource(R.string.nav_channels),
-            onChannelCardFocusChanged = layerState.core.chrome::onChannelCardFocusChanged,
             decorationCoversControls = channelRailOpen,
             controlsDecoration = { actionsAlpha, controls ->
                 // Below the controls, the rail's cards hint at what Down opens.
@@ -1986,9 +1987,11 @@ fun VideoPlayerScreen(
                     channels = channels,
                     recentChannels = recentChannels,
                     playingChannelId = currentChannelId,
+                    playbackIndicator = channelIndicator(),
                     recordingChannelIds = recordingChannelIds,
                     nowSec = railNowSec,
                     nowEvent = { id -> observation.eventAt(id, kotlin.time.Instant.fromEpochSeconds(railNowSec)) },
+                    runningRecordingForEvent = observation::runningRecordingForEvent,
                     onFocusChannel = { selectedId = it },
                     onPickChannel = { onPickChannel(it) },
                     onClose = { keyCode ->
@@ -2013,13 +2016,18 @@ fun VideoPlayerScreen(
                 val previewNext = previewChannel?.let {
                     observation.nextEvent(it.id, kotlin.time.Instant.fromEpochSeconds(nowSec))
                 }
+                val previewEvent = previewChannel?.let {
+                    observation.eventAt(it.id, kotlin.time.Instant.fromEpochSeconds(nowSec))
+                }
                 QuickZapTrayPreview(previewChannel,
-                    previewChannel?.let { observation.eventAt(it.id, kotlin.time.Instant.fromEpochSeconds(nowSec)) },
+                    previewEvent,
                     previewNext,
                     nowSec,
                     Modifier.padding(horizontal = at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin),
                     scrolling = channelBrowser.scrolling,
-                    nextScheduled = observation.isScheduled(previewNext))
+                    nextScheduled = observation.isScheduled(previewNext),
+                    nextRecording = observation.runningRecordingForEvent(previewNext),
+                    nowRecording = observation.runningRecordingForEvent(previewEvent))
             },
             peeks = channels.isNotEmpty(),
             visible = controlsShown && !chromePanelOpen,

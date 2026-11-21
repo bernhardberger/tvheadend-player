@@ -93,6 +93,12 @@ Direct Gradle runs and `tools/verify` default to `exclude`: ordinary behavior,
 focused layout smoke checks and clipping/focus regressions remain in the routine gate.
 Pass `-Ptvhplayer.captureTests=all` for behavior plus visual captures, or `only`
 for the marked visual scenarios alone; capture generation is opt-in.
+`StatusMarksCaptureTest` renders recording, scheduled and watching marks across the app, including the Channels art and name options, to `app/build/outputs/status-marks/`.
+
+```bash
+timeout --kill-after=5s 20m ./gradlew :app:testPlayDebugUnitTest -Ptvhplayer.captureTests=only --tests '*StatusMarksCaptureTest' --console=plain --no-scan
+```
+
 Audio preferences, startup-buffer choices and playback track lists retain English/default
 and German/1.3× smoke cases; redundant combinations join the extended visual matrix.
 Player geometry, badge visibility and other targeted large-text regressions remain routine.

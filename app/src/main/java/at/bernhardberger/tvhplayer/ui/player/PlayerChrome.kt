@@ -99,17 +99,8 @@ internal fun PlayerChrome(
     /** A recording's marker navigation, opened from its timeline. */
     markerNavigation: RecordingMarkerNavigation = remember { RecordingMarkerNavigation() },
     onSeekMarker: (Long) -> Unit = {},
-    /** Retained trial caller input; the passive top identity never handles channel gestures. */
-    onChannelZap: ((direction: Int, keyTimeMs: Long, repeat: Boolean) -> Unit)? = null,
     /** What Down from the action row opens, shown centred in the row. */
     downHint: String? = null,
-    /** Retained trial caller input; Recent is now hosted by the bottom browser. */
-    recents: List<RecentChannelPeek> = emptyList(),
-    onRecentPick: ((Int) -> Unit)? = null,
-    recentRowOpen: Boolean = false,
-    onRecentRowOpenChange: (Boolean) -> Unit = {},
-    /** Retained trial caller input; the passive top identity cannot take focus. */
-    onChannelCardFocusChanged: (Boolean) -> Unit = {},
     /**
      * The channel number entry stands in the top identity's place, which gives way to it; the
      * controls kept up under the entry take no focus.
@@ -142,7 +133,6 @@ internal fun PlayerChrome(
         val header: @Composable (Modifier) -> Unit = { PlayerChromeHeader(content.clock, it.testTag("player-header")) }
         // One chrome for every source: the channel at the top, the info bar leading with the programme's
         // artwork, and the [timelineRow] the full width below it.
-        val recentList = if (onRecentPick != null) recents else emptyList()
         val infoBar: @Composable (contentAlpha: () -> Float, programmeFocus: Modifier, timelineRow: @Composable () -> Unit) -> Unit =
             { contentAlpha, programmeFocus, timelineRow ->
                 // The artwork card, then the text from its top: now (title, time and metadata, subtitle)
@@ -191,9 +181,8 @@ internal fun PlayerChrome(
                 decoration = controlsDecoration,
                 markerNavigation = markerNavigation,
                 onSeekMarker = onSeekMarker,
-                onChannelZap = onChannelZap,
                 downHint = downHint,
-                topIdentity = { placed, _, _ ->
+                topIdentity = { placed ->
                     PlayerTopIdentity(content, placed, numberEntryShown = numberEntryShown)
                 },
             )

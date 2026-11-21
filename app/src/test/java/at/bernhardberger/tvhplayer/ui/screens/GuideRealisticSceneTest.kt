@@ -209,7 +209,7 @@ class GuideRealisticSceneTest {
             compose.onAllNodes(hasTestTag("guide-headline-title") and hasText(checkNotNull(recordingNow.title)),
                 useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
         }
-        compose.onNode(hasTestTag("recording-badge") and hasAnyAncestor(hasTestTag("guide-headline")),
+        compose.onNode(hasTestTag("recording-badge") and hasAnyAncestor(hasTestTag("guide-headline-channel")),
             useUnmergedTree = true).assertIsDisplayed()
     }
 

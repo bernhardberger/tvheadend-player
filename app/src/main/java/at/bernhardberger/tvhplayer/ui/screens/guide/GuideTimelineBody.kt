@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens.guide
 
+import at.bernhardberger.tvhplayer.core.linkedRecordingForEvent
+
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.BringIntoViewSpec
@@ -8,6 +10,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
+import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
+import at.bernhardberger.tvhplayer.ui.components.LocalWatchingChannel
+import at.bernhardberger.tvhplayer.ui.components.LocalWatchingIndicator
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
@@ -223,6 +228,8 @@ internal fun GuideTimelineBody(
             val lead = startPadding + TvBrowseLeadingInset + LocalGuideChannelWidth.current + GuideChannelGap
             with(density) { lead.toPx() }
         } else terminalReservePx
+        val watchedChannel = LocalWatchingChannel.current
+        val playback = if (watchedChannel != null) LocalWatchingIndicator.current else ChannelPlaybackIndicator.NONE
         // Now draws outside the faded layer, so it stays solid under the top and inner fades.
         Box(Modifier.weight(1f).fillMaxWidth()
             .guideNowLine(renderedWindowStartSec, windowEndSec, nowSecProvider, trackLeftPx, trackWidthPx,
@@ -263,6 +270,7 @@ internal fun GuideTimelineBody(
                         orderedChannelIds, channelNumbers, channel.id,
                     ),
                     selectedEventId = selected?.takeIf { it.channelIndex == channelIndex }?.eventId,
+                    channelPlayback = if (channel.id == watchedChannel) playback else ChannelPlaybackIndicator.NONE,
                     eventFocusRequesters = eventFocusRequesters,
                     windowStartSec = renderedWindowStartSec,
                     windowEndSec = windowEndSec,
@@ -278,7 +286,7 @@ internal fun GuideTimelineBody(
                     },
                     recordingForEvent = { event ->
                         profileTrace("P48:guideRecordingLookup") {
-                            observation.dvrEntryForEvent(event)?.takeUnless(::recordingWasRemoved)
+                            observation.linkedRecordingForEvent(event)?.takeUnless(::recordingWasRemoved)
                         }
                     },
                     onOpenDetails = {
