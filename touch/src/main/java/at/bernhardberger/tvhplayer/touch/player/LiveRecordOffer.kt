@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.touch.player
 
+import android.content.res.Configuration
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.Icon
@@ -8,6 +9,7 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -104,7 +106,8 @@ internal fun PlayerDvrConfirmation(controls: DvrControls, inWindow: Boolean) {
     if (inWindow) {
         LaunchedEffect(controls, controls.pending) { controls.dismiss() }
     } else {
-        ConfirmDvrChange(controls)
+        val landscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+        ConfirmDvrChange(controls, hideSystemBars = landscape)
     }
 }
 
