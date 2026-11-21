@@ -345,7 +345,7 @@ private fun RecordingLineText(line: List<RecordingLinePart>) {
 }
 
 @Composable
-private fun partText(part: RecordingLinePart): String = when (part) {
+internal fun partText(part: RecordingLinePart): String = when (part) {
     is RecordingLinePart.Episode -> part.name
     is RecordingLinePart.Time -> part.time
     is RecordingLinePart.Day -> dayText(part.day)

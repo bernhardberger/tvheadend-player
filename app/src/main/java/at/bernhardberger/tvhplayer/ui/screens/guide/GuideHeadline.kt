@@ -69,7 +69,7 @@ import at.bernhardberger.tvhplayer.ui.components.ProgrammeHeadlineLineGap
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeHeadlineTitleGap
 import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
-import at.bernhardberger.tvhplayer.ui.components.programmeAboutFacts
+import at.bernhardberger.tvhplayer.ui.common.programmeAboutFacts
 import at.bernhardberger.tvhplayer.ui.components.programmeHeaderMetadata
 import at.bernhardberger.tvhplayer.ui.components.focusedInfoSwap
 import at.bernhardberger.tvhplayer.ui.screens.ChannelsImmersiveBackground

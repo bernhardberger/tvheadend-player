@@ -3,18 +3,11 @@ package at.bernhardberger.tvhplayer.ui.common
 import android.app.Application
 import android.content.res.Configuration
 import androidx.test.core.app.ApplicationProvider
-import at.bernhardberger.tvhplayer.presentation.R
-import at.bernhardberger.tvhplayer.ui.components.recordingMetadataFacts
 import at.bernhardberger.tvhplayer.ui.screens.recordings.recordingDateTime
 import at.bernhardberger.tvhplayer.ui.screens.recordings.recordingTimeRange
-import at.bernhardberger.tvheadend.sdk.core.DvrEntry
-import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
-import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
-import at.bernhardberger.tvheadend.sdk.core.DvrRecordingFile
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.util.Locale
-import kotlin.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -157,33 +150,5 @@ class TimeIntervalFormatTest {
         assertEquals(sameDay.first.recordingDateTime(Locale.US), recordingTimeRange(sameDay.first, null, Locale.US))
         assertEquals(formatClock(sameDay.second), recordingTimeRange(null, sameDay.second, Locale.US))
         assertEquals("", recordingTimeRange(null, null, Locale.US))
-    }
-
-    @Test fun `recording details give the recorded span as one interval with the date once`() {
-        val context = ApplicationProvider.getApplicationContext<Application>()
-        val recording = DvrEntry.create(DvrEntryId(1),
-            start = Instant.fromEpochSeconds(sameDay.first), stop = Instant.fromEpochSeconds(sameDay.second))
-        AppClock.format = at.bernhardberger.tvhplayer.settings.ClockFormat.TWENTY_FOUR_HOUR
-        try {
-            val recorded = recordingMetadataFacts(recording, emptyList(), context, Locale.US, now)
-                .single { it.first == context.getString(R.string.details_recorded) }.second
-            assertEquals("Tue, Sep 15, 18:58 – 21:05", recorded)
-            val stoppedEarly = DvrEntry.create(DvrEntryId(2), state = DvrEntryState.COMPLETED,
-                start = Instant.fromEpochSeconds(sameDay.first), stop = Instant.fromEpochSeconds(sameDay.second),
-                files = listOf(DvrRecordingFile.create(start = Instant.fromEpochSeconds(sameDay.first),
-                    stop = Instant.fromEpochSeconds(sameDay.first + 30 * 60))))
-            assertEquals("Tue, Sep 15, 18:58 – 19:28", recordingMetadataFacts(stoppedEarly, emptyList(), context, Locale.US, now)
-                .single { it.first == context.getString(R.string.details_recorded) }.second)
-            // Nothing was recorded, so the slot it was scheduled for is labelled as such.
-            for (state in listOf(DvrEntryState.MISSED, DvrEntryState.INVALID)) {
-                val facts = recordingMetadataFacts(DvrEntry.create(DvrEntryId(3), state = state,
-                    start = Instant.fromEpochSeconds(sameDay.first), stop = Instant.fromEpochSeconds(sameDay.second)),
-                    emptyList(), context, Locale.US, now)
-                assertEquals(recorded, facts.single { it.first == "Scheduled" }.second)
-                assertTrue(facts.none { it.first == context.getString(R.string.details_recorded) })
-            }
-        } finally {
-            AppClock.format = at.bernhardberger.tvhplayer.settings.ClockFormat.SYSTEM
-        }
     }
 }

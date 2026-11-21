@@ -102,21 +102,21 @@ class PlayerActivity : ComponentActivity() {
     private val channels: ChannelsViewModel by inject()
     private val runtime get() = sdk.playbackRuntime
 
-    private lateinit var requested: MutableStateFlow<Tune>
+    private lateinit var requested: MutableStateFlow<PlayerRoute>
     private lateinit var pictureWindow: PlayerWindow
     private val requestFailed = MutableStateFlow(false)
     private var leaving = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val channelId = intent.channelId()
+        val route = intent.playerRoute()
         // First, before any playback: a user stop since the tap that opened this closes it.
-        if (channelId == null || runtime.enterPlayerScreen(this) == null) {
+        if (route == null || runtime.enterPlayerScreen(this) == null) {
             leaving = true
             finish()
             return
         }
-        requested = MutableStateFlow(Tune(channelId))
+        requested = MutableStateFlow(route)
         pictureWindow = PlayerWindow(this, runtime.player).also { it.open() }
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
@@ -126,14 +126,29 @@ class PlayerActivity : ComponentActivity() {
         // The window's previous/next step through the channel order Channels shows, as the TV's player.
         lifecycle.addObserver(
             PlayerMediaSession(this, runtime, session.observation) { direction ->
+                val current = requested.value as? Tune ?: return@PlayerMediaSession
                 val order = channels.scope.value.scope.visibleChannels.map { it.id }
-                adjacentChannel(order, requested.value.channelId, direction)
+                adjacentChannel(order, current.channelId, direction)
                     ?.takeUnless { leaving }?.let { next -> requested.update { tuneTo(it, next) } }
             },
         )
-        lifecycleScope.launch { requested.collectLatest { tune(runtime, session, it, requestFailed) } }
-        lifecycleScope.launch { retuneOnNewSession(runtime, session) }
-        lifecycleScope.launch { followConnection(runtime, session) }
+        lifecycleScope.launch {
+            requested.collectLatest {
+                when (it) {
+                    is Tune -> tune(runtime, session, it, requestFailed)
+                    is RecordingRoute -> restoreRecording(runtime, session, it, pictureWindow.inWindow)
+                }
+            }
+        }
+        lifecycleScope.launch {
+            requested.map { it is Tune }.distinctUntilChanged().collectLatest { live ->
+                if (live) {
+                    launch { retuneOnNewSession(runtime, session) }
+                    followConnection(runtime, session)
+                }
+            }
+        }
+        finishRecordingAtEof(lifecycleScope, runtime, requested, { lifecycle.currentState }, ::leave)
         lifecycleScope.launch {
             runtime.sessionStops.first()
             leaving = true
@@ -143,7 +158,14 @@ class PlayerActivity : ComponentActivity() {
             MaterialTheme(colorScheme = MobileDarkColors) {
                 CompositionLocalProvider(LocalChannelAccents provides get<ChannelAccents>()) {
                     // The window's one notice host, for the connection in use, as browsing builds it.
-                    FrameNotices(notices, owner, session) { Player() }
+                    FrameNotices(notices, owner, session) {
+                        when (val shown = requested.collectAsStateWithLifecycle().value) {
+                            is Tune -> Player(shown)
+                            is RecordingRoute -> RecordingPlayback(
+                                shown, runtime, session, artwork, pictureWindow, window, ::back,
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -151,8 +173,15 @@ class PlayerActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        val channelId = intent.channelId() ?: return
-        if (::requested.isInitialized) requested.update { tuneTo(it, channelId) }
+        val route = intent.playerRoute() ?: return
+        if (!::requested.isInitialized || leaving) return
+        if (route is RecordingRoute && runtime.enterPlayerScreen(this) == null) {
+            leaving = true
+            finish()
+        } else {
+            setIntent(intent)
+            requested.update { if (route is Tune) tuneTo(it, route.channelId) else route }
+        }
     }
 
     override fun onUserLeaveHint() {
@@ -218,7 +247,7 @@ class PlayerActivity : ComponentActivity() {
             PlayerAction.PictureInPicture -> pictureWindow.enter()
             PlayerAction.WatchLive -> {
                 runtime.consumeBackgroundNotice(BackgroundPlaybackNotice.LIMIT_EXPIRED)
-                requested.update { it.copy(token = it.token + 1) }
+                requested.update { if (it is Tune) it.copy(token = it.token + 1) else it }
             }
             PlayerAction.TogglePlay -> timeshift.toggle(paused)
             PlayerAction.BackTen -> timeshift.skip(-BACK_SKIP_MS)
@@ -230,12 +259,11 @@ class PlayerActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun Player() {
+    private fun Player(tune: Tune) {
         val presentation by connection.uiState.collectAsStateWithLifecycle()
         val scope by channels.scope.collectAsStateWithLifecycle()
         val observation by channels.observation.collectAsStateWithLifecycle()
         val video by runtime.videoPresentation.collectAsStateWithLifecycle()
-        val tune by requested.collectAsStateWithLifecycle()
         val failed by requestFailed.collectAsStateWithLifecycle()
         val inWindow by pictureWindow.inWindow.collectAsStateWithLifecycle()
         val windowAvailable by pictureWindow.available.collectAsStateWithLifecycle()
@@ -280,7 +308,7 @@ class PlayerActivity : ComponentActivity() {
             onBrightness = { brightness = it; applyBrightness(window, it) },
             onChannel = { id -> requested.update { tuneTo(it, ChannelId(id.toLong())) } },
             onChoice = playerChoices(dvr, info, options, channels) {
-                session.currentLiveRecord(requested.value.channelId, timeshift.programs.value, clock())
+                session.currentLiveRecord((requested.value as? Tune)?.channelId, timeshift.programs.value, clock())
             },
             onInfoShown = info.onShown,
             video = { TouchVideoSurface(runtime.player, video.visible, it, pictureWindow::attach, options.aspect) },
@@ -303,15 +331,17 @@ class PlayerActivity : ComponentActivity() {
 
         private fun Intent.channelId(): ChannelId? =
             getLongExtra(EXTRA_CHANNEL, -1L).takeIf { it >= 0 }?.let(::ChannelId)
+
+        private fun Intent.playerRoute(): PlayerRoute? = recordingRoute() ?: channelId()?.let { Tune(it) }
     }
 }
 
 /** The channel asked for; a new [token] tunes again (Watch live after the pause ended). */
-private data class Tune(val channelId: ChannelId, val token: Int = 0)
+private data class Tune(val channelId: ChannelId, val token: Int = 0) : PlayerRoute
 
 /** A newer tap replaces one still starting; the same channel again changes nothing. */
-private fun tuneTo(current: Tune, channelId: ChannelId): Tune =
-    if (current.channelId == channelId) current else Tune(channelId)
+private fun tuneTo(current: PlayerRoute, channelId: ChannelId): Tune =
+    if (current is Tune && current.channelId == channelId) current else Tune(channelId)
 
 @OptIn(UnstableApi::class)
 private suspend fun tune(
@@ -373,12 +403,12 @@ private suspend fun followConnection(runtime: AppPlaybackRuntime, session: Tvhea
 }
 
 /** The system's backlight level (0–1), which the slider shows on its own curve ([brightnessSlider]). */
-private fun systemBrightness(context: Context): Float = Settings.System.getInt(
+internal fun systemBrightness(context: Context): Float = Settings.System.getInt(
     context.contentResolver, Settings.System.SCREEN_BRIGHTNESS, DEFAULT_BRIGHTNESS,
 ) / MAX_BRIGHTNESS
 
 /** The slider sets this window's backlight only; the system setting stays as it was. */
-private fun applyBrightness(window: Window, slider: Float) {
+internal fun applyBrightness(window: Window, slider: Float) {
     window.attributes = window.attributes.apply {
         screenBrightness = brightnessLevel(slider).coerceIn(MIN_BRIGHTNESS, 1f)
     }

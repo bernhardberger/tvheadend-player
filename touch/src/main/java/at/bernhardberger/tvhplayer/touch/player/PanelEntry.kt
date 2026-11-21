@@ -2,6 +2,7 @@ package at.bernhardberger.tvhplayer.touch.player
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
+import at.bernhardberger.tvhplayer.settings.AdBreakMode
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import at.bernhardberger.tvhplayer.touch.R
 
@@ -24,7 +25,7 @@ private class EntryMaker(
 @Composable
 internal fun panelEntries(
     panel: PlayerPanel,
-    state: LivePlayerState,
+    state: PlayerFaceState,
     onChoice: (PlayerChoice) -> Unit,
     done: () -> Unit,
 ): List<PanelEntry> {
@@ -40,9 +41,42 @@ internal fun panelEntries(
             make.choice(stringResource(it.label), null, options.stats == it, PlayerChoice.Stats(it))
         }
         PlayerPanel.Profile -> make.profiles(options)
-        PlayerPanel.Channels, PlayerPanel.Options, PlayerPanel.Info, PlayerPanel.InfoDetails -> emptyList()
+        PlayerPanel.AdBreaks -> (state as? RecordingPlayerState)?.let { make.adBreaks(it) }.orEmpty()
+        PlayerPanel.Channels, PlayerPanel.Options, PlayerPanel.Info, PlayerPanel.InfoDetails,
+        PlayerPanel.Markers -> emptyList()
     }
 }
+
+@Composable
+private fun EntryMaker.adBreaks(state: RecordingPlayerState): List<PanelEntry> = buildList {
+    add(choice(adBreakDefault(state), null, state.adBreakPick == null, PlayerChoice.AdBreaks(null)))
+    AdBreakMode.entries.forEach { mode ->
+        add(
+            choice(
+                stringResource(mode.label), stringResource(mode.help), state.adBreakPick == mode,
+                PlayerChoice.AdBreaks(mode),
+            ),
+        )
+    }
+}
+
+@Composable
+internal fun adBreakDefault(state: RecordingPlayerState): String =
+    stringResource(SharedR.string.playback_option_default, stringResource(state.adBreakSetting.label))
+
+internal val AdBreakMode.label: Int
+    get() = when (this) {
+        AdBreakMode.ASK -> SharedR.string.ad_breaks_ask
+        AdBreakMode.AUTOMATIC -> SharedR.string.ad_breaks_automatic
+        AdBreakMode.OFF -> SharedR.string.ad_breaks_off
+    }
+
+private val AdBreakMode.help: Int
+    get() = when (this) {
+        AdBreakMode.ASK -> SharedR.string.ad_breaks_ask_help
+        AdBreakMode.AUTOMATIC -> SharedR.string.ad_breaks_automatic_help
+        AdBreakMode.OFF -> SharedR.string.ad_breaks_off_help
+    }
 
 @Composable
 private fun EntryMaker.audio(tracks: PlayerTracks): List<PanelEntry> = buildList {

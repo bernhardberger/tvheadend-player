@@ -40,14 +40,7 @@ class RecordingsMappingTest {
     private val clock = RecordingClock(java.time.Instant.ofEpochSecond(NOW), ZoneOffset.UTC, Locale.US) {
         formatClock(it, Locale.US, uses24Hour = false)
     }
-    private val texts = RecordingsTexts(
-        noChannel = "No channel", noGenre = "No genre", recordingNow = "Recording now",
-        genre = { null }, episode = { null }, section = { it.toString() }, size = { "$it B" },
-        keepUntil = { _, _ -> null },
-        recorded = { start, stop, _ -> "$start to $stop" },
-        errors = { "$it errors" },
-        language = { if (it == "eng") "English" else null },
-    )
+    private val texts = FixtureRecordingsTexts
     private val unreachable = ConnectionUiState.Error(
         ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.EXPLICIT_RETRY,
     )
@@ -187,16 +180,11 @@ class RecordingsMappingTest {
     }
 
     @Test
-    fun detailsUseRecordedFileFactsAndCountBothKindsOfErrors() {
+    fun detailsExposeWatchAndFileSummaryForACompletedRecording() {
         val item = mapped(watchEntry())
         assertEquals(listOf(RecordingPlayAction.Watch), item.play)
         assertEquals(Duration.ofMinutes(60), item.length)
-        assertEquals("${NOW - 3600} to $NOW", item.details.recorded)
         assertEquals("64 B", item.details.size)
-        assertEquals("HD 1080", item.details.picture)
-        assertEquals("English", item.details.audio)
-        assertEquals("English", item.details.subtitles)
-        assertEquals("3 errors", item.details.errors)
     }
 
     private fun mapped(entry: DvrEntry): RecordingItem = recordingsState(

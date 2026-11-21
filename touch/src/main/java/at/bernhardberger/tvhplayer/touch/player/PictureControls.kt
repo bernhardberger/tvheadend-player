@@ -39,6 +39,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -50,8 +51,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.DpSize
 import at.bernhardberger.tvhplayer.core.AppErrorCondition
+import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.ui.common.hintRes
+import at.bernhardberger.tvhplayer.ui.common.AppErrorText
 import at.bernhardberger.tvhplayer.ui.common.titleRes
 import at.bernhardberger.tvhplayer.touch.channels.ChannelRow
 import at.bernhardberger.tvhplayer.touch.ui.ChannelLogoTile
@@ -61,13 +64,14 @@ private val DarkControl = Color(0xA82C2E2E)
 
 @Composable
 internal fun BoxScope.PictureControls(
-    state: LivePlayerState,
+    state: PlayerFaceState,
     layout: PlayerLayout,
     visible: Boolean,
-    preview: Int?,
+    preview: Long?,
     onAction: (PlayerAction) -> Unit,
     onBrightness: (Float) -> Unit,
     onSettings: () -> Unit,
+    onChoice: (PlayerChoice) -> Unit = {},
 ) {
     if (!visible) return
     val status = state.status
@@ -78,21 +82,24 @@ internal fun BoxScope.PictureControls(
         if (playing || tuning) {
             PictureCenter(state, layout, onAction, onBrightness)
         } else {
-            StatusMessage(status, layout, onAction, Modifier.align(Alignment.Center))
+            StatusMessage(state, layout, onAction, Modifier.align(Alignment.Center))
         }
     }
     if (layout.upright && (playing || tuning)) {
-        LiveOffer(
-            state.timeline, state.offered, preview, onAction, layout, live = playing,
-            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-                .padding(start = 16.dp, end = 10.dp, bottom = 22.dp),
-        )
+        val line = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+            .padding(start = 16.dp, end = 10.dp, bottom = 22.dp)
+        when (state) {
+            is LivePlayerState -> LiveOffer(
+                state.timeline, state.offered, preview?.let { (it / 1_000).toInt() }, onAction, layout, line, playing,
+            )
+            is RecordingPlayerState -> RecordingPositionLine(state, preview, layout, onAction, onChoice, line)
+        }
     }
 }
 
 @Composable
 private fun BoxScope.PictureCenter(
-    state: LivePlayerState,
+    state: PlayerFaceState,
     layout: PlayerLayout,
     onAction: (PlayerAction) -> Unit,
     onBrightness: (Float) -> Unit,
@@ -117,7 +124,7 @@ private fun BoxScope.PictureCenter(
 
 @Composable
 private fun PlayerTopBar(
-    state: LivePlayerState,
+    state: PlayerFaceState,
     layout: PlayerLayout,
     onAction: (PlayerAction) -> Unit,
     onSettings: () -> Unit,
@@ -161,7 +168,7 @@ private fun PlayerTopBar(
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun Transport(
-    state: LivePlayerState,
+    state: PlayerFaceState,
     layout: PlayerLayout,
     onAction: (PlayerAction) -> Unit,
     modifier: Modifier,
@@ -178,7 +185,7 @@ private fun Transport(
             .semantics { contentDescription = loading }, color = OnPicture)
         return
     }
-    val canSeek by remember(state.timeline) { derivedStateOf { state.timeline.value?.seekable == true } }
+    val canSeek by remember(state) { derivedStateOf { state.seekable } }
     val skipSize = if (layout == PlayerLayout.Tablet) 72.dp else 52.dp
     val skipColors = IconButtonDefaults.filledTonalIconButtonColors(
         containerColor = DarkControl, contentColor = OnPicture,
@@ -252,12 +259,16 @@ private fun Brightness(value: Float, onBrightness: (Float) -> Unit, modifier: Mo
 
 @Composable
 private fun StatusMessage(
-    status: LivePlayerStatus,
+    state: PlayerFaceState,
     layout: PlayerLayout,
     onAction: (PlayerAction) -> Unit,
     modifier: Modifier,
 ) {
-    val (icon, heading, message) = statusText(status) ?: return
+    val status = state.status
+    val (icon, heading, message) = if (state is RecordingPlayerState && status is LivePlayerStatus.Unavailable) {
+        val reason = status.condition?.let { AppErrorText(LocalContext.current).reason(it) }
+        Triple(R.drawable.player_no_video, SharedR.string.error_306_title, reason)
+    } else statusText(status) ?: return
     val compact = layout.upright
     val type = MaterialTheme.typography
     Column(
@@ -275,6 +286,10 @@ private fun StatusMessage(
                 it, color = OnPicture.copy(alpha = .75f),
                 style = if (compact) type.bodySmall else type.bodyMedium, textAlign = TextAlign.Center,
             )
+        }
+        (state as? RecordingPlayerState)?.failureDetail?.let {
+            Text(it, color = OnPicture.copy(alpha = .75f),
+                style = if (compact) type.bodySmall else type.bodyMedium, textAlign = TextAlign.Center)
         }
         if (status == LivePlayerStatus.PauseEnded) {
             Button(

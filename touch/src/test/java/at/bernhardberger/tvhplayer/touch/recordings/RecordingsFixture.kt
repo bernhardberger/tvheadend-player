@@ -137,7 +137,7 @@ private fun kickoffSaturday() =
     recording("kickoff-saturday", "Harbor Kickoff", "harbor-kickoff", HarborSport, at(14, 20, 15), 105)
         .copy(episode = "Kingsbridge – Northport")
 
-private fun kickoffPicked() =
+internal fun kickoffPicked() =
     recording(PickedId, "Harbor Kickoff", "still-harbor-kickoff", HarborSport, at(11, 20, 30), 105)
         .copy(
             episode = "Westvale – Ridge Town",
@@ -147,13 +147,12 @@ private fun kickoffPicked() =
                 synopsis = "Westvale host Ridge Town under the lights with the league lead at stake. " +
                     "Full match with commentary from the Harbor Sport team.",
                 genre = "Football",
-                recorded = "Wed, Nov 11 • 8:30–10:15 PM",
                 size = "5.1 GB",
-                picture = "1080i • H.264",
-                audio = "English",
-                subtitles = "English",
-                errors = "No errors",
-                retention = "Kept until space is needed",
+                facts = listOf(
+                    "Genre" to "Football", "Size" to "5.1 GB", "Picture" to "1080i • H.264",
+                    "Audio" to "English", "Subtitles" to "English", "Errors" to "No errors",
+                    "Recorded" to "Wed, Nov 11 • 8:30–10:15 PM", "Retention" to "Kept until space is needed",
+                ),
             ),
         )
 
@@ -165,6 +164,12 @@ internal val FixtureClock = RecordingClock(
     now = Instant.parse("2026-11-16T21:00:00Z"), zone = ZoneOffset.UTC, locale = Locale.US,
     // The drawings' "8:30 PM", in the JDK's short style the captures were drawn with.
     time = { DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).withLocale(Locale.US).format(it) },
+)
+
+internal val FixtureRecordingsTexts = RecordingsTexts(
+    noChannel = "No channel", noGenre = "No genre", recordingNow = "Recording now",
+    genre = { null }, episode = { null }, section = { it.toString() }, size = { "$it B" },
+    facts = { _, _ -> emptyList() },
 )
 
 private fun at(dayOfNovember: Int, hour: Int, minute: Int): Instant =

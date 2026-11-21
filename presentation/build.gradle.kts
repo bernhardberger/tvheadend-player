@@ -43,6 +43,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel:${libs.versions.lifecycle.get()}")
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.androidx.media3.common)
     // Channel logo and picture loading; brings coil-core and OkHttp at the catalog's Coil version.
     implementation(libs.coil.network.okhttp)
     // Coil's singleton loader, which the picture-colour sampler decodes through.

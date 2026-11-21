@@ -64,7 +64,7 @@ import org.koin.dsl.module
 import org.koin.dsl.onClose
 
 private val Io = named("io")
-private val Application = named("application")
+internal val Application = named("application")
 private val Channels = named("channels")
 
 /**

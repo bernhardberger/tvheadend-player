@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "LongParameterList")
+@file:Suppress("MagicNumber", "LongParameterList", "TooManyFunctions")
 
 package at.bernhardberger.tvhplayer.touch.player
 
@@ -66,13 +66,54 @@ internal fun PlayerScreen(
     progressing: Boolean = true,
     confirmationOpen: Boolean = false,
     notices: @Composable (Modifier) -> Unit = {},
+) = PlayerFace(
+    state, onAction, { onSeek((it / 1_000).toInt()) }, onBrightness, onChannel, onChoice, modifier, video,
+    onControlsShown, onInfoShown, inWindow, hideAfterMs, progressing, confirmationOpen, notices,
+)
+
+@Composable
+internal fun PlayerScreen(
+    state: RecordingPlayerState,
+    onAction: (PlayerAction) -> Unit,
+    onSeek: (Long) -> Unit,
+    onBrightness: (Float) -> Unit,
+    onChoice: (PlayerChoice) -> Unit,
+    modifier: Modifier = Modifier,
+    video: (@Composable (Modifier) -> Unit)? = null,
+    onControlsShown: (Boolean) -> Unit = {},
+    inWindow: Boolean = false,
+    hideAfterMs: Long? = null,
+    progressing: Boolean = true,
+    notices: @Composable (Modifier) -> Unit = {},
+) = PlayerFace(
+    state, onAction, onSeek, onBrightness, {}, onChoice, modifier, video,
+    onControlsShown, {}, inWindow, hideAfterMs, progressing, false, notices,
+)
+
+@Composable
+private fun PlayerFace(
+    state: PlayerFaceState,
+    onAction: (PlayerAction) -> Unit,
+    onSeek: (Long) -> Unit,
+    onBrightness: (Float) -> Unit,
+    onChannel: (String) -> Unit,
+    onChoice: (PlayerChoice) -> Unit,
+    modifier: Modifier,
+    video: (@Composable (Modifier) -> Unit)?,
+    onControlsShown: (Boolean) -> Unit,
+    onInfoShown: (Boolean) -> Unit,
+    inWindow: Boolean,
+    hideAfterMs: Long?,
+    progressing: Boolean,
+    confirmationOpen: Boolean,
+    notices: @Composable (Modifier) -> Unit,
 ) {
-    var visible by rememberSaveable(state.channel.id) { mutableStateOf(true) }
+    var visible by rememberSaveable(state.key) { mutableStateOf(true) }
     var touches by remember { mutableIntStateOf(0) }
     var touching by remember { mutableStateOf(false) }
     var panel by rememberSaveable { mutableStateOf<PlayerPanel?>(null) }
     // Info opens on the program being watched each time; inside the sheet the viewer opens others.
-    var infoStack by rememberSaveable(state.channel.id, stateSaver = InfoStackSaver) {
+    var infoStack by rememberSaveable(state.key, stateSaver = InfoStackSaver) {
         mutableStateOf(InfoStack(followWatching = true))
     }
     val showPanel: (PlayerPanel?) -> Unit = {
@@ -80,7 +121,7 @@ internal fun PlayerScreen(
         panel = it
     }
     val openOptions = { panel = PlayerPanel.Options }
-    var preview by remember(state.channel.id, state.status) { mutableStateOf<Int?>(null) }
+    var preview by remember(state.key, state.status) { mutableStateOf<Long?>(null) }
     val hideAfter = controlsHideAfter(
         visible, state.status, state.paused, progressing, dragging = preview != null, fingerDown = touching,
         panelOpen = panel != null || confirmationOpen, inWindow = inWindow, timeoutMs = hideAfterMs,
@@ -93,7 +134,7 @@ internal fun PlayerScreen(
         val held = remember { HeldLayout(playerLayout(maxWidth, maxHeight)) }
         if (!inWindow) held.layout = playerLayout(maxWidth, maxHeight)
         val layout = held.layout
-        val panelGone = panelGone(panel, state.offered, inWindow, layout)
+        val panelGone = panelGone(panel, state, inWindow, layout)
         LaunchedEffect(panelGone) { if (panelGone) panel = null }
         val activePanel = panel.takeUnless { panelGone }.infoPanel(infoStack)
         val latestInfoShown by rememberUpdatedState(onInfoShown)
@@ -115,9 +156,9 @@ internal fun PlayerScreen(
         } else {
             Picture(state, layout, controls, toggle, video, inWindow)
             if (!inWindow) {
-                PictureControls(state, layout, controls, preview, onAction, onBrightness, openOptions)
+                PictureControls(state, layout, controls, preview, onAction, onBrightness, openOptions, panels.onChoice)
                 LandscapeFooter(
-                    state, layout, controls, preview, { preview = it }, onAction, panels, onSeek, notices,
+                    state, layout, controls, sheet, preview, { preview = it }, onAction, panels, onSeek, notices,
                 )
             }
         }
@@ -126,7 +167,7 @@ internal fun PlayerScreen(
             maxWidth * (9f / 16)
         PlayerSheets(
             activePanel, state, layout, showPanel, onAction, onChoice, onChannel,
-            InfoPage(infoStack) { infoStack = it }, belowPicture,
+            InfoPage(infoStack) { infoStack = it }, belowPicture, onSeek,
         )
     }
 }
@@ -134,25 +175,28 @@ internal fun PlayerScreen(
 private fun PlayerPanel?.infoPanel(stack: InfoStack): PlayerPanel? =
     if (this == PlayerPanel.InfoDetails && stack.shown == null) PlayerPanel.Info else this
 
-private fun panelGone(panel: PlayerPanel?, offered: Set<PlayerControl>, inWindow: Boolean, layout: PlayerLayout) =
-    inWindow || (layout.upright && panel == PlayerPanel.Channels) ||
-        panel?.button?.control?.let { it !in offered } == true
+private fun panelGone(panel: PlayerPanel?, state: PlayerFaceState, inWindow: Boolean, layout: PlayerLayout) = when {
+    inWindow -> true
+    panel == PlayerPanel.Channels && layout.upright -> true
+    panel == PlayerPanel.Markers -> layout.upright || (state as? RecordingPlayerState)?.hasMarkers != true
+    else -> panel?.button?.control?.let { it !in state.offered } == true
+}
 
 /** The upright layout: the picture on top with its controls, the program and the channel list below. */
 @Composable
 private fun UprightPlayer(
-    state: LivePlayerState,
+    state: PlayerFaceState,
     layout: PlayerLayout,
     controls: Boolean,
     toggle: (() -> Unit)?,
     video: (@Composable (Modifier) -> Unit)?,
     inWindow: Boolean,
-    preview: Int?,
-    onPreview: (Int?) -> Unit,
+    preview: Long?,
+    onPreview: (Long?) -> Unit,
     onAction: (PlayerAction) -> Unit,
     onBrightness: (Float) -> Unit,
     openOptions: () -> Unit,
-    onSeek: (Int) -> Unit,
+    onSeek: (Long) -> Unit,
     panels: PanelHost,
     onChannel: (String) -> Unit,
     notices: @Composable (Modifier) -> Unit,
@@ -164,11 +208,17 @@ private fun UprightPlayer(
         Box(Modifier.fillMaxWidth().aspectRatio(16f / 9).background(Color.Black)) {
             Picture(state, layout, controls, toggle, video, inWindow)
             if (!inWindow) {
-                PictureControls(state, layout, controls, preview, onAction, onBrightness, openOptions)
+                PictureControls(state, layout, controls, preview, onAction, onBrightness, openOptions, panels.onChoice)
                 if (state.status.hasTimeline) {
-                    PlayerTimeline(
-                        state.timeline, state.status, layout, controls, preview, onPreview, onSeek,
+                    FaceTimeline(
+                        state, layout, controls, preview, onPreview, onSeek,
                         Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(24.dp),
+                    )
+                }
+                if (state is RecordingPlayerState) {
+                    BareAdOffer(
+                        state, !controls && panels.panel == null, panels.onChoice,
+                        Modifier.align(Alignment.BottomEnd).padding(end = 10.dp, bottom = 22.dp),
                     )
                 }
                 // The upright tablet's notice stands over the picture, above its timeline.
@@ -177,7 +227,7 @@ private fun UprightPlayer(
                 }
             }
         }
-        if (!inWindow) UprightPlayerContent(state, layout, preview != null, onAction, panels, onChannel)
+        if (!inWindow) UprightPlayerContent(state, layout, preview != null, onAction, panels, onChannel, onSeek)
     }
     // The upright phone's notice stands at the window's foot, as in browsing, not over the picture.
     if (!inWindow && layout == PlayerLayout.Phone) {
@@ -187,14 +237,15 @@ private fun UprightPlayer(
 
 @Composable
 private fun BoxScope.LandscapeFooter(
-    state: LivePlayerState,
+    state: PlayerFaceState,
     layout: PlayerLayout,
     controls: Boolean,
-    preview: Int?,
-    onPreview: (Int?) -> Unit,
+    sheet: Boolean,
+    preview: Long?,
+    onPreview: (Long?) -> Unit,
     onAction: (PlayerAction) -> Unit,
     panels: PanelHost,
-    onSeek: (Int) -> Unit,
+    onSeek: (Long) -> Unit,
     notices: @Composable (Modifier) -> Unit,
 ) {
     val showFooter = controls && state.status !is LivePlayerStatus.Reconnecting &&
@@ -210,11 +261,23 @@ private fun BoxScope.LandscapeFooter(
         // TouchNotice adds 16dp at the sides and 12dp below the snackbar.
         notices(Modifier.align(Alignment.BottomStart).padding(start = margin - 16.dp, bottom = margin - 12.dp))
     }
+    if (state is RecordingPlayerState) {
+        // On a tablet align the offer to the fitted picture, not the black band below it.
+        val picture = if (layout == PlayerLayout.Tablet) {
+            Modifier.align(Alignment.Center).fillMaxWidth().aspectRatio(16f / 9)
+        } else Modifier.matchParentSize()
+        Box(picture) {
+            BareAdOffer(
+                state, !controls && !sheet, panels.onChoice,
+                Modifier.align(Alignment.BottomEnd).padding(end = 40.dp, bottom = 8.dp),
+            )
+        }
+    }
 }
 
 @Composable
 private fun BoxScope.Picture(
-    state: LivePlayerState,
+    state: PlayerFaceState,
     layout: PlayerLayout,
     controls: Boolean,
     toggle: (() -> Unit)?,
@@ -252,7 +315,7 @@ private fun BoxScope.Picture(
 
 @Composable
 private fun Frame(
-    state: LivePlayerState,
+    state: PlayerFaceState,
     layout: PlayerLayout,
     controls: Boolean,
     modifier: Modifier,

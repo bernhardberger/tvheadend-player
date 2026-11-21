@@ -64,8 +64,8 @@ internal fun liveRecordOffer(
     }
 }
 
-internal fun TvheadendSession.currentLiveRecord(channel: ChannelId, programs: ShownPrograms, nowSec: Long) =
-    liveRecordOffer(channel, programs, observation.value, nowSec)
+internal fun TvheadendSession.currentLiveRecord(channel: ChannelId?, programs: ShownPrograms, nowSec: Long) =
+    channel?.let { liveRecordOffer(it, programs, observation.value, nowSec) }
 
 internal fun playerChoices(
     dvr: DvrControls,

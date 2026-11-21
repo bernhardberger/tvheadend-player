@@ -8,6 +8,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -117,21 +118,43 @@ private fun timelineDrag(
                 }
             }
         }
-        .pointerInput(snapPx) {
-            var target: Int? = null
-            detectHorizontalDragGestures(
-                onDragStart = { target = null },
-                onHorizontalDrag = { change, _ ->
-                    target = latestTimeline.dragTarget(change.position.x, size.width, snapPx)
-                    latestPreview(target)
-                },
-                onDragCancel = { latestPreview(null) },
-                onDragEnd = {
-                    latestPreview(null)
-                    target?.takeUnless { it == latestTimeline.position }?.let(latestSeek)
-                },
-            )
-        }
+        .dragOnBar(
+            snapPx, { x, width -> latestTimeline.dragTarget(x, width, snapPx) },
+            { latestTimeline.position }, { latestPreview(it) }, { latestSeek(it) },
+        )
+}
+
+@Composable
+internal fun <T : Any> Modifier.dragOnBar(
+    snapPx: Float,
+    targetAt: (Float, Int) -> T?,
+    current: () -> T,
+    onPreview: (T?) -> Unit,
+    onSeek: (T) -> Unit,
+    onTargetChanged: (T?) -> Unit = {},
+): Modifier {
+    val latestTarget by rememberUpdatedState(targetAt)
+    val latestCurrent by rememberUpdatedState(current)
+    val latestPreview by rememberUpdatedState(onPreview)
+    val latestSeek by rememberUpdatedState(onSeek)
+    val latestChanged by rememberUpdatedState(onTargetChanged)
+    return pointerInput(snapPx) {
+        var target: T? = null
+        detectHorizontalDragGestures(
+            onDragStart = { target = null },
+            onHorizontalDrag = { change, _ ->
+                val previous = target
+                target = latestTarget(change.position.x, size.width)
+                if (target != previous) latestChanged(target)
+                latestPreview(target)
+            },
+            onDragCancel = { latestPreview(null) },
+            onDragEnd = {
+                latestPreview(null)
+                target?.takeUnless { it == latestCurrent() }?.let(latestSeek)
+            },
+        )
+    }
 }
 
 private fun LiveTimeline.dragTarget(x: Float, width: Int, snapPx: Float): Int? {
@@ -189,7 +212,7 @@ private fun Track(
 }
 
 @Composable
-private fun PositionThumb(x: Dp, y: Dp, layout: PlayerLayout, dragging: Boolean) {
+internal fun PositionThumb(x: Dp, y: Dp, layout: PlayerLayout, dragging: Boolean) {
     val interaction = remember { MutableInteractionSource() }
     val width = if (dragging) 3.dp else if (layout.upright) 5.dp else 6.dp
     val height = when (layout) {
@@ -211,16 +234,26 @@ private fun PositionThumb(x: Dp, y: Dp, layout: PlayerLayout, dragging: Boolean)
  * stands above the time as a marker's name would (labelMedium).
  */
 @Composable
-private fun DragLabel(time: String, live: Boolean, compact: Boolean, markerX: Dp, trackY: Dp, trackWidth: Dp) {
+internal fun DragLabel(
+    time: String,
+    live: Boolean,
+    compact: Boolean,
+    markerX: Dp,
+    trackY: Dp,
+    trackWidth: Dp,
+    markerName: String? = null,
+    markerSymbol: (@Composable () -> Unit)? = null,
+    minimumGap: Dp = 0.dp,
+) {
     val colors = MaterialTheme.colorScheme
     val type = MaterialTheme.typography
-    val gap = if (compact) 42.dp else 28.dp
+    val gap = maxOf(if (compact) 42.dp else 28.dp, minimumGap)
     Surface(
         modifier = Modifier.layout { measurable, _ ->
             val label = measurable.measure(Constraints())
             val x = (markerX.roundToPx() - label.width / 2).coerceIn(0, max(0, trackWidth.roundToPx() - label.width))
             layout(0, 0) { label.place(x, (trackY - gap).roundToPx() - label.height) }
-        }.heightIn(min = 44.dp),
+        }.heightIn(min = 44.dp).then(if (markerName != null) Modifier.testTag("recording-drag-label") else Modifier),
         shape = RoundedCornerShape(14.dp), color = colors.inverseSurface, contentColor = colors.inverseOnSurface,
     ) {
         Column(
@@ -229,7 +262,18 @@ private fun DragLabel(time: String, live: Boolean, compact: Boolean, markerX: Dp
             verticalArrangement = Arrangement.Center,
         ) {
             if (live) Text(stringResource(R.string.player_live), style = type.labelMedium)
-            Text(time, style = type.labelLarge)
+            markerName?.let { Text(it, style = type.labelMedium) }
+            if (markerSymbol == null) {
+                Text(time, style = type.labelLarge)
+            } else {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    markerSymbol()
+                    Text(time, style = type.labelLarge)
+                }
+            }
         }
     }
 }
@@ -249,7 +293,7 @@ internal fun behindLive(seconds: Int): String =
 
 private fun LiveTimeline.fraction(seconds: Int): Float = seconds.toFloat() / duration
 
-private fun Modifier.excludeBarEnds(): Modifier =
+internal fun Modifier.excludeBarEnds(): Modifier =
     systemGestureExclusion { bounds ->
         val end = bounds.size.height.toFloat().coerceAtMost(bounds.size.width / 2f)
         Rect(0f, 0f, end, bounds.size.height.toFloat())
