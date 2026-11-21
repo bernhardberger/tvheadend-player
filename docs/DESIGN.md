@@ -270,7 +270,8 @@ intermediate layout. Disabled motion means static branding without the glow.
 Startup does not play audio or
 request audio focus.
 A return waiting for existing playback uses the stable ring and status over the
-same gently pulsing ambient glow, without the logo. The glow appears with
+same gently pulsing ambient glow, with the returning channel's logo once that
+channel is known and the app symbol until then. The glow appears with
 visible waiting feedback; the hidden grace period remains flat. Recovery focus, Back and key
 consumption keep their existing contracts.
 
