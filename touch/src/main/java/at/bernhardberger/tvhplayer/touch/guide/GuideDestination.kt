@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.touch.guide
 
 import at.bernhardberger.tvhplayer.touch.ui.DvrControls
+import at.bernhardberger.tvhplayer.touch.ui.ArtworkScreenShown
 import at.bernhardberger.tvhplayer.touch.ui.LocalArtworkModels
 import android.content.Context
 import androidx.compose.runtime.Composable
@@ -51,6 +52,7 @@ internal fun GuideDestination(
     onOpenConnections: () -> Unit,
     onSignIn: () -> Unit,
 ) {
+    ArtworkScreenShown("Guide")
     val presentation by connection.uiState.collectAsStateWithLifecycle()
     val scope by channels.scope.collectAsStateWithLifecycle()
     val observation by guide.observation.collectAsStateWithLifecycle()
