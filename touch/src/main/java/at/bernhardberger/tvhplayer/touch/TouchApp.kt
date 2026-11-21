@@ -82,6 +82,7 @@ internal fun TouchApp(
             }
             ConnectionsPage(
                 session, owner, connect, active?.uiState(connectionStatus(profile, presentation)), active,
+                listed = profiles is ServerProfileListResult.Available,
                 signIn = page == Page.SignIn,
                 onBack = { page = Page.Frame },
                 onSaved = { page = Page.Connections },
@@ -106,6 +107,8 @@ private fun ConnectionsPage(
     connect: ConnectViewModel,
     card: ActiveConnectionUiState?,
     active: ServerProfileSummary?,
+    /** False while the owner can't list connections, as after a write it could not read back. */
+    listed: Boolean,
     signIn: Boolean,
     onBack: () -> Unit,
     onSaved: () -> Unit,
@@ -117,14 +120,19 @@ private fun ConnectionsPage(
         onEdit = { if (!connect.removing) editing = true },
         onRemove = { if (active != null) connect.remove(active.id) },
     )
-    val editorShown = (editing || signIn) && active != null && !connect.removing
+    // An open editor stays on its connection while the list can't be read; only an accepted close,
+    // a finished save or the connection's removal takes it away.
+    val kept = connect.openEditor.takeIf { active == null && !listed }
+    val editorShown = (editing || signIn) && (active != null || kept != null) && !connect.removing
     LaunchedEffect(editorShown) { if (!editorShown) connect.releaseEditor() }
-    if (editorShown && active != null) {
+    if (editorShown) {
         val restoreSaved = rememberSavedConnectionRestore(session, owner)
-        // An unreadable saved sign-in keeps a password connection one, whichever way the editor opened.
-        val requireSignIn = active.authenticationMode == ServerProfileAuthenticationMode.PASSWORD &&
-            !active.credentialsAvailable
-        val setup = connect.editor(active.id, active.label.orEmpty(), requireSignIn, restoreSaved)
+        val setup = if (active != null) {
+            // An unreadable saved sign-in keeps a password connection one, whichever way the editor opened.
+            val requireSignIn = active.authenticationMode == ServerProfileAuthenticationMode.PASSWORD &&
+                !active.credentialsAvailable
+            connect.editor(active.id, active.label.orEmpty(), requireSignIn, restoreSaved)
+        } else checkNotNull(kept)
         // The editor closes once the change and its name are saved.
         LaunchedEffect(setup, setup.finished) {
             if (setup.finished) {

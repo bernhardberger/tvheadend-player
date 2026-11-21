@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.emptyPreferences
 import at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileId
+import at.bernhardberger.tvheadend.sdk.core.ServerProfileListResult
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileStore
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileWriteResult
 import at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi
@@ -71,6 +72,11 @@ internal class FakeConnection(
     /** True when the last applied password write carried this sign-in; the values never leave the test. */
     fun savedSignIn(username: String, password: String): Boolean = writes.lastSignIn == (username to password)
 
+    /** The next applied write is stored, but the list read right after it fails, as a store can. */
+    fun failReadAfterNextWrite() {
+        writes.failReadAfterNextWrite = true
+    }
+
     fun close() = scope.cancel()
 }
 
@@ -80,10 +86,23 @@ private class HeldWrites(
 ) : ServerProfileStore by store {
     var lastSignIn: Pair<String, String>? = null
         private set
+    var failReadAfterNextWrite = false
+    private var failRead = false
+
+    override suspend fun profiles(): ServerProfileListResult {
+        if (!failRead) return store.profiles()
+        failRead = false
+        return ServerProfileListResult.Unavailable
+    }
 
     private suspend fun <T> write(operation: suspend () -> T): T {
         held.first { !it }
-        return operation()
+        return operation().also {
+            if (it is ServerProfileWriteResult.Applied && failReadAfterNextWrite) {
+                failReadAfterNextWrite = false
+                failRead = true
+            }
+        }
     }
 
     override suspend fun addAnonymous(host: String, port: Int, label: String?, activate: Boolean) =

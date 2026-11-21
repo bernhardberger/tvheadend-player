@@ -77,6 +77,9 @@ internal class ConnectViewModel(
         ).also { editor = it }
     }
 
+    /** The editor open now, if any; it stays on its connection while the owner can't list connections. */
+    val openEditor: ConnectionSetupHolder? get() = editor
+
     fun releaseEditor() {
         editor?.close()
         editor = null
@@ -271,24 +274,32 @@ private class SetupProfileEditor(
         owner.loadServerForEditing(target ?: return, applyAvailable)
     }
 
-    override suspend fun saveServer(host: String, htspPort: Int) {
-        val id = target
-        stored(
-            if (id == null) owner.addAnonymous(host, htspPort, name())
-            else owner.updateAnonymous(id, host, htspPort, name()),
-        )
+    override suspend fun saveServer(host: String, htspPort: Int) = write { id ->
+        if (id == null) owner.addAnonymous(host, htspPort, name())
+        else owner.updateAnonymous(id, host, htspPort, name())
     }
 
-    override suspend fun savePasswordServer(host: String, htspPort: Int, username: String, password: String) {
-        val id = target
-        stored(
+    override suspend fun savePasswordServer(host: String, htspPort: Int, username: String, password: String) =
+        write { id ->
             if (id == null) owner.addPassword(host, htspPort, username, password, name())
-            else owner.updatePassword(id, host, htspPort, username, password, name()),
-        )
-    }
+            else owner.updatePassword(id, host, htspPort, username, password, name())
+        }
 
     /** The setup offers no removal; the Connections page removes a connection. */
     override suspend fun clearProfile() = Unit
+
+    /**
+     * First run finds this connection already stored when an earlier write applied but was never
+     * read back: it completes that one as an update with the typed values and name, not a second add.
+     */
+    private suspend fun write(command: suspend (ServerProfileId?) -> SaveServerProfileResult) {
+        val result = command(target)
+        val existing = (result as? SaveServerProfileResult.AlreadyExists)?.id
+        if (existing != null && target == null && mode == SetupMode.FIRST_RUN) {
+            target = existing
+            stored(command(existing))
+        } else stored(result)
+    }
 
     /**
      * Any outcome but a write the owner then reports in use fails the save, which the shared form

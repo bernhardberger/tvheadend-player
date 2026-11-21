@@ -195,6 +195,59 @@ class TouchAppTest {
     }
 
     @Test
+    fun anUnreadListAfterTheEditorsWriteKeepsTheEditorForTheRetry() {
+        runBlocking { connection.store.addAnonymous(server.host, server.port, "Home server", true) }
+        val id = (runBlocking { connection.store.profiles() } as ServerProfileListResult.Available).activeId
+        show()
+        openEditor()
+        field(SharedR.string.onboarding_server_address).performTextReplacement("192.168.1.21")
+        connection.failReadAfterNextWrite()
+        compose.onNodeWithText(label(SharedR.string.server_name_save)).performClick()
+        connection.session.publish(SessionObservation.create(sessionState = SessionState.Connecting))
+        connection.session.publish(ready())
+
+        compose.onNodeWithText(label(SharedR.string.connection_save_failed)).assertIsDisplayed()
+        val retried = connection.store.calls.size
+        compose.onNodeWithText(label(SharedR.string.server_name_save)).performClick()
+
+        compose.onNode(heading and hasText(label(SharedR.string.server_list_title))).assertIsDisplayed()
+        compose.onNodeWithText("192.168.1.21").assertIsDisplayed()
+        assertEquals(
+            listOf(FakeServerProfileStoreCall.UPDATE_ANONYMOUS),
+            connection.store.calls.drop(retried).filter { it in writes },
+        )
+        val saved = runBlocking { connection.store.profiles() } as ServerProfileListResult.Available
+        assertEquals(listOf(id to "192.168.1.21"), saved.profiles.map { it.id to it.host })
+    }
+
+    @Test
+    fun firstRunInANewActivityCompletesAConnectionStoredButNotReadBack() {
+        show()
+        compose.onNode(hasClickAction() and hasText(server.name)).performClick()
+        connection.failReadAfterNextWrite()
+        compose.onNodeWithText(label(SharedR.string.onboarding_connect)).performClick()
+        connection.session.publish(ready())
+        compose.onNodeWithText(label(SharedR.string.connection_save_failed)).assertIsDisplayed()
+
+        // The activity finishes and opens again while the process lives: a new first run, nothing it knew.
+        compose.activityRule.scenario.onActivity { it.viewModelStore.clear() }
+        recreate()
+        val replaced = connection.store.calls.size
+        compose.onNode(hasClickAction() and hasText(server.name)).performClick()
+        compose.onNodeWithText(label(SharedR.string.onboarding_connect)).performClick()
+        connection.session.publish(SessionObservation.create(sessionState = SessionState.Connecting))
+        connection.session.publish(ready())
+
+        compose.onNode(heading and hasText(label(R.string.nav_channels))).assertIsDisplayed()
+        val saved = runBlocking { connection.store.profiles() } as ServerProfileListResult.Available
+        assertEquals(listOf(server.host), saved.profiles.map { it.host })
+        assertEquals(
+            listOf(FakeServerProfileStoreCall.UPDATE_ANONYMOUS),
+            connection.store.calls.drop(replaced).filter { it in writes },
+        )
+    }
+
+    @Test
     fun unreachableContinueAnywaySavesTheUntestedConnection() {
         signInToFoundServer()
         unavailable(SessionFailure.SERVER_UNREACHABLE)
