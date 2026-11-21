@@ -52,6 +52,7 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -63,6 +64,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.touch.R
@@ -102,7 +104,7 @@ internal fun RecordingPane(item: RecordingItem, clock: RecordingClock, actions: 
         }
         Progress(item.state, clock, Modifier.padding(top = 16.dp))
         Row(Modifier.padding(top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-            PlayButtons(item, actions, equalWidth = false)
+            PlayButtons(item, actions)
             Spacer(Modifier.weight(1f))
             ItemIcons(item, actions)
         }
@@ -144,7 +146,7 @@ private fun UprightPage(item: RecordingItem, clock: RecordingClock, actions: Rec
                     DetailsEpisode(item.episode)
                     Facts(item)
                     Progress(item.state, clock, Modifier.padding(top = 16.dp))
-                    Row(Modifier.padding(top = 16.dp)) { PlayButtons(item, actions, equalWidth = false) }
+                    Row(Modifier.padding(top = 16.dp)) { PlayButtons(item, actions) }
                     DetailsSynopsis(item.details.synopsis, Modifier.padding(top = 20.dp))
                 }
                 Facts(item.details, columns = 2, keyWidth = 132.dp)
@@ -188,7 +190,7 @@ private fun PhonePage(item: RecordingItem, clock: RecordingClock, actions: Recor
                 whenModifier = if (picture != null) Modifier.padding(top = 16.dp) else Modifier,
                 beforeSynopsis = {
                     Progress(item.state, clock, Modifier.padding(top = 16.dp))
-                    Row(Modifier.padding(top = 16.dp)) { PlayButtons(item, actions, equalWidth = true) }
+                    Row(Modifier.padding(top = 16.dp)) { PlayButtons(item, actions, compact = true) }
                 },
             )
         }
@@ -315,30 +317,57 @@ private fun Progress(state: RecordingProgress, clock: RecordingClock, modifier: 
 }
 
 @Composable
-private fun PlayButtons(item: RecordingItem, actions: RecordingsActions, equalWidth: Boolean) {
+private fun PlayButtons(item: RecordingItem, actions: RecordingsActions, compact: Boolean = false) {
     if (!item.playing && item.remove == RecordingRemoveControl.RemoveEntry) {
         actions.onDelete?.let { RecordingActionButton(item.remove) { it(item.id) } }
         return
     }
     val onPlay = actions.onPlay?.takeIf { item.play.isNotEmpty() } ?: return
-    val width = if (equalWidth) Modifier.fillMaxWidth() else Modifier
-    val height = if (equalWidth) Modifier.heightIn(min = 48.dp) else Modifier
-    val padding = if (equalWidth) ButtonDefaults.SmallContentPadding else ButtonDefaults.ContentPadding
-    Row(width, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        val share = if (equalWidth) Modifier.weight(1f).then(height) else Modifier
+    val height = if (compact) Modifier.heightIn(min = 48.dp) else Modifier
+    val padding = if (compact) ButtonDefaults.SmallContentPadding else ButtonDefaults.ContentPadding
+    val buttons: @Composable () -> Unit = {
         item.play.forEach { action ->
             when (action) {
                 RecordingPlayAction.StartOver -> FilledTonalButton(
-                    onClick = { onPlay(item.id, true) }, modifier = share,
+                    onClick = { onPlay(item.id, true) }, modifier = height,
                     contentPadding = padding,
                 ) {
                     Text(
-                        stringResource(R.string.recordings_watch_from_beginning), maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                        stringResource(R.string.recordings_watch_from_beginning),
+                        maxLines = if (compact) Int.MAX_VALUE else 1,
+                        overflow = if (compact) TextOverflow.Clip else TextOverflow.Ellipsis,
+                        textAlign = if (compact) TextAlign.Center else null,
                     )
                 }
-                else -> PrimaryPlayButton(action, share, equalWidth) { onPlay(item.id, false) }
+                else -> PrimaryPlayButton(action, height, compact) { onPlay(item.id, false) }
             }
+        }
+    }
+    if (compact) {
+        PhonePlayButtonLayout(Modifier.fillMaxWidth(), buttons)
+    } else {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { buttons() }
+    }
+}
+
+/** Unlike FlowRow's weighted fit check, require the full single-line widths, not word minima. */
+@Composable
+private fun PhonePlayButtonLayout(modifier: Modifier, content: @Composable () -> Unit) {
+    Layout(content, modifier) { buttons, constraints ->
+        val width = constraints.maxWidth
+        val gap = 8.dp.roundToPx()
+        val primary = buttons.first()
+        val secondary = buttons.getOrNull(1)
+        val secondaryWidth = secondary?.maxIntrinsicWidth(Constraints.Infinity) ?: 0
+        val remainder = width - secondaryWidth - gap
+        val stack = secondary != null && primary.maxIntrinsicWidth(Constraints.Infinity) > remainder
+        val main = primary.measure(Constraints.fixedWidth(if (secondary == null || stack) width else remainder))
+        val other = secondary?.measure(Constraints.fixedWidth(if (stack) width else secondaryWidth))
+        val height = if (stack) main.height + gap + checkNotNull(other).height
+        else maxOf(main.height, other?.height ?: 0)
+        layout(width, height) {
+            main.placeRelative(0, 0)
+            other?.placeRelative(if (stack) 0 else remainder + gap, if (stack) main.height + gap else 0)
         }
     }
 }
@@ -347,16 +376,15 @@ private fun PlayButtons(item: RecordingItem, actions: RecordingsActions, equalWi
 private fun PrimaryPlayButton(
     action: RecordingPlayAction,
     modifier: Modifier,
-    equalWidth: Boolean,
+    compact: Boolean,
     onClick: () -> Unit,
 ) {
-    val compactContinue = equalWidth && action == RecordingPlayAction.ContinueWatching
-    val padding = if (compactContinue) ButtonDefaults.SmallContentPadding else ButtonDefaults.ContentPadding
-    Button(onClick = onClick, modifier = modifier, contentPadding = padding) {
-        if (!compactContinue) {
-            Icon(painterResource(R.drawable.channels_play), null, Modifier.size(ButtonDefaults.IconSize))
-            Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-        }
+    Button(onClick = onClick, modifier = modifier) {
+        Icon(
+            painterResource(R.drawable.channels_play), null,
+            Modifier.size(ButtonDefaults.IconSize).testTag("recording-play-icon"),
+        )
+        Spacer(Modifier.width(ButtonDefaults.IconSpacing))
         val label = when (action) {
             RecordingPlayAction.ContinueWatching -> SharedR.string.player_continue_watching
             is RecordingPlayAction.Resume -> R.string.recordings_resume
@@ -369,8 +397,8 @@ private fun PrimaryPlayButton(
         Text(
             stringResource(label),
             if (spoken == null) Modifier else Modifier.clearAndSetSemantics { contentDescription = spoken },
-            maxLines = if (compactContinue) Int.MAX_VALUE else 1,
-            textAlign = if (compactContinue) TextAlign.Center else null,
+            maxLines = if (compact) Int.MAX_VALUE else 1,
+            textAlign = if (compact) TextAlign.Center else null,
         )
     }
 }

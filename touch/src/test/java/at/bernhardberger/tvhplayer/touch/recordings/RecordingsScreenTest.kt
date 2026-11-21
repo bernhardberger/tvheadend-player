@@ -7,10 +7,12 @@ import android.view.ViewGroup
 import androidx.activity.ComponentActivity
 import androidx.activity.ComponentDialog
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.unit.IntRect
 import at.bernhardberger.tvhplayer.touch.testutil.assertLogoFitsItsShare
@@ -19,6 +21,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsFocused
@@ -41,6 +44,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.unit.Density
 import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -299,6 +303,7 @@ class RecordingsScreenTest {
         pickTheHalfWatchedMatch()
         compose.onNodeWithText("Week 46").assertDoesNotExist()
         compose.onNodeWithText("Watch from beginning").assertIsDisplayed()
+        assertActionRow(resumeButton(), stacked = false)
         capture("phone-recording-details", TouchCanvas.PHONE)
 
         captureDeleteConfirmation("phone-recordings-delete-confirm", TouchCanvas.PHONE)
@@ -306,17 +311,59 @@ class RecordingsScreenTest {
         asking = false
         state.value = foldersFixture().withPlayingRecording()
         capture("phone-recording-details-playing", TouchCanvas.PHONE)
-        val continueWatching = compose.activity.getString(SharedR.string.player_continue_watching)
+        compose.onNodeWithTag("recording-play-icon", useUnmergedTree = true).assertIsDisplayed()
+        assertActionRow(continueButton(), stacked = false)
+        assertFullSingleLineLabel(continueButton())
+        assertPlayingActions()
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
+    fun phoneDetailsStacksPlayingActionsAtLargerFontScale() {
+        state.value = foldersFixture().withPlayingRecording()
+        show(initialPath = WeekPath, fontScale = 1.3f)
+        pickTheHalfWatchedMatch()
+        assertActionRow(continueButton(), stacked = true)
+        assertFullSingleLineLabel(continueButton())
+        compose.onNodeWithTag("recording-play-icon", useUnmergedTree = true).assertIsDisplayed()
+        val delete = compose.activity.getString(SharedR.string.context_delete)
+        val more = compose.activity.getString(R.string.recordings_more)
+        val primaryTop = continueButton().fetchSemanticsNode().boundsInRoot.top
+        for (label in listOf(delete, more)) {
+            val icon = compose.onNodeWithContentDescription(label).assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+            assertTrue("Toolbar action must remain above playback actions", icon.bottom < primaryTop)
+        }
+        capture("phone-recording-details-playing-stacked", TouchCanvas.PHONE)
+    }
+
+    private fun assertActionRow(primary: SemanticsNodeInteraction, stacked: Boolean) {
+        val secondary = compose.onNodeWithText("Watch from beginning")
+        val first = primary.assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val second = secondary.assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val picture = compose.onNodeWithTag("recording-details-picture").fetchSemanticsNode().boundsInRoot
+        assertEquals(picture.left, first.left)
+        assertEquals(picture.right, second.right)
+        if (stacked) {
+            assertTrue("Secondary must be below primary: $first, $second", first.bottom <= second.top)
+            assertEquals(first.left, second.left)
+            assertEquals(first.right, second.right)
+        } else {
+            assertEquals("Actions must share a row", first.top, second.top)
+            assertTrue("Actions must not overlap", first.right <= second.left)
+        }
+        assertFullSingleLineLabel(secondary)
+    }
+
+    private fun assertFullSingleLineLabel(node: SemanticsNodeInteraction) {
         val layouts = mutableListOf<TextLayoutResult>()
-        compose.onNodeWithText(continueWatching, useUnmergedTree = true)
-            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        node.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
         val layout = layouts.single()
+        assertEquals("A label that fits should not wrap", 1, layout.lineCount)
         assertEquals(
-            "Continue watching must fit the button",
-            continueWatching.length,
+            "The action label must fit the button",
+            layout.layoutInput.text.length,
             layout.getLineEnd(layout.lineCount - 1, visibleEnd = true),
         )
-        assertPlayingActions()
     }
 
     @Test
@@ -374,7 +421,7 @@ class RecordingsScreenTest {
         }
     }
 
-    private fun show(initialPath: List<String> = emptyList()) {
+    private fun show(initialPath: List<String> = emptyList(), fontScale: Float? = null) {
         val actions = RecordingsActions(
             onView = { view ->
                 val regrouped = if (view.grouping == DvrArchiveGrouping.FOLDERS) foldersFixture() else flatFixture()
@@ -387,7 +434,10 @@ class RecordingsScreenTest {
         )
         compose.setContent {
             MaterialTheme(colorScheme = MobileDarkColors) {
-                RecordingsScreen(state.value, actions, initialPath = initialPath)
+                val density = LocalDensity.current
+                CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale ?: density.fontScale)) {
+                    RecordingsScreen(state.value, actions, initialPath = initialPath)
+                }
                 if (asking) {
                     val control = RecordingRemoveControl.Delete
                     DvrChangeDialog(
@@ -449,6 +499,9 @@ class RecordingsScreenTest {
         compose.onNodeWithText("Westvale – Ridge Town", substring = true).performClick()
 
     private fun resumeButton() = compose.onNodeWithContentDescription("Resume from", substring = true)
+
+    private fun continueButton() =
+        compose.onNodeWithText(compose.activity.getString(SharedR.string.player_continue_watching))
 
     private fun assertLongEpisodeKeepsItsFacts() {
         val layouts = mutableListOf<TextLayoutResult>()
