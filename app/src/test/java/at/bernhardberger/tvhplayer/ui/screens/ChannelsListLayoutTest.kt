@@ -42,6 +42,7 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -236,8 +237,8 @@ class ChannelsListLayoutTest {
         compose.pressKey(Key.DirectionUp)
         tagsButton().assertIsFocused()
 
-        // No title is drawn; Tags and View options end on the trailing inset.
-        compose.onNode(hasText("Channels") and hasAnyAncestor(hasTestTag("channels-header")), useUnmergedTree = true).assertDoesNotExist()
+        // The title starts the header; Tags and View options end on the trailing inset.
+        val screenTitle = screenTitle().bounds()
         val header = header().bounds()
         assertEquals("header y", 28f, header.top, .5f)
         val group = tagsButton().bounds()
@@ -247,12 +248,15 @@ class ChannelsListLayoutTest {
         assertEquals("button gap", 20f, view.left - group.right, .5f)
         assertEquals("buttons share the header's axis", header.center.y, view.center.y, 1f)
         assertEquals("Tags shares it too", header.center.y, group.center.y, 1f)
+        assertEquals("the title shares it too", header.center.y, screenTitle.center.y, 1f)
+        assertTrue("the title ends before the buttons", screenTitle.right <= group.left)
         // The list column spans the focus reserve, starts level with the header beside its buttons,
-        // and runs to the screen bottom. Its viewport reaches on to the screen's top for scrolled rows.
+        // and runs to the screen bottom. Its viewport begins below the header band, so scrolled rows
+        // fade out before they reach the title.
         val list = compose.onNodeWithTag("channels-list").bounds()
         assertEquals("list column x", 118f, list.left, .5f)
         assertEquals("list column level with the header", header.top, detail("channels-list-column").bounds().top, .5f)
-        assertEquals("list viewport reaches the screen's top", 0f, list.top, .5f)
+        assertEquals("list viewport begins below the header band", header.bottom, list.top, .5f)
         assertTrue("rows pass beside the header's buttons, not under them", list.right <= group.left)
         assertEquals("list column width", 364f, list.width, .5f)
         assertEquals("list runs to the screen bottom", 540f, list.bottom, .5f)
@@ -262,6 +266,7 @@ class ChannelsListLayoutTest {
         val first = row(1).bounds()
         val second = row(2).bounds()
         assertEquals("row x", 130f, first.left, .5f)
+        assertEquals("the title starts on the rows' edge", first.left, screenTitle.left, .5f)
         assertEquals("the first row starts alongside the picture", detail("channels-list-art").bounds().top, first.top, .5f)
         assertEquals("row width", 340f, first.width, .5f)
         assertTrue("row respects the library standard minimum (${first.height})", first.height >= 64f)
@@ -477,17 +482,13 @@ class ChannelsListLayoutTest {
         repeat(downTarget - 1) { compose.pressKey(Key.DirectionDown) }
         row(downTarget).assertIsFocused()
         assertFocusedShapePixels(downTarget, rowHeight, scrolled = true)
-        // Earlier rows are not cut at the list's band beside the header: they run on beneath the
-        // fade into the screen's top.
-        val bandTop = detail("channels-list-column").bounds().top
-        assertTrue(
-            "an earlier row peeks above the list's band",
-            (1 until downTarget).flatMap { compose.onAllNodesWithTag("channel-row-$it").fetchSemanticsNodes() }
-                .any { it.boundsInRoot.top < bandTop && it.boundsInRoot.bottom > 0f },
-        )
+        // Earlier rows fade out under the list's top edge below the header band: nothing of them
+        // is drawn behind the screen title.
+        val headerBand = Rect(detail("channels-list").bounds().left, 0f, detail("channels-list").bounds().right, header.bottom)
+        assertSamePixels(initial, drawShell(), headerBand)
         capture("en-font$fontScale-top-fade-down-scrolled-bright-video")
 
-        val fadeTarget = topFadeFocusTarget(fontScale)
+        val fadeTarget = topFadeFocusTarget
         repeat(CHANNEL_COUNT - downTarget) { compose.pressKey(Key.DirectionDown) }
         repeat(CHANNEL_COUNT - fadeTarget) { compose.pressKey(Key.DirectionUp) }
         row(fadeTarget).assertIsFocused()
@@ -530,7 +531,7 @@ class ChannelsListLayoutTest {
         // A non-focused neighbor gives the native unscaled height after offscreen restoration.
         val rowHeight = row(CHANNEL_COUNT - 1).bounds().height
         assertFocusedShapePixels(CHANNEL_COUNT, rowHeight, scrolled = true)
-        val fadeTarget = topFadeFocusTarget(fontScale)
+        val fadeTarget = topFadeFocusTarget
         repeat(CHANNEL_COUNT - fadeTarget) { compose.pressKey(Key.DirectionUp) }
         row(fadeTarget).assertIsFocused()
         assertFocusedShapePixels(fadeTarget, rowHeight, scrolled = true)
@@ -615,8 +616,8 @@ class ChannelsListLayoutTest {
         }
     }
 
-    // The platform pivot puts row 7's 5:3 logo inside the fade at these focus positions.
-    private fun topFadeFocusTarget(fontScale: Float): Int = if (fontScale == 1f) 10 else 9
+    // The platform pivot puts row 7's 5:3 logo inside the fade at this focus position.
+    private val topFadeFocusTarget = 9
 
     /**
      * The fixture's 5:3 picon has a uniform bright right-hand stripe through the fade; fitted 4dp
@@ -635,7 +636,9 @@ class ChannelsListLayoutTest {
         assertTrue("top fade attenuates real picon pixels ($first, $last), not only a flag", last < 228)
         assertTrue("top fade reveals more of the picon downward ($first -> $last)", last > first + (lastY - firstY))
         if (unfadedBackdrop != null) {
-            val backdrop = android.graphics.Color.red(unfadedBackdrop.getPixel(x, lastY))
+            // The band reaches the resting rows, so the uniform backdrop is read in the column's
+            // focus reserve beside them.
+            val backdrop = android.graphics.Color.red(unfadedBackdrop.getPixel(list.left.toInt() + 1, lastY))
             val alpha = (lastY + .5f - list.top) / ListBottomFadeHeight.value
             // The picon's solid stripe is #E8F1F5. The top uses the bottom's linear fade length.
             assertEquals("top fade has the same length and linear ramp as the bottom fade",
@@ -1012,6 +1015,7 @@ class ChannelsListLayoutTest {
     }
 
     private fun header() = compose.onNodeWithTag("channels-header")
+    private fun screenTitle() = compose.onNode(hasText("Channels") and isHeading() and hasAnyAncestor(hasTestTag("channels-header")))
     private fun tagsButton() = compose.onNodeWithTag("channels-tags-button")
 
     /** Up from the first row, OK on the Tags button, [steps] Downs in the picker and OK. */

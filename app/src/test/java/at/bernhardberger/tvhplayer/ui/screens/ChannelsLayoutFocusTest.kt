@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.SemanticsMatcher
@@ -22,6 +23,7 @@ import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isFocused
+import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
@@ -714,11 +716,22 @@ class ChannelsLayoutFocusTest {
         }
     }
 
-    @Test fun headerNamesTheScreenAsItsPaneTitleAndTheTagsButtonShowsTheGroup() {
+    @Test fun headerNamesTheScreenAsItsPaneTitleAndDrawsItOnTheContentEdgeOnlyOverListAndGrid() {
+        val title = hasText("Channels") and isHeading() and hasAnyAncestor(hasTestTag("channels-header"))
+        fun titleLeft() = compose.onNode(title).getUnclippedBoundsInRoot().left.value
         fixture.show(list)
         fixture.awaitFocus(row(1))
         compose.onNodeWithTag("channels-header").assert(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "Channels"))
-        compose.onNode(hasText("Channels") and hasAnyAncestor(hasTestTag("channels-header")), useUnmergedTree = true).assertDoesNotExist()
+        // Focus rests on the header, so the content is at its unscaled size; the title takes none.
+        fixture.key(Key.DirectionUp)
+        fixture.awaitFocus(tagsButton)
+        assertEquals("on the rows' edge", compose.onNode(row(1)).getUnclippedBoundsInRoot().left.value, titleLeft(), .5f)
+        compose.runOnIdle { fixture.channelsView = grid }
+        compose.onNode(tagsButton).assertIsFocused()
+        assertEquals("on the cards' edge", compose.onNode(card(1)).getUnclippedBoundsInRoot().left.value, titleLeft(), .5f)
+        compose.runOnIdle { fixture.channelsView = immersive }
+        compose.onNode(hasText("Channels") and hasAnyAncestor(hasTestTag("channels-header")), useUnmergedTree = true)
+            .assertDoesNotExist()
     }
 
     @Test fun immersiveRowRunsUnderTheRailAndKeepsItsKeyline() {
