@@ -71,6 +71,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsPropertyKey
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.semantics.SemanticsProperties
 import at.bernhardberger.tvhplayer.touch.R
@@ -252,6 +253,8 @@ class PlayerScreenTest {
     fun uprightTabletShowsChannelListInPlaceOfButton() {
         show()
         assertInlineChannels()
+        channelHandle(SemanticsActions.Expand).assertDoesNotExist()
+        channelHandle(SemanticsActions.Collapse).assertDoesNotExist()
         capture("tablet-upright-player", TouchCanvas.TABLET_UPRIGHT)
         infoSheet("tablet-upright-player", TouchCanvas.TABLET_UPRIGHT, details = false)
         assertOfflineChannels(R.string.channels_offline)
@@ -353,6 +356,51 @@ class PlayerScreenTest {
         tapPicture()
         tag("player-transport").assertIsDisplayed()
         captureStatuses("phone", canvas)
+        status.value = LivePlayerStatus.Playing
+        checkPhoneChannelSheet(canvas)
+    }
+
+    private fun checkPhoneChannelSheet(canvas: TouchCanvas) {
+        val expand = channelHandle(SemanticsActions.Expand)
+        val collapse = channelHandle(SemanticsActions.Collapse)
+        val picture = tag("player-picture").getBoundsInRoot()
+        val actions = tag("player-actions").assertIsDisplayed().getBoundsInRoot()
+        val restTop = expand.getBoundsInRoot().top
+        assertTrue("The channel sheet rests below the action row", restTop >= actions.bottom)
+
+        expand.performTouchInput { click() }
+        fun assertRaised() {
+            val sheetTop = collapse.getBoundsInRoot().top
+            assertEquals("Raised sheet stops at the picture", picture.bottom.value, sheetTop.value, 1f)
+            assertEquals("The sheet does not move the picture", picture, tag("player-picture").getBoundsInRoot())
+        }
+        assertRaised()
+        capture("phone-player-list-raised", canvas)
+        collapse.performTouchInput { click() }
+        assertEquals(restTop.value, expand.getBoundsInRoot().top.value, 1f)
+        tag("player-actions").assertIsDisplayed()
+
+        expand.performTouchInput {
+            swipe(center, center - Offset(0f, (restTop - picture.bottom).toPx()), durationMillis = 240)
+        }
+        assertRaised()
+        val sport = compose.onNode(hasText("Harbor Sport") and hasAnyAncestor(hasTestTag("player-channel-list")))
+        sport.performClick()
+        compose.runOnIdle {
+            assertEquals(listOf("harbor-sport"), played)
+            channelId.value = "harbor-sport"
+        }
+        assertRaised()
+        val feedback = Notice.CacheClear(success = true)
+        notice.value = feedback
+        compose.onNodeWithText(NoticeFormatter(compose.activity).format(feedback).headline).assertIsDisplayed()
+        notice.value = null
+
+        collapse.performTouchInput { click() }
+        sport.performTouchInput {
+            swipe(center, center - Offset(0f, (restTop - picture.bottom).toPx()), durationMillis = 240)
+        }
+        assertRaised()
     }
 
     @Test
@@ -859,6 +907,9 @@ class PlayerScreenTest {
         tag("player-channel-list").assertIsDisplayed()
         compose.onNode(hasClickAction() and hasText(compose.activity.getString(R.string.player_channels))).assertDoesNotExist()
     }
+
+    private fun channelHandle(action: SemanticsPropertyKey<*>) =
+        compose.onNode(SemanticsMatcher.keyIsDefined(action))
 
     private fun assertOfflineChannels(message: Int) {
         channelState.value = ChannelsState.Offline(channelsFixture())

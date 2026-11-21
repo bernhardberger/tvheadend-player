@@ -1,7 +1,42 @@
 package at.bernhardberger.tvhplayer.touch.player
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.BottomSheetDefaults
+import androidx.compose.material3.BottomSheetScaffold
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SheetValue
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberBottomSheetScaffoldState
+import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.channels.ChannelRows
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsActions
@@ -9,11 +44,97 @@ import at.bernhardberger.tvhplayer.touch.channels.ChannelsLayout
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsLoadingLine
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsSkeleton
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsState
+import at.bernhardberger.tvhplayer.touch.channels.TagFilter
 import at.bernhardberger.tvhplayer.touch.ui.ListFailure
 import at.bernhardberger.tvhplayer.touch.ui.ListMessage
 import at.bernhardberger.tvhplayer.touch.ui.MessageKind
 import at.bernhardberger.tvhplayer.touch.ui.OfflineBanner
 import at.bernhardberger.tvhplayer.touch.ui.OfflineTexts
+
+private val ChannelListShape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun PhoneChannelSheet(
+    state: ChannelsState,
+    onChoice: (PlayerChoice) -> Unit,
+    onChannel: (String) -> Unit,
+    onRetry: () -> Unit,
+    modifier: Modifier,
+    program: @Composable (Modifier) -> Unit,
+) {
+    val colors = MaterialTheme.colorScheme
+    val sheet = rememberBottomSheetState(
+        SheetValue.PartiallyExpanded, setOf(SheetValue.PartiallyExpanded, SheetValue.Expanded),
+    )
+    var headerHeight by remember { mutableIntStateOf(0) }
+    BoxWithConstraints(modifier.clipToBounds()) {
+        val peek = if (headerHeight == 0) BottomSheetDefaults.SheetPeekHeight else
+            (maxHeight - with(LocalDensity.current) { headerHeight.toDp() }).coerceAtLeast(1.dp)
+        BottomSheetScaffold(
+            scaffoldState = rememberBottomSheetScaffoldState(sheet),
+            containerColor = Color.Transparent,
+            sheetPeekHeight = peek,
+            sheetShape = ChannelListShape,
+            sheetContainerColor = colors.surfaceContainer,
+            sheetContentColor = colors.onSurface,
+            sheetShadowElevation = 0.dp,
+            sheetContent = {
+                InlineChannelList(
+                    state, ChannelsLayout.Phone, onChoice, onChannel, onRetry,
+                    Modifier.fillMaxHeight().padding(horizontal = 12.dp),
+                )
+            },
+        ) {
+            // No scaffold body padding: the sheet overlays this block when raised.
+            program(Modifier.onSizeChanged { headerHeight = it.height })
+        }
+    }
+}
+
+@Composable
+internal fun UprightChannelList(
+    state: ChannelsState,
+    onChoice: (PlayerChoice) -> Unit,
+    onChannel: (String) -> Unit,
+    onRetry: () -> Unit,
+    modifier: Modifier,
+) {
+    val colors = MaterialTheme.colorScheme
+    Surface(modifier.fillMaxWidth(), ChannelListShape, colors.surfaceContainer, colors.onSurface) {
+        InlineChannelList(
+            state, ChannelsLayout.Upright, onChoice, onChannel, onRetry,
+            Modifier.padding(start = 24.dp, end = 24.dp, top = 16.dp),
+        )
+    }
+}
+
+@Composable
+private fun InlineChannelList(
+    state: ChannelsState,
+    layout: ChannelsLayout,
+    onChoice: (PlayerChoice) -> Unit,
+    onChannel: (String) -> Unit,
+    onRetry: () -> Unit,
+    modifier: Modifier,
+) {
+    Column(modifier.fillMaxWidth().testTag("player-channel-list").windowInsetsPadding(WindowInsets.navigationBars)) {
+        Row(
+            Modifier.fillMaxWidth().height(50.dp).padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                stringResource(R.string.player_channels), Modifier.semantics { heading() },
+                color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleMedium,
+            )
+            state.displayedList?.takeIf { it.tags.isNotEmpty() }?.let { list ->
+                TagFilter(list, { onChoice(PlayerChoice.ChannelTag(it)) })
+            }
+        }
+        PlayerChannelsContent(state, layout, onChannel, { onChoice(PlayerChoice.ChannelTag(it)) }, onRetry)
+    }
+}
 
 /** The same browse states under the picture and inside the side sheet, with no settings route. */
 @Composable
