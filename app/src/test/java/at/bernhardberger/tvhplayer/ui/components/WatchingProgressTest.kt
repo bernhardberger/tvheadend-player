@@ -60,6 +60,8 @@ import at.bernhardberger.tvhplayer.images.ChannelAccents
 import at.bernhardberger.tvhplayer.stores.ChannelAccentStore
 import kotlin.coroutines.EmptyCoroutineContext
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
+import at.bernhardberger.tvhplayer.ui.TvTextColors
+import at.bernhardberger.tvhplayer.ui.player.NowPlayingPlateHeight
 import at.bernhardberger.tvhplayer.ui.player.NowPlayingStrip
 import at.bernhardberger.tvhplayer.ui.screens.ProgrammeContextMenu
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideHeadline
@@ -575,8 +577,9 @@ class WatchingProgressTest {
     @Test fun zapWithoutLogoKeepsChannelNumberFallback() {
         show("zap", picon = null)
         marker().assertExists()
-        compose.onNodeWithText("101", useUnmergedTree = true).assertIsDisplayed()
-        assertPlate()
+        compose.onNodeWithText("101 ${channel.name}").assertIsDisplayed()
+        compose.onNodeWithText("101", useUnmergedTree = true).assertDoesNotExist()
+        assertPlate(expectNumberInk = true)
     }
     @Test fun recordingRowMarksPlaybackRatherThanSelection() {
         show("row")
@@ -617,7 +620,7 @@ class WatchingProgressTest {
         .assert(SemanticsMatcher.expectValue(SemanticsProperties.ProgressBarRangeInfo, ProgressBarRangeInfo(value, 0f..1f)))
     private fun progressBar() = compose.onNode(SemanticsMatcher.keyIsDefined(SemanticsProperties.ProgressBarRangeInfo),
         useUnmergedTree = true)
-    private fun assertPlate() {
+    private fun assertPlate(expectNumberInk: Boolean = false) {
         val bar = progressBar().fetchSemanticsNode().boundsInRoot
         val bitmap = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
         compose.runOnIdle { view.draw(Canvas(bitmap)) }
@@ -625,6 +628,14 @@ class WatchingProgressTest {
         // the plate carries the strip, so the strip never floats over the picture.
         assertEquals(at.bernhardberger.tvhplayer.ui.TvSurfaceColors.containerLowest.toArgb(),
             bitmap.getPixel(bar.left.toInt() + 2, bar.top.toInt() - 15))
+        if (expectNumberInk) {
+            val plateTop = bar.bottom.toInt() - with(compose.density) { NowPlayingPlateHeight.roundToPx() }
+            val ink = TvTextColors.primary.toArgb()
+            assertTrue("The plate draws its decorative channel number above the progress bar",
+                (plateTop until bar.top.toInt()).any { y ->
+                    (bar.left.toInt() until bar.right.toInt()).any { x -> bitmap.getPixel(x, y) == ink }
+                })
+        }
         bitmap.recycle()
     }
     private fun assertOrangeProgress() {
