@@ -31,7 +31,6 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.SemanticsMatcher
-import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
@@ -44,7 +43,6 @@ import at.bernhardberger.tvheadend.sdk.core.AutorecRuleId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrMutationResult
 import at.bernhardberger.tvheadend.sdk.core.DvrSchedule
-import at.bernhardberger.tvheadend.sdk.core.DvrScheduleRequest
 import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionCall
@@ -527,31 +525,29 @@ class TouchAppTest {
     @Test
     fun channelsAppearAfterConnectingWithoutUnwiredControls() {
         val guide = savedConnectionWithGuide()
+        val next = compose.onNodeWithText(guide.programs[1], substring = true)
         compose.onNodeWithText(guide.first.name!!).assertIsDisplayed()
         compose.onNodeWithText(guide.second.name!!).assertIsDisplayed()
-        // The phone row writes what is left of the program on now beside its title.
-        compose.onNodeWithText(guide.programs[0], substring = true).assertIsDisplayed()
+        compose.onNodeWithText(guide.programs[0]).assertIsDisplayed()
+        next.assertIsDisplayed()
 
-        // The open row offers nothing to play or record yet.
         compose.onNodeWithText(label(R.string.nav_epg)).assertIsDisplayed()
         compose.onNodeWithText(label(R.string.nav_recordings)).assertIsDisplayed()
-        compose.onNodeWithContentDescription(compose.activity.getString(R.string.channels_expand, guide.first.name))
-            .performClick()
-        compose.onNodeWithText(guide.programs[2]).assertIsDisplayed()
-        compose.onNode(hasClickAction() and hasText(label(SharedR.string.stop_recording))).assertIsDisplayed()
-        listOf(R.string.channels_watch, R.string.channels_record, R.string.channels_details, R.string.channels_show_in_guide)
-            .forEach { compose.onNodeWithText(label(it)).assertDoesNotExist() }
-        // The logo and the open program's picture come from the server through the image loader.
+        compose.onNode(hasClickAction() and hasText(guide.first.name!!)).assertDoesNotExist()
+        compose.onNodeWithContentDescription(
+            compose.activity.getString(R.string.channels_watch_named, guide.first.name),
+        ).assertDoesNotExist()
+        // Browse asks for the channel logo but not the current program's artwork.
         val session = connection.session.observation.value.currentSession
         val logo = AppArtworkSource(session, (guide.logo as ChannelIcon.ImageCache).artworkId)
         assertTrue(images.requested.toString(), logo in images.requested)
-        assertTrue(images.requested.toString(), AppArtworkSource(session, guide.picture) in images.requested)
+        assertTrue(AppArtworkSource(session, guide.picture) !in images.requested)
 
         compose.onNodeWithContentDescription(label(R.string.channels_connection_settings)).performClick()
         recreate()
         compose.onNode(heading and hasText(label(SharedR.string.server_list_title))).assertIsDisplayed()
         back()
-        compose.onNodeWithText(guide.programs[2]).assertIsDisplayed()
+        next.assertIsDisplayed()
 
         val connections = compose.onNode(heading and hasText(label(SharedR.string.server_list_title)))
         val openConnections = compose.onNodeWithContentDescription(label(R.string.channels_connection_settings))
@@ -559,24 +555,11 @@ class TouchAppTest {
         openConnections.performClick()
         advance(64)
         connections.assertExists()
-        compose.onNodeWithText(guide.programs[2]).assertExists()
+        next.assertExists()
         back()
         compose.mainClock.autoAdvance = true
         connections.assertDoesNotExist()
-        compose.onNodeWithText(guide.programs[2]).assertIsDisplayed()
-
-        // A separate Back during the return now belongs to the open Channels row.
-        openConnections.performClick()
-        connections.assertIsDisplayed()
-        compose.mainClock.autoAdvance = false
-        back()
-        advance(64)
-        connections.assertExists()
-        compose.onNodeWithText(guide.programs[2]).assertExists()
-        back()
-        compose.mainClock.autoAdvance = true
-        connections.assertDoesNotExist()
-        compose.onNodeWithText(guide.programs[2]).assertDoesNotExist()
+        next.assertIsDisplayed()
         compose.onNode(heading and hasText(label(R.string.nav_channels))).assertIsDisplayed()
     }
 
@@ -737,16 +720,12 @@ class TouchAppTest {
         val dispatcher = mutableStateOf<CoroutineDispatcher>(Dispatchers.Main.immediate)
         val guide = savedConnectionWithGuide(mappingDispatcher = { dispatcher.value })
         val channel = compose.onNodeWithText(guide.first.name!!)
-        val stopRecording = compose.onNode(hasClickAction() and hasText(label(SharedR.string.stop_recording)))
-        compose.onNodeWithContentDescription(compose.activity.getString(R.string.channels_expand, guide.first.name))
-            .performClick()
-        stopRecording.assertIsDisplayed()
+        channel.assertIsDisplayed()
 
         val held = StandardTestDispatcher()
         compose.runOnIdle { dispatcher.value = held }
         compose.runOnIdle { connection.session.replaceGeneration(guide.connected()) }
         channel.assertDoesNotExist()
-        stopRecording.assertDoesNotExist()
         compose.onNodeWithText(label(R.string.channels_loading)).assertIsDisplayed()
 
         compose.runOnIdle { dispatcher.value = Dispatchers.Main.immediate }
@@ -756,7 +735,9 @@ class TouchAppTest {
     @Test
     fun aTagFiltersTheChannels() {
         val guide = savedConnectionWithGuide()
-        compose.onNode(hasClickAction() and hasText(label(R.string.channels_all))).performClick()
+        compose.onNodeWithContentDescription(
+            compose.activity.getString(R.string.channels_filter, label(R.string.channels_all)),
+        ).performClick()
         compose.onNode(hasClickAction() and hasText(guide.news.name!!)).performClick()
 
         compose.onNodeWithText(guide.first.name!!).assertIsDisplayed()
@@ -887,12 +868,14 @@ class TouchAppTest {
     }
 
     @Test
+    @Config(qualifiers = TABLET)
     fun aPendingConfirmationWaitsForTheInFlightCommand() {
         val guide = savedConnectionWithGuide()
         connection.dvrRepliesHeld.value = true
         connection.session.dvrRepository.scriptScheduleEntry(DvrMutationResult.Confirmed(DvrEntryId(WEATHER_ENTRY)))
-        connection.session.publish(guide.connected(guide.dvr.entries - guide.recordingNow))
-        expandedChannelRecord(guide).performClick()
+        openGuide()
+        compose.onNodeWithText(guide.programs[1]).performClick()
+        compose.onNode(hasClickAction() and hasText(label(R.string.channels_record))).performClick()
         compose.waitForIdle()
         assertTrue(FakeSessionCall.DVR_SCHEDULE_ENTRY in connection.session.calls)
         openRecordings()
@@ -999,30 +982,6 @@ class TouchAppTest {
         compose.onNode(stop).assertIsDisplayed()
         connection.session.publish(guide.connected(guide.dvr.entries - guide.recordingNow))
         compose.onNode(stop).assertDoesNotExist()
-    }
-
-    @Test
-    fun recordOnAChannelRecordsWhatIsOnNow() {
-        val guide = savedConnectionWithGuide()
-        connection.session.dvrRepository.scriptScheduleEntry(DvrMutationResult.Confirmed(DvrEntryId(WEATHER_ENTRY)))
-        connection.session.publish(guide.connected(guide.dvr.entries - guide.recordingNow))
-        expandedChannelRecord(guide).performClick()
-        compose.waitForIdle()
-        assertEquals(DvrSchedule.Programme(EventId(1)), connection.scheduleRequests.single().schedule)
-    }
-
-    @Test
-    fun aStaleChannelsRecordTapDoesNotRecordTheNextProgramme() {
-        val guide = savedConnectionWithGuide()
-        connection.session.publish(guide.connected(guide.dvr.entries - guide.recordingNow))
-        val tap = expandedChannelRecord(guide).fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
-        val advanced = ServerGuide(guide.now - 1.hours)
-        compose.runOnIdle {
-            connection.session.publish(advanced.connected(emptyList()))
-            tap()
-        }
-        compose.waitForIdle()
-        assertEquals(emptyList<DvrScheduleRequest>(), connection.scheduleRequests)
     }
 
     @Test
@@ -1173,12 +1132,6 @@ class TouchAppTest {
         // The platform's requested mask, not its reported/visible insets (which Robolectric doesn't render).
         ReflectionHelpers.callInstanceMethod<Int>(controller, "getRequestedVisibleTypes") and
             WindowInsets.Type.systemBars()
-    }
-
-    private fun expandedChannelRecord(guide: ServerGuide): SemanticsNodeInteraction {
-        compose.onNodeWithContentDescription(compose.activity.getString(R.string.channels_expand, guide.first.name))
-            .performClick()
-        return compose.onNode(hasClickAction() and hasText(label(R.string.channels_record)))
     }
 
     @Test

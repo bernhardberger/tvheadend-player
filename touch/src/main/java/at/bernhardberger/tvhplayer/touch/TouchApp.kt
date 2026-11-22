@@ -289,7 +289,6 @@ private fun AppFrame(
     channels: ChannelsViewModel,
     playingId: String?,
     onWatch: ((String) -> Unit)?,
-    dvr: DvrControls,
     onOpenConnections: () -> Unit,
     onSignIn: () -> Unit,
     mappingDispatcher: CoroutineDispatcher,
@@ -350,7 +349,7 @@ private fun AppFrame(
                 // Until Home exists, connection settings open from the end of the Channels top bar.
                 onOpenConnectionSettings = onOpenConnections,
                 onSignIn = onSignIn,
-                onRecordControl = dvr::channelRecordControl,
+                onOpenChannel = null, // The channel page will provide this action.
             ),
             destinations = AppDestinationList,
         )
@@ -424,7 +423,7 @@ private suspend fun ChannelsMappingKey.map(
     val started = context.artworkMappingStart()
     val programs = scope.scope.visibleChannels.map {
         job.ensureActive()
-        observation.channelRowPrograms(it.id, now)
+        observation.channelRowPrograms(it.id, now, includeDetails = false)
     }
     val boundary = programs.minOfOrNull { it.nextBoundary(now) } ?: Long.MAX_VALUE
     val projectionMs = started?.let { SystemClock.elapsedRealtime() - it }
@@ -442,6 +441,7 @@ private suspend fun ChannelsMappingKey.map(
             val mapped = channelsState(
                 scope, connection, degraded, observation, now, texts, playingId, artwork, programs, job::ensureActive,
                 previousRows = previousRows, mappedRows = rows,
+                includeDetails = false,
             )
             job.ensureActive()
             mapped
@@ -504,7 +504,7 @@ private fun AppDestinations(
                     )
                 Destination.Channels ->
                     AppFrame(
-                        connection, channels, playingId, onWatch, dvr, onOpenConnections, onSignIn,
+                        connection, channels, playingId, onWatch, onOpenConnections, onSignIn,
                         channelsDispatcher, channelsCache,
                     )
             }

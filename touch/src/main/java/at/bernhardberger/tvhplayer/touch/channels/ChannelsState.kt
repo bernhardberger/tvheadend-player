@@ -83,9 +83,9 @@ internal data class ChannelDetails(
 )
 
 /**
- * A null callback leaves its control out. Without [onPlay] a tap on a row opens or closes it, and
- * Watch is not offered. [onSignIn] is what the sign-in-needed message's button does, else
- * [onOpenConnectionSettings].
+ * Browse rows open through [onOpenChannel] and only their Watch button tunes through [onPlay].
+ * The player list still uses the expanded-row actions. [onSignIn] overrides the connection
+ * settings action on the sign-in-needed message.
  */
 internal class ChannelsActions(
     val onPlay: ((String) -> Unit)?,
@@ -96,6 +96,7 @@ internal class ChannelsActions(
     val onDetails: ((String) -> Unit)? = null,
     val onShowInGuide: ((String) -> Unit)? = null,
     val onSignIn: (() -> Unit)? = null,
+    val onOpenChannel: ((String) -> Unit)? = null,
 )
 
 /**

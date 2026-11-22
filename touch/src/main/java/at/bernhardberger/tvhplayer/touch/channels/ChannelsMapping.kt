@@ -30,11 +30,8 @@ import kotlin.time.Instant
  * The Channels destination from the shared channel scope and the session's guide, as the TV's
  * Channels screen reads them: the scope already holds the visible channels and tags.
  *
- * Every row on now carries its time range, time left and on-air progress; the row of [playingId]
- * is the channel the player plays, whose progress marks the viewer. Marks follow the TV: the
- * running program's own recording, else the channel's running recording; scheduled on the
- * programs ahead. With [artwork] rows carry the logo's and the running program's image models;
- * [ChannelList.hasLogos] keeps the tile in its place, the no-logo tile where a channel has none.
+ * Browse needs only the logo and what's on now and next. The player list still asks for
+ * [includeDetails] (including the image, controls, time range and programs after next).
  */
 @Suppress("LongParameterList")
 internal fun channelsState(
@@ -50,6 +47,7 @@ internal fun channelsState(
     checkpoint: () -> Unit = {},
     previousRows: Map<ChannelId, MappedChannelRow> = emptyMap(),
     mappedRows: MutableMap<ChannelId, MappedChannelRow>? = null,
+    includeDetails: Boolean = true,
 ): ChannelsState {
     val browsing = scope.scope
     val current = scope.channelCatalogCurrent
@@ -71,7 +69,7 @@ internal fun channelsState(
             else -> connection.browseAppError()?.let(ChannelsState::Failed) ?: ChannelsState.Loading
         }
         else -> {
-            val mapper = RowMapper(observation, now, texts, artwork)
+            val mapper = RowMapper(observation, now, texts, artwork, includeDetails)
             val rows = browsing.visibleChannels.mapIndexed { index, channel ->
                 checkpoint()
                 val row = mapper.map(
@@ -126,6 +124,7 @@ private class RowMapper(
     private val now: Instant,
     private val texts: ChannelsTexts,
     private val artwork: ArtworkModels?,
+    private val includeDetails: Boolean = true,
 ) {
     private val remainingLabels = mutableMapOf<Long, String?>()
     private val recordingChannels by lazy {
@@ -139,7 +138,7 @@ private class RowMapper(
         projected: ChannelRowPrograms? = null,
         previous: MappedChannelRow? = null,
     ): MappedChannelRow {
-        val programs = projected ?: observation.channelRowPrograms(channel.id, now)
+        val programs = projected ?: observation.channelRowPrograms(channel.id, now, includeDetails)
         val running = programs.running
         val recording = when {
             observation.runningRecordingForEvent(running) != null -> ChannelRecording.Program
@@ -148,8 +147,8 @@ private class RowMapper(
         }
         val inputs = ChannelRowInputs(
             programs, channel.name.orEmpty(), artwork?.logo(channel.icon, observation),
-            running?.let { artwork?.picture(programmeArtwork(it), observation) }, playing, recording,
-            running?.marks(), programs.ahead.map { it.marks() },
+            if (includeDetails) running?.let { artwork?.picture(programmeArtwork(it), observation) } else null,
+            playing, recording, if (includeDetails) running?.marks() else null, programs.ahead.map { it.marks() },
             running?.let { remainingLabel(it.stop.epochSeconds - now.epochSeconds) },
             running?.let { Math.floorDiv(now.epochSeconds, SECONDS_PER_MINUTE) },
         )
@@ -160,22 +159,24 @@ private class RowMapper(
     private fun buildRow(id: ChannelId, inputs: ChannelRowInputs): ChannelRow = with(inputs) {
         val running = programs.running
         val ahead = programs.ahead.mapIndexed { index, event -> event.program(aheadMarks[index]) }
-        val details = ChannelDetails(
-            artworkModel = picture,
-            episode = running?.let { texts.episode(it) },
-            metadata = running?.metadata(),
-            synopsis = running?.synopsis(),
-            following = ahead.drop(1),
-        )
+        val details = if (includeDetails) {
+            ChannelDetails(
+                artworkModel = picture,
+                episode = running?.let { texts.episode(it) },
+                metadata = running?.metadata(),
+                synopsis = running?.synopsis(),
+                following = ahead.drop(1),
+            ).takeIf { it != ChannelDetails() }
+        } else null
         ChannelRow(
             id = id.value.toString(),
             name = name,
             logoModel = logo,
-            now = running?.let { it.program(requireNotNull(runningMarks)) },
+            now = running?.program(runningMarks),
             next = ahead.firstOrNull(),
             playback = if (playing) ChannelPlayback(running?.progress(now.epochSeconds)) else null,
             recording = recording,
-            details = details.takeIf { it != ChannelDetails() },
+            details = details,
         )
     }
 
@@ -187,23 +188,25 @@ private class RowMapper(
     private fun EpgEvent.marks() = ChannelProgramMarks(
         scheduled = !isRunning(now.epochSeconds) && observation.isScheduled(this),
         rule = observation.ruleSchedule(this),
-        record = programRecordControl(programmeRecordKeyAction(this, observation, now.epochSeconds)),
+        record = if (includeDetails) {
+            programRecordControl(programmeRecordKeyAction(this, observation, now.epochSeconds))
+        } else null,
     )
 
     /** A running program gives its range, time left and progress; one ahead gives its start. */
-    private fun EpgEvent.program(marks: ChannelProgramMarks): ChannelProgram {
+    private fun EpgEvent.program(marks: ChannelProgramMarks?): ChannelProgram {
         val nowSec = now.epochSeconds
         val running = isRunning(nowSec)
         return ChannelProgram(
             title = title.orEmpty(),
-            start = texts.clock(start.epochSeconds),
-            timeRange = if (running) texts.timeRange(start.epochSeconds, stop.epochSeconds) else null,
+            start = if (!running || includeDetails) texts.clock(start.epochSeconds) else null,
+            timeRange = if (running && includeDetails) texts.timeRange(start.epochSeconds, stop.epochSeconds) else null,
             progress = progress(nowSec).takeIf { running },
             timeLeft = if (running) remainingLabel(stop.epochSeconds - nowSec) else null,
-            scheduled = marks.scheduled,
-            ruleSchedule = marks.rule,
-            record = marks.record,
-            eventId = id,
+            scheduled = marks?.scheduled == true,
+            ruleSchedule = marks?.rule,
+            record = marks?.record,
+            eventId = id.takeIf { includeDetails },
             airing = (start.epochSeconds until stop.epochSeconds).takeIf { running },
         )
     }
@@ -237,10 +240,16 @@ internal data class ChannelRowPrograms(
         ?: Long.MAX_VALUE
 }
 
-internal fun SessionObservation.channelRowPrograms(id: ChannelId, now: Instant): ChannelRowPrograms =
+internal fun SessionObservation.channelRowPrograms(
+    id: ChannelId,
+    now: Instant,
+    includeDetails: Boolean = true,
+): ChannelRowPrograms =
     ChannelRowPrograms(
         eventAt(id, now),
-        generateSequence(nextEvent(id, now)) { nextEvent(id, it.start) }.take(FOLLOWING_LIMIT + 1).toList(),
+        if (includeDetails) {
+            generateSequence(nextEvent(id, now)) { nextEvent(id, it.start) }.take(FOLLOWING_LIMIT + 1).toList()
+        } else listOfNotNull(nextEvent(id, now)),
     )
 
 internal fun SessionObservation.sameProgrammeAuthority(previous: SessionObservation): Boolean {

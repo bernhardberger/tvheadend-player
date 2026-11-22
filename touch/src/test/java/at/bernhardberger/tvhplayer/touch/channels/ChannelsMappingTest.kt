@@ -149,17 +149,23 @@ class ChannelsMappingTest {
             session.publish(guide.connected(epg = EpgSnapshot.create(epg.events + otherShow)))
             return session.observation.value
         }
-        val previous = mutableMapOf<ChannelId, MappedChannelRow>()
-        val before = channelsState(
-            scope, ConnectionUiState.Ready, false, publish(guide.snapshot), guide.now, texts, mappedRows = previous,
-        ) as ChannelsState.Ready
-        val after = channelsState(
-            scope, ConnectionUiState.Ready, false, publish(guide.refreshedEpg("Updated News")),
-            guide.now, texts, previousRows = previous,
-        ) as ChannelsState.Ready
+        for (includeDetails in listOf(false, true)) {
+            val previous = mutableMapOf<ChannelId, MappedChannelRow>()
+            val before = channelsState(
+                scope, ConnectionUiState.Ready, false, publish(guide.snapshot), guide.now, texts,
+                mappedRows = previous, includeDetails = includeDetails,
+            ) as ChannelsState.Ready
+            val after = channelsState(
+                scope, ConnectionUiState.Ready, false, publish(guide.refreshedEpg("Updated News")),
+                guide.now, texts, previousRows = previous, includeDetails = includeDetails,
+            ) as ChannelsState.Ready
 
-        assertEquals("Updated News", after.list.rows.first().now?.title)
-        assertSame(before.list.rows.last(), after.list.rows.last())
+            val row = after.list.rows.first()
+            assertEquals("Updated News", row.now?.title)
+            assertEquals(guide.programs[1], row.next?.title)
+            assertEquals(includeDetails, row.details != null)
+            assertSame(before.list.rows.last(), after.list.rows.last())
+        }
     }
 
     @Test

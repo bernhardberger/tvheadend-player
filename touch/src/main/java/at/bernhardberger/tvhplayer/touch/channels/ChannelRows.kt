@@ -340,7 +340,7 @@ private val ItemSpacing = 12.dp
 private val ExpandTarget = 48.dp
 private val RowInset = 10.dp
 private val PlayingSlot = 30.dp
-private const val SAVED_ROW_ALPHA = 0.58f
+internal const val SAVED_ROW_ALPHA = 0.58f
 
 @Composable
 private fun TabletNow(
@@ -402,12 +402,7 @@ private fun NextProgram(program: ChannelProgram?, showMarks: Boolean, modifier: 
                 program?.title ?: stringResource(R.string.channels_no_program), Modifier.weight(1f, fill = false),
             )
             if (showMarks && program?.scheduled == true) {
-                Icon(
-                    painterResource(program.ruleSchedule?.icon ?: R.drawable.channels_schedule),
-                    stringResource(program.ruleSchedule?.markDescription ?: R.string.channels_scheduled),
-                    Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                ScheduledProgramMark(program)
             }
         }
         program?.start?.let { SupportingLine(it, Modifier.padding(top = 3.dp)) }
@@ -415,7 +410,19 @@ private fun NextProgram(program: ChannelProgram?, showMarks: Boolean, modifier: 
 }
 
 @Composable
-private fun ChannelProgress(
+internal fun ScheduledProgramMark(program: ChannelProgram) {
+    Icon(
+        painterResource(program.ruleSchedule?.icon ?: R.drawable.channels_schedule),
+        stringResource(program.ruleSchedule?.markDescription ?: R.string.channels_scheduled),
+        Modifier.size(ScheduledMarkSize),
+        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+internal val ScheduledMarkSize = 16.dp
+
+@Composable
+internal fun ChannelProgress(
     program: ChannelProgram?,
     playback: ChannelPlayback?,
     recording: ChannelRecording?,

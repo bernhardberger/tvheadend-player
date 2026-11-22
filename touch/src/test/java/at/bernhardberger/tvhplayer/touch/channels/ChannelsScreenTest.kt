@@ -26,6 +26,8 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.click
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasProgressBarRangeInfo
 import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -33,10 +35,12 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
@@ -47,12 +51,14 @@ import at.bernhardberger.tvhplayer.core.NEUTRAL_ACCENT_RGB
 import at.bernhardberger.tvhplayer.images.ChannelAccents
 import at.bernhardberger.tvhplayer.images.LogoInkTransformation
 import at.bernhardberger.tvhplayer.stores.ChannelAccentStore
+import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.testutil.ImageLoaderRule
 import at.bernhardberger.tvhplayer.touch.testutil.LogoMark
 import at.bernhardberger.tvhplayer.touch.testutil.ServerGuide
 import at.bernhardberger.tvhplayer.touch.testutil.TouchCanvas
 import at.bernhardberger.tvhplayer.touch.testutil.assertLogoFitsItsShare
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouch
+import at.bernhardberger.tvhplayer.touch.testutil.captureTouchWindows
 import at.bernhardberger.tvhplayer.touch.testutil.markedLogos
 import at.bernhardberger.tvhplayer.touch.ui.ArtworkModels
 import at.bernhardberger.tvhplayer.touch.ui.ArtworkImage
@@ -98,7 +104,7 @@ class ChannelsScreenTest {
         val state = mutableStateOf(ChannelsState.Ready(list))
         compose.setContent {
             MaterialTheme(colorScheme = TouchDarkColors) {
-                ChannelsScreen(state.value, fixtureActions(optional = true), initiallyOpenChannelId = "amber-stage")
+                ChannelsScreen(state.value, fixtureActions())
             }
         }
         capture("tablet-channels", TouchCanvas.TABLET)
@@ -130,19 +136,10 @@ class ChannelsScreenTest {
         assertTrue("The row without a logo still has a leading tile", tile.boundsInRoot.right < name.left)
         capture("tablet-channels-some-logos", TouchCanvas.TABLET)
         compose.runOnIdle { state.value = ChannelsState.Ready(list.withoutLogos()) }
-        assertTrue("No tiles remain when the entire list has no logos", tiles.fetchSemanticsNodes().isEmpty())
-        assertTrue("Without logos the names no longer reserve a column", ridge.getBoundsInRoot().left < withColumn)
+        assertTrue("Fallback tiles remain when the entire list has no logos", tiles.fetchSemanticsNodes().isNotEmpty())
+        assertEquals(withColumn, ridge.getBoundsInRoot().left)
         assertEquals(harbor.getBoundsInRoot().left, ridge.getBoundsInRoot().left)
         capture("tablet-channels-no-logos", TouchCanvas.TABLET)
-    }
-
-    @Test
-    @Config(qualifiers = "en-rUS-w1280dp-h800dp-land-xhdpi")
-    fun tabletOpenRowWithoutAPicture() {
-        val list = channelsFixture()
-        val rows = list.rows.map { if (it.id == "amber-stage") it.copy(details = it.details?.copy(artwork = null)) else it }
-        show(ChannelsState.Ready(list.copy(rows = rows)), open = "amber-stage")
-        capture("tablet-channels-no-picture", TouchCanvas.TABLET)
     }
 
     @Test
@@ -152,10 +149,9 @@ class ChannelsScreenTest {
         val width = mutableStateOf(800.dp)
         compose.setContent {
             MaterialTheme(colorScheme = TouchDarkColors) {
-                ChannelsScreen(state, fixtureActions(), Modifier.width(width.value), initiallyOpenChannelId = "amber-stage")
+                ChannelsScreen(state, fixtureActions(), Modifier.width(width.value))
             }
         }
-        assertCompactFollowing()
         capture("tablet-upright-channels", TouchCanvas.TABLET_UPRIGHT)
 
         // The wide canvas can hit the old track's upper cap for both labels and hide the defect.
@@ -173,55 +169,70 @@ class ChannelsScreenTest {
     @Test
     @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
     fun phoneChannels() {
+        var opened: String? = null
         var played: String? = null
-        show(ChannelsState.Ready(channelsFixture()), fixtureActions(onPlay = { played = it }))
-
-        compose.onNodeWithContentDescription("Show programs on Amber Stage").performClick()
-        assertNull(played)
-        compose.onNodeWithText("S2 E4 • The Long Tide").assertIsDisplayed()
-        compose.onNodeWithText("Watch").assertIsDisplayed()
-        compose.onNodeWithText("Record").assertDoesNotExist()
-        compose.onNodeWithText("Details").assertDoesNotExist()
-        compose.onNodeWithText("Show in Guide").assertDoesNotExist()
-        assertCompactFollowing()
-        capture("phone-channels", TouchCanvas.PHONE)
-
-        compose.onNodeWithContentDescription("Hide programs on Amber Stage").performClick()
-        compose.onNodeWithText("S2 E4 • The Long Tide").assertDoesNotExist()
-        compose.onNodeWithText("Amber Stage").performClick()
-        compose.runOnIdle { assertEquals("amber-stage", played) }
-    }
-
-    @Test
-    @Config(qualifiers = "en-rUS-w1280dp-h800dp-land-xhdpi")
-    fun aKeptOpenRowFollowsItsChannelAndStaysClosedAfterRemoval() {
-        val list = channelsFixture()
-        val channels = mutableStateOf(list)
-        val visible = mutableStateOf(true)
-        showKeptChannels(channels, visible)
-        val open = compose.onNodeWithContentDescription("Show programs on Amber Stage")
-        val close = compose.onNodeWithContentDescription("Hide programs on Amber Stage")
-        open.performClick()
-
-        compose.runOnIdle { channels.value = list.copy(rows = listOf(list.rows[1], list.rows[0]) + list.rows.drop(2)) }
-        close.assertIsDisplayed()
-        compose.onNodeWithContentDescription("Hide programs on Ridge Earth").assertDoesNotExist()
-        val withoutAmber = list.rows.filterNot { it.id == "amber-stage" }
-        for (remaining in listOf(
-            list.copy(rows = withoutAmber),
-            list.copy(rows = emptyList()),
-            list.copy(rows = withoutAmber, selectedTagId = "news"),
-        )) {
-            compose.runOnIdle { visible.value = false }
-            compose.runOnIdle {
-                channels.value = remaining
-                visible.value = true
+        val openEnabled = mutableStateOf(true)
+        val fixture = channelsFixture(playing = true).withoutLogos("northline-news")
+        val rows = fixture.rows.map {
+            when (it.id) {
+                "harbor-lights" -> it.copy(next = it.next?.copy(title = "Dockside Sessions: Portside"))
+                "lantern-hour" -> it.copy(now = null)
+                else -> it
             }
-            close.assertDoesNotExist()
-            compose.runOnIdle { channels.value = list }
-            open.assertIsDisplayed()
-            open.performClick()
         }
+        val selected = mutableStateOf<String?>(null)
+        compose.setContent {
+            MaterialTheme(colorScheme = TouchDarkColors) {
+                val list = if (selected.value == null) fixture.copy(rows = rows)
+                else fixture.copy(rows = rows.filter { it.id == "northline-news" }, selectedTagId = selected.value)
+                ChannelsScreen(
+                    ChannelsState.Ready(list),
+                    fixtureActions(
+                        onPlay = { played = it },
+                        onOpen = if (openEnabled.value) ({ opened = it }) else null,
+                        onTag = { selected.value = it },
+                    ),
+                )
+            }
+        }
+        val amber = compose.onNode(hasClickAction() and hasText("Amber Stage"))
+        amber.assertIsDisplayed()
+        compose.onNodeWithText("Amber Stage", useUnmergedTree = true).performTouchInput { click() }
+        val missingGuideRow = compose.onNode(hasClickAction() and hasText("Lantern Hour")).getBoundsInRoot()
+        val populatedRow = amber.getBoundsInRoot()
+        assertEquals(populatedRow.bottom - populatedRow.top, missingGuideRow.bottom - missingGuideRow.top)
+        compose.runOnIdle {
+            assertEquals("amber-stage", opened)
+            assertNull("Tapping the channel name must not tune it", played)
+            opened = null
+        }
+        compose.onNodeWithContentDescription(watchLabel("Amber Stage")).performTouchInput { click() }
+        compose.runOnIdle {
+            assertEquals("amber-stage", played)
+            assertNull("Watch must not open the channel page", opened)
+            openEnabled.value = false
+        }
+        amber.assertDoesNotExist()
+        compose.onNodeWithContentDescription(watchLabel("Ridge Earth")).performClick()
+        compose.runOnIdle { assertEquals("ridge-earth", played) }
+        compose.onNodeWithText("9:00 PM", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Dockside Sessions", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("10:00 PM", substring = true).assertDoesNotExist()
+        compose.onNodeWithText("The Reading Room", substring = true).assertDoesNotExist()
+        compose.onNodeWithText(compose.activity.getString(R.string.channels_no_program)).assertIsDisplayed()
+        capture("phone-channels", TouchCanvas.PHONE)
+        val filter = compose.onNodeWithContentDescription(filterLabel(R.string.channels_all))
+        filter.performClick()
+        compose.onNodeWithText("News").assertIsDisplayed()
+        compose.captureTouchWindows("slice2", "phone-channels-tag-menu", TouchCanvas.PHONE)
+        compose.onNodeWithText("News").performClick()
+        compose.onNodeWithContentDescription(
+            compose.activity.getString(R.string.channels_filter, "News"),
+        ).assertIsDisplayed()
+        val count = compose.activity.resources.getQuantityString(R.plurals.channels_count, 1, 1)
+        compose.onNodeWithText(compose.activity.getString(R.string.channels_count_with_tag, count, "News"))
+            .assertIsDisplayed()
+        capture("phone-channels-selected-tag", TouchCanvas.PHONE)
     }
 
     @Test
@@ -234,12 +245,10 @@ class ChannelsScreenTest {
         showKeptChannels(channels, visible, taps)
         val rows = compose.onNode(hasScrollToIndexAction())
         val first = compose.onNodeWithText(list.rows.first().name)
-        compose.onNodeWithContentDescription("Show programs on Amber Stage").performClick()
         rows.performScrollToIndex(8)
         first.assertIsNotDisplayed()
         compose.runOnIdle { check(taps.tryEmit(Destination.Channels)) }
         first.assertIsDisplayed()
-        compose.onNodeWithContentDescription("Hide programs on Amber Stage").assertIsDisplayed().performClick()
         rows.performScrollToIndex(8)
         first.assertIsNotDisplayed()
 
@@ -515,22 +524,19 @@ class ChannelsScreenTest {
         }, Description.EMPTY).evaluate()
     }
 
-    private fun show(state: ChannelsState, actions: ChannelsActions = fixtureActions(), open: String? = null) {
+    private fun show(state: ChannelsState, actions: ChannelsActions = fixtureActions()) {
         compose.setContent {
             MaterialTheme(colorScheme = TouchDarkColors) {
-                ChannelsScreen(state, actions, initiallyOpenChannelId = open)
+                ChannelsScreen(state, actions)
             }
         }
     }
 
     private fun capture(name: String, canvas: TouchCanvas) = compose.captureTouch("slice2", name, canvas)
 
-    private fun assertCompactFollowing() {
-        compose.onNodeWithText("The Kettle Hour").assertIsDisplayed()
-        compose.onNodeWithText("Coastal Miles").assertIsDisplayed()
-        compose.onNodeWithText("Amber Late").assertIsDisplayed()
-        compose.onNodeWithText("11:40 PM").assertDoesNotExist()
-    }
+    private fun watchLabel(channel: String) = compose.activity.getString(R.string.channels_watch_named, channel)
+
+    private fun filterLabel(tag: Int) = compose.activity.getString(R.string.channels_filter, compose.activity.getString(tag))
 
     private fun captureLoading(name: String, canvas: TouchCanvas) {
         compose.mainClock.autoAdvance = false
@@ -539,13 +545,15 @@ class ChannelsScreenTest {
         capture(name, canvas)
     }
 
-    private fun fixtureActions(onPlay: (String) -> Unit = {}, optional: Boolean = false) = ChannelsActions(
+    private fun fixtureActions(
+        onPlay: (String) -> Unit = {},
+        onOpen: ((String) -> Unit)? = null,
+        onTag: (String?) -> Unit = {},
+    ) = ChannelsActions(
         onPlay = onPlay,
-        onTag = {},
+        onOpenChannel = onOpen,
+        onTag = onTag,
         onRetry = {},
         onOpenConnectionSettings = {},
-        onRecordControl = if (optional) ({ _, _, _ -> }) else null,
-        onDetails = if (optional) ({}) else null,
-        onShowInGuide = if (optional) ({}) else null,
     )
 }

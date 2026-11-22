@@ -192,34 +192,6 @@ class TouchFrameTest {
 
     @Test
     @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
-    fun backDuringTheFadeDoesNotCloseTheOutgoingChannel() {
-        val channels = ChannelsState.Ready(channelsFixture())
-        val actions = ChannelsActions(onPlay = null, onTag = {}, onRetry = {}, onOpenConnectionSettings = {})
-        compose.setContent {
-            MaterialTheme {
-                DestinationFrame { current ->
-                    if (current == Destination.Channels) {
-                        ChannelsScreen(channels, actions, initiallyOpenChannelId = "amber-stage")
-                    } else {
-                        TouchFrame(initialDestination = current)
-                    }
-                }
-            }
-        }
-        val opened = compose.onNodeWithText("S2 E4 • The Long Tide")
-        opened.assertExists()
-        compose.mainClock.autoAdvance = false
-        selectOnTheNextFrame("Guide")
-        compose.onNode(destination and hasText("Guide")).assertIsSelected()
-        opened.assertExists()
-        compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
-        compose.mainClock.autoAdvance = true
-        compose.onNode(destination and hasText("Channels")).assertIsSelected()
-        opened.assertExists()
-    }
-
-    @Test
-    @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
     fun restoringFullWindowDetailsDoesNotLayOutNavigation() {
         val restoration = StateRestorationTester(compose)
         val heights = mutableListOf<Int>()
@@ -391,7 +363,9 @@ class TouchFrameTest {
         val byChannel = byChannelFixture(phone = true).copy(details = emptyMap())
         var guideView by mutableStateOf(GuideView.Overview)
         val recordings = flatFixture()
-        val channelsActions = ChannelsActions(onPlay = null, onTag = {}, onRetry = {}, onOpenConnectionSettings = {})
+        val channelsActions = ChannelsActions(
+            onPlay = null, onTag = {}, onRetry = {}, onOpenConnectionSettings = {}, onOpenChannel = {},
+        )
         val guideActions = GuideActions(
             onWatch = null, onRecord = null, onRecordOptions = null, onDay = {}, onJump = {}, onTag = {},
             onView = { guideView = it },

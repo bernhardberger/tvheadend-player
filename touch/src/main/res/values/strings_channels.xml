@@ -2,6 +2,12 @@
 <resources>
     <!-- TV: all_channels -->
     <string name="channels_all">All channels</string>
+    <string name="channels_filter">Filter channels: %1$s</string>
+    <plurals name="channels_count">
+        <item quantity="one">%1$d channel</item>
+        <item quantity="other">%1$d channels</item>
+    </plurals>
+    <string name="channels_count_with_tag">%1$s • %2$s</string>
     <!-- TV: details_status_on_now -->
     <string name="channels_on_now">On now</string>
     <string name="channels_next">Next</string>
@@ -10,6 +16,8 @@
     <!-- TV: player_minutes_left -->
     <string name="channels_time_left">%1$s left</string>
     <string name="channels_program_and_time_left">%1$s • %2$s</string>
+    <string name="channels_row_fact">• %1$s</string>
+    <string name="channels_row_next">Next: %1$s</string>
     <string name="channels_expand">Show programs on %1$s</string>
     <string name="channels_collapse">Hide programs on %1$s</string>
     <!-- TV: player_status_rec -->
@@ -24,6 +32,7 @@
     <string name="channels_playing">Playing</string>
     <!-- TV: context_watch -->
     <string name="channels_watch">Watch</string>
+    <string name="channels_watch_named">Watch %1$s</string>
     <!-- TV: context_record -->
     <string name="channels_record">Record</string>
     <!-- TV: context_details -->

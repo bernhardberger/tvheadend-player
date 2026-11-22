@@ -14,6 +14,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.runtime.Composable
@@ -24,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -46,7 +48,6 @@ internal fun ChannelsScreen(
     state: ChannelsState,
     actions: ChannelsActions,
     modifier: Modifier = Modifier,
-    initiallyOpenChannelId: String? = null,
     destinations: List<Destination> = Destination.entries,
 ) {
     val window = currentWindowAdaptiveInfoV2().windowSizeClass
@@ -66,8 +67,8 @@ internal fun ChannelsScreen(
         lastActionIsIconOnly = true,
         actions = { destination ->
             if (destination == Destination.Channels) {
-                if (layout.tablet && list != null && list.canFilter) {
-                    TagFilter(list, actions.onTag)
+                if (list != null && list.canFilter) {
+                    TagFilter(list, actions.onTag, iconOnly = layout != ChannelsLayout.Wide)
                     Spacer(Modifier.width(8.dp))
                 }
                 IconButton(onClick = actions.onOpenConnectionSettings) {
@@ -79,13 +80,13 @@ internal fun ChannelsScreen(
             }
         },
         belowTopBar = { destination ->
-            if (destination == Destination.Channels && state == ChannelsState.Loading) {
-                ChannelsLoadingLine(layout, LocalBrowseMargin.current)
+            if (destination == Destination.Channels) {
+                ChannelsSubtitle(state, list, layout)
             }
         },
     ) { destination ->
         if (destination == Destination.Channels) {
-            ChannelsContent(state, layout, actions, initiallyOpenChannelId)
+            ChannelsContent(state, layout, actions)
         }
     }
 }
@@ -103,7 +104,6 @@ private fun ChannelsContent(
     state: ChannelsState,
     layout: ChannelsLayout,
     actions: ChannelsActions,
-    initiallyOpenChannelId: String?,
 ) {
     val margin = LocalBrowseMargin.current
     when (state) {
@@ -117,21 +117,40 @@ private fun ChannelsContent(
                 OfflineBanner(
                     !layout.tablet, ChannelsOfflineTexts, actions.onOpenConnectionSettings, retryIn = state.retryIn,
                 )
-                if (!layout.tablet && state.list.canFilter) TagFilter(state.list, actions.onTag)
-                ChannelRows(state.list, layout, actions, offline = true)
+                BrowseChannelRows(state.list, actions, offline = true)
             }
         }
         is ChannelsState.Ready -> {
             Column(Modifier.fillMaxSize().padding(horizontal = margin)) {
                 val list = state.list
-                if (!layout.tablet && list.canFilter) TagFilter(list, actions.onTag)
-                ChannelRows(list, layout, actions, initiallyOpenChannelId = initiallyOpenChannelId) {
+                BrowseChannelRows(list, actions) {
                     val kind = if (list.selectedTagId == null) MessageKind.Empty else MessageKind.EmptyTag
                     ChannelsMessage(kind, actions, horizontalMargin = if (layout.tablet) margin else 0.dp)
                 }
             }
         }
     }
+}
+
+@Composable
+private fun ChannelsSubtitle(state: ChannelsState, list: ChannelList?, layout: ChannelsLayout) {
+    if (state == ChannelsState.Loading) {
+        ChannelsLoadingLine(layout, LocalBrowseMargin.current)
+    } else if (list != null && layout != ChannelsLayout.Wide) {
+        ChannelsCount(list)
+    }
+}
+
+@Composable
+private fun ChannelsCount(list: ChannelList) {
+    val count = pluralStringResource(R.plurals.channels_count, list.rows.size, list.rows.size)
+    val tag = list.selectedTagLabel
+    Text(
+        if (tag == null) count else stringResource(R.string.channels_count_with_tag, count, tag),
+        Modifier.padding(horizontal = LocalBrowseMargin.current).padding(top = 4.dp, bottom = 8.dp),
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 /** The shared message form with Channels' actions; sign-in needed opens the sign-in editor when there is one. */
@@ -152,20 +171,30 @@ private fun ChannelsMessage(
 private val ChannelsOfflineTexts = OfflineTexts(R.string.channels_offline, R.string.channels_saved)
 
 private val ChannelList.canFilter: Boolean get() = rows.isNotEmpty() || selectedTagId != null
+private val ChannelList.selectedTagLabel: String? get() = tags.find { it.id == selectedTagId }?.label
 
 @Composable
-internal fun TagFilter(list: ChannelList, onTag: (String?) -> Unit, modifier: Modifier = Modifier) {
+internal fun TagFilter(
+    list: ChannelList,
+    onTag: (String?) -> Unit,
+    modifier: Modifier = Modifier,
+    iconOnly: Boolean = false,
+) {
     var open by remember { mutableStateOf(false) }
     val all = stringResource(R.string.channels_all)
-    val label = list.tags.find { it.id == list.selectedTagId }?.label ?: all
+    val label = list.selectedTagLabel ?: all
     Box(modifier) {
-        FilledTonalButton(
-            onClick = { open = true },
-        ) {
-            Icon(painterResource(R.drawable.channels_tag), null, Modifier.size(ButtonDefaults.IconSize))
-            Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-            Text(label, Modifier.weight(1f, fill = false), maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Icon(painterResource(R.drawable.channels_expand), null, Modifier.testTag("channel-tag-chevron"))
+        if (iconOnly) {
+            IconButton(onClick = { open = true }) {
+                Icon(painterResource(R.drawable.channels_filter), stringResource(R.string.channels_filter, label))
+            }
+        } else {
+            FilledTonalButton(onClick = { open = true }) {
+                Icon(painterResource(R.drawable.channels_tag), null, Modifier.size(ButtonDefaults.IconSize))
+                Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                Text(label, Modifier.weight(1f, fill = false), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Icon(painterResource(R.drawable.channels_expand), null, Modifier.testTag("channel-tag-chevron"))
+            }
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             TagOption(all, list.selectedTagId == null) {
