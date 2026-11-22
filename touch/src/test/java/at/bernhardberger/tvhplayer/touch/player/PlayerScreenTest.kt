@@ -66,6 +66,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.performTouchInput
@@ -413,6 +414,12 @@ class PlayerScreenTest {
         val restTop = restHandle.top
         val stockHeight = restHandle.bottom - restTop
         assertTrue("The channel sheet rests below the action row", restTop >= actions.bottom)
+        val scrollableProgram = hasAnyDescendant(hasTestTag("player-actions")) and
+            SemanticsMatcher("has vertical scroll range") {
+                val range = SemanticsProperties.VerticalScrollAxisRange
+                range in it.config && it.config[range].maxValue() > 0f
+            }
+        compose.onAllNodes(scrollableProgram, useUnmergedTree = true).assertCountEquals(0)
 
         expand.performTouchInput { click() }
         fun assertRaised() {
@@ -457,6 +464,19 @@ class PlayerScreenTest {
         val shortHandle = expand.getBoundsInRoot()
         val shortHeight = shortHandle.bottom - shortHandle.top
         assertTrue("Short window handle $shortHeight is shorter than the stock $stockHeight", shortHeight >= stockHeight)
+        val row = tag("player-actions")
+        val fullRowHeight = actions.bottom - actions.top
+        val clippedRow = row.getBoundsInRoot()
+        assertTrue("The action row does not fully fit at rest", clippedRow.bottom - clippedRow.top < fullRowHeight)
+        row.performScrollTo().assertIsDisplayed()
+        val scrolledRow = row.getBoundsInRoot()
+        assertEquals(fullRowHeight, scrolledRow.bottom - scrolledRow.top)
+        assertTrue("The full action row is above the resting sheet", scrolledRow.bottom <= expand.getBoundsInRoot().top)
+        assertEquals(picture, tag("player-picture").getBoundsInRoot())
+        compose.onNode(scrollableProgram, useUnmergedTree = true).performTouchInput {
+            swipe(Offset(center.x, height * .75f), Offset(center.x, height * .25f), durationMillis = 240)
+        }
+        assertEquals(shortHandle, expand.getBoundsInRoot())
         expand.assertIsDisplayed().performSemanticsAction(SemanticsActions.Expand)
         assertRaised()
     }

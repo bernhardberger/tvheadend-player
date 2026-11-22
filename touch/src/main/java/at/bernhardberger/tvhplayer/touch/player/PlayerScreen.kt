@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -37,6 +38,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -44,6 +46,7 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -249,12 +252,26 @@ private fun UprightPlayer(
     notices: @Composable (Modifier) -> Unit,
     opacity: State<Float>,
     reveal: (() -> Unit)?,
-) = Box(Modifier.fillMaxSize()) {
+) = BoxWithConstraints(Modifier.fillMaxSize()) {
+    var handleHeight by remember { mutableIntStateOf(0) }
+    val minimumPeek = with(LocalDensity.current) {
+        (handleHeight + WindowInsets.navigationBars.getBottom(this)).toDp()
+    }
+    // Keep room for the sheet even when a full-width 16:9 picture would fill the window.
+    val pictureRoom = maxHeight - WindowInsets.statusBars.asPaddingValues().calculateTopPadding() - minimumPeek
+    val hasChannelSheet = !inWindow && layout == PlayerLayout.Phone && state is LivePlayerState
+    val pictureFrame = if (!hasChannelSheet || pictureRoom >= maxWidth * (9f / 16)) {
+        Modifier.fillMaxWidth().aspectRatio(16f / 9)
+    } else {
+        val height = pictureRoom.coerceAtLeast(0.dp)
+        Modifier.size(width = height * (16f / 9), height = height).clipToBounds()
+    }
     Column(
         Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)
             .windowInsetsPadding(WindowInsets.statusBars),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Box(Modifier.fillMaxWidth().aspectRatio(16f / 9).background(Color.Black)) {
+        Box(pictureFrame.background(Color.Black)) {
             Picture(state, layout, controls, toggle, video, inWindow, opacity)
             if (!inWindow) {
                 val activity = LocalActivity.current as? ComponentActivity
@@ -282,7 +299,10 @@ private fun UprightPlayer(
                 }
             }
         }
-        if (!inWindow) UprightPlayerContent(state, layout, preview != null, onAction, panels, onChannel, onSeek)
+        if (!inWindow) UprightPlayerContent(
+            state, layout, preview != null, onAction, panels, onChannel, onSeek, minimumPeek,
+            onHandleHeight = { handleHeight = it },
+        )
     }
     // The upright phone's notice stands at the window's foot, as in browsing, not over the picture.
     if (!inWindow && layout == PlayerLayout.Phone) {

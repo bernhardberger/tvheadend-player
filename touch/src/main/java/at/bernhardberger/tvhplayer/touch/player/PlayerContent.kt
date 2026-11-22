@@ -229,11 +229,13 @@ internal fun UprightPlayerContent(
     panels: PanelHost,
     onChannel: (String) -> Unit,
     onSeek: (Long) -> Unit,
+    minimumPeek: Dp,
+    onHandleHeight: (Int) -> Unit,
 ) {
     if (state is LivePlayerState && layout == PlayerLayout.Phone) {
         PhoneChannelSheet(
             state.channels, panels.onChoice, onChannel, { onAction(PlayerAction.RetryChannels) },
-            Modifier.fillMaxSize(),
+            Modifier.fillMaxSize(), minimumPeek, onHandleHeight,
         ) { modifier ->
             UprightProgramActions(state, layout, dragging, panels, modifier)
         }

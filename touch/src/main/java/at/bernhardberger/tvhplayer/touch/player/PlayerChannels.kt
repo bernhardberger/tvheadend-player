@@ -11,7 +11,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -36,6 +39,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.channels.ChannelRows
@@ -61,6 +65,8 @@ internal fun PhoneChannelSheet(
     onChannel: (String) -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier,
+    minimumPeek: Dp,
+    onHandleHeight: (Int) -> Unit,
     program: @Composable (Modifier) -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
@@ -68,15 +74,11 @@ internal fun PhoneChannelSheet(
         SheetValue.PartiallyExpanded, setOf(SheetValue.PartiallyExpanded, SheetValue.Expanded),
     )
     var headerHeight by remember { mutableIntStateOf(0) }
-    var handleHeight by remember { mutableIntStateOf(0) }
+    val scroll = rememberScrollState()
     BoxWithConstraints(modifier.clipToBounds()) {
-        val density = LocalDensity.current
-        // The player draws edge to edge; keep the whole handle above system navigation.
-        val minimumPeek = with(density) {
-            (handleHeight + WindowInsets.navigationBars.getBottom(this)).toDp()
-        }.coerceAtMost(maxHeight)
-        val peek = if (headerHeight == 0) BottomSheetDefaults.SheetPeekHeight else
-            (maxHeight - with(density) { headerHeight.toDp() }).coerceAtLeast(minimumPeek)
+        val header = with(LocalDensity.current) { headerHeight.toDp() }
+        val naturalPeek = if (headerHeight == 0) BottomSheetDefaults.SheetPeekHeight else maxHeight - header
+        val peek = maxOf(naturalPeek, minimumPeek).coerceAtMost(maxHeight)
         BottomSheetScaffold(
             scaffoldState = rememberBottomSheetScaffoldState(sheet),
             containerColor = Color.Transparent,
@@ -86,7 +88,9 @@ internal fun PhoneChannelSheet(
             sheetContentColor = colors.onSurface,
             sheetShadowElevation = 0.dp,
             sheetDragHandle = {
-                BottomSheetDefaults.DragHandle(Modifier.onSizeChanged { handleHeight = it.height })
+                BottomSheetDefaults.DragHandle(
+                    Modifier.wrapContentHeight(unbounded = true).onSizeChanged { onHandleHeight(it.height) },
+                )
             },
             sheetContent = {
                 InlineChannelList(
@@ -94,9 +98,13 @@ internal fun PhoneChannelSheet(
                     Modifier.fillMaxHeight().padding(horizontal = 12.dp),
                 )
             },
-        ) {
-            // No scaffold body padding: the sheet overlays this block when raised.
-            program(Modifier.onSizeChanged { headerHeight = it.height })
+        ) { padding ->
+            // The scaffold's bottom padding is the resting peek, not the raised sheet.
+            program(
+                Modifier.padding(padding)
+                    .verticalScroll(scroll, enabled = header > maxHeight - peek)
+                    .onSizeChanged { headerHeight = it.height },
+            )
         }
     }
 }
