@@ -29,6 +29,11 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.compose.runtime.CompositionLocalProvider
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.EpgRepository
@@ -634,6 +639,56 @@ class GuideScreenTest {
     }
 
     @Test
+    @Config(instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.common.TimeConverterKt"])
+    fun aStoppedGuideMapsOnlyTheLatestInputsWhenItStartsAgain() {
+        val connection = FakeConnection()
+        val now = Instant.parse("2027-01-15T12:00:55Z")
+        val fixture = ServerGuide(now)
+        val owner = object : LifecycleOwner {
+            override val lifecycle = LifecycleRegistry(this)
+        }
+        var shown by mutableStateOf(true)
+        withMappingTrace {
+            try {
+                assertTrue(SystemClock.setCurrentTimeMillis(now.toEpochMilliseconds()))
+                compose.runOnIdle {
+                    owner.lifecycle.currentState = Lifecycle.State.STARTED
+                    connection.session.publish(fixture.connected())
+                }
+                showDestination(connection, shown = { shown }, lifecycleOwner = owner) {}
+                compose.onNodeWithText("Evening News").assertIsDisplayed()
+                assertEquals(1, guideMappings())
+                compose.runOnIdle {
+                    owner.lifecycle.currentState = Lifecycle.State.CREATED
+                    connection.session.publish(fixture.connected(epg = fixture.refreshedEpg("Missed News")))
+                }
+                assertTrue(SystemClock.setCurrentTimeMillis(now.toEpochMilliseconds() + 5_000))
+                compose.mainClock.advanceTimeBy(5_016)
+                compose.runOnIdle {
+                    connection.session.publish(fixture.connected(epg = fixture.refreshedEpg("Latest News")))
+                    assertEquals("A stopped Guide must not map on the minute tick", 1, guideMappings())
+                    owner.lifecycle.currentState = Lifecycle.State.STARTED
+                }
+                compose.onNodeWithText("Latest News").assertIsDisplayed()
+                assertEquals("Resume maps the latest data and minute together", 2, guideMappings())
+                compose.runOnIdle { shown = false }
+                compose.onAllNodesWithText("Latest News").assertCountEquals(0)
+                compose.runOnIdle {
+                    connection.session.publish(fixture.connected(epg = fixture.refreshedEpg("New News")))
+                }
+                compose.runOnIdle {
+                    assertEquals("A hidden Guide does not map a new publication", 2, guideMappings())
+                    shown = true
+                }
+                compose.onNodeWithText("New News").assertIsDisplayed()
+                assertEquals("Re-entry maps the latest publication once", 3, guideMappings())
+            } finally {
+                connection.close()
+            }
+        }
+    }
+
+    @Test
     fun aNewGuideInputSupersedesARequestInTheSameUiTurn() {
         val connection = FakeConnection()
         val noon = Instant.parse("2027-01-15T12:00:00Z")
@@ -724,6 +779,7 @@ class GuideScreenTest {
         connection: FakeConnection,
         shown: () -> Boolean = { true },
         mappingDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate,
+        lifecycleOwner: LifecycleOwner? = null,
         onCoverage: suspend (Instant) -> Unit,
     ) {
         val fake = connection.session
@@ -744,10 +800,12 @@ class GuideScreenTest {
         compose.setContent {
             MaterialTheme(colorScheme = MobileDarkColors) {
                 val dvr = viewModel { DvrControls(session, connection.noticeCenter) }
-                if (shown()) GuideDestination(
-                    guide, channels, presentation, listOf(Destination.Guide), playingId = null, onWatch = null,
-                    dvr = dvr, onOpenConnections = {}, onSignIn = {},
-                )
+                CompositionLocalProvider(LocalLifecycleOwner provides (lifecycleOwner ?: LocalLifecycleOwner.current)) {
+                    if (shown()) GuideDestination(
+                        guide, channels, presentation, listOf(Destination.Guide), playingId = null, onWatch = null,
+                        dvr = dvr, onOpenConnections = {}, onSignIn = {},
+                    )
+                }
             }
         }
     }

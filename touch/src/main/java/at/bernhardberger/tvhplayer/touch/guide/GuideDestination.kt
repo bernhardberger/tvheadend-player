@@ -13,6 +13,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleStartEffect
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.currentStateAsState
 import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
 import at.bernhardberger.tvhplayer.core.programmeCategory
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
@@ -60,10 +64,11 @@ internal fun GuideDestination(
     val observation by guide.observation.collectAsStateWithLifecycle()
     val selection by guide.selection.collectAsStateWithLifecycle()
     val pendingVersion by guide.pendingVersion.collectAsStateWithLifecycle()
-    val context = LocalContext.current
     val configuration = LocalConfiguration.current
-    val nowSec = rememberDetailsEpochSeconds()
-    val clock = GuideClock(nowSec - Math.floorMod(nowSec, 60L), ZoneId.systemDefault())
+    val result by guide.mapped.collectAsStateWithLifecycle()
+    val activeClock = activeGuideClock()
+    val clock = activeClock ?: result?.input?.clock
+        ?: remember { GuideClock(Instant.now().epochSecond, ZoneId.systemDefault()) }
     val coverage = remember(
         scope, observation, selection.view, selection.channelId, selection.day, clock.zone, clock.today,
     ) {
@@ -75,8 +80,7 @@ internal fun GuideDestination(
         Configuration(configuration), AppClock.uses24Hour, LocalArtworkModels.current,
         playingId, guide.overviewViewport.collectAsStateWithLifecycle().value,
     )
-    SideEffect { guide.map(context, input) }
-    val result by guide.mapped.collectAsStateWithLifecycle()
+    SubmitGuideMapping(guide, channels, connection, input, activeClock)
     val retained = result?.takeIf { it.input.scope.profileId == scope.profileId }
     val mapped = retained?.state ?: EmptyGuide
     val dayLoading = remember(mapped.listed, coverage, pendingVersion, observation.currentSession?.generationIdentity) {
@@ -114,6 +118,40 @@ internal fun GuideDestination(
         ),
         destinations = destinations,
     )
+}
+
+@Composable
+private fun activeGuideClock(): GuideClock? {
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    if (!lifecycle.currentStateAsState().value.isAtLeast(Lifecycle.State.STARTED)) return null
+    val nowSec = rememberDetailsEpochSeconds()
+    return GuideClock(nowSec - Math.floorMod(nowSec, SECONDS_PER_MINUTE), ZoneId.systemDefault())
+}
+
+private const val SECONDS_PER_MINUTE = 60L
+
+@Composable
+private fun SubmitGuideMapping(
+    guide: GuideViewModel, channels: ChannelsViewModel, connection: AppConnectionViewModel,
+    input: GuideMappingInput, activeClock: GuideClock?,
+) {
+    val context = LocalContext.current
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LifecycleStartEffect(guide) { onStopOrDispose { guide.map(context, null) } }
+    SideEffect {
+        if (activeClock != null && lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+            // On restart, the UI's lifecycle-aware collectors may still be catching up independently.
+            val presentation = connection.uiState.value
+            guide.map(
+                context,
+                GuideMappingInput(
+                    channels.scope.value, presentation.connection, presentation.degraded,
+                    guide.observation.value, guide.selection.value, activeClock, input.configuration,
+                    input.uses24Hour, input.artwork, input.playingId, guide.overviewViewport.value,
+                ),
+            )
+        }
+    }
 }
 
 private fun GuideState.withSelectedDay(input: GuideMappingInput, result: GuideMappingResult?): GuideState {
