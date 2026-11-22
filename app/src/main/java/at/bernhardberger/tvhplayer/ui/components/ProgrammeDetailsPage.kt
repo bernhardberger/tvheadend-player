@@ -50,6 +50,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import at.bernhardberger.tvhplayer.images.ProgrammeArtworkMode
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.platform.testTag
@@ -64,6 +65,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.dp
@@ -1156,10 +1158,13 @@ internal fun DetailsHero(
         return
     }
     val context = LocalPlatformContext.current
-    val request = remember(session, image, context, height != null) {
+    val density = LocalDensity.current.density
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    val request = remember(session, image, context, height != null, density, rtl) {
+        val scrim = if (height != null) GuideScrimTransformation(density, rtl)
+        else CinematicScrimTransformation(density, rtl)
         ImageRequest.Builder(context).data(programmeArtworkModel(image, session))
-            .transformations(ProgrammeArtworkTransformation(mode = ProgrammeArtworkMode.BACKDROP),
-                if (height != null) GuideScrimTransformation else CinematicScrimTransformation).build()
+            .transformations(ProgrammeArtworkTransformation(mode = ProgrammeArtworkMode.BACKDROP), scrim).build()
     }
     AsyncImage(request, null,
         contentScale = ContentScale.Crop,

@@ -793,6 +793,8 @@ only.
   icon until a genre is chosen, then the same pill with the genre. Pills show
   the icon and value (cut at 160dp), and TalkBack reads the name with the value
   ("Tags, Entertainment"). The header has no scrim of its own.
+  Over a programme picture, a soft fade baked into the picture's top end is
+  only as strong as the date needs for 4.5:1 contrast; dark pictures stay unchanged.
 - Tags opens the channel sets: the app's sets, a divider, then the server's
   tags. It shows only with a choice of sets, the same on Channels and Guide.
   Panels open on the checked entry; OK applies and closes, Back closes, and
