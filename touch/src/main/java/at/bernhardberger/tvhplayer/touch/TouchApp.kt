@@ -19,11 +19,14 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import at.bernhardberger.tvheadend.sdk.android.TvheadendDiscoveryState
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileAuthenticationMode
@@ -44,11 +47,13 @@ import at.bernhardberger.tvhplayer.touch.channels.LocalChannelProgressClock
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsActions
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsScreen
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsState
+import at.bernhardberger.tvhplayer.touch.channels.ChannelsTextsFormat
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsTexts
 import at.bernhardberger.tvhplayer.touch.channels.MappedChannelRow
 import at.bernhardberger.tvhplayer.touch.channels.channelRowPrograms
 import at.bernhardberger.tvhplayer.touch.channels.sameProgrammeAuthority
 import at.bernhardberger.tvhplayer.touch.channels.channelsState
+import at.bernhardberger.tvhplayer.touch.channels.channelsTextFormat
 import at.bernhardberger.tvhplayer.touch.channels.rememberChannelsTexts
 import at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
@@ -81,6 +86,8 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 
 /** [SignIn] is the Connections page opened on the editor, for a password that can't be read. */
 private enum class Page { Frame, Connections, SignIn }
@@ -113,6 +120,7 @@ internal fun TouchApp(
     val connectedAt = rememberArtworkConnectedAt(session)
     val connect = viewModel { ConnectViewModel(session, owner) }
     val dvr = viewModel { DvrControls(session, notices) }
+    val channelsCache = viewModel { ChannelsMappingCache(session) }
     SideEffect { connect.discovery = discovery }
     var page by rememberSaveable { mutableStateOf(Page.Frame) }
     // First run follows the settled profile: a removal's passing "no connection" does not open it,
@@ -143,7 +151,7 @@ internal fun TouchApp(
             }
             else -> CompositionLocalProvider(LocalArtworkConnectedAt provides connectedAt) {
                 AppDestinations(
-                    session, dvr, connection, channels, recordings, guide, playingId, onWatch, onPlayRecording,
+                    channelsCache, dvr, connection, channels, recordings, guide, playingId, onWatch, onPlayRecording,
                     channelsDispatcher = channelsDispatcher,
                     playingRecordingId = playingRecordingId,
                     onOpenConnections = { page = Page.Connections },
@@ -237,26 +245,39 @@ private fun AppFrame(
     onOpenConnections: () -> Unit,
     onSignIn: () -> Unit,
     mappingDispatcher: CoroutineDispatcher,
+    cache: ChannelsMappingCache,
 ) {
-    val presentation = connection.uiState.collectAsStateWithLifecycle().value
     val scope = channels.scope.collectAsStateWithLifecycle().value
-    // The scope is republished for channel changes only; the guide comes with every observation.
-    val observation = channels.observation.collectAsStateWithLifecycle().value
-    val texts = rememberChannelsTexts()
-    val artwork = LocalArtworkModels.current
+    val format = channelsTextFormat()
+    val texts = rememberChannelsTexts(format)
     val context = LocalContext.current.applicationContext
-    val key = ChannelsMappingKey(scope, presentation.connection, presentation.degraded, texts, playingId, artwork)
-    val mapped by produceState<ChannelsMappingResult?>(null, key, observation) {
-        while (true) {
-            // A clock wake and a data update in the same UI turn need only the newest inputs.
-            yield()
-            val previous = value
-            val result = withContext(mappingDispatcher) { key.map(context, observation, previous) }
-            value = result
-            delay((result.nextWakeSec * MILLIS_PER_SECOND - System.currentTimeMillis()).coerceAtLeast(1L))
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(lifecycle, channels, connection, playingId, format, texts, cache, mappingDispatcher) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            // The scope changes with the catalog or tag, not with every guide update.
+            combine(channels.scope, connection.uiState, channels.observation) { scope, presentation, observation ->
+                val key = ChannelsMappingKey(
+                    scope, presentation.connection, presentation.degraded, format, playingId, cache.artwork,
+                )
+                key to observation
+            }.collectLatest { (key, observation) ->
+                while (true) {
+                    // A clock wake and a data update in the same UI turn need only the newest inputs.
+                    yield()
+                    val previous = cache.mapped
+                    val now = Instant.fromEpochSeconds(System.currentTimeMillis() / MILLIS_PER_SECOND)
+                    val reasons = key.mappingReasons(previous, observation, now.epochSeconds)
+                    val result = if (reasons.isEmpty() && previous != null) previous else {
+                        withContext(mappingDispatcher) { key.map(context, observation, previous, now, reasons, texts) }
+                    }
+                    cache.mapped = result
+                    delay((result.nextWakeSec * MILLIS_PER_SECOND - System.currentTimeMillis()).coerceAtLeast(1L))
+                }
+            }
         }
     }
-    val state = mapped?.takeIf { it.key.scope.profileId == scope.profileId }?.state ?: ChannelsState.Loading
+    val state = cache.mapped?.takeIf { it.key.scope.profileId == scope.profileId && it.key.format == format }
+        ?.state ?: ChannelsState.Loading
     ArtworkFirstLoad("Channels", if (state == ChannelsState.Loading) when {
         !scope.settingsLoaded -> "settings"
         scope.scope.visibleChannels.isEmpty() -> "channels"
@@ -279,11 +300,17 @@ private fun AppFrame(
     }
 }
 
+/** Keep the last rows across browse composition and configuration changes, not process death. */
+private class ChannelsMappingCache(session: TvheadendSession) : ViewModel() {
+    val artwork = ArtworkModels(session)
+    var mapped by mutableStateOf<ChannelsMappingResult?>(null)
+}
+
 private data class ChannelsMappingKey(
     val scope: ChannelScopeState,
     val connection: ConnectionUiState,
     val degraded: Boolean,
-    val texts: ChannelsTexts,
+    val format: ChannelsTextsFormat,
     val playingId: String?,
     val artwork: ArtworkModels?,
 )
@@ -311,9 +338,12 @@ private suspend fun ChannelsMappingKey.map(
     context: android.content.Context,
     observation: SessionObservation,
     previous: ChannelsMappingResult?,
+    now: Instant,
+    reasons: List<String>,
+    texts: ChannelsTexts,
 ): ChannelsMappingResult {
     val job = kotlin.coroutines.coroutineContext
-    val now = Instant.fromEpochSeconds(System.currentTimeMillis() / MILLIS_PER_SECOND)
+    job.ensureActive()
     val nowSec = now.epochSeconds
     val started = context.artworkMappingStart()
     val programs = scope.scope.visibleChannels.map {
@@ -322,7 +352,6 @@ private suspend fun ChannelsMappingKey.map(
     }
     val boundary = programs.minOfOrNull { it.nextBoundary(now) } ?: Long.MAX_VALUE
     val projectionMs = started?.let { SystemClock.elapsedRealtime() - it }
-    val reasons = mappingReasons(previous, observation, nowSec)
     val sameRows = previous != null && reasons.all { it == "epg" } && previous.programs == programs &&
         observation.currentSession != null &&
         observation.channelCatalogForDisplay === previous.observation.channelCatalogForDisplay
@@ -330,7 +359,7 @@ private suspend fun ChannelsMappingKey.map(
     val state = if (sameRows) previous.state else {
         val previousRows = previous?.takeIf {
             it.key.scope.profileId == scope.profileId && it.observation.currentSession === observation.currentSession &&
-                it.key.texts === texts && it.key.artwork === artwork && nowSec >= it.atSec
+                it.key.format == format && it.key.artwork === artwork && nowSec >= it.atSec
         }?.rows.orEmpty()
         val counts = if ("epg" in reasons) context.epgChangeCounts(previous?.observation, observation) else ""
         traceArtworkMapping(context, "Channels", reasons.joinToString("+") + counts, projectionMs) {
@@ -353,7 +382,9 @@ private fun ChannelsMappingKey.mappingReasons(
 ): List<String> {
     if (previous == null) return listOf("initial")
     return buildList {
-        if (this@mappingReasons != previous.key) add("input")
+        if (this@mappingReasons != previous.key ||
+            observation.channelCatalogForDisplay !== previous.observation.channelCatalogForDisplay
+        ) add("input")
         if (nowSec >= previous.nextBoundarySec) add("boundary")
         if (nowSec >= nextChannelMinute(previous.atSec) || nowSec < previous.atSec) add("minute")
         if (observation.epgSnapshotForDisplay?.events !== previous.observation.epgSnapshotForDisplay?.events) add("epg")
@@ -367,7 +398,7 @@ private fun ChannelsMappingKey.mappingReasons(
 @Suppress("LongParameterList") // One view model per destination.
 @Composable
 private fun AppDestinations(
-    session: TvheadendSession,
+    channelsCache: ChannelsMappingCache,
     dvr: DvrControls,
     connection: AppConnectionViewModel,
     channels: ChannelsViewModel,
@@ -381,9 +412,8 @@ private fun AppDestinations(
     onOpenConnections: () -> Unit,
     onSignIn: () -> Unit,
 ) {
-    val artwork = remember(session) { ArtworkModels(session) }
     ConfirmDvrChange(dvr)
-    CompositionLocalProvider(LocalArtworkModels provides artwork) {
+    CompositionLocalProvider(LocalArtworkModels provides channelsCache.artwork) {
         DestinationFrame { destination ->
             when (destination) {
                 Destination.Recordings ->
@@ -398,7 +428,8 @@ private fun AppDestinations(
                     )
                 Destination.Channels ->
                     AppFrame(
-                        connection, channels, playingId, onWatch, dvr, onOpenConnections, onSignIn, channelsDispatcher,
+                        connection, channels, playingId, onWatch, dvr, onOpenConnections, onSignIn,
+                        channelsDispatcher, channelsCache,
                     )
             }
         }
