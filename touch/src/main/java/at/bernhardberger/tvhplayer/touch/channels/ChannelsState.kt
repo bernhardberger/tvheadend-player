@@ -83,7 +83,7 @@ internal data class ChannelDetails(
 )
 
 /**
- * Browse rows open through [onOpenChannel] and only their Watch button tunes through [onPlay].
+ * Browse rows open through [onOpenChannel]; the Watch button or split-pane logo tunes through [onPlay].
  * The player list still uses the expanded-row actions. [onSignIn] overrides the connection
  * settings action on the sign-in-needed message.
  */

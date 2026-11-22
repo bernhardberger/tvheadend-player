@@ -30,6 +30,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasClickAction
@@ -113,13 +114,15 @@ class ChannelsScreenTest {
         val list = channelsFixture(playing = true)
         val state = mutableStateOf(ChannelsState.Ready(list))
         val taps = MutableSharedFlow<Destination>(extraBufferCapacity = 1)
+        val openChannel = mutableStateOf<String?>(null)
         var played: String? = null
         compose.setContent {
             MaterialTheme(colorScheme = TouchDarkColors) {
                 CompositionLocalProvider(LocalDestinationReselections provides taps) {
                     ChannelsScreen(
-                        state.value, fixtureActions(onPlay = { played = it }),
+                        state.value, fixtureActions(onPlay = { played = it }, onOpen = { openChannel.value = it }),
                         lastWatchedId = "amber-stage",
+                        openChannelId = openChannel.value,
                         pane = { id, modifier ->
                             Text(state.value.list.rows.first { it.id == id }.name, modifier.testTag("channel-pane"))
                         },
@@ -129,7 +132,8 @@ class ChannelsScreenTest {
         }
         val pane = compose.onNodeWithTag("channel-pane")
         val amberRow = compose.onNode(isSelected() and hasText("Amber Stage"))
-        compose.onNode(hasClickAction() and hasText("Amber Stage")).performClick()
+        val openAmber = compose.onNode(hasClickAction() and hasText("Amber Stage"))
+        openAmber.performSemanticsAction(SemanticsActions.OnClick)
         amberRow.assertIsDisplayed()
         pane.assertIsDisplayed()
         capture("tablet-channels", TouchCanvas.TABLET)
@@ -149,17 +153,18 @@ class ChannelsScreenTest {
             played = null
         }
         amberRow.assertIsDisplayed()
-        ridge.performTouchInput { click() }
+        val ridgeRow = compose.onNode(hasClickAction() and hasText("Ridge Earth"))
+        ridgeRow.performSemanticsAction(SemanticsActions.OnClick)
         compose.runOnIdle { assertNull("Selecting the pane must not tune", played) }
         compose.onNode(isSelected() and hasText("Ridge Earth")).assertIsDisplayed()
         capture("tablet-channels-playing-selected", TouchCanvas.TABLET)
-        compose.onNode(hasClickAction() and hasText("Amber Stage")).performClick()
+        openAmber.performSemanticsAction(SemanticsActions.OnClick)
         compose.onNode(hasScrollToIndexAction()).performScrollToIndex(list.rows.lastIndex)
         ridge.assertIsNotDisplayed()
         compose.runOnIdle { check(taps.tryEmit(Destination.Channels)) }
         ridge.assertIsDisplayed()
         amberRow.assertIsDisplayed()
-        ridge.performTouchInput { click() }
+        ridgeRow.performSemanticsAction(SemanticsActions.OnClick)
 
         val longTitle = "Harbor Kickoff: " + "Harbor FC meet Amber Town in a floodlit stadium. ".repeat(8)
         compose.runOnIdle {
@@ -207,9 +212,13 @@ class ChannelsScreenTest {
         val list = channelsFixture(playing = true)
         val state = mutableStateOf(ChannelsState.Ready(list))
         val lastWatched = mutableStateOf<String?>(null)
+        val openChannel = mutableStateOf<String?>(null)
         compose.setContent {
             MaterialTheme(colorScheme = TouchDarkColors) {
-                ChannelsScreen(state.value, fixtureActions(), lastWatchedId = lastWatched.value)
+                ChannelsScreen(
+                    state.value, fixtureActions(onOpen = { openChannel.value = it }),
+                    lastWatchedId = lastWatched.value, openChannelId = openChannel.value,
+                )
             }
         }
         val ridge = compose.onNode(isSelected() and hasText("Ridge Earth"))
@@ -438,13 +447,24 @@ class ChannelsScreenTest {
     @Config(qualifiers = "en-rUS-w1280dp-h800dp-land-xhdpi")
     fun tabletOffline() {
         val list = channelsFixture()
-        show(ChannelsState.Offline(list, retryIn = "12 s")) { id, modifier ->
-            Text(list.rows.first { it.id == id }.name, modifier)
+        val openChannel = mutableStateOf<String?>(null)
+        compose.setContent {
+            MaterialTheme(colorScheme = TouchDarkColors) {
+                ChannelsScreen(
+                    ChannelsState.Offline(list, retryIn = "12 s"),
+                    fixtureActions(onOpen = { openChannel.value = it }),
+                    openChannelId = openChannel.value,
+                ) { id, modifier ->
+                    Text(list.rows.first { it.id == id }.name, modifier.testTag("channel-pane"))
+                }
+            }
         }
         compose.onNodeWithText("Harbor Sport").assertIsDisplayed()
         compose.onNodeWithContentDescription("Recording", useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithContentDescription("Recording scheduled", useUnmergedTree = true).assertDoesNotExist()
         capture("tablet-offline", TouchCanvas.TABLET)
+        compose.onNode(hasClickAction() and hasText("Ridge Earth")).performSemanticsAction(SemanticsActions.OnClick)
+        compose.onNodeWithTag("channel-pane").assertTextEquals("Ridge Earth")
     }
 
     @Test

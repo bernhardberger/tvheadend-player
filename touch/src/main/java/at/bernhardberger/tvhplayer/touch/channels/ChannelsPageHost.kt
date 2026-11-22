@@ -12,6 +12,7 @@ import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvhplayer.core.BrowseContextAction
 import at.bernhardberger.tvhplayer.touch.guide.ChannelPage
 import at.bernhardberger.tvhplayer.touch.guide.GuideActions
+import at.bernhardberger.tvhplayer.touch.guide.GuideLayout
 import at.bernhardberger.tvhplayer.touch.guide.ProgramPageHost
 import at.bernhardberger.tvhplayer.touch.guide.ProgramPageStack
 import at.bernhardberger.tvhplayer.touch.guide.guideLayout
@@ -42,10 +43,15 @@ internal fun ChannelsPageHost(
     onOpenConnections: () -> Unit,
     onSignIn: () -> Unit,
 ) {
-    val catalog = scope.scope.allChannels
-    if (pages != null && scope.channelCatalogCurrent) {
-        LaunchedEffect(pages, catalog) {
-            pages.removeMissingChannels(catalog.mapTo(mutableSetOf()) { it.id.value.toString() })
+    val openChannel = pages?.rootChannel
+    if (openChannel != null) {
+        LaunchedEffect(pages, openChannel, scope) {
+            val id = openChannel.channelId
+            // A retained channel can leave a tag while offline; an unknown catalog cannot prove deletion.
+            val canPrune = scope.channelCatalogCurrent || scope.scope.allChannels.any { it.id.value.toString() == id }
+            if (canPrune && scope.scope.visibleChannels.none { it.id.value.toString() == id }) {
+                pages.removeChannel(openChannel)
+            }
         }
     }
     val details = if (pages != null) programDetailsForPages(pages, session, playingId, dispatcher) else emptyMap()
@@ -59,11 +65,12 @@ internal fun ChannelsPageHost(
             )
         }
     val shownPages = pages ?: remember { ProgramPageStack() }
+    val layout = guideLayout()
     key(scope.profileId) {
         ProgramPageHost(
             destination = Destination.Channels,
             destinations = Destination.entries,
-            layout = guideLayout(),
+            layout = layout,
             pageStack = shownPages,
             details = details,
             actions = GuideActions(
@@ -72,6 +79,7 @@ internal fun ChannelsPageHost(
             ),
             onShowInGuide = null,
             channelPage = { entry, active, back -> page(entry.channelId, Modifier, false, active, back) },
+            channelInPane = layout == GuideLayout.Wide,
         ) { top, modifier ->
             val active = top && LocalDestinationBackEnabled.current
             CompositionLocalProvider(LocalChannelProgressClock provides rememberCurrentEpochSeconds()) {
@@ -84,10 +92,12 @@ internal fun ChannelsPageHost(
                         onRetry = onRetry,
                         onOpenConnectionSettings = onOpenConnections,
                         onSignIn = onSignIn,
-                        onOpenChannel = { if (active) pages?.openChannel(it) },
+                        onOpenChannel = { if (active) pages?.selectChannel(it) },
                     ),
                     lastWatchedId = lastWatchedId?.value?.toString(),
+                    openChannelId = openChannel?.channelId,
                     pane = { id, paneModifier -> page(id, paneModifier, true, active) {} },
+                    windowLayout = layout,
                 )
             }
         }
