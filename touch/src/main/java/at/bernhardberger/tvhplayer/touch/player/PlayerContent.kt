@@ -40,6 +40,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -233,13 +234,17 @@ internal fun UprightPlayerContent(
     onSeek: (Long) -> Unit,
     minimumPeek: Dp,
     onHandleHeight: (Int) -> Unit,
+    onActionRowHeight: (Int) -> Unit,
 ) {
     if (state is LivePlayerState && layout == PlayerLayout.Phone) {
         PhoneChannelSheet(
             state.channels, panels.onChoice, onChannel, { onAction(PlayerAction.RetryChannels) },
             Modifier.fillMaxSize(), minimumPeek, onHandleHeight,
         ) { modifier ->
-            UprightProgramActions(state, layout, dragging, panels, modifier)
+            UprightProgramActions(
+                state, layout, dragging, panels, modifier,
+                actionRowMeasurement = Modifier.onSizeChanged { onActionRowHeight(it.height) },
+            )
         }
         return
     }
@@ -264,6 +269,7 @@ private fun UprightProgramActions(
     dragging: Boolean,
     panels: PanelHost,
     modifier: Modifier = Modifier,
+    actionRowMeasurement: Modifier = Modifier,
 ) {
     val inset = if (layout == PlayerLayout.Phone) CompactBrowseMargin else WideBrowseMargin
     Column(modifier.fillMaxWidth()) {
@@ -294,7 +300,8 @@ private fun UprightProgramActions(
         }
         PlayerActionRow(
             state, layout, dragging, panels,
-            Modifier.padding(horizontal = inset - 8.dp).padding(top = 14.dp, bottom = 12.dp),
+            Modifier.padding(horizontal = inset - 8.dp).padding(top = 14.dp, bottom = 12.dp)
+                .then(actionRowMeasurement),
         )
     }
 }

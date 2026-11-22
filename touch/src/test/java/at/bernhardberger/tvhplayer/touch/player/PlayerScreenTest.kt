@@ -87,6 +87,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.DpRect
+import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.channels.ChannelDetails
 import at.bernhardberger.tvhplayer.touch.channels.ChannelPlayback
@@ -562,10 +564,10 @@ class PlayerScreenTest {
         compose.onAllNodes(scrollableProgram, useUnmergedTree = true).assertCountEquals(0)
 
         expand.performTouchInput { click() }
-        fun assertRaised() {
+        fun assertRaised(expectedPicture: DpRect = picture) {
             val sheetTop = collapse.getBoundsInRoot().top
-            assertEquals("Raised sheet stops at the picture", picture.bottom.value, sheetTop.value, 1f)
-            assertEquals("The sheet does not move the picture", picture, tag("player-picture").getBoundsInRoot())
+            assertEquals("Raised sheet stops at the picture", expectedPicture.bottom.value, sheetTop.value, 1f)
+            assertEquals("The sheet does not move the picture", expectedPicture, tag("player-picture").getBoundsInRoot())
         }
         assertRaised()
         capture("phone-player-list-raised", canvas)
@@ -596,35 +598,64 @@ class PlayerScreenTest {
         assertRaised()
 
         collapse.performSemanticsAction(SemanticsActions.Collapse)
+        // A narrow split window can cross both thresholds without switching to the landscape layout.
+        val width = 240.dp
+        fun resize(height: Int) = compose.runOnIdle {
+            val widthPx = (width.value * compose.activity.resources.displayMetrics.density).roundToInt()
+            compose.activity.window.setLayout(widthPx, height)
+        }
         compose.runOnIdle {
             channelId.value = null
-            val height = (420 * compose.activity.resources.displayMetrics.density).roundToInt()
-            compose.activity.window.setLayout(android.view.ViewGroup.LayoutParams.MATCH_PARENT, height)
+            fontScale.value = 2f
         }
+        resize(canvas.height)
         val bottomInset = compose.reserveSystemBars(canvas)
+        val row = tag("player-actions").assertIsDisplayed()
+        val narrowRow = row.getBoundsInRoot()
+        val fullRowHeight = narrowRow.bottom - narrowRow.top
+        val pictureAndSheet = tag("player-picture").getBoundsInRoot().bottom + stockHeight + bottomInset
+        assertTrue("Both short windows must still be upright", pictureAndSheet > width)
+        val justAbove = pictureAndSheet + fullRowHeight / 2
+        val justBelow = (pictureAndSheet + width) / 2
+        for (height in listOf(justAbove, justBelow)) {
+            resize((height.value * compose.activity.resources.displayMetrics.density).roundToInt())
+            compose.reserveSystemBars(canvas)
+            row.performScrollTo()
+            val scrolledRow = row.getBoundsInRoot()
+            assertEquals(
+                "The whole action row can scroll into view at $height", fullRowHeight, scrolledRow.bottom - scrolledRow.top,
+            )
+            val shortHandle = expand.getBoundsInRoot()
+            val shortHeight = shortHandle.bottom - shortHandle.top
+            assertTrue("Short window handle $shortHeight is shorter than the stock $stockHeight", shortHeight >= stockHeight)
+            val navigationBarTop = compose.onRoot().getBoundsInRoot().bottom - bottomInset
+            assertTrue(
+                "Resting handle ends at ${shortHandle.bottom}, below the navigation bar top at $navigationBarTop",
+                shortHandle.bottom <= navigationBarTop,
+            )
+            assertTrue("The full action row is above the resting sheet", scrolledRow.bottom <= shortHandle.top)
+            val actions = listOf(R.string.player_record, R.string.player_audio, R.string.player_subtitles, R.string.player_info)
+            for (action in actions) {
+                button(action).assertIsDisplayed()
+            }
+            val shortPicture = tag("player-picture").getBoundsInRoot()
+            val pictureHeight = shortPicture.bottom - shortPicture.top
+            assertEquals(
+                "The picture gives up only the room needed for the row", shortHandle.top - fullRowHeight, shortPicture.bottom,
+            )
+            assertEquals(
+                "The picture keeps its aspect ratio", pictureHeight.value * (16f / 9),
+                (shortPicture.right - shortPicture.left).value, 1f,
+            )
+        }
         val shortHandle = expand.getBoundsInRoot()
-        val shortHeight = shortHandle.bottom - shortHandle.top
-        assertTrue("Short window handle $shortHeight is shorter than the stock $stockHeight", shortHeight >= stockHeight)
-        val navigationBarTop = compose.onRoot().getBoundsInRoot().bottom - bottomInset
-        assertTrue(
-            "Resting handle ends at ${shortHandle.bottom}, below the navigation bar top at $navigationBarTop",
-            shortHandle.bottom <= navigationBarTop,
-        )
-        val row = tag("player-actions")
-        val fullRowHeight = actions.bottom - actions.top
-        val clippedRow = row.getBoundsInRoot()
-        assertTrue("The action row does not fully fit at rest", clippedRow.bottom - clippedRow.top < fullRowHeight)
-        row.performScrollTo().assertIsDisplayed()
-        val scrolledRow = row.getBoundsInRoot()
-        assertEquals(fullRowHeight, scrolledRow.bottom - scrolledRow.top)
-        assertTrue("The full action row is above the resting sheet", scrolledRow.bottom <= expand.getBoundsInRoot().top)
-        assertEquals(picture, tag("player-picture").getBoundsInRoot())
+        val shortPicture = tag("player-picture").getBoundsInRoot()
         compose.onNode(scrollableProgram, useUnmergedTree = true).performTouchInput {
-            swipe(Offset(center.x, height * .75f), Offset(center.x, height * .25f), durationMillis = 240)
+            swipe(Offset(center.x, height * .25f), Offset(center.x, height * .75f), durationMillis = 240)
         }
         assertEquals(shortHandle, expand.getBoundsInRoot())
         expand.assertIsDisplayed().performSemanticsAction(SemanticsActions.Expand)
-        assertRaised()
+        assertRaised(shortPicture)
     }
 
     @Test
