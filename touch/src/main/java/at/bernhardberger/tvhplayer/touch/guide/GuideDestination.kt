@@ -81,7 +81,7 @@ internal fun GuideDestination(
         playingId, guide.overviewViewport.collectAsStateWithLifecycle().value,
     )
     SubmitGuideMapping(guide, channels, connection, input, activeClock)
-    val retained = result?.takeIf { it.input.scope.profileId == scope.profileId }
+    val retained = result?.takeIf { it.input.sameBrowseOwner(input) }
     val mapped = retained?.state ?: EmptyGuide
     val dayLoading = remember(mapped.listed, coverage, pendingVersion, observation.currentSession?.generationIdentity) {
         mapped.listed && coverage?.let(guide::isPending) == true
@@ -156,8 +156,8 @@ private fun SubmitGuideMapping(
 
 private fun GuideState.withSelectedDay(input: GuideMappingInput, result: GuideMappingResult?): GuideState {
     if (input.selection.view != GuideView.ByChannel) return this
-    val day = input.selection.day?.takeIf { it in dayDates } ?: input.clock.today
-    val days = result?.takeIf { it.input.sameDayOwner(input) }?.days.orEmpty()
+    val day = input.selection.day?.takeIf { it >= input.clock.today && it in dayDates } ?: input.clock.today
+    val days = result?.daysFor(input).orEmpty()
     return copy(
         date = formatDayHeader(day, input.configuration.locales[0]),
         retainedDays = days.mapValues { it.value.programs },

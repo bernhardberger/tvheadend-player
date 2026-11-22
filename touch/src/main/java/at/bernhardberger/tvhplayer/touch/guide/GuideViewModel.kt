@@ -5,6 +5,7 @@ import android.content.res.Configuration
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.DvrSnapshot
 import at.bernhardberger.tvheadend.sdk.core.SessionGenerationIdentity
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
@@ -105,7 +106,11 @@ internal class GuideViewModel(
                 val captured = checkNotNull(mappingInput)
                 val result = prepareGuide(app, captured, mutableMapped.value)
                 ensureActive()
-                mutableMapped.value = result
+                if (captured.sameBrowseOwner(checkNotNull(mappingInput)) &&
+                    captured.generation == observation.value.currentSession?.generationIdentity
+                ) {
+                    mutableMapped.value = result
+                }
                 if (mappingInput === captured) break
             }
         }
@@ -188,9 +193,14 @@ internal class GuideMappingInput(
         (id?.let { channels.firstOrNull { channel -> channel.id.value == id } } ?: channels.firstOrNull())?.id
     }
 
+    val generation get() = observation.currentSession?.generationIdentity
+
+    fun sameBrowseOwner(next: GuideMappingInput): Boolean =
+        scope.profileId == next.scope.profileId && scope.scope.activeTagId == next.scope.scope.activeTagId &&
+            generation == next.generation
+
     fun sameDayOwner(next: GuideMappingInput): Boolean =
-        scope === next.scope && dayChannel == next.dayChannel &&
-            observation.currentSession?.generationIdentity == next.observation.currentSession?.generationIdentity
+        sameBrowseOwner(next) && scope === next.scope && dayChannel == next.dayChannel
 
     fun changesFrom(previous: GuideMappingInput?): List<String> {
         if (previous == null) return listOf("initial")
@@ -223,6 +233,9 @@ internal data class GuideMappingResult(
     val rows: GuideOverviewRows,
     val days: Map<LocalDate, GuideCachedDay> = emptyMap(),
 ) {
+    fun daysFor(next: GuideMappingInput): Map<LocalDate, GuideCachedDay> =
+        if (input.sameDayOwner(next)) days.filter { (date, day) -> day.isCurrent(next, date) } else emptyMap()
+
     fun metadataUnchanged(
         next: GuideMappingInput, changes: List<String>, nextProjection: GuideEpgProjection?,
     ): Boolean = ("epg" !in changes || nextProjection == (projection ?: input.epgProjection())) &&
@@ -262,7 +275,12 @@ internal data class GuideCachedDay(
     private val configuration: Configuration,
     private val uses24Hour: Boolean,
     private val artwork: ArtworkModels?,
+    private val dvr: DvrSnapshot?,
 ) {
+    fun isCurrent(next: GuideMappingInput, date: LocalDate): Boolean =
+        canReuseRows(next, date) && clock.today == next.clock.today &&
+            (dvr === next.observation.dvrSnapshotForDisplay || rows.marksUnchanged(next))
+
     fun canReuseRows(next: GuideMappingInput, date: LocalDate): Boolean =
         clock.zone == next.clock.zone && date >= next.clock.today &&
             playingId == next.playingId && configuration == next.configuration &&
@@ -272,13 +290,14 @@ internal data class GuideCachedDay(
 private fun GuideMappingInput.rememberDay(
     state: GuideState, rows: GuideOverviewRows, previous: GuideMappingResult?,
 ): Map<LocalDate, GuideCachedDay> {
-    val retained = previous?.takeIf { it.input.sameDayOwner(this) }?.days.orEmpty()
-        .filterKeys { it in state.dayDates }
+    val retained = previous?.daysFor(this).orEmpty().filterKeys { it in state.dayDates }
     val date = state.dayDates.getOrNull(state.selectedDay)
     val channelId = dayChannel?.value?.toString()
     val day = state.channels.firstOrNull { it.id == channelId }?.day
     return if (selection.view == GuideView.ByChannel && date != null && day != null) {
-        retained + (date to GuideCachedDay(day, rows, clock, playingId, configuration, uses24Hour, artwork))
+        retained + (date to GuideCachedDay(
+            day, rows, clock, playingId, configuration, uses24Hour, artwork, observation.dvrSnapshotForDisplay,
+        ))
     } else retained
 }
 
