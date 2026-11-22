@@ -82,6 +82,7 @@ import java.time.ZoneId
 import java.time.ZoneOffset
 import android.content.res.Configuration
 import at.bernhardberger.tvhplayer.ui.common.AppClock
+import at.bernhardberger.tvhplayer.ui.common.formatDayHeader
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import kotlin.coroutines.EmptyCoroutineContext
@@ -943,17 +944,34 @@ class GuideScreenTest {
         val connection = FakeConnection()
         val now = Instant.parse("2027-01-15T12:00:00Z")
         val fixture = ServerGuide(now)
-        val yesterday = GuideClock(now.epochSeconds, ZoneId.systemDefault()).today.minusDays(1)
+        val zone = ZoneId.systemDefault()
+        val today = GuideClock(now.epochSeconds, zone).today
+        val tomorrow = today.plusDays(1)
         val channelId = fixture.second.id.value.toString()
+        val start = Instant.fromEpochSeconds(tomorrow.atTime(12, 0).atZone(zone).toEpochSecond())
+        val future = EpgEvent.create(EventId(800), fixture.second.id, start,
+            Instant.fromEpochSeconds(start.epochSeconds + 3600), title = "Kept day programme")
+        val current = EpgEvent.create(EventId(801), fixture.second.id, now, fixture.snapshot.events.first().stop,
+            title = "Current day programme")
+        val firstSnapshot = fixture.connected(epg = EpgSnapshot.create(listOf(current)))
+        val refilled = fixture.connected(epg = EpgSnapshot.create(listOf(current, future)))
+        var release = CompletableDeferred<Unit>()
+        val session = connection.withCoverage { release.await() }
         val factory = viewModelFactory {
-            initializer { connection.guide(createSavedStateHandle()) }
+            initializer {
+                GuideViewModel(
+                    session, createSavedStateHandle(), EmptyCoroutineContext, mappingDispatcher = Dispatchers.Main.immediate,
+                )
+            }
         }
+        val kept = GuideSelection(view = GuideView.ByChannel, day = tomorrow, channelId = channelId)
         try {
+            motionScale.scaleFactor = 0f
             val savedState = Bundle()
             Robolectric.buildActivity(ComponentActivity::class.java).create().use { original ->
                 val guide = ViewModelProvider.create(original.get(), factory)[GuideViewModel::class]
                 guide.selectPage(GuideView.ByChannel, channelId)
-                guide.selectDay(yesterday)
+                guide.selectDay(tomorrow)
                 guide.selectJump(1L)
                 guide.openDetails(fixture.snapshot.events.first().id.value.toString())
                 original.saveInstanceState(savedState)
@@ -962,11 +980,11 @@ class GuideScreenTest {
                 val guide = ViewModelProvider.create(restored.get(), factory)[GuideViewModel::class]
                 assertEquals(
                     "A fresh Guide restores the tab, day and channel, but not the jump or Details",
-                    GuideSelection(view = GuideView.ByChannel, day = yesterday, channelId = channelId),
+                    kept,
                     guide.selection.value,
                 )
                 assertTrue(SystemClock.setCurrentTimeMillis(now.toEpochMilliseconds()))
-                connection.session.publish(fixture.connected())
+                connection.session.publish(firstSnapshot)
                 val channels = connection.channels()
                 val presentation = connection.presentation()
                 compose.setContent {
@@ -982,16 +1000,45 @@ class GuideScreenTest {
                 }
                 compose.onNodeWithText("By channel").assertIsSelected()
                 compose.onNodeWithText("Channel Two").assertIsSelected()
+                compose.runOnIdle {
+                    assertEquals("The first snapshot must not forget a day still loading", kept, guide.selection.value)
+                }
+                val loading = compose.onNodeWithContentDescription(compose.activity.getString(SharedR.string.epg_loading))
+                val locale = compose.activity.resources.configuration.locales[0]
+                loading.assertIsDisplayed()
+                compose.onNodeWithText(current.title!!).assertDoesNotExist()
+                compose.runOnIdle {
+                    connection.session.publish(refilled)
+                    release.complete(Unit)
+                }
+                compose.onNodeWithText(formatDayHeader(tomorrow, locale)).assertIsDisplayed()
+                compose.onNodeWithText(future.title!!).assertIsDisplayed()
+                compose.runOnIdle { assertEquals(kept, guide.selection.value) }
+
+                compose.runOnIdle {
+                    release = CompletableDeferred()
+                    connection.session.replaceGeneration(firstSnapshot)
+                }
+                loading.assertIsDisplayed()
+                compose.runOnIdle {
+                    assertEquals("The replacement session is still loading the kept day", kept, guide.selection.value)
+                    release.complete(Unit)
+                }
                 compose.onNodeWithText("Today").assertIsDisplayed()
+                compose.onNodeWithText(current.title!!).assertIsDisplayed()
                 compose.runOnIdle {
                     assertEquals(
-                        "Only the expired day is forgotten",
-                        GuideSelection(view = GuideView.ByChannel, channelId = channelId),
-                        guide.selection.value,
+                        "The day is forgotten once coverage settles without it", kept.copy(day = null), guide.selection.value,
                     )
+                    guide.selectDay(today.minusDays(1))
+                }
+                compose.onNodeWithText(formatDayHeader(today, locale)).assertIsDisplayed()
+                compose.runOnIdle {
+                    assertEquals("An expired day is forgotten", kept.copy(day = null), guide.selection.value)
                 }
             }
         } finally {
+            release.complete(Unit)
             connection.close()
         }
     }
@@ -1213,18 +1260,7 @@ class GuideScreenTest {
         channels: ChannelsViewModel = connection.channels(),
         onCoverage: suspend (Instant) -> Unit,
     ): GuideViewModel {
-        val fake = connection.session
-        val session = object : TvheadendSession by fake {
-            override val epgRepository = object : EpgRepository by fake.epgRepository {
-                override suspend fun acquireCoverageBatch(
-                    currentSession: CurrentSessionObservation,
-                    channelIds: List<ChannelId>,
-                    through: Instant,
-                ) = fake.epgRepository.acquireCoverageBatch(currentSession, channelIds, through).also {
-                    onCoverage(through)
-                }
-            }
-        }
+        val session = connection.withCoverage(onCoverage)
         val guide = GuideViewModel(
             session, SavedStateHandle(), EmptyCoroutineContext, mappingDispatcher = mappingDispatcher,
         )
@@ -1244,6 +1280,19 @@ class GuideScreenTest {
         }
         return guide
     }
+
+    private fun FakeConnection.withCoverage(onCoverage: suspend (Instant) -> Unit): TvheadendSession =
+        object : TvheadendSession by session {
+            override val epgRepository = object : EpgRepository by session.epgRepository {
+                override suspend fun acquireCoverageBatch(
+                    currentSession: CurrentSessionObservation,
+                    channelIds: List<ChannelId>,
+                    through: Instant,
+                ) = session.epgRepository.acquireCoverageBatch(currentSession, channelIds, through).also {
+                    onCoverage(through)
+                }
+            }
+        }
 
     private fun show(
         fixture: GuideState,
