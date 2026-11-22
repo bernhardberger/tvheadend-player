@@ -4,52 +4,56 @@ import androidx.media3.common.C
 import androidx.media3.common.Format
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
-import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvhplayer.settings.CHANNEL_TRACK_CHOICE_LIMIT
+import at.bernhardberger.tvhplayer.settings.RECORDING_TRACK_CHOICE_LIMIT
 import at.bernhardberger.tvhplayer.settings.SubtitleChoice
-
-private const val MAX_SUBTITLE_CHOICES = 64
 
 private fun choice(format: Format) =
     SubtitleChoice.Track(format.language, format.sampleMimeType, format.roleFlags)
 
-/** Explicit live-channel choices; recordings keep only their current player parameters. */
+/** One configured profile, semantic choices only; no retained track groups. */
 internal class SessionSubtitleSelection {
     private var profile: Any? = null
-    private var channel: ChannelId? = null
-    private val choices = LinkedHashMap<ChannelId, SubtitleChoice>()
+    private var target: AppPlaybackTarget? = null
+    private val choices = LinkedHashMap<AppPlaybackTarget, SubtitleChoice>()
     private var restoring = false
 
-    fun load(channelId: ChannelId, choice: SubtitleChoice?) {
-        choices.remove(channelId)
-        if (choice != null) choices[channelId] = choice
-        if (choices.size > MAX_SUBTITLE_CHOICES) choices.remove(choices.keys.first())
+    fun load(target: AppPlaybackTarget, choice: SubtitleChoice?) {
+        choices.remove(target)
+        if (choice != null) choices[target] = choice
+        val sameKind = choices.keys.filter { (it is AppPlaybackTarget.Live) == (target is AppPlaybackTarget.Live) }
+        val limit = if (target is AppPlaybackTarget.Live) CHANNEL_TRACK_CHOICE_LIMIT else RECORDING_TRACK_CHOICE_LIMIT
+        if (sameKind.size > limit) choices.remove(sameKind.first())
     }
 
     fun useProfile(currentProfile: Any?, player: Player) {
         if (profile === currentProfile) return
         profile = currentProfile
-        channel = null
+        target = null
         choices.clear()
         reset(player)
     }
 
     fun onMediaItemTransition(player: Player) {
-        channel = null
+        target = null
         reset(player)
     }
 
-    fun activate(channelId: ChannelId, player: Player) {
-        channel = channelId
+    fun activate(target: AppPlaybackTarget, player: Player) {
+        this.target = target
         restore(player)
     }
 
-    fun rememberExplicitChoice(player: Player): Pair<ChannelId, SubtitleChoice>? {
-        val currentChannel = channel
-        if (currentChannel == null || profile == null || restoring) return null
+    fun rememberExplicitChoice(
+        player: Player,
+        explicitCommand: Boolean = false,
+    ): Pair<AppPlaybackTarget, SubtitleChoice>? {
+        val current = target?.takeUnless { profile == null || restoring } ?: return null
         val selected = explicitChoice(player)
-        return if (selected != null && choices[currentChannel] != selected) {
-            load(currentChannel, selected)
-            currentChannel to selected
+        val pinRecording = explicitCommand && current is AppPlaybackTarget.Recording
+        return if (selected != null && (choices[current] != selected || pinRecording)) {
+            load(current, selected)
+            current to selected
         } else null
     }
 
@@ -71,7 +75,7 @@ internal class SessionSubtitleSelection {
     }
 
     fun restore(player: Player) {
-        val saved = choices[channel] ?: return
+        val saved = choices[target] ?: return
         val parameters = player.trackSelectionParameters
         if (saved == SubtitleChoice.Off) {
             if (C.TRACK_TYPE_TEXT !in parameters.disabledTrackTypes) applySaved(player, saved, null)
@@ -94,15 +98,15 @@ internal class SessionSubtitleSelection {
         }
     }
 
-    fun useDefault(player: Player): ChannelId? {
-        val forgotten = channel
-        if (forgotten != null) choices.remove(forgotten)
+    fun useDefault(player: Player): AppPlaybackTarget? {
+        val current = target
+        if (current != null) load(current, SubtitleChoice.Default.takeIf { current is AppPlaybackTarget.Recording })
         reset(player)
-        return forgotten
+        return current
     }
 
     fun clear(player: Player) {
-        channel = null
+        target = null
         choices.clear()
         profile = null
         reset(player)

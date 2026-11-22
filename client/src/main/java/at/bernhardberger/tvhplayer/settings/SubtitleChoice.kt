@@ -7,6 +7,10 @@ import kotlinx.serialization.Serializable
 @Serializable
 sealed interface SubtitleChoice {
     @Serializable
+    @SerialName("default")
+    data object Default : SubtitleChoice
+
+    @Serializable
     @SerialName("off")
     data object Off : SubtitleChoice
 

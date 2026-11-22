@@ -705,8 +705,8 @@ class PlaybackOptionsRemoteKeyTest {
                             quickListAvailable = targetAvailable,
                             isQuickListTargetCurrent = { it == targetEpoch && targetAvailable },
                             // As the runtime's queue: record the command, then apply it.
-                            onQuickAudioSelection = if (queueAudio) { epoch, override ->
-                                quickAudioQueue += epoch to override
+                            onAudioSelection = if (queueAudio) { override, epoch ->
+                                if (epoch != null) quickAudioQueue += epoch to override
                                 fake.parameters = fake.parameters.buildUpon()
                                     .clearOverridesOfType(C.TRACK_TYPE_AUDIO)
                                     .apply { override?.let(::addOverride) }

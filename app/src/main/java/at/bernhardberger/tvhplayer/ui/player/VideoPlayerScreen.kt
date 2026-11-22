@@ -2208,7 +2208,7 @@ fun VideoPlayerScreen(
                     playbackRuntime.isQuickListTargetCurrent(epoch) &&
                         videoPlayerViewModel.playingLiveChannelId.value == currentChannelId
                 },
-                onQuickAudioSelection = { epoch, override -> playbackRuntime.selectQuickListAudio(epoch, override) },
+                onAudioSelection = { override, epoch -> playbackRuntime.selectAudio(override, epoch) },
                 onAspectRatioChange = targetAspect.select,
                 onStatsLevelChange = statsStore::setLevel,
             )

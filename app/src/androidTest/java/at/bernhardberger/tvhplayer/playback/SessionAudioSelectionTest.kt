@@ -54,7 +54,7 @@ class SessionAudioSelectionTest {
                 fixture.tune(id)
                 selectAudioTrack(fixture.player, collectTracks(fixture.tracks, C.TRACK_TYPE_AUDIO).last())
                 val selected = checkNotNull(fixture.owner.rememberExplicitChoice(fixture.player))
-                store.set("profile", selected.first.value, selected.second)
+                store.set("profile", (selected.first as AppPlaybackTarget.Live).channelId.value, selected.second)
             }
             for (id in 1L..64L) choose(id)
             fixture.tune(1)
@@ -62,7 +62,7 @@ class SessionAudioSelectionTest {
                 .setPreferredTextLanguage("fr").build()
             // Same callback used by the runtime, including deferred restore notifications.
             fixture.owner.rememberExplicitChoice(fixture.player)?.let {
-                store.set("profile", it.first.value, it.second)
+                store.set("profile", (it.first as AppPlaybackTarget.Live).channelId.value, it.second)
             }
             choose(65)
             assertNull(store.read("profile", 1))
@@ -152,7 +152,7 @@ class SessionAudioSelectionTest {
         fun tune(id: Long, tracks: Tracks = audioTracks()) {
             owner.onMediaItemTransition(player)
             this.tracks = tracks
-            owner.activate(ChannelId(id), player)
+            owner.activate(AppPlaybackTarget.Live(ChannelId(id)), player)
         }
 
         fun chooseAlternate(): TrackGroup {

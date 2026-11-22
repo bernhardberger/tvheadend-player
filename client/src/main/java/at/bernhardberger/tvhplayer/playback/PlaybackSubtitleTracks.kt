@@ -30,10 +30,8 @@ internal class PlaybackSubtitleTracks(
 ) {
     private val selection = SessionSubtitleSelection()
     private var writeJob: Job? = null
-    private fun isDefault(parameters: TrackSelectionParameters) =
-        C.TRACK_TYPE_TEXT !in parameters.disabledTrackTypes &&
-            parameters.overrides.values.none { it.type == C.TRACK_TYPE_TEXT }
-    private val _subtitlesDefault = MutableStateFlow(isDefault(player.trackSelectionParameters))
+    private var pendingRecordingSubtitles: (() -> Unit)? = null
+    private val _subtitlesDefault = MutableStateFlow(usesDefaultSubtitles(player.trackSelectionParameters))
     val subtitlesDefault = _subtitlesDefault.asStateFlow()
 
     fun onMediaItemTransition() {
@@ -42,13 +40,15 @@ internal class PlaybackSubtitleTracks(
         selection.onMediaItemTransition(player)
     }
 
-    fun onTrackSelectionParametersChanged(parameters: TrackSelectionParameters) {
+    fun onTrackSelectionParametersChanged(parameters: TrackSelectionParameters, explicitCommand: Boolean = false) {
         if (!targetCommands.isOpen()) return
-        _subtitlesDefault.value = isDefault(parameters)
+        _subtitlesDefault.value = usesDefaultSubtitles(parameters)
+        if (targetInstallationInProgress() || activeTarget.value == null) return
         selection.useProfile(profileOwner.serverProfile.value, player)
-        val profileId = profileOwner.audioProfileId
-        if (profileId != null) {
-            selection.rememberExplicitChoice(player)?.let { (channel, choice) -> write(profileId, channel, choice) }
+        profileOwner.audioProfileId?.let { profileId ->
+            selection.rememberExplicitChoice(player, explicitCommand)?.let { (target, choice) ->
+                write(profileId, target, choice)
+            }
         }
     }
 
@@ -58,12 +58,24 @@ internal class PlaybackSubtitleTracks(
         selection.restore(player)
     }
 
-    suspend fun loadStoredSubtitlesLocked(channelId: ChannelId, canApply: () -> Boolean): PlaybackTargetResult? {
+    suspend fun loadStoredSubtitlesLocked(
+        target: AppPlaybackTarget,
+        recordingChannel: ChannelId? = null,
+        canApply: () -> Boolean,
+    ): PlaybackTargetResult? {
+        pendingRecordingSubtitles = null
         val profile = profileOwner.serverProfile.value
         val profileId = profileOwner.audioProfileId
         writeJob?.join()
         val stored = try {
-            profileId?.let { settings.subtitleChoices.read(it, channelId.value) }
+            profileId?.let {
+                when (target) {
+                    is AppPlaybackTarget.Live -> settings.subtitleChoices.read(it, target.channelId.value)
+                    is AppPlaybackTarget.Recording -> settings.recordingSubtitleChoices
+                        .read(it, target.recordingId.value)
+                        ?: recordingChannel?.let { channel -> settings.subtitleChoices.read(it, channel.value) }
+                }
+            }
         } catch (_: IOException) {
             null
         }
@@ -73,43 +85,71 @@ internal class PlaybackSubtitleTracks(
                 PlaybackTargetResult.NOT_READY
             else -> {
                 selection.useProfile(profile, player)
-                selection.load(channelId, stored)
+                if (target is AppPlaybackTarget.Live) selection.load(target, stored)
+                else pendingRecordingSubtitles = pendingRecordingChoice(target, profile, profileId, stored)
                 null
             }
         }
     }
 
-    fun activateAfterInstallLocked() {
+    private fun pendingRecordingChoice(
+        target: AppPlaybackTarget,
+        profile: Any?,
+        profileId: String?,
+        stored: SubtitleChoice?,
+    ): () -> Unit = {
+        if (activeTarget.value == target && profileOwner.serverProfile.value === profile &&
+            profileOwner.audioProfileId == profileId
+        ) selection.load(target, stored)
+    }
+
+    fun activateAfterInstallLocked(committed: Boolean) {
+        val pending = pendingRecordingSubtitles
+        pendingRecordingSubtitles = null
         if (!targetCommands.isOpen()) return
         selection.useProfile(profileOwner.serverProfile.value, player)
-        (activeTarget.value as? AppPlaybackTarget.Live)?.let { selection.activate(it.channelId, player) }
+        activeTarget.value?.let {
+            if (committed) pending?.invoke()
+            selection.activate(it, player)
+        }
     }
 
     fun applyDefaultLocked() {
         selection.useProfile(profileOwner.serverProfile.value, player)
-        val channel = selection.useDefault(player)
+        val target = selection.useDefault(player)
         val profileId = profileOwner.audioProfileId
-        if (channel != null && profileId != null) write(profileId, channel, null)
+        if (target != null && profileId != null) write(profileId, target, SubtitleChoice.Default)
     }
 
     fun selectLocked(override: androidx.media3.common.TrackSelectionOverride?, off: Boolean) {
         if (override == null && !off) {
             applyDefaultLocked()
         } else {
-            player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+            val parameters = player.trackSelectionParameters.buildUpon()
                 .clearOverridesOfType(C.TRACK_TYPE_TEXT)
                 .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, off)
                 .apply { override?.let(::addOverride) }
                 .build()
+            val changed = parameters != player.trackSelectionParameters
+            if (changed) player.trackSelectionParameters = parameters
+            if (!changed || activeTarget.value is AppPlaybackTarget.Recording) {
+                onTrackSelectionParametersChanged(parameters, explicitCommand = true)
+            }
         }
     }
 
-    private fun write(profileId: String, channel: ChannelId, choice: SubtitleChoice?) {
+    private fun write(profileId: String, target: AppPlaybackTarget, choice: SubtitleChoice) {
         val previous = writeJob
         writeJob = scope.launch {
             previous?.join()
             try {
-                settings.subtitleChoices.set(profileId, channel.value, choice)
+                when (target) {
+                    is AppPlaybackTarget.Live -> settings.subtitleChoices.set(
+                        profileId, target.channelId.value, choice.takeUnless { it == SubtitleChoice.Default },
+                    )
+                    is AppPlaybackTarget.Recording ->
+                        settings.recordingSubtitleChoices.set(profileId, target.recordingId.value, choice)
+                }
             } catch (_: IOException) {
                 // Storage cannot interrupt playback, including when forgetting a choice.
             }
@@ -119,3 +159,7 @@ internal class PlaybackSubtitleTracks(
     fun clearSessionLocked() = selection.clear(player)
     suspend fun joinWrites() { writeJob?.join() }
 }
+
+private fun usesDefaultSubtitles(parameters: TrackSelectionParameters) =
+    C.TRACK_TYPE_TEXT !in parameters.disabledTrackTypes &&
+        parameters.overrides.values.none { it.type == C.TRACK_TYPE_TEXT }

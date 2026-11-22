@@ -9,6 +9,7 @@
 
 ### Recordings
 
+- Recordings remember the audio and subtitle tracks you choose. If you haven't chosen for a recording, it uses your live TV choices for its channel when they match.
 - A recording that comes back after standby says *Resuming playback* until it plays again, like live TV. Before, it showed only a spinner (#50).
 
 ### Playback

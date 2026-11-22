@@ -1418,8 +1418,10 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
   Default until the viewer picks Off or a track, even when the setting itself
   shows a track; the header names what is shown. A pick on a live channel is
   remembered for that channel and connection, like its audio track, and comes
-  back when exactly one track matches it. It never carries to the next
-  channel or recording; a recording keeps a pick only while it plays.
+  back when exactly one track matches it. A recording remembers its own audio
+  and subtitle choices for that connection, including Automatic and Default.
+  Without its own choice, it follows the live choice for its channel, if known
+  and applicable, without changing what either item remembers.
 - The live player's options carry Stream profile after Display mode:
   `Default (<the connection's profile>)`, then the server's profiles in the
   server's order, labelled as in Settings. A pick is remembered for that

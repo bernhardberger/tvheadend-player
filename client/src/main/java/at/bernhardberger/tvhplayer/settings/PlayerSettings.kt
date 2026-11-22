@@ -145,14 +145,27 @@ data class StartupBufferLearningState(
     val recentVerdicts: List<StartupBufferVerdict> = emptyList(),
 )
 
+internal const val CHANNEL_TRACK_CHOICE_LIMIT = 64
+internal const val RECORDING_TRACK_CHOICE_LIMIT = 256
+
 class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
     constructor(context: Context) : this(context.dataStore)
 
     internal val audioChoices = ItemChoiceStore(
-        dataStore, "explicit_audio_choices_v1", "channel", "choice", AudioTrackChoice.serializer(), maxEntries = 64,
+        dataStore, "explicit_audio_choices_v1", "channel", "choice",
+        AudioTrackChoice.serializer(), CHANNEL_TRACK_CHOICE_LIMIT,
     )
     internal val subtitleChoices = ItemChoiceStore(
-        dataStore, "channel_subtitle_choices_v1", "channel", "choice", SubtitleChoice.serializer(), maxEntries = 64,
+        dataStore, "channel_subtitle_choices_v1", "channel", "choice",
+        SubtitleChoice.serializer(), CHANNEL_TRACK_CHOICE_LIMIT,
+    )
+    internal val recordingAudioChoices = ItemChoiceStore(
+        dataStore, "recording_audio_choices_v1", "recording", "choice",
+        AudioChoice.serializer(), RECORDING_TRACK_CHOICE_LIMIT,
+    )
+    internal val recordingSubtitleChoices = ItemChoiceStore(
+        dataStore, "recording_subtitle_choices_v1", "recording", "choice",
+        SubtitleChoice.serializer(), RECORDING_TRACK_CHOICE_LIMIT,
     )
     val channelAspects = ItemChoiceStore(
         dataStore, "channel_aspect_modes_v1", "channel", "mode", AspectRatioMode.serializer(), maxEntries = 256,
@@ -173,6 +186,8 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
     internal suspend fun removeProfile(id: ServerProfileId) {
         audioChoices.removeProfile(id.value)
         subtitleChoices.removeProfile(id.value)
+        recordingAudioChoices.removeProfile(id.value)
+        recordingSubtitleChoices.removeProfile(id.value)
         channelAspects.removeProfile(id.value)
         channelStreamProfiles.removeProfile(id.value)
         recordingAdBreaks.removeProfile(id.value)

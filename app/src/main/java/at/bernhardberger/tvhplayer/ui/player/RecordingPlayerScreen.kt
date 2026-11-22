@@ -885,7 +885,7 @@ fun RecordingPlayerScreen(
                 quickListTargetEpoch = videoPresentation.epoch,
                 quickListAvailable = playbackAvailable && activeTarget == AppPlaybackTarget.Recording(recordingId),
                 isQuickListTargetCurrent = session::isQuickListTargetCurrent,
-                onQuickAudioSelection = { epoch, override -> session.selectQuickListAudio(epoch, override) },
+                onAudioSelection = { override, epoch -> session.selectAudio(override, epoch) },
                 recording = true,
                 adBreaks = adBreakOption,
                 onAspectRatioChange = targetAspect.select,

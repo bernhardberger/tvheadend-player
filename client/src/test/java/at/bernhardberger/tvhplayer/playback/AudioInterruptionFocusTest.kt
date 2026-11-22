@@ -616,8 +616,8 @@ internal class AudioInterruptionFocusTest : AudioInterruptionFixture() {
         val blocker = scope.launch { commands.serialize(onClosed = {}) { entered.complete(Unit); release.await() } }
         entered.await()
         val epoch = runtime.videoPresentation.value.epoch
-        val preview = runtime.selectQuickListAudio(epoch, null)
-        val back = runtime.selectQuickListAudio(epoch, manual)
+        val preview = runtime.selectAudio(null, epoch)
+        val back = runtime.selectAudio(manual, epoch)
         settle()
         assertFalse(preview.isCompleted)
         release.complete(Unit)
@@ -646,7 +646,7 @@ internal class AudioInterruptionFocusTest : AudioInterruptionFixture() {
             markReady()
         }
         settle()
-        val stalePreview = runtime.selectQuickListAudio(oldEpoch, null)
+        val stalePreview = runtime.selectAudio(null, oldEpoch)
         settle()
         assertFalse(stalePreview.isCompleted)
         release.complete(Unit)
@@ -674,9 +674,9 @@ internal class AudioInterruptionFocusTest : AudioInterruptionFixture() {
         await { audioDisabled() }
         focus.send(AudioInterruption.GAIN)
         await { !audioDisabled() }
-        runtime.selectQuickListAudio(epoch, manual).join()
+        runtime.selectAudio(manual, epoch).join()
         assertFalse(audioDisabled())
-        runtime.selectQuickListAudio(epoch, null).join()
+        runtime.selectAudio(null, epoch).join()
         settle()
         audioSelection.restore(runtimePlayer)
         assertTrue(player.trackSelectionParameters.overrides.isEmpty())
