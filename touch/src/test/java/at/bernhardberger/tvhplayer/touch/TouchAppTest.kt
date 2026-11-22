@@ -73,6 +73,8 @@ import at.bernhardberger.tvheadend.sdk.android.TvheadendDiscoveryTestFactory
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
+import at.bernhardberger.tvheadend.sdk.core.ChannelTag
+import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
 import at.bernhardberger.tvheadend.sdk.core.ContentGenre
 import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileAuthenticationMode
@@ -144,6 +146,7 @@ import org.junit.runner.RunWith
 import org.koin.dsl.koinApplication
 import org.koin.dsl.module
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
@@ -865,9 +868,70 @@ class TouchAppTest {
         compose.captureTouch("channels-step", "tablet-channels-pane-menu-open", TouchCanvas.TABLET)
         compose.onNode(hasClickAction() and hasText(guide.second.name!!)).performClick()
         compose.onNode(heading and hasText(guide.second.name!!)).assertIsDisplayed()
-        compose.onNode(hasClickAction() and hasText(name)).performClick()
+        val row = compose.onNode(hasClickAction() and hasText(name))
+        row.performClick()
         menu.assertIsDisplayed()
         live.assertDoesNotExist()
+
+        val details = compose.onNodeWithText("About ${guide.programs[0]}")
+        program.performSemanticsAction(SemanticsActions.OnClick)
+        details.assertIsDisplayed()
+        compose.mainClock.autoAdvance = false
+        try {
+            recreate(TouchCanvas.TABLET_UPRIGHT)
+            details.assertIsDisplayed()
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+        back()
+        paneHeading.assertIsDisplayed()
+        row.assertDoesNotExist() // Back returns to the same channel, now drawn as a page.
+
+        program.performSemanticsAction(SemanticsActions.OnClick)
+        details.assertIsDisplayed()
+        compose.mainClock.autoAdvance = false
+        try {
+            recreate(TouchCanvas.TABLET)
+            details.assertIsDisplayed()
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+        val otherTag = ChannelTag.create(ChannelTagId(8), name = "Other channels")
+        val other = Channel.create(guide.second.id, name = guide.second.name, tagIds = listOf(otherTag.id))
+        val observation = guide.connected()
+        compose.runOnIdle {
+            connection.session.publish(
+                SessionObservation.create(
+                    sessionState = observation.sessionState,
+                    channelState = ChannelRepositoryState.Current(
+                        ChannelCatalog.create(listOf(guide.first, other), listOf(guide.news, otherTag)),
+                    ),
+                    epgState = observation.epgState,
+                    dvrState = observation.dvrState,
+                ),
+            )
+            browseChannels.selectTag(otherTag.id)
+        }
+        details.assertIsDisplayed()
+        back()
+        val otherRow = compose.onNode(hasClickAction() and hasText(other.name!!))
+        otherRow.assertIsSelected()
+        paneHeading.assertDoesNotExist()
+        row.assertDoesNotExist()
+
+        // Removing the filter must not resurrect the pick that left the list.
+        compose.runOnIdle { browseChannels.selectTag(null) }
+        recreate(TouchCanvas.TABLET_UPRIGHT)
+        row.assertIsDisplayed()
+        paneHeading.assertDoesNotExist()
+        recreate(TouchCanvas.TABLET)
+        otherRow.performSemanticsAction(SemanticsActions.OnClick)
+        otherRow.assertIsSelected()
+        compose.onNode(hasClickAction() and hasText(label(R.string.nav_channels)))
+            .performSemanticsAction(SemanticsActions.OnClick)
+        otherRow.assertIsSelected()
+        back()
+        assertTrue("With no Details above the picked pane, Back leaves the app", compose.activity.isFinishing)
     }
 
     @Test
@@ -912,7 +976,7 @@ class TouchAppTest {
             SessionObservation.create(
                 sessionState = observation.sessionState,
                 channelState = ChannelRepositoryState.Current(ChannelCatalog.create(
-                    listOf(guide.first, guide.second) + extras, emptyList(),
+                    listOf(guide.first, guide.second) + extras, listOf(guide.news),
                 )),
                 epgState = observation.epgState,
             ),
@@ -929,6 +993,12 @@ class TouchAppTest {
         first.assertDoesNotExist()
         compose.onNode(hasClickAction() and hasText(label(R.string.nav_channels))).performClick()
         first.assertIsDisplayed()
+
+        compose.onNode(hasScrollToIndexAction()).performScrollToIndex(extras.size + 1)
+        row.performSemanticsAction(SemanticsActions.OnClick)
+        compose.runOnIdle { browseChannels.selectTag(guide.news.id) }
+        first.assertIsDisplayed()
+        compose.onNode(heading and hasText(name)).assertDoesNotExist()
     }
 
     @Test
@@ -962,6 +1032,45 @@ class TouchAppTest {
         compose.onNodeWithContentDescription(label(R.string.recordings_back)).performClick()
         row.assertIsDisplayed()
         channel.assertDoesNotExist()
+
+        recreate(TouchCanvas.TABLET)
+        row.assertIsSelected()
+        channel.assertIsDisplayed()
+
+        recreate(TouchCanvas.TABLET_UPRIGHT)
+        row.assertIsDisplayed()
+        channel.assertDoesNotExist()
+        row.performSemanticsAction(SemanticsActions.OnClick)
+        val pageBack = compose.onNodeWithContentDescription(label(R.string.recordings_back))
+        pageBack.assertIsDisplayed()
+
+        compose.mainClock.autoAdvance = false
+        try {
+            recreate(TouchCanvas.TABLET)
+            row.assertIsSelected()
+            pageBack.assertDoesNotExist()
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+        val other = compose.onNode(hasClickAction() and hasText(guide.second.name!!))
+        other.performSemanticsAction(SemanticsActions.OnClick)
+        other.assertIsSelected()
+        recreate(TouchCanvas.TABLET_UPRIGHT)
+        compose.onNode(heading and hasText(guide.second.name!!)).assertIsDisplayed()
+        pageBack.assertIsDisplayed()
+        back()
+        other.assertIsDisplayed()
+        recreate(TouchCanvas.TABLET)
+        row.assertIsSelected()
+        channel.assertIsDisplayed()
+
+        recreate(TouchCanvas.PHONE_LANDSCAPE)
+        compose.captureTouch("channels-step", "phone-sideways-wide-channels", TouchCanvas.PHONE_LANDSCAPE)
+        recreate(TouchCanvas.PHONE_LANDSCAPE_MEDIUM)
+        compose.captureTouch("channels-step", "phone-sideways-medium-channels", TouchCanvas.PHONE_LANDSCAPE_MEDIUM)
+        row.performSemanticsAction(SemanticsActions.OnClick)
+        pageBack.assertIsDisplayed()
+        compose.captureTouch("channels-step", "phone-sideways-medium-channel-page", TouchCanvas.PHONE_LANDSCAPE_MEDIUM)
     }
 
     @Test
@@ -1702,11 +1811,12 @@ class TouchAppTest {
     private val behindLive = mutableStateOf<String?>(null)
     private var captureLogo: ArtworkId? = null
     private var capturePicture: ArtworkId? = null
+    private lateinit var browseChannels: ChannelsViewModel
 
     private fun show(mappingDispatcher: () -> CoroutineDispatcher = { Dispatchers.Main.immediate }) {
         connection.start()
         val presentation = connection.presentation()
-        val channels = connection.channels()
+        val channels = connection.channels().also { browseChannels = it }
         val recordings = connection.recordings()
         val guide = connection.guide()
         content = {
@@ -1726,7 +1836,8 @@ class TouchAppTest {
     }
 
     /** A configuration change: the activity is rebuilt, and its view models stay. */
-    private fun recreate() {
+    private fun recreate(canvas: TouchCanvas? = null) {
+        if (canvas != null) compose.runOnIdle { RuntimeEnvironment.setQualifiers(canvas.qualifiers) }
         compose.activityRule.scenario.recreate()
         compose.activityRule.scenario.onActivity { it.setContent(content = content) }
         compose.waitForIdle()

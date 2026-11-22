@@ -40,6 +40,7 @@ enum class TouchCanvas(val qualifiers: String, val width: Int, val height: Int, 
     TABLET_CHANNEL_PANE("en-rUS-w740dp-h800dp-port-xhdpi", 1480, 1600, 32),
     PHONE("en-rUS-w412dp-h892dp-port-xhdpi", 824, 1784, 40),
     PHONE_LANDSCAPE("en-rUS-w892dp-h412dp-land-xhdpi", 1784, 824, 0),
+    PHONE_LANDSCAPE_MEDIUM("en-rUS-w780dp-h360dp-land-xhdpi", 1560, 720, 0),
 }
 
 fun AndroidComposeTestRule<*, out ComponentActivity>.capturePausedPlayer(
@@ -65,7 +66,7 @@ internal fun SemanticsNodeInteraction.assertTransportAction(description: String)
 /**
  * Writes the current screen as `<group>/<name>.png` under the `touch.captureDir` directory.
  * Robolectric supplies no system-bar insets, so the space the drawings show is reserved here.
- * The test's `@Config(qualifiers = canvas.qualifiers)` must match [canvas].
+ * The test's active window configuration must match [canvas].
  */
 fun AndroidComposeTestRule<*, out ComponentActivity>.captureTouch(group: String, name: String, canvas: TouchCanvas) {
     reserveSystemBars(canvas)

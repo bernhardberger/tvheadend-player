@@ -1,6 +1,9 @@
 package at.bernhardberger.tvhplayer.touch.guide
 
 import android.content.res.Configuration
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -23,7 +26,6 @@ import androidx.navigation3.scene.rememberNavigationEventState
 import androidx.navigation3.scene.rememberSceneState
 import androidx.navigation3.ui.NavDisplay
 import androidx.navigationevent.compose.NavigationBackHandler
-import at.bernhardberger.tvheadend.sdk.core.SessionGenerationIdentity
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvhplayer.touch.ui.Destination
 import at.bernhardberger.tvhplayer.touch.ui.LocalArtworkModels
@@ -56,7 +58,6 @@ internal fun programDetailsForPages(
     val uses24Hour = AppClock.uses24Hour
     val artwork = LocalArtworkModels.current
     val context = LocalContext.current
-    var result by remember { mutableStateOf<DetailsResult?>(null) }
     LaunchedEffect(visits, observation, clock, config, uses24Hour, artwork, playingId) {
         if (clock != null && observation.epgSnapshotForDisplay != null) {
             val details = withContext(dispatcher) {
@@ -69,18 +70,13 @@ internal fun programDetailsForPages(
                 visits.mapNotNull { key -> mapper.details(key.programId)?.let { key to it } }.toMap()
             }
             if (generation === session.observation.value.currentSession?.generationIdentity) {
-                result = DetailsResult(generation, details)
+                stack.detailsResult = ProgramPageStack.DetailsResult(generation, details)
                 if (generation != null) stack.removeMissing(visits.toSet() - details.keys)
             }
         }
     }
-    return result?.takeIf { it.generation === generation }?.details.orEmpty()
+    return stack.detailsResult?.takeIf { it.generation === generation }?.details.orEmpty()
 }
-
-private data class DetailsResult(
-    val generation: SessionGenerationIdentity?,
-    val details: Map<GuidePageKey.Details, ProgramDetails>,
-)
 
 /** A destination's retained base screen and its shared channel/Details pages. */
 @Suppress("LongParameterList")
@@ -95,18 +91,21 @@ internal fun ProgramPageHost(
     onShowInGuide: ((ProgramDetails) -> Unit)?,
     channelPage: @Composable (GuidePageKey.Channel, Boolean, () -> Unit) -> Unit,
     modifier: Modifier = Modifier,
+    channelInPane: Boolean = false,
     browse: @Composable (Boolean, Modifier) -> Unit,
 ) {
-    val pages = pageStack.pages
+    val paneChannel = if (channelInPane) pageStack.rootChannel else null
+    val pages = pageStack.pages.filterNot { it == paneChannel }
     val readyPages = pages.filter { it !is GuidePageKey.Details || it in details }
     val stack = listOf(GuidePageKey.Browse) + readyPages
     // Back cancels unmapped visits and closes what was actually shown, in one update.
-    val onBack = { pageStack.back(readyPages) }
-    val canHandleBack = LocalDestinationBackEnabled.current
-    if (canHandleBack && pages.isNotEmpty()) OnDestinationReselected(destination, pageStack::clear)
+    val onBack = { pageStack.back(readyPages, paneChannel) }
+    val destinationActive = LocalDestinationBackEnabled.current
+    val canHandleBack = destinationActive && pages.isNotEmpty()
+    if (canHandleBack) OnDestinationReselected(destination) { pageStack.clear(keep = paneChannel) }
     val render by rememberUpdatedState<@Composable (GuidePageKey, ProgramDetails?) -> Unit> { page, initial ->
         val top = page == stack.last()
-        val active = top && canHandleBack
+        val active = top && destinationActive
         val back = { if (active) onBack() }
         ReportFrameBarsWhen(top) {
             when (page) {
@@ -131,15 +130,20 @@ internal fun ProgramPageHost(
         val initial = (page as? GuidePageKey.Details)?.let(details::get)
         NavEntry(page) { render(page, initial) }
     }
-    val scene = rememberSceneState(entries, sceneStrategies = emptyList(), onBack = onBack)
-    val navigation = rememberNavigationEventState(scene)
-    NavigationBackHandler(navigation, isBackEnabled = canHandleBack && pages.isNotEmpty(), onBackCompleted = onBack)
+    // A change in pane count redraws the same channel; it is not a page push or pop.
+    var previousPaneMode by remember { mutableStateOf(channelInPane) }
+    val redraw = remember(stack, channelInPane) { previousPaneMode != channelInPane }
+    SideEffect { previousPaneMode = channelInPane }
+    val noMove = ContentTransform(EnterTransition.None, ExitTransition.None, sizeTransform = null)
     val forward = pageMove(forward = true)
     val backward = pageMove(forward = false)
+    val scene = rememberSceneState(entries, sceneStrategies = emptyList(), onBack = onBack)
+    val navigation = rememberNavigationEventState(scene)
+    NavigationBackHandler(navigation, isBackEnabled = canHandleBack, onBackCompleted = onBack)
     NavDisplay(
         scene, navigation, modifier = modifier.fillMaxSize(),
-        transitionSpec = { forward },
-        popTransitionSpec = { backward },
+        transitionSpec = { if (redraw) noMove else forward },
+        popTransitionSpec = { if (redraw) noMove else backward },
     )
 }
 

@@ -48,9 +48,10 @@ internal fun BrowseChannelRows(
     scroll: LazyListState,
     offline: Boolean,
     modifier: Modifier = Modifier,
-    selectedId: String? = null,
-    onSelect: ((String) -> Unit)? = null,
+    paneChannelId: String? = null,
 ) {
+    val split = paneChannelId != null
+    val open = actions.onOpenChannel?.takeIf { split || !offline }
     scroll.ScrollToStartOnReselect(Destination.Channels)
     LazyColumn(modifier, state = scroll, verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
         itemsIndexed(list.rows, key = { _, row -> row.id }) { index, row ->
@@ -59,11 +60,11 @@ internal fun BrowseChannelRows(
                 row = row,
                 shapes = ListItemDefaults.segmentedShapes(index, list.rows.size),
                 offline = offline,
-                onOpen = (onSelect ?: actions.onOpenChannel?.takeUnless { offline })?.let { open -> { open(row.id) } },
-                onPlay = play.takeIf { onSelect == null },
-                onLogoPlay = play.takeIf { onSelect != null },
-                selected = row.id == selectedId,
-                selectable = onSelect != null,
+                onOpen = open?.let { { it(row.id) } },
+                onPlay = play.takeUnless { split },
+                onLogoPlay = play.takeIf { split },
+                selected = row.id == paneChannelId,
+                selectable = split,
             )
         }
     }

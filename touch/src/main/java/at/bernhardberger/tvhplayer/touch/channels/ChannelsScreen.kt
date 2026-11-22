@@ -28,7 +28,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -44,8 +43,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.window.core.layout.WindowSizeClass
 import at.bernhardberger.tvhplayer.touch.R
+import at.bernhardberger.tvhplayer.touch.guide.GuideLayout
+import at.bernhardberger.tvhplayer.touch.guide.guideLayout
 import at.bernhardberger.tvhplayer.touch.ui.Destination
 import at.bernhardberger.tvhplayer.touch.ui.ListFailure
 import at.bernhardberger.tvhplayer.touch.ui.ListMessage
@@ -63,13 +63,14 @@ internal fun ChannelsScreen(
     modifier: Modifier = Modifier,
     destinations: List<Destination> = Destination.entries,
     lastWatchedId: String? = null,
+    openChannelId: String? = null,
+    windowLayout: GuideLayout = guideLayout(),
     pane: @Composable (channelId: String, modifier: Modifier) -> Unit = { _, _ -> },
 ) {
-    val window = currentWindowAdaptiveInfoV2().windowSizeClass
-    val layout = when {
-        window.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND) -> ChannelsLayout.Wide
-        window.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND) -> ChannelsLayout.Upright
-        else -> ChannelsLayout.Phone
+    val layout = when (windowLayout) {
+        GuideLayout.Wide -> ChannelsLayout.Wide
+        GuideLayout.Upright -> ChannelsLayout.Upright
+        GuideLayout.Phone -> ChannelsLayout.Phone
     }
     val list = when (state) {
         is ChannelsState.Ready -> state.list
@@ -101,7 +102,7 @@ internal fun ChannelsScreen(
         },
     ) { destination ->
         if (destination == Destination.Channels) {
-            ChannelsContent(state, list, layout, actions, lastWatchedId, pane)
+            ChannelsContent(state, list, layout, actions, lastWatchedId, openChannelId, pane)
         }
     }
 }
@@ -121,32 +122,29 @@ private fun ChannelsContent(
     layout: ChannelsLayout,
     actions: ChannelsActions,
     lastWatchedId: String?,
+    openChannelId: String?,
     pane: @Composable (String, Modifier) -> Unit,
 ) {
     val margin = LocalBrowseMargin.current
     val scroll = rememberLazyListState()
     var savedTag by rememberSaveable { mutableStateOf(list?.selectedTagId) }
-    var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     var revealedId by rememberSaveable { mutableStateOf<String?>(null) }
     val paneChannel = list?.takeIf { layout == ChannelsLayout.Wide }?.rows?.let { rows ->
-        rows.firstOrNull { it.id == selectedId }
+        rows.firstOrNull { it.id == openChannelId }
             ?: rows.firstOrNull { it.playback != null }
             ?: rows.firstOrNull { it.id == lastWatchedId }
             ?: rows.firstOrNull()
     }
     SideEffect {
-        if (list != null) {
-            if (savedTag != list.selectedTagId) {
-                scroll.requestScrollToItem(0)
-                savedTag = list.selectedTagId
-                revealedId = null
-            }
-            if (list.rows.none { it.id == selectedId }) selectedId = null
+        if (list != null && savedTag != list.selectedTagId) {
+            scroll.requestScrollToItem(0)
+            savedTag = list.selectedTagId
+            revealedId = null
         }
     }
-    LaunchedEffect(paneChannel?.id, selectedId, list?.selectedTagId) {
+    LaunchedEffect(paneChannel?.id, openChannelId, list?.selectedTagId) {
         if (list == null || paneChannel == null) return@LaunchedEffect
-        if (paneChannel.id == selectedId || paneChannel.id == revealedId) return@LaunchedEffect
+        if (paneChannel.id == openChannelId || paneChannel.id == revealedId) return@LaunchedEffect
         // Let the initial list lay out before deciding whether the automatically chosen row is visible.
         val layoutInfo = snapshotFlow { scroll.layoutInfo }.first { it.visibleItemsInfo.isNotEmpty() }
         if (layoutInfo.visibleItemsInfo.none { it.key == paneChannel.id }) {
@@ -155,9 +153,7 @@ private fun ChannelsContent(
         revealedId = paneChannel.id
     }
     if (list != null) {
-        BrowseChannels(list, layout, actions, state as? ChannelsState.Offline, scroll, paneChannel, pane) {
-            selectedId = it
-        }
+        BrowseChannels(list, layout, actions, state as? ChannelsState.Offline, scroll, paneChannel, pane)
     } else {
         ChannelsLoadContent(state, layout, actions, margin)
     }
@@ -184,7 +180,6 @@ private fun BrowseChannels(
     scroll: LazyListState,
     paneChannel: ChannelRow?,
     pane: @Composable (String, Modifier) -> Unit,
-    onSelect: (String) -> Unit,
 ) {
     val margin = LocalBrowseMargin.current
     Column(Modifier.fillMaxSize().padding(horizontal = margin)) {
@@ -202,7 +197,7 @@ private fun BrowseChannels(
             paneChannel == null -> BrowseChannelRows(list, actions, scroll, offline != null)
             else -> ChannelsPanes(
                 listPane = { modifier ->
-                    BrowseChannelRows(list, actions, scroll, offline != null, modifier, paneChannel.id, onSelect)
+                    BrowseChannelRows(list, actions, scroll, offline != null, modifier, paneChannel.id)
                 },
                 detailPane = { modifier -> pane(paneChannel.id, modifier) },
             )
