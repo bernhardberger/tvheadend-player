@@ -28,6 +28,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.doubleClick
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -794,6 +795,13 @@ class RecordingPlayerScreenTest {
     @OptIn(UnstableApi::class)
     fun recordingRouteMarkerSeeksWithoutResumingOrClosingTheSheet() = withRecordingRoute(marked = true) { activity, runtime ->
         runtime.pause()
+        runtime.seekTo(30_000L)
+        settleRoute(runtime.player)
+        tag("player-picture").performTouchInput { doubleClick(Offset(width * .25f, height * .28f)) }
+        settleRoute(runtime.player)
+        assertEquals("A picture double tap uses the recording's back skip", 20_000L, runtime.player.currentPosition)
+        assertTrue(!runtime.player.playWhenReady)
+        runtime.player.seekTo(0)
         settleRoute(runtime.player)
         val symbol = compose.onNode(hasTestTag("recording-marker-symbol") and hasClickAction())
         symbol.performTouchInput { click() }
@@ -977,7 +985,7 @@ class RecordingPlayerScreenTest {
         }
     }
 
-    private fun tapPicture() = tag("player-picture").performTouchInput { click(Offset(width * .25f, height * .28f)) }
+    private fun tapPicture() = tag("player-picture").tapPlayerPicture(compose.mainClock)
 
     private fun assertLandscapeProgramIntact() {
         val episode = compose.onNodeWithText("Westvale – Ridge Town")

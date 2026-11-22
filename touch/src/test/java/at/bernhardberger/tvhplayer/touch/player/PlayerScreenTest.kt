@@ -12,6 +12,7 @@ import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.content.res.Resources
 import android.os.Looper
+import android.view.ViewConfiguration
 import androidx.lifecycle.Lifecycle
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
@@ -55,6 +56,7 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.doubleClick
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.assert
@@ -62,6 +64,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.MainTestClock
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -322,6 +325,49 @@ class PlayerScreenTest {
 
     @Test
     @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
+    fun doubleTapBackSkipsOnceWithoutRevealingControls() {
+        show()
+        val picture = tag("player-picture")
+        picture.assert(hasClickAction() and SemanticsMatcher.keyIsDefined(SemanticsProperties.Focused))
+        togglePicture()
+        picture.performTouchInput { doubleClick(Offset(width * .25f, height * .28f)) }
+        tag("player-transport").assertDoesNotExist()
+        compose.runOnIdle { assertEquals(listOf(PlayerAction.BackTen), actions) }
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
+    fun doubleTapForwardSkipsOnceOnlyWhenTheButtonIsEnabled() {
+        show()
+        val behind = liveTimeline.value
+        val picture = tag("player-picture")
+        val forward = button(R.string.player_forward_thirty)
+        compose.runOnIdle { liveTimeline.value = behind.copy(position = behind.live, behind = 0) }
+        forward.assertIsNotEnabled()
+        picture.performTouchInput { doubleClick(Offset(width * .75f, height * .28f)) }
+        compose.runOnIdle { assertTrue(actions.isEmpty()) }
+        compose.runOnIdle { liveTimeline.value = behind }
+        forward.assertIsEnabled()
+        picture.performTouchInput { doubleClick(Offset(width * .75f, height * .28f)) }
+        compose.runOnIdle { assertEquals(listOf(PlayerAction.ForwardThirty), actions) }
+        tag("player-transport").assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
+    fun singlePictureTapTogglesAfterTheDoubleTapTimeout() {
+        compose.mainClock.autoAdvance = false
+        show()
+        tag("player-picture").performTouchInput { click(Offset(width * .25f, height * .28f)) }
+        compose.mainClock.advanceTimeByFrame()
+        tag("player-transport").assertIsDisplayed()
+        compose.mainClock.advanceTimeBy(ViewConfiguration.getDoubleTapTimeout().toLong())
+        tag("player-transport").assertDoesNotExist()
+        compose.mainClock.autoAdvance = true
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
     fun controlsLeaveByThemselvesWhilePlayingAndATouchRestartsTheCount() {
         // Before composing: idling with the clock running would let the count run out unseen.
         compose.mainClock.autoAdvance = false
@@ -366,7 +412,7 @@ class PlayerScreenTest {
     private fun assertPictureChromeMotion() {
         val picture = tag("player-picture")
         val hidden = picture.redAt(Offset(40f, 50f))
-        tapPicture()
+        togglePicture()
         compose.mainClock.advanceTimeBy(80)
         val top = tag("player-top").fetchSemanticsNode().boundsInRoot
         val partial = picture.redAt(Offset(40f, 50f))
@@ -376,11 +422,11 @@ class PlayerScreenTest {
             partial != hidden && partial != shown)
         assertEquals(top, tag("player-top").fetchSemanticsNode().boundsInRoot)
 
-        tapPicture()
+        togglePicture()
         compose.mainClock.advanceTimeBy(80)
         tag("player-top").assertDoesNotExist()
         val leaving = picture.redAt(Offset(40f, 50f))
-        tapPicture()
+        togglePicture()
         compose.mainClock.advanceTimeByFrame()
         assertEquals("A touch reverses the fade without jumping", leaving, picture.redAt(Offset(40f, 50f)), .08f)
 
@@ -1204,7 +1250,7 @@ class PlayerScreenTest {
         }
     }
 
-    private fun tapPicture() = tag("player-picture").performTouchInput { click(Offset(width * .25f, height * .28f)) }
+    private fun tapPicture() = tag("player-picture").tapPlayerPicture(compose.mainClock)
 
     private fun dragTo(fraction: Float) = timeline().performTouchInput {
         down(Offset(width * .713f, center.y))
@@ -1242,6 +1288,12 @@ class PlayerScreenTest {
     )
 
     private fun capture(name: String, canvas: TouchCanvas) = compose.captureTouch("slice2-player", name, canvas)
+}
+
+internal fun SemanticsNodeInteraction.tapPlayerPicture(clock: MainTestClock) {
+    performTouchInput { click(Offset(width * .25f, height * .28f)) }
+    clock.advanceTimeBy(ViewConfiguration.getDoubleTapTimeout().toLong())
+    clock.advanceTimeByFrame()
 }
 
 internal fun androidx.compose.ui.test.SemanticsNodeInteraction.redAt(point: Offset): Float =
