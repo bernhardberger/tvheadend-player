@@ -46,6 +46,7 @@ import kotlin.coroutines.EmptyCoroutineContext
 @OptIn(TvheadendTestingApi::class)
 internal class FakeConnection(
     readForEditing: ServerProfileEditReadResult = ServerProfileEditReadResult.Missing,
+    private val preferences: DataStore<Preferences>? = null,
 ) {
     val session = FakeTvheadendSession()
     val dvrRepliesHeld = MutableStateFlow(false)
@@ -68,7 +69,7 @@ internal class FakeConnection(
     private val writes = HeldWrites(store, writesHeld)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     val owner = AppProfileOwner(
-        session, writes, PlayerSettingsStore(MemoryPreferences()), Dispatchers.Main,
+        session, writes, PlayerSettingsStore(preferences ?: MemoryPreferences()), Dispatchers.Main,
         { readForEditing },
     )
     /** The queue's clock; a test that times notices sets it to the Compose main clock. */
@@ -94,7 +95,7 @@ internal class FakeConnection(
     /** The Channels destination's state, as the composition root's view model gives it. */
     fun channels() = ChannelsViewModel(session, channelTagSettings(), owner.liveProfile)
 
-    fun channelTagSettings() = ChannelTagSettingsStore(MemoryPreferences())
+    fun channelTagSettings() = ChannelTagSettingsStore(preferences ?: MemoryPreferences())
 
     /** The Recordings destination's state, as the composition root's view model gives it. */
     fun recordings() = RecordingsViewModel(session)

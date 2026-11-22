@@ -58,6 +58,8 @@ import at.bernhardberger.tvheadend.sdk.core.DvrCutpointAction
 import at.bernhardberger.tvheadend.sdk.core.DvrCutpointsResult
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.PlaybackBindingResult
+import at.bernhardberger.tvheadend.sdk.core.ServerProfileId
+import at.bernhardberger.tvheadend.sdk.core.ServerProfileWriteResult
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvheadend.sdk.core.TvheadendTestResultFactory
 import at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi
@@ -75,6 +77,7 @@ import at.bernhardberger.tvhplayer.playback.PlaybackAudioFocus
 import at.bernhardberger.tvhplayer.playback.PlaybackRuntimePolicy
 import at.bernhardberger.tvhplayer.playback.currentRecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.settings.AdBreakMode
+import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.stores.ChannelAccentStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
@@ -92,6 +95,7 @@ import at.bernhardberger.tvhplayer.touch.testutil.captureTouchWindows
 import at.bernhardberger.tvhplayer.touch.ui.TouchNotice
 import at.bernhardberger.tvhplayer.touch.ui.TouchDarkColors
 import at.bernhardberger.tvhplayer.ui.notifications.NoticeFormatter
+import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -99,7 +103,9 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -107,6 +113,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.ErrorCollector
 import org.junit.runner.RunWith
+import org.koin.core.context.GlobalContext
 import org.koin.core.context.startKoin
 import org.koin.core.context.stopKoin
 import org.koin.dsl.module
@@ -123,6 +130,7 @@ import org.robolectric.shadows.SensorEventBuilder
 import org.robolectric.shadows.ShadowActivity
 import org.robolectric.shadows.ShadowSensor
 import org.robolectric.util.ReflectionHelpers
+import java.net.InetAddress
 import java.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
@@ -274,10 +282,12 @@ class RecordingPlayerScreenTest {
         offerPictureInPicture: Boolean = false,
         onRejectedBind: () -> Unit = {},
         holdSettings: MutableStateFlow<Boolean>? = null,
+        prepareConnection: (FakeConnection) -> Unit = {},
         exercise: (ActivityController<PlayerActivity>, AppPlaybackRuntime, ServerGuide, FakeTvheadendSession) -> Unit,
     ) {
         val context = compose.activity.applicationContext
-        val connection = FakeConnection()
+        val preferences = MemoryPreferences()
+        val connection = FakeConnection(preferences = preferences)
         val player = ExoPlayer.Builder(context).build()
         val server = ServerGuide(Instant.parse("2026-11-11T21:00:00Z"))
         val session = when {
@@ -306,7 +316,7 @@ class RecordingPlayerScreenTest {
             modules(module {
                 single { owner }
                 single { settings }
-                single { LastPlayedChannelStore(MemoryPreferences()) }
+                single { LastPlayedChannelStore(preferences) }
                 single { connection.owner }
                 single { connection.noticeCenter }
                 single { connection.browseSession }
@@ -319,6 +329,7 @@ class RecordingPlayerScreenTest {
             })
         }
         try {
+            prepareConnection(connection)
             val id = if (marked) server.film.id else DvrEntryId(1)
             if (live) {
                 connection.session.scriptLivePlaybackSuccess()
@@ -414,6 +425,48 @@ class RecordingPlayerScreenTest {
         settleRoute()
         compose.onNodeWithText(activity.get().getString(SharedR.string.error_207_title)).assertIsDisplayed()
         assertEquals("The rejected zap must not keep the previous channel playing", null, runtime.activeTarget.value)
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
+    @OptIn(UnstableApi::class)
+    @kotlin.OptIn(FakePlaybackApi::class, TvheadendTestingApi::class)
+    fun lastWatchedIsSavedOnlyAfterPlayingOnThatConnection() {
+        var next: ServerProfileId? = null
+        withPlayerRoute(live = true, prepareConnection = { connection ->
+            val address = InetAddress.getLoopbackAddress().hostAddress
+            next = runBlocking {
+                check(connection.store.addAnonymous(address, 9982, null, true) is ServerProfileWriteResult.Applied)
+                (connection.store.addAnonymous(address, 9983, null, false) as ServerProfileWriteResult.Applied).id
+            }
+            connection.start()
+            shadowOf(Looper.getMainLooper()).idle()
+        }) { activity, runtime, server, fake ->
+            val koin = GlobalContext.get()
+            val lastPlayed = koin.get<LastPlayedChannelStore>()
+            val scope = koin.get<ChannelsViewModel>().scope
+            val profileB = checkNotNull(next)
+            fun saved() = runBlocking { lastPlayed.channelId.first() }
+            assertTrue(runtime.state.value.presented)
+            assertEquals("A confirmed tune must save the channel on A", server.first.id, saved())
+
+            fake.scriptLivePlaybackFailure(PlaybackBindingResult.TargetUnavailable)
+            activity.get().lifecycleScope.launch {
+                // The real SDK retires the current session during disconnect, before B can be ready.
+                fake.retire()
+                check(koin.get<AppProfileOwner>().setActive(profileB) is ServerProfileWriteResult.Applied)
+                fake.replaceGeneration(server.connected())
+            }
+            settleRoute(runtime.player)
+            assertEquals(profileB, scope.value.profileId)
+            assertTrue(!runtime.state.value.presented)
+            assertNull("A's channel must not be saved on B without a confirmed tune", saved())
+
+            fake.scriptLivePlaybackSuccess()
+            activity.newIntent(PlayerActivity.intent(activity.get(), server.second.id, runtime.notePlaybackIntent()))
+            settleRoute(runtime.player)
+            assertEquals("A confirmed tune must save the channel on B", server.second.id, saved())
+        }
     }
 
     @Test
