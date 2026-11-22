@@ -420,7 +420,9 @@ private fun OnNow(
         program.progress?.let {
             ProgramProgress(it, program.timeLeft, program.recording, Modifier.padding(top = 4.dp), program.watching)
         }
-        program.synopsis?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+        program.synopsis?.let {
+            Text(it, style = MaterialTheme.typography.bodyMedium, maxLines = 3, overflow = TextOverflow.Ellipsis)
+        }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ProgramRecordAction(program.record, program.id, actions, ruleSchedule = program.ruleSchedule)
             TextButton(onClick = { onDetails(program.id) }) {
