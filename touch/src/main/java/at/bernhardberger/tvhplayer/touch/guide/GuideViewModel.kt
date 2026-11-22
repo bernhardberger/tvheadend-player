@@ -79,9 +79,17 @@ internal class GuideViewModel(
     // Retain Details across configuration changes, but start closed after process death.
     fun openDetails(programId: String?) = mutableSelection.update { it.copy(detailsId = programId) }
 
-    fun map(context: Context, input: GuideMappingInput) {
-        val changes = input.changesFrom(mappingInput)
-        if (changes.isEmpty()) return
+    /** Null stops work without discarding the last published result. */
+    fun map(context: Context, input: GuideMappingInput?) {
+        val changes = input?.changesFrom(mappingInput).orEmpty()
+        if (changes.isEmpty() || input == null) {
+            if (input == null) {
+                mappingJob?.cancel()
+                mappingJob = null
+                mappingInput = mutableMapped.value?.input
+            }
+            return
+        }
         mutableMapped.value?.let {
             if (it.days.isNotEmpty() && !it.input.sameDayOwner(input)) mutableMapped.value = it.copy(days = emptyMap())
         }
