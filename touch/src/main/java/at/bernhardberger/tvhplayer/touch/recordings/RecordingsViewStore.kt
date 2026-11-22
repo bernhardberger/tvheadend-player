@@ -13,21 +13,26 @@ import kotlinx.coroutines.flow.first
 
 /** How the archive is drawn, independent of its current connection or browse position. */
 internal class RecordingsViewStore(private val preferences: DataStore<Preferences>) {
+    // The app-scoped store outlives a ViewModel while its last write is still pending.
+    private var latestView: DvrArchiveView? = null
+
     suspend fun read(): DvrArchiveView {
+        latestView?.let { return it }
         val defaults = DvrArchiveView()
         val saved = try {
             preferences.data.first()
         } catch (_: IOException) {
-            return defaults
+            null
         }
-        return DvrArchiveView(
-            grouping = DvrArchiveGrouping.entries.firstOrNull { it.name == saved[Grouping] } ?: defaults.grouping,
-            sort = DvrArchiveSort.entries.firstOrNull { it.name == saved[Sort] } ?: defaults.sort,
-            show = DvrArchiveShow.entries.firstOrNull { it.name == saved[Show] } ?: defaults.show,
+        return latestView ?: DvrArchiveView(
+            grouping = DvrArchiveGrouping.entries.firstOrNull { it.name == saved?.get(Grouping) } ?: defaults.grouping,
+            sort = DvrArchiveSort.entries.firstOrNull { it.name == saved?.get(Sort) } ?: defaults.sort,
+            show = DvrArchiveShow.entries.firstOrNull { it.name == saved?.get(Show) } ?: defaults.show,
         )
     }
 
     suspend fun write(view: DvrArchiveView) {
+        latestView = view
         preferences.edit {
             it[Grouping] = view.grouping.name
             it[Sort] = view.sort.name
