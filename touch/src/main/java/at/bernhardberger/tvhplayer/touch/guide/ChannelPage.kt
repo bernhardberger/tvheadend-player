@@ -129,9 +129,10 @@ internal fun ChannelPage(
     mappingDispatcher: CoroutineDispatcher = Dispatchers.Default,
     behindLive: Boolean = false,
     onWatch: ((String, BrowseContextAction, String?) -> Unit)? = null,
+    visitModel: ChannelPageModel? = null,
 ) {
     val id = ChannelId(channelId.toLong())
-    val model = viewModel(key = "channel-page:$channelId") {
+    val model = visitModel ?: viewModel(key = "channel-page:$channelId") {
         ChannelPageModel(session, acquisitionContext, mappingDispatcher, id, initialDay)
     }
     val scope by channels.scope.collectAsStateWithLifecycle()
@@ -160,7 +161,7 @@ internal fun ChannelPage(
     }
     val shown = prepared?.takeIf { input != null && it.first.sameDays(input) }?.second ?: ChannelPageState()
     val fallbackName = scope.scope.allChannels.firstOrNull { it.id == id }?.name.orEmpty()
-    key(channelId) {
+    key(channelId, visitModel) {
         ChannelPageContent(
             shown, onBack, onDetails, model::selectDay,
             GuideActions(
@@ -169,6 +170,7 @@ internal fun ChannelPage(
             ),
             modifier, inPane, initialProgramId, fallbackName,
             active = active,
+            visitScroll = model.scroll,
             onWatch = onWatch?.let { watch ->
                 { way -> if (active) watch(channelId, way, shown.watchRecordingId) }
             },
@@ -206,6 +208,7 @@ internal fun ChannelPageContent(
     fallbackName: String = "",
     active: Boolean = true,
     onWatch: ((BrowseContextAction) -> Unit)? = null,
+    visitScroll: ChannelScheduleScroll? = null,
 ) {
     val watchWays = if (onWatch != null) state.watchWays else emptyList()
     val colors = MaterialTheme.colorScheme
@@ -223,6 +226,7 @@ internal fun ChannelPageContent(
                         state.days.isEmpty() -> NoSchedule(onWatch = null)
                         else -> ChannelSchedule(
                             state, onDetails, onDay, actions, initialProgramId, watchWays.isNotEmpty(), ground,
+                            visitScroll,
                         )
                     }
                 }
@@ -272,6 +276,24 @@ private fun ChannelPageHeading(
     }
 }
 
+/** Stock lazy states kept in memory for an open Channels visit shared by its two drawings. */
+internal class ChannelScheduleScroll {
+    val outer = LazyListState()
+    val lists = mutableMapOf<LocalDate, LazyListState>()
+    val tabsHeight = mutableIntStateOf(0)
+}
+
+@Composable
+private fun rememberDayLists(
+    dates: List<LocalDate>,
+    visitScroll: ChannelScheduleScroll?,
+): Map<LocalDate, LazyListState> {
+    // Keep each day's list outside the pager's disposable items.
+    if (visitScroll == null) return dates.associateWith { date -> key(date) { rememberLazyListState() } }
+    SideEffect { visitScroll.lists.keys.retainAll(dates) }
+    return dates.associateWith { date -> visitScroll.lists.getOrPut(date) { LazyListState() } }
+}
+
 @Composable
 private fun ChannelSchedule(
     state: ChannelPageState,
@@ -281,16 +303,16 @@ private fun ChannelSchedule(
     initialProgramId: String?,
     hasWatchButton: Boolean,
     ground: Color,
+    visitScroll: ChannelScheduleScroll?,
 ) {
     val dates = state.days.keys.toList()
     val selected = dates.indexOf(state.selectedDay).coerceAtLeast(0)
     val pager = rememberGuidePager(dates, selected) { dates.getOrNull(it)?.let(onDay) }
-    val outer = rememberLazyListState()
-    // Keep the list positions with this entry, not with the pager's disposable items.
-    val lists = dates.associateWith { date -> key(date) { rememberLazyListState() } }
+    val outer = visitScroll?.outer ?: rememberLazyListState()
+    val lists = rememberDayLists(dates, visitScroll)
     val margin = LocalBrowseMargin.current
     // A temporary full-height pager would clamp a restored list position near the end.
-    var tabsHeight by rememberSaveable { mutableIntStateOf(0) }
+    var tabsHeight by visitScroll?.tabsHeight ?: rememberSaveable { mutableIntStateOf(0) }
     var revealed by rememberSaveable(initialProgramId) { mutableStateOf(false) }
     val onNow = state.onNow
     val collapse = rememberHeaderCollapse(outer)

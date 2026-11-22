@@ -19,6 +19,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -30,6 +31,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewmodel.compose.rememberViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
@@ -73,6 +75,7 @@ import at.bernhardberger.tvhplayer.touch.connect.EditConnectionFlow
 import at.bernhardberger.tvhplayer.touch.connect.FirstRunFlow
 import at.bernhardberger.tvhplayer.touch.connect.connectionStatus
 import at.bernhardberger.tvhplayer.touch.ui.Destination
+import at.bernhardberger.tvhplayer.touch.guide.ChannelPageModel
 import at.bernhardberger.tvhplayer.touch.guide.ProgramPageStack
 import at.bernhardberger.tvhplayer.touch.ui.FrameNotices
 import at.bernhardberger.tvhplayer.touch.ui.BottomWindowNotices
@@ -133,6 +136,19 @@ internal fun TouchApp(
     val connect = viewModel { ConnectViewModel(session, owner) }
     val dvr = viewModel { DvrControls(session, notices) }
     val channelsCache = viewModel { ChannelsMappingCache(session) }
+    // The open channel belongs to this visit, not to either of its navigation entries.
+    val openChannel = channelsCache.pages.rootChannel
+    val openChannelModel = openChannel?.let { visit ->
+        key(visit) {
+            val store = rememberViewModelStoreOwner()
+            viewModel(viewModelStoreOwner = store) {
+                ChannelPageModel(
+                    session, Dispatchers.Default, channelsDispatcher, ChannelId(visit.channelId.toLong()), null,
+                    retainScroll = true,
+                )
+            }
+        }
+    }
     LaunchedEffect(owner, channels, channelsCache) {
         // The saved scope and the live connection publish independently.
         val scopeProfile = channels.scope.map { it.profileId }.distinctUntilChanged()
@@ -185,6 +201,7 @@ internal fun TouchApp(
                         AppDestinations(
                             channelsCache, dvr, connection, channels, recordings, guide,
                             playingId, onWatch, onPlayRecording,
+                            openChannelModel = openChannelModel,
                             channelsDispatcher = channelsDispatcher,
                             playingRecordingId = playingRecordingId,
                             lastWatchedId = lastWatchedId,
@@ -311,6 +328,7 @@ private fun AppFrame(
     lastWatchedId: ChannelId?,
     behindLiveId: String?,
     onChannelWatch: ((String, BrowseContextAction, String?) -> Unit)?,
+    openChannelModel: ChannelPageModel?,
 ) {
     val scope = channels.scope.collectAsStateWithLifecycle().value
     val observedSession = channels.observation.collectAsStateWithLifecycle()
@@ -362,6 +380,7 @@ private fun AppFrame(
         dvr, mappingDispatcher,
         playingId, lastWatchedId, behindLiveId, onWatch, onChannelWatch,
         { connection.reconnectNow() }, onOpenConnections, onSignIn,
+        openChannelModel,
     )
 }
 
@@ -495,6 +514,7 @@ private fun AppDestinations(
     playingId: String?,
     onWatch: ((String) -> Unit)?,
     onPlayRecording: ((String, Boolean) -> Unit)?,
+    openChannelModel: ChannelPageModel?,
     channelsDispatcher: CoroutineDispatcher,
     playingRecordingId: DvrEntryId?,
     lastWatchedId: ChannelId?,
@@ -522,6 +542,7 @@ private fun AppDestinations(
                     AppFrame(
                         connection, channels, playingId, onWatch, onOpenConnections, onSignIn,
                         channelsDispatcher, channelsCache, dvr, lastWatchedId, behindLiveId, onChannelWatch,
+                        openChannelModel,
                     )
             }
         }

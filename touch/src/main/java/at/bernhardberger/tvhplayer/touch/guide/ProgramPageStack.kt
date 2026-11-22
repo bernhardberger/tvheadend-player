@@ -48,7 +48,8 @@ internal class ProgramPageStack {
     }
 
     fun back(visiblePages: List<GuidePageKey>, paneChannel: GuidePageKey.Channel?) {
-        val remaining = visiblePages.dropLast(1)
+        val hasPending = pages.any { it != paneChannel && it !in visiblePages }
+        val remaining = if (hasPending) visiblePages else visiblePages.dropLast(1)
         pages = pages.filter { it == paneChannel || it in remaining }
     }
 

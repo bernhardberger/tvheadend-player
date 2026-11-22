@@ -31,12 +31,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.DeviceConfigurationOverride
+import androidx.compose.ui.test.WindowSize
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasAnyDescendant
@@ -52,6 +55,8 @@ import at.bernhardberger.tvheadend.sdk.core.AutorecRuleId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrMutationResult
 import at.bernhardberger.tvheadend.sdk.core.DvrSchedule
+import at.bernhardberger.tvheadend.sdk.core.EpgEvent
+import at.bernhardberger.tvheadend.sdk.core.EpgSnapshot
 import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionCall
@@ -66,6 +71,8 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import at.bernhardberger.tvheadend.sdk.android.DiscoveredTvheadendServer
@@ -1056,6 +1063,35 @@ class TouchAppTest {
         val pageBack = compose.onNodeWithContentDescription(label(R.string.recordings_back))
         pageBack.assertIsDisplayed()
 
+        val zone = ZoneId.systemDefault()
+        val start = GuideClock(guide.now.epochSeconds, zone).today.plusDays(1).atStartOfDay(zone).toEpochSecond()
+        val tomorrowPrograms = List(48) { index ->
+            val begins = start + index * 1800L
+            EpgEvent.create(
+                EventId(800L + index), guide.first.id, Instant.fromEpochSeconds(begins),
+                Instant.fromEpochSeconds(begins + 1800L), title = "Tomorrow programme $index",
+            )
+        }
+        connection.session.publish(guide.connected(epg = EpgSnapshot.create(guide.snapshot.events + tomorrowPrograms)))
+        val today = compose.onNodeWithText(label(SharedR.string.channel_schedule_today))
+        val tomorrow = compose.onNodeWithText(label(SharedR.string.channel_schedule_tomorrow))
+        val onNow = compose.onNodeWithText(label(R.string.channels_on_now))
+        val outer = compose.onNodeWithTag("channel-page-scroll")
+        val schedule = compose.onNodeWithTag("channel-program-rows")
+        fun assertTomorrowAt(index: Int) {
+            tomorrow.assertIsSelected()
+            onNow.assertIsNotDisplayed()
+            compose.onNodeWithText(tomorrowPrograms[index].title!!).assertIsDisplayed()
+        }
+        fun scrollPositions() = listOf(outer, schedule).map {
+            it.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
+        }
+        tomorrow.performSemanticsAction(SemanticsActions.OnClick)
+        outer.performScrollToIndex(1)
+        schedule.performScrollToIndex(12)
+        assertTomorrowAt(12)
+        val uprightPositions = scrollPositions()
+
         compose.mainClock.autoAdvance = false
         try {
             recreate(TouchCanvas.TABLET)
@@ -1064,6 +1100,23 @@ class TouchAppTest {
         } finally {
             compose.mainClock.autoAdvance = true
         }
+        assertTomorrowAt(12)
+        assertEquals(uprightPositions, scrollPositions())
+        schedule.performScrollToIndex(24)
+        assertTomorrowAt(24)
+        val widePositions = scrollPositions()
+        recreate(TouchCanvas.TABLET_UPRIGHT)
+        pageBack.assertIsDisplayed()
+        assertTomorrowAt(24)
+        assertEquals(widePositions, scrollPositions())
+
+        back()
+        row.performSemanticsAction(SemanticsActions.OnClick)
+        today.assertIsSelected()
+        onNow.assertIsDisplayed()
+        connection.session.publish(guide.connected())
+        recreate(TouchCanvas.TABLET)
+
         val other = compose.onNode(hasClickAction() and hasText(guide.second.name!!))
         other.performSemanticsAction(SemanticsActions.OnClick)
         other.assertIsSelected()
@@ -1110,6 +1163,36 @@ class TouchAppTest {
             pageBack.performSemanticsAction(SemanticsActions.OnClick)
             row.assertIsDisplayed()
         }
+    }
+
+    @Test
+    @Config(qualifiers = TABLET)
+    fun resizingOpenChannelToOnePaneDoesNotSlideThePage() {
+        val windowSize = mutableStateOf(DpSize(1280.dp, 800.dp))
+        val guide = savedConnectionWithGuide(
+            configurationOverride = { DeviceConfigurationOverride.WindowSize(windowSize.value) },
+        )
+        val row = compose.onNode(hasClickAction() and hasText(guide.first.name!!))
+        val pageBack = compose.onNodeWithContentDescription(label(R.string.recordings_back))
+        row.performSemanticsAction(SemanticsActions.OnClick)
+        row.assertIsSelected()
+        pageBack.assertDoesNotExist()
+
+        val midResize = try {
+            compose.mainClock.autoAdvance = false
+            compose.runOnUiThread {
+                windowSize.value = DpSize(800.dp, 800.dp)
+                Snapshot.sendApplyNotifications()
+            }
+            compose.mainClock.advanceTimeBy(64)
+            pageBack.assertIsDisplayed()
+            pageBack.fetchSemanticsNode().positionInRoot.x
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+        val settled = pageBack.fetchSemanticsNode().positionInRoot.x
+        assertEquals("A resize draws the page without a horizontal slide", settled, midResize)
+        row.assertDoesNotExist()
     }
 
     @Test
@@ -1818,6 +1901,7 @@ class TouchAppTest {
         now: Instant = FIXTURE_NOW,
         withChannelArt: Boolean = false,
         mappingDispatcher: () -> CoroutineDispatcher = { Dispatchers.Main.immediate },
+        configurationOverride: (@Composable () -> DeviceConfigurationOverride)? = null,
     ): ServerGuide {
         runBlocking { connection.store.addAnonymous(server.host, server.port, "Home server", true) }
         val guide = ServerGuide(now)
@@ -1825,7 +1909,7 @@ class TouchAppTest {
             captureLogo = (guide.logo as ChannelIcon.ImageCache).artworkId
             capturePicture = guide.picture
         }
-        show(mappingDispatcher)
+        show(mappingDispatcher, configurationOverride)
         connection.session.publish(guide.connected())
         compose.waitForIdle()
         return guide
@@ -1852,13 +1936,16 @@ class TouchAppTest {
     private var capturePicture: ArtworkId? = null
     private lateinit var browseChannels: ChannelsViewModel
 
-    private fun show(mappingDispatcher: () -> CoroutineDispatcher = { Dispatchers.Main.immediate }) {
+    private fun show(
+        mappingDispatcher: () -> CoroutineDispatcher = { Dispatchers.Main.immediate },
+        configurationOverride: (@Composable () -> DeviceConfigurationOverride)? = null,
+    ) {
         connection.start()
         val presentation = connection.presentation()
         val channels = connection.channels().also { browseChannels = it }
         val recordings = connection.recordings()
         val guide = connection.guide()
-        content = {
+        val app: @Composable () -> Unit = {
             MaterialTheme(colorScheme = TouchDarkColors) {
                 TouchApp(
                     connection.browseSession, connection.owner, presentation, channels,
@@ -1871,6 +1958,7 @@ class TouchAppTest {
                 }
             }
         }
+        content = if (configurationOverride == null) app else { { DeviceConfigurationOverride(configurationOverride(), app) } }
         compose.setContent(content)
     }
 

@@ -13,8 +13,10 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvhplayer.core.BrowseContextAction
 import at.bernhardberger.tvhplayer.touch.guide.ChannelPage
+import at.bernhardberger.tvhplayer.touch.guide.ChannelPageModel
 import at.bernhardberger.tvhplayer.touch.guide.GuideActions
 import at.bernhardberger.tvhplayer.touch.guide.GuideLayout
+import at.bernhardberger.tvhplayer.touch.guide.GuidePageKey
 import at.bernhardberger.tvhplayer.touch.guide.ProgramPageHost
 import at.bernhardberger.tvhplayer.touch.guide.ProgramPageStack
 import at.bernhardberger.tvhplayer.touch.guide.guideLayout
@@ -44,26 +46,18 @@ internal fun ChannelsPageHost(
     onRetry: () -> Unit,
     onOpenConnections: () -> Unit,
     onSignIn: () -> Unit,
+    openChannelModel: ChannelPageModel?,
 ) {
     val openChannel = pages?.rootChannel
-    if (openChannel != null) {
-        LaunchedEffect(pages, openChannel, scope) {
-            val id = openChannel.channelId
-            // A retained channel can leave a tag while offline; an unknown catalog cannot prove deletion.
-            val canPrune = scope.channelCatalogCurrent || scope.scope.allChannels.any { it.id.value.toString() == id }
-            if (canPrune && scope.scope.visibleChannels.none { it.id.value.toString() == id }) {
-                pages.removeChannel(openChannel)
-            }
-        }
-    }
+    if (openChannel != null) PruneUnavailableChannel(pages, openChannel, scope)
     val details = if (pages != null) programDetailsForPages(pages, session, playingId, dispatcher) else emptyMap()
-    val page: @Composable (String, Modifier, Boolean, Boolean, () -> Unit) -> Unit =
-        { id, modifier, inPane, active, back ->
+    val page: @Composable (String, Modifier, Boolean, Boolean, ChannelPageModel?, () -> Unit) -> Unit =
+        { id, modifier, inPane, active, model, back ->
             ChannelPage(
                 session, channels, id, back, { if (active) pages?.openDetails(it) },
                 dvr::record, dvr::cancel, dvr::stopProgram, modifier,
                 inPane = inPane, playingId = playingId, active = active, mappingDispatcher = dispatcher,
-                behindLive = behindLiveId == id, onWatch = onChannelWatch,
+                behindLive = behindLiveId == id, onWatch = onChannelWatch, visitModel = model,
             )
         }
     val shownPages = pages ?: remember { ProgramPageStack() }
@@ -80,7 +74,13 @@ internal fun ChannelsPageHost(
                 onCancel = dvr::cancel, onStop = dvr::stopProgram, onAiring = { pages?.openDetails(it) },
             ),
             onShowInGuide = null,
-            channelPage = { entry, active, back -> page(entry.channelId, Modifier, false, active, back) },
+            channelPage = { entry, active, back ->
+                // Do not attach the same lazy lists to the outgoing full page and its new pane.
+                if (channelsLayout != ChannelsLayout.Wide) {
+                    val model = remember(entry) { openChannelModel.takeIf { entry == openChannel } }
+                    page(entry.channelId, Modifier, false, active, model, back)
+                }
+            },
             channelInPane = channelsLayout == ChannelsLayout.Wide,
         ) { top, modifier ->
             val active = top && LocalDestinationBackEnabled.current
@@ -98,10 +98,29 @@ internal fun ChannelsPageHost(
                     ),
                     lastWatchedId = lastWatchedId?.value?.toString(),
                     openChannelId = openChannel?.channelId,
-                    pane = { id, paneModifier -> page(id, paneModifier, true, active) {} },
+                    pane = { id, paneModifier ->
+                        val model = openChannelModel.takeIf { id == openChannel?.channelId }
+                        page(id, paneModifier, true, active, model) {}
+                    },
                     layout = channelsLayout,
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun PruneUnavailableChannel(
+    pages: ProgramPageStack,
+    openChannel: GuidePageKey.Channel,
+    scope: ChannelScopeState,
+) {
+    LaunchedEffect(pages, openChannel, scope) {
+        val id = openChannel.channelId
+        // A retained channel can leave a tag while offline; an unknown catalog cannot prove deletion.
+        val canPrune = scope.channelCatalogCurrent || scope.scope.allChannels.any { it.id.value.toString() == id }
+        if (canPrune && scope.scope.visibleChannels.none { it.id.value.toString() == id }) {
+            pages.removeChannel(openChannel)
         }
     }
 }

@@ -98,7 +98,7 @@ internal fun ProgramPageHost(
     val pages = pageStack.pages.filterNot { it == paneChannel }
     val readyPages = pages.filter { it !is GuidePageKey.Details || it in details }
     val stack = listOf(GuidePageKey.Browse) + readyPages
-    // Back cancels unmapped visits and closes what was actually shown, in one update.
+    // A pending visit takes the first Back; otherwise Back closes the visible page.
     val onBack = { pageStack.back(readyPages, paneChannel) }
     val destinationActive = LocalDestinationBackEnabled.current
     val canHandleBack = destinationActive && pages.isNotEmpty()
@@ -130,7 +130,7 @@ internal fun ProgramPageHost(
         val initial = (page as? GuidePageKey.Details)?.let(details::get)
         NavEntry(page) { render(page, initial) }
     }
-    // A change in pane count redraws the same channel; it is not a page push or pop.
+    // A live window resize can redraw the same channel without a page push or pop.
     var previousPaneMode by remember { mutableStateOf(channelInPane) }
     val redraw = remember(stack, channelInPane) { previousPaneMode != channelInPane }
     SideEffect { previousPaneMode = channelInPane }

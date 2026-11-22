@@ -75,7 +75,9 @@ internal class ChannelPageModel(
     private val mappingDispatcher: CoroutineDispatcher,
     private val channelId: ChannelId,
     initialDay: LocalDate?,
+    retainScroll: Boolean = false,
 ) : ViewModel() {
+    val scroll = if (retainScroll) ChannelScheduleScroll() else null
     private var day = initialDay
     private var input: ChannelPageInput? = null
     private var context: Context? = null

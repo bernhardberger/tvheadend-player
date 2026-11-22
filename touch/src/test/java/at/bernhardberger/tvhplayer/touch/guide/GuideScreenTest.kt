@@ -785,7 +785,7 @@ class GuideScreenTest {
 
     @Test
     @Config(qualifiers = TABLET, instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.common.TimeConverterKt"])
-    fun backClosesTheVisibleChannelAndCancelsItsUnmappedDetailsVisit() {
+    fun backCancelsUnmappedDetailsBeforeClosingTheVisibleChannel() {
         motionScale.scaleFactor = 0f
         val now = Instant.parse("2027-01-15T12:00:00Z")
         val worker = StandardTestDispatcher()
@@ -805,9 +805,11 @@ class GuideScreenTest {
             compose.onNodeWithText("Details").performClick()
             onNow.assertIsDisplayed()
             back()
-            head.assertIsDisplayed()
+            onNow.assertIsDisplayed()
             compose.waitForIdle()
             worker.scheduler.runCurrent()
+            onNow.assertIsDisplayed()
+            back()
             head.assertIsDisplayed()
         } finally {
             connection.close()
