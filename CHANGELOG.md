@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.5.5
+
+### Player
+
+- The channel at the top of the live player is larger, and wide logos such as ORF's no longer look tiny next to others. When you open the channel rows, the channel moves into the strip above them.
+- A recording says so at the top: *Recorded* with its date and time, or *Recording until* while it's still running, with the channel below.
+- *Skip to program start* appears with the first picture, inside the player's info. Before, it waited until the info had gone. It moves to the corner when the info hides. Ad break offers work the same way.
+- Opening the controls with Up or Down dismisses the skip offer. *Skip* stays in the controls.
+- Settings → Playback → Recording marks can turn off the *Skip to program start* offer.
+
+### Home and Channels
+
+- Continue watching, Expiring soon, New recordings and Upcoming recordings name the episode.
+- Recent channels show what's on now.
+- *Next* lines on Home, in Channels and in the player show the stacked clocks when a rule scheduled the recording, and the skipped mark when that recording is turned off.
+- Pages without a program picture take their tint from the channel logo.
+
 ## 0.5.4
 
 ### Browse and player
