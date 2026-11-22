@@ -6,7 +6,9 @@ import androidx.activity.compose.BackHandler
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -233,7 +235,11 @@ private fun FrameShell(
     val expanded = window.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND)
     val mediumOrWider = window.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND)
 
-    val bottomBar = !expanded && bars.navigation && destinations.size > 1
+    val hasBottomBar = !expanded && destinations.size > 1
+    val bottomBar = hasBottomBar && bars.navigation
+    val navigation = if (hasBottomBar) updateTransition(bottomBar, label = "Bottom navigation") else null
+    val barOccupiesSlot = bottomBar || navigation?.currentState == true || navigation?.isRunning == true
+    val effects = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
     val notices = LocalFrameNotices.current
     val browseMargin = if (mediumOrWider) WideBrowseMargin else CompactBrowseMargin
     Row(modifier.fillMaxSize()) {
@@ -244,14 +250,19 @@ private fun FrameShell(
                 CompositionLocalProvider(LocalBrowseMargin provides browseMargin) { top?.invoke() }
             },
             bottomBar = {
-                if (bottomBar) {
-                    DestinationBar(destinations, selected, mediumOrWider, select)
+                // Reserve the full bar on entry so a returning list doesn't lose its scroll position.
+                navigation?.AnimatedVisibility(
+                    visible = { it },
+                    enter = fadeIn(effects),
+                    exit = fadeOut(effects),
+                ) {
+                    DestinationBar(destinations, selected, mediumOrWider, bottomBar, select)
                 }
             },
             snackbarHost = {
                 // Above the bar, or above the system bar when a page takes the whole window; at the
                 // start beside the rail on wider windows, across on the phone.
-                val insets = if (!bars.top && !bottomBar) {
+                val insets = if (!bars.top && !barOccupiesSlot) {
                     Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
                 } else {
                     Modifier
@@ -366,6 +377,7 @@ private fun DestinationBar(
     destinations: List<Destination>,
     selected: Destination,
     medium: Boolean,
+    enabled: Boolean,
     onSelect: (Destination) -> Unit,
 ) {
     ShortNavigationBar(
@@ -374,6 +386,7 @@ private fun DestinationBar(
         destinations.forEach { destination ->
             ShortNavigationBarItem(
                 selected = destination == selected,
+                enabled = enabled,
                 onClick = { onSelect(destination) },
                 icon = { DestinationIcon(destination, selected) },
                 label = { Text(stringResource(destination.label)) },
