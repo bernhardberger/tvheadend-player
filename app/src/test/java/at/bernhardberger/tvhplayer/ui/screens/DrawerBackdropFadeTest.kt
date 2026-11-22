@@ -38,22 +38,25 @@ class DrawerBackdropFadeTest {
         val (channels, departure, guide, arrival) = moveBetweenChannelsAndGuide(ChannelId(1))
         val shown = distance(channels, guide, BehindDrawer)
         assertTrue("Channels shows its picture behind the drawer: $shown", shown > .03f)
-        assertFades("leaving Channels", departure, channels, guide)
-        assertFades("returning to Channels", arrival, guide, capture())
+        assertFades("leaving Channels", departure, channels, guide, BehindDrawer)
+        assertFades("returning to Channels", arrival, guide, capture(), BehindDrawer)
     }
 
     /**
-     * The Kettle Hour has no programme art, so Channels shows its logo on a glow from the top right,
-     * which leaves the page plain behind the drawer: no frame shows anything else there. The cards
-     * before it run on under the drawer and come and go with the page's cards.
+     * The Kettle Hour has no programme art: the logo's ambient tint fades with Channels, including
+     * behind the open drawer. The cards run under the drawer and come and go with the page's cards.
      */
-    @Test fun behindTheOpenDrawerTheLogoFallbackLeavesThePagePlain() {
+    @Test fun behindTheOpenDrawerTheLogoTintFadesWithItsPage() {
         val (channels, departure, guide, arrival) = moveBetweenChannelsAndGuide(ChannelId(6))
+        val shown = distance(channels, guide, AboveCards)
+        assertTrue("Channels shows its logo tint behind the drawer: $shown", shown > .03f)
+        assertFades("leaving Channels", departure, channels, guide, AboveCards)
+        assertFades("returning to Channels", arrival, guide, capture(), AboveCards)
         (listOf(channels) + departure + arrival).forEachIndexed { frame, it ->
-            val off = distance(it, guide, AboveCards)
-            assertTrue("frame $frame shows a picture behind the drawer: $off", off < .01f)
             val page = distance(it, guide, PageCards)
-            val behind = distance(it, guide, CardsBehindDrawer)
+            // Remove the tint at the same x before measuring under-drawer card contrast. The
+            // on-page reference still includes its backdrop, keeping the comparison conservative.
+            val behind = distance(it, guide, CardsBehindDrawer, above = 150)
             // Those cards are past the keyline, so they are muted and show no text.
             if (page > .05f) assertTrue("frame $frame: cards %.3f behind the drawer, %.3f on the page".format(behind, page),
                 behind > page * RowPastStartAlpha / 2)
@@ -84,9 +87,10 @@ class DrawerBackdropFadeTest {
 
     private data class Journey(val channels: Bitmap, val departure: List<Bitmap>, val guide: Bitmap, val arrival: List<Bitmap>)
 
-    /** Behind the drawer, the picture goes from [from] to [to] a little each frame, never in one step. */
-    private fun assertFades(name: String, frames: List<Bitmap>, from: Bitmap, to: Bitmap) {
-        val progress = listOf(0f) + frames.map { distance(it, from, BehindDrawer) / distance(to, from, BehindDrawer) }
+    /** In [region], the backdrop goes from [from] to [to] a little each frame, never in one step. */
+    private fun assertFades(name: String, frames: List<Bitmap>, from: Bitmap, to: Bitmap, region: Region) {
+        val change = distance(to, from, region)
+        val progress = listOf(0f) + frames.map { distance(it, from, region) / change }
         val log = progress.joinToString { "%.2f".format(it) }
         progress.zipWithNext().forEachIndexed { frame, (before, after) ->
             assertTrue("$name, frame ${frame + 1} jumps behind the drawer: $log", abs(after - before) < .35f)
@@ -125,15 +129,21 @@ class DrawerBackdropFadeTest {
         return bitmap
     }
 
-    /** Mean colour distance over [region], given as x range and y ranges. */
-    private fun distance(a: Bitmap, b: Bitmap, region: Region): Float {
+    /** Mean colour distance over [region], optionally minus each column's backdrop RGB shift. */
+    private fun distance(a: Bitmap, b: Bitmap, region: Region, above: Int? = null): Float {
         var sum = 0f
         var n = 0
-        for (ys in region.ys) for (y in ys step 4) for (x in region.xs step 4) {
-            val p = Color(a.getPixel(x - 200, y - 60))
-            val q = Color(b.getPixel(x - 200, y - 60))
-            sum += abs(p.red - q.red) + abs(p.green - q.green) + abs(p.blue - q.blue)
-            n++
+        for (x in region.xs step 4) {
+            val pBase = above?.let { Color(a.getPixel(x - 200, it - 60)) } ?: Color.Black
+            val qBase = above?.let { Color(b.getPixel(x - 200, it - 60)) } ?: Color.Black
+            for (ys in region.ys) for (y in ys step 4) {
+                val p = Color(a.getPixel(x - 200, y - 60))
+                val q = Color(b.getPixel(x - 200, y - 60))
+                sum += abs((p.red - q.red) - (pBase.red - qBase.red)) +
+                    abs((p.green - q.green) - (pBase.green - qBase.green)) +
+                    abs((p.blue - q.blue) - (pBase.blue - qBase.blue))
+                n++
+            }
         }
         return sum / n
     }

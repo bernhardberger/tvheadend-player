@@ -1089,11 +1089,12 @@ class ProgrammeDetailsPageTest {
             .fetchSemanticsNode().boundsInRoot.top
         val logoAtTop = logoTop()
         compose.onNodeWithTag("details-logo-glow", useUnmergedTree = true).assertExists()
-        val background = android.graphics.Color.rgb(19, 19, 19)
-        compose.mainClock.advanceTimeUntil { snapshot().let { it.getPixel(1910, 5).also { _ -> it.recycle() } } != background }
-        val top = snapshot()
+        compose.mainClock.advanceTimeUntil {
+            val frame = snapshot(settle = false)
+            (frame.getPixel(1910, 5) != frame.getPixel(5, 540)).also { frame.recycle() }
+        }
+        val top = snapshot(settle = false)
         // The glow is stronger at the top right than the ambient base toward the left.
-        Assert.assertNotEquals(background, top.getPixel(1910, 5))
         fun light(pixel: Int) = android.graphics.Color.red(pixel) + android.graphics.Color.green(pixel) + android.graphics.Color.blue(pixel)
         Assert.assertTrue(light(top.getPixel(1910, 5)) > light(top.getPixel(5, 540)) + 30)
         val glow = top.getPixel(1910, 5)
@@ -1109,6 +1110,7 @@ class ProgrammeDetailsPageTest {
         val edge = scrolled.getPixel(5, 540)
         scrolled.recycle()
         Assert.assertTrue("dimmer than the glow", light(corner) < light(glow))
+        val background = android.graphics.Color.rgb(19, 19, 19)
         Assert.assertTrue("tinted, not the plain background", corner != background)
         Assert.assertEquals("even", light(corner).toFloat(), light(edge).toFloat(), 3f)
     }
