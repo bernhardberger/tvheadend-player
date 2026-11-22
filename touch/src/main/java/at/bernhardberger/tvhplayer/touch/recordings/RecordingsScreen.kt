@@ -26,6 +26,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.window.core.layout.WindowSizeClass
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.ui.Destination
+import at.bernhardberger.tvhplayer.touch.ui.OnDestinationReselected
 import at.bernhardberger.tvhplayer.touch.ui.TouchFrame
 import kotlin.math.roundToInt
 import at.bernhardberger.tvhplayer.core.DvrArchiveView
@@ -75,6 +77,7 @@ internal fun RecordingsScreen(
     val pageItem = pickedItem?.takeIf { layout != RecordingsLayout.Wide }
     val page = pageItem != null
     val listed = state.listed
+    val browse = rememberSaveableStateHolder()
     LaunchedEffect(state.availability, levels, path, picked, pickedItem) {
         if (state.availability != RecordingsAvailability.Current) return@LaunchedEffect
         path = ArrayList(levels.drop(1).map { it.id })
@@ -83,8 +86,7 @@ internal fun RecordingsScreen(
 
     Box(modifier.fillMaxSize()) {
         TouchFrame(
-            initialDestination = Destination.Recordings,
-            destinations = destinations,
+            initialDestination = Destination.Recordings, destinations = destinations,
             showTopBar = { !(it == Destination.Recordings && page) },
             showNavigation = { !(it == Destination.Recordings && page && layout == RecordingsLayout.Phone) },
             lastActionIsIconOnly = layout.compact,
@@ -99,30 +101,30 @@ internal fun RecordingsScreen(
         ) { destination ->
             if (destination != Destination.Recordings) return@TouchFrame
             // Registered after the frame's own handler, so a page or a folder level takes Back first.
-            BackHandler(enabled = page) { picked = null }
+            val closeDetails = { picked = null }
+            BackHandler(enabled = page, onBack = closeDetails)
             BackHandler(enabled = !page && levels.size > 1) { path = ArrayList(path.take(levels.size - 2)) }
             if (!listed) {
                 RecordingsStandIn(state.availability, layout, actions)
             } else if (pageItem != null) {
-                RecordingPage(pageItem, state.clock, layout, actions) { picked = null }
+                OnDestinationReselected(Destination.Recordings) { closeDetails() }
+                RecordingPage(pageItem, state.clock, layout, actions, closeDetails)
             } else {
-                Browse(
-                    state = state, levels = levels, layout = layout,
-                    picked = pickedItem, actions = actions,
-                    onOpen = { path = ArrayList(levels.drop(1).map { it.id } + it) },
-                    onUp = { path = ArrayList(path.take(levels.size - 2)) },
-                    onPick = { picked = it },
-                )
+                browse.SaveableStateProvider("RecordingsBrowse") {
+                    Browse(
+                        state, levels, layout, pickedItem, actions,
+                        onOpen = { path = ArrayList(levels.drop(1).map { it.id } + it) },
+                        onUp = { path = ArrayList(path.take(levels.size - 2)) },
+                        onPick = { picked = it },
+                    )
+                }
             }
         }
         sheet?.let { current ->
             ViewOptionsSheet(
-                page = current,
-                view = state.view,
+                page = current, view = state.view,
                 side = layout != RecordingsLayout.Phone,
-                onPage = { sheet = it },
-                onView = actions.onView,
-                onClose = { sheet = null },
+                onPage = { sheet = it }, onView = actions.onView, onClose = { sheet = null },
             )
         }
     }

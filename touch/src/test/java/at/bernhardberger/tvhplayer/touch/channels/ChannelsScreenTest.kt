@@ -10,6 +10,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import at.bernhardberger.tvhplayer.touch.ui.Destination
+import at.bernhardberger.tvhplayer.touch.ui.LocalDestinationReselections
+import kotlinx.coroutines.flow.MutableSharedFlow
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
@@ -227,9 +230,16 @@ class ChannelsScreenTest {
         val list = channelsFixture()
         val channels = mutableStateOf(list)
         val visible = mutableStateOf(true)
-        showKeptChannels(channels, visible)
+        val taps = MutableSharedFlow<Destination>(extraBufferCapacity = 1)
+        showKeptChannels(channels, visible, taps)
         val rows = compose.onNode(hasScrollToIndexAction())
         val first = compose.onNodeWithText(list.rows.first().name)
+        compose.onNodeWithContentDescription("Show programs on Amber Stage").performClick()
+        rows.performScrollToIndex(8)
+        first.assertIsNotDisplayed()
+        compose.runOnIdle { check(taps.tryEmit(Destination.Channels)) }
+        first.assertIsDisplayed()
+        compose.onNodeWithContentDescription("Hide programs on Amber Stage").assertIsDisplayed().performClick()
         rows.performScrollToIndex(8)
         first.assertIsNotDisplayed()
 
@@ -257,13 +267,16 @@ class ChannelsScreenTest {
     private fun showKeptChannels(
         channels: State<ChannelList>,
         visible: State<Boolean>,
+        taps: MutableSharedFlow<Destination> = MutableSharedFlow(),
     ) {
         compose.setContent {
             val holder = rememberSaveableStateHolder()
             MaterialTheme(colorScheme = MobileDarkColors) {
                 if (visible.value) {
                     holder.SaveableStateProvider("Channels") {
-                        ChannelsScreen(ChannelsState.Ready(channels.value), fixtureActions())
+                        CompositionLocalProvider(LocalDestinationReselections provides taps) {
+                            ChannelsScreen(ChannelsState.Ready(channels.value), fixtureActions())
+                        }
                     }
                 }
             }

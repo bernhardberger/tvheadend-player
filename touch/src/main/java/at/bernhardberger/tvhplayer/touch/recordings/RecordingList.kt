@@ -3,6 +3,10 @@
 
 package at.bernhardberger.tvhplayer.touch.recordings
 
+import androidx.compose.foundation.lazy.rememberLazyListState
+import at.bernhardberger.tvhplayer.touch.ui.Destination
+import at.bernhardberger.tvhplayer.touch.ui.ScrollToStartOnReselect
+
 import at.bernhardberger.tvhplayer.touch.ui.PlayingBars
 import at.bernhardberger.tvhplayer.touch.ui.playingContainerColor
 import at.bernhardberger.tvhplayer.touch.ui.watchedProgressColor
@@ -82,9 +86,11 @@ internal fun RecordingList(
     modifier: Modifier = Modifier,
     highlightPlaying: Boolean = false,
 ) {
+    val list = rememberLazyListState()
+    list.ScrollToStartOnReselect(Destination.Recordings)
     Column(modifier.fillMaxSize()) {
         head()
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
+        LazyColumn(Modifier.fillMaxSize(), state = list, contentPadding = PaddingValues(bottom = 16.dp)) {
             if (level.folders.isNotEmpty()) {
                 group(level.folders, key = { "folder:${it.id}" }) { folder, index, count ->
                     FolderRow(folder, index, count) { onOpen(folder.id) }

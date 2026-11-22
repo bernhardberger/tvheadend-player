@@ -4,6 +4,9 @@
 
 package at.bernhardberger.tvhplayer.touch.guide
 
+import at.bernhardberger.tvhplayer.touch.ui.Destination
+import at.bernhardberger.tvhplayer.touch.ui.ScrollToStartOnReselect
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -122,8 +125,10 @@ internal fun OverviewColumns(
     contentPadding: PaddingValues,
 ) {
     val width = if (layout == GuideLayout.Wide) 264.dp else 232.dp
+    val list = rememberOverviewListState(channels, actions.onOverviewViewport)
+    list.ScrollToStartOnReselect(Destination.Guide)
     LazyRow(
-        Modifier.fillMaxSize(), state = rememberOverviewListState(channels, actions.onOverviewViewport),
+        Modifier.fillMaxSize(), state = list,
         contentPadding = contentPadding,
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
@@ -312,8 +317,10 @@ internal fun OverviewRows(
     contentPadding: PaddingValues,
 ) {
     val rows = remember(channels) { channels.filter { it.programs.isNotEmpty() || it.overviewHasLead } }
+    val list = rememberOverviewListState(rows, actions.onOverviewViewport)
+    list.ScrollToStartOnReselect(Destination.Guide)
     LazyColumn(
-        Modifier.fillMaxSize(), state = rememberOverviewListState(rows, actions.onOverviewViewport),
+        Modifier.fillMaxSize(), state = list,
         contentPadding = contentPadding,
         verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
     ) {

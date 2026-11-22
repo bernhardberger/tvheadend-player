@@ -37,12 +37,14 @@ import androidx.compose.material3.SecondaryScrollableTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -59,10 +61,14 @@ import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.channels.ChannelActionLabel
 import at.bernhardberger.tvhplayer.touch.ui.channelLogoSlot
 import at.bernhardberger.tvhplayer.touch.ui.Destination
+import at.bernhardberger.tvhplayer.touch.ui.LocalDestinationReselections
 import at.bernhardberger.tvhplayer.touch.ui.ListMessage
 import at.bernhardberger.tvhplayer.touch.ui.MessageKind
+import at.bernhardberger.tvhplayer.touch.ui.OnDestinationReselected
+import at.bernhardberger.tvhplayer.touch.ui.ScrollToStartOnReselect
 import at.bernhardberger.tvhplayer.touch.ui.TouchFrame
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 
@@ -87,6 +93,7 @@ internal fun GuideScreen(
     val (openId, onOpen) = rememberOpenedGuideRow(state, view, channel, dayIndex, initiallyOpen)
     val details = state.details
     val page = details != null
+    val browse = rememberSaveableStateHolder()
 
     TouchFrame(
         modifier = modifier,
@@ -107,14 +114,18 @@ internal fun GuideScreen(
             return@TouchFrame
         }
         // Registered after the frame's own handler, so the page and an opened program take Back first.
-        BackHandler(enabled = page) { actions.onDetails(null) }
+        val closeDetails = { actions.onDetails(null) }
+        BackHandler(enabled = page, onBack = closeDetails)
         BackHandler(enabled = !page && openId != null) { onOpen(null) }
         if (details != null) {
-            ProgramDetailsPage(details, layout, actions) { actions.onDetails(null) }
+            OnDestinationReselected(Destination.Guide) { closeDetails() }
+            ProgramDetailsPage(details, layout, actions, closeDetails)
             return@TouchFrame
         }
-        GuideList(state, layout, actions) {
-            GuidePages(state, layout, view, channel, dayIndex, openId, onOpen, actions)
+        browse.SaveableStateProvider("GuideBrowse") {
+            GuideList(state, layout, actions) {
+                GuidePages(state, layout, view, channel, dayIndex, openId, onOpen, actions)
+            }
         }
     }
 }
@@ -179,18 +190,31 @@ private fun GuidePages(
 ) {
     val pager = rememberGuidePager(GuideView.entries, view.ordinal)
     HorizontalPager(pager, Modifier.fillMaxSize(), userScrollEnabled = false) { index ->
-        when (GuideView.entries[index]) {
-            GuideView.Overview -> Overview(
-                state, layout, openId.takeIf { view == GuideView.Overview }, onOpen, actions, actions.onDetails,
-                actions.onChannel,
-            )
-            GuideView.ByChannel -> if (channel != null) {
-                ByChannel(
-                    state, layout, channel, dayIndex, openId.takeIf { view == GuideView.ByChannel }, onOpen, actions,
+        GuidePageReselection(enabled = index == view.ordinal) {
+            when (GuideView.entries[index]) {
+                GuideView.Overview -> Overview(
+                    state, layout, openId.takeIf { view == GuideView.Overview }, onOpen, actions, actions.onDetails,
+                    actions.onChannel,
                 )
+                GuideView.ByChannel -> if (channel != null) {
+                    ByChannel(
+                        state, layout, channel, dayIndex, openId.takeIf { view == GuideView.ByChannel },
+                        onOpen, actions,
+                    )
+                }
             }
         }
     }
+}
+
+// Pagers can compose neighbors; only the chosen tab, channel, or day should consume a tap.
+@Composable
+private fun GuidePageReselection(enabled: Boolean, content: @Composable () -> Unit) {
+    val taps = LocalDestinationReselections.current
+    CompositionLocalProvider(
+        LocalDestinationReselections provides if (enabled) taps else emptyFlow(),
+        content = content,
+    )
 }
 
 /** The listed Guide: the offline line above saved content, and Channels' empty forms without channels. */
@@ -300,10 +324,12 @@ private fun ByChannel(
                 val page = state.channels[index]
                 val programs = state.dayProgramsFor(page, dayIndex)
                     .takeIf { page.id == channel.id || state.retainedDays == null }
-                Day(
-                    page, programs, state.dayLoading, layout,
-                    openId.takeIf { page.id == channel.id }, onOpen, actions, Modifier.padding(horizontal = 12.dp),
-                )
+                GuidePageReselection(enabled = page.id == channel.id) {
+                    Day(
+                        page, programs, state.dayLoading, layout,
+                        openId.takeIf { page.id == channel.id }, onOpen, actions, Modifier.padding(horizontal = 12.dp),
+                    )
+                }
             }
         }
         return
@@ -330,10 +356,12 @@ private fun ByChannel(
             val keys = state.dayDates.ifEmpty { state.days }
             val pager = rememberGuidePager(keys, dayIndex, actions.onDay)
             HorizontalPager(pager, Modifier.fillMaxSize(), key = { keys[it] }) { index ->
-                Day(
-                    channel, state.dayProgramsFor(channel, index), state.dayLoading, layout,
-                    openId.takeIf { index == dayIndex }, onOpen, actions, Modifier.padding(top = 12.dp),
-                )
+                GuidePageReselection(enabled = index == dayIndex) {
+                    Day(
+                        channel, state.dayProgramsFor(channel, index), state.dayLoading, layout,
+                        openId.takeIf { index == dayIndex }, onOpen, actions, Modifier.padding(top = 12.dp),
+                    )
+                }
             }
         }
     }
@@ -384,9 +412,11 @@ private fun Day(
         if (programs == null || loading) DayLoading() else NoSchedule(watch?.let { { it(channel.id) } })
         return
     }
+    val list = rememberLazyListState()
+    list.ScrollToStartOnReselect(Destination.Guide)
     ChannelDay(
         programs, openId, onOpen, layout, actions, actions.onDetails, modifier.fillMaxSize(),
-        listState = rememberLazyListState(),
+        listState = list,
     )
 }
 
@@ -424,6 +454,7 @@ private fun ChannelList(
     val listState = rememberLazyListState(
         initialFirstVisibleItemIndex = (channels.indexOfFirst { it.id == selectedId } - VISIBLE_ABOVE).coerceAtLeast(0),
     )
+    listState.ScrollToStartOnReselect(Destination.Guide)
     LazyColumn(
         modifier, state = listState, contentPadding = PaddingValues(bottom = 16.dp),
         verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),

@@ -8,6 +8,7 @@ import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
@@ -17,6 +18,8 @@ import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasProgressBarRangeInfo
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.hasScrollToIndexAction
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.isDisplayed
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -25,6 +28,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
 import androidx.compose.ui.text.TextLayoutResult
@@ -52,6 +56,7 @@ import at.bernhardberger.tvhplayer.touch.ui.DvrControls
 import at.bernhardberger.tvhplayer.touch.ui.ProgramRecordControl
 import at.bernhardberger.tvhplayer.touch.ui.RuleSchedule
 import at.bernhardberger.tvhplayer.touch.ui.Destination
+import at.bernhardberger.tvhplayer.touch.ui.LocalDestinationReselections
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -74,6 +79,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -487,6 +493,33 @@ class GuideScreenTest {
     }
 
     @Test
+    @Config(qualifiers = "en-rUS-w412dp-h558dp-port-xhdpi")
+    fun reselectingGuideReturnsFromDetailsBeforeScrollingTheSelectedDay() {
+        val taps = MutableSharedFlow<Destination>(extraBufferCapacity = 1)
+        val fixture = byChannelFixture(phone = true)
+        val channel = fixture.channels.first()
+        val program = channel.programs[4]
+        show(
+            fixture.copy(details = glassHarborDetails().copy(id = program.id)),
+            view = GuideView.ByChannel, channel = channel.id, taps = taps,
+        )
+        val list = compose.onNode(
+            hasScrollToIndexAction() and SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange),
+        )
+        list.performScrollToIndex(4)
+        fun position() = list.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
+        compose.onNodeWithText(program.title).performClick()
+        val scrolled = position()
+        assertTrue(scrolled > 0f)
+        compose.onNodeWithText("Details").performClick()
+        compose.runOnIdle { check(taps.tryEmit(Destination.Guide)) }
+        compose.onNodeWithText("By channel").assertIsSelected()
+        assertEquals(scrolled, position(), 0f)
+        compose.runOnIdle { check(taps.tryEmit(Destination.Guide)) }
+        assertEquals(0f, position(), 0f)
+    }
+
+    @Test
     @Config(qualifiers = PHONE, instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.common.TimeConverterKt"])
     fun aMissingProgramClosesDetailsWithoutReopeningOnASubsequentPublication() {
         val connection = FakeConnection()
@@ -862,6 +895,7 @@ class GuideScreenTest {
         channel: String? = null,
         open: String? = null,
         detailsId: String? = null,
+        taps: MutableSharedFlow<Destination> = MutableSharedFlow(),
         state: () -> GuideState = { fixture },
         over: @Composable () -> Unit = {},
     ) {
@@ -892,13 +926,15 @@ class GuideScreenTest {
         compose.setContent {
             MaterialTheme(colorScheme = MobileDarkColors) {
                 val current = state()
-                GuideScreen(
-                    current.copy(
-                        details = current.details?.takeIf { it.id == shownDetailsId },
-                        selectedDay = selectedDay ?: current.selectedDay,
-                    ), actions,
-                    view = selectedView, channelId = selectedChannel, initiallyOpen = open,
-                )
+                CompositionLocalProvider(LocalDestinationReselections provides taps) {
+                    GuideScreen(
+                        current.copy(
+                            details = current.details?.takeIf { it.id == shownDetailsId },
+                            selectedDay = selectedDay ?: current.selectedDay,
+                        ), actions,
+                        view = selectedView, channelId = selectedChannel, initiallyOpen = open,
+                    )
+                }
                 over()
             }
         }

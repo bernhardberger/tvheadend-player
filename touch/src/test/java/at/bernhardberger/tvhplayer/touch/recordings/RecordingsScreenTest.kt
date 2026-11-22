@@ -33,6 +33,7 @@ import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -41,6 +42,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.TextLayoutResult
@@ -54,12 +56,15 @@ import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouch
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouchWindows
 import at.bernhardberger.tvhplayer.touch.ui.DvrChangeDialog
+import at.bernhardberger.tvhplayer.touch.ui.Destination
+import at.bernhardberger.tvhplayer.touch.ui.LocalDestinationReselections
 import at.bernhardberger.tvhplayer.touch.ui.RecordingRemoveControl
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import at.bernhardberger.tvhplayer.ui.MobileDarkColors
 import java.io.File
+import kotlinx.coroutines.flow.MutableSharedFlow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -345,6 +350,27 @@ class RecordingsScreenTest {
     }
 
     @Test
+    @Config(qualifiers = "en-rUS-w412dp-h558dp-port-xhdpi")
+    fun reselectingRecordingsReturnsFromDetailsBeforeScrollingTheOpenFolder() {
+        val taps = MutableSharedFlow<Destination>(extraBufferCapacity = 1)
+        state.value = foldersFixture()
+        show(initialPath = WeekPath, taps = taps)
+        val list = compose.onNode(hasScrollToIndexAction())
+        list.performScrollToIndex(3)
+        fun position() = list.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
+        val scrolled = position()
+        assertTrue(scrolled > 0f)
+        pickTheHalfWatchedMatch()
+        compose.onNodeWithText("Week 46").assertDoesNotExist()
+        compose.runOnIdle { check(taps.tryEmit(Destination.Recordings)) }
+        compose.onNodeWithText("Week 46").assertIsDisplayed()
+        assertEquals(scrolled, position(), 0f)
+        compose.runOnIdle { check(taps.tryEmit(Destination.Recordings)) }
+        assertEquals(0f, position(), 0f)
+        compose.onNodeWithText("Week 46").assertIsDisplayed()
+    }
+
+    @Test
     @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
     fun phoneDetailsStacksPlayingActionsAtLargerFontScale() {
         state.value = foldersFixture().withPlayingRecording()
@@ -448,7 +474,11 @@ class RecordingsScreenTest {
         }
     }
 
-    private fun show(initialPath: List<String> = emptyList(), fontScale: Float? = null) {
+    private fun show(
+        initialPath: List<String> = emptyList(),
+        fontScale: Float? = null,
+        taps: MutableSharedFlow<Destination> = MutableSharedFlow(),
+    ) {
         val actions = RecordingsActions(
             onView = { view ->
                 val regrouped = if (view.grouping == DvrArchiveGrouping.FOLDERS) foldersFixture() else flatFixture()
@@ -462,7 +492,10 @@ class RecordingsScreenTest {
         compose.setContent {
             MaterialTheme(colorScheme = MobileDarkColors) {
                 val density = LocalDensity.current
-                CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale ?: density.fontScale)) {
+                CompositionLocalProvider(
+                    LocalDensity provides Density(density.density, fontScale ?: density.fontScale),
+                    LocalDestinationReselections provides taps,
+                ) {
                     RecordingsScreen(state.value, actions, initialPath = initialPath)
                 }
                 if (asking) {

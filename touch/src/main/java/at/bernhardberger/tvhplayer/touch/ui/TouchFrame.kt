@@ -11,6 +11,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -45,10 +46,12 @@ import androidx.compose.material3.WideNavigationRail
 import androidx.compose.material3.WideNavigationRailItem
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -57,6 +60,7 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -65,9 +69,12 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.window.core.layout.WindowSizeClass
 import at.bernhardberger.tvhplayer.touch.R
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
 
@@ -88,6 +95,25 @@ private val LocalReportFrameBars = staticCompositionLocalOf<((FrameBars) -> Unit
 
 /** The shown page may collect taps on its already selected destination; events are not replayed. */
 internal val LocalDestinationReselections = staticCompositionLocalOf<Flow<Destination>> { emptyFlow() }
+
+@Composable
+internal fun OnDestinationReselected(destination: Destination, action: suspend () -> Unit) {
+    val taps = LocalDestinationReselections.current
+    val latestAction by rememberUpdatedState(action)
+    LaunchedEffect(taps, destination) {
+        taps.filter { it == destination }.collectLatest { latestAction() }
+    }
+}
+
+@Composable
+internal fun LazyListState.ScrollToStartOnReselect(destination: Destination) {
+    OnDestinationReselected(destination) {
+        if (firstVisibleItemIndex != 0 || firstVisibleItemScrollOffset != 0) {
+            if (currentCoroutineContext()[MotionDurationScale]?.scaleFactor == 0f) scrollToItem(0)
+            else animateScrollToItem(0)
+        }
+    }
+}
 
 // AnimatedContent's default fade timings; the theme's spring effects have no fixed delay.
 private const val DESTINATION_EXIT_MILLIS = 90
