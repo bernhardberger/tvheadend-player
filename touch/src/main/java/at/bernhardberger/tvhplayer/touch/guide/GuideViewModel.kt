@@ -239,7 +239,7 @@ internal data class GuideMappingResult(
         if (cached?.canReuseRows(next, date) == true) return cached.rows
         return rows.takeIf {
             input.scope.profileId == next.scope.profileId &&
-                input.clock == next.clock && input.configuration == next.configuration &&
+                input.clock.zone == next.clock.zone && input.configuration == next.configuration &&
                 input.uses24Hour == next.uses24Hour && input.artwork === next.artwork &&
                 input.playingId == next.playingId
         }
@@ -256,7 +256,7 @@ internal data class GuideCachedDay(
     private val artwork: ArtworkModels?,
 ) {
     fun canReuseRows(next: GuideMappingInput, date: LocalDate): Boolean =
-        clock.zone == next.clock.zone && (clock == next.clock || date > next.clock.today) &&
+        clock.zone == next.clock.zone && date >= next.clock.today &&
             playingId == next.playingId && configuration == next.configuration &&
             uses24Hour == next.uses24Hour && artwork === next.artwork
 }

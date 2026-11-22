@@ -152,11 +152,35 @@ class GuideMappingTest {
         assertEquals(1, nextDvrRows.formattedCount)
     }
 
+    @Test
+    fun anOverviewTickRefreshesProgressWithoutFormattingProgrammesAgain() {
+        val channels = listOf(guide.first, guide.second)
+        val first = GuideOverviewRows()
+        val before = overview(channels, guide.snapshot.events, first)
+        val tickText = GuideTexts(
+            texts.clock, { _, _ -> error("Clock tick reformatted programme text") },
+            texts.duration, texts.day, texts.date, texts.airing, texts.number, texts.episode, texts.genre,
+            texts.firstAired, texts.count, texts.broadcast,
+        )
+        val next = GuideOverviewRows(previous = first)
+        val after = overview(channels, guide.snapshot.events, next, at = clock.copy(nowSec = NOW + 60), labels = tickText)
+        assertEquals("29m", after.channels[0].programs.first().timeLeft)
+        assertSame(before.channels[0].programs[1], after.channels[0].programs[1])
+        assertSame(before.channels[1], after.channels[1])
+        val boundary = overview(
+            channels, guide.snapshot.events, GuideOverviewRows(previous = next),
+            at = clock.copy(nowSec = NOW + 30 * 60), labels = tickText,
+        )
+        assertEquals("Weather", boundary.channels[0].programs.first().title)
+        assertEquals(0f, boundary.channels[0].programs.first().progress)
+    }
+
     private fun overview(
         channels: List<Channel>, events: List<EpgEvent>, rows: GuideOverviewRows, dvr: DvrSnapshot = guide.dvr,
+        at: GuideClock = clock, labels: GuideTexts = texts,
     ) = guideState(
         scope(channels, channels, tagged = false, loaded = true), ConnectionUiState.Ready, false,
-        observation(EpgSnapshot.create(events), dvr), GuideSelection(), false, clock, texts, overviewRows = rows,
+        observation(EpgSnapshot.create(events), dvr), GuideSelection(), false, at, labels, overviewRows = rows,
     )
 
     @Test

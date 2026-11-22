@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.touch.guide
 
+import at.bernhardberger.tvheadend.sdk.core.Channel
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvhplayer.core.programmeArtwork
@@ -46,22 +48,72 @@ internal class GuideOverviewRows(
     previous: GuideOverviewRows? = null,
 ) {
     private val previousRows = previous?.mapped.orEmpty()
-    private val mapped = mutableMapOf<GuideOverviewRowKey, GuideChannel>()
+    private val previousSchedule = previous?.schedule
+    private val mapped = mutableMapOf<String, Pair<GuideOverviewRowKey, GuideChannel>>()
+    private var schedule: GuideSchedule? = null
     var formattedCount = 0
         private set
 
     fun includes(index: Int, phoneIndex: Int?, id: String): Boolean =
         index < FIRST_GUIDE_ROWS || (phoneIndex != null && phoneIndex < FIRST_GUIDE_ROWS) || id in viewport
 
-    fun marksUnchanged(input: GuideMappingInput): Boolean = mapped.keys.all { key ->
+    fun schedule(channels: List<Channel>, events: List<EpgEvent>, clock: GuideClock): GuideSchedule =
+        (previousSchedule?.takeIf { it.matches(channels, events, clock) }
+            ?: GuideSchedule(channels, events, clock)).also { schedule = it }
+
+    fun marksUnchanged(input: GuideMappingInput): Boolean = mapped.values.all { (key, _) ->
         key.marks.all { (event, marks) ->
             input.observation.overviewMarks(event, input.clock.nowSec, input.artwork) == marks
         }
     }
 
-    fun getOrMap(key: GuideOverviewRowKey, format: () -> GuideChannel): GuideChannel {
-        val row = previousRows[key] ?: format().also { formattedCount++ }
-        mapped[key] = row
+    fun getOrMap(
+        key: GuideOverviewRowKey,
+        gapText: (Long) -> String,
+        format: (EpgEvent, GuideProgram?) -> GuideProgram,
+    ): GuideChannel {
+        val (oldKey, oldRow) = previousRows[key.head.id] ?: (null to null)
+        val oldEvents = oldKey?.marks?.keys.orEmpty().associateBy { it.id }
+        val oldPrograms = oldRow?.let { row ->
+            (row.programs + row.day.orEmpty()).associateBy { it.id }
+        }.orEmpty()
+        var formatted = false
+        fun program(event: EpgEvent): GuideProgram {
+            val existing = oldPrograms[event.id.value.toString()].takeIf { oldEvents[event.id] == event }
+            if (existing == null) formatted = true
+            return format(event, existing)
+        }
+        val day = key.day?.associate { it.id to program(it) }
+        val newRow = key.head.copy(
+            programs = key.overview.map { day?.get(it.id) ?: program(it) },
+            gap = key.gap?.let { (start, stop) ->
+                if (key.gap == oldKey?.gap) oldRow?.gap else GuideGap(gapText(start), gapText(stop))
+            },
+            day = day?.values?.toList(),
+        )
+        if (formatted || (key != oldKey && newRow != oldRow)) formattedCount++
+        val row = oldRow?.takeIf { it == newRow } ?: newRow
+        mapped[key.head.id] = key to row
         return row
     }
+}
+
+/** Reuse the same epoch index on viewport and clock passes until the EPG, scope or local day changes. */
+internal class GuideSchedule(
+    private val channels: List<Channel>,
+    private val events: List<EpgEvent>,
+    clock: GuideClock,
+) {
+    private val zone = clock.zone
+    private val date = clock.today
+    private val ids = channels.mapTo(HashSet()) { it.id }
+    val byChannel: Map<ChannelId?, List<EpgEvent>> = events.asSequence()
+        .filter { it.channelId in ids && it.stop > it.start }
+        .distinctBy { it.id }
+        .sortedBy { it.start }
+        .groupBy { it.channelId }
+    val days = guideDays(byChannel.values.flatten(), clock)
+
+    fun matches(channels: List<Channel>, events: List<EpgEvent>, clock: GuideClock): Boolean =
+        this.channels === channels && this.events === events && zone == clock.zone && date == clock.today
 }
