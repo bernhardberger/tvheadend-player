@@ -3,6 +3,7 @@ package at.bernhardberger.tvhplayer.touch.testutil
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.lifecycle.SavedStateHandle
 import at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileId
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileListResult
@@ -107,7 +108,8 @@ internal class FakeConnection(
     }
 
     /** The Guide on the test looper, for both coverage and mapped state. */
-    fun guide() = GuideViewModel(session, EmptyCoroutineContext, mappingDispatcher = Dispatchers.Main.immediate)
+    fun guide(savedState: SavedStateHandle = SavedStateHandle()) =
+        GuideViewModel(session, savedState, EmptyCoroutineContext, mappingDispatcher = Dispatchers.Main.immediate)
 
     fun close() = scope.cancel()
 }

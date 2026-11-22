@@ -186,7 +186,7 @@ val touchModule = module {
         ViewModelProvider.create(get<ViewModelStore>(Channels), factory)[ChannelsViewModel::class]
     }
     viewModel { RecordingsViewModel(session = get()) }
-    viewModel { GuideViewModel(session = get()) }
+    viewModel { GuideViewModel(session = get(), savedState = get()) }
 
     // The TV's loader (AppModule): server artwork with the session, remote logos through the shared cache.
     single { RemoteLogoCache(androidContext(), onClear = DetailsArtColors::clear) }

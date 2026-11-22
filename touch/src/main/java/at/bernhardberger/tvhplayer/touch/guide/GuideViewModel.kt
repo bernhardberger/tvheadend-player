@@ -2,6 +2,9 @@ package at.bernhardberger.tvhplayer.touch.guide
 
 import android.content.Context
 import android.content.res.Configuration
+import android.os.Bundle
+import androidx.core.os.bundleOf
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
@@ -39,11 +42,20 @@ import kotlin.time.Instant
  */
 internal class GuideViewModel(
     private val session: TvheadendSession,
+    savedState: SavedStateHandle,
     private val acquisitionContext: CoroutineContext = Dispatchers.Default,
     private val mappingDispatcher: CoroutineDispatcher = Dispatchers.Default.limitedParallelism(1),
 ) : ViewModel() {
     val observation: StateFlow<SessionObservation> = session.observation
-    private val mutableSelection = MutableStateFlow(GuideSelection())
+    private val mutableSelection = MutableStateFlow(
+        savedState.get<Bundle>(SELECTION_STATE).let { saved ->
+            GuideSelection(
+                day = saved?.getString("day")?.let(LocalDate::parse),
+                channelId = saved?.getString("channel"),
+                view = saved?.getString("view")?.let(GuideView::valueOf) ?: GuideView.Overview,
+            )
+        },
+    )
     val selection: StateFlow<GuideSelection> = mutableSelection.asStateFlow()
     private val mutablePending = MutableStateFlow(0L)
 
@@ -60,6 +72,11 @@ internal class GuideViewModel(
     private var mappingJob: Job? = null
 
     init {
+        // Save the latest browse position, not the transient jump or open Details.
+        savedState.setSavedStateProvider(SELECTION_STATE) {
+            val current = selection.value
+            bundleOf("day" to current.day?.toString(), "channel" to current.channelId, "view" to current.view.name)
+        }
         viewModelScope.launch {
             observation.collect { updateCoverageSession(it.currentSession?.generationIdentity) }
         }
@@ -187,6 +204,10 @@ internal class GuideViewModel(
 
     override fun onCleared() {
         requests.dispose()
+    }
+
+    private companion object {
+        const val SELECTION_STATE = "guideSelection"
     }
 }
 

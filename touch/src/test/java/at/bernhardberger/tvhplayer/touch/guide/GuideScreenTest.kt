@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.touch.guide
 
 import android.content.pm.ApplicationInfo
+import android.os.Bundle
 import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.compose.material3.MaterialTheme
@@ -37,7 +38,12 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
+import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.createSavedStateHandle
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.compose.runtime.CompositionLocalProvider
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
@@ -68,6 +74,7 @@ import at.bernhardberger.tvhplayer.ui.MobileDarkColors
 import at.bernhardberger.tvhplayer.ui.screens.recordings.StopConfirmationTimes
 import at.bernhardberger.tvhplayer.ui.screens.recordings.stopConfirmationSentence
 import java.util.TimeZone
+import java.time.ZoneId
 import java.time.ZoneOffset
 import android.content.res.Configuration
 import at.bernhardberger.tvhplayer.ui.common.AppClock
@@ -94,6 +101,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
@@ -849,6 +857,63 @@ class GuideScreenTest {
 
     @Test
     @Config(instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.common.TimeConverterKt"])
+    fun guideRestoresItsPlaceAndLetsAnExpiredDayFallBackToToday() {
+        val connection = FakeConnection()
+        val now = Instant.parse("2027-01-15T12:00:00Z")
+        val fixture = ServerGuide(now)
+        val yesterday = GuideClock(now.epochSeconds, ZoneId.systemDefault()).today.minusDays(1)
+        val channelId = fixture.second.id.value.toString()
+        val factory = viewModelFactory {
+            initializer { connection.guide(createSavedStateHandle()) }
+        }
+        try {
+            val savedState = Bundle()
+            Robolectric.buildActivity(ComponentActivity::class.java).create().use { original ->
+                val guide = ViewModelProvider.create(original.get(), factory)[GuideViewModel::class]
+                guide.selectPage(GuideView.ByChannel, channelId)
+                guide.selectDay(yesterday)
+                guide.selectJump(1L)
+                guide.openDetails(fixture.snapshot.events.first().id.value.toString())
+                original.saveInstanceState(savedState)
+            }
+            Robolectric.buildActivity(ComponentActivity::class.java).create(savedState).use { restored ->
+                val guide = ViewModelProvider.create(restored.get(), factory)[GuideViewModel::class]
+                assertEquals(
+                    "A fresh Guide restores the tab, day and channel, but not the jump or Details",
+                    GuideSelection(view = GuideView.ByChannel, day = yesterday, channelId = channelId),
+                    guide.selection.value,
+                )
+                assertTrue(SystemClock.setCurrentTimeMillis(now.toEpochMilliseconds()))
+                connection.session.publish(fixture.connected())
+                val channels = connection.channels()
+                val presentation = connection.presentation()
+                compose.setContent {
+                    MaterialTheme(colorScheme = MobileDarkColors) {
+                        val dvr = viewModel { DvrControls(connection.session, connection.noticeCenter) }
+                        GuideDestination(
+                            guide, channels, presentation, listOf(Destination.Guide), playingId = null,
+                            onWatch = null, dvr = dvr, onOpenConnections = {}, onSignIn = {},
+                        )
+                    }
+                }
+                compose.onNodeWithText("By channel").assertIsSelected()
+                compose.onNodeWithText("Channel Two").assertIsSelected()
+                compose.onNodeWithText("Today").assertIsDisplayed()
+                compose.runOnIdle {
+                    assertEquals(
+                        "Only the expired day is forgotten",
+                        GuideSelection(view = GuideView.ByChannel, channelId = channelId),
+                        guide.selection.value,
+                    )
+                }
+            }
+        } finally {
+            connection.close()
+        }
+    }
+
+    @Test
+    @Config(instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.common.TimeConverterKt"])
     fun returningToGuideShowsTheLastMappingWithoutDoingItAgain() {
         val connection = FakeConnection()
         val noon = Instant.parse("2027-01-15T12:00:00Z")
@@ -1008,7 +1073,9 @@ class GuideScreenTest {
         val noon = Instant.parse("2027-01-15T12:00:00Z")
         val fixture = ServerGuide(noon)
         val worker = StandardTestDispatcher()
-        val viewModel = GuideViewModel(connection.session, EmptyCoroutineContext, mappingDispatcher = worker)
+        val viewModel = GuideViewModel(
+            connection.session, SavedStateHandle(), EmptyCoroutineContext, mappingDispatcher = worker,
+        )
         val channels = connection.channels()
         val context = compose.activity
         val receiver = CoroutineScope(Dispatchers.Unconfined)
@@ -1074,7 +1141,9 @@ class GuideScreenTest {
                 }
             }
         }
-        val guide = GuideViewModel(session, EmptyCoroutineContext, mappingDispatcher = mappingDispatcher)
+        val guide = GuideViewModel(
+            session, SavedStateHandle(), EmptyCoroutineContext, mappingDispatcher = mappingDispatcher,
+        )
         val presentation = connection.presentation()
         compose.setContent {
             MaterialTheme(colorScheme = MobileDarkColors) {
