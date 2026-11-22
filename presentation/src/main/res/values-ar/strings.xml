@@ -995,6 +995,12 @@
     <string name="frame_rate_switching_always">دائمًا</string>
     <string name="frame_rate_switching_seamless_only">دون انقطاع فقط</string>
     <string name="frame_rate_switching_off">إيقاف</string>
+    <string name="frame_rate_switching_follow_system">اتباع النظام</string>
+    <string name="frame_rate_switching_never">أبدًا</string>
+    <string name="frame_rate_switching_follow_system_summary">%1$s · %2$s</string>
+    <string name="frame_rate_switching_follow_system_choice">النظام: %1$s</string>
+    <string name="frame_rate_switching_follow_system_help">يستخدم إعداد التلفزيون نفسه</string>
+    <string name="frame_rate_switching_force_help">يبدّل حتى إن لم يسمح إعداد التلفزيون بذلك</string>
     <string name="frame_rate_switching_always_help">تبديل معدل إطارات التلفزيون لمطابقة الفيديو، حتى لو أظلمت الشاشة للحظة</string>
     <string name="frame_rate_switching_seamless_help">التبديل فقط عندما يستطيع التلفزيون إجراءه دون أن تظلم الشاشة</string>
     <string name="frame_rate_switching_off_help">الإبقاء على وضع العرض الحالي للتلفزيون</string>

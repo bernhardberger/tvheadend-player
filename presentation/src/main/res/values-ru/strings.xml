@@ -925,6 +925,12 @@
     <string name="frame_rate_switching_always">Всегда</string>
     <string name="frame_rate_switching_seamless_only">Только без разрывов</string>
     <string name="frame_rate_switching_off">Выкл.</string>
+    <string name="frame_rate_switching_follow_system">Как в системе</string>
+    <string name="frame_rate_switching_never">Никогда</string>
+    <string name="frame_rate_switching_follow_system_summary">%1$s · %2$s</string>
+    <string name="frame_rate_switching_follow_system_choice">Система: %1$s</string>
+    <string name="frame_rate_switching_follow_system_help">Использует настройку телевизора</string>
+    <string name="frame_rate_switching_force_help">Меняет частоту, даже если настройка телевизора этого не разрешает</string>
     <string name="frame_rate_switching_always_help">Переключает телевизор на частоту кадров видео, даже если экран на мгновение гаснет</string>
     <string name="frame_rate_switching_seamless_help">Переключает, только если телевизор может сделать это без погасания экрана</string>
     <string name="frame_rate_switching_off_help">Сохраняет текущий режим экрана телевизора</string>

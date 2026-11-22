@@ -9,6 +9,7 @@ import androidx.media3.common.MimeTypes
 import androidx.media3.common.TrackGroup
 import androidx.media3.common.TrackSelectionOverride
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
 import at.bernhardberger.tvhplayer.settings.SubtitleChoice
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import java.io.IOException
@@ -127,20 +128,63 @@ internal class SubtitleSelectionRuntimeTest : AudioInterruptionFixture() {
         assertTrue(runtime.subtitlesDefault.value)
     }
 
-    @Test fun recordingManualChoiceIsPlaybackOnlyAndDefaultClearsIt() = exercise {
+    @Test fun recordingManualChoiceSurvivesStopAndDoesNotChangeLiveOrAnotherRecording() = exercise {
         useChoiceProfile()
         recording()
         select(installSubtitleTracks("en").single())
         settle()
         assertFalse(runtime.subtitlesDefault.value)
         assertNull(settings.subtitleChoices.read("test-profile", 1))
-        runtime.useDefaultSubtitles()
-        settle()
+        stopPlayback()
+        recording(start = RecordingPlaybackStart.RESUME)
+        val resumed = installSubtitleTracks("en").single()
+        assertSame(resumed, textOverride()?.mediaTrackGroup)
+        recording(id = 2)
+        installSubtitleTracks("en")
         assertTrue(runtime.subtitlesDefault.value)
-        select(installSubtitleTracks("en").single())
         live(timeshift = false)
         assertNull(textOverride())
         assertFalse(textDisabled())
+        restartPlaybackRuntime()
+        recording()
+        val restarted = installSubtitleTracks("en").single()
+        assertSame(restarted, textOverride()?.mediaTrackGroup)
+        stopPlayback()
+        useChoiceProfile("other-profile")
+        recording()
+        installSubtitleTracks("en")
+        assertTrue(runtime.subtitlesDefault.value)
+    }
+
+    @Test fun recordingInheritsLiveSubtitlesUntilItChoosesOffOrDefault() = exercise {
+        useChoiceProfile()
+        settings.subtitleChoices.set("test-profile", 1, english)
+        recording(id = 2)
+        val inherited = installSubtitleTracks("de", "en")[1]
+        assertSame(inherited, textOverride()?.mediaTrackGroup)
+        settle()
+        assertNull(settings.recordingSubtitleChoices.read("test-profile", 2))
+        settings.subtitleChoices.set("test-profile", 1, english.copy(language = "de"))
+        recording(id = 2)
+        val updated = installSubtitleTracks("de", "en")[0]
+        assertSame(updated, textOverride()?.mediaTrackGroup)
+        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+            .clearOverridesOfType(C.TRACK_TYPE_TEXT).build()
+        runtime.selectSubtitles(TrackSelectionOverride(updated, listOf(0)), off = false).join()
+        settle()
+        assertEquals(english.copy(language = "de"), settings.recordingSubtitleChoices.read("test-profile", 2))
+
+        runtime.selectSubtitles(null, off = true)
+        settle()
+        recording(id = 2)
+        assertTrue(textDisabled())
+        runtime.useDefaultSubtitles()
+        settle()
+        restartPlaybackRuntime()
+        recording(id = 2)
+        installSubtitleTracks("de", "en")
+        assertTrue(runtime.subtitlesDefault.value)
+        assertEquals(english.copy(language = "de"), settings.subtitleChoices.read("test-profile", 1))
     }
 
     @Test fun queuedDefaultAndBackRestoreInOrderAndRetiredChoicesCannotApplyToTheNextChannel() = exercise {

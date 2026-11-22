@@ -2,6 +2,8 @@ package at.bernhardberger.tvhplayer.ui
 
 import at.bernhardberger.tvhplayer.testutil.pressKey
 import android.app.Application
+import android.hardware.display.DisplayManager
+import android.os.Build
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.mutableStateOf
@@ -10,14 +12,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.junit4.createComposeRule
 import at.bernhardberger.tvhplayer.settings.FrameRateSwitching
+import at.bernhardberger.tvhplayer.settings.resolveFrameRateSwitching
 import at.bernhardberger.tvhplayer.ui.components.depth.rememberDepthNavigationState
 import at.bernhardberger.tvhplayer.ui.screens.SettingsScreenNavigation
+import at.bernhardberger.tvhplayer.ui.screens.settings.FRAME_RATE_LEVEL
 import at.bernhardberger.tvhplayer.ui.screens.settings.settingsDisplayRateLevel
 import at.bernhardberger.tvhplayer.ui.screens.settings.settingsFrameRateLevel
 import at.bernhardberger.tvhplayer.ui.screens.settings.settingsLevel
@@ -33,6 +42,9 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.annotation.Implementation
+import org.robolectric.annotation.Implements
+import org.robolectric.shadows.ShadowDisplayManager
 
 /** The frame-rate choice level under Settings > Player: opens on the stored choice, a pick stores it and returns. */
 @RunWith(RobolectricTestRunner::class)
@@ -49,15 +61,17 @@ class FrameRateSettingsUiTest {
     }
 
     @Test
-    fun levelOpensOnTheStoredChoiceAndAPickStoresItAndReturns() {
+    @Config(sdk = [30, 31], shadows = [SeamlessDisplayPreference::class])
+    fun levelOpensOnTheEffectiveChoiceAndAPickStoresItAndReturns() {
         val title = "Match content frame rate"
-        var ui by mutableStateOf(SettingsPlayerUiState(frameRateSwitching = FrameRateSwitching.SEAMLESS_ONLY))
+        val modern = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+        val choices = listOf("Always", "Only if seamless", "Off").let { if (modern) listOf("Follow system") + it else it }
+        var ui by mutableStateOf(SettingsPlayerUiState(frameRateSwitching = resolveFrameRateSwitching(null)))
         val picks = mutableListOf<FrameRateSwitching>()
         compose.setContent {
             TVHeadendPlayerTheme {
-                val navigation = rememberDepthNavigationState("root")
+                val navigation = rememberDepthNavigationState(SettingsSection.PLAYER.name, FRAME_RATE_LEVEL)
                 val levels = listOf(
-                    settingsLevel("root", "Settings", listOf(settingsRow("player", "Open player", child = SettingsSection.PLAYER.name))),
                     settingsPlayerLevel(ui, {}, {}, {}),
                     settingsFrameRateLevel(ui.frameRateSwitching) {
                         picks += it
@@ -68,37 +82,48 @@ class FrameRateSettingsUiTest {
                 Box(Modifier.fillMaxSize()) { SettingsScreenNavigation(navigation, levels) }
             }
         }
-        compose.pressKey(Key.DirectionCenter)
-        var downs = 0
-        while (compose.onAllNodes(isFocused() and hasText(title)).fetchSemanticsNodes().isEmpty()) {
-            check(++downs < 20) { "Frame rate row not reachable" }
-            compose.pressKey(Key.DirectionDown)
-        }
-        compose.onNode(isFocused() and hasText(title) and hasText("Only if seamless")).assertExists()
+        val parentRow = isFocused() and hasText(title)
+        compose.onNode(parentRow).assertIsEnabled()
 
         compose.pressKey(Key.DirectionCenter)
-        compose.onNode(isFocused() and hasText("Only if seamless")).assertIsSelected()
-        compose.onNode(hasText("Always")).assertIsNotSelected()
-        // Each option carries its own help instead of one description for the page.
-        compose.onNode(isFocused() and hasText("Switches only when the TV can do it without going dark")).assertExists()
-        compose.onNode(hasText("Always") and hasText("Switches the TV to the video’s frame rate, even if the screen goes dark for a moment"))
-            .assertExists()
+        compose.onAllNodes(hasClickAction() and hasAnyAncestor(hasTestTag("depth-active")))
+            .assertCountEquals(choices.size)
+        val firstChoice = isFocused() and hasText(choices.first())
+        compose.onNode(firstChoice).assertIsSelected()
+        if (modern) {
+            compose.onNode(firstChoice and hasText("Only if seamless", substring = true)).assertExists()
+        }
+        choices.drop(1).forEach { label ->
+            compose.pressKey(Key.DirectionDown)
+            compose.onNode(isFocused() and hasText(label)).assertIsNotSelected()
+        }
 
         // Back leaves without choosing.
         compose.pressKey(Key.Back)
-        compose.onNode(isFocused() and hasText(title)).assertExists()
+        compose.onNode(
+            parentRow and if (modern) {
+                hasText("Follow system", substring = true) and hasText("Only if seamless", substring = true)
+            } else {
+                hasText("Always")
+            },
+        ).assertExists()
         assertEquals(emptyList<FrameRateSwitching>(), picks)
 
         compose.pressKey(Key.DirectionCenter)
-        compose.pressKey(Key.DirectionDown)
+        repeat(choices.lastIndex) { compose.pressKey(Key.DirectionDown) }
         compose.pressKey(Key.DirectionCenter)
         assertEquals(listOf(FrameRateSwitching.OFF), picks)
-        compose.onNode(isFocused() and hasText(title) and hasText("Off")).assertExists()
+        compose.onNode(parentRow and hasText("Off")).assertExists()
 
         compose.pressKey(Key.DirectionCenter)
         compose.onNode(isFocused() and hasText("Off")).assertIsSelected()
     }
 
+    @Implements(DisplayManager::class, minSdk = 31)
+    class SeamlessDisplayPreference : ShadowDisplayManager() {
+        @Implementation
+        fun getMatchContentFrameRateUserPreference(): Int = DisplayManager.MATCH_CONTENT_FRAMERATE_SEAMLESSS_ONLY
+    }
 
     @Test
     fun displayRateLevelListsRatesFocusesRoundedStoredChoiceAndEmitsPicks() {

@@ -166,7 +166,8 @@ internal open class AudioInterruptionFixture {
         val driver = PlaybackTestDriver(scheduler)
         private val context = ApplicationProvider.getApplicationContext<Application>()
         val focus = FakeFocus(granted)
-        val outputs = FakeOutputs()
+        var outputs = FakeOutputs()
+            private set
         val connection = ScriptedSubscriptionConnection().apply {
             scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 120)))
         }
@@ -205,7 +206,10 @@ internal open class AudioInterruptionFixture {
         }, workDispatcher).apply { startAdmission() }
         val session = FakeTvheadendSession(currentPlaybackObservation(
             channels = listOf(Channel.create(ChannelId(1)), Channel.create(ChannelId(2))),
-            recordings = listOf(DvrEntry.create(id = DvrEntryId(1), state = DvrEntryState.COMPLETED)),
+            recordings = listOf(
+                DvrEntry.create(id = DvrEntryId(1), state = DvrEntryState.COMPLETED),
+                DvrEntry.create(id = DvrEntryId(2), state = DvrEntryState.COMPLETED, channelId = ChannelId(1)),
+            ),
         )).apply {
             scriptLivePlaybackSuccess(manager)
             scriptRecordingPlaybackSuccess()
@@ -311,7 +315,10 @@ internal open class AudioInterruptionFixture {
         }
         val startupBuffer = StartupBufferController(at.bernhardberger.tvheadend.sdk.media3.TvheadendLiveStartBuffer(),
             settings, profiles.startupBufferIdentity(), scope)
-        val runtime = AppPlaybackRuntime(runtimePlayer, runtimeSession, coordinator, settings, profiles, scope, output, focus,
+        var runtime = createRuntime()
+            private set
+
+        private fun createRuntime() = AppPlaybackRuntime(runtimePlayer, runtimeSession, coordinator, settings, profiles, scope, output, focus,
             PlaybackRuntimePolicy.fromPlayerSettings(),
             elapsedRealtime = { scheduler.currentTime },
             startupBuffer = startupBuffer, audioOutputs = outputs,
@@ -338,7 +345,7 @@ internal open class AudioInterruptionFixture {
             val group = TrackGroup(Format.Builder().setSampleMimeType(MimeTypes.AUDIO_AAC).setLanguage("de").build())
             audioTracks = Tracks(listOf(Tracks.Group(group, false, intArrayOf(C.FORMAT_HANDLED), booleanArrayOf(true))))
             audioSelection.useProfile(requireNotNull(profiles.serverProfile.value), runtimePlayer)
-            audioSelection.activate(ChannelId(channel), runtimePlayer)
+            audioSelection.activate(AppPlaybackTarget.Live(ChannelId(channel)), runtimePlayer)
             return TrackSelectionOverride(group, listOf(0)).also {
                 player.trackSelectionParameters = player.trackSelectionParameters.buildUpon().addOverride(it).build()
             }
@@ -484,13 +491,26 @@ internal open class AudioInterruptionFixture {
             settle()
         }
 
-        suspend fun recording() {
+        suspend fun recording(id: Long = 1, start: RecordingPlaybackStart = RecordingPlaybackStart.START_OVER) {
             val install = scope.async {
-                runtime.playRecording(requireNotNull(currentRecordingPlaybackSelection(session.observation.value, DvrEntryId(1))),
-                    RecordingPlaybackStart.START_OVER)
+                runtime.playRecording(requireNotNull(currentRecordingPlaybackSelection(session.observation.value, DvrEntryId(id))), start)
             }
             await { install.isCompleted }
             assertTrue("Recording target installed", install.await()?.isStarted == true)
+        }
+
+        suspend fun stopPlayback() {
+            val stop = scope.async { runtime.stop() }
+            await { stop.isCompleted }
+            assertEquals(PlaybackStopOutcome.STOPPED, stop.await().outcome)
+        }
+
+        suspend fun restartPlaybackRuntime() {
+            stopPlayback()
+            runtime.detach()
+            audioTracks = null
+            outputs = FakeOutputs()
+            runtime = createRuntime()
         }
 
         // Target the exact stream: a broadcast would also reach a predecessor whose channel

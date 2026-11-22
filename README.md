@@ -79,9 +79,9 @@ and decoders. A mobile version might come later, but the TV comes first.
 - SD channels get the right shape. In Auto they show at exactly 16:9 or 4:3, the
   way a TV or set-top box shows them. You can also pick 16:9 or 4:3 for a single
   channel, and the app remembers it.
-- On Android 11 and newer, the app can switch the TV to the frame rate Tvheadend
-  reports for the channel, either always or only when the TV can switch without
-  going dark.
+- The app can switch the TV to the frame rate Tvheadend reports for the channel,
+  either always or only when the TV can switch without going dark. On Android 12
+  and newer it follows the TV's own setting unless you choose otherwise.
 - Audio passthrough is on by default, so surround sound reaches your soundbar or
   receiver unchanged.
 - DVB and teletext subtitles work, in your preferred language or following the
@@ -118,7 +118,8 @@ them before Tvheadend imports it.
 - The remote's media buttons work in the player: Play/Pause, Rewind and Fast
   forward at up to 32 times, and Record for the program you're watching.
 - Open the playing channel's schedule next to the picture.
-- Pick audio and subtitle tracks and set your preferred languages.
+- Pick audio and subtitle tracks and set your preferred languages. Channels and
+  recordings remember the tracks you pick.
 
 **Channels**
 

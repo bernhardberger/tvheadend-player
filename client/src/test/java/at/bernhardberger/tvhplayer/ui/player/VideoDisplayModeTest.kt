@@ -21,26 +21,21 @@ class VideoDisplayModeTest {
     }
 
     @Test
-    fun seamlessOnlyRequestsDropInBrowse() {
-        assertFalse(keepVideoFrameRateInBrowse(SurfaceFrameRateChange.ONLY_IF_SEAMLESS, 24f, null))
-    }
-
-    @Test
-    fun alwaysDropsWhenTheBaseOrItsAlternativeMatches() {
-        assertFalse(keepVideoFrameRateInBrowse(SurfaceFrameRateChange.ALWAYS, 60f, current))
+    fun followSystemDropsWhenTheBaseOrItsAlternativeMatches() {
+        assertFalse(keepVideoFrameRateInBrowse(SurfaceFrameRateChange.FOLLOW_SYSTEM, 60f, current))
         val seamless = current.copy(alternativeRefreshRates = listOf(24f, 50f))
-        assertFalse(keepVideoFrameRateInBrowse(SurfaceFrameRateChange.ALWAYS, 24.0001f, seamless))
-        assertFalse(keepVideoFrameRateInBrowse(SurfaceFrameRateChange.ALWAYS, 50f, seamless))
+        assertFalse(keepVideoFrameRateInBrowse(SurfaceFrameRateChange.FOLLOW_SYSTEM, 24.0001f, seamless))
+        assertFalse(keepVideoFrameRateInBrowse(SurfaceFrameRateChange.FOLLOW_SYSTEM, 50f, seamless))
     }
 
     @Test
     fun alwaysKeepsNonSeamlessAndUnknownBaseRequests() {
-        assertTrue(keepVideoFrameRateInBrowse(SurfaceFrameRateChange.ALWAYS, 24f, current))
-        assertTrue(keepVideoFrameRateInBrowse(SurfaceFrameRateChange.ALWAYS, 24f, null))
+        assertTrue(keepVideoFrameRateInBrowse(SurfaceFrameRateChange.FOLLOW_SYSTEM, 24f, current))
+        assertTrue(keepVideoFrameRateInBrowse(SurfaceFrameRateChange.FOLLOW_SYSTEM, 24f, null))
         // Matching multiples do not count, and NTSC is distinct from whole cadence.
-        assertTrue(keepVideoFrameRateInBrowse(SurfaceFrameRateChange.ALWAYS, 30f, current))
-        assertTrue(keepVideoFrameRateInBrowse(SurfaceFrameRateChange.ALWAYS, 59.94f, current))
-        assertTrue(keepVideoFrameRateInBrowse(SurfaceFrameRateChange.ALWAYS, 23.976f,
+        assertTrue(keepVideoFrameRateInBrowse(SurfaceFrameRateChange.FOLLOW_SYSTEM, 30f, current))
+        assertTrue(keepVideoFrameRateInBrowse(SurfaceFrameRateChange.FOLLOW_SYSTEM, 59.94f, current))
+        assertTrue(keepVideoFrameRateInBrowse(SurfaceFrameRateChange.FOLLOW_SYSTEM, 23.976f,
             current.copy(alternativeRefreshRates = listOf(24f))))
     }
 
@@ -48,7 +43,7 @@ class VideoDisplayModeTest {
     fun browseRetentionComparesTheBaseRatherThanTheMatchingCurrentMode() {
         val switched = current.copy(refreshRate = 24f, modeId = 2)
         assertEquals(switched, videoDisplayMode(24f, switched, listOf(current, switched)))
-        assertTrue(keepVideoFrameRateInBrowse(SurfaceFrameRateChange.ALWAYS, 24f, current))
+        assertTrue(keepVideoFrameRateInBrowse(SurfaceFrameRateChange.FOLLOW_SYSTEM, 24f, current))
     }
 
     @Test
@@ -61,7 +56,7 @@ class VideoDisplayModeTest {
         assertEquals(current, base)
         // A renewed 24 Hz request and then browse must still compare against the original 60 Hz.
         base = nextBaseMode(base, switched, unrequested = false, lastRequestedRate = 24f)
-        assertTrue(keepVideoFrameRateInBrowse(SurfaceFrameRateChange.ALWAYS, 24f, base))
+        assertTrue(keepVideoFrameRateInBrowse(SurfaceFrameRateChange.FOLLOW_SYSTEM, 24f, base))
         assertEquals(current, nextBaseMode(base, current.copy(refreshRate = 50f), true, 24f))
     }
 
@@ -70,7 +65,7 @@ class VideoDisplayModeTest {
         val stale = current.copy(refreshRate = 24.0001f, modeId = 2)
         val base = nextBaseMode(null, stale, unrequested = true, lastRequestedRate = 24f)
         assertNull(base)
-        assertTrue(keepVideoFrameRateInBrowse(SurfaceFrameRateChange.ALWAYS, 24f, base))
+        assertTrue(keepVideoFrameRateInBrowse(SurfaceFrameRateChange.FOLLOW_SYSTEM, 24f, base))
         assertEquals(current, nextBaseMode(base, current, unrequested = true, lastRequestedRate = 24f))
     }
 
@@ -180,26 +175,26 @@ class VideoDisplayModeTest {
     }
 
     @Test
-    fun theWindowFollowsAnAlwaysRequestOnlyWithAnAppRate() {
-        assertEquals(50f, windowVideoRate(SurfaceFrameRateChange.DISPLAY_MODE, 50f, null))
-        assertNull(windowVideoRate(SurfaceFrameRateChange.ALWAYS, 50f, null))
-        assertEquals(50f, windowVideoRate(SurfaceFrameRateChange.ALWAYS, 50f, 60f))
-        assertNull(windowVideoRate(SurfaceFrameRateChange.ALWAYS, null, 60f))
-        for (seamless in listOf(SurfaceFrameRateChange.ONLY_IF_SEAMLESS, SurfaceFrameRateChange.SEAMLESS_DEFAULT)) {
-            assertNull(windowVideoRate(seamless, 50f, 60f))
-        }
-    }
-
-    @Test
     fun theWindowPrefersTheVideosModeAndFallsBackToTheAppRate() {
         val fifty = current.copy(refreshRate = 50f, modeId = 2)
         val film = current.copy(refreshRate = 24f, modeId = 3)
         val modes = listOf(current, fifty, film)
-        assertEquals(film, windowDisplayMode(24f, 50f, current, modes))
-        assertEquals(fifty, windowDisplayMode(null, 50f, current, modes))
+        fun select(change: SurfaceFrameRateChange?, rate: Float?, appRate: Float?, allowSwitch: Boolean = false) =
+            windowDisplayMode(change, rate, appRate, current, modes, systemAllowsAnySwitch = allowSwitch)
+
+        assertNull(select(SurfaceFrameRateChange.FOLLOW_SYSTEM, 24f, 50f, allowSwitch = true))
+        assertEquals(fifty, select(SurfaceFrameRateChange.FOLLOW_SYSTEM, 24f, 50f))
+        assertNull(select(SurfaceFrameRateChange.FOLLOW_SYSTEM, 24f, null))
+        assertNull(select(SurfaceFrameRateChange.FOLLOW_SYSTEM, 24f, null, allowSwitch = true))
+        assertEquals(fifty, select(SurfaceFrameRateChange.FOLLOW_SYSTEM, null, 50f, allowSwitch = true))
+        assertEquals(fifty, select(null, null, 50f))
+        assertEquals(fifty, select(SurfaceFrameRateChange.SEAMLESS_DEFAULT, 24f, 50f))
+        assertEquals(film, select(SurfaceFrameRateChange.DISPLAY_MODE, 24f, null))
+        assertEquals(film, select(SurfaceFrameRateChange.DISPLAY_MODE, 24f, 50f))
+        assertEquals(film, select(SurfaceFrameRateChange.DISPLAY_MODE, 24f, 50f, allowSwitch = true))
         // A video rate the display lacks, and a stored rate another TV offered.
-        assertEquals(fifty, windowDisplayMode(25f, 50f, current, modes))
-        assertNull(windowDisplayMode(null, 120f, current, modes))
-        assertNull(windowDisplayMode(null, null, current, modes))
+        assertEquals(fifty, select(SurfaceFrameRateChange.DISPLAY_MODE, 25f, 50f))
+        assertNull(select(null, null, 120f))
+        assertNull(select(null, null, null))
     }
 }

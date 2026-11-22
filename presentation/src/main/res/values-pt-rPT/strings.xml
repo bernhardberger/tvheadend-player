@@ -834,6 +834,12 @@
     <string name="frame_rate_switching_always">Sempre</string>
     <string name="frame_rate_switching_seamless_only">Só sem interrupções</string>
     <string name="frame_rate_switching_off">Desativado</string>
+    <string name="frame_rate_switching_follow_system">Seguir o sistema</string>
+    <string name="frame_rate_switching_never">Nunca</string>
+    <string name="frame_rate_switching_follow_system_summary">%1$s · %2$s</string>
+    <string name="frame_rate_switching_follow_system_choice">Sistema: %1$s</string>
+    <string name="frame_rate_switching_follow_system_help">Usa a definição do próprio televisor</string>
+    <string name="frame_rate_switching_force_help">Muda a frequência mesmo que a definição do televisor não o permita</string>
     <string name="frame_rate_switching_always_help">Ajusta o televisor à taxa de fotogramas do vídeo, mesmo que o ecrã fique escuro por um instante</string>
     <string name="frame_rate_switching_seamless_help">Só muda quando o televisor o consegue fazer sem que o ecrã fique escuro</string>
     <string name="frame_rate_switching_off_help">Mantém o modo de apresentação atual do televisor</string>

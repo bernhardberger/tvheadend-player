@@ -270,7 +270,8 @@ intermediate layout. Disabled motion means static branding without the glow.
 Startup does not play audio or
 request audio focus.
 A return waiting for existing playback uses the stable ring and status over the
-same gently pulsing ambient glow, without the logo. The glow appears with
+same gently pulsing ambient glow, with the returning channel's logo once that
+channel is known and the app symbol until then. The glow appears with
 visible waiting feedback; the hidden grace period remains flat. Recovery focus, Back and key
 consumption keep their existing contracts.
 
@@ -771,7 +772,7 @@ only.
 - The destination's name ("Channels", "Guide") is the header row's pane title
   for TalkBack. List and Grid also draw "Channels" as a static one-line
   heading in the Settings heading's `headlineMedium` and `onSurface`, at the
-  header start on the content's leading edge (trial 2026-11-21); Immersive and the Guide draw no title, as the drawer already
+  header start on the content's leading edge (accepted 2026-11-22); Immersive and the Guide draw no title, as the drawer already
   says where you are (accepted 2026-10-24). Its Tags and View options buttons sit
   20dp apart on the header row at y28 of the 960×540 reference canvas, 24dp
   before the wall clock, which ends on the trailing inset. At larger text the
@@ -792,6 +793,8 @@ only.
   icon until a genre is chosen, then the same pill with the genre. Pills show
   the icon and value (cut at 160dp), and TalkBack reads the name with the value
   ("Tags, Entertainment"). The header has no scrim of its own.
+  Over a programme picture, a soft fade baked into the picture's top end is
+  only as strong as the date needs for 4.5:1 contrast; dark pictures stay unchanged.
 - Tags opens the channel sets: the app's sets, a divider, then the server's
   tags. It shows only with a choice of sets, the same on Channels and Guide.
   Panels open on the checked entry; OK applies and closes, Back closes, and
@@ -1415,8 +1418,10 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
   Default until the viewer picks Off or a track, even when the setting itself
   shows a track; the header names what is shown. A pick on a live channel is
   remembered for that channel and connection, like its audio track, and comes
-  back when exactly one track matches it. It never carries to the next
-  channel or recording; a recording keeps a pick only while it plays.
+  back when exactly one track matches it. A recording remembers its own audio
+  and subtitle choices for that connection, including Automatic and Default.
+  Without its own choice, it follows the live choice for its channel, if known
+  and applicable, without changing what either item remembers.
 - The live player's options carry Stream profile after Display mode:
   `Default (<the connection's profile>)`, then the server's profiles in the
   server's order, labelled as in Settings. A pick is remembered for that

@@ -925,6 +925,12 @@
     <string name="frame_rate_switching_always">Zawsze</string>
     <string name="frame_rate_switching_seamless_only">Tylko bez zakłóceń</string>
     <string name="frame_rate_switching_off">Wyłączone</string>
+    <string name="frame_rate_switching_follow_system">Zgodnie z systemem</string>
+    <string name="frame_rate_switching_never">Nigdy</string>
+    <string name="frame_rate_switching_follow_system_summary">%1$s · %2$s</string>
+    <string name="frame_rate_switching_follow_system_choice">System: %1$s</string>
+    <string name="frame_rate_switching_follow_system_help">Używa ustawienia telewizora</string>
+    <string name="frame_rate_switching_force_help">Przełącza, nawet jeśli ustawienie telewizora na to nie pozwala</string>
     <string name="frame_rate_switching_always_help">Przełącza telewizor na liczbę klatek na sekundę zgodną z filmem, nawet jeśli ekran na chwilę zgaśnie</string>
     <string name="frame_rate_switching_seamless_help">Przełącza tylko wtedy, gdy telewizor może to zrobić bez wygaszania ekranu</string>
     <string name="frame_rate_switching_off_help">Zachowuje bieżący tryb wyświetlania telewizora</string>

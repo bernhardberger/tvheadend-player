@@ -34,7 +34,7 @@ fun keepVideoFrameRateInBrowse(change: SurfaceFrameRateChange, rate: Float?, bas
     return when (change) {
         SurfaceFrameRateChange.DISPLAY_MODE -> true
         SurfaceFrameRateChange.SEAMLESS_DEFAULT, SurfaceFrameRateChange.ONLY_IF_SEAMLESS -> false
-        SurfaceFrameRateChange.ALWAYS -> base == null ||
+        SurfaceFrameRateChange.FOLLOW_SYSTEM -> base == null ||
             (!matchesVideoRate(base.refreshRate, rate) && base.alternativeRefreshRates.none { matchesVideoRate(it, rate) })
     }
 }
@@ -67,22 +67,17 @@ fun displayRefreshRateChoices(current: DisplayModeSpec, supported: List<DisplayM
         .map { it.refreshRate }.filter { it.isFinite() && it > 0f }.sorted()
         .fold(emptyList()) { rates, rate -> if (rates.any { matchesVideoRate(it, rate) }) rates else rates + rate }
 
-/**
- * The video rate the window's display mode follows. Display-mode requests always do. With an app
- * refresh rate set, an Always request does too: the window would otherwise hold the app's rate
- * against the surface vote. Seamless requests stay a surface vote.
- */
-fun windowVideoRate(change: SurfaceFrameRateChange, rate: Float?, appRate: Float?): Float? = when (change) {
-    SurfaceFrameRateChange.DISPLAY_MODE -> rate
-    SurfaceFrameRateChange.ALWAYS -> rate.takeIf { appRate != null }
-    SurfaceFrameRateChange.SEAMLESS_DEFAULT, SurfaceFrameRateChange.ONLY_IF_SEAMLESS -> null
-}
-
-/** The mode the window prefers: the video's while one is requested and offered, else the app's. */
+/** Release the app's pin for an installed Follow system vote only if Android allows non-seamless switches. */
 fun windowDisplayMode(
+    videoChange: SurfaceFrameRateChange?,
     videoRate: Float?,
     appRate: Float?,
     current: DisplayModeSpec,
     supported: List<DisplayModeSpec>,
-): DisplayModeSpec? = videoRate?.let { videoDisplayMode(it, current, supported) }
-    ?: appRate?.let { videoDisplayMode(it, current, supported) }
+    systemAllowsAnySwitch: Boolean,
+): DisplayModeSpec? {
+    if (videoChange == SurfaceFrameRateChange.FOLLOW_SYSTEM && videoRate != null && systemAllowsAnySwitch) return null
+    val requested = videoRate?.takeIf { videoChange == SurfaceFrameRateChange.DISPLAY_MODE }
+    return requested?.let { videoDisplayMode(it, current, supported) }
+        ?: appRate?.let { videoDisplayMode(it, current, supported) }
+}

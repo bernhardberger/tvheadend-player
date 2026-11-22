@@ -1,10 +1,16 @@
 package at.bernhardberger.tvhplayer.ui.screens.settings
 
+import android.hardware.display.DisplayManager
+import android.os.Build
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import at.bernhardberger.tvheadend.sdk.core.StreamProfileId
 import at.bernhardberger.tvheadend.sdk.core.StreamProfilesResult
@@ -17,6 +23,8 @@ import at.bernhardberger.tvhplayer.settings.keepChannelMinuteChoices
 import at.bernhardberger.tvhplayer.ui.player.displayRefreshRateChoices
 import at.bernhardberger.tvhplayer.ui.player.formatRefreshRate
 import at.bernhardberger.tvhplayer.ui.player.matchesVideoRate
+import at.bernhardberger.tvhplayer.ui.player.MatchFrameRatePreference
+import at.bernhardberger.tvhplayer.ui.player.readMatchFrameRatePreference
 import at.bernhardberger.tvhplayer.ui.player.toSpec
 import at.bernhardberger.tvhplayer.settings.WarmPlaybackMode
 import at.bernhardberger.tvhplayer.settings.STARTUP_BUFFER_AUTOMATIC
@@ -134,21 +142,62 @@ internal fun settingsFrameRateLevel(navigation: DepthNavigationState, vm: Settin
 }
 
 @Composable
-internal fun settingsFrameRateLevel(switching: FrameRateSwitching, onSelect: (FrameRateSwitching) -> Unit): DepthLevel =
-    settingsLevel(FRAME_RATE_LEVEL, stringResource(R.string.refresh_rate_matching_setting), FrameRateSwitching.entries.map { value ->
-        settingsRow(value.name, frameRateSwitchingLabel(value), supporting = stringResource(when (value) {
-            FrameRateSwitching.ALWAYS -> R.string.frame_rate_switching_always_help
-            FrameRateSwitching.SEAMLESS_ONLY -> R.string.frame_rate_switching_seamless_help
-            FrameRateSwitching.OFF -> R.string.frame_rate_switching_off_help
-        }), selected = switching == value, onClick = { onSelect(value) })
+internal fun settingsFrameRateLevel(switching: FrameRateSwitching, onSelect: (FrameRateSwitching) -> Unit): DepthLevel {
+    val sdkInt = Build.VERSION.SDK_INT
+    val supportsFollowSystem = FrameRateSwitching.supportsFollowSystem(sdkInt)
+    val title = stringResource(R.string.refresh_rate_matching_setting)
+    return settingsLevel(FRAME_RATE_LEVEL, title, FrameRateSwitching.choices(sdkInt).map { value ->
+        val help = when (value) {
+            FrameRateSwitching.FOLLOW_SYSTEM -> rememberFrameRateSystemChoice()?.let {
+                stringResource(R.string.frame_rate_switching_follow_system_choice, it)
+            } ?: stringResource(R.string.frame_rate_switching_follow_system_help)
+            FrameRateSwitching.ALWAYS -> stringResource(
+                if (supportsFollowSystem) R.string.frame_rate_switching_force_help
+                else R.string.frame_rate_switching_always_help,
+            )
+            FrameRateSwitching.SEAMLESS_ONLY -> stringResource(R.string.frame_rate_switching_seamless_help)
+            FrameRateSwitching.OFF -> stringResource(R.string.frame_rate_switching_off_help)
+        }
+        settingsRow(value.name, frameRateSwitchingLabel(value), supporting = help,
+            selected = switching == value, onClick = { onSelect(value) })
     }, initialItemId = switching.name)
+}
 
 @Composable
-private fun frameRateSwitchingLabel(switching: FrameRateSwitching): String = stringResource(when (switching) {
-    FrameRateSwitching.ALWAYS -> R.string.frame_rate_switching_always
-    FrameRateSwitching.SEAMLESS_ONLY -> R.string.frame_rate_switching_seamless_only
-    FrameRateSwitching.OFF -> R.string.frame_rate_switching_off
-})
+private fun frameRateSwitchingLabel(switching: FrameRateSwitching): String =
+    stringResource(when (switching) {
+        FrameRateSwitching.FOLLOW_SYSTEM -> R.string.frame_rate_switching_follow_system
+        FrameRateSwitching.ALWAYS -> R.string.frame_rate_switching_always
+        FrameRateSwitching.SEAMLESS_ONLY -> R.string.frame_rate_switching_seamless_only
+        FrameRateSwitching.OFF -> R.string.frame_rate_switching_off
+    })
+
+@Composable
+private fun frameRateSwitchingSummary(switching: FrameRateSwitching): String {
+    val label = frameRateSwitchingLabel(switching)
+    if (switching != FrameRateSwitching.FOLLOW_SYSTEM) return label
+    val choice = rememberFrameRateSystemChoice()
+    return if (choice == null) label
+    else stringResource(R.string.frame_rate_switching_follow_system_summary, label, choice)
+}
+
+@Composable
+private fun rememberFrameRateSystemChoice(): String? {
+    val context = LocalContext.current
+    val manager = remember(context) { context.getSystemService(DisplayManager::class.java) }
+    var preference by remember(manager) { mutableStateOf(readMatchFrameRatePreference(manager)) }
+    LifecycleResumeEffect(manager) {
+        preference = readMatchFrameRatePreference(manager)
+        onPauseOrDispose { }
+    }
+    val choice = when (preference) {
+        MatchFrameRatePreference.NEVER -> R.string.frame_rate_switching_never
+        MatchFrameRatePreference.SEAMLESS_ONLY -> R.string.frame_rate_switching_seamless_only
+        MatchFrameRatePreference.ALWAYS -> R.string.frame_rate_switching_always
+        null -> return null
+    }
+    return stringResource(choice)
+}
 
 internal const val STARTUP_BUFFER_LEVEL = "startup-buffer"
 
@@ -295,7 +344,7 @@ internal fun settingsPlayerLevel(
             displayRefreshRateLabel(ui.displayRefreshRate), child = DISPLAY_RATE_LEVEL,
             section = stringResource(R.string.settings_section_picture)),
         settingsRow(FRAME_RATE_LEVEL, stringResource(R.string.refresh_rate_matching_setting),
-            frameRateSwitchingLabel(ui.frameRateSwitching), child = FRAME_RATE_LEVEL),
+            frameRateSwitchingSummary(ui.frameRateSwitching), child = FRAME_RATE_LEVEL),
         settingsRow("tunneling", stringResource(R.string.tunneling_setting),
             supporting = stringResource(
                 if (ui.tunnelingEnabled && ui.tunnelingFallbackActive) R.string.tunneling_setting_fallback

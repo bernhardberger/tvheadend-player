@@ -890,6 +890,12 @@
     <string name="frame_rate_switching_always">תמיד</string>
     <string name="frame_rate_switching_seamless_only">רק ללא הפרעה</string>
     <string name="frame_rate_switching_off">כבוי</string>
+    <string name="frame_rate_switching_follow_system">בהתאם למערכת</string>
+    <string name="frame_rate_switching_never">אף פעם</string>
+    <string name="frame_rate_switching_follow_system_summary">%1$s · %2$s</string>
+    <string name="frame_rate_switching_follow_system_choice">מערכת: %1$s</string>
+    <string name="frame_rate_switching_follow_system_help">משתמש בהגדרה של הטלוויזיה</string>
+    <string name="frame_rate_switching_force_help">משנה את הקצב גם אם הגדרת הטלוויזיה לא מאפשרת זאת</string>
     <string name="frame_rate_switching_always_help">התאמת קצב התמונות של הטלוויזיה לווידאו, גם אם המסך מחשיך לרגע</string>
     <string name="frame_rate_switching_seamless_help">החלפה רק כשהטלוויזיה יכולה לבצע אותה בלי שהמסך יחשיך</string>
     <string name="frame_rate_switching_off_help">שמירה על מצב התצוגה הנוכחי של הטלוויזיה</string>

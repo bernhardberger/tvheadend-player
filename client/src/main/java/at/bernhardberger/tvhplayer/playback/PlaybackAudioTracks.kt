@@ -9,6 +9,8 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult
 import at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
+import at.bernhardberger.tvhplayer.settings.AudioChoice
+import at.bernhardberger.tvhplayer.settings.AudioTrackChoice
 import at.bernhardberger.tvhplayer.settings.FrameRateSwitching
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
@@ -21,7 +23,7 @@ import kotlinx.coroutines.launch
 
 /**
  * [AppPlaybackRuntime]'s audio tracks and output: the session audio choice and its stored
- * per-channel copy, automatic audio, track preferences, frame-rate matching and passthrough.
+ * per-target copy, automatic audio, track preferences, frame-rate matching and passthrough.
  * It is the only user of the [SessionAudioSelection]; the runtime and the audio interruption
  * controller change it through the methods here. The runtime owns the lock, the active target
  * and the audio interruption mute.
@@ -45,6 +47,7 @@ internal class PlaybackAudioTracks(
     private val _audioPassthroughChangeFailed = MutableStateFlow(false)
     val audioPassthroughChangeFailed = _audioPassthroughChangeFailed.asStateFlow()
     private var audioWriteJob: Job? = null
+    private var pendingRecordingAudio: (() -> Unit)? = null
     private var storedTunneling: Boolean? = null
     private val _tunnelingFallbackActive = MutableStateFlow(false)
     val tunnelingFallbackActive = _tunnelingFallbackActive.asStateFlow()
@@ -64,18 +67,7 @@ internal class PlaybackAudioTracks(
             preserveInterruptionMute()
             return
         }
-        audioSelection.useProfile(profileOwner.serverProfile.value, player)
-        val profileId = profileOwner.audioProfileId ?: return
-        val selected = audioSelection.rememberExplicitChoice(player) ?: return
-        val previous = audioWriteJob
-        audioWriteJob = scope.launch {
-            previous?.join()
-            try {
-                settings.audioChoices.set(profileId, selected.first.value, selected.second)
-            } catch (_: java.io.IOException) {
-                // A storage failure must not interrupt otherwise valid playback.
-            }
-        }
+        rememberAudioChoice()
     }
 
     fun onTracksChanged() {
@@ -85,15 +77,27 @@ internal class PlaybackAudioTracks(
     }
 
     /**
-     * Loads the stored audio choice for [channelId] before a live target is installed. Returns
+     * Loads the stored audio choice for [target] before it is installed. Returns
      * the result that ends the start, or null to go on.
      */
-    suspend fun loadStoredAudioLocked(channelId: ChannelId, canApply: () -> Boolean = { true }): PlaybackTargetResult? {
+    suspend fun loadStoredAudioLocked(
+        target: AppPlaybackTarget,
+        recordingChannel: ChannelId? = null,
+        canApply: () -> Boolean,
+    ): PlaybackTargetResult? {
+        pendingRecordingAudio = null
         val audioProfile = profileOwner.serverProfile.value
         val audioProfileId = profileOwner.audioProfileId
         audioWriteJob?.join()
         val storedAudio = try {
-            audioProfileId?.let { settings.audioChoices.read(it, channelId.value) }
+            audioProfileId?.let { profileId ->
+                when (target) {
+                    is AppPlaybackTarget.Live -> settings.audioChoices.read(profileId, target.channelId.value)
+                    is AppPlaybackTarget.Recording -> settings.recordingAudioChoices
+                        .read(profileId, target.recordingId.value)
+                        ?: recordingChannel?.let { settings.audioChoices.read(profileId, it.value) }
+                }
+            }
         } catch (_: java.io.IOException) {
             null
         }
@@ -103,16 +107,32 @@ internal class PlaybackAudioTracks(
         }
         if (!canApply()) return PlaybackTargetResult.NOT_READY
         audioSelection.useProfile(audioProfile, player)
-        audioSelection.load(channelId, storedAudio)
+        if (target is AppPlaybackTarget.Live) audioSelection.load(target, storedAudio)
+        else pendingRecordingAudio = pendingRecordingChoice(target, audioProfile, audioProfileId, storedAudio)
         return null
     }
 
-    /** After a target installation, also a failed or cancelled one: the installed live channel's choice. */
-    fun activateAudioAfterInstallLocked() {
+    // A failed restart of the same recording must leave its current choice in place.
+    private fun pendingRecordingChoice(
+        target: AppPlaybackTarget,
+        profile: Any?,
+        profileId: String?,
+        stored: AudioChoice?,
+    ): () -> Unit = {
+        if (_activeTarget.value == target && profileOwner.serverProfile.value === profile &&
+            profileOwner.audioProfileId == profileId
+        ) audioSelection.load(target, stored)
+    }
+
+    /** After a target installation, also a failed or cancelled one: the installed target's choice. */
+    fun activateAudioAfterInstallLocked(committed: Boolean) {
+        val pending = pendingRecordingAudio
+        pendingRecordingAudio = null
         if (targetCommands.isOpen()) {
             audioSelection.useProfile(profileOwner.serverProfile.value, player)
-            (_activeTarget.value as? AppPlaybackTarget.Live)?.takeUnless { interruptionMuted() }?.let {
-                audioSelection.activate(it.channelId, player)
+            _activeTarget.value?.let {
+                if (committed) pending?.invoke()
+                audioSelection.activate(it, player, muted = interruptionMuted())
             }
         }
     }
@@ -170,32 +190,59 @@ internal class PlaybackAudioTracks(
         }
     }
 
-    fun selectQuickListAudioLocked(override: androidx.media3.common.TrackSelectionOverride?) {
+    fun selectAudioLocked(override: androidx.media3.common.TrackSelectionOverride?, enableAudio: Boolean) {
         if (override == null) {
             applyAutomaticAudioLocked()
         } else {
             // Keep the exact group identity for SessionAudioSelection's explicit-choice listener.
-            player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+            val parameters = player.trackSelectionParameters.buildUpon()
+                .apply { if (enableAudio && !interruptionMuted()) setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, false) }
                 .clearOverridesOfType(C.TRACK_TYPE_AUDIO)
                 .addOverride(override)
                 .build()
+            val changed = parameters != player.trackSelectionParameters
+            if (changed) player.trackSelectionParameters = parameters
+            if (_activeTarget.value is AppPlaybackTarget.Recording) {
+                // The mute owner keeps audio disabled; the command still owns the choice.
+                rememberAudioChoice(explicitCommand = true, parameters = parameters)
+            } else if (!changed && !interruptionMuted()) {
+                rememberAudioChoice()
+            }
         }
     }
 
     fun applyAutomaticAudioLocked() {
         audioSelection.useProfile(profileOwner.serverProfile.value, player)
-        val channel = audioSelection.useAutomatic(player)
+        val target = audioSelection.useAutomatic(player)
         val profileId = profileOwner.audioProfileId
-        if (channel != null && profileId != null) {
-            // A pending explicit-choice write must finish before its removal is persisted.
-            val previous = audioWriteJob
-            audioWriteJob = scope.launch {
-                previous?.join()
-                try {
-                    settings.audioChoices.set(profileId, channel.value, null)
-                } catch (_: java.io.IOException) {
-                    // Storage failure must not interrupt playback; the session choice is still forgotten.
+        if (target != null && profileId != null) write(profileId, target, AudioChoice.Automatic)
+    }
+
+    private fun rememberAudioChoice(
+        explicitCommand: Boolean = false,
+        parameters: TrackSelectionParameters = player.trackSelectionParameters,
+    ) {
+        if (targetInstallationInProgress() || audioOutputChanging || _activeTarget.value == null) return
+        audioSelection.useProfile(profileOwner.serverProfile.value, player)
+        val profileId = profileOwner.audioProfileId ?: return
+        audioSelection.rememberExplicitChoice(player, explicitCommand, parameters)?.let { (target, choice) ->
+            write(profileId, target, choice)
+        }
+    }
+
+    private fun write(profileId: String, target: AppPlaybackTarget, choice: AudioChoice) {
+        val previous = audioWriteJob
+        audioWriteJob = scope.launch {
+            previous?.join()
+            try {
+                when (target) {
+                    is AppPlaybackTarget.Live ->
+                        settings.audioChoices.set(profileId, target.channelId.value, choice as? AudioTrackChoice)
+                    is AppPlaybackTarget.Recording ->
+                        settings.recordingAudioChoices.set(profileId, target.recordingId.value, choice)
                 }
+            } catch (_: java.io.IOException) {
+                // A storage failure must not interrupt otherwise valid playback.
             }
         }
     }

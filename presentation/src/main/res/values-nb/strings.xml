@@ -855,6 +855,12 @@
     <string name="frame_rate_switching_always">Alltid</string>
     <string name="frame_rate_switching_seamless_only">Bare sømløst</string>
     <string name="frame_rate_switching_off">Av</string>
+    <string name="frame_rate_switching_follow_system">Følg systemet</string>
+    <string name="frame_rate_switching_never">Aldri</string>
+    <string name="frame_rate_switching_follow_system_summary">%1$s · %2$s</string>
+    <string name="frame_rate_switching_follow_system_choice">System: %1$s</string>
+    <string name="frame_rate_switching_follow_system_help">Bruker TV-ens egen innstilling</string>
+    <string name="frame_rate_switching_force_help">Bytter selv om TV-ens innstilling ikke tillater det</string>
     <string name="frame_rate_switching_always_help">Bytter TV-en til videoens bildefrekvens, selv om skjermen blir svart et øyeblikk</string>
     <string name="frame_rate_switching_seamless_help">Bytter bare når TV-en kan gjøre det uten at skjermen blir svart</string>
     <string name="frame_rate_switching_off_help">Beholder TV-ens nåværende visningsmodus</string>

@@ -9,6 +9,7 @@ import at.bernhardberger.tvhplayer.profiling.ProfileVideoFrameTrace
 import at.bernhardberger.tvhplayer.profiling.declaredFrameDurationMarker
 import at.bernhardberger.tvhplayer.profiling.profileTrace
 import at.bernhardberger.tvhplayer.settings.FrameRateSwitching
+import at.bernhardberger.tvhplayer.settings.resolveFrameRateSwitching
 import kotlin.time.Duration
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -28,7 +29,7 @@ import kotlinx.coroutines.flow.asStateFlow
 class PlaybackFrameRate internal constructor(private val sdkInt: Int = Build.VERSION.SDK_INT) {
     private val lock = Any()
     private val estimator = VideoFrameRateEstimator()
-    private var switching = FrameRateSwitching.ALWAYS
+    private var switching = resolveFrameRateSwitching(null, sdkInt)
     private var rate: Float? = null
     private var closed = false
 

@@ -855,6 +855,12 @@
     <string name="frame_rate_switching_always">Aina</string>
     <string name="frame_rate_switching_seamless_only">Vain saumattomasti</string>
     <string name="frame_rate_switching_off">Pois</string>
+    <string name="frame_rate_switching_follow_system">Järjestelmän mukaan</string>
+    <string name="frame_rate_switching_never">Ei koskaan</string>
+    <string name="frame_rate_switching_follow_system_summary">%1$s · %2$s</string>
+    <string name="frame_rate_switching_follow_system_choice">Järjestelmä: %1$s</string>
+    <string name="frame_rate_switching_follow_system_help">Käyttää TV:n omaa asetusta</string>
+    <string name="frame_rate_switching_force_help">Vaihtaa, vaikka TV:n asetus ei sallisi sitä</string>
     <string name="frame_rate_switching_always_help">Vaihtaa television käyttämään videon kuvataajuutta, vaikka näyttö pimenisi hetkeksi</string>
     <string name="frame_rate_switching_seamless_help">Vaihtaa vain, jos televisio pystyy siihen ilman näytön pimenemistä</string>
     <string name="frame_rate_switching_off_help">Säilyttää television nykyisen näyttötilan</string>

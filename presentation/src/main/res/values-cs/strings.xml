@@ -925,6 +925,12 @@
     <string name="frame_rate_switching_always">Vždy</string>
     <string name="frame_rate_switching_seamless_only">Jen plynule</string>
     <string name="frame_rate_switching_off">Vypnuto</string>
+    <string name="frame_rate_switching_follow_system">Podle systému</string>
+    <string name="frame_rate_switching_never">Nikdy</string>
+    <string name="frame_rate_switching_follow_system_summary">%1$s · %2$s</string>
+    <string name="frame_rate_switching_follow_system_choice">Systém: %1$s</string>
+    <string name="frame_rate_switching_follow_system_help">Použije nastavení televizoru</string>
+    <string name="frame_rate_switching_force_help">Přepne, i když to nastavení televizoru nedovoluje</string>
     <string name="frame_rate_switching_always_help">Přepne televizor na snímkovou frekvenci videa, i když obrazovka na chvíli zčerná</string>
     <string name="frame_rate_switching_seamless_help">Přepne jen tehdy, když to televizor zvládne bez zčernání obrazovky</string>
     <string name="frame_rate_switching_off_help">Ponechá aktuální režim zobrazení televizoru</string>

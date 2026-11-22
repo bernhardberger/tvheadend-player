@@ -817,12 +817,13 @@ class AppPlaybackRuntime(
             )
         }
         val streamProfileId = profileOwner.selectedStreamProfileIdFor(profileSelection.currentSession, channelId)
-        val audioResult = audioTracks.loadStoredAudioLocked(channelId) {
+        val liveTarget = AppPlaybackTarget.Live(channelId)
+        val audioResult = audioTracks.loadStoredAudioLocked(liveTarget) {
             recoveryFence == null || canContinueRecoveryLocked(recoveryFence, playWhenReady)
         }
         if (recoveryFence != null && !canContinueRecoveryLocked(recoveryFence, playWhenReady)) return null
         audioResult?.let { return it }
-        val subtitleResult = subtitleTracks.loadStoredSubtitlesLocked(channelId) {
+        val subtitleResult = subtitleTracks.loadStoredSubtitlesLocked(liveTarget) {
             recoveryFence == null || canContinueRecoveryLocked(recoveryFence, playWhenReady)
         }
         if (recoveryFence != null && !canContinueRecoveryLocked(recoveryFence, playWhenReady)) return null
@@ -1274,7 +1275,8 @@ class AppPlaybackRuntime(
         presentationEpoch.publishIfCurrent(expectedPresentationEpoch) {
             if (_activeTarget.value == null) presentation.publishStarting()
         }
-        val selection = currentRecordingPlaybackSelection(session.observation.value, recordingId)
+        val recordingObservation = session.observation.value
+        val selection = currentRecordingPlaybackSelection(recordingObservation, recordingId)
         if (selection == null) {
             if (continueReleased && session.observation.value.currentSession == null) {
                 presentation.publishFailed(AppPlaybackState.Failed(
@@ -1303,6 +1305,11 @@ class AppPlaybackRuntime(
                 },
             )
         }
+        val target = AppPlaybackTarget.Recording(recordingId)
+        val recordingChannel = recordingObservation.dvrEntry(recordingId)?.channelId
+        val choiceResult = audioTracks.loadStoredAudioLocked(target, recordingChannel, canInstall)
+            ?: subtitleTracks.loadStoredSubtitlesLocked(target, recordingChannel, canInstall)
+        if (choiceResult == PlaybackTargetResult.SHUT_DOWN) return choiceResult
         var admission: RecordingPlaybackAdmission? = null
         var installedBinding: PlaybackBinding.Recording? = null
         var committed = false
@@ -1314,12 +1321,12 @@ class AppPlaybackRuntime(
             canInstall = canInstall,
             installTarget = {
                 if (!targetCommands.isOpen()) return@installTargetForPresentation PlaybackTargetResult.SHUT_DOWN
-                when (
-                    val binding = session.bindRecordingPlayback(
-                        selection.currentSession,
-                        selection.recordingId,
-                    )
-                ) {
+                // Bind against the original observation: entry/session changes during the reads
+                // must settle the published start. A profile change also expires this start.
+                val binding = if (choiceResult == PlaybackTargetResult.NOT_READY) {
+                    PlaybackBindingResult.ObservationExpired
+                } else session.bindRecordingPlayback(selection.currentSession, selection.recordingId)
+                when (binding) {
                     is PlaybackBindingResult.Bound -> {
                         admission = binding.binding.admission
                         installedBinding = binding.binding
@@ -2857,8 +2864,9 @@ class AppPlaybackRuntime(
                 presentation.publishPlayerState()
             }
             if (_activeTarget.value != null && livePlaybackObservation.value != LivePlaybackObservation.Departed) {
-                audioTracks.activateAudioAfterInstallLocked()
-                subtitleTracks.activateAfterInstallLocked()
+                val committed = activeTargetEpoch != previousTargetEpoch
+                audioTracks.activateAudioAfterInstallLocked(committed)
+                subtitleTracks.activateAfterInstallLocked(committed)
             }
         }
     }
@@ -3174,9 +3182,16 @@ class AppPlaybackRuntime(
     }
 
     // A committed UI choice outlives the options sheet, including while another command holds the lock.
-    fun useAutomaticAudio() = scope.launch {
-        targetCommands.serialize(onClosed = {}) {
-            audioTracks.applyAutomaticAudioLocked()
+    fun useAutomaticAudio(): Job {
+        val continuity = targetContinuity
+        val target = _activeTarget.value
+        val profile = profileOwner.audioProfileId
+        return scope.launch {
+            targetCommands.serialize(onClosed = {}) {
+                if (target != _activeTarget.value || targetInstallationInProgress) return@serialize
+                if (continuity != targetContinuity || profile != profileOwner.audioProfileId) return@serialize
+                audioTracks.applyAutomaticAudioLocked()
+            }
         }
     }
 
@@ -3204,11 +3219,17 @@ class AppPlaybackRuntime(
         targetCommands.isOpen() && !targetInstallationInProgress && activeTargetEpoch == epoch &&
             state.value.presented
 
-    /** Preview and Back use the same queue. A retired target cannot change its successor's choice. */
-    fun selectQuickListAudio(epoch: Long, override: androidx.media3.common.TrackSelectionOverride?) = scope.launch {
-        targetCommands.serialize(onClosed = {}) {
-            if (!isQuickListTargetCurrent(epoch)) return@serialize
-            audioTracks.selectQuickListAudioLocked(override)
+    fun selectAudio(
+        override: androidx.media3.common.TrackSelectionOverride?,
+        quickListEpoch: Long? = null,
+    ): Job {
+        val epoch = quickListEpoch ?: activeTargetEpoch
+        return scope.launch {
+            targetCommands.serialize(onClosed = {}) {
+                if (epoch == null || epoch != activeTargetEpoch || targetInstallationInProgress) return@serialize
+                if (quickListEpoch != null && !isQuickListTargetCurrent(quickListEpoch)) return@serialize
+                audioTracks.selectAudioLocked(override, enableAudio = quickListEpoch == null)
+            }
         }
     }
 

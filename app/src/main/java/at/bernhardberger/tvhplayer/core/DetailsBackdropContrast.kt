@@ -2,18 +2,22 @@ package at.bernhardberger.tvhplayer.core
 
 import kotlin.math.pow
 
+internal const val DETAILS_LIGHTEST_TINT_CHANNEL = 0x1a
+
 /** Minimum dim for the measured luminance pair, retaining the old floor when it already passes.
  * The measurement includes sRGB compositing (including translucent text), not a linear-light
  * interpolation of luminance: that would unnecessarily flatten even moderately bright art.
  */
-internal fun detailsBackdropDimAlpha(floor: Float, luminanceAt: (Float) -> Pair<Double, Double>): Float {
-    fun passes(alpha: Float): Boolean {
+internal fun detailsBackdropDimAlpha(floor: Float, luminanceAt: (Float) -> Pair<Double, Double>): Float =
+    detailsBackdropDimAlpha(floor, 1f) { alpha ->
         val (foreground, background) = luminanceAt(alpha)
-        return (foreground + .05) / (background + .05) >= 4.55
+        (foreground + .05) / (background + .05) >= 4.55
     }
+
+internal fun detailsBackdropDimAlpha(floor: Float, ceiling: Float, passes: (Float) -> Boolean): Float {
     if (passes(floor)) return floor
     var low = floor
-    var high = 1f
+    var high = ceiling
     repeat(12) {
         val middle = (low + high) / 2f
         if (passes(middle)) high = middle else low = middle
@@ -40,7 +44,8 @@ internal fun detailsBackdropSamples(pixels: IntArray, width: Int, height: Int): 
         for (y in top until bottom) for (x in left until right) {
             val pixel = pixels[y * width + x]
             val coverage = (pixel ushr 24) / 255.0
-            fun channel(shift: Int) = (((pixel shr shift and 255) * coverage + 26 * (1 - coverage)).toInt())
+            fun channel(shift: Int) =
+                ((pixel shr shift and 255) * coverage + DETAILS_LIGHTEST_TINT_CHANNEL * (1 - coverage)).toInt()
             val old = samples[index]
             samples[index] = (maxOf(old shr 16 and 255, channel(16)) shl 16) or
                 (maxOf(old shr 8 and 255, channel(8)) shl 8) or maxOf(old and 255, channel(0))
@@ -86,7 +91,8 @@ internal fun measuredDetailsDim(samples: IntArray, sharp: Boolean, floor: Float,
             val pixel = samples[y * 160 + x]
             val scrim = if (sharp) detailsScrimAlpha((x + 1) / 160f, y / 90f) else 0f
             val alpha = scrim + (1 - scrim) * dim
-            fun channel(shift: Int) = ((pixel shr shift and 255) * (1 - alpha) + 26 * alpha) / 255.0
+            fun channel(shift: Int) =
+                ((pixel shr shift and 255) * (1 - alpha) + DETAILS_LIGHTEST_TINT_CHANNEL * alpha) / 255.0
             val r = channel(16); val g = channel(8); val b = channel(0)
             val background = detailsRelativeLuminance(r, g, b)
             // The wide title can reach the right side; secondary text stays in the left column.

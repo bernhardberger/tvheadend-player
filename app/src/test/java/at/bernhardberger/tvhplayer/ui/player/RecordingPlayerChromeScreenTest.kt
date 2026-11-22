@@ -12,11 +12,15 @@ import at.bernhardberger.tvhplayer.testutil.pressKey
 import at.bernhardberger.tvhplayer.testutil.settleFrames
 import at.bernhardberger.tvhplayer.testutil.holdBack
 import at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore
+import at.bernhardberger.tvhplayer.settings.AudioChoice
+import at.bernhardberger.tvhplayer.settings.AudioTrackChoice
+import at.bernhardberger.tvhplayer.settings.ItemChoiceStore
 
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.edit
 import at.bernhardberger.tvhplayer.settings.dataStore
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileId
+import at.bernhardberger.tvheadend.sdk.core.ServerProfileReadResult
 import android.app.Application
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
@@ -141,6 +145,8 @@ class RecordingPlayerChromeScreenTest {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private lateinit var player: ExoPlayer
     private lateinit var runtime: AppPlaybackRuntime
+    private val trackChoiceData = InMemoryPreferencesDataStore()
+    private val trackChoiceProfile = ServerProfileId.generate()
     private val statsStore = at.bernhardberger.tvhplayer.di.PlayerStatsStore()
     private var playerVisible by androidx.compose.runtime.mutableStateOf(true)
     private val owner = object : LifecycleOwner {
@@ -815,6 +821,28 @@ class RecordingPlayerChromeScreenTest {
         assertEquals("closing the options returns focus to their gear", listOf("player-settings"), focused())
     }
 
+    @Test fun choosingInheritedAudioInTheFullPickerPinsItToTheRecording() {
+        val inherited = AudioTrackChoice("de", MimeTypes.AUDIO_AAC, 0, 2, Format.NO_VALUE)
+        screen(inheritedAudio = inherited)
+        playing()
+        val tracks = Tracks(listOf(audioTrack("a1", "de", true), audioTrack("a2", "en", false)))
+        publishTracks(tracks)
+        val inheritedGroup = tracks.groups.first().mediaTrackGroup
+        assertEquals(inheritedGroup, player.trackSelectionParameters.overrides.values.single().mediaTrackGroup)
+        val recordingChoices = ItemChoiceStore(
+            trackChoiceData, "recording_audio_choices_v1", "recording", "choice", AudioChoice.serializer(), 256,
+        )
+        val recordingId = (runtime.activeTarget.value as AppPlaybackTarget.Recording).recordingId.value
+        assertEquals(null, runBlocking { recordingChoices.read(trackChoiceProfile.value, recordingId) })
+        key(Key.Menu)
+        compose.onNodeWithTag("playback-options-audio").performSemanticsAction(SemanticsActions.RequestFocus)
+        key(Key.DirectionCenter)
+        compose.onNodeWithTag("playback-options-track-1:${inheritedGroup.id}:a1")
+            .performSemanticsAction(SemanticsActions.RequestFocus)
+        key(Key.DirectionCenter)
+        assertEquals(inherited, runBlocking { recordingChoices.read(trackChoiceProfile.value, recordingId) })
+    }
+
     @Test fun statsStayShownUnderOptionsAndBackClosesWithoutDisablingThem() {
         var closed = false
         screen(onClose = { closed = true })
@@ -1214,7 +1242,7 @@ class RecordingPlayerChromeScreenTest {
 
     /** [listed] false: the server never lists the recording, so the screen stays in its loading state. */
     private fun screen(onClose: () -> Unit = {}, listed: Boolean = true, refusedEntry: DvrEntry? = null,
-        settleEntry: Boolean = true): FakeTvheadendSession {
+        settleEntry: Boolean = true, inheritedAudio: AudioTrackChoice? = null): FakeTvheadendSession {
         val recording = DvrEntryId(7)
         val session = FakeTvheadendSession(SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
@@ -1222,10 +1250,16 @@ class RecordingPlayerChromeScreenTest {
             epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create(listOfNotNull(refusedEntry ?: DvrEntry.create(
                 id = recording, state = DvrEntryState.COMPLETED, title = "Zeit im Bild", channelName = "Documentary",
+                channelId = ChannelId(1).takeIf { inheritedAudio != null },
             ).takeIf { listed }))),
         )).apply { scriptRecordingPlaybackSuccess() }
-        val settings = PlayerSettingsStore(InMemoryPreferencesDataStore())
-        val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.IO,
+        val settings = PlayerSettingsStore(trackChoiceData)
+        val profile = inheritedAudio?.let {
+            ServerProfileReadResult.anonymous(
+                trackChoiceProfile, java.net.InetAddress.getLoopbackAddress().hostAddress, 9982,
+            )
+        } ?: ServerProfileReadResult.Missing
+        val profiles = AppProfileOwner(session, FakeServerProfileStore(profile), settings, Dispatchers.IO,
             readProfileForEditing = { ServerProfileEditReadResult.Missing })
         scope.launch { profiles.run() }
         player = ExoPlayer.Builder(context).build()
@@ -1276,6 +1310,13 @@ class RecordingPlayerChromeScreenTest {
         if (listed) {
             // The recordings screen starts the recording before the player opens.
             val install = scope.async {
+                if (inheritedAudio != null) {
+                    profiles.serverProfile.first { it != null }
+                    ItemChoiceStore(
+                        trackChoiceData, "explicit_audio_choices_v1", "channel", "choice",
+                        AudioTrackChoice.serializer(), 64,
+                    ).set(trackChoiceProfile.value, 1, inheritedAudio)
+                }
                 runtime.playRecording(requireNotNull(currentRecordingPlaybackSelection(session.observation.value, recording)),
                     RecordingPlaybackStart.START_OVER)
             }

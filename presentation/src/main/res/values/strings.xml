@@ -1024,6 +1024,12 @@
     <string name="frame_rate_switching_always">Always</string>
     <string name="frame_rate_switching_seamless_only">Only if seamless</string>
     <string name="frame_rate_switching_off">Off</string>
+    <string name="frame_rate_switching_follow_system">Follow system</string>
+    <string name="frame_rate_switching_never">Never</string>
+    <string name="frame_rate_switching_follow_system_summary">%1$s · %2$s</string>
+    <string name="frame_rate_switching_follow_system_choice">System: %1$s</string>
+    <string name="frame_rate_switching_follow_system_help">Uses the TV’s own setting</string>
+    <string name="frame_rate_switching_force_help">Switches even if the TV’s setting doesn’t allow it</string>
     <string name="frame_rate_switching_always_help">Switches the TV to the video’s frame rate, even if the screen goes dark for a moment</string>
     <string name="frame_rate_switching_seamless_help">Switches only when the TV can do it without going dark</string>
     <string name="frame_rate_switching_off_help">Keeps the TV’s current display mode</string>

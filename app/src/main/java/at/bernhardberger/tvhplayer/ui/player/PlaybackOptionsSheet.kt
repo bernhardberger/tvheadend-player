@@ -184,7 +184,7 @@ internal fun PlaybackOptionsSheet(
     quickListTargetEpoch: Long = 0L,
     quickListAvailable: Boolean = true,
     isQuickListTargetCurrent: (Long) -> Boolean = { true },
-    onQuickAudioSelection: ((Long, androidx.media3.common.TrackSelectionOverride?) -> Unit)? = null,
+    onAudioSelection: ((androidx.media3.common.TrackSelectionOverride?, Long?) -> Unit)? = null,
     subtitlesDefault: Boolean = false,
     onDefaultSubtitles: () -> Unit = {},
     subtitleLanguage: String? = null,
@@ -259,20 +259,23 @@ internal fun PlaybackOptionsSheet(
         subtitleLanguage = subtitleLanguage,
         onAutomaticAudio = {
             if (canApply()) {
-                if (quickList != null && onQuickAudioSelection != null) {
+                if (quickList != null && onAudioSelection != null) {
                     quickAudioChanged = true
-                    onQuickAudioSelection(openingEpoch, null)
+                    onAudioSelection(null, openingEpoch)
                 } else onAutomaticAudio()
             }
         },
         onPageChange = onPageChange,
         onAudioTrackSelected = { key ->
             if (canApply()) audioChoices.firstOrNull { it.stableKey == key }?.let {
-                if (quickList != null && onQuickAudioSelection != null) {
-                    quickAudioChanged = true
-                    onQuickAudioSelection(openingEpoch, androidx.media3.common.TrackSelectionOverride(
-                        it.group.mediaTrackGroup, listOf(it.trackIndexInGroup),
-                    ))
+                if (onAudioSelection != null) {
+                    if (quickList != null) quickAudioChanged = true
+                    onAudioSelection(
+                        androidx.media3.common.TrackSelectionOverride(
+                            it.group.mediaTrackGroup, listOf(it.trackIndexInGroup),
+                        ),
+                        openingEpoch.takeIf { quickList != null },
+                    )
                 } else selectAudioTrack(player, it)
             }
         },
@@ -299,10 +302,11 @@ internal fun PlaybackOptionsSheet(
         onQuickListClose = onQuickListClose,
         onQuickListRestore = {
             if (canApply()) {
-                if (page == PlaybackOptionsPage.AUDIO && onQuickAudioSelection != null) {
+                if (page == PlaybackOptionsPage.AUDIO && onAudioSelection != null) {
                     // Enqueue even if the preview has not reached the player yet.
-                    if (quickAudioChanged) onQuickAudioSelection(openingEpoch,
-                        quickListStart.overrides.values.firstOrNull { it.type == C.TRACK_TYPE_AUDIO })
+                    if (quickAudioChanged) onAudioSelection(
+                        quickListStart.overrides.values.firstOrNull { it.type == C.TRACK_TYPE_AUDIO }, openingEpoch,
+                    )
                 } else if (page == PlaybackOptionsPage.SUBTITLES && onSubtitleSelection != null) {
                     if (quickSubtitlesChanged) onSubtitleSelection(
                         quickListStart.overrides.values.firstOrNull { it.type == C.TRACK_TYPE_TEXT },

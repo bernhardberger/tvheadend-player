@@ -129,13 +129,7 @@ class VideoFrameRateTest {
 
     @Test
     fun theSettingAndAndroidVersionDecideHowTheAppVotes() {
-        assertEquals(SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.ALWAYS), surfaceFrameRateRequest(FrameRateSwitching.ALWAYS, 31, 50f))
-        assertEquals(
-            SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.ONLY_IF_SEAMLESS),
-            surfaceFrameRateRequest(FrameRateSwitching.SEAMLESS_ONLY, 34, 50f),
-        )
-        // Before Android 12, Always requests a display mode, not a seamless surface vote.
-        for (sdkInt in 28..30) {
+        for (sdkInt in 28..31) {
             assertEquals(
                 SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.DISPLAY_MODE),
                 surfaceFrameRateRequest(FrameRateSwitching.ALWAYS, sdkInt, 50f),
@@ -143,6 +137,14 @@ class VideoFrameRateTest {
             assertEquals(SurfaceFrameRateRequest(), surfaceFrameRateRequest(FrameRateSwitching.OFF, sdkInt, 50f))
             assertEquals(SurfaceFrameRateRequest(), surfaceFrameRateRequest(FrameRateSwitching.ALWAYS, sdkInt, null))
         }
+        assertEquals(
+            SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.FOLLOW_SYSTEM),
+            surfaceFrameRateRequest(FrameRateSwitching.FOLLOW_SYSTEM, 31, 50f),
+        )
+        assertEquals(
+            SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.DISPLAY_MODE),
+            surfaceFrameRateRequest(FrameRateSwitching.FOLLOW_SYSTEM, 30, 50f),
+        )
         assertEquals(
             SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.SEAMLESS_DEFAULT),
             surfaceFrameRateRequest(FrameRateSwitching.SEAMLESS_ONLY, 30, 50f),
@@ -157,18 +159,24 @@ class VideoFrameRateTest {
     }
 
     @Test
-    fun frameRateSwitchingDefaultsToAlways() {
-        assertEquals(FrameRateSwitching.ALWAYS, resolveFrameRateSwitching(null))
-        assertEquals(FrameRateSwitching.ALWAYS, resolveFrameRateSwitching("bogus"))
-        assertEquals(FrameRateSwitching.SEAMLESS_ONLY, resolveFrameRateSwitching("SEAMLESS_ONLY"))
-        assertEquals(FrameRateSwitching.OFF, resolveFrameRateSwitching("OFF"))
+    fun frameRateSwitchingDefaultsToTheFirstSupportedChoiceWithoutChangingExplicitChoices() {
+        assertEquals(FrameRateSwitching.ALWAYS, resolveFrameRateSwitching(null, 30))
+        assertEquals(FrameRateSwitching.FOLLOW_SYSTEM, resolveFrameRateSwitching(null, 31))
+        assertEquals(FrameRateSwitching.FOLLOW_SYSTEM, resolveFrameRateSwitching("bogus", 31))
+        assertEquals(FrameRateSwitching.ALWAYS, resolveFrameRateSwitching("FOLLOW_SYSTEM", 30))
+        for (sdkInt in 30..31) {
+            assertEquals(FrameRateSwitching.ALWAYS, resolveFrameRateSwitching("ALWAYS", sdkInt))
+            assertEquals(FrameRateSwitching.SEAMLESS_ONLY, resolveFrameRateSwitching("SEAMLESS_ONLY", sdkInt))
+            assertEquals(FrameRateSwitching.OFF, resolveFrameRateSwitching("OFF", sdkInt))
+        }
+        assertEquals(FrameRateSwitching.FOLLOW_SYSTEM, resolveFrameRateSwitching("FOLLOW_SYSTEM", 31))
     }
 
     @Test
     fun aDeclarationIsRequestedAtOnceKeptThroughAGapReplacedByTheNextAndClearedOnReset() {
         val frameRate = PlaybackFrameRate(sdkInt = 31)
         frameRate.onDeclared(40.milliseconds)
-        assertEquals(SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.ALWAYS), frameRate.requested.value)
+        assertEquals(SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.FOLLOW_SYSTEM), frameRate.requested.value)
         assertEquals(40.milliseconds, frameRate.declared.value)
 
         // A live restart gap keeps the display where it is.
@@ -192,13 +200,14 @@ class VideoFrameRateTest {
     @Test
     fun theSettingChangesHowTheDeclaredRateIsAskedFor() {
         val frameRate = PlaybackFrameRate(sdkInt = 31)
+        frameRate.setSwitching(FrameRateSwitching.OFF)
         frameRate.onDeclared(40.milliseconds)
         frameRate.setSwitching(FrameRateSwitching.SEAMLESS_ONLY)
         assertEquals(SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.ONLY_IF_SEAMLESS), frameRate.requested.value)
         frameRate.setSwitching(FrameRateSwitching.OFF)
         assertEquals(SurfaceFrameRateRequest(), frameRate.requested.value)
         frameRate.setSwitching(FrameRateSwitching.ALWAYS)
-        assertEquals(SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.ALWAYS), frameRate.requested.value)
+        assertEquals(SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.DISPLAY_MODE), frameRate.requested.value)
 
         val android11 = PlaybackFrameRate(sdkInt = 30).apply { onDeclared(40.milliseconds) }
         assertEquals(SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.DISPLAY_MODE), android11.requested.value)
@@ -232,8 +241,8 @@ class VideoFrameRateTest {
     @Test
     fun aSurfaceVoteIsSetOnceClearedOnDemandAndRenewedOnARecreatedSurface() {
         val vote = SurfaceFrameRateVote()
-        val fifty = SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.ALWAYS)
-        val twentyFive = SurfaceFrameRateRequest(25f, SurfaceFrameRateChange.ALWAYS)
+        val fifty = SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.FOLLOW_SYSTEM)
+        val twentyFive = SurfaceFrameRateRequest(25f, SurfaceFrameRateChange.FOLLOW_SYSTEM)
         // No surface yet: nothing to set until it exists.
         assertNull(vote.request(fifty))
         assertEquals(fifty, vote.surfaceCreated())
@@ -255,9 +264,10 @@ class VideoFrameRateTest {
     fun aChangedStrategyVotesAgainAndOffOrReleaseClearsTheVote() {
         val vote = SurfaceFrameRateVote()
         vote.surfaceCreated()
-        assertEquals(SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.ALWAYS), vote.request(SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.ALWAYS)))
+        val request = SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.FOLLOW_SYSTEM)
+        assertEquals(request, vote.request(request))
         // Same rate, seamless only now: the surface gets the new strategy.
-        val seamless = SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.ONLY_IF_SEAMLESS)
+        val seamless = SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.SEAMLESS_DEFAULT)
         assertEquals(seamless, vote.request(seamless))
         // Off: the app's earlier vote is cleared; nothing else votes on the surface.
         assertEquals(SurfaceFrameRateRequest(), vote.request(SurfaceFrameRateRequest()))

@@ -49,10 +49,10 @@ class SessionAudioPreferenceTest {
         val text = TrackGroup(Format.Builder().setSampleMimeType(MimeTypes.TEXT_VTT).build())
         f.parameters = f.parameters.buildUpon().addOverride(TrackSelectionOverride(text, listOf(0)))
             .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, true).build()
-        assertEquals(ChannelId(1), f.owner.useAutomatic(f.player))
+        assertEquals(f.target, f.owner.useAutomatic(f.player))
         assertNull(f.owner.rememberExplicitChoice(f.player))
         f.owner.onMediaItemTransition(f.player)
-        f.owner.activate(ChannelId(1), f.player)
+        f.activate()
         assertEquals(listOf(text), f.parameters.overrides.keys.toList())
         assertTrue(C.TRACK_TYPE_AUDIO in f.parameters.disabledTrackTypes)
     }
@@ -64,12 +64,13 @@ class SessionAudioPreferenceTest {
         f.parameters = f.parameters.buildUpon().addOverride(TrackSelectionOverride(f.tracks.groups[0].mediaTrackGroup, listOf(0))).build()
         assertNull(f.owner.useAutomatic(f.player))
         assertTrue(f.parameters.overrides.isEmpty())
-        f.owner.activate(ChannelId(1), f.player)
+        f.activate()
         assertEquals(0, f.selectedIndex())
     }
 
     private inner class Fixture(vararg choices: AudioTrackChoice) {
         val owner = SessionAudioSelection()
+        val target = AppPlaybackTarget.Live(ChannelId(1))
         var parameters = TrackSelectionParameters.DEFAULT_WITHOUT_CONTEXT
         val tracks = Tracks(choices.mapIndexed { index, choice -> Tracks.Group(
             TrackGroup(index.toString(), Format.Builder().setLanguage(choice.language).setSampleMimeType(choice.mimeType)
@@ -84,8 +85,8 @@ class SessionAudioPreferenceTest {
                 else -> error("Unexpected Player call: ${method.name}")
             }
         } as Player
-        init { owner.useProfile(Any(), player); owner.load(ChannelId(1), remembered) }
-        fun activate() = owner.activate(ChannelId(1), player)
+        init { owner.useProfile(Any(), player); owner.load(target, remembered) }
+        fun activate() = owner.activate(target, player)
         fun selectedIndex() = parameters.overrides.values.single().mediaTrackGroup.id.toInt()
     }
 }
