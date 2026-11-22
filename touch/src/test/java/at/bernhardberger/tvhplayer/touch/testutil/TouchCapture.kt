@@ -24,6 +24,7 @@ import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.isRoot
+import androidx.compose.ui.unit.dp
 import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -46,21 +47,19 @@ fun AndroidComposeTestRule<*, out ComponentActivity>.capturePausedPlayer(
     button: (Int) -> SemanticsNodeInteraction,
     setPaused: (Boolean) -> Unit,
 ) {
-    fun assertTransportAction(label: Int) {
-        button(label)
-            .assert(hasContentDescription(activity.getString(label)))
-            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
-            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.ToggleableState))
-            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.StateDescription))
-    }
-
-    assertTransportAction(R.string.player_pause)
+    button(R.string.player_pause).assertTransportAction(activity.getString(R.string.player_pause))
     runOnIdle { setPaused(true) }
-    assertTransportAction(R.string.player_play)
+    button(R.string.player_play).assertTransportAction(activity.getString(R.string.player_play))
     captureTouch("review", "$name-paused", canvas)
     runOnIdle { setPaused(false) }
-    assertTransportAction(R.string.player_pause)
+    button(R.string.player_pause).assertTransportAction(activity.getString(R.string.player_pause))
 }
+
+internal fun SemanticsNodeInteraction.assertTransportAction(description: String) =
+    assert(hasContentDescription(description))
+        .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+        .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.ToggleableState))
+        .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.StateDescription))
 
 /**
  * Writes the current screen as `<group>/<name>.png` under the `touch.captureDir` directory.
@@ -68,7 +67,7 @@ fun AndroidComposeTestRule<*, out ComponentActivity>.capturePausedPlayer(
  * The test's `@Config(qualifiers = canvas.qualifiers)` must match [canvas].
  */
 fun AndroidComposeTestRule<*, out ComponentActivity>.captureTouch(group: String, name: String, canvas: TouchCanvas) {
-    runOnIdle { reserveSystemBars(activity.findViewById<ViewGroup>(android.R.id.content).getChildAt(0), canvas) }
+    reserveSystemBars(canvas)
     // With a dialog open, onRoot() matches the dialog's root too, and a capture of several roots takes
     // Robolectric's screenshot of all windows, which draws each at its origin rather than where its
     // gravity puts it. The frame is the activity's window alone; a test draws a dialog over it once.
@@ -138,6 +137,11 @@ private fun statusBar(canvas: TouchCanvas, density: Float) = (canvas.statusBarDp
 private fun navigationBar(density: Float) = (NAVIGATION_BAR_DP * density).roundToInt()
 
 private const val NAVIGATION_BAR_DP = 24
+
+internal fun AndroidComposeTestRule<*, out ComponentActivity>.reserveSystemBars(canvas: TouchCanvas) = runOnIdle {
+    reserveSystemBars(activity.findViewById<ViewGroup>(android.R.id.content).getChildAt(0), canvas)
+    NAVIGATION_BAR_DP.dp
+}
 
 private fun reserveSystemBars(content: View, canvas: TouchCanvas) {
     val density = content.resources.displayMetrics.density

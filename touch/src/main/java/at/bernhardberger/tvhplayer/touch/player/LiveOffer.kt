@@ -75,9 +75,10 @@ private fun PhoneBehindLive(seconds: Int, modifier: Modifier) {
     BoxWithConstraints(modifier) {
         val available = constraints.maxWidth
         val minimumEllipsis = label.substringBefore(offset) + offset + "…"
-        val fitsEllipsis = seconds == 0 || measure.measure(minimumEllipsis, style, maxLines = 1).size.width <= available
-        val fitsOffset = fitsEllipsis || measure.measure(offset, style, maxLines = 1).size.width <= available
-        val showOffsetOnly = !fitsEllipsis && fitsOffset
+        val fitsLabelOrEllipsis = seconds == 0 || measure.measure(label, style, maxLines = 1).size.width <= available ||
+            measure.measure(minimumEllipsis, style, maxLines = 1).size.width <= available
+        val fitsOffset = fitsLabelOrEllipsis || measure.measure(offset, style, maxLines = 1).size.width <= available
+        val showOffsetOnly = !fitsLabelOrEllipsis && fitsOffset
         Text(
             if (showOffsetOnly) offset else label,
             if (showOffsetOnly) Modifier.clearAndSetSemantics { text = AnnotatedString(label) } else Modifier,
