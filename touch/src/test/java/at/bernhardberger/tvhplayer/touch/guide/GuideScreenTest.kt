@@ -877,21 +877,27 @@ class GuideScreenTest {
     fun channelPageDoesNotShowYesterdaysRowsUnderTodaysTab() {
         val connection = FakeConnection()
         val savedZone = TimeZone.getDefault()
-        val before = Instant.parse("2027-01-15T23:59:58Z")
+        val before = Instant.parse("2027-01-15T23:59:28Z")
+        val boundary = Instant.parse("2027-01-15T23:59:30Z")
         val worker = StandardTestDispatcher()
         try {
             TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
             assertTrue(SystemClock.setCurrentTimeMillis(before.toEpochMilliseconds()))
-            val fixture = ServerGuide(before)
+            val fixture = ServerGuide(Instant.parse("2027-01-15T23:29:30Z"))
             connection.session.publish(fixture.connected())
             showChannelDestination(connection, fixture.first.id, mappingDispatcher = worker)
             compose.waitForIdle()
             worker.scheduler.runCurrent()
             compose.onNodeWithText("Evening News").assertIsDisplayed()
-            assertTrue(SystemClock.setCurrentTimeMillis(before.toEpochMilliseconds() + 5_000))
-            compose.mainClock.advanceTimeBy(5_016)
+            assertTrue(SystemClock.setCurrentTimeMillis(boundary.toEpochMilliseconds()))
+            compose.mainClock.advanceTimeBy(2_032)
+            worker.scheduler.runCurrent()
+            compose.onNodeWithText("Details").performClick()
+            assertEquals("On now opens the programme starting at :30", listOf("2"), details)
+            assertTrue(SystemClock.setCurrentTimeMillis(boundary.toEpochMilliseconds() + 31_000))
+            compose.mainClock.advanceTimeBy(30_032)
             assertEquals("Yesterday's day must not survive midnight while mapping is held",
-                false, compose.onNodeWithText("Evening News").isDisplayed())
+                false, compose.onNodeWithText("Weather").isDisplayed())
         } finally {
             TimeZone.setDefault(savedZone)
             connection.close()
@@ -908,22 +914,39 @@ class GuideScreenTest {
         val tomorrow = GuideClock(now.epochSeconds, zone).today.plusDays(1)
         val start = Instant.fromEpochSeconds(tomorrow.atStartOfDay(zone).toEpochSecond())
         val future = EpgEvent.create(
-            EventId(800), fixture.first.id, start, Instant.fromEpochSeconds(start.epochSeconds + 3600),
+            EventId(800), fixture.first.id, Instant.fromEpochSeconds(start.epochSeconds + 20 * 3600),
+            Instant.fromEpochSeconds(start.epochSeconds + 21 * 3600),
             title = "Kept day programme",
         )
+        val earlier = (0L until 20).map { hour ->
+            val second = start.epochSeconds + hour * 3600
+            EpgEvent.create(
+                EventId(810 + hour), fixture.first.id, Instant.fromEpochSeconds(second),
+                Instant.fromEpochSeconds(second + 3600), title = "Earlier programme $hour",
+            )
+        }
         var release = CompletableDeferred<Unit>()
         try {
             assertTrue(SystemClock.setCurrentTimeMillis(now.toEpochMilliseconds()))
             connection.session.publish(fixture.connected())
-            showChannelDestination(connection, fixture.first.id, initialDay = tomorrow) { release.await() }
+            showChannelDestination(
+                connection, fixture.first.id, initialDay = tomorrow, initialProgramId = future.id.value.toString(),
+            ) { release.await() }
             val loading = compose.onNodeWithContentDescription(compose.activity.getString(SharedR.string.epg_loading))
             loading.assertIsDisplayed()
             compose.runOnIdle {
-                connection.session.publish(fixture.connected(epg = EpgSnapshot.create(fixture.snapshot.events + future)))
-                release.complete(Unit)
+                connection.session.publish(fixture.connected(epg = EpgSnapshot.create(fixture.snapshot.events + earlier)))
             }
             compose.onNodeWithText("Tomorrow").assertIsSelected()
-            compose.onNodeWithText(future.title!!).assertIsDisplayed()
+            compose.onNodeWithText("Earlier programme 0").assertIsDisplayed()
+            compose.runOnIdle {
+                connection.session.publish(
+                    fixture.connected(epg = EpgSnapshot.create(fixture.snapshot.events + earlier + future)),
+                )
+            }
+            assertTrue("The target is revealed when it arrives during coverage",
+                compose.onNodeWithText(future.title!!).isDisplayed())
+            compose.runOnIdle { release.complete(Unit) }
             compose.runOnIdle {
                 release = CompletableDeferred()
                 connection.session.replaceGeneration(fixture.connected())
@@ -1557,6 +1580,7 @@ class GuideScreenTest {
         id: ChannelId,
         mappingDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate,
         initialDay: LocalDate? = null,
+        initialProgramId: String? = null,
         channels: ChannelsViewModel = connection.channels(),
         lifecycleOwner: LifecycleOwner? = null,
         active: () -> Boolean = { true },
@@ -1568,7 +1592,7 @@ class GuideScreenTest {
                 CompositionLocalProvider(LocalLifecycleOwner provides (lifecycleOwner ?: LocalLifecycleOwner.current)) {
                     ChannelPage(
                         session, channels, id.value.toString(), {}, { details += it }, {}, {}, {},
-                        initialDay = initialDay, active = active(),
+                        initialDay = initialDay, initialProgramId = initialProgramId, active = active(),
                         mappingDispatcher = mappingDispatcher, acquisitionContext = EmptyCoroutineContext,
                     )
                 }
