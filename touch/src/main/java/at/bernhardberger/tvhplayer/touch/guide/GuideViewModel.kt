@@ -131,7 +131,10 @@ internal class GuideViewModel(
             val counts = if ("epg" in sincePublished) {
                 context.epgChangeCounts(previous?.input?.observation, input.observation)
             } else ""
-            val rows = GuideOverviewRows(input.viewport.toSet(), previous?.reusableRows(input))
+            val overviewRows = previous?.reusableOverviewRows(input)
+            val overview = input.selection.view == GuideView.Overview
+            val priorRows = if (overview) overviewRows else previous?.reusableDayRows(input)
+            val rows = GuideOverviewRows(input.viewport.toSet(), priorRows)
             val state = traceArtworkMapping(
                 context, "Guide", sincePublished.joinToString("+") + counts, rows = { rows.formattedCount },
             ) {
@@ -146,7 +149,15 @@ internal class GuideViewModel(
                 ensureActive()
                 state
             }
-            GuideMappingResult(input, state, projection, rows, input.rememberDay(state, rows, previous))
+            GuideMappingResult(
+                input, state, projection, rows, input.rememberDay(state, rows, previous),
+                overviewRows = when {
+                    overview -> rows
+                    state.dayDates.getOrNull(state.selectedDay) == (input.selection.day ?: input.clock.today) ->
+                        overviewRows
+                    else -> null
+                },
+            )
         }
 
     /** Asks the server for the [coverage] window's guide unless that request is already running. */
@@ -232,6 +243,7 @@ internal data class GuideMappingResult(
     val projection: GuideEpgProjection? = null,
     val rows: GuideOverviewRows,
     val days: Map<LocalDate, GuideCachedDay> = emptyMap(),
+    private val overviewRows: GuideOverviewRows? = null,
 ) {
     fun daysFor(next: GuideMappingInput): Map<LocalDate, GuideCachedDay> =
         if (input.sameDayOwner(next)) days.filter { (date, day) -> day.isCurrent(next, date) } else emptyMap()
@@ -254,15 +266,23 @@ internal data class GuideMappingResult(
         } ?: true
     }
 
-    fun reusableRows(next: GuideMappingInput): GuideOverviewRows? {
+    fun reusableOverviewRows(next: GuideMappingInput): GuideOverviewRows? =
+        overviewRows?.takeIf {
+            input.sameBrowseOwner(next) && input.clock.today == next.clock.today &&
+                state.dayDates.getOrNull(state.selectedDay) == (next.selection.day ?: next.clock.today) &&
+                sameRowFormat(next)
+        }
+
+    private fun sameRowFormat(next: GuideMappingInput): Boolean =
+        input.clock.zone == next.clock.zone && input.configuration == next.configuration &&
+            input.uses24Hour == next.uses24Hour && input.artwork === next.artwork
+
+    fun reusableDayRows(next: GuideMappingInput): GuideOverviewRows? {
         val date = next.selection.day ?: next.clock.today
-        val cached = days[date]?.takeIf { next.selection.view == GuideView.ByChannel && input.sameDayOwner(next) }
+        val cached = days[date]?.takeIf { input.sameDayOwner(next) }
         if (cached?.canReuseRows(next, date) == true) return cached.rows
         return rows.takeIf {
-            input.scope.profileId == next.scope.profileId &&
-                input.clock.zone == next.clock.zone && input.configuration == next.configuration &&
-                input.uses24Hour == next.uses24Hour && input.artwork === next.artwork &&
-                input.playingId == next.playingId
+            input.scope.profileId == next.scope.profileId && sameRowFormat(next) && input.playingId == next.playingId
         }
     }
 }

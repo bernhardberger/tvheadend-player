@@ -42,24 +42,29 @@ internal data class GuideOverviewRowKey(
     val marks: Map<EpgEvent, GuideOverviewMarks>,
 )
 
-/** Worker-local while preparing; only rows in this publication are retained. */
+/** One publication's prepared rows, including those already visited in this Overview. */
 internal class GuideOverviewRows(
     val viewport: Set<String> = emptySet(),
     previous: GuideOverviewRows? = null,
 ) {
     private val previousRows = previous?.mapped.orEmpty()
     private val previousSchedule = previous?.schedule
+    private val previousProgressInputs = previous?.progressInputs
     private val mapped = mutableMapOf<String, Pair<GuideOverviewRowKey, GuideChannel>>()
     private var schedule: GuideSchedule? = null
+    private var progressInputs: Pair<Long, String?>? = null
     var formattedCount = 0
         private set
 
     fun includes(index: Int, phoneIndex: Int?, id: String): Boolean =
-        index < FIRST_GUIDE_ROWS || (phoneIndex != null && phoneIndex < FIRST_GUIDE_ROWS) || id in viewport
+        index < FIRST_GUIDE_ROWS || (phoneIndex != null && phoneIndex < FIRST_GUIDE_ROWS) ||
+            id in viewport || id in previousRows
 
-    fun schedule(channels: List<Channel>, events: List<EpgEvent>, clock: GuideClock): GuideSchedule =
-        (previousSchedule?.takeIf { it.matches(channels, events, clock) }
+    fun schedule(channels: List<Channel>, events: List<EpgEvent>, clock: GuideClock, playing: String?): GuideSchedule {
+        progressInputs = clock.nowSec to playing
+        return (previousSchedule?.takeIf { it.matches(channels, events, clock) }
             ?: GuideSchedule(channels, events, clock)).also { schedule = it }
+    }
 
     fun marksUnchanged(input: GuideMappingInput): Boolean = mapped.values.all { (key, _) ->
         key.marks.all { (event, marks) ->
@@ -73,6 +78,11 @@ internal class GuideOverviewRows(
         format: (EpgEvent, GuideProgram?) -> GuideProgram,
     ): GuideChannel {
         val (oldKey, oldRow) = previousRows[key.head.id] ?: (null to null)
+        if (oldKey == key && progressInputs == previousProgressInputs) {
+            val prepared = checkNotNull(oldRow)
+            mapped[key.head.id] = key to prepared
+            return prepared
+        }
         val oldEvents = oldKey?.marks?.keys.orEmpty().associateBy { it.id }
         val oldPrograms = oldRow?.let { row ->
             (row.programs + row.day.orEmpty()).associateBy { it.id }
