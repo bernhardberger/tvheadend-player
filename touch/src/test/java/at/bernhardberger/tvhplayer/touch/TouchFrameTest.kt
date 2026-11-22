@@ -5,14 +5,24 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import at.bernhardberger.tvheadend.sdk.core.DvrMutationKind
 import at.bernhardberger.tvhplayer.notices.ConnectionNoticeKind
 import at.bernhardberger.tvhplayer.notices.DvrMutationFeedback
@@ -44,9 +54,11 @@ import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.click
 import androidx.compose.ui.unit.Dp
@@ -63,6 +75,7 @@ import at.bernhardberger.tvhplayer.touch.testutil.TouchCanvas
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouch
 import at.bernhardberger.tvhplayer.touch.ui.Destination
 import at.bernhardberger.tvhplayer.touch.ui.DestinationFrame
+import at.bernhardberger.tvhplayer.touch.ui.LocalDestinationReselections
 import at.bernhardberger.tvhplayer.touch.ui.TouchFrame
 import at.bernhardberger.tvhplayer.ui.MobileDarkColors
 import org.junit.Assert.assertEquals
@@ -103,7 +116,7 @@ class TouchFrameTest {
 
     @Test
     @Config(qualifiers = "en-rUS-w1280dp-h800dp-land-xhdpi")
-    fun destinationContentFadesWhileTheRailStaysPut() {
+    fun destinationFadesOutBeforeTheNextFadesInWhileTheRailStaysPut() {
         var outgoingClicks = 0
         compose.setContent {
             MaterialTheme(colorScheme = MobileDarkColors) {
@@ -128,9 +141,10 @@ class TouchFrameTest {
         var fading = contentPixel()
         compose.mainClock.advanceTimeUntil {
             fading = contentPixel()
-            fading != Color.Red
+            fading.red < 0.75f
         }
         assertTrue("The outgoing red page should be partly faded: $fading", fading.red in 0.1f..<0.99f)
+        assertTrue("The incoming green page must still be transparent: $fading", fading.green < 0.1f)
         assertEquals("Rail item and mark retain their identity and pixels", before, stable.map { it.idAndPixels() })
         compose.onRoot().performTouchInput { click(center) }
         compose.runOnIdle { assertEquals(0, outgoingClicks) }
@@ -141,6 +155,72 @@ class TouchFrameTest {
         selectOnTheNextFrame("Channels")
         assertEquals(Color.Red, contentPixel())
         compose.onNode(heading and hasText("Guide")).assertDoesNotExist()
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
+    fun destinationRestoresItsListAndOpenedRowAfterLeaving() {
+        val restoration = StateRestorationTester(compose)
+        restoration.setContent {
+            MaterialTheme {
+                DestinationFrame { current ->
+                    if (current == Destination.Channels) {
+                        TouchFrame { SavedList() }
+                    }
+                }
+            }
+        }
+        compose.onNodeWithText("Opened row: 0").performClick()
+        compose.onNodeWithTag("saved-list").performScrollToIndex(8)
+        assertSavedList()
+        selectOnTheNextFrame("Channels")
+        assertSavedList()
+        selectOnTheNextFrame("Guide")
+        compose.onNodeWithTag("saved-list").assertDoesNotExist()
+        selectOnTheNextFrame("Channels")
+        assertSavedList()
+        selectOnTheNextFrame("Guide")
+        compose.onNodeWithTag("saved-list").assertDoesNotExist()
+        restoration.emulateSavedInstanceStateRestore()
+        selectOnTheNextFrame("Channels")
+        assertSavedList()
+    }
+
+    @Composable
+    private fun SavedList() {
+        var opened by rememberSaveable { mutableIntStateOf(0) }
+        val list = rememberLazyListState()
+        LazyColumn(state = list, modifier = Modifier.testTag("saved-list")) {
+            items(40) { Text("Row $it") }
+        }
+        Button(onClick = { opened++ }) { Text("Opened row: $opened") }
+        Text("First row: ${list.firstVisibleItemIndex}")
+    }
+
+    private fun assertSavedList() {
+        compose.onNodeWithText("Opened row: 1").assertExists()
+        compose.onNodeWithText("First row: 8").assertExists()
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
+    fun onlyTappingTheSelectedDestinationEmitsAReselection() {
+        val received = mutableListOf<Destination>()
+        compose.setContent {
+            MaterialTheme {
+                DestinationFrame { current ->
+                    val events = LocalDestinationReselections.current
+                    LaunchedEffect(events, current) { events.collect { if (it == current) received += it } }
+                    TouchFrame(initialDestination = current)
+                }
+            }
+        }
+        selectOnTheNextFrame("Channels")
+        compose.runOnIdle { assertEquals(listOf(Destination.Channels), received) }
+        selectOnTheNextFrame("Guide")
+        compose.runOnIdle { assertEquals(listOf(Destination.Channels), received) }
+        selectOnTheNextFrame("Guide")
+        compose.runOnIdle { assertEquals(listOf(Destination.Channels, Destination.Guide), received) }
     }
 
     private fun SemanticsNodeInteraction.idAndPixels(): Pair<Int, List<Color>> {

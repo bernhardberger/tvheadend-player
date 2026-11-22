@@ -6,6 +6,7 @@ import androidx.activity.compose.BackHandler
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -47,10 +48,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -62,6 +65,11 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.window.core.layout.WindowSizeClass
 import at.bernhardberger.tvhplayer.touch.R
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.launch
 
 internal enum class Destination(
     @param:StringRes val label: Int,
@@ -78,7 +86,13 @@ private data class FrameBars(val top: Boolean = true, val navigation: Boolean = 
 // The rendered destination owns its page chrome; the shell owns the navigation and notice host.
 private val LocalReportFrameBars = staticCompositionLocalOf<((FrameBars) -> Unit)?> { null }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+/** The shown page may collect taps on its already selected destination; events are not replayed. */
+internal val LocalDestinationReselections = staticCompositionLocalOf<Flow<Destination>> { emptyFlow() }
+
+// AnimatedContent's default fade timings; the theme's spring effects have no fixed delay.
+private const val DESTINATION_EXIT_MILLIS = 90
+private const val DESTINATION_ENTER_MILLIS = 220
+
 @Composable
 internal fun DestinationFrame(
     initialDestination: Destination = Destination.Channels,
@@ -86,20 +100,32 @@ internal fun DestinationFrame(
 ) {
     var selected by rememberSaveable { mutableStateOf(initialDestination) }
     var bars by remember { mutableStateOf(FrameBars()) }
-    val motion = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+    val saved = rememberSaveableStateHolder()
+    val taps = remember { MutableSharedFlow<Destination>() }
+    val reselections = remember(taps) { taps.asSharedFlow() }
+    val scope = rememberCoroutineScope()
+    val select: (Destination) -> Unit = {
+        if (it == selected) scope.launch { taps.emit(it) } else selected = it
+    }
     BackHandler(enabled = selected != Destination.Channels) { selected = Destination.Channels }
-    FrameShell(Modifier, Destination.entries, selected, { selected = it }, bars) { padding ->
+    FrameShell(Modifier, Destination.entries, selected, select, bars) { padding ->
         AnimatedContent(
             targetState = selected,
             modifier = Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding),
-            transitionSpec = { (fadeIn(motion) togetherWith fadeOut(motion)) using null },
+            transitionSpec = {
+                val enter = fadeIn(tween(DESTINATION_ENTER_MILLIS, delayMillis = DESTINATION_EXIT_MILLIS))
+                (enter togetherWith fadeOut(tween(DESTINATION_EXIT_MILLIS))) using null
+            },
             label = "Browse destination",
         ) { destination ->
             val report = remember(destination) {
                 { next: FrameBars -> if (destination == selected) bars = next }
             }
-            CompositionLocalProvider(LocalReportFrameBars provides report) {
-                content(destination)
+            CompositionLocalProvider(
+                LocalReportFrameBars provides report,
+                LocalDestinationReselections provides reselections,
+            ) {
+                saved.SaveableStateProvider(destination) { content(destination) }
             }
         }
     }
