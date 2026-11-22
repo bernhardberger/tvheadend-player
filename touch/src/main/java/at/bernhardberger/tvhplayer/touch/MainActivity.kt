@@ -32,8 +32,10 @@ import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.touch.player.PlayerActivity
+import at.bernhardberger.tvhplayer.touch.player.WatchLiveOutcome
 import at.bernhardberger.tvhplayer.touch.player.playingChannelId
 import at.bernhardberger.tvhplayer.touch.player.playingRecordingId
+import at.bernhardberger.tvhplayer.touch.player.watchLiveOutcome
 import at.bernhardberger.tvhplayer.touch.player.watchTunes
 import at.bernhardberger.tvhplayer.touch.player.RecordingRoute
 import at.bernhardberger.tvhplayer.touch.player.recordingStart
@@ -156,17 +158,28 @@ class MainActivity : ComponentActivity() {
             return
         }
         val request = ++watchRequest
+        val profile = owner.liveProfile.value
+        val generation = session.observation.value.currentSession?.generationIdentity
         lifecycleScope.launch {
             val result = runtime.goLive()
-            if (request != watchRequest || !lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return@launch
             val current = runtime.activeTarget.value as? AppPlaybackTarget.Live
-            if (current?.channelId != id) {
-                watch(id.value.toString())
-                return@launch
+            val outcome = watchLiveOutcome(
+                sameConnection = profile == owner.liveProfile.value &&
+                    generation === session.observation.value.currentSession?.generationIdentity,
+                requestActive = request == watchRequest && lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED),
+                sameChannel = current?.channelId == id,
+                sameTarget = current === target,
+                jumpAccepted = result.disposition == TimeshiftCommandDisposition.ACCEPTED,
+            )
+            when (outcome) {
+                WatchLiveOutcome.Ignore -> Unit
+                WatchLiveOutcome.WatchAsUsual -> watch(id.value.toString())
+                WatchLiveOutcome.OpenPlayer, WatchLiveOutcome.PlayAndOpenPlayer -> {
+                    // A refused jump still returns to playback as it stands.
+                    if (outcome == WatchLiveOutcome.PlayAndOpenPlayer) runtime.play()
+                    startActivity(PlayerActivity.intent(this@MainActivity, id))
+                }
             }
-            // A refused jump (or superseded target) still returns to playback as it stands.
-            if (current === target && result.disposition == TimeshiftCommandDisposition.ACCEPTED) runtime.play()
-            startActivity(PlayerActivity.intent(this@MainActivity, id))
         }
     }
 

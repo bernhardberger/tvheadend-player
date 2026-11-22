@@ -48,6 +48,21 @@ internal fun playingChannelId(target: AppPlaybackTarget?, state: AppPlaybackStat
 /** Watch on the channel that plays brings its player back without tuning again; any other channel tunes. */
 internal fun watchTunes(channelId: ChannelId, playingId: ChannelId?): Boolean = channelId != playingId
 
+internal enum class WatchLiveOutcome { Ignore, WatchAsUsual, OpenPlayer, PlayAndOpenPlayer }
+
+internal fun watchLiveOutcome(
+    sameConnection: Boolean,
+    requestActive: Boolean,
+    sameChannel: Boolean,
+    sameTarget: Boolean,
+    jumpAccepted: Boolean,
+): WatchLiveOutcome = when {
+    !sameConnection || !requestActive -> WatchLiveOutcome.Ignore
+    !sameChannel -> WatchLiveOutcome.WatchAsUsual
+    sameTarget && jumpAccepted -> WatchLiveOutcome.PlayAndOpenPlayer
+    else -> WatchLiveOutcome.OpenPlayer
+}
+
 /** The recording the runtime is playing or starting, including while its player is in PiP. */
 internal fun playingRecordingId(target: AppPlaybackTarget?, state: AppPlaybackState): DvrEntryId? =
     when (state) {

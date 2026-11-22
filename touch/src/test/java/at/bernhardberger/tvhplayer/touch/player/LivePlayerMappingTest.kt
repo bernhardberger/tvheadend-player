@@ -370,6 +370,26 @@ class LivePlayerMappingTest {
     }
 
     @Test
+    fun watchLiveOnlyCompletesOnItsOriginalConnection() {
+        assertEquals(
+            "A connection change must not retune the old channel ID",
+            WatchLiveOutcome.Ignore,
+            watchLiveOutcome(false, requestActive = true, sameChannel = false, sameTarget = false, jumpAccepted = true),
+        )
+        assertEquals(
+            "Even a matching channel ID on another connection must not open the player",
+            WatchLiveOutcome.Ignore,
+            watchLiveOutcome(false, requestActive = true, sameChannel = true, sameTarget = false, jumpAccepted = true),
+        )
+
+        assertEquals(WatchLiveOutcome.Ignore, watchLiveOutcome(true, false, false, false, true))
+        assertEquals(WatchLiveOutcome.WatchAsUsual, watchLiveOutcome(true, true, false, false, true))
+        assertEquals(WatchLiveOutcome.OpenPlayer, watchLiveOutcome(true, true, true, true, false))
+        assertEquals(WatchLiveOutcome.OpenPlayer, watchLiveOutcome(true, true, true, false, true))
+        assertEquals(WatchLiveOutcome.PlayAndOpenPlayer, watchLiveOutcome(true, true, true, true, true))
+    }
+
+    @Test
     fun windowFollowsThePictureInsideAndroidsAspectLimits() {
         val player = Proxy.newProxyInstance(ExoPlayer::class.java.classLoader, arrayOf(ExoPlayer::class.java)) {
                 _, method, _ ->
