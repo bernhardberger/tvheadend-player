@@ -772,7 +772,7 @@ only.
 - The destination's name ("Channels", "Guide") is the header row's pane title
   for TalkBack. List and Grid also draw "Channels" as a static one-line
   heading in the Settings heading's `headlineMedium` and `onSurface`, at the
-  header start on the content's leading edge (trial 2026-11-21); Immersive and the Guide draw no title, as the drawer already
+  header start on the content's leading edge (accepted 2026-11-22); Immersive and the Guide draw no title, as the drawer already
   says where you are (accepted 2026-10-24). Its Tags and View options buttons sit
   20dp apart on the header row at y28 of the 960×540 reference canvas, 24dp
   before the wall clock, which ends on the trailing inset. At larger text the

@@ -1,10 +1,22 @@
 # Changelog
 
-## Unreleased
+## 0.5.4
+
+### Browse and player
+
+- Home, Channels, Guide, Recordings and the player show the time and date at the top right. On Home the clock moves from before the buttons to the end of the row, and the player's clock gains the date.
+- Channels shows its title in List and Grid. Scrolled rows fade out below it.
+
+### Recordings
+
+- A recording that comes back after standby says *Resuming playback* until it plays again, like live TV. Before, it showed only a spinner (#50).
 
 ### Playback
 
-- On Android 12 and later, *Match content frame rate* offers Follow system (the default), Always, Only if seamless, and Off. Follow system follows the TV's choice and shows it when Android makes it available. Always switches to the video's frame rate even if the TV's own setting doesn't allow it, and the screen may briefly go dark. If you previously used Always without setting a display refresh rate, choose Follow system to keep the earlier behavior. Android 9 to 11 are unchanged.
+- On Android 12 and later, *Match content frame rate* offers Follow system, Always, Only if seamless and Off. Android 9 to 11 are unchanged.
+  - Follow system is the default if you never changed the setting. It follows the TV's choice and shows it when Android makes it available.
+  - Always switches to the video's frame rate even if the TV's own setting doesn't allow it, and the screen may briefly go dark. If you previously chose Always without setting a *Display refresh rate*, choose Follow system to keep the earlier behavior.
+  - With a *Display refresh rate* set, Follow system keeps that rate during playback unless the TV allows every frame rate change. If you never changed *Match content frame rate*, choose Always to keep the earlier switching.
 
 ## 0.5.3
 
