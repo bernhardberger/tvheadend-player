@@ -84,12 +84,7 @@ internal fun GuideScreen(
     val layout = guideLayout()
     val listed = state.listed
     val channel = state.channels.firstOrNull { it.id == channelId } ?: state.channels.firstOrNull()
-    val pageKey = "${view.name}:${channel?.id}:${state.dayDates.getOrNull(dayIndex) ?: dayIndex}"
-    var openedPage by rememberSaveable { mutableStateOf(pageKey) }
-    var openedId by rememberSaveable { mutableStateOf(initiallyOpen) }
-    val openId = openedId.takeIf { openedPage == pageKey }
-    LaunchedEffect(pageKey) { if (openedPage != pageKey) openedId = null }
-    val onOpen: (String?) -> Unit = { openedPage = pageKey; openedId = it }
+    val (openId, onOpen) = rememberOpenedGuideRow(state, view, channel, dayIndex, initiallyOpen)
     val details = state.details
     val page = details != null
 
@@ -122,6 +117,47 @@ internal fun GuideScreen(
             GuidePages(state, layout, view, channel, dayIndex, openId, onOpen, actions)
         }
     }
+}
+
+@Composable
+private fun rememberOpenedGuideRow(
+    state: GuideState, view: GuideView, channel: GuideChannel?, dayIndex: Int, initiallyOpen: String?,
+): Pair<String?, (String?) -> Unit> {
+    val pageKey = "${view.name}:${channel?.id}:${state.dayDates.getOrNull(dayIndex) ?: dayIndex}"
+    var openedPage by rememberSaveable { mutableStateOf(pageKey) }
+    var openedId by rememberSaveable { mutableStateOf(initiallyOpen) }
+    var owner by rememberSaveable { mutableStateOf(state.overviewOwner(initiallyOpen)) }
+    val lostRow = state.availability == GuideAvailability.Current && openedId?.let {
+        state.lostOpenedRow(view, channel, dayIndex, it, owner)
+    } == true
+    val openId = openedId.takeIf { openedPage == pageKey && !lostRow }
+    LaunchedEffect(pageKey, state.listed, lostRow) {
+        if (lostRow || state.listed && openedPage != pageKey) openedId = null
+    }
+    return openId to { id ->
+        openedPage = pageKey
+        openedId = id
+        owner = state.overviewOwner(id)
+    }
+}
+
+private fun GuideState.overviewOwner(id: String?): String? =
+    id?.let { channels.firstOrNull { row -> row.programs.any { it.id == id } }?.id }
+
+private fun GuideState.lostOpenedRow(
+    view: GuideView, channel: GuideChannel?, dayIndex: Int, id: String, owner: String?,
+): Boolean = when (view) {
+    GuideView.Overview -> {
+        val row = channels.firstOrNull { it.id == owner }
+        when {
+            row?.overviewPending == true -> false
+            row != null -> row.programs.none { it.id == id }
+            owner != null -> true
+            else -> channels.none { it.programs.any { program -> program.id == id } }
+        }
+    }
+    GuideView.ByChannel -> channel == null ||
+        dayProgramsFor(channel, dayIndex)?.none { it.id == id } == true
 }
 
 /** The view switch under the top bar once there is a list; the first load's progress line before. */

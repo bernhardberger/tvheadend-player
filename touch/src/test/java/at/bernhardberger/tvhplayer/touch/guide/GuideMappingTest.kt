@@ -231,6 +231,12 @@ class GuideMappingTest {
         val tomorrow = clock.copy(nowSec = NOW + DAY_SEC)
         assertEquals("Midnight does not change the chosen date", selectedDate.toString(), state(selection, listOf(later, earlier), tomorrow).date)
         assertEquals("A removed date returns to today", state(GuideSelection()).date, state(selection, listOf(earlier)).date)
+        val daysLater = clock.copy(nowSec = NOW + 4 * DAY_SEC)
+        assertEquals(
+            "An expired date returns to today after several days",
+            state(GuideSelection(), at = daysLater).date,
+            state(selection, listOf(later, earlier), daysLater).date,
+        )
     }
 
     @Test

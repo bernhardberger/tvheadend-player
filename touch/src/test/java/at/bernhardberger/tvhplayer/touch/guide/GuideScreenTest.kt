@@ -245,6 +245,12 @@ class GuideScreenTest {
 
         compose.onNodeWithText("Watch").performClick()
         assertEquals(listOf("ridge-earth"), watched)
+        state = fixture.copy(channels = fixture.channels.map { channel ->
+            channel.copy(day = (channel.day ?: channel.programs).filterNot { it.id == RIDGE_LIGHT_ID })
+        })
+        compose.onNodeWithText("60m • 2024 • Documentary").assertDoesNotExist()
+        state = fixture
+        compose.onNodeWithText("60m • 2024 • Documentary").assertDoesNotExist()
 
         swipeDay(left = true, tablet = true)
         compose.onNodeWithText(fixture.days[1]).assertIsSelected()
@@ -256,6 +262,22 @@ class GuideScreenTest {
         compose.onNodeWithText("No schedule").assertIsDisplayed()
         compose.onNodeWithText("Watch").performClick()
         assertEquals(listOf("ridge-earth", otherChannel.id), watched)
+    }
+
+    @Test
+    @Config(qualifiers = TABLET)
+    fun anOpenedProgramDoesNotReopenAfterLeavingItsList() {
+        val fixture = overviewFixture()
+        var state by mutableStateOf(fixture)
+        show(fixture, state = { state })
+        compose.onAllNodesWithText("Coastal Miles")[0].performClick()
+        compose.onNodeWithText(COASTAL_MILES_SYNOPSIS_START, substring = true).assertIsDisplayed()
+        state = fixture.copy(channels = fixture.channels.map { channel ->
+            channel.copy(programs = channel.programs.filterNot { it.title == "Coastal Miles" })
+        })
+        compose.onNodeWithText(COASTAL_MILES_SYNOPSIS_START, substring = true).assertDoesNotExist()
+        state = fixture
+        compose.onNodeWithText(COASTAL_MILES_SYNOPSIS_START, substring = true).assertDoesNotExist()
     }
 
     @Test
@@ -462,6 +484,30 @@ class GuideScreenTest {
         compose.onNodeWithContentDescription("Back").performClick()
         compose.onNodeWithText("Overview").assertIsDisplayed()
         assertEquals("The page's Back button clears Details too", listOf<String?>(null), details)
+    }
+
+    @Test
+    @Config(qualifiers = PHONE, instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.common.TimeConverterKt"])
+    fun aMissingProgramClosesDetailsWithoutReopeningOnASubsequentPublication() {
+        val connection = FakeConnection()
+        val now = Instant.parse("2027-01-15T12:00:00Z")
+        val server = ServerGuide(now)
+        try {
+            assertTrue(SystemClock.setCurrentTimeMillis(now.toEpochMilliseconds()))
+            connection.session.publish(server.connected())
+            showDestination(connection) {}
+            compose.onNodeWithText("Evening News").performClick()
+            compose.onNodeWithText("Details").performClick()
+            compose.onNodeWithText("Overview").assertDoesNotExist()
+            compose.runOnIdle {
+                connection.session.publish(server.connected(epg = EpgSnapshot.create(server.snapshot.events.drop(1))))
+            }
+            compose.onNodeWithText("Overview").assertIsDisplayed()
+            compose.runOnIdle { connection.session.publish(server.connected()) }
+            compose.onNodeWithText("Overview").assertIsDisplayed()
+        } finally {
+            connection.close()
+        }
     }
 
     @Test

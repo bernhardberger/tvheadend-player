@@ -113,6 +113,13 @@ class RecordingsScreenTest {
         compose.onNodeWithText("Field Desk").assertIsNotSelected()
         compose.onNode(hasClickAction() and hasText("Westvale – Ridge Town", substring = true)).assertIsSelected()
         capture("tablet-recordings-playing", TouchCanvas.TABLET)
+
+        state.value = flatFixture().let { fixture ->
+            fixture.copy(root = fixture.root.copy(recordings = fixture.root.recordings.filterNot { it.id == PickedId }))
+        }
+        compose.onNodeWithText("Pick a recording to see it here").assertIsDisplayed()
+        state.value = flatFixture()
+        compose.onNodeWithText("Pick a recording to see it here").assertIsDisplayed()
     }
 
     @Test
@@ -316,6 +323,25 @@ class RecordingsScreenTest {
         assertActionRow(continueButton(), stacked = false)
         assertFullSingleLineLabel(continueButton())
         assertPlayingActions()
+
+        val fixture = foldersFixture()
+        state.value = fixture.copy(root = fixture.root.copy(folders = emptyList(), recordingCount = 0))
+        compose.onNodeWithText("Watch from beginning").assertDoesNotExist()
+        state.value = fixture
+        compose.onNodeWithText("Watch from beginning").assertDoesNotExist()
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
+    fun aRemovedFolderDoesNotReopenWhenTheArchiveChangesAgain() {
+        val fixture = foldersFixture()
+        state.value = fixture
+        show(initialPath = WeekPath)
+        compose.onNodeWithText("Week 46").assertIsDisplayed()
+        state.value = fixture.copy(root = fixture.root.copy(folders = emptyList(), recordingCount = 0))
+        compose.onNodeWithText("Week 46").assertDoesNotExist()
+        state.value = fixture
+        compose.onNodeWithText("Sport").assertIsDisplayed()
     }
 
     @Test

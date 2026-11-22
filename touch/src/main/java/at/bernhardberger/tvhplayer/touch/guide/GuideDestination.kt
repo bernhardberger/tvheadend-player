@@ -173,6 +173,7 @@ private fun GuideSelection.availableIn(state: GuideState): GuideSelection = copy
     day = day?.takeIf { it in state.dayDates },
     jump = state.jumpTimes.getOrNull(state.selectedJump - 1),
     channelId = channelId?.takeIf { id -> state.channels.any { it.id == id } },
+    detailsId = detailsId.takeUnless { state.availability == GuideAvailability.Current && state.details == null },
 )
 
 private fun firstLoadWait(state: GuideState, input: GuideMappingInput): String? = when {
