@@ -6,7 +6,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -42,17 +44,20 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.core.app.MultiWindowModeChangedInfo
 import androidx.core.util.Consumer
@@ -201,7 +206,7 @@ private fun BoxScope.LandscapePlayer(
     reveal: (() -> Unit)?,
     sheet: Boolean,
 ) {
-    Picture(state, layout, controls, toggle, video, inWindow, opacity)
+    Picture(state, layout, controls, toggle, video, inWindow, opacity, onAction)
     if (inWindow) return
     val notice = remember(layout) { LandscapeNoticeAnchor() }
     val footer = state.status !is LivePlayerStatus.Reconnecting && state.status != LivePlayerStatus.PauseEnded
@@ -269,7 +274,7 @@ private fun UprightPlayer(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(pictureFrame.background(Color.Black)) {
-            Picture(state, layout, controls, toggle, video, inWindow, opacity)
+            Picture(state, layout, controls, toggle, video, inWindow, opacity, onAction)
             if (!inWindow) {
                 val activity = LocalActivity.current as? ComponentActivity
                 var inMultiWindow by remember(activity) { mutableStateOf(activity?.isInMultiWindowMode == true) }
@@ -371,6 +376,7 @@ private fun BoxScope.Picture(
     video: (@Composable (Modifier) -> Unit)?,
     inWindow: Boolean,
     opacity: State<Float>,
+    onAction: (PlayerAction) -> Unit,
 ) {
     val playing = state.status == LivePlayerStatus.Playing
     val reconnecting = state.status is LivePlayerStatus.Reconnecting
@@ -394,9 +400,35 @@ private fun BoxScope.Picture(
     }
     if (toggle != null) {
         val label = stringResource(if (controls) R.string.player_hide_controls else R.string.player_show_controls)
+        val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+        var lastDownOnLeft by remember { mutableStateOf<Boolean?>(null) }
         Box(
             Modifier.matchParentSize().testTag("player-picture").semantics { contentDescription = label }
-                .clickable(interactionSource = null, indication = null, role = Role.Button, onClick = toggle),
+                .pointerInput(Unit) {
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                        lastDownOnLeft = down.position.x < size.width / 2f
+                    }
+                }
+                .onPreviewKeyEvent {
+                    // A keyboard double activation must not seek using a stale touch position.
+                    lastDownOnLeft = null
+                    false
+                }
+                .combinedClickable(
+                    interactionSource = null, indication = null, role = Role.Button, onClick = toggle,
+                    onDoubleClick = {
+                        val left = lastDownOnLeft
+                        // Match the transport row: Back at the start, Forward at the end.
+                        if (left == null) {
+                            toggle()
+                        } else {
+                            val action = if (left != rtl) PlayerAction.BackTen.takeIf { state.seekable }
+                            else PlayerAction.ForwardThirty.takeIf { state.canSkipForward }
+                            action?.let(onAction)
+                        }
+                    },
+                ),
         )
     }
 }
