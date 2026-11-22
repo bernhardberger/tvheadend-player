@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.touch
 
 import android.content.pm.ApplicationInfo
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import org.robolectric.shadows.ShadowLog
 
@@ -109,6 +110,7 @@ import kotlin.time.Instant
 import kotlin.time.Duration.Companion.hours
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -540,6 +542,7 @@ class TouchAppTest {
     }
 
     @Test
+    @Config(instrumentedPackages = ["at.bernhardberger.tvhplayer.touch.TouchAppKt"])
     fun channelsIgnoreEpgUpdatesOutsideTheirRowsButShowAChangedCurrentProgram() {
         val info = compose.activity.applicationInfo
         val oldFlags = info.flags
@@ -547,7 +550,9 @@ class TouchAppTest {
         ShadowLog.clear()
         fun mappings() = ShadowLog.getLogsForTag("TouchArtwork").count { it.msg.startsWith("mapped Channels ") }
         try {
-            val guide = savedConnectionWithGuide()
+            val now = Instant.parse("2027-01-16T12:00:05Z")
+            assertTrue(SystemClock.setCurrentTimeMillis(now.toEpochMilliseconds()))
+            val guide = savedConnectionWithGuide(now)
             compose.onNodeWithText(guide.programs[0], substring = true).assertIsDisplayed()
             val initial = mappings()
             assertTrue(initial > 0)
@@ -558,6 +563,22 @@ class TouchAppTest {
             }
             compose.onNodeWithText("Updated News", substring = true).assertIsDisplayed()
             compose.runOnIdle { assertEquals("One mapping for one visible publication", initial + 1, mappings()) }
+
+            openGuide()
+            openRecordings()
+            back()
+            compose.runOnIdle { assertEquals("An unchanged return reuses the last mapping", initial + 1, mappings()) }
+
+            openGuide()
+            compose.runOnIdle { connection.session.publish(guide.connected(epg = guide.refreshedEpg("Hidden News"))) }
+            openRecordings()
+            compose.runOnIdle {
+                connection.session.publish(guide.connected(epg = guide.refreshedEpg("Latest News")))
+            }
+            compose.runOnIdle { assertEquals("Neither hidden destination starts a mapping", initial + 1, mappings()) }
+            back()
+            compose.onNodeWithText("Latest News", substring = true).assertIsDisplayed()
+            compose.runOnIdle { assertEquals("Only the latest hidden update is mapped", initial + 2, mappings()) }
         } finally {
             info.flags = oldFlags
         }
@@ -599,9 +620,67 @@ class TouchAppTest {
                 assertEquals("The off-minute boundary maps once", initial + 2, mappings().size)
                 assertTrue(mappings().last().msg.contains("reason=boundary"))
             }
+
+            compose.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
+            advance(77, 60_016)
+            compose.runOnIdle {
+                assertEquals("The stopped activity must not map at a clock wake", initial + 2, mappings().size)
+            }
+            connection.session.publish(guide.connected(epg = guide.refreshedEpg()))
+            connection.session.publish(guide.connected(emptyList()))
+            compose.runOnIdle {
+                assertEquals("The stopped activity must not map a publication", initial + 2, mappings().size)
+            }
+            compose.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
+            compose.runOnIdle { assertEquals("Resume combines clock and data into one pass", initial + 3, mappings().size) }
         } finally {
             info.flags = oldFlags
         }
+    }
+
+    @Test
+    fun channelsShowsKeptRowsBeforeMappingCanRunAgain() {
+        val dispatcher = mutableStateOf<CoroutineDispatcher>(Dispatchers.Main.immediate)
+        val guide = savedConnectionWithGuide(mappingDispatcher = { dispatcher.value })
+        val held = StandardTestDispatcher()
+        fun holdMapping() = compose.runOnIdle { dispatcher.value = held }
+        fun releaseMapping() = compose.runOnIdle { dispatcher.value = Dispatchers.Main.immediate }
+        val loading = compose.onNodeWithText(label(R.string.channels_loading))
+        val original = compose.onNodeWithText(guide.programs[0], substring = true)
+        val mappedAfterReturn = compose.onNodeWithText("Back to Channels", substring = true)
+        original.assertIsDisplayed()
+
+        openRecordings()
+        holdMapping()
+        connection.session.publish(guide.connected(epg = guide.refreshedEpg("Back to Channels")))
+        back()
+        loading.assertDoesNotExist()
+        original.assertIsDisplayed()
+        releaseMapping()
+        mappedAfterReturn.assertIsDisplayed()
+
+        holdMapping()
+        compose.waitForIdle()
+        compose.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
+        // Re-enter with a publication queued while stopped and no mapping dispatcher available.
+        connection.session.publish(guide.connected(epg = guide.refreshedEpg("After Stop")))
+        compose.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
+        loading.assertDoesNotExist()
+        mappedAfterReturn.assertIsDisplayed()
+        releaseMapping()
+        val mappedAfterStop = compose.onNodeWithText("After Stop", substring = true)
+        mappedAfterStop.assertIsDisplayed()
+
+        holdMapping()
+        recreate()
+        loading.assertDoesNotExist()
+        mappedAfterStop.assertIsDisplayed()
+
+        compose.onNodeWithContentDescription(label(R.string.channels_connection_settings)).performClick()
+        compose.onNode(heading and hasText(label(SharedR.string.server_list_title))).assertIsDisplayed()
+        back()
+        loading.assertDoesNotExist()
+        mappedAfterStop.assertIsDisplayed()
     }
 
     @Test
@@ -1281,9 +1360,12 @@ class TouchAppTest {
         compose.waitForIdle()
     }
 
-    private fun savedConnectionWithGuide(now: Instant? = null): ServerGuide {
+    private fun savedConnectionWithGuide(
+        now: Instant? = null,
+        mappingDispatcher: () -> CoroutineDispatcher = { Dispatchers.Main.immediate },
+    ): ServerGuide {
         runBlocking { connection.store.addAnonymous(server.host, server.port, "Home server", true) }
-        show()
+        show(mappingDispatcher)
         val guide = ServerGuide(now ?: Clock.System.now())
         connection.session.publish(guide.connected())
         compose.waitForIdle()
@@ -1299,7 +1381,7 @@ class TouchAppTest {
 
     private var content: @Composable () -> Unit = {}
 
-    private fun show() {
+    private fun show(mappingDispatcher: () -> CoroutineDispatcher = { Dispatchers.Main.immediate }) {
         connection.start()
         val presentation = connection.presentation()
         val channels = connection.channels()
@@ -1309,7 +1391,7 @@ class TouchAppTest {
             MaterialTheme(colorScheme = MobileDarkColors) {
                 TouchApp(
                     connection.browseSession, connection.owner, presentation, channels, recordings, guide,
-                    connection.noticeCenter, channelsDispatcher = Dispatchers.Main.immediate,
+                    connection.noticeCenter, channelsDispatcher = mappingDispatcher(),
                 ) {
                     flowOf(TvheadendDiscoveryTestFactory.discovering(listOf(server)))
                 }
