@@ -230,8 +230,8 @@ internal fun RecordButton(
 internal fun OnNowBadge() {
     Surface(
         shape = RoundedCornerShape(6.dp),
-        color = MaterialTheme.colorScheme.primary.copy(alpha = BADGE_ALPHA),
-        contentColor = MaterialTheme.colorScheme.primary,
+        color = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
     ) {
         Text(
             stringResource(R.string.channels_on_now), Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
@@ -361,6 +361,5 @@ internal fun MenuButton(
 internal const val PICTURE_RATIO = 16f / 9f
 internal val PictureShape = RoundedCornerShape(12.dp)
 private const val PICTURE_TRACK_ALPHA = 0.2f
-private const val BADGE_ALPHA = 0.16f
 
 internal val CompactButtonPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)

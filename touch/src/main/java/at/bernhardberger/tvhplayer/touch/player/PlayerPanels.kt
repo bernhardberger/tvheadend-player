@@ -120,6 +120,7 @@ private fun SelectableMenuItem(
         shapes = shapes,
         selectedLeadingIcon = { Icon(painterResource(R.drawable.channels_check), null) },
         supportingText = detail,
+        // Stock tertiaryContainer is orange, reserved here for where the viewer is.
         colors = MenuDefaults.selectableItemColors(
             selectedContainerColor = colors.secondaryContainer,
             selectedTextColor = colors.onSecondaryContainer,

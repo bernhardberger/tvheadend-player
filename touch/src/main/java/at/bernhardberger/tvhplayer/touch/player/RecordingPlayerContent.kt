@@ -143,7 +143,6 @@ internal fun InlineRecordingMarkers(state: RecordingPlayerState, onSeek: (Long) 
             BottomSheetDefaults.DragHandle(
                 Modifier.align(Alignment.CenterHorizontally).height(16.dp)
                     .wrapContentHeight(unbounded = true).clearAndSetSemantics {},
-                color = colors.onSurfaceVariant.copy(alpha = .55f),
             )
             Text(
                 stringResource(R.string.player_markers),

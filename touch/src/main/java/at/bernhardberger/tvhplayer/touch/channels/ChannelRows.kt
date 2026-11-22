@@ -35,6 +35,7 @@ import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.ListItemShapes
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ProgressIndicatorDefaults
 import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.SegmentedListItem
 import androidx.compose.material3.Text
@@ -436,6 +437,7 @@ private fun ChannelProgress(
                 (clock() - airing.first).coerceIn(0L, duration).toFloat() / duration
             }
         }, modifier = modifier, color = fill,
+        trackColor = if (playback != null) scheme.surface else ProgressIndicatorDefaults.linearTrackColor,
     )
 }
 
