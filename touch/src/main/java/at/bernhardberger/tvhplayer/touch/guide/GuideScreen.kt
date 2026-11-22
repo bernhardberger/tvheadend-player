@@ -262,8 +262,10 @@ private fun ByChannel(
             DayBar(state.days, dayIndex, state.date, actions.onDay)
             HorizontalPager(pager, Modifier.fillMaxSize(), key = { keys[it] }) { index ->
                 val page = state.channels[index]
+                val programs = state.dayProgramsFor(page, dayIndex)
+                    .takeIf { page.id == channel.id || state.retainedDays == null }
                 Day(
-                    page, state.dayProgramsFor(page, dayIndex), state.dayLoading, layout,
+                    page, programs, state.dayLoading, layout,
                     openId.takeIf { page.id == channel.id }, onOpen, actions, Modifier.padding(horizontal = 12.dp),
                 )
             }
@@ -324,6 +326,7 @@ private fun rememberGuidePager(keys: List<Any>, selected: Int, onSettle: ((Int) 
 }
 
 private fun GuideState.dayProgramsFor(channel: GuideChannel, dayIndex: Int): List<GuideProgram>? = when {
+    retainedDays != null -> retainedDays[dayDates.getOrNull(dayIndex)]
     dayIndex != selectedDay -> null
     dayDates.isEmpty() -> channel.dayPrograms
     else -> channel.day

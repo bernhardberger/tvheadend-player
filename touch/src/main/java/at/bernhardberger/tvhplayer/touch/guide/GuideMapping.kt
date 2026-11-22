@@ -151,8 +151,12 @@ internal fun GuideMappingInput.epgProjection(): GuideEpgProjection? {
         second > clock.nowSec && GUIDE_JUMP_TIMES.any { date.atTime(it).atZone(clock.zone).toEpochSecond() == second }
     }
     val window = guideWindow(date, jump, clock)
-    val end = maxOf(window.daySec.last + 1, window.anchorSec + OVERVIEW_SPAN_SEC)
+    val byChannel = selection.view == GuideView.ByChannel
+    val selectedChannel = dayChannel
+    val end = if (byChannel) window.daySec.last + 1
+    else maxOf(window.daySec.last + 1, window.anchorSec + OVERVIEW_SPAN_SEC)
     val events = upcoming.asSequence()
+        .filter { !byChannel || it.channelId == selectedChannel }
         .filter { it.stop.epochSeconds > window.daySec.first && it.start.epochSeconds < end }
         .groupBy { it.channelId }
     val details = selection.detailsId?.toLongOrNull()?.let { id -> snapshot.events.firstOrNull { it.id.value == id } }
@@ -180,11 +184,14 @@ internal fun guideCoverage(
     selection: GuideSelection,
     clock: GuideClock,
 ): GuideCoverage? {
-    val ids = scope.scope.visibleChannels.map { it.id }
-    val coverage = guideCoverage(ids, observation, selection, clock) ?: return null
-    return if (selection.view == GuideView.Overview) coverage else {
-        val channel = ids.firstOrNull { it.value.toString() == selection.channelId } ?: ids.first()
-        coverage.copy(channelIds = listOf(channel))
+    val channels = scope.scope.visibleChannels
+    return if (selection.view == GuideView.Overview) {
+        guideCoverage(channels.map { it.id }, observation, selection, clock)
+    } else {
+        val requestedId = selection.channelId?.toLongOrNull()
+        val channel = requestedId?.let { id -> channels.firstOrNull { it.id.value == id } } ?: channels.firstOrNull()
+        val window = guideWindow(maxOf(selection.day ?: clock.today, clock.today), null, clock)
+        channel?.let { GuideCoverage(listOf(it.id), window.daySec.first, window.daySec.last + 1) }
     }
 }
 

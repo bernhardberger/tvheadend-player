@@ -82,6 +82,9 @@ internal class GuideViewModel(
     fun map(context: Context, input: GuideMappingInput) {
         val changes = input.changesFrom(mappingInput)
         if (changes.isEmpty()) return
+        mutableMapped.value?.let {
+            if (it.days.isNotEmpty() && !it.input.sameDayOwner(input)) mutableMapped.value = it.copy(days = emptyMap())
+        }
         mappingInput = input
         // Like the TV's browse preparation: finish the captured projection, then take
         // the newest EPG update. Metadata churn must not starve the first display.
@@ -110,7 +113,7 @@ internal class GuideViewModel(
                 else -> previous?.projection
             }
             if (metadataOnly && previous != null && previous.metadataUnchanged(input, sincePublished, projection)) {
-                return@withContext GuideMappingResult(input, previous.state, projection, previous.rows)
+                return@withContext previous.copy(input = input, projection = projection)
             }
             val counts = if ("epg" in sincePublished) {
                 context.epgChangeCounts(previous?.input?.observation, input.observation)
@@ -130,7 +133,7 @@ internal class GuideViewModel(
                 ensureActive()
                 state
             }
-            GuideMappingResult(input, state, projection, rows)
+            GuideMappingResult(input, state, projection, rows, input.rememberDay(state, rows, previous))
         }
 
     /** Asks the server for the [coverage] window's guide unless that request is already running. */
@@ -172,6 +175,15 @@ internal class GuideMappingInput(
     val playingId: String?,
     val viewport: List<String> = emptyList(),
 ) {
+    val dayChannel get() = scope.scope.visibleChannels.let { channels ->
+        val id = selection.channelId?.toLongOrNull()
+        (id?.let { channels.firstOrNull { channel -> channel.id.value == id } } ?: channels.firstOrNull())?.id
+    }
+
+    fun sameDayOwner(next: GuideMappingInput): Boolean =
+        scope === next.scope && dayChannel == next.dayChannel &&
+            observation.currentSession?.generationIdentity == next.observation.currentSession?.generationIdentity
+
     fun changesFrom(previous: GuideMappingInput?): List<String> {
         if (previous == null) return listOf("initial")
         return buildList {
@@ -196,11 +208,12 @@ private fun MutableList<String>.addObservationChanges(current: SessionObservatio
     if (!current.sameProgrammeAuthority(previous)) add("authority")
 }
 
-internal class GuideMappingResult(
+internal data class GuideMappingResult(
     val input: GuideMappingInput,
     val state: GuideState,
     val projection: GuideEpgProjection? = null,
     val rows: GuideOverviewRows,
+    val days: Map<LocalDate, GuideCachedDay> = emptyMap(),
 ) {
     fun metadataUnchanged(
         next: GuideMappingInput, changes: List<String>, nextProjection: GuideEpgProjection?,
@@ -220,13 +233,45 @@ internal class GuideMappingResult(
         } ?: true
     }
 
-    fun reusableRows(next: GuideMappingInput): GuideOverviewRows? =
-        rows.takeIf {
+    fun reusableRows(next: GuideMappingInput): GuideOverviewRows? {
+        val date = next.selection.day ?: next.clock.today
+        val cached = days[date]?.takeIf { next.selection.view == GuideView.ByChannel && input.sameDayOwner(next) }
+        if (cached?.canReuseRows(next, date) == true) return cached.rows
+        return rows.takeIf {
             input.scope.profileId == next.scope.profileId &&
                 input.clock == next.clock && input.configuration == next.configuration &&
                 input.uses24Hour == next.uses24Hour && input.artwork === next.artwork &&
                 input.playingId == next.playingId
         }
+    }
+}
+
+internal data class GuideCachedDay(
+    val programs: List<GuideProgram>,
+    val rows: GuideOverviewRows,
+    private val clock: GuideClock,
+    private val playingId: String?,
+    private val configuration: Configuration,
+    private val uses24Hour: Boolean,
+    private val artwork: ArtworkModels?,
+) {
+    fun canReuseRows(next: GuideMappingInput, date: LocalDate): Boolean =
+        clock.zone == next.clock.zone && (clock == next.clock || date > next.clock.today) &&
+            playingId == next.playingId && configuration == next.configuration &&
+            uses24Hour == next.uses24Hour && artwork === next.artwork
+}
+
+private fun GuideMappingInput.rememberDay(
+    state: GuideState, rows: GuideOverviewRows, previous: GuideMappingResult?,
+): Map<LocalDate, GuideCachedDay> {
+    val retained = previous?.takeIf { it.input.sameDayOwner(this) }?.days.orEmpty()
+        .filterKeys { it in state.dayDates }
+    val date = state.dayDates.getOrNull(state.selectedDay)
+    val channelId = dayChannel?.value?.toString()
+    val day = state.channels.firstOrNull { it.id == channelId }?.day
+    return if (selection.view == GuideView.ByChannel && date != null && day != null) {
+        retained + (date to GuideCachedDay(day, rows, clock, playingId, configuration, uses24Hour, artwork))
+    } else retained
 }
 
 /** The shown channels and the selected day's window a coverage request asks for. */

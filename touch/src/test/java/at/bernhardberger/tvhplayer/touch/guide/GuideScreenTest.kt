@@ -32,6 +32,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.EpgRepository
+import at.bernhardberger.tvheadend.sdk.core.EpgEvent
+import at.bernhardberger.tvheadend.sdk.core.EpgSnapshot
+import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi
 import at.bernhardberger.tvhplayer.touch.testutil.FakeConnection
@@ -60,6 +63,7 @@ import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.time.Instant
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.currentCoroutineContext
@@ -488,6 +492,52 @@ class GuideScreenTest {
     }
 
     @Test
+    @Config(
+        qualifiers = "en-rUS-w1024dp-h558dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.common.TimeConverterKt"],
+    )
+    fun tabletDayHeadingAndPreviouslyOpenedDayDoNotWaitForMapping() {
+        val connection = FakeConnection()
+        val noon = Instant.parse("2027-01-15T12:00:00Z")
+        val fixture = ServerGuide(noon)
+        val tomorrow = EpgEvent.create(
+            EventId(800), fixture.first.id, Instant.parse("2027-01-16T12:00:00Z"),
+            Instant.parse("2027-01-16T13:00:00Z"), title = "Saturday programme",
+        )
+        val worker = StandardTestDispatcher()
+        fun finishMapping() {
+            compose.waitForIdle()
+            worker.scheduler.runCurrent()
+            compose.waitForIdle()
+        }
+        try {
+            assertTrue(SystemClock.setCurrentTimeMillis(noon.toEpochMilliseconds()))
+            connection.session.publish(fixture.connected(epg = EpgSnapshot.create(fixture.snapshot.events + tomorrow)))
+            showDestination(connection, mappingDispatcher = worker) {}
+            finishMapping()
+            compose.onNodeWithText("By channel").performClick()
+            finishMapping()
+            compose.onNodeWithText("Evening News").assertIsDisplayed()
+            compose.onNodeWithText("Tomorrow").performClick()
+            val dateChanged = compose.onNodeWithText("Saturday, January 16").isDisplayed()
+            finishMapping()
+            compose.onNodeWithText("Saturday programme").assertIsDisplayed()
+            compose.runOnIdle {
+                val revised = fixture.refreshedEpg("Revised Friday programme").events
+                connection.session.publish(fixture.connected(epg = EpgSnapshot.create(revised + tomorrow)))
+            }
+            compose.onNodeWithText("Today").performClick()
+            val returned = compose.onNodeWithText("Evening News").isDisplayed()
+            assertEquals("Heading changes and Today returns before the worker runs", listOf(true, true),
+                listOf(dateChanged, returned))
+            finishMapping()
+            compose.onNodeWithText("Revised Friday programme").assertIsDisplayed()
+        } finally {
+            connection.close()
+        }
+    }
+
+    @Test
     @Config(instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.common.TimeConverterKt"])
     fun coverageFollowsLocalMidnightWithoutWaitingForUtcMidnight() {
         val savedZone = TimeZone.getDefault()
@@ -673,6 +723,7 @@ class GuideScreenTest {
     private fun showDestination(
         connection: FakeConnection,
         shown: () -> Boolean = { true },
+        mappingDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate,
         onCoverage: suspend (Instant) -> Unit,
     ) {
         val fake = connection.session
@@ -687,7 +738,7 @@ class GuideScreenTest {
                 }
             }
         }
-        val guide = GuideViewModel(session, EmptyCoroutineContext, mappingDispatcher = Dispatchers.Main.immediate)
+        val guide = GuideViewModel(session, EmptyCoroutineContext, mappingDispatcher = mappingDispatcher)
         val channels = connection.channels()
         val presentation = connection.presentation()
         compose.setContent {
