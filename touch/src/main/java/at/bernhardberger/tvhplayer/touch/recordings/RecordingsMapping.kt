@@ -237,5 +237,5 @@ private val DvrDateSection.rowDates: RowDates
         DvrDateSection.Undated -> RowDates.None
     }
 
-private const val ROOT_ID = "root"
+internal const val ROOT_ID = "root"
 private const val RECORDING_NOW_ID = "recording-now"

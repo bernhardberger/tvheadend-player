@@ -16,6 +16,7 @@ import at.bernhardberger.tvheadend.sdk.core.DvrConfigurationsState
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
+import at.bernhardberger.tvhplayer.core.DvrArchiveView
 import at.bernhardberger.tvhplayer.core.DvrDateSection
 import at.bernhardberger.tvhplayer.core.programmeCategory
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
@@ -51,7 +52,7 @@ internal fun RecordingsDestination(
     ArtworkScreenShown("Recordings")
     val presentation by connection.uiState.collectAsStateWithLifecycle()
     val observation by recordings.observation.collectAsStateWithLifecycle()
-    val view by recordings.view.collectAsStateWithLifecycle()
+    val view = recordings.view.collectAsStateWithLifecycle().value
     val context = LocalContext.current
     val locale = LocalConfiguration.current.locales[0]
     val nowSec = rememberCurrentEpochSeconds()()
@@ -70,6 +71,11 @@ internal fun RecordingsDestination(
     ) {
         val clock = RecordingClock(Instant.ofEpochSecond(nowSec), ZoneId.systemDefault(), locale) {
             formatClock(it, locale)
+        }
+        if (view == null) {
+            return@remember RecordingsState(
+                DvrArchiveView(), RecordingFolder(ROOT_ID, ""), clock, availability = RecordingsAvailability.Loading,
+            )
         }
         traceArtworkMapping(context, "Recordings") {
             recordingsState(
