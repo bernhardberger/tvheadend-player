@@ -4,11 +4,14 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.view.ViewGroup
+import androidx.activity.BackEventCompat
 import androidx.activity.ComponentActivity
 import androidx.activity.ComponentDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.snapshots.Snapshot
+import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toPixelMap
@@ -57,6 +60,7 @@ import at.bernhardberger.tvhplayer.touch.testutil.captureTouch
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouchWindows
 import at.bernhardberger.tvhplayer.touch.ui.DvrChangeDialog
 import at.bernhardberger.tvhplayer.touch.ui.Destination
+import at.bernhardberger.tvhplayer.touch.ui.DestinationFrame
 import at.bernhardberger.tvhplayer.touch.ui.LocalDestinationReselections
 import at.bernhardberger.tvhplayer.touch.ui.RecordingRemoveControl
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
@@ -81,7 +85,8 @@ import at.bernhardberger.tvhplayer.core.DvrArchiveGrouping
 @Config(sdk = [34])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class RecordingsScreenTest {
-    @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
+    private val motionScale = object : MotionDurationScale { override var scaleFactor = 1f }
+    @get:Rule val compose = createAndroidComposeRule<ComponentActivity>(effectContext = motionScale)
 
     private val state = mutableStateOf(flatFixture())
     private val deleted = mutableListOf<String>()
@@ -330,7 +335,18 @@ class RecordingsScreenTest {
         assertPlayingActions()
 
         val fixture = foldersFixture()
-        state.value = fixture.copy(root = fixture.root.copy(folders = emptyList(), recordingCount = 0))
+        compose.mainClock.autoAdvance = false
+        try {
+            compose.runOnUiThread {
+                Snapshot.withMutableSnapshot {
+                    state.value = fixture.copy(root = fixture.root.copy(folders = emptyList(), recordingCount = 0))
+                }
+            }
+            repeat(3) { compose.mainClock.advanceTimeByFrame() }
+            continueButton().assertIsDisplayed()
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
         compose.onNodeWithText("Watch from beginning").assertDoesNotExist()
         state.value = fixture
         compose.onNodeWithText("Watch from beginning").assertDoesNotExist()
@@ -347,6 +363,38 @@ class RecordingsScreenTest {
         compose.onNodeWithText("Week 46").assertDoesNotExist()
         state.value = fixture
         compose.onNodeWithText("Sport").assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w412dp-h558dp-port-xhdpi")
+    fun predictiveBackPreviewsTheKeptFolderWithoutRestoringTheNavigationBarUntilCommit() {
+        motionScale.scaleFactor = 0f
+        state.value = foldersFixture()
+        show(initialPath = WeekPath)
+        val list = compose.onNode(hasScrollToIndexAction())
+        list.performScrollToIndex(3)
+        fun position() = list.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
+        val scrolled = position()
+        assertTrue(scrolled > 0f)
+        val bar = compose.onNode(hasText("Recordings") and hasClickAction())
+        bar.assertIsDisplayed()
+
+        pickTheHalfWatchedMatch()
+        bar.assertDoesNotExist()
+        val dispatcher = compose.activity.onBackPressedDispatcher
+        compose.runOnUiThread {
+            dispatcher.dispatchOnBackStarted(BackEventCompat(0f, 0f, 0f, BackEventCompat.EDGE_LEFT))
+            dispatcher.dispatchOnBackProgressed(BackEventCompat(0f, 0f, 0.5f, BackEventCompat.EDGE_LEFT))
+        }
+        compose.onNodeWithText("Week 46").assertIsDisplayed()
+        bar.assertDoesNotExist()
+        assertEquals("Preview keeps the list position", scrolled, position(), 0f)
+
+        back()
+        bar.assertIsDisplayed()
+        compose.onNodeWithText("Watch from beginning").assertDoesNotExist()
+        compose.onNodeWithText("Week 46").assertIsDisplayed()
+        assertEquals(scrolled, position(), 0f)
     }
 
     @Test
@@ -477,7 +525,7 @@ class RecordingsScreenTest {
     private fun show(
         initialPath: List<String> = emptyList(),
         fontScale: Float? = null,
-        taps: MutableSharedFlow<Destination> = MutableSharedFlow(),
+        taps: MutableSharedFlow<Destination>? = null,
     ) {
         val actions = RecordingsActions(
             onView = { view ->
@@ -492,11 +540,16 @@ class RecordingsScreenTest {
         compose.setContent {
             MaterialTheme(colorScheme = MobileDarkColors) {
                 val density = LocalDensity.current
-                CompositionLocalProvider(
-                    LocalDensity provides Density(density.density, fontScale ?: density.fontScale),
-                    LocalDestinationReselections provides taps,
-                ) {
-                    RecordingsScreen(state.value, actions, initialPath = initialPath)
+                CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale ?: density.fontScale)) {
+                    DestinationFrame(initialDestination = Destination.Recordings) { destination ->
+                        if (destination == Destination.Recordings) {
+                            CompositionLocalProvider(
+                                LocalDestinationReselections provides (taps ?: LocalDestinationReselections.current),
+                            ) {
+                                RecordingsScreen(state.value, actions, initialPath = initialPath)
+                            }
+                        }
+                    }
                 }
                 if (asking) {
                     val control = RecordingRemoveControl.Delete
@@ -557,7 +610,7 @@ class RecordingsScreenTest {
     }
 
     private fun pickTheHalfWatchedMatch() =
-        compose.onNodeWithText("Westvale – Ridge Town", substring = true).performClick()
+        compose.onNodeWithText("Westvale – Ridge Town", substring = true).performSemanticsAction(SemanticsActions.OnClick)
 
     private fun resumeButton() = compose.onNodeWithContentDescription("Resume from", substring = true)
 

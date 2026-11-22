@@ -21,12 +21,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,9 +49,9 @@ import androidx.window.core.layout.WindowSizeClass
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.ui.Destination
 import at.bernhardberger.tvhplayer.touch.ui.LocalBrowseMargin
-import at.bernhardberger.tvhplayer.touch.ui.LocalDestinationBackEnabled as PageBack
-import at.bernhardberger.tvhplayer.touch.ui.OnDestinationReselected
+import at.bernhardberger.tvhplayer.touch.ui.LocalDestinationReselections
 import at.bernhardberger.tvhplayer.touch.ui.TouchFrame
+import kotlinx.coroutines.flow.emptyFlow
 import kotlin.math.roundToInt
 import at.bernhardberger.tvhplayer.core.DvrArchiveView
 import at.bernhardberger.tvhplayer.core.DvrArchiveShow
@@ -77,10 +77,6 @@ internal fun RecordingsScreen(
 
     val levels = state.root.levels(path)
     val pickedItem = picked?.let(state.root::find)
-    val pageItem = pickedItem?.takeIf { layout != RecordingsLayout.Wide }
-    val page = pageItem != null
-    val listed = state.listed
-    val browse = rememberSaveableStateHolder()
     LaunchedEffect(state.availability, levels, path, picked, pickedItem) {
         if (state.availability != RecordingsAvailability.Current) return@LaunchedEffect
         path = ArrayList(levels.drop(1).map { it.id })
@@ -88,38 +84,40 @@ internal fun RecordingsScreen(
     }
 
     Box(modifier.fillMaxSize()) {
-        TouchFrame(
-            initialDestination = Destination.Recordings, destinations = destinations,
-            showTopBar = { !(it == Destination.Recordings && page) },
-            showNavigation = { !(it == Destination.Recordings && page && layout == RecordingsLayout.Phone) },
-            lastActionIsIconOnly = layout.compact,
-            actions = { destination ->
-                if (destination == Destination.Recordings && listed) {
-                    TitleActions(state.space, layout, sheetOpen = sheet != null) { sheet = SheetPage.Main }
-                }
-            },
-            belowTopBar = { destination ->
-                if (destination == Destination.Recordings) RecordingsLoadingLine(state.availability)
-            },
-        ) { destination ->
-            if (destination != Destination.Recordings) return@TouchFrame
-            // Registered after the frame's own handler, so a page or a folder level takes Back first.
-            val closeDetails = { picked = null }
-            BackHandler(enabled = PageBack.current and page, onBack = closeDetails)
-            BackHandler(PageBack.current and !page && levels.size > 1) { path = ArrayList(path.take(levels.size - 2)) }
-            if (!listed) {
-                RecordingsStandIn(state.availability, layout, actions)
-            } else if (pageItem != null) {
-                OnDestinationReselected(Destination.Recordings) { closeDetails() }
-                RecordingPage(pageItem, state.clock, layout, actions, closeDetails)
-            } else {
-                browse.SaveableStateProvider("RecordingsBrowse") {
-                    Browse(
-                        state, levels, layout, pickedItem, actions,
-                        onOpen = { path = ArrayList(levels.drop(1).map { it.id } + it) },
-                        onUp = { path = ArrayList(path.take(levels.size - 2)) },
-                        onPick = { picked = it },
-                    )
+        val listed = state.listed
+        val pageItem = pickedItem?.takeIf { layout != RecordingsLayout.Wide && listed }
+        RecordingsPages(
+            pageItem, state.clock, layout, actions, destinations, onClose = { picked = null },
+        ) { active, frame ->
+            TouchFrame(
+                modifier = frame,
+                initialDestination = Destination.Recordings, destinations = destinations,
+                lastActionIsIconOnly = layout.compact,
+                actions = { destination ->
+                    if (destination == Destination.Recordings && listed) {
+                        TitleActions(state.space, layout, sheetOpen = sheet != null) { sheet = SheetPage.Main }
+                    }
+                },
+                belowTopBar = { destination ->
+                    if (destination == Destination.Recordings) RecordingsLoadingLine(state.availability)
+                },
+            ) { destination ->
+                if (destination != Destination.Recordings) return@TouchFrame
+                val up = { path = ArrayList(path.take(levels.size - 2)) }
+                BackHandler(active && levels.size > 1, onBack = up)
+                if (!listed) {
+                    RecordingsStandIn(state.availability, layout, actions)
+                } else {
+                    // The list may be visible under Details, but only the top page handles reselection.
+                    val taps = if (active) LocalDestinationReselections.current else emptyFlow()
+                    CompositionLocalProvider(LocalDestinationReselections provides taps) {
+                        Browse(
+                            state, levels, layout, pickedItem, actions,
+                            onOpen = { path = ArrayList(levels.drop(1).map { it.id } + it) },
+                            onUp = up,
+                            onPick = { if (active) picked = it },
+                        )
+                    }
                 }
             }
         }
