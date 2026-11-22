@@ -58,6 +58,7 @@ internal fun nextFullScreenRequest(
 internal class PlayerFullScreen(private val activity: ComponentActivity) : DefaultLifecycleObserver {
     private var request = FullScreenRequest.Inactive
     private var listener: OrientationEventListener? = null
+    val isRequested: Boolean get() = request != FullScreenRequest.Inactive
 
     fun restore(state: Bundle?, inWindow: StateFlow<Boolean>) {
         activity.lifecycle.addObserver(this)

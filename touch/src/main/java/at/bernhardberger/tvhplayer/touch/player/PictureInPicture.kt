@@ -11,27 +11,30 @@ import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import kotlin.math.roundToInt
 
-/** What makes the player go: Back (system or the top bar's), the activity hidden, or the user leaving the app. */
-internal enum class LeaveTrigger { Back, Hidden, UserLeave }
+/** Back (system or arrow), the window button, the activity hidden, or leaving the app. */
+internal enum class LeaveTrigger { Back, WindowButton, Hidden, UserLeave }
 
-internal enum class Leave { EnterWindow, Stop, Stay }
+internal enum class Leave { EnterWindow, EnterWindowAndBrowse, StopAndBrowse, ExitFullScreen, Stop, Stay }
 
 /**
- * Back and leaving the app put the picture into the picture-in-picture window when the window is
- * available, and end playback when it is not (touch design section 5). The activity hidden outside
- * a rotation ends playback: in the window that is the window being closed, as in the X1 trial.
+ * Only Back returns to browsing, and only after leaving any button-forced full screen.
+ * Hidden outside a rotation ends playback, including when the user closes the window.
  */
 internal fun leavePlayer(
     trigger: LeaveTrigger,
     windowAvailable: Boolean,
     inWindow: Boolean,
     changingConfigurations: Boolean,
+    fullScreenRequested: Boolean = false,
 ): Leave = when (trigger) {
     LeaveTrigger.Back -> when {
         inWindow -> Leave.Stay
-        windowAvailable -> Leave.EnterWindow
-        else -> Leave.Stop
+        fullScreenRequested -> Leave.ExitFullScreen
+        windowAvailable -> Leave.EnterWindowAndBrowse
+        else -> Leave.StopAndBrowse
     }
+    // The button attempts entry as before; refusal leaves the player alone.
+    LeaveTrigger.WindowButton -> Leave.EnterWindow
     LeaveTrigger.Hidden -> if (changingConfigurations) Leave.Stay else Leave.Stop
     // Without the window the activity is hidden next, and that ends playback.
     LeaveTrigger.UserLeave -> if (windowAvailable && !inWindow) Leave.EnterWindow else Leave.Stay

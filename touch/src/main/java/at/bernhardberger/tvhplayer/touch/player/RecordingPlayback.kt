@@ -69,7 +69,7 @@ internal fun RecordingPlayback(
     artwork: ArtworkModels,
     pictureWindow: PlayerWindow,
     window: Window,
-    back: () -> Unit,
+    navigate: (LeaveTrigger) -> Unit,
     fullScreen: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -126,7 +126,7 @@ internal fun RecordingPlayback(
     )
     RecordingPlaybackFace(
         face.copy(growing = growing), menus, owned, runtime, session,
-        pictureWindow, installed && video.visible, inWindow, timeline, back, fullScreen, { shown = it },
+        pictureWindow, installed && video.visible, inWindow, timeline, navigate, fullScreen, { shown = it },
         onBrightness = { brightness = it; applyBrightness(window, it) },
         onAdBreakMode = { if (face.hasAdBreakOptions) adBreaks.set(it) },
     )
@@ -192,7 +192,7 @@ private fun RecordingPlaybackFace(
     videoVisible: Boolean,
     inWindow: Boolean,
     timeline: RecordingTimelinePresentation,
-    back: () -> Unit,
+    navigate: (LeaveTrigger) -> Unit,
     fullScreen: () -> Unit,
     onControlsShown: (Boolean) -> Unit,
     onBrightness: (Float) -> Unit,
@@ -208,8 +208,8 @@ private fun RecordingPlaybackFace(
         face.copy(artwork = picture),
         onAction = { action ->
             when (action) {
-                PlayerAction.Back -> back()
-                PlayerAction.PictureInPicture -> pictureWindow.enter()
+                PlayerAction.Back -> navigate(LeaveTrigger.Back)
+                PlayerAction.PictureInPicture -> navigate(LeaveTrigger.WindowButton)
                 PlayerAction.FullScreen -> fullScreen()
                 else -> if (ownsPlayback()) runtime.recordingAction(timeline, action)
             }
