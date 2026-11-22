@@ -82,7 +82,7 @@ internal fun GuideDestination(
     val dayLoading = remember(mapped.listed, coverage, pendingVersion, observation.currentSession?.generationIdentity) {
         mapped.listed && coverage?.let(guide::isPending) == true
     }
-    val state = mapped.withCurrentDetails(selection.detailsId, dayLoading)
+    val state = mapped.withCurrentDetails(selection.detailsId, dayLoading).withSelectedDay(input, retained)
     ArtworkFirstLoad("Guide", firstLoadWait(state, input))
     // Forget invalid choices, so they cannot silently return when a tag or the schedule changes again.
     val available = selection.availableIn(state)
@@ -113,6 +113,16 @@ internal fun GuideDestination(
             onOverviewViewport = { guide.overviewViewport.value = it },
         ),
         destinations = destinations,
+    )
+}
+
+private fun GuideState.withSelectedDay(input: GuideMappingInput, result: GuideMappingResult?): GuideState {
+    if (input.selection.view != GuideView.ByChannel) return this
+    val day = input.selection.day?.takeIf { it in dayDates } ?: input.clock.today
+    val days = result?.takeIf { it.input.sameDayOwner(input) }?.days.orEmpty()
+    return copy(
+        date = formatDayHeader(day, input.configuration.locales[0]),
+        retainedDays = days.mapValues { it.value.programs },
     )
 }
 

@@ -71,6 +71,8 @@ internal data class GuideState(
     val availability: GuideAvailability = GuideAvailability.Current,
     /** The picked day's or time's programs are still coming: a short wait inside the shown Guide. */
     val dayLoading: Boolean = false,
+    /** Previously prepared dates for the currently selected channel. Null for standalone fixtures. */
+    val retainedDays: Map<LocalDate, List<GuideProgram>>? = null,
 ) {
     val channelsHaveLogos = channels.any { it.hasLogoSlot }
     val overviewHasLogos = channels.any { (it.programs.isNotEmpty() || it.overviewHasLead) && it.hasLogoSlot }
