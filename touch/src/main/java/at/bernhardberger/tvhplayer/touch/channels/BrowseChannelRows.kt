@@ -1,7 +1,7 @@
 package at.bernhardberger.tvhplayer.touch.channels
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -10,8 +10,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItemDefaults
@@ -20,58 +20,50 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedListItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.ui.ChannelLogoTile
 import at.bernhardberger.tvhplayer.touch.ui.Destination
+import at.bernhardberger.tvhplayer.touch.ui.LogoShape
+import at.bernhardberger.tvhplayer.touch.ui.PartsLine
+import at.bernhardberger.tvhplayer.touch.ui.PlayingBars
 import at.bernhardberger.tvhplayer.touch.ui.ScrollToStartOnReselect
+import at.bernhardberger.tvhplayer.presentation.R as SharedR
 
 @Composable
 internal fun BrowseChannelRows(
     list: ChannelList,
     actions: ChannelsActions,
-    offline: Boolean = false,
-    emptyContent: @Composable () -> Unit = {},
+    scroll: LazyListState,
+    offline: Boolean,
+    modifier: Modifier = Modifier,
+    selectedId: String? = null,
+    onSelect: ((String) -> Unit)? = null,
 ) {
-    // A restored scroll position belongs to the tag it was saved with.
-    var savedTag by rememberSaveable { mutableStateOf(list.selectedTagId) }
-    val scroll = rememberLazyListState()
-    SideEffect {
-        if (savedTag != list.selectedTagId) {
-            scroll.requestScrollToItem(0)
-            savedTag = list.selectedTagId
-        }
-    }
-    if (list.rows.isEmpty()) {
-        emptyContent()
-        return
-    }
     scroll.ScrollToStartOnReselect(Destination.Channels)
-    LazyColumn(state = scroll, verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
+    LazyColumn(modifier, state = scroll, verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
         itemsIndexed(list.rows, key = { _, row -> row.id }) { index, row ->
+            val play = actions.onPlay?.let { watch -> { watch(row.id) } }
             BrowseChannelRow(
                 row = row,
                 shapes = ListItemDefaults.segmentedShapes(index, list.rows.size),
                 offline = offline,
-                onOpen = actions.onOpenChannel?.takeUnless { offline }?.let { open -> { open(row.id) } },
-                onPlay = actions.onPlay?.let { play -> { play(row.id) } },
+                onOpen = (onSelect ?: actions.onOpenChannel?.takeUnless { offline })?.let { open -> { open(row.id) } },
+                onPlay = play.takeIf { onSelect == null },
+                logoModifier = if (onSelect != null && play != null) WatchLogo(row, !offline, play) else Modifier,
+                selected = row.id == selectedId,
+                selectable = onSelect != null,
             )
         }
     }
@@ -85,16 +77,24 @@ private fun BrowseChannelRow(
     onOpen: (() -> Unit)?,
     onPlay: (() -> Unit)?,
     logoModifier: Modifier = Modifier,
+    selected: Boolean = false,
+    selectable: Boolean = false,
 ) {
     val modifier = Modifier.fillMaxWidth().alpha(if (offline) SAVED_ROW_ALPHA else 1f)
-    val leading: @Composable () -> Unit = { BrowseChannelLogo(row, offline, logoModifier) }
-    val trailing: (@Composable () -> Unit)? = onPlay?.let { play -> { BrowseChannelPlay(row.name, !offline, play) } }
+    val leading: @Composable () -> Unit = { BrowseChannelLogo(row, offline, logoModifier, selected) }
+    val trailing: (@Composable () -> Unit)? = onPlay?.let { play -> { BrowseChannelPlay(row, !offline, play) } }
     val content: @Composable () -> Unit = { BrowseChannelText(row, offline) }
     val padding = PaddingValues(horizontal = BrowseRowInset, vertical = BrowseRowVerticalPadding)
     val colors = ListItemDefaults.segmentedColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
     if (onOpen == null) {
         SegmentedListItem(
             shapes = shapes, colors = colors, modifier = modifier, leadingContent = leading, trailingContent = trailing,
+            verticalAlignment = Alignment.CenterVertically, contentPadding = padding, content = content,
+        )
+    } else if (selectable) {
+        SegmentedListItem(
+            selected = selected, onClick = onOpen, shapes = shapes, colors = colors,
+            modifier = modifier.semantics { role = Role.Button }, leadingContent = leading,
             verticalAlignment = Alignment.CenterVertically, contentPadding = padding, content = content,
         )
     } else {
@@ -107,21 +107,39 @@ private fun BrowseChannelRow(
 }
 
 @Composable
-private fun BrowseChannelLogo(row: ChannelRow, offline: Boolean, modifier: Modifier) {
+private fun WatchLogo(row: ChannelRow, enabled: Boolean, onPlay: () -> Unit): Modifier {
+    val label = watchLabel(row, enabled)
+    return Modifier.clip(LogoShape).clickable(enabled = enabled, role = Role.Button, onClick = onPlay)
+        .semantics { contentDescription = label }
+}
+
+@Composable
+private fun BrowseChannelLogo(row: ChannelRow, offline: Boolean, modifier: Modifier, selected: Boolean) {
     Column(Modifier.width(BrowseTileWidth), verticalArrangement = Arrangement.spacedBy(ProgressGap)) {
         ChannelLogoTile(row.logo, row.logoTint, modifier.size(BrowseTileWidth, BrowseTileHeight), model = row.logoModel)
         ChannelProgress(
             row.now, row.playback.takeUnless { offline }, row.recording.takeUnless { offline }, Modifier.fillMaxWidth(),
+            surfaceTrack = selected,
         )
     }
 }
 
 @Composable
-private fun BrowseChannelPlay(channel: String, enabled: Boolean, onPlay: () -> Unit) {
+private fun BrowseChannelPlay(row: ChannelRow, enabled: Boolean, onPlay: () -> Unit) {
     FilledTonalIconButton(onClick = onPlay, enabled = enabled) {
-        Icon(painterResource(R.drawable.channels_play), stringResource(R.string.channels_watch_named, channel))
+        Icon(painterResource(R.drawable.channels_play), watchLabel(row, enabled))
     }
 }
+
+@Composable
+private fun watchLabel(row: ChannelRow, enabled: Boolean): String =
+    if (enabled && row.playback != null) {
+        stringResource(
+            R.string.channels_continue_named, stringResource(SharedR.string.player_continue_watching), row.name,
+        )
+    } else {
+        stringResource(R.string.channels_watch_named, row.name)
+    }
 
 @Composable
 private fun BrowseChannelText(row: ChannelRow, offline: Boolean) {
@@ -132,6 +150,7 @@ private fun BrowseChannelText(row: ChannelRow, offline: Boolean) {
                 row.name, Modifier.weight(1f, fill = false), style = MaterialTheme.typography.titleMedium,
                 color = colors.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
+            if (!offline && row.playback != null) PlayingBars()
             if (!offline && row.recording != null) {
                 RecordingBadge(row.recording, compact = row.recording == ChannelRecording.Channel)
             }
@@ -145,7 +164,7 @@ private fun BrowseChannelText(row: ChannelRow, offline: Boolean) {
 private fun BrowseNow(program: ChannelProgram?) {
     val style = MaterialTheme.typography.bodyMedium
     val colors = MaterialTheme.colorScheme
-    val title = program?.title ?: stringResource(R.string.channels_no_program)
+    val title = program?.title ?: stringResource(SharedR.string.no_epg)
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
             title, Modifier.weight(1f, fill = false), style = style,
@@ -170,24 +189,10 @@ private fun BrowseNext(program: ChannelProgram?, showMarks: Boolean) {
         Text("", style = style, minLines = 1)
         return
     }
-    val title = stringResource(R.string.channels_row_next, program.title)
-    val showMark = showMarks && program.scheduled
-    BoxWithConstraints {
-        val candidate = program.start?.let { stringResource(R.string.channels_program_and_time_left, title, it) }
-        val measurer = rememberTextMeasurer()
-        val textWidth = with(LocalDensity.current) {
-            (constraints.maxWidth - if (showMark) ScheduledMarkSize.roundToPx() + MarkGap.roundToPx() else 0)
-                .coerceAtLeast(0)
-        }
-        // Reserve the recording mark before deciding whether the entire title and time fit.
-        val line = candidate?.takeUnless {
-            measurer.measure(it, style, maxLines = 1, constraints = Constraints(maxWidth = textWidth)).hasVisualOverflow
-        } ?: title
-        Row(horizontalArrangement = Arrangement.spacedBy(MarkGap), verticalAlignment = Alignment.CenterVertically) {
-            Text(line, Modifier.weight(1f, fill = false), style = style, color = color,
-                maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (showMark) ScheduledProgramMark(program)
-        }
+    val parts = listOfNotNull(stringResource(R.string.channels_row_next, program.title), program.start)
+    Row(horizontalArrangement = Arrangement.spacedBy(MarkGap), verticalAlignment = Alignment.CenterVertically) {
+        PartsLine(parts, Modifier.weight(1f, fill = false), style, color)
+        if (showMarks && program.scheduled) ScheduledProgramMark(program)
     }
 }
 

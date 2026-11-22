@@ -3,6 +3,7 @@
 
 package at.bernhardberger.tvhplayer.touch.channels
 
+import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import at.bernhardberger.tvhplayer.touch.ui.Destination
 import at.bernhardberger.tvhplayer.touch.ui.LocalDestinationBackEnabled
 import at.bernhardberger.tvhplayer.touch.ui.ScrollToStartOnReselect
@@ -297,7 +298,7 @@ private fun RowScope.PhoneRowContent(
             if (recording != null) RecordingBadge(recording, compact = recording == ChannelRecording.Channel)
         }
         val now = row.now
-        val title = now?.title ?: stringResource(R.string.channels_no_program)
+        val title = now?.title ?: stringResource(SharedR.string.no_epg)
         val line = now?.timeLeft?.let {
             stringResource(
                 R.string.channels_program_and_time_left, title, stringResource(R.string.channels_time_left, it),
@@ -352,7 +353,7 @@ private fun TabletNow(
     Column(modifier) {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
             ChannelLine(
-                program?.title ?: stringResource(R.string.channels_no_program), Modifier.weight(1f, fill = false),
+                program?.title ?: stringResource(SharedR.string.no_epg), Modifier.weight(1f, fill = false),
             )
             if (recording == ChannelRecording.Program) RecordingBadge(recording)
         }
@@ -399,7 +400,7 @@ private fun NextProgram(program: ChannelProgram?, showMarks: Boolean, modifier: 
     Column(modifier.padding(end = 8.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             ChannelLine(
-                program?.title ?: stringResource(R.string.channels_no_program), Modifier.weight(1f, fill = false),
+                program?.title ?: stringResource(SharedR.string.no_epg), Modifier.weight(1f, fill = false),
             )
             if (showMarks && program?.scheduled == true) {
                 ScheduledProgramMark(program)
@@ -427,6 +428,7 @@ internal fun ChannelProgress(
     playback: ChannelPlayback?,
     recording: ChannelRecording?,
     modifier: Modifier,
+    surfaceTrack: Boolean = playback != null,
 ) {
     val fraction = (playback?.progress ?: program?.progress ?: return).coerceIn(0f, 1f)
     val clock = LocalChannelProgressClock.current
@@ -444,7 +446,7 @@ internal fun ChannelProgress(
                 (clock() - airing.first).coerceIn(0L, duration).toFloat() / duration
             }
         }, modifier = modifier, color = fill,
-        trackColor = if (playback != null) scheme.surface else ProgressIndicatorDefaults.linearTrackColor,
+        trackColor = if (surfaceTrack) scheme.surface else ProgressIndicatorDefaults.linearTrackColor,
     )
 }
 

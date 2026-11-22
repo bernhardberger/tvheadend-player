@@ -10,8 +10,14 @@ import at.bernhardberger.tvhplayer.touch.ui.traceArtworkMapping
 import at.bernhardberger.tvhplayer.touch.ui.LocalArtworkModels
 import at.bernhardberger.tvhplayer.touch.ui.ArtworkModels
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.CompositionLocalProvider
@@ -25,6 +31,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.structuralEqualityPolicy
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -50,6 +58,7 @@ import at.bernhardberger.tvheadend.sdk.core.SessionGenerationIdentity
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.touch.channels.ChannelRowPrograms
+import at.bernhardberger.tvhplayer.touch.channels.ChannelRow
 import at.bernhardberger.tvhplayer.touch.channels.LocalChannelProgressClock
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsActions
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsScreen
@@ -75,6 +84,7 @@ import at.bernhardberger.tvhplayer.touch.connect.EditConnectionFlow
 import at.bernhardberger.tvhplayer.touch.connect.FirstRunFlow
 import at.bernhardberger.tvhplayer.touch.connect.connectionStatus
 import at.bernhardberger.tvhplayer.touch.ui.Destination
+import at.bernhardberger.tvhplayer.touch.ui.ChannelLogoTile
 import at.bernhardberger.tvhplayer.touch.ui.FrameNotices
 import at.bernhardberger.tvhplayer.touch.ui.BottomWindowNotices
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
@@ -352,7 +362,32 @@ private fun AppFrame(
                 onOpenChannel = null, // The channel page will provide this action.
             ),
             destinations = AppDestinationList,
+            lastWatchedId = playingId,
+            pane = { channelId, modifier -> ChannelPanePlaceholder(state, channelId, modifier) },
         )
+    }
+}
+
+// Stand-in until the channel page is available as a pane.
+@Composable
+private fun ChannelPanePlaceholder(state: ChannelsState, channelId: String, modifier: Modifier) {
+    val list = when (state) {
+        is ChannelsState.Ready -> state.list
+        is ChannelsState.Offline -> state.list
+        else -> null
+    }
+    list?.rows?.firstOrNull { it.id == channelId }?.let { ChannelPaneHeading(it, modifier) }
+}
+
+@Composable
+internal fun ChannelPaneHeading(row: ChannelRow, modifier: Modifier) {
+    Row(
+        modifier.padding(24.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        ChannelLogoTile(row.logo, row.logoTint, Modifier.size(width = 88.dp, height = 48.dp), model = row.logoModel)
+        Text(row.name, style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface)
     }
 }
 

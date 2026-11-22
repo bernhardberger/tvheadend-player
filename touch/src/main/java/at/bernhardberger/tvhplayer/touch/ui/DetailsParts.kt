@@ -195,7 +195,7 @@ private fun Fact(key: String, value: String, keyWidth: Dp) {
     }
 }
 
-private val LogoShape = RoundedCornerShape(12.dp)
+internal val LogoShape = RoundedCornerShape(12.dp)
 private const val LOGO_SHADE = 0.35f
 private const val LOGO_WIDTH_SHARE = 0.64f
 private const val LOGO_HEIGHT_SHARE = 0.50f

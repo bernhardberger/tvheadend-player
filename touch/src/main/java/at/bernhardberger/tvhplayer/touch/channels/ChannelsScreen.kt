@@ -1,5 +1,17 @@
 package at.bernhardberger.tvhplayer.touch.channels
 
+import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffold
+import androidx.compose.material3.adaptive.layout.PaneAdaptedValue
+import androidx.compose.material3.adaptive.layout.PaneScaffoldDirective
+import androidx.compose.material3.adaptive.layout.ThreePaneScaffoldValue
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -42,6 +54,7 @@ import at.bernhardberger.tvhplayer.touch.ui.MessageKind
 import at.bernhardberger.tvhplayer.touch.ui.OfflineBanner
 import at.bernhardberger.tvhplayer.touch.ui.OfflineTexts
 import at.bernhardberger.tvhplayer.touch.ui.TouchFrame
+import kotlinx.coroutines.flow.first
 
 @Composable
 internal fun ChannelsScreen(
@@ -49,6 +62,8 @@ internal fun ChannelsScreen(
     actions: ChannelsActions,
     modifier: Modifier = Modifier,
     destinations: List<Destination> = Destination.entries,
+    lastWatchedId: String? = null,
+    pane: @Composable (channelId: String, modifier: Modifier) -> Unit = { _, _ -> },
 ) {
     val window = currentWindowAdaptiveInfoV2().windowSizeClass
     val layout = when {
@@ -86,7 +101,7 @@ internal fun ChannelsScreen(
         },
     ) { destination ->
         if (destination == Destination.Channels) {
-            ChannelsContent(state, layout, actions)
+            ChannelsContent(state, list, layout, actions, lastWatchedId, pane)
         }
     }
 }
@@ -102,35 +117,124 @@ internal enum class ChannelsLayout {
 @Composable
 private fun ChannelsContent(
     state: ChannelsState,
+    list: ChannelList?,
     layout: ChannelsLayout,
     actions: ChannelsActions,
+    lastWatchedId: String?,
+    pane: @Composable (String, Modifier) -> Unit,
 ) {
     val margin = LocalBrowseMargin.current
+    val scroll = rememberLazyListState()
+    var savedTag by rememberSaveable { mutableStateOf(list?.selectedTagId) }
+    var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
+    val paneChannel = list?.takeIf { layout == ChannelsLayout.Wide }?.let {
+        val preferred = selectedId ?: lastWatchedId
+        preferred?.let { id -> it.rows.firstOrNull { row -> row.id == id } } ?: it.rows.firstOrNull()
+    }
+    SideEffect {
+        if (list != null && savedTag != list.selectedTagId) {
+            scroll.requestScrollToItem(0)
+            savedTag = list.selectedTagId
+        }
+    }
+    LaunchedEffect(paneChannel?.id, selectedId, list?.selectedTagId) {
+        if (list == null || paneChannel == null || paneChannel.id == selectedId) return@LaunchedEffect
+        // Let the initial list lay out before deciding whether the automatically chosen row is visible.
+        val layoutInfo = snapshotFlow { scroll.layoutInfo }.first { it.visibleItemsInfo.isNotEmpty() }
+        if (layoutInfo.visibleItemsInfo.none { it.key == paneChannel.id }) {
+            scroll.requestScrollToItem(list.rows.indexOf(paneChannel))
+        }
+        selectedId = paneChannel.id
+    }
+    if (list != null) {
+        BrowseChannels(list, layout, actions, state as? ChannelsState.Offline, scroll, paneChannel, pane) {
+            selectedId = it
+        }
+    } else {
+        ChannelsLoadContent(state, layout, actions, margin)
+    }
+}
+
+@Composable
+private fun ChannelsLoadContent(state: ChannelsState, layout: ChannelsLayout, actions: ChannelsActions, margin: Dp) {
     when (state) {
         ChannelsState.Loading -> ChannelsSkeleton(layout, margin)
         ChannelsState.Unreachable -> ChannelsMessage(MessageKind.Unreachable, actions)
         ChannelsState.SignInFailed -> ChannelsMessage(MessageKind.SignInFailed, actions)
         ChannelsState.SignInNeeded -> ChannelsMessage(MessageKind.SignInNeeded, actions)
         is ChannelsState.Failed -> ListFailure(state.error, actions.onRetry, actions.onOpenConnectionSettings)
-        is ChannelsState.Offline -> {
-            Column(Modifier.fillMaxSize().padding(horizontal = margin)) {
-                OfflineBanner(
-                    !layout.tablet, ChannelsOfflineTexts, actions.onOpenConnectionSettings, retryIn = state.retryIn,
-                )
-                BrowseChannelRows(state.list, actions, offline = true)
-            }
+        is ChannelsState.Offline, is ChannelsState.Ready -> Unit
+    }
+}
+
+@Composable
+private fun BrowseChannels(
+    list: ChannelList,
+    layout: ChannelsLayout,
+    actions: ChannelsActions,
+    offline: ChannelsState.Offline?,
+    scroll: LazyListState,
+    paneChannel: ChannelRow?,
+    pane: @Composable (String, Modifier) -> Unit,
+    onSelect: (String) -> Unit,
+) {
+    val margin = LocalBrowseMargin.current
+    Column(Modifier.fillMaxSize().padding(horizontal = margin)) {
+        if (offline != null) {
+            OfflineBanner(
+                !layout.tablet, ChannelsOfflineTexts, actions.onOpenConnectionSettings,
+                modifier = Modifier.padding(bottom = 8.dp), retryIn = offline.retryIn,
+            )
         }
-        is ChannelsState.Ready -> {
-            Column(Modifier.fillMaxSize().padding(horizontal = margin)) {
-                val list = state.list
-                BrowseChannelRows(list, actions) {
-                    val kind = if (list.selectedTagId == null) MessageKind.Empty else MessageKind.EmptyTag
-                    ChannelsMessage(kind, actions, horizontalMargin = if (layout.tablet) margin else 0.dp)
-                }
+        when {
+            list.rows.isEmpty() -> {
+                val kind = if (list.selectedTagId == null) MessageKind.Empty else MessageKind.EmptyTag
+                ChannelsMessage(kind, actions, horizontalMargin = if (layout.tablet) margin else 0.dp)
             }
+            paneChannel == null -> BrowseChannelRows(list, actions, scroll, offline != null)
+            else -> ChannelsPanes(
+                listPane = { modifier ->
+                    BrowseChannelRows(list, actions, scroll, offline != null, modifier, paneChannel.id, onSelect)
+                },
+                detailPane = { modifier -> pane(paneChannel.id, modifier) },
+            )
         }
     }
 }
+
+@OptIn(ExperimentalMaterial3AdaptiveApi::class)
+@Composable
+private fun ChannelsPanes(
+    listPane: @Composable (Modifier) -> Unit,
+    detailPane: @Composable (Modifier) -> Unit,
+) {
+    ListDetailPaneScaffold(
+        directive = ChannelsPaneDirective,
+        value = ChannelsPaneValue,
+        modifier = Modifier.fillMaxSize(),
+        listPane = { listPane(Modifier.preferredWidth(480.dp)) },
+        detailPane = {
+            Surface(
+                Modifier.preferredWidth(240.dp).fillMaxSize().padding(bottom = 8.dp),
+                shape = MaterialTheme.shapes.extraLarge,
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+            ) {
+                detailPane(Modifier.fillMaxSize())
+            }
+        },
+    )
+}
+
+@OptIn(ExperimentalMaterial3AdaptiveApi::class)
+private val ChannelsPaneDirective = PaneScaffoldDirective.Default.copy(
+    maxHorizontalPartitions = 2, horizontalPartitionSpacerSize = 24.dp,
+)
+@OptIn(ExperimentalMaterial3AdaptiveApi::class)
+private val ChannelsPaneValue = ThreePaneScaffoldValue(
+    primary = PaneAdaptedValue.Expanded,
+    secondary = PaneAdaptedValue.Expanded,
+    tertiary = PaneAdaptedValue.Hidden,
+)
 
 @Composable
 private fun ChannelsSubtitle(state: ChannelsState, list: ChannelList?, layout: ChannelsLayout) {

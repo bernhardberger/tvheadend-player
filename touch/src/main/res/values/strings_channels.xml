@@ -12,7 +12,6 @@
     <string name="channels_on_now">On now</string>
     <string name="channels_next">Next</string>
     <!-- TV: no_epg -->
-    <string name="channels_no_program">No program information</string>
     <!-- TV: player_minutes_left -->
     <string name="channels_time_left">%1$s left</string>
     <string name="channels_program_and_time_left">%1$s • %2$s</string>
@@ -33,6 +32,7 @@
     <!-- TV: context_watch -->
     <string name="channels_watch">Watch</string>
     <string name="channels_watch_named">Watch %1$s</string>
+    <string name="channels_continue_named">%1$s %2$s</string>
     <!-- TV: context_record -->
     <string name="channels_record">Record</string>
     <!-- TV: context_details -->
