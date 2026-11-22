@@ -1,6 +1,5 @@
 package at.bernhardberger.tvhplayer.touch.connect
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -55,7 +54,6 @@ internal fun ConnectionsScreen(
 ) {
     // A changing state line keeps the question open; another connection closes it.
     var confirmRemove by rememberSaveable(active?.copy(status = ConnectionStatus.Connected)) { mutableStateOf(false) }
-    BackHandler(enabled = !confirmRemove, onBack = onBack)
     Surface(Modifier.fillMaxSize()) {
         Column(Modifier.windowInsetsPadding(WindowInsets.safeDrawing)) {
             TopAppBar(

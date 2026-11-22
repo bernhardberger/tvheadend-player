@@ -20,6 +20,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.structuralEqualityPolicy
@@ -30,6 +31,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation3.runtime.NavEntry
+import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
+import androidx.navigation3.ui.NavDisplay
 import at.bernhardberger.tvheadend.sdk.android.TvheadendDiscoveryState
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileAuthenticationMode
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileListResult
@@ -81,6 +85,7 @@ import at.bernhardberger.tvhplayer.touch.recordings.RecordingsDestination
 import at.bernhardberger.tvhplayer.touch.recordings.RecordingsViewModel
 import at.bernhardberger.tvhplayer.touch.ui.epgChangeCounts
 import at.bernhardberger.tvhplayer.touch.ui.artworkMappingStart
+import at.bernhardberger.tvhplayer.touch.ui.pageMove
 import android.os.SystemClock
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -92,15 +97,14 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 
-/** [SignIn] is the Connections page opened on the editor, for a password that can't be read. */
-private enum class Page { Frame, Connections, SignIn }
+private enum class Page { Frame, Connections }
 
 /**
  * The app's pages: first run while no connection is saved, else the frame with the Connections
  * page over it. First run stays until its save has finished, so the save is not cut short when
  * the saved connection appears.
  */
-@Suppress("LongParameterList") // The app's owners and view models, handed in by the activity.
+@Suppress("LongParameterList", "LongMethod") // The activity's owners and the two page entries are wired here.
 @Composable
 internal fun TouchApp(
     session: TvheadendSession,
@@ -125,13 +129,25 @@ internal fun TouchApp(
     val dvr = viewModel { DvrControls(session, notices) }
     val channelsCache = viewModel { ChannelsMappingCache(session) }
     SideEffect { connect.discovery = discovery }
-    var page by rememberSaveable { mutableStateOf(Page.Frame) }
+    var backStack by rememberSaveable { mutableStateOf(listOf(Page.Frame)) }
+    // Sign-in is an editor in the Connections entry, not a second page to animate to.
+    var signIn by rememberSaveable { mutableStateOf(false) }
+    val closeConnections = {
+        signIn = false
+        backStack = listOf(Page.Frame)
+    }
+    val openConnections: (Boolean) -> Unit = { openOnPassword ->
+        if (backStack.last() == Page.Frame) {
+            signIn = openOnPassword
+            backStack = backStack + Page.Connections
+        }
+    }
     // First run follows the settled profile: a removal's passing "no connection" does not open it,
     // and it stays until its own save and naming have finished.
     val firstRun = (profile == ServerProfileReadResult.Missing && !connect.removing) || connect.firstRunSettling
     LaunchedEffect(firstRun) {
         // Whatever was open belonged to the removed connection; nothing stays behind first run.
-        if (firstRun) page = Page.Frame else connect.releaseFirstRun()
+        if (firstRun) closeConnections() else connect.releaseFirstRun()
     }
     FrameNotices(notices, owner, session) {
         when {
@@ -140,25 +156,50 @@ internal fun TouchApp(
                 FirstRunFlow(connect.firstRun())
                 BottomWindowNotices()
             }
-            page != Page.Frame -> {
-                val active = (profiles as? ServerProfileListResult.Available)?.let { list ->
-                    list.profiles.firstOrNull { it.id == list.activeId }
+            else -> {
+                val forward = pageMove(forward = true)
+                val backward = pageMove(forward = false)
+                // NavDisplay can retain a scene across recompositions. Its entry must read current
+                // inputs (notably the playing IDs), even when that scene's key has not changed.
+                val frame by rememberUpdatedState<@Composable () -> Unit> {
+                    CompositionLocalProvider(LocalArtworkConnectedAt provides connectedAt) {
+                        AppDestinations(
+                            channelsCache, dvr, connection, channels, recordings, guide,
+                            playingId, onWatch, onPlayRecording,
+                            channelsDispatcher = channelsDispatcher,
+                            playingRecordingId = playingRecordingId,
+                            onOpenConnections = { openConnections(false) },
+                            onSignIn = { openConnections(true) },
+                        )
+                    }
                 }
-                ConnectionsPage(
-                    session, owner, connect, active?.uiState(connectionStatus(profile, presentation)), active,
-                    listed = profiles is ServerProfileListResult.Available,
-                    signIn = page == Page.SignIn,
-                    onBack = { page = Page.Frame },
-                    onSaved = { page = Page.Connections },
-                )
-            }
-            else -> CompositionLocalProvider(LocalArtworkConnectedAt provides connectedAt) {
-                AppDestinations(
-                    channelsCache, dvr, connection, channels, recordings, guide, playingId, onWatch, onPlayRecording,
-                    channelsDispatcher = channelsDispatcher,
-                    playingRecordingId = playingRecordingId,
-                    onOpenConnections = { page = Page.Connections },
-                    onSignIn = { page = Page.SignIn },
+                NavDisplay(
+                    backStack = backStack,
+                    modifier = Modifier.fillMaxSize(),
+                    onBack = closeConnections,
+                    entryDecorators = listOf(rememberSaveableStateHolderNavEntryDecorator()),
+                    transitionSpec = { forward },
+                    popTransitionSpec = { backward },
+                    entryProvider = { page ->
+                        NavEntry(page) {
+                            when (page) {
+                                Page.Frame -> frame()
+                                Page.Connections -> {
+                                    val active = (profiles as? ServerProfileListResult.Available)?.let { list ->
+                                        list.profiles.firstOrNull { it.id == list.activeId }
+                                    }
+                                    ConnectionsPage(
+                                        session, owner, connect,
+                                        active?.uiState(connectionStatus(profile, presentation)), active,
+                                        listed = profiles is ServerProfileListResult.Available,
+                                        signIn = signIn,
+                                        onBack = closeConnections,
+                                        onSaved = { signIn = false },
+                                    )
+                                }
+                            }
+                        }
+                    },
                 )
             }
         }

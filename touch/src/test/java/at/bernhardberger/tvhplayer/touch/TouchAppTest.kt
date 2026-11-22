@@ -51,6 +51,7 @@ import at.bernhardberger.tvheadend.sdk.testing.FakeSessionCall
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -130,7 +131,8 @@ import org.robolectric.util.ReflectionHelpers
 @Config(sdk = [34], qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
 @OptIn(TvheadendTestingApi::class)
 class TouchAppTest {
-    @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
+    private val motionScale = object : MotionDurationScale { override var scaleFactor = 1f }
+    @get:Rule val compose = createAndroidComposeRule<ComponentActivity>(effectContext = motionScale)
     @get:Rule val images = ImageLoaderRule()
 
     private var connection = FakeConnection()
@@ -204,6 +206,11 @@ class TouchAppTest {
         compose.onNodeWithText(label(R.string.connect_remove)).performClick()
 
         compose.onNode(heading and hasText(label(SharedR.string.onboarding_find_title))).assertIsDisplayed()
+        connectToFoundServer()
+        connection.session.publish(SessionObservation.create(sessionState = SessionState.Connecting))
+        connection.session.publish(ready())
+        compose.onNode(heading and hasText(label(R.string.nav_channels))).assertIsDisplayed()
+        compose.onNode(heading and hasText(label(SharedR.string.server_list_title))).assertDoesNotExist()
         back()
         assertTrue(compose.activity.isFinishing)
     }
@@ -539,6 +546,12 @@ class TouchAppTest {
         val logo = AppArtworkSource(session, (guide.logo as ChannelIcon.ImageCache).artworkId)
         assertTrue(images.requested.toString(), logo in images.requested)
         assertTrue(images.requested.toString(), AppArtworkSource(session, guide.picture) in images.requested)
+
+        compose.onNodeWithContentDescription(label(R.string.channels_connection_settings)).performClick()
+        recreate()
+        compose.onNode(heading and hasText(label(SharedR.string.server_list_title))).assertIsDisplayed()
+        back()
+        compose.onNodeWithText(guide.programs[2]).assertIsDisplayed()
     }
 
     @Test
@@ -1224,6 +1237,14 @@ class TouchAppTest {
         openGuide()
         compose.onNodeWithText(guide.programs[0]).assertIsDisplayed()
 
+        unavailable(SessionFailure.NETWORK_UNAVAILABLE)
+        compose.onNode(hasClickAction() and hasText(label(R.string.channels_connection_settings))).performClick()
+        compose.onNode(heading and hasText(label(SharedR.string.server_list_title))).assertIsDisplayed()
+        connection.session.publish(guide.connected())
+        back()
+        compose.onNode(heading and hasText(label(R.string.nav_epg))).assertIsDisplayed()
+        compose.onNodeWithText(guide.programs[0]).assertIsDisplayed()
+
         // A tap opens the program in place; only Details has something behind it.
         compose.onNodeWithText(guide.programs[0]).performClick()
         listOf(R.string.channels_watch, R.string.channels_record)
@@ -1294,9 +1315,11 @@ class TouchAppTest {
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun postedNoticeShowsOnConnectionsAndContinuesInTheFrame() {
         showSavedConnectionForNotices()
+        motionScale.scaleFactor = 0f
+        compose.mainClock.autoAdvance = true
         compose.onNodeWithContentDescription(label(R.string.channels_connection_settings)).performClick()
-        advance(16)
         compose.onNode(heading and hasText(label(SharedR.string.server_list_title))).assertIsDisplayed()
+        compose.mainClock.autoAdvance = false
 
         val failed = Notice.DvrActionFailed(DvrMutationKind.DELETE, DvrMutationFeedback.REJECTED)
         val next = Notice.RecordUnavailable(null)
@@ -1307,10 +1330,11 @@ class TouchAppTest {
         compose.captureTouch("slice1", "tablet-connections-notice", TouchCanvas.TABLET)
 
         val active = connection.noticeCenter.state.value.active
+        compose.mainClock.autoAdvance = true
         back()
-        advance(16)
         compose.onNode(heading and hasText(label(R.string.nav_channels))).assertIsDisplayed()
         notice(headline).assertIsDisplayed() // A single visible live region, with the original display time.
+        compose.mainClock.autoAdvance = false
         assertEquals(active, connection.noticeCenter.state.value.active)
         advance(connection.noticeCenter.remaining(checkNotNull(active).expiresAt) + 32)
         notice(headline).assertDoesNotExist()
@@ -1405,6 +1429,10 @@ class TouchAppTest {
 
     private fun signInToFoundServer() {
         show()
+        connectToFoundServer()
+    }
+
+    private fun connectToFoundServer() {
         compose.onNode(hasClickAction() and hasText(server.name)).performClick()
         compose.onNodeWithText(label(SharedR.string.onboarding_connect)).performClick()
         compose.waitForIdle()
