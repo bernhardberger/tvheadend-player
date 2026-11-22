@@ -15,12 +15,6 @@ import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.channels.ChannelTag
 import java.time.LocalDate
 
-/** The Guide's two views, as tabs under the top bar. */
-internal enum class GuideView(@param:StringRes val label: Int) {
-    Overview(R.string.guide_overview),
-    ByChannel(R.string.guide_by_channel),
-}
-
 /**
  * A program's " • " line in the design's order (touch-design §7): the episode number, the time facts, the
  * year, and the genre last, so a narrow line, which drops whole parts from its end, loses the genre first.
@@ -49,6 +43,12 @@ internal sealed interface GuidePageKey {
     data object Browse : GuidePageKey
     // Two visits to the same program must still have separate entry state.
     data class Details(val programId: String, val visit: Long) : GuidePageKey
+    data class Channel(
+        val channelId: String,
+        val day: LocalDate?,
+        val programId: String?,
+        val visit: Long,
+    ) : GuidePageKey
 }
 
 /**
@@ -60,7 +60,7 @@ internal data class GuideState(
     val channels: List<GuideChannel>,
     val tags: List<ChannelTag> = emptyList(),
     val selectedTagId: String? = null,
-    /** The day tabs and menu: "Today", "Tomorrow", "Tue 17". */
+    /** The Overview's day menu. */
     val days: List<String>,
     val selectedDay: Int = 0,
     val dayDates: List<LocalDate> = emptyList(),
@@ -71,16 +71,11 @@ internal data class GuideState(
     /** 0 is Now, then [jumps] by index plus one. */
     val selectedJump: Int = 0,
     val jumpTimes: List<Long> = emptyList(),
-    /** Available Details visits, in back-stack order. */
-    val details: Map<GuidePageKey.Details, ProgramDetails> = emptyMap(),
     /** Whether there is a list yet, or saved content while offline. */
     val availability: GuideAvailability = GuideAvailability.Current,
     /** The picked day's or time's programs are still coming: a short wait inside the shown Guide. */
     val dayLoading: Boolean = false,
-    /** Previously prepared dates for the currently selected channel. Null for standalone fixtures. */
-    val retainedDays: Map<LocalDate, List<GuideProgram>>? = null,
 ) {
-    val channelsHaveLogos = channels.any { it.hasLogoSlot }
     val overviewHasLogos = channels.any { (it.programs.isNotEmpty() || it.overviewHasLead) && it.hasLogoSlot }
 }
 
@@ -102,12 +97,10 @@ internal data class GuideChannel(
     val logo: Painter? = null,
     /** The logo's tile tint, supplied by the caller; null uses the neutral surface. */
     val logoTint: Color? = null,
-    /** From the jump time on in the overview; the selected day in By channel. Empty: no guide data. */
+    /** From the jump time on in the overview. Empty: no guide data. */
     val programs: List<GuideProgram> = emptyList(),
     /** A gap after [programs], or at the selected time if there is no lead program. */
     val gap: GuideGap? = null,
-    /** The mapped day for the selected channel. Null means this channel's day wasn't mapped. */
-    val day: List<GuideProgram>? = null,
     /** The server image's model for the touch-level image composable; the fixture painter wins. */
     val logoModel: Any? = null,
     val overviewPending: Boolean = false,
@@ -154,6 +147,7 @@ internal data class GuideProgram(
     val watching: Boolean = false,
     /** The server image's model for the touch-level image composable; the fixture painter wins. */
     val stillModel: Any? = null,
+    val episodeName: String? = null,
 ) {
     val onNow: Boolean get() = progress != null
     val hasStill: Boolean get() = still != null || stillModel != null
@@ -195,6 +189,7 @@ internal data class ProgramDetails(
     val channelLogoModel: Any? = null,
     /** The server image's model for the touch-level image composable; the fixture painter wins. */
     val pictureModel: Any? = null,
+    val guideDay: LocalDate? = null,
 ) {
     val onNow: Boolean get() = progress != null
     val airingsHaveLogos = otherAirings.any { hasChannelLogo(it.logo, it.logoModel) }
@@ -251,7 +246,7 @@ internal class GuideActions(
     val onDay: (Int) -> Unit,
     val onJump: (Int) -> Unit,
     val onTag: (String?) -> Unit,
-    /** Details' Show in Guide; the Guide itself already shows the program. */
+    /** Details' Show in Guide. */
     val onShowInGuide: ((programId: String) -> Unit)? = {},
     val onAiring: ((programId: String) -> Unit)? = {},
     /** Section 12's failure and offline ways on: try again, connection settings, sign in. */
@@ -262,9 +257,12 @@ internal class GuideActions(
     val onCancel: ((programId: String) -> Unit)? = null,
     val onStop: ((programId: String) -> Unit)? = null,
     val onChannel: (String) -> Unit = {},
-    val onView: (GuideView) -> Unit = {},
     val onOverviewViewport: ((List<String>) -> Unit)? = null,
 ) {
+    fun forDetails(onShow: ((String) -> Unit)?) = GuideActions(
+        onWatch, onRecord, onRecordOptions, onDetails, onDay, onJump, onTag, onShow, onAiring,
+        onRetry, onOpenConnectionSettings, onSignIn, onCancel, onStop, onChannel, onOverviewViewport,
+    )
     /** Whether there is something behind a program's [record] control. */
     fun offers(record: ProgramRecordControl?): Boolean = when (record) {
         ProgramRecordControl.Record -> onRecord != null

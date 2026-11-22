@@ -29,9 +29,6 @@ import java.time.ZoneId
 internal data class GuideSelection(
     val day: LocalDate? = null,
     val jump: Long? = null,
-    val details: List<GuidePageKey.Details> = emptyList(),
-    val channelId: String? = null,
-    val view: GuideView = GuideView.Overview,
 ) {
     fun dateIn(days: List<LocalDate>): LocalDate = day?.takeIf { it in days } ?: days.first()
 }
@@ -73,7 +70,7 @@ internal class GuideTexts(
 
 /**
  * The Guide destination from the shared channel scope and the session's guide: the overview from
- * the day's jump time, By channel's day, the day tabs and the opened program's Details.
+ * the day's jump time and the day menu.
  *
  * With [artwork] channels carry their logos' and programs their pictures' image models; the program
  * on now on the [playing] channel is the one watched.
@@ -132,11 +129,10 @@ internal fun guideState(
 /** The jump times after Now, as drawn (section 7); which times to offer is an open design question. */
 internal val GUIDE_JUMP_TIMES: List<LocalTime> = listOf(LocalTime.of(20, 15), LocalTime.of(22, 0))
 
-/** Raw inputs to the visible schedule, including the tabs and the separately opened Details. */
+/** Raw inputs to the visible schedule and its day choices. */
 internal data class GuideEpgProjection(
     val days: List<LocalDate>,
     val events: Map<ChannelId?, List<EpgEvent>>,
-    val details: Map<EpgEvent, List<EpgEvent>>,
 )
 
 internal fun GuideMappingInput.epgProjection(): GuideEpgProjection? {
@@ -151,19 +147,11 @@ internal fun GuideMappingInput.epgProjection(): GuideEpgProjection? {
         second > clock.nowSec && GUIDE_JUMP_TIMES.any { date.atTime(it).atZone(clock.zone).toEpochSecond() == second }
     }
     val window = guideWindow(date, jump, clock)
-    val byChannel = selection.view == GuideView.ByChannel
-    val selectedChannel = dayChannel
-    val end = if (byChannel) window.daySec.last + 1
-    else maxOf(window.daySec.last + 1, window.anchorSec + OVERVIEW_SPAN_SEC)
+    val end = maxOf(window.daySec.last + 1, window.anchorSec + OVERVIEW_SPAN_SEC)
     val events = upcoming.asSequence()
-        .filter { !byChannel || it.channelId == selectedChannel }
         .filter { it.stop.epochSeconds > window.daySec.first && it.start.epochSeconds < end }
         .groupBy { it.channelId }
-    val detailsIds = selection.details.mapNotNullTo(HashSet()) { it.programId.toLongOrNull() }
-    val details = if (detailsIds.isEmpty()) emptyMap() else snapshot.events.asSequence()
-        .filter { it.id.value in detailsIds }
-        .associateWith { otherAirings(it, snapshot.events, clock.nowSec, AIRINGS_LIMIT) }
-    return GuideEpgProjection(days, events, details)
+    return GuideEpgProjection(days, events)
 }
 
 /** The day tabs: today, then every later day the visible channels have programs on. */
@@ -186,14 +174,7 @@ internal fun guideCoverage(
     selection: GuideSelection,
     clock: GuideClock,
 ): GuideCoverage? {
-    val channels = scope.scope.visibleChannels
-    val ids = if (selection.view == GuideView.Overview) {
-        channels.map { it.id }
-    } else {
-        val requestedId = selection.channelId?.toLongOrNull()
-        val channel = requestedId?.let { id -> channels.firstOrNull { it.id.value == id } } ?: channels.firstOrNull()
-        listOfNotNull(channel?.id)
-    }
+    val ids = scope.scope.visibleChannels.map { it.id }
     val window = guideWindow(maxOf(selection.day ?: clock.today, clock.today), null, clock)
     return ids.takeIf { it.isNotEmpty() }?.let { GuideCoverage(it, window.daySec.first, window.daySec.last + 1) }
 }
@@ -264,9 +245,6 @@ internal class GuideMapper(
             .filter { it > clock.nowSec }
         val jumpIndex = jumps.indexOf(selection.jump) + 1
         val window = guideWindow(date, jumps.getOrNull(jumpIndex - 1), clock)
-        val dayChannel = if (selection.view == GuideView.ByChannel) {
-            channels.firstOrNull { it.id.value.toString() == selection.channelId } ?: channels.firstOrNull()
-        } else null
         var phoneRows = 0
         val guideChannels = channels.mapIndexed { index, channel ->
             checkpoint()
@@ -275,16 +253,14 @@ internal class GuideMapper(
             val next = schedule.firstOrNull { it.stop.epochSeconds > window.anchorSec }
             val hasLead = next != null && next.start.epochSeconds <= window.anchorSec
             val phoneIndex = if (hasLead) phoneRows++ else null
-            val requested = dayChannel == null && rows.includes(index, phoneIndex, id)
-            val pending = !requested && channel != dayChannel
-            val logo = if (!pending || dayChannel != null) artwork?.logo(channel.icon, observation) else null
+            val pending = !rows.includes(index, phoneIndex, id)
+            val logo = if (!pending) artwork?.logo(channel.icon, observation) else null
             val head = GuideChannel(
                 id, channel.name.orEmpty(), logoModel = logo, overviewHasLead = hasLead, overviewPending = pending,
                 hasUnmappedLogo = pending && artwork != null && channel.icon != null,
             )
-            if (pending) head else overviewChannel(head, schedule, window, channel == dayChannel, rows)
+            if (pending) head else overviewChannel(head, schedule, window, rows)
         }
-        val details = selection.details.mapNotNull { key -> details(key.programId)?.let { key to it } }.toMap()
         return GuideState(
             channels = guideChannels,
             tags = tags,
@@ -296,12 +272,11 @@ internal class GuideMapper(
             jumps = jumps.map(texts.clock),
             selectedJump = jumpIndex,
             jumpTimes = jumps,
-            details = details,
         )
     }
 
     private fun overviewChannel(
-        head: GuideChannel, schedule: List<EpgEvent>, window: GuideWindow, includeDay: Boolean, rows: GuideOverviewRows,
+        head: GuideChannel, schedule: List<EpgEvent>, window: GuideWindow, rows: GuideOverviewRows,
     ): GuideChannel {
         val overviewEnd = maxOf(window.daySec.last + 1, window.anchorSec + OVERVIEW_SPAN_SEC)
         val overview = mutableListOf<EpgEvent>()
@@ -316,11 +291,9 @@ internal class GuideMapper(
             }
             overview += event
         }
-        val day = if (includeDay) schedule.filter { it.stop.epochSeconds > clock.nowSec && it.overlaps(window.daySec) }
-        else null
-        val marks = (overview + day.orEmpty()).distinctBy { it.id }
+        val marks = overview.distinctBy { it.id }
             .associateWith { observation.overviewMarks(it, clock.nowSec, artwork) }
-        val key = GuideOverviewRowKey(head, overview, gap, day, marks)
+        val key = GuideOverviewRowKey(head, overview, gap, marks)
         return rows.getOrMap(key, texts.clock) { event, previous ->
             val currentMarks = marks.getValue(event)
             if (previous == null) program(event, marks = currentMarks)
@@ -346,7 +319,7 @@ internal class GuideMapper(
     private fun EpgEvent.overlaps(window: LongRange): Boolean =
         stop.epochSeconds > window.first && start.epochSeconds <= window.last
 
-    private fun program(
+    fun program(
         event: EpgEvent, watched: EpgEvent? = null,
         marks: GuideOverviewMarks = observation.overviewMarks(event, clock.nowSec, artwork),
     ): GuideProgram {
@@ -363,6 +336,7 @@ internal class GuideMapper(
             genre = texts.genre(event),
             timeRange = texts.timeRange(event.start.epochSeconds, event.stop.epochSeconds),
             episode = texts.episode(event),
+            episodeName = event.subtitle?.takeIf(String::isNotBlank),
             synopsis = event.synopsis(),
             stillModel = marks.picture,
             progress = event.progress(clock.nowSec).takeIf { running },
@@ -404,6 +378,7 @@ internal class GuideMapper(
             otherAirings = otherAirings(event, events, clock.nowSec, AIRINGS_LIMIT).map(::airing),
             credits = credits(event),
             facts = facts(event, program),
+            guideDay = clock.dateAt(event.start.epochSeconds).takeIf { event.start.epochSeconds > clock.nowSec },
         )
     }
 

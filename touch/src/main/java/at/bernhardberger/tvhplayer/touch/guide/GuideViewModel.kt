@@ -30,7 +30,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
 import java.time.LocalDate
-import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.CoroutineContext
 import kotlin.time.Instant
 
@@ -41,25 +40,22 @@ import kotlin.time.Instant
  *
  * [acquisitionContext] keeps the SDK call off Main, as the TV's Guide does.
  */
-@Suppress("TooManyFunctions") // Single-page Back and destination reselection are distinct selection operations.
 internal class GuideViewModel(
-    private val session: TvheadendSession,
+    val session: TvheadendSession,
     savedState: SavedStateHandle,
-    private val acquisitionContext: CoroutineContext = Dispatchers.Default,
-    private val mappingDispatcher: CoroutineDispatcher = Dispatchers.Default.limitedParallelism(1),
+    val acquisitionContext: CoroutineContext = Dispatchers.Default,
+    val mappingDispatcher: CoroutineDispatcher = Dispatchers.Default.limitedParallelism(1),
 ) : ViewModel() {
     val observation: StateFlow<SessionObservation> = session.observation
     private val mutableSelection = MutableStateFlow(
         savedState.get<Bundle>(SELECTION_STATE).let { saved ->
             GuideSelection(
                 day = saved?.getString("day")?.let(LocalDate::parse),
-                channelId = saved?.getString("channel"),
-                view = saved?.getString("view")?.let(GuideView::valueOf) ?: GuideView.Overview,
             )
         },
     )
     val selection: StateFlow<GuideSelection> = mutableSelection.asStateFlow()
-    private val detailsVisit = AtomicLong()
+    val pageStack = ProgramPageStack()
     private val mutablePending = MutableStateFlow(0L)
 
     /** Changes whenever a request starts or ends; read [isPending] after it. */
@@ -78,7 +74,7 @@ internal class GuideViewModel(
         // Save the latest browse position, not the transient jump or open Details.
         savedState.setSavedStateProvider(SELECTION_STATE) {
             val current = selection.value
-            bundleOf("day" to current.day?.toString(), "channel" to current.channelId, "view" to current.view.name)
+            bundleOf("day" to current.day?.toString())
         }
         viewModelScope.launch {
             observation.collect { updateCoverageSession(it.currentSession?.generationIdentity) }
@@ -87,22 +83,11 @@ internal class GuideViewModel(
 
     fun selectDay(day: LocalDate?) = mutableSelection.update { it.copy(day = day, jump = null) }
 
-    fun selectPage(view: GuideView, channelId: String? = null) =
-        mutableSelection.update { it.copy(view = view, channelId = channelId ?: it.channelId) }
-
     fun selectJump(jump: Long?) = mutableSelection.update { it.copy(jump = jump) }
 
     fun reconcileSelection(expected: GuideSelection, available: GuideSelection) {
         mutableSelection.compareAndSet(expected, available)
     }
-
-    // Retain visits across configuration changes, but start closed after process death.
-    fun openDetails(programId: String?) {
-        val visit = programId?.let { GuidePageKey.Details(it, detailsVisit.incrementAndGet()) }
-        mutableSelection.update { it.copy(details = if (visit == null) it.details.dropLast(1) else it.details + visit) }
-    }
-
-    fun closeAllDetails() = mutableSelection.update { it.copy(details = emptyList()) }
 
     /** Null or a scope that hasn't caught up with the observation stops work, retaining the last result. */
     fun map(context: Context, input: GuideMappingInput?) {
@@ -115,11 +100,6 @@ internal class GuideViewModel(
                 mappingInput = mutableMapped.value?.input
             }
             return
-        }
-        mutableMapped.value?.let {
-            if (it.days.isNotEmpty() && !it.input.sameDayOwner(current)) {
-                mutableMapped.value = it.copy(days = emptyMap())
-            }
         }
         mappingInput = current
         // Like the TV's browse preparation: finish the captured projection, then take
@@ -154,16 +134,13 @@ internal class GuideViewModel(
             }
             if (metadataOnly && previous != null && previous.metadataUnchanged(input, sincePublished, projection)) {
                 return@withContext previous.copy(
-                    input = input, projection = projection, days = previous.validatedDays(input),
+                    input = input, projection = projection,
                 )
             }
             val counts = if ("epg" in sincePublished) {
                 context.epgChangeCounts(previous?.input?.observation, input.observation)
             } else ""
-            val overviewRows = previous?.reusableOverviewRows(input)
-            val overview = input.selection.view == GuideView.Overview
-            val priorRows = if (overview) overviewRows else previous?.reusableDayRows(input)
-            val rows = GuideOverviewRows(input.viewport.toSet(), priorRows)
+            val rows = GuideOverviewRows(input.viewport.toSet(), previous?.reusableOverviewRows(input))
             val state = traceArtworkMapping(
                 context, "Guide", sincePublished.joinToString("+") + counts, rows = { rows.formattedCount },
             ) {
@@ -178,15 +155,7 @@ internal class GuideViewModel(
                 ensureActive()
                 state
             }
-            GuideMappingResult(
-                input, state, projection, rows, input.rememberDay(state, rows, previous),
-                overviewRows = when {
-                    overview -> rows
-                    state.dayDates.getOrNull(state.selectedDay) == (input.selection.day ?: input.clock.today) ->
-                        overviewRows
-                    else -> null
-                },
-            )
+            GuideMappingResult(input, state, projection, rows)
         }
 
     /** Asks the server for the [coverage] window's guide unless that request is already running. */
@@ -232,20 +201,12 @@ internal class GuideMappingInput(
     val playingId: String?,
     val viewport: List<String> = emptyList(),
 ) {
-    val dayChannel get() = scope.scope.visibleChannels.let { channels ->
-        val id = selection.channelId?.toLongOrNull()
-        (id?.let { channels.firstOrNull { channel -> channel.id.value == id } } ?: channels.firstOrNull())?.id
-    }
-
     val generation get() = observation.currentSession?.generationIdentity
     val hasMatchingGeneration get() = scope.observation?.currentSession?.generationIdentity === generation
 
     fun sameBrowseOwner(next: GuideMappingInput): Boolean =
         hasMatchingGeneration && next.hasMatchingGeneration && generation === next.generation &&
             scope.profileId == next.scope.profileId && scope.scope.activeTagId == next.scope.scope.activeTagId
-
-    fun sameDayOwner(next: GuideMappingInput): Boolean =
-        sameBrowseOwner(next) && scope === next.scope && dayChannel == next.dayChannel
 
     fun changesFrom(previous: GuideMappingInput?): List<String> {
         if (previous == null) return listOf("initial")
@@ -276,48 +237,14 @@ internal data class GuideMappingResult(
     val state: GuideState,
     val projection: GuideEpgProjection? = null,
     val rows: GuideOverviewRows,
-    val days: Map<LocalDate, GuideCachedDay> = emptyMap(),
-    private val overviewRows: GuideOverviewRows? = null,
 ) {
-    // Snapshot churn can change the marks, not the day. Keep its rows mounted until the worker
-    // rechecks the marks, without reusing them across a change in programme authority.
-    fun daysFor(next: GuideMappingInput): Map<LocalDate, GuideCachedDay> =
-        if (sameDvrSnapshot(next) || input.observation.sameProgrammeAuthority(next.observation)) {
-            formattedDays(next)
-        } else emptyMap()
-
-    // Only the worker may recheck the marks. Its publication stamps the surviving days with its DVR snapshot.
-    fun validatedDays(next: GuideMappingInput): Map<LocalDate, GuideCachedDay> {
-        val formatted = formattedDays(next)
-        return if (sameDvrSnapshot(next)) formatted else formatted.filterValues { it.rows.marksUnchanged(next) }
-    }
-
-    private fun sameDvrSnapshot(next: GuideMappingInput): Boolean =
-        input.observation.dvrSnapshotForDisplay === next.observation.dvrSnapshotForDisplay
-
-    private fun formattedDays(next: GuideMappingInput): Map<LocalDate, GuideCachedDay> =
-        if (input.sameDayOwner(next)) days.filter { (date, day) -> day.isCurrent(next, date) } else emptyMap()
-
     fun metadataUnchanged(
         next: GuideMappingInput, changes: List<String>, nextProjection: GuideEpgProjection?,
     ): Boolean = ("epg" !in changes || nextProjection == (projection ?: input.epgProjection())) &&
-            ("dvr" !in changes || dvrMarksUnchanged(next))
-
-    private fun dvrMarksUnchanged(next: GuideMappingInput): Boolean {
-        if (!rows.marksUnchanged(next)) return false
-        return state.details.values.takeIf { it.isNotEmpty() }?.let { pages ->
-            val ids = pages.flatMapTo(HashSet()) { details -> details.otherAirings.map { it.id } + details.id }
-            input.observation.epgSnapshotForDisplay?.events.orEmpty().asSequence()
-                .filter { it.id.value.toString() in ids }
-                .all { event ->
-                    input.observation.overviewMarks(event, input.clock.nowSec, input.artwork) ==
-                        next.observation.overviewMarks(event, next.clock.nowSec, next.artwork)
-                }
-        } ?: true
-    }
+            ("dvr" !in changes || rows.marksUnchanged(next))
 
     fun reusableOverviewRows(next: GuideMappingInput): GuideOverviewRows? =
-        overviewRows?.takeIf {
+        rows.takeIf {
             input.sameBrowseOwner(next) && input.clock.today == next.clock.today &&
                 state.dayDates.getOrNull(state.selectedDay) == (next.selection.day ?: next.clock.today) &&
                 sameRowFormat(next)
@@ -327,50 +254,10 @@ internal data class GuideMappingResult(
         input.clock.zone == next.clock.zone && input.configuration == next.configuration &&
             input.uses24Hour == next.uses24Hour && input.artwork === next.artwork
 
-    fun reusableDayRows(next: GuideMappingInput): GuideOverviewRows? {
-        val date = next.selection.day ?: next.clock.today
-        val cached = days[date]?.takeIf { input.sameDayOwner(next) }
-        if (cached?.canReuseRows(next, date) == true) return cached.rows
-        return rows.takeIf {
-            input.scope.profileId == next.scope.profileId && sameRowFormat(next) && input.playingId == next.playingId
-        }
-    }
-}
-
-internal data class GuideCachedDay(
-    val programs: List<GuideProgram>,
-    val rows: GuideOverviewRows,
-    private val clock: GuideClock,
-    private val playingId: String?,
-    private val configuration: Configuration,
-    private val uses24Hour: Boolean,
-    private val artwork: ArtworkModels?,
-) {
-    fun isCurrent(next: GuideMappingInput, date: LocalDate): Boolean =
-        canReuseRows(next, date) && clock.today == next.clock.today
-
-    fun canReuseRows(next: GuideMappingInput, date: LocalDate): Boolean =
-        clock.zone == next.clock.zone && date >= next.clock.today &&
-            playingId == next.playingId && configuration == next.configuration &&
-            uses24Hour == next.uses24Hour && artwork === next.artwork
-}
-
-private fun GuideMappingInput.rememberDay(
-    state: GuideState, rows: GuideOverviewRows, previous: GuideMappingResult?,
-): Map<LocalDate, GuideCachedDay> {
-    val retained = previous?.validatedDays(this).orEmpty().filterKeys { it in state.dayDates }
-    val date = state.dayDates.getOrNull(state.selectedDay)
-    val channelId = dayChannel?.value?.toString()
-    val day = state.channels.firstOrNull { it.id == channelId }?.day
-    return if (selection.view == GuideView.ByChannel && date != null && day != null) {
-        retained + (date to GuideCachedDay(
-            day, rows, clock, playingId, configuration, uses24Hour, artwork,
-        ))
-    } else retained
 }
 
 /** The shown channels and the selected day's window a coverage request asks for. */
 internal data class GuideCoverage(val channelIds: List<ChannelId>, val startSec: Long, val throughSec: Long)
 
-private const val COVERAGE_TIMEOUT_MS = 30_000L
+internal const val COVERAGE_TIMEOUT_MS = 30_000L
 private val GUIDE_STREAM_CHANGES = setOf("epg", "dvr", "viewport")

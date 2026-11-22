@@ -1,8 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- The Guide's two views, as tabs under the top bar. -->
-    <string name="guide_overview">Overview</string>
-    <string name="guide_by_channel">By channel</string>
     <!-- TV: now. First choice of the jump switch. -->
     <string name="guide_now">Now</string>
     <!-- A gap in a channel's schedule; the line under it says when programs return. -->
@@ -16,8 +13,8 @@
     <string name="guide_record_options">Record options</string>
     <!-- Content description of the chevron that folds an opened program back into its row. Not drawn. -->
     <string name="guide_collapse">Collapse</string>
-    <!-- Content description of a channel head in the overview: opens that channel's day. Not drawn. -->
-    <string name="guide_open_channel">%1$s, by channel</string>
+    <!-- Content description of a channel head in the overview: opens its channel page. -->
+    <string name="guide_open_channel">Open %1$s</string>
 
     <!-- Program details. -->
     <!-- TV: details_other_airings -->

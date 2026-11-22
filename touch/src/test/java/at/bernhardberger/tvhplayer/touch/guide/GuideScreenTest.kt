@@ -4,11 +4,13 @@ import android.content.pm.ApplicationInfo
 import android.os.Bundle
 import android.os.Looper
 import android.os.SystemClock
+import android.text.format.DateFormat
 import androidx.activity.ComponentActivity
 import androidx.activity.BackEventCompat
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -65,17 +67,19 @@ import at.bernhardberger.tvhplayer.touch.testutil.ServerGuide
 import at.bernhardberger.tvhplayer.touch.testutil.TouchCanvas
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouch
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouchWindows
+import at.bernhardberger.tvhplayer.touch.ui.CompactBrowseMargin
 import at.bernhardberger.tvhplayer.touch.ui.DvrChangeDialog
 import at.bernhardberger.tvhplayer.touch.ui.DvrControls
 import at.bernhardberger.tvhplayer.touch.ui.ProgramRecordControl
 import at.bernhardberger.tvhplayer.touch.ui.RuleSchedule
 import at.bernhardberger.tvhplayer.touch.ui.Destination
 import at.bernhardberger.tvhplayer.touch.ui.DestinationFrame
+import at.bernhardberger.tvhplayer.touch.ui.LocalBrowseMargin
 import at.bernhardberger.tvhplayer.touch.ui.LocalDestinationReselections
+import at.bernhardberger.tvhplayer.touch.ui.WideBrowseMargin
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import at.bernhardberger.tvhplayer.touch.ui.TouchDarkColors
@@ -85,9 +89,10 @@ import java.util.TimeZone
 import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.Duration
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import android.content.res.Configuration
 import at.bernhardberger.tvhplayer.ui.common.AppClock
-import at.bernhardberger.tvhplayer.ui.common.formatDayHeader
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import kotlin.coroutines.EmptyCoroutineContext
@@ -130,7 +135,6 @@ class GuideScreenTest {
     private val watched = mutableListOf<String>()
     private val cancelled = mutableListOf<String>()
     private val stopped = mutableListOf<String>()
-    private val selectedChannels = mutableListOf<String>()
     private val selectedDays = mutableListOf<Int>()
 
     @Test
@@ -140,6 +144,8 @@ class GuideScreenTest {
         val state = mutableStateOf(fixture)
         show(fixture, state = { state.value })
         capture("tablet-guide-overview", TouchCanvas.TABLET)
+        val firstHead = compose.onNodeWithContentDescription("Open ${fixture.channels.first().name}")
+        val guideStart = firstHead.getBoundsInRoot().left
 
         // A tap opens the program where it is and plays nothing; only on-air programs offer Watch.
         val row = compose.onAllNodesWithText("Coastal Miles")[0]
@@ -162,7 +168,7 @@ class GuideScreenTest {
         compose.onAllNodes(hasText(COASTAL_MILES_SYNOPSIS_START, substring = true)).assertCountEquals(0)
 
         compose.runOnIdle { state.value = fixture.withoutLogo("ridge-earth") }
-        val head = hasContentDescription("Ridge Earth, by channel")
+        val head = hasContentDescription("Open Ridge Earth")
         compose.onNode(hasTestTag("channel-logo-tile") and hasAnyAncestor(head), useUnmergedTree = true)
             .assertDoesNotExist()
         assertEquals(
@@ -180,8 +186,16 @@ class GuideScreenTest {
         back()
 
         compose.onNode(head).performClick()
-        compose.onNodeWithText("Sunday, November 15").assertIsDisplayed()
-        compose.onNodeWithText("Six Bridges and a River That Changed Its Mind").assertIsDisplayed()
+        compose.onNodeWithContentDescription(compose.activity.getString(R.string.recordings_back)).assertIsDisplayed()
+        compose.onNodeWithText("Today").assertIsSelected()
+        compose.onNodeWithText("Ridge Earth").assertIsDisplayed()
+        val onNow = compose.onNodeWithText("On now", useUnmergedTree = true).getBoundsInRoot()
+        val tab = compose.onNodeWithText("Today", useUnmergedTree = true).getBoundsInRoot()
+        val rowBounds = compose.onAllNodesWithText("Tide Watch").onFirst().getBoundsInRoot()
+        assertEquals("The full channel page shares the Guide start keyline",
+            listOf(guideStart, guideStart, guideStart), listOf(onNow.left, tab.left, rowBounds.left),
+        )
+        capture("tablet-channel-page-in-guide", TouchCanvas.TABLET)
     }
 
     @Test
@@ -287,7 +301,7 @@ class GuideScreenTest {
         listOf("Record", "Cancel recording").forEach { compose.onAllNodes(hasText(it)).assertCountEquals(0) }
         capture("tablet-guide-scheduled-series", TouchCanvas.TABLET)
 
-        compose.onNodeWithText("Snowline").performClick()
+        compose.onAllNodesWithText("Snowline").onFirst().performSemanticsAction(SemanticsActions.OnClick)
         compose.onAllNodes(hasText("Record")).assertCountEquals(0)
         compose.onNodeWithText("Cancel recording").performClick()
         assertEquals(listOf(SNOWLINE_ID), cancelled)
@@ -304,42 +318,6 @@ class GuideScreenTest {
         val spoken = stopConfirmationSentence(stopTimes, compose.activity.resources, spoken = true)
         compose.onNodeWithText(spoken).assertIsDisplayed()
         compose.captureTouchWindows(GROUP, "tablet-guide-stop-confirm", TouchCanvas.TABLET)
-    }
-
-    @Test
-    @Config(qualifiers = TABLET)
-    fun tabletChannelDay() {
-        val fixture = byChannelFixture()
-        var state by mutableStateOf(fixture)
-        show(fixture, GuideView.ByChannel, channel = fixture.channels.first().id, open = RIDGE_LIGHT_ID, state = { state })
-        compose.onNodeWithText("Monday, November 16").assertIsDisplayed()
-        compose.onAllNodes(hasText("8:00–9:00 PM", substring = true)).assertCountEquals(1)
-        compose.onNodeWithText("60m • 2024 • Documentary").assertIsDisplayed()
-        capture("tablet-guide-channel", TouchCanvas.TABLET)
-
-        compose.onNodeWithText("Watch").performClick()
-        assertEquals(listOf("ridge-earth"), watched)
-        state = fixture.copy(channels = fixture.channels.map { channel ->
-            channel.copy(day = (channel.day ?: channel.programs).filterNot { it.id == RIDGE_LIGHT_ID })
-        })
-        compose.onNodeWithText("60m • 2024 • Documentary").assertDoesNotExist()
-        state = fixture
-        compose.onNodeWithText("60m • 2024 • Documentary").assertDoesNotExist()
-
-        dragPastHalfway(tablet = true) {
-            assertEquals(emptyList<Int>(), selectedDays)
-            compose.onNodeWithText(fixture.days[1]).assertIsSelected()
-        }
-        compose.onNodeWithText(fixture.days[1]).assertIsSelected()
-        assertEquals(listOf(1), selectedDays)
-        tapDistantTab(fixture.days.last(), fixture.days)
-        assertEquals(listOf(1, fixture.days.lastIndex), selectedDays)
-
-        val otherChannel = fixture.channels.first { it.id == "glass-drama" }
-        state = fixture.copy(channels = listOf(otherChannel), selectedTagId = "other")
-        compose.onNodeWithText("No schedule").assertIsDisplayed()
-        compose.onNodeWithText("Watch").performClick()
-        assertEquals(listOf("ridge-earth", otherChannel.id), watched)
     }
 
     @Test
@@ -370,36 +348,13 @@ class GuideScreenTest {
     }
 
     @Test
-    @Config(qualifiers = "en-rUS-w1024dp-h558dp-land-xhdpi")
-    fun tabletChannelDayRevealsActionsWhenTheLastVisibleProgramOpens() = assertChannelDayRevealsActions(phone = false)
-
-    @Test
-    @Config(qualifiers = "en-rUS-w412dp-h558dp-port-xhdpi")
-    fun phoneChannelDayRevealsActionsWhenTheLastVisibleProgramOpens() = assertChannelDayRevealsActions(phone = true)
-
-    private fun assertChannelDayRevealsActions(phone: Boolean) {
-        val fixture = byChannelFixture(phone)
-        val selected = fixture.channels.first()
-        val programs = selected.programs.distinctBy { it.title }.map {
-            it.copy(art = selected.programs.first().art, synopsis = selected.programs.first().synopsis)
-        }
-        show(fixture.copy(channels = listOf(selected.copy(programs = programs))), GuideView.ByChannel, channel = selected.id)
-
-        val lastVisible = programs.map { compose.onNodeWithText(it.title) }.last { it.isDisplayed() }
-        lastVisible.performClick()
-        compose.onNodeWithText("Details").assertIsDisplayed()
-        lastVisible.assertIsDisplayed()
-    }
-
-    @Test
-    @Config(qualifiers = TABLET)
-    fun tabletChannelWithoutGuideDataOffersWatch() {
-        show(byChannelFixture(), GuideView.ByChannel, channel = "glass-drama")
+    @Config(qualifiers = PHONE)
+    fun channelWithoutGuideDataShowsTheEmptyState() {
+        val channel = byChannelFixture().channels.first { it.id == "glass-drama" }
+        showChannelFixture(channelPageFixture(channel, compose.activity), inPane = false)
         compose.onNodeWithText("No schedule").assertIsDisplayed()
-        capture("tablet-guide-channel-empty", TouchCanvas.TABLET)
-
-        compose.onNodeWithText("Watch").performClick()
-        assertEquals(listOf("glass-drama"), watched)
+        compose.onNodeWithText("Watch").assertDoesNotExist()
+        capture("phone-channel-page-empty", TouchCanvas.PHONE)
     }
 
     @Test
@@ -413,7 +368,7 @@ class GuideScreenTest {
         capture("tablet-details", TouchCanvas.TABLET)
 
         back()
-        compose.onNodeWithText("Overview").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Back").assertDoesNotExist()
         compose.onAllNodes(hasText("Other airings of Glass Harbor")).assertCountEquals(0)
         assertEquals("System Back clears the producer's Details selection", listOf(GLASS_HARBOR_ID, null), details)
     }
@@ -432,8 +387,7 @@ class GuideScreenTest {
     fun tabletFirstLoad() {
         show(overviewFixture().copy(availability = GuideAvailability.Loading))
         compose.onNodeWithText("Loading guide…").assertIsDisplayed()
-        // The view switch and the day bar come with the list.
-        compose.onNodeWithText("Overview").assertDoesNotExist()
+        // The day bar comes with the list.
         compose.onNodeWithText("Now").assertDoesNotExist()
         capture("tablet-guide-loading", TouchCanvas.TABLET)
     }
@@ -449,14 +403,6 @@ class GuideScreenTest {
 
     @Test
     @Config(qualifiers = UPRIGHT)
-    fun uprightChannelDay() {
-        show(byChannelFixture(upright = true), GuideView.ByChannel, open = RIDGE_LIGHT_ID)
-        assertPartLinesWhole()
-        capture("tablet-upright-guide-channel", TouchCanvas.TABLET_UPRIGHT)
-    }
-
-    @Test
-    @Config(qualifiers = UPRIGHT)
     fun uprightDetails() {
         show(overviewFixture(upright = true), detailsId = GLASS_HARBOR_ID)
         capture("tablet-upright-details", TouchCanvas.TABLET_UPRIGHT)
@@ -464,7 +410,7 @@ class GuideScreenTest {
 
     @Test
     @Config(qualifiers = PHONE)
-    fun phoneOverviewOpensInPlaceAndTabsSwitchTheView() {
+    fun phoneOverviewOpensInPlace() {
         show(phoneOverviewFixture())
         assertPartLinesWhole()
         assertTimeLeftStays()
@@ -474,10 +420,8 @@ class GuideScreenTest {
         compose.onNodeWithText("S2 E4 • The Long Tide").assertIsDisplayed()
         capture("phone-guide-overview-open", TouchCanvas.PHONE)
 
-        compose.onNodeWithText("By channel").performClick()
-        compose.onNodeWithText("Sunday, November 15").assertIsDisplayed()
-        compose.onNodeWithText("Overview").performClick()
-        compose.onNodeWithText("Ridge Earth • 8:00 PM").assertIsDisplayed()
+        back()
+        compose.onNodeWithText("Ridge Light").assertIsDisplayed()
     }
 
     @Test
@@ -502,110 +446,82 @@ class GuideScreenTest {
     fun phoneFirstLoad() {
         show(phoneOverviewFixture().copy(availability = GuideAvailability.Loading))
         compose.onNodeWithText("Loading guide…").assertIsDisplayed()
-        compose.onNodeWithText("Overview").assertDoesNotExist()
         capture("phone-guide-loading", TouchCanvas.PHONE)
     }
 
     @Test
     @Config(qualifiers = PHONE)
-    fun phoneChannelDay() {
-        val fixture = byChannelFixture(phone = true)
-        val channel = fixture.channels.first()
-        var channelOverride by mutableStateOf<String?>(channel.id)
-        val snowline = channel.programs.first { it.title == "Snowline" }
-        val programs = channel.programs.map {
-            if (it.id == snowline.id) it.copy(timeRange = "10:00–10:45 PM") else it
-        }
-        show(
-            fixture.copy(channels = listOf(channel.copy(programs = programs)) + fixture.channels.drop(1)),
-            GuideView.ByChannel, open = RIDGE_LIGHT_ID,
-            channelOverride = { channelOverride },
+    fun phoneChannelPageScrollsToStickyDayTabsAndSwipesBetweenDays() {
+        val state = channelPageFixture(byChannelFixture(phone = true, upright = true).channels.first(), compose.activity)
+        showChannelFixture(state, inPane = false)
+        compose.onNodeWithText("On now").assertIsDisplayed()
+        compose.onNodeWithText("Watch").assertDoesNotExist()
+        val tide = compose.onAllNodesWithText("Tide Watch", useUnmergedTree = true).onFirst().getBoundsInRoot()
+        val snowline = compose.onAllNodesWithText("Snowline", useUnmergedTree = true).onFirst().getBoundsInRoot()
+        val clock = compose.onNodeWithContentDescription("Recording scheduled", useUnmergedTree = true)
+            .getBoundsInRoot()
+        val row = compose.onAllNodesWithText("Snowline").onFirst().getBoundsInRoot()
+        val onNow = compose.onNodeWithText("On now", useUnmergedTree = true).getBoundsInRoot()
+        val todayTab = compose.onNodeWithText("Today", useUnmergedTree = true).getBoundsInRoot()
+        assertEquals("The phone's first day label and On now share the row start keyline",
+            listOf(row.left, row.left), listOf(onNow.left, todayTab.left),
         )
-        capture("phone-guide-channel", TouchCanvas.PHONE)
+        assertTrue("The scheduled clock belongs next to the title, not at the row's end",
+            clock.left >= snowline.right && clock.left - snowline.right < row.right - clock.right,
+        )
+        assertEquals("Different time widths share a title keyline", tide.left, snowline.left)
+        capture("phone-channel-page-today", TouchCanvas.PHONE)
+        compose.onAllNodesWithText("Snowline").onFirst().performSemanticsAction(SemanticsActions.OnClick)
+        assertEquals(listOf(state.retained.getValue(state.days.keys.first()).first { it.title == "Snowline" }.id), details)
 
-        // A tap on another program opens it instead.
-        compose.onNodeWithText("Snowline").performClick()
-        compose.onAllNodes(hasText("Winter on the ridge", substring = true)).assertCountEquals(0)
-        compose.onAllNodes(hasText("10:00–10:45 PM", substring = true)).assertCountEquals(1)
-        compose.onNodeWithText("45m • Documentary").assertIsDisplayed()
-
-        swipeDay(left = false)
-        compose.onNodeWithText(channel.name).assertIsSelected()
-        swipeDay(left = true, distance = 0.04f)
-        compose.onNodeWithText(channel.name).assertIsSelected()
-        assertEquals(emptyList<String>(), selectedChannels)
-        val next = fixture.channels[1]
-        val tabs = guideTabs(fixture.channels.map { it.name })
-        val selectedTabs = compose.onAllNodes(tabs and isSelected())
-        val neighbor = hasText(next.name)
-        val assertNeighborSelected = {
-            val selected = selectedTabs.fetchSemanticsNodes()
-            assertEquals(1, selected.size)
-            assertTrue("The neighboring tab must stay selected", neighbor.matches(selected.single()))
-        }
-        motionScale.scaleFactor = 0f
-        dragPastHalfway(afterRelease = {
-            var remainingFrames = 60
-            while (selectedChannels.isEmpty() && remainingFrames-- > 0) {
-                compose.mainClock.advanceTimeByFrame()
-                assertNeighborSelected()
-            }
-            assertEquals(listOf(next.id), selectedChannels)
-            // The screen can still be showing the previous ViewModel value when the callback fires.
-            repeat(2) {
-                compose.mainClock.advanceTimeByFrame()
-                assertNeighborSelected()
-            }
-            compose.runOnUiThread { channelOverride = null }
-            repeat(2) {
-                compose.mainClock.advanceTimeByFrame()
-                assertNeighborSelected()
-            }
-        }) {
-            assertEquals(emptyList<String>(), selectedChannels)
-            assertNeighborSelected()
-        }
-        compose.onNode(hasText(next.name) and isSelectable()).assertIsSelected()
-        compose.onNodeWithText("By channel").assertIsSelected()
-        assertEquals(listOf(next.id), selectedChannels)
-        compose.mainClock.autoAdvance = false
-        try {
-            compose.onNodeWithText(channel.name).performClick()
-            compose.mainClock.advanceTimeByFrame()
-            compose.onNodeWithText(channel.name).assertIsSelected()
-            compose.onNodeWithText("Snowline").assertIsDisplayed()
-        } finally {
-            compose.mainClock.autoAdvance = true
-        }
         compose.onRoot().performTouchInput {
-            swipe(Offset(center.x, height * 0.83f), Offset(center.x, height * 0.45f))
+            swipe(Offset(center.x, height * 0.86f), Offset(center.x, height * 0.34f))
         }
-        compose.onNodeWithText(channel.name).assertIsSelected()
-        assertEquals(listOf(next.id, channel.id), selectedChannels)
-        compose.onNodeWithText("Overview").performClick()
-        compose.onNodeWithText("Overview").assertIsSelected()
+        assertFalse(compose.onNodeWithText("On now").isDisplayed())
+        compose.onNodeWithText("Today").assertIsSelected()
+        capture("phone-channel-page-sticky-tabs", TouchCanvas.PHONE)
+
+        dragPastHalfway {
+            assertEquals(emptyList<Int>(), selectedDays)
+            compose.onNodeWithText("Tomorrow").assertIsSelected()
+        }
+        compose.onNodeWithText("Tomorrow").assertIsSelected()
+        assertEquals(listOf(1), selectedDays)
+        tapDistantTab(state.days.values.last(), state.days.values.toList())
+        assertEquals(listOf(1, state.days.size - 1), selectedDays)
+        capture("phone-channel-page-later-day", TouchCanvas.PHONE)
+
+        compose.onRoot().performTouchInput {
+            swipe(Offset(center.x, height * 0.32f), Offset(center.x, height * 0.83f))
+        }
+        compose.onNodeWithText("On now").assertIsDisplayed()
     }
 
-    private fun swipeDay(left: Boolean, distance: Float = 0.5f) {
-        compose.onRoot().performTouchInput {
-            val right = width * 0.89f
-            val other = right - width * distance
-            val y = height * 0.54f
-            swipe(Offset(if (left) right else other, y), Offset(if (left) other else right, y))
-        }
+    @Test
+    @Config(qualifiers = "en-rUS-w740dp-h800dp-port-xhdpi")
+    fun channelPaneHasNoBackButton() {
+        showChannelFixture(channelPageFixture(byChannelFixture().channels.first(), compose.activity), inPane = true)
+        compose.onNodeWithContentDescription("Back").assertDoesNotExist()
+        compose.onNodeWithText("Ridge Earth").assertIsDisplayed()
+        val tile = compose.onNode(hasTestTag("channel-logo-tile"), useUnmergedTree = true).getBoundsInRoot()
+        val onNow = compose.onNodeWithText("On now", useUnmergedTree = true).getBoundsInRoot()
+        val tab = compose.onNodeWithText("Today", useUnmergedTree = true).getBoundsInRoot()
+        val row = compose.onNodeWithText("Snowline").getBoundsInRoot()
+        val timeLeft = compose.onNodeWithText("13m left", useUnmergedTree = true).getBoundsInRoot()
+        assertEquals("The pane begins on one keyline", listOf(tile.left, tile.left, tile.left),
+            listOf(onNow.left, tab.left, row.left),
+        )
+        assertEquals("The pane ends on one keyline", row.right, timeLeft.right)
+        capture("tablet-channel-pane", TouchCanvas.TABLET_CHANNEL_PANE)
     }
 
-    private fun dragPastHalfway(
-        tablet: Boolean = false,
-        afterRelease: () -> Unit = {},
-        assertDuringDrag: () -> Unit,
-    ) {
+    private fun dragPastHalfway(assertDuringDrag: () -> Unit) {
         compose.mainClock.autoAdvance = false
         try {
             compose.onRoot().performTouchInput {
                 val start = Offset(width * 0.96f, height * 0.54f)
                 down(start)
-                moveTo(start - Offset(width * (if (tablet) 0.36f else 0.65f), 0f))
+                moveTo(start - Offset(width * 0.65f, 0f))
             }
             try {
                 compose.mainClock.advanceTimeByFrame()
@@ -613,7 +529,6 @@ class GuideScreenTest {
             } finally {
                 compose.onRoot().performTouchInput { up() }
             }
-            afterRelease()
         } finally {
             compose.mainClock.autoAdvance = true
         }
@@ -646,37 +561,32 @@ class GuideScreenTest {
         capture("phone-details", TouchCanvas.PHONE)
 
         compose.onNodeWithContentDescription("Back").performClick()
-        compose.onNodeWithText("Overview").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Back").assertDoesNotExist()
         assertEquals("The page's Back button clears Details too", listOf<String?>(null), details)
     }
 
     @Test
     @Config(qualifiers = "en-rUS-w412dp-h558dp-port-xhdpi")
-    fun reselectingGuideReturnsFromDetailsBeforeScrollingTheSelectedDay() {
+    fun backKeepsTheChannelScrollAndReselectingGuidePopsTheStack() {
         motionScale.scaleFactor = 0f
         val taps = MutableSharedFlow<Destination>(extraBufferCapacity = 1)
         val fixture = byChannelFixture(phone = true)
-        val channel = fixture.channels.first()
+        val channel = byChannelFixture(phone = true, upright = true).channels.first()
         val program = channel.programs.last()
-        val first = glassHarborDetails().copy(id = program.id)
+        val first = glassHarborDetails().copy(id = program.id, channelId = channel.id)
         val airing = first.otherAirings.first()
         val returnAiring = airing.copy(id = first.id, time = "Today 8:00 PM")
         val second = first.copy(id = airing.id, title = "The next showing", otherAirings = listOf(returnAiring))
         show(
-            fixture.copy(details = mapOf(GuidePageKey.Details(first.id, 0) to first)), extraDetails = second,
-            view = GuideView.ByChannel, channel = channel.id, taps = taps,
+            fixture, detailsFixture = listOf(first), extraDetails = second,
+            channel = channel.id, taps = taps, channelFixture = channelPageFixture(channel, compose.activity),
         )
-        val list = compose.onNode(
-            hasScrollToIndexAction() and SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange),
-        )
-        list.performScrollToIndex(channel.programs.lastIndex)
+        val list = channelRows()
+        compose.onNode(hasTestTag("channel-page-scroll")).performScrollToIndex(1)
+        list.performScrollToIndex(channel.programs.lastIndex - 1)
         fun position() = list.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
-        compose.onNodeWithText(program.title).performSemanticsAction(SemanticsActions.OnClick)
-        val detailsButton = compose.onNodeWithText("Details")
-        detailsButton.performScrollTo()
         val scrolled = position()
-        assertTrue(scrolled > 0f)
-        detailsButton.performSemanticsAction(SemanticsActions.OnClick)
+        compose.onNodeWithText(program.title).performSemanticsAction(SemanticsActions.OnClick)
         fun openAiring() {
             compose.onNodeWithText(airing.time).performScrollTo().performClick()
             compose.onNodeWithText(second.title).assertIsDisplayed()
@@ -685,28 +595,26 @@ class GuideScreenTest {
         back()
         compose.onNodeWithText(first.title).assertExists()
         back()
-        compose.onNodeWithText("By channel").assertIsSelected()
+        compose.onNodeWithText("Today").assertIsSelected()
         val afterBack = position()
-        detailsButton.performScrollTo()
         val beforeReselect = position()
-        detailsButton.performSemanticsAction(SemanticsActions.OnClick)
+        compose.onNodeWithText(program.title).performSemanticsAction(SemanticsActions.OnClick)
         openAiring()
         compose.onNodeWithText(returnAiring.time).performScrollTo().performClick()
         compose.onNodeWithText(first.title).assertExists()
         compose.onNodeWithContentDescription("Back").performClick()
         compose.onNodeWithText(second.title).assertIsDisplayed()
         compose.runOnIdle { check(taps.tryEmit(Destination.Guide)) }
-        compose.onNodeWithText("By channel").assertIsSelected()
-        val afterReselect = position()
-        compose.runOnIdle { check(taps.tryEmit(Destination.Guide)) }
-        assertEquals(0f, position(), 0f)
-        assertEquals("Scroll after ordinary Back and after reselecting Guide",
-            listOf(scrolled, beforeReselect), listOf(afterBack, afterReselect))
+        compose.onNode(hasTestTag("channel-page-scroll")).assertDoesNotExist()
+        compose.onNodeWithContentDescription("Back").assertDoesNotExist()
+        assertTrue("The schedule was scrolled before navigation", scrolled > 0f)
+        assertEquals("Back restores the scrolled schedule", scrolled, afterBack)
+        assertEquals("The restored position stays put", scrolled, beforeReselect)
     }
 
     @Test
     @Config(qualifiers = PHONE, instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.common.TimeConverterKt"])
-    fun phoneChannelDayStaysOpenAndScrolledDuringBackgroundPublications() {
+    fun phoneChannelDayStaysScrolledDuringBackgroundPublications() {
         val connection = FakeConnection()
         val now = Instant.parse("2027-01-15T12:00:00Z")
         val fixture = ServerGuide(now)
@@ -727,27 +635,21 @@ class GuideScreenTest {
         try {
             assertTrue(SystemClock.setCurrentTimeMillis(now.toEpochMilliseconds()))
             connection.session.publish(fixture.connected(epg = EpgSnapshot.create(schedule)))
-            showDestination(connection, mappingDispatcher = worker) {}
-            finishMapping()
-            compose.onNodeWithText("By channel").performClick()
+            showChannelDestination(connection, fixture.first.id, mappingDispatcher = worker)
             finishMapping()
 
-            val list = compose.onNode(
-                hasScrollToIndexAction() and SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange),
-            )
+            val list = channelRows()
             val loading = compose.onNodeWithContentDescription(compose.activity.getString(SharedR.string.epg_loading))
             fun position() = list.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
             val last = schedule.last()
-            list.performScrollToIndex(schedule.lastIndex)
-            compose.onNodeWithText(last.title.orEmpty()).performClick()
-            val detailsButton = compose.onNodeWithText("Details")
-            detailsButton.performScrollTo()
+            compose.onNode(hasTestTag("channel-page-scroll")).performScrollToIndex(1)
+            val scheduledToday = schedule.count { it.channelId == fixture.first.id && it.start > now }
+            list.performScrollToIndex(scheduledToday - 1)
             val scrolled = position()
             assertTrue(scrolled > 0f)
             fun assertDayHeld() {
                 loading.assertDoesNotExist()
                 assertEquals("The open list keeps its scroll position", scrolled, position(), 0f)
-                detailsButton.assertIsDisplayed()
             }
 
             val revised = listOf("Updated programme", "Revised programme").map { title ->
@@ -791,33 +693,21 @@ class GuideScreenTest {
             assertTrue(SystemClock.setCurrentTimeMillis(now.toEpochMilliseconds()))
             connection.session.publish(server.connected(epg = EpgSnapshot.create(server.snapshot.events + airing)))
             val guide = showDestination(connection) {}
-            compose.onNodeWithText("By channel").performClick()
-            compose.onNodeWithText("Evening News").performClick()
-            compose.onNodeWithText("Details").performClick()
-            compose.onNodeWithText("Overview").assertDoesNotExist()
+            compose.runOnIdle { guide.pageStack.openDetails(server.snapshot.events.first().id.value.toString()) }
+            compose.onNodeWithContentDescription("Back").assertIsDisplayed()
             compose.onNodeWithText("Other airings of Evening News").assertExists()
             compose.runOnIdle { connection.session.publish(server.connected()) }
-            val afterRemoval = compose.runOnIdle {
-                guide.mapped.value?.state?.details?.values?.single()?.otherAirings?.map { it.id }
-            }
+            compose.onNodeWithText("Other airings of Evening News").assertDoesNotExist()
             compose.runOnIdle {
                 connection.session.publish(server.connected(epg = EpgSnapshot.create(server.snapshot.events + replacement)))
             }
-            val afterAddition = compose.runOnIdle {
-                guide.mapped.value?.state?.details?.values?.single()?.otherAirings?.map { it.id }
-            }
-            assertEquals("Open Details receives removed and added airings", listOf(emptyList(), listOf("801")),
-                listOf(afterRemoval, afterAddition))
-            compose.onNodeWithText("Other airings of Evening News").assertExists()
-            val nextAiring = compose.runOnIdle {
-                guide.mapped.value?.state?.details?.values?.single()?.otherAirings?.single()?.time
-            }
-            compose.onNodeWithText(checkNotNull(nextAiring)).performScrollTo().performClick()
+            val nextAiring = compose.onNode(hasText("Channel Two") and hasClickAction())
+            nextAiring.performScrollTo().performClick()
             val secondPageChannel = compose.onNode(hasText("Channel Two") and !hasClickAction())
             secondPageChannel.assertExists()
             compose.runOnIdle { connection.session.publish(server.connected()) }
             compose.onNodeWithText("About Evening News").assertExists()
-            compose.onNodeWithText("Overview").assertDoesNotExist()
+            compose.onNodeWithContentDescription("Back").assertIsDisplayed()
             compose.runOnIdle {
                 connection.session.publish(server.connected(epg = EpgSnapshot.create(server.snapshot.events + replacement)))
             }
@@ -826,9 +716,9 @@ class GuideScreenTest {
             compose.runOnIdle {
                 connection.session.publish(server.connected(epg = EpgSnapshot.create(server.snapshot.events.drop(1))))
             }
-            compose.onNodeWithText("Overview").assertIsDisplayed()
+            compose.onNodeWithContentDescription("Back").assertDoesNotExist()
             compose.runOnIdle { connection.session.publish(server.connected()) }
-            compose.onNodeWithText("Overview").assertIsDisplayed()
+            compose.onNodeWithContentDescription("Back").assertDoesNotExist()
         } finally {
             connection.close()
         }
@@ -841,7 +731,7 @@ class GuideScreenTest {
         val fixture = phoneOverviewFixture()
         val program = fixture.channels.last().programs.first()
         val page = glassHarborDetails().copy(id = program.id, title = program.title)
-        show(fixture.copy(details = mapOf(GuidePageKey.Details(page.id, 0) to page)), inShell = true)
+        show(fixture, detailsFixture = listOf(page), inShell = true)
         val dispatcher = compose.activity.onBackPressedDispatcher
         val bar = compose.onNode(hasText("Guide") and hasClickAction())
         val list = compose.onNode(hasScrollToIndexAction())
@@ -858,7 +748,7 @@ class GuideScreenTest {
             dispatcher.dispatchOnBackStarted(BackEventCompat(0f, 0f, 0f, BackEventCompat.EDGE_LEFT))
             dispatcher.dispatchOnBackProgressed(BackEventCompat(0f, 0f, 0.5f, BackEventCompat.EDGE_LEFT))
         }
-        compose.onNodeWithText("Overview").assertExists()
+        list.assertExists()
         bar.assertDoesNotExist()
         assertEquals("Scroll during predictive preview", scrolled, position(), 0f)
         back()
@@ -903,7 +793,7 @@ class GuideScreenTest {
         qualifiers = "en-rUS-w1024dp-h558dp-land-xhdpi",
         instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.common.TimeConverterKt"],
     )
-    fun tabletDayHeadingAndPreviouslyOpenedDayDoNotWaitForMapping() {
+    fun channelDayTabAndPreviouslyOpenedDayDoNotWaitForMapping() {
         val connection = FakeConnection()
         val noon = Instant.parse("2027-01-15T12:00:00Z")
         val fixture = ServerGuide(noon)
@@ -911,7 +801,19 @@ class GuideScreenTest {
             EventId(800), fixture.first.id, Instant.parse("2027-01-16T12:00:00Z"),
             Instant.parse("2027-01-16T13:00:00Z"), title = "Saturday programme",
         )
+        val channels = connection.channels()
         val worker = StandardTestDispatcher()
+        val owner = object : LifecycleOwner {
+            override val lifecycle = LifecycleRegistry(this)
+        }
+        var active by mutableStateOf(true)
+        var passes = 0
+        val dispatcher = object : CoroutineDispatcher() {
+            override fun dispatch(context: CoroutineContext, block: Runnable) {
+                passes++
+                worker.dispatch(context, block)
+            }
+        }
         val saved24Hour = AppClock.systemUses24Hour
         fun finishMapping() {
             compose.waitForIdle()
@@ -920,41 +822,50 @@ class GuideScreenTest {
         }
         try {
             assertTrue(SystemClock.setCurrentTimeMillis(noon.toEpochMilliseconds()))
+            compose.runOnIdle { owner.lifecycle.currentState = Lifecycle.State.STARTED }
             connection.session.publish(fixture.connected(epg = EpgSnapshot.create(fixture.snapshot.events + tomorrow)))
-            showDestination(connection, mappingDispatcher = worker) {}
-            finishMapping()
-            compose.onNodeWithText("By channel").performClick()
+            showChannelDestination(
+                connection, fixture.first.id, mappingDispatcher = dispatcher, channels = channels,
+                lifecycleOwner = owner, active = { active },
+            )
             finishMapping()
             compose.onNodeWithText("Evening News").assertIsDisplayed()
             compose.onNodeWithText("Tomorrow").performClick()
-            val dateChanged = compose.onNodeWithText("Saturday, January 16").isDisplayed()
+            compose.onNodeWithText("Tomorrow").assertIsSelected()
             finishMapping()
             compose.onNodeWithText("Saturday programme").assertIsDisplayed()
             val revised = EpgSnapshot.create(fixture.refreshedEpg("Revised Friday programme").events + tomorrow)
             compose.runOnIdle { connection.session.publish(fixture.connected(epg = revised)) }
             compose.onNodeWithText("Today").performClick()
             val returned = compose.onNodeWithText("Evening News").isDisplayed()
-            assertEquals("Heading changes and Today returns before the worker runs", listOf(true, true),
-                listOf(dateChanged, returned))
+            assertTrue("Today returns before the worker runs", returned)
             finishMapping()
             compose.onNodeWithText("Revised Friday programme").assertIsDisplayed()
+            val previousPasses = passes
+            compose.runOnIdle { active = false }
+            compose.runOnIdle { connection.session.publish(fixture.connected(epg = fixture.refreshedEpg("Behind Details"))) }
+            finishMapping()
+            assertEquals("A covered channel page does not map", previousPasses, passes)
+            compose.runOnIdle {
+                owner.lifecycle.currentState = Lifecycle.State.CREATED
+                active = true
+                connection.session.publish(fixture.connected(epg = fixture.refreshedEpg("Latest programme")))
+            }
+            finishMapping()
+            assertEquals("A stopped channel page does not map", previousPasses, passes)
+            compose.runOnIdle { owner.lifecycle.currentState = Lifecycle.State.STARTED }
+            finishMapping()
+            compose.onNodeWithText("Latest programme").assertIsDisplayed()
+            compose.runOnIdle { channels.selectTag(fixture.news.id) }
+            assertFalse("The previous tag's rows are not reused",
+                compose.onNodeWithText("Latest programme").isDisplayed())
+            finishMapping()
+            compose.onNodeWithText("Latest programme").assertIsDisplayed()
             compose.runOnIdle { AppClock.systemUses24Hour = !AppClock.systemUses24Hour }
             assertFalse("A format change waits for reformatted rows",
-                compose.onNodeWithText("Revised Friday programme").isDisplayed())
+                compose.onNodeWithText("Latest programme").isDisplayed())
             finishMapping()
-            compose.onNodeWithText("Revised Friday programme").assertIsDisplayed()
-            compose.onNodeWithText("Weather").performClick()
-            val cancel = compose.onNodeWithText(compose.activity.getString(SharedR.string.cancel_recording))
-            cancel.assertDoesNotExist()
-            compose.runOnIdle {
-                connection.session.publish(fixture.connected(
-                    entries = fixture.dvr.entries + fixture.scheduling(900L, 2),
-                    epg = revised,
-                ))
-            }
-            compose.onNodeWithText("Details").assertIsDisplayed()
-            finishMapping()
-            cancel.assertIsDisplayed()
+            compose.onNodeWithText("Latest programme").assertIsDisplayed()
         } finally {
             AppClock.systemUses24Hour = saved24Hour
             connection.close()
@@ -963,7 +874,7 @@ class GuideScreenTest {
 
     @Test
     @Config(instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.common.TimeConverterKt"])
-    fun byChannelDoesNotShowYesterdaysRowsUnderTodaysHeading() {
+    fun channelPageDoesNotShowYesterdaysRowsUnderTodaysTab() {
         val connection = FakeConnection()
         val savedZone = TimeZone.getDefault()
         val before = Instant.parse("2027-01-15T23:59:58Z")
@@ -971,11 +882,9 @@ class GuideScreenTest {
         try {
             TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
             assertTrue(SystemClock.setCurrentTimeMillis(before.toEpochMilliseconds()))
-            connection.session.publish(ServerGuide(before).connected())
-            showDestination(connection, mappingDispatcher = worker) {}
-            compose.waitForIdle()
-            worker.scheduler.runCurrent()
-            compose.onNodeWithText("By channel").performClick()
+            val fixture = ServerGuide(before)
+            connection.session.publish(fixture.connected())
+            showChannelDestination(connection, fixture.first.id, mappingDispatcher = worker)
             compose.waitForIdle()
             worker.scheduler.runCurrent()
             compose.onNodeWithText("Evening News").assertIsDisplayed()
@@ -985,6 +894,92 @@ class GuideScreenTest {
                 false, compose.onNodeWithText("Evening News").isDisplayed())
         } finally {
             TimeZone.setDefault(savedZone)
+            connection.close()
+        }
+    }
+
+    @Test
+    @Config(instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.common.TimeConverterKt"])
+    fun channelPageKeepsAnUncoveredDayUntilCoverageSettles() {
+        val connection = FakeConnection()
+        val now = Instant.parse("2027-01-15T12:00:00Z")
+        val fixture = ServerGuide(now)
+        val zone = ZoneId.systemDefault()
+        val tomorrow = GuideClock(now.epochSeconds, zone).today.plusDays(1)
+        val start = Instant.fromEpochSeconds(tomorrow.atStartOfDay(zone).toEpochSecond())
+        val future = EpgEvent.create(
+            EventId(800), fixture.first.id, start, Instant.fromEpochSeconds(start.epochSeconds + 3600),
+            title = "Kept day programme",
+        )
+        var release = CompletableDeferred<Unit>()
+        try {
+            assertTrue(SystemClock.setCurrentTimeMillis(now.toEpochMilliseconds()))
+            connection.session.publish(fixture.connected())
+            showChannelDestination(connection, fixture.first.id, initialDay = tomorrow) { release.await() }
+            val loading = compose.onNodeWithContentDescription(compose.activity.getString(SharedR.string.epg_loading))
+            loading.assertIsDisplayed()
+            compose.runOnIdle {
+                connection.session.publish(fixture.connected(epg = EpgSnapshot.create(fixture.snapshot.events + future)))
+                release.complete(Unit)
+            }
+            compose.onNodeWithText("Tomorrow").assertIsSelected()
+            compose.onNodeWithText(future.title!!).assertIsDisplayed()
+            compose.runOnIdle {
+                release = CompletableDeferred()
+                connection.session.replaceGeneration(fixture.connected())
+            }
+            loading.assertIsDisplayed()
+            compose.onNodeWithText(future.title!!).assertDoesNotExist()
+            compose.runOnIdle { release.complete(Unit) }
+            compose.onNodeWithText("Today").assertIsSelected()
+            compose.onNodeWithText("Weather").assertIsDisplayed()
+            compose.runOnIdle {
+                connection.session.publish(fixture.connected(epg = EpgSnapshot.create(fixture.snapshot.events + future)))
+            }
+            compose.onNodeWithText("Today").assertIsSelected()
+        } finally {
+            release.complete(Unit)
+            connection.close()
+        }
+    }
+
+    @Test
+    @Config(qualifiers = PHONE, instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.common.TimeConverterKt"])
+    fun showInGuideRevealsTheFutureProgramAndDetailsOverItsChannelOmitsTheAction() {
+        motionScale.scaleFactor = 0f
+        val connection = FakeConnection()
+        val now = Instant.parse("2027-01-15T12:00:00Z")
+        val fixture = ServerGuide(now)
+        val zone = ZoneId.systemDefault()
+        val tomorrow = GuideClock(now.epochSeconds, zone).today.plusDays(1)
+        val start = tomorrow.atStartOfDay(zone).toEpochSecond()
+        val tomorrowEvents = (1..24).map { index ->
+            EpgEvent.create(
+                EventId(800L + index), fixture.first.id, Instant.fromEpochSeconds(start + index * 3600L),
+                Instant.fromEpochSeconds(start + index * 3600L + 1800), title = "Tomorrow programme $index",
+            )
+        }
+        val target = tomorrowEvents[19]
+        try {
+            assertTrue(SystemClock.setCurrentTimeMillis(now.toEpochMilliseconds()))
+            connection.session.publish(fixture.connected(epg = EpgSnapshot.create(fixture.snapshot.events + tomorrowEvents)))
+            val guide = showDestination(connection) {}
+            compose.runOnIdle { guide.pageStack.openDetails(target.id.value.toString()) }
+            val show = compose.onNodeWithText(compose.activity.getString(R.string.channels_show_in_guide))
+            show.performScrollTo().performClick()
+            val resources = compose.activity.resources
+            val locale = resources.configuration.locales[0]
+            val weekdayDay = DateTimeFormatter.ofPattern(DateFormat.getBestDateTimePattern(locale, "EEEd"), locale)
+            compose.onNodeWithText(resources.getString(SharedR.string.channel_schedule_today)).assertIsDisplayed()
+            compose.onNodeWithText(resources.getString(SharedR.string.channel_schedule_tomorrow)).assertIsSelected()
+            compose.onNodeWithText(weekdayDay.format(tomorrow.plusDays(1))).assertIsDisplayed()
+            compose.onNodeWithText(target.title!!).assertIsDisplayed().performClick()
+            show.assertDoesNotExist()
+            back()
+            compose.onNodeWithText(target.title!!).assertIsDisplayed()
+            back()
+            show.assertExists()
+        } finally {
             connection.close()
         }
     }
@@ -1099,25 +1094,14 @@ class GuideScreenTest {
     fun guideRestoresItsPlaceAndLetsAnExpiredDayFallBackToToday() {
         val now = Instant.parse("2027-01-15T12:00:00Z")
         assertTrue(SystemClock.setCurrentTimeMillis(now.toEpochMilliseconds()))
-        var content by mutableStateOf<(@Composable () -> Unit)?>(null)
-        compose.setContent { content?.invoke() }
-        GuideView.entries.forEach { view ->
-            assertRestoredGuideDay(view, now) { body ->
-                compose.runOnIdle { content = { key(view) { body() } } }
-            }
-        }
-    }
-
-    private fun assertRestoredGuideDay(view: GuideView, now: Instant, setContent: (@Composable () -> Unit) -> Unit) {
         val connection = FakeConnection()
         val fixture = ServerGuide(now)
         val zone = ZoneId.systemDefault()
         val today = GuideClock(now.epochSeconds, zone).today
         val tomorrow = today.plusDays(1)
-        val missingDay = if (view == GuideView.Overview) today.plusDays(90) else tomorrow
+        val missingDay = today.plusDays(90)
         val tomorrowThrough = Instant.fromEpochSeconds(tomorrow.plusDays(1).atStartOfDay(zone).toEpochSecond())
         val missingThrough = Instant.fromEpochSeconds(missingDay.plusDays(1).atStartOfDay(zone).toEpochSecond())
-        val channelId = fixture.second.id.value.toString()
         val start = Instant.fromEpochSeconds(tomorrow.atStartOfDay(zone).toEpochSecond())
         val future = EpgEvent.create(EventId(800), fixture.second.id, start,
             Instant.fromEpochSeconds(start.epochSeconds + 3600), title = "Kept day programme")
@@ -1138,29 +1122,29 @@ class GuideScreenTest {
                 )
             }
         }
-        val kept = GuideSelection(view = view, day = tomorrow, channelId = channelId)
+        val kept = GuideSelection(day = tomorrow)
         try {
             motionScale.scaleFactor = 0f
             val savedState = Bundle()
             Robolectric.buildActivity(ComponentActivity::class.java).create().use { original ->
                 val guide = ViewModelProvider.create(original.get(), factory)[GuideViewModel::class]
-                guide.selectPage(view, channelId)
                 guide.selectDay(tomorrow)
                 guide.selectJump(1L)
-                guide.openDetails(fixture.snapshot.events.first().id.value.toString())
+                guide.pageStack.openChannel(fixture.second.id.value.toString(), tomorrow)
+                guide.pageStack.openDetails(fixture.snapshot.events.first().id.value.toString())
                 original.saveInstanceState(savedState)
             }
             Robolectric.buildActivity(ComponentActivity::class.java).create(savedState).use { restored ->
                 val guide = ViewModelProvider.create(restored.get(), factory)[GuideViewModel::class]
                 assertEquals(
-                    "A fresh Guide restores the tab, day and channel, but not the jump or Details",
+                    "A fresh Guide restores the day, but not the jump or page stack",
                     kept,
                     guide.selection.value,
                 )
                 connection.session.publish(firstSnapshot)
                 val channels = connection.channels()
                 val presentation = connection.presentation()
-                setContent {
+                compose.setContent {
                     MaterialTheme(colorScheme = TouchDarkColors) {
                         val dvr = viewModel { DvrControls(connection.session, connection.noticeCenter) }
                         DestinationFrame(initialDestination = Destination.Guide) {
@@ -1171,27 +1155,22 @@ class GuideScreenTest {
                         }
                     }
                 }
-                compose.onNodeWithText(compose.activity.getString(view.label)).assertIsSelected()
-                if (view == GuideView.ByChannel) compose.onNodeWithText("Channel Two").assertIsSelected()
                 compose.runOnIdle {
                     assertEquals(
-                        "$view must not forget a kept day while coverage is pending",
+                        "The Guide must not forget a kept day while coverage is pending",
                         kept,
                         guide.selection.value,
                     )
                     assertEquals(tomorrowThrough, requestedWindows.last())
                 }
                 val loading = compose.onNodeWithContentDescription(compose.activity.getString(SharedR.string.epg_loading))
-                val locale = compose.activity.resources.configuration.locales[0]
                 loading.assertIsDisplayed()
                 compose.onNodeWithText(current.title!!).assertDoesNotExist()
                 compose.runOnIdle {
                     connection.session.publish(refilled)
                     release.complete(Unit)
                 }
-                val keptDayLabel = if (view == GuideView.Overview) {
-                    compose.activity.getString(SharedR.string.channel_schedule_tomorrow)
-                } else formatDayHeader(tomorrow, locale)
+                val keptDayLabel = compose.activity.getString(SharedR.string.channel_schedule_tomorrow)
                 compose.onNodeWithText(keptDayLabel).assertIsDisplayed()
                 compose.onNodeWithText(future.title!!).assertIsDisplayed()
                 compose.runOnIdle { assertEquals(kept, guide.selection.value) }
@@ -1205,18 +1184,15 @@ class GuideScreenTest {
                 compose.runOnIdle {
                     assertEquals("The replacement session is still loading the kept day",
                         kept.copy(day = missingDay), guide.selection.value)
-                    if (view == GuideView.ByChannel) release.complete(Unit)
                 }
-                if (view == GuideView.Overview) shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(30))
+                shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(30))
                 compose.onNodeWithText("Today").assertIsDisplayed()
                 compose.onNodeWithText(current.title!!).assertIsDisplayed()
                 compose.runOnIdle {
                     assertEquals(
                         "The day is forgotten once coverage settles without it", kept.copy(day = null), guide.selection.value,
                     )
-                    if (view == GuideView.Overview) {
-                        assertEquals("Do not retry an unreachable day", 1, requestedWindows.count { it == missingThrough })
-                    }
+                    assertEquals("Do not retry an unreachable day", 1, requestedWindows.count { it == missingThrough })
                     guide.selectDay(today.minusDays(1))
                 }
                 compose.onNodeWithText(current.title!!).assertIsDisplayed()
@@ -1483,27 +1459,29 @@ class GuideScreenTest {
 
     private fun show(
         fixture: GuideState,
-        view: GuideView = GuideView.Overview,
         channel: String? = null,
         open: String? = null,
         detailsId: String? = null,
         taps: MutableSharedFlow<Destination> = MutableSharedFlow(),
         state: () -> GuideState = { fixture },
         onOverviewViewport: ((List<String>) -> Unit)? = null,
+        detailsFixture: List<ProgramDetails> = emptyList(),
         extraDetails: ProgramDetails? = null,
         inShell: Boolean = false,
-        channelOverride: () -> String? = { null },
+        channelFixture: ChannelPageState? = null,
         over: @Composable () -> Unit = {},
     ) {
         var visit = 0L
-        var stack by mutableStateOf(listOfNotNull(detailsId?.let { GuidePageKey.Details(it, visit++) }))
+        var stack by mutableStateOf(listOfNotNull(
+            channel?.let { GuidePageKey.Channel(it, null, null, visit++) },
+            detailsId?.let { GuidePageKey.Details(it, visit++) },
+        ))
         val openDetails: (String?) -> Unit = {
             details += it
             stack = if (it == null) stack.dropLast(1) else stack + GuidePageKey.Details(it, visit++)
         }
         var selectedDay by mutableStateOf<Int?>(null)
-        var selectedView by mutableStateOf(view)
-        var selectedChannel by mutableStateOf(channel)
+        val pageActions = channelPageActions()
         val actions = GuideActions(
             onWatch = { watched += it },
             onRecord = {},
@@ -1518,35 +1496,82 @@ class GuideScreenTest {
             onTag = {},
             onCancel = { cancelled += it },
             onStop = { stopped += it },
-            onView = { selectedView = it },
             onOverviewViewport = onOverviewViewport,
-            onChannel = {
-                selectedChannels += it
-                selectedChannel = it
-                selectedView = GuideView.ByChannel
-            },
+            onChannel = { stack = stack + GuidePageKey.Channel(it, null, null, visit++) },
         )
         compose.setContent {
             MaterialTheme(colorScheme = TouchDarkColors) {
                 val current = state()
-                val pages = current.details.values + listOfNotNull(extraDetails)
+                val pages = detailsFixture + glassHarborDetails() + listOfNotNull(extraDetails)
                 DestinationFrame(initialDestination = Destination.Guide) {
                     val screen: @Composable () -> Unit = {
                         GuideScreen(
-                            current.copy(
-                                details = stack.mapNotNull { key ->
-                                    pages.firstOrNull { it.id == key.programId }?.let { key to it }
-                                }.toMap(),
-                                selectedDay = selectedDay ?: current.selectedDay,
-                            ), actions,
-                            view = selectedView, channelId = channelOverride() ?: selectedChannel, initiallyOpen = open,
-                            onCloseAllDetails = { stack = emptyList() },
+                            current.copy(selectedDay = selectedDay ?: current.selectedDay), actions,
+                            details = stack.filterIsInstance<GuidePageKey.Details>().mapNotNull { key ->
+                                pages.firstOrNull { it.id == key.programId }?.let { key to it }
+                            }.toMap(),
+                            initiallyOpen = open, pages = stack, onCloseAllPages = { stack = emptyList() },
+                            channelPage = { entry, _, back ->
+                                val page = channelFixture ?: channelPageFixture(
+                                    byChannelFixture().channels.first { it.id == entry.channelId }, LocalContext.current,
+                                )
+                                ChannelPageContent(page, back, openDetails, {}, pageActions)
+                            },
                         )
                     }
                     if (inShell) screen()
                     else CompositionLocalProvider(LocalDestinationReselections provides taps, content = screen)
                 }
                 over()
+            }
+        }
+    }
+
+    private fun channelRows() = compose.onNode(hasTestTag("channel-program-rows"))
+
+    private fun channelPageActions() = GuideActions(
+        onWatch = null, onRecord = {}, onRecordOptions = null, onDay = {}, onJump = {}, onTag = {},
+        onCancel = { cancelled += it }, onStop = { stopped += it },
+    )
+
+    private fun showChannelFixture(fixture: ChannelPageState, inPane: Boolean) {
+        var selected by mutableStateOf(fixture.selectedDay)
+        val actions = channelPageActions()
+        compose.setContent {
+            MaterialTheme(colorScheme = TouchDarkColors) {
+                val margin = if (inPane) WideBrowseMargin else CompactBrowseMargin
+                CompositionLocalProvider(LocalBrowseMargin provides margin) {
+                    ChannelPageContent(
+                        fixture.copy(selectedDay = selected), {}, { details += it }, {
+                            selectedDays += fixture.days.keys.indexOf(it)
+                            selected = it
+                        }, actions, inPane = inPane,
+                    )
+                }
+            }
+        }
+    }
+
+    private fun showChannelDestination(
+        connection: FakeConnection,
+        id: ChannelId,
+        mappingDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate,
+        initialDay: LocalDate? = null,
+        channels: ChannelsViewModel = connection.channels(),
+        lifecycleOwner: LifecycleOwner? = null,
+        active: () -> Boolean = { true },
+        onCoverage: suspend (Instant) -> Unit = {},
+    ) {
+        val session = connection.withCoverage(onCoverage)
+        compose.setContent {
+            MaterialTheme(colorScheme = TouchDarkColors) {
+                CompositionLocalProvider(LocalLifecycleOwner provides (lifecycleOwner ?: LocalLifecycleOwner.current)) {
+                    ChannelPage(
+                        session, channels, id.value.toString(), {}, { details += it }, {}, {}, {},
+                        initialDay = initialDay, active = active(),
+                        mappingDispatcher = mappingDispatcher, acquisitionContext = EmptyCoroutineContext,
+                    )
+                }
             }
         }
     }

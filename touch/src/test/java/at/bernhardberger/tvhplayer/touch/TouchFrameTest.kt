@@ -70,8 +70,6 @@ import at.bernhardberger.tvhplayer.touch.channels.ChannelsState
 import at.bernhardberger.tvhplayer.touch.channels.channelsFixture
 import at.bernhardberger.tvhplayer.touch.guide.GuideActions
 import at.bernhardberger.tvhplayer.touch.guide.GuideScreen
-import at.bernhardberger.tvhplayer.touch.guide.GuideView
-import at.bernhardberger.tvhplayer.touch.guide.byChannelFixture
 import at.bernhardberger.tvhplayer.touch.guide.overviewFixture
 import at.bernhardberger.tvhplayer.touch.guide.phoneOverviewFixture
 import at.bernhardberger.tvhplayer.touch.testutil.TouchCanvas
@@ -359,16 +357,13 @@ class TouchFrameTest {
 
     private fun assertBrowseActionEnds(compact: Boolean) {
         val channels = ChannelsState.Ready(channelsFixture())
-        val guide = (if (compact) phoneOverviewFixture() else overviewFixture()).copy(details = emptyMap())
-        val byChannel = byChannelFixture(phone = true).copy(details = emptyMap())
-        var guideView by mutableStateOf(GuideView.Overview)
+        val guide = if (compact) phoneOverviewFixture() else overviewFixture()
         val recordings = flatFixture()
         val channelsActions = ChannelsActions(
             onPlay = null, onTag = {}, onRetry = {}, onOpenConnectionSettings = {}, onOpenChannel = {},
         )
         val guideActions = GuideActions(
             onWatch = null, onRecord = null, onRecordOptions = null, onDay = {}, onJump = {}, onTag = {},
-            onView = { guideView = it },
         )
         val recordingsActions = RecordingsActions(onView = {}, onPlay = null, onDelete = null, onMore = null)
         compose.setContent {
@@ -376,9 +371,7 @@ class TouchFrameTest {
                 DestinationFrame { current ->
                     when (current) {
                         Destination.Channels -> ChannelsScreen(channels, channelsActions)
-                        Destination.Guide -> GuideScreen(
-                            if (guideView == GuideView.Overview) guide else byChannel, guideActions, view = guideView,
-                        )
+                        Destination.Guide -> GuideScreen(guide, guideActions)
                         Destination.Recordings -> RecordingsScreen(recordings, recordingsActions)
                     }
                 }
@@ -389,10 +382,6 @@ class TouchFrameTest {
         compose.onNode(destination and hasText("Guide")).performClick()
         val guideEnd = buttonEnd(R.string.channels_all)
         val overviewMatch = !compact || rowSharesKeyline("Guide", "Ridge Light", guideEnd)
-        val byChannelMatch = !compact || run {
-            compose.onNodeWithText("By channel").performClick()
-            rowSharesKeyline("Guide", "Snowline", guideEnd)
-        }
         compose.onNode(destination and hasText("Recordings")).performClick()
         val recordingsEnd = if (compact) symbolEnd(R.string.recordings_view_options)
         else buttonEnd(R.string.recordings_view_options)
@@ -406,9 +395,9 @@ class TouchFrameTest {
         if (compact) {
             val recordingsMatch = rowSharesKeyline("Recordings", "Field Desk", recordingsEnd)
             assertEquals(
-                "Row edges share the title/action keyline: Channels / Overview / By channel / Recordings",
-                List(4) { true },
-                listOf(channelsMatch, overviewMatch, byChannelMatch, recordingsMatch),
+                "Row edges share the title/action keyline: Channels / Guide / Recordings",
+                List(3) { true },
+                listOf(channelsMatch, overviewMatch, recordingsMatch),
             )
         }
     }

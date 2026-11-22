@@ -1237,7 +1237,8 @@ class TouchAppTest {
         compose.onNode(hasClickAction() and hasText(label(R.string.channels_details))).performClick()
 
         compose.onNodeWithText("About ${guide.programs[0]}").assertIsDisplayed()
-        listOf(R.string.channels_watch, R.string.channels_record, R.string.channels_show_in_guide)
+        compose.onNodeWithText(label(R.string.channels_show_in_guide)).assertIsDisplayed()
+        listOf(R.string.channels_watch, R.string.channels_record)
             .forEach { compose.onNodeWithText(label(it)).assertDoesNotExist() }
     }
 
@@ -1254,7 +1255,6 @@ class TouchAppTest {
         openGuide()
 
         compose.onNodeWithText(label(SharedR.string.epg_loading)).assertIsDisplayed()
-        compose.onNodeWithText(label(R.string.guide_overview)).assertDoesNotExist()
     }
 
     @Test
