@@ -72,6 +72,7 @@ import java.time.ZoneOffset
 import android.content.res.Configuration
 import at.bernhardberger.tvhplayer.ui.common.AppClock
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
+import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.coroutines.CoroutineContext
 import kotlin.time.Instant
@@ -85,6 +86,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -750,7 +752,14 @@ class GuideScreenTest {
             assertTrue(SystemClock.setCurrentTimeMillis(now.toEpochMilliseconds()))
             val fixture = ServerGuide(now)
             connection.session.publish(fixture.connected())
-            showDestination(connection, mappingDispatcher = worker) {}
+            val channelObservation = MutableStateFlow(connection.session.observation.value)
+            val channelSession = object : TvheadendSession by connection.session {
+                override val observation = channelObservation
+            }
+            val channels = ChannelsViewModel(
+                channelSession, connection.channelTagSettings(), connection.owner.liveProfile,
+            )
+            showDestination(connection, mappingDispatcher = worker, channels = channels) {}
             compose.waitForIdle()
             worker.scheduler.runCurrent()
             compose.onNodeWithText("Evening News").assertIsDisplayed()
@@ -759,10 +768,19 @@ class GuideScreenTest {
             val hiddenAfterTag = !compose.onNodeWithText("Evening News").isDisplayed()
             worker.scheduler.runCurrent()
             compose.onNodeWithText("Evening News").assertIsDisplayed()
-            compose.runOnIdle { connection.session.replaceGeneration(fixture.connected()) }
+            compose.runOnIdle {
+                connection.session.replaceGeneration(fixture.connected(epg = fixture.refreshedEpg("Reconnected News")))
+            }
             val hiddenAfterReconnect = !compose.onNodeWithText("Evening News").isDisplayed()
             assertEquals("Previous tag and generation rows are hidden",
                 listOf(true, true), listOf(hiddenAfterTag, hiddenAfterReconnect))
+            worker.scheduler.runCurrent()
+            assertFalse("The new guide must wait for its own channel scope",
+                compose.onNodeWithText("Reconnected News").isDisplayed())
+            compose.runOnIdle { channelObservation.value = connection.session.observation.value }
+            compose.waitForIdle()
+            worker.scheduler.runCurrent()
+            compose.onNodeWithText("Reconnected News").assertIsDisplayed()
         } finally {
             connection.close()
         }
@@ -1041,6 +1059,7 @@ class GuideScreenTest {
         shown: () -> Boolean = { true },
         mappingDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate,
         lifecycleOwner: LifecycleOwner? = null,
+        channels: ChannelsViewModel = connection.channels(),
         onCoverage: suspend (Instant) -> Unit,
     ): GuideViewModel {
         val fake = connection.session
@@ -1056,7 +1075,6 @@ class GuideScreenTest {
             }
         }
         val guide = GuideViewModel(session, EmptyCoroutineContext, mappingDispatcher = mappingDispatcher)
-        val channels = connection.channels()
         val presentation = connection.presentation()
         compose.setContent {
             MaterialTheme(colorScheme = MobileDarkColors) {
