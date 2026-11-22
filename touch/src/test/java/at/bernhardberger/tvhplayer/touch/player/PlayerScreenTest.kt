@@ -9,6 +9,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.ComponentDialog
 import android.app.PictureInPictureParams
 import android.content.pm.PackageManager
+import android.content.res.Configuration
+import android.content.res.Resources
 import android.os.Looper
 import androidx.lifecycle.Lifecycle
 import androidx.media3.exoplayer.ExoPlayer
@@ -22,6 +24,7 @@ import androidx.media3.common.SimpleBasePlayer
 import androidx.media3.common.util.UnstableApi
 import at.bernhardberger.tvhplayer.ui.common.AppClock
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import at.bernhardberger.tvheadend.sdk.core.DvrMutationKind
 import at.bernhardberger.tvhplayer.notices.DvrMutationFeedback
 import at.bernhardberger.tvhplayer.notices.Notice
@@ -65,6 +68,7 @@ import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performScrollTo
@@ -75,13 +79,13 @@ import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
 import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsPropertyKey
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.unit.Density
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.channels.ChannelDetails
@@ -97,11 +101,14 @@ import at.bernhardberger.tvhplayer.touch.guide.ridgeLightDetails
 import at.bernhardberger.tvhplayer.touch.guide.ridgeLightRepeatDetails
 import at.bernhardberger.tvhplayer.touch.testutil.TouchCanvas
 import at.bernhardberger.tvhplayer.touch.testutil.TouchFixtureArt
+import at.bernhardberger.tvhplayer.touch.testutil.assertTransportAction
 import at.bernhardberger.tvhplayer.touch.testutil.capturePausedPlayer
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouch
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouchWindows
+import at.bernhardberger.tvhplayer.touch.testutil.reserveSystemBars
 import at.bernhardberger.tvhplayer.ui.MobileDarkColors
 import java.time.LocalTime
+import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -473,7 +480,47 @@ class PlayerScreenTest {
         assertPhoneChannelHeading(longTag.label)
         val label = textLayout(compose.onNodeWithText(longTag.label, useUnmergedTree = true))
         assertTrue("The wide tag label ellipsizes on one line", label.lineCount == 1 && label.isLineEllipsized(0))
+        checkNumberLastBehindLive(offset, behindText)
     }
+
+    private fun checkNumberLastBehindLive(offset: String, english: TextLayoutResult) {
+        channelHandle(SemanticsActions.Collapse).performSemanticsAction(SemanticsActions.Collapse)
+        val activity = compose.activity
+        val chinese = activity.createConfigurationContext(
+            Configuration(activity.resources.configuration).apply { setLocale(Locale.SIMPLIFIED_CHINESE) },
+        ).getString(SharedR.string.timeshift_behind_live, offset)
+        assertTrue("The translated fixture ends in the timestamp", chinese.endsWith(offset))
+        val input = english.layoutInput
+        val measurer = TextMeasurer(input.fontFamilyResolver, input.density, input.layoutDirection)
+        val fullWidth = measurer.measure(chinese, input.style, maxLines = 1).size.width
+        val withEllipsis = measurer.measure("$chinese…", input.style, maxLines = 1).size.width
+        assertTrue("The fixture can fit the full label but not an added ellipsis", fullWidth < withEllipsis)
+        compose.runOnIdle {
+            val width = activity.window.attributes.width + fullWidth - input.constraints.maxWidth
+            activity.window.setLayout(width, activity.window.attributes.height)
+            behindLiveResources.value = numberLastResources(activity.resources, chinese)
+        }
+        val localized = compose.onNodeWithText(chinese).assertIsDisplayed()
+        assertTrue(
+            "Draw the full number-last label when it fits",
+            SemanticsActions.GetTextLayoutResult in localized.fetchSemanticsNode().config,
+        )
+        val displayed = textLayout(localized)
+        assertTrue(
+            "The available width can fit only the full label, not an added ellipsis",
+            displayed.layoutInput.constraints.maxWidth in fullWidth until withEllipsis,
+        )
+        assertEquals(chinese, displayed.layoutInput.text.text)
+        assertTrue("The full number-last label is not ellipsized", !displayed.isLineEllipsized(0))
+    }
+
+    // Touch ships only English today; borrow the translated wording from the shared resources.
+    @Suppress("DEPRECATION")
+    private fun numberLastResources(base: Resources, label: String) =
+        object : Resources(base.assets, base.displayMetrics, base.configuration) {
+            override fun getString(id: Int, vararg formatArgs: Any): String =
+                if (id == R.string.player_behind_live) label else base.getString(id, *formatArgs)
+        }
 
     private fun textLayout(node: SemanticsNodeInteraction): TextLayoutResult {
         val results = mutableListOf<TextLayoutResult>()
@@ -554,9 +601,15 @@ class PlayerScreenTest {
             val height = (420 * compose.activity.resources.displayMetrics.density).roundToInt()
             compose.activity.window.setLayout(android.view.ViewGroup.LayoutParams.MATCH_PARENT, height)
         }
+        val bottomInset = compose.reserveSystemBars(canvas)
         val shortHandle = expand.getBoundsInRoot()
         val shortHeight = shortHandle.bottom - shortHandle.top
         assertTrue("Short window handle $shortHeight is shorter than the stock $stockHeight", shortHeight >= stockHeight)
+        val navigationBarTop = compose.onRoot().getBoundsInRoot().bottom - bottomInset
+        assertTrue(
+            "Resting handle ends at ${shortHandle.bottom}, below the navigation bar top at $navigationBarTop",
+            shortHandle.bottom <= navigationBarTop,
+        )
         val row = tag("player-actions")
         val fullRowHeight = actions.bottom - actions.top
         val clippedRow = row.getBoundsInRoot()
@@ -745,6 +798,7 @@ class PlayerScreenTest {
     private val schedulePending = mutableStateOf(false)
     private val scheduleAvailability = mutableStateOf<GuideAvailability>(GuideAvailability.Current)
     private val fontScale = mutableStateOf<Float?>(null)
+    private val behindLiveResources = mutableStateOf<Resources?>(null)
     private val playerChannels by lazy { channelsFixture(playing = true) }
 
     private val paused = mutableStateOf(false)
@@ -808,6 +862,7 @@ class PlayerScreenTest {
                 val density = LocalDensity.current
                 CompositionLocalProvider(
                     LocalDensity provides (fontScale.value?.let { Density(density.density, it) } ?: density),
+                    LocalResources provides (behindLiveResources.value ?: LocalResources.current),
                 ) {
                     PlayerScreen(
                         fixture.copy(
@@ -1135,10 +1190,7 @@ class PlayerScreenTest {
 
     private fun pressPlayPause(label: Int) {
         button(label)
-            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
-            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.ToggleableState))
-            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.StateDescription))
-            .assert(hasContentDescription(compose.activity.getString(label)))
+            .assertTransportAction(compose.activity.getString(label))
             .performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
         compose.mainClock.advanceTimeByFrame()
         compose.runOnIdle { assertEquals(label == R.string.player_pause, paused.value) }
