@@ -66,9 +66,8 @@ internal fun RecordingsScreen(
     destinations: List<Destination> = Destination.entries,
 ) {
     val layout = recordingsLayout()
-    val grouping = state.view.grouping
-    var path by rememberSaveable(grouping) { mutableStateOf<List<String>>(ArrayList(initialPath)) }
-    var picked by rememberSaveable(grouping) { mutableStateOf(initiallyPicked) }
+    var path by rememberSaveable(state.view.grouping) { mutableStateOf<List<String>>(ArrayList(initialPath)) }
+    var picked by rememberSaveable(state.view.grouping) { mutableStateOf(initiallyPicked) }
     var sheet by remember { mutableStateOf<SheetPage?>(null) }
 
     val levels = state.root.levels(path)
@@ -76,6 +75,11 @@ internal fun RecordingsScreen(
     val pageItem = pickedItem?.takeIf { layout != RecordingsLayout.Wide }
     val page = pageItem != null
     val listed = state.listed
+    LaunchedEffect(state.availability, levels, path, picked, pickedItem) {
+        if (state.availability != RecordingsAvailability.Current) return@LaunchedEffect
+        path = ArrayList(levels.drop(1).map { it.id })
+        picked = pickedItem?.id
+    }
 
     Box(modifier.fillMaxSize()) {
         TouchFrame(
@@ -103,11 +107,8 @@ internal fun RecordingsScreen(
                 RecordingPage(pageItem, state.clock, layout, actions) { picked = null }
             } else {
                 Browse(
-                    state = state,
-                    levels = levels,
-                    layout = layout,
-                    picked = pickedItem,
-                    actions = actions,
+                    state = state, levels = levels, layout = layout,
+                    picked = pickedItem, actions = actions,
                     onOpen = { path = ArrayList(levels.drop(1).map { it.id } + it) },
                     onUp = { path = ArrayList(path.take(levels.size - 2)) },
                     onPick = { picked = it },
