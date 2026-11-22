@@ -100,6 +100,16 @@ private val FrameBarsSaver = listSaver<FrameBars, Boolean>(
 // The rendered destination owns its page chrome; the shell owns the navigation and notice host.
 private val LocalReportFrameBars = staticCompositionLocalOf<((FrameBars) -> Unit)?> { null }
 
+/** Keep a composed entry's own chrome, but let only the top entry change the destination shell. */
+internal val ReportFrameBarsWhen: @Composable (isTop: Boolean, content: @Composable () -> Unit) -> Unit =
+    { isTop, content ->
+        val report = LocalReportFrameBars.current
+        CompositionLocalProvider(
+            LocalReportFrameBars provides if (isTop || report == null) report else { _ -> },
+            content = content,
+        )
+    }
+
 /** The outgoing page stays composed during its fade but can no longer handle system Back. */
 internal val LocalDestinationBackEnabled = compositionLocalOf { true }
 

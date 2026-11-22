@@ -297,8 +297,8 @@ class TouchFrameTest {
 
     private fun assertBrowseActionEnds(compact: Boolean) {
         val channels = ChannelsState.Ready(channelsFixture())
-        val guide = (if (compact) phoneOverviewFixture() else overviewFixture()).copy(details = null)
-        val byChannel = byChannelFixture(phone = true).copy(details = null)
+        val guide = (if (compact) phoneOverviewFixture() else overviewFixture()).copy(details = emptyMap())
+        val byChannel = byChannelFixture(phone = true).copy(details = emptyMap())
         var guideView by mutableStateOf(GuideView.Overview)
         val recordings = flatFixture()
         val channelsActions = ChannelsActions(onPlay = null, onTag = {}, onRetry = {}, onOpenConnectionSettings = {})

@@ -30,6 +30,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
 import java.time.LocalDate
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.CoroutineContext
 import kotlin.time.Instant
 
@@ -40,6 +41,7 @@ import kotlin.time.Instant
  *
  * [acquisitionContext] keeps the SDK call off Main, as the TV's Guide does.
  */
+@Suppress("TooManyFunctions") // Single-page Back and destination reselection are distinct selection operations.
 internal class GuideViewModel(
     private val session: TvheadendSession,
     savedState: SavedStateHandle,
@@ -57,6 +59,7 @@ internal class GuideViewModel(
         },
     )
     val selection: StateFlow<GuideSelection> = mutableSelection.asStateFlow()
+    private val detailsVisit = AtomicLong()
     private val mutablePending = MutableStateFlow(0L)
 
     /** Changes whenever a request starts or ends; read [isPending] after it. */
@@ -93,8 +96,13 @@ internal class GuideViewModel(
         mutableSelection.compareAndSet(expected, available)
     }
 
-    // Retain Details across configuration changes, but start closed after process death.
-    fun openDetails(programId: String?) = mutableSelection.update { it.copy(detailsId = programId) }
+    // Retain visits across configuration changes, but start closed after process death.
+    fun openDetails(programId: String?) {
+        val visit = programId?.let { GuidePageKey.Details(it, detailsVisit.incrementAndGet()) }
+        mutableSelection.update { it.copy(details = if (visit == null) it.details.dropLast(1) else it.details + visit) }
+    }
+
+    fun closeAllDetails() = mutableSelection.update { it.copy(details = emptyList()) }
 
     /** Null or a scope that hasn't caught up with the observation stops work, retaining the last result. */
     fun map(context: Context, input: GuideMappingInput?) {
@@ -293,8 +301,8 @@ internal data class GuideMappingResult(
 
     private fun dvrMarksUnchanged(next: GuideMappingInput): Boolean {
         if (!rows.marksUnchanged(next)) return false
-        return state.details?.let { details ->
-            val ids = (details.otherAirings.map { it.id } + details.id).toHashSet()
+        return state.details.values.takeIf { it.isNotEmpty() }?.let { pages ->
+            val ids = pages.flatMapTo(HashSet()) { details -> details.otherAirings.map { it.id } + details.id }
             input.observation.epgSnapshotForDisplay?.events.orEmpty().asSequence()
                 .filter { it.id.value.toString() in ids }
                 .all { event ->

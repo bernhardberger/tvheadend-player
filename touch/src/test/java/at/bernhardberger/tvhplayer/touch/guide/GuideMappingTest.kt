@@ -221,7 +221,7 @@ class GuideMappingTest {
         assertEquals("A passed jump returns to Now", 0, state(selection, at = pastFirstJump).selectedJump)
         assertEquals("Yesterday's jump stays expired after midnight", 0, state(selection, at = clock.copy(nowSec = NOW + DAY_SEC)).selectedJump)
 
-        val details = checkNotNull(state(GuideSelection(detailsId = "1")).details)
+        val details = state(GuideSelection(details = listOf(GuidePageKey.Details("1", 0)))).details.values.single()
         assertEquals("Channel One", details.channel)
         assertEquals("About ${guide.programs[0]}", details.synopsis)
         assertEquals("07:30–08:30", details.timeRange)
@@ -272,7 +272,8 @@ class GuideMappingTest {
         val connected = guide.connected()
         val state = guideState(
             scope(all, all, tagged = false, loaded = true), ConnectionUiState.Ready, false, connected,
-            GuideSelection(detailsId = "1"), false, clock, texts, ArtworkModels(tvheadend = null),
+            GuideSelection(details = listOf(GuidePageKey.Details("1", 0))), false, clock, texts,
+            ArtworkModels(tvheadend = null),
         )
         val logo = AppArtworkSource(connected.currentSession, (guide.logo as ChannelIcon.ImageCache).artworkId)
         val picture = AppArtworkSource(connected.currentSession, guide.picture)
@@ -280,7 +281,7 @@ class GuideMappingTest {
         assertEquals(logo, first.logoModel)
         assertEquals(null, second.logoModel)
         assertEquals(listOf(picture, null, null, null), first.programs.map { it.stillModel })
-        val details = checkNotNull(state.details)
+        val details = state.details.values.single()
         assertEquals(logo, details.channelLogoModel)
         assertEquals(picture, details.pictureModel)
     }
@@ -307,10 +308,11 @@ class GuideMappingTest {
         val all = listOf(guide.first, guide.second)
         fun shown(playing: String?) = guideState(
             scope(all, all, tagged = false, loaded = true), ConnectionUiState.Ready, false,
-            observation(EpgSnapshot.create(events)), GuideSelection(detailsId = "1"), false, clock, texts,
+            observation(EpgSnapshot.create(events)), GuideSelection(details = listOf(GuidePageKey.Details("1", 0))),
+            false, clock, texts,
             playing = playing,
         )
-        val details = checkNotNull(shown(playing = guide.first.id.value.toString()).details)
+        val details = shown(playing = guide.first.id.value.toString()).details.values.single()
         assertEquals(
             listOf(
                 FactKey.Genre to "News", FactKey.Season to "2 of 3", FactKey.Episode to "7",
@@ -329,7 +331,7 @@ class GuideMappingTest {
         assertEquals(true, details.watching)
         val overview = shown(playing = guide.first.id.value.toString()).channels.first().programs
         assertEquals(listOf(true, false, false, false), overview.map { it.watching })
-        assertEquals(false, shown(playing = guide.second.id.value.toString()).details?.watching)
+        assertEquals(false, shown(playing = guide.second.id.value.toString()).details.values.single().watching)
     }
 
     private fun state(

@@ -29,7 +29,7 @@ import java.time.ZoneId
 internal data class GuideSelection(
     val day: LocalDate? = null,
     val jump: Long? = null,
-    val detailsId: String? = null,
+    val details: List<GuidePageKey.Details> = emptyList(),
     val channelId: String? = null,
     val view: GuideView = GuideView.Overview,
 ) {
@@ -136,8 +136,7 @@ internal val GUIDE_JUMP_TIMES: List<LocalTime> = listOf(LocalTime.of(20, 15), Lo
 internal data class GuideEpgProjection(
     val days: List<LocalDate>,
     val events: Map<ChannelId?, List<EpgEvent>>,
-    val details: EpgEvent?,
-    val airings: List<EpgEvent>,
+    val details: Map<EpgEvent, List<EpgEvent>>,
 )
 
 internal fun GuideMappingInput.epgProjection(): GuideEpgProjection? {
@@ -160,9 +159,11 @@ internal fun GuideMappingInput.epgProjection(): GuideEpgProjection? {
         .filter { !byChannel || it.channelId == selectedChannel }
         .filter { it.stop.epochSeconds > window.daySec.first && it.start.epochSeconds < end }
         .groupBy { it.channelId }
-    val details = selection.detailsId?.toLongOrNull()?.let { id -> snapshot.events.firstOrNull { it.id.value == id } }
-    val airings = details?.let { otherAirings(it, snapshot.events, clock.nowSec, AIRINGS_LIMIT) }.orEmpty()
-    return GuideEpgProjection(days, events, details, airings)
+    val detailsIds = selection.details.mapNotNullTo(HashSet()) { it.programId.toLongOrNull() }
+    val details = if (detailsIds.isEmpty()) emptyMap() else snapshot.events.asSequence()
+        .filter { it.id.value in detailsIds }
+        .associateWith { otherAirings(it, snapshot.events, clock.nowSec, AIRINGS_LIMIT) }
+    return GuideEpgProjection(days, events, details)
 }
 
 /** The day tabs: today, then every later day the visible channels have programs on. */
@@ -283,7 +284,7 @@ internal class GuideMapper(
             )
             if (pending) head else overviewChannel(head, schedule, window, channel == dayChannel, rows)
         }
-        val details = selection.detailsId?.let { details(it) }
+        val details = selection.details.mapNotNull { key -> details(key.programId)?.let { key to it } }.toMap()
         return GuideState(
             channels = guideChannels,
             tags = tags,

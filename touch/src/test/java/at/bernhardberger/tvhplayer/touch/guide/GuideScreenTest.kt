@@ -4,6 +4,7 @@ import android.content.pm.ApplicationInfo
 import android.os.Bundle
 import android.os.SystemClock
 import androidx.activity.ComponentActivity
+import androidx.activity.BackEventCompat
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.geometry.Offset
@@ -19,6 +20,7 @@ import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasProgressBarRangeInfo
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.isDisplayed
@@ -30,6 +32,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
@@ -64,6 +67,7 @@ import at.bernhardberger.tvhplayer.touch.ui.DvrControls
 import at.bernhardberger.tvhplayer.touch.ui.ProgramRecordControl
 import at.bernhardberger.tvhplayer.touch.ui.RuleSchedule
 import at.bernhardberger.tvhplayer.touch.ui.Destination
+import at.bernhardberger.tvhplayer.touch.ui.DestinationFrame
 import at.bernhardberger.tvhplayer.touch.ui.LocalDestinationReselections
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import androidx.compose.runtime.Composable
@@ -562,12 +566,17 @@ class GuideScreenTest {
     @Test
     @Config(qualifiers = "en-rUS-w412dp-h558dp-port-xhdpi")
     fun reselectingGuideReturnsFromDetailsBeforeScrollingTheSelectedDay() {
+        motionScale.scaleFactor = 0f
         val taps = MutableSharedFlow<Destination>(extraBufferCapacity = 1)
         val fixture = byChannelFixture(phone = true)
         val channel = fixture.channels.first()
         val program = channel.programs[4]
+        val first = glassHarborDetails().copy(id = program.id)
+        val airing = first.otherAirings.first()
+        val returnAiring = airing.copy(id = first.id, time = "Today 8:00 PM")
+        val second = first.copy(id = airing.id, title = "The next showing", otherAirings = listOf(returnAiring))
         show(
-            fixture.copy(details = glassHarborDetails().copy(id = program.id)),
+            fixture.copy(details = mapOf(GuidePageKey.Details(first.id, 0) to first)), extraDetails = second,
             view = GuideView.ByChannel, channel = channel.id, taps = taps,
         )
         val list = compose.onNode(
@@ -579,6 +588,23 @@ class GuideScreenTest {
         val scrolled = position()
         assertTrue(scrolled > 0f)
         compose.onNodeWithText("Details").performClick()
+        fun openAiring() {
+            compose.onNodeWithText(airing.time).performScrollTo().performClick()
+            compose.onNodeWithText(second.title).assertIsDisplayed()
+        }
+        openAiring()
+        back()
+        compose.onNodeWithText(first.title).assertExists()
+        back()
+        compose.onNodeWithText("By channel").assertIsSelected()
+        compose.onNodeWithText("Details").assertExists()
+        assertEquals(scrolled, position(), 0f)
+        compose.onNodeWithText("Details").performClick()
+        openAiring()
+        compose.onNodeWithText(returnAiring.time).performScrollTo().performClick()
+        compose.onNodeWithText(first.title).assertExists()
+        compose.onNodeWithContentDescription("Back").performClick()
+        compose.onNodeWithText(second.title).assertIsDisplayed()
         compose.runOnIdle { check(taps.tryEmit(Destination.Guide)) }
         compose.onNodeWithText("By channel").assertIsSelected()
         assertEquals(scrolled, position(), 0f)
@@ -589,6 +615,7 @@ class GuideScreenTest {
     @Test
     @Config(qualifiers = PHONE, instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.common.TimeConverterKt"])
     fun aMissingProgramClosesDetailsWithoutReopeningOnASubsequentPublication() {
+        motionScale.scaleFactor = 0f
         val connection = FakeConnection()
         val now = Instant.parse("2027-01-15T12:00:00Z")
         val server = ServerGuide(now)
@@ -610,14 +637,32 @@ class GuideScreenTest {
             compose.onNodeWithText("Overview").assertDoesNotExist()
             compose.onNodeWithText("Other airings of Evening News").assertExists()
             compose.runOnIdle { connection.session.publish(server.connected()) }
-            val afterRemoval = compose.runOnIdle { guide.mapped.value?.state?.details?.otherAirings?.map { it.id } }
+            val afterRemoval = compose.runOnIdle {
+                guide.mapped.value?.state?.details?.values?.single()?.otherAirings?.map { it.id }
+            }
             compose.runOnIdle {
                 connection.session.publish(server.connected(epg = EpgSnapshot.create(server.snapshot.events + replacement)))
             }
-            val afterAddition = compose.runOnIdle { guide.mapped.value?.state?.details?.otherAirings?.map { it.id } }
+            val afterAddition = compose.runOnIdle {
+                guide.mapped.value?.state?.details?.values?.single()?.otherAirings?.map { it.id }
+            }
             assertEquals("Open Details receives removed and added airings", listOf(emptyList(), listOf("801")),
                 listOf(afterRemoval, afterAddition))
             compose.onNodeWithText("Other airings of Evening News").assertExists()
+            val nextAiring = compose.runOnIdle {
+                guide.mapped.value?.state?.details?.values?.single()?.otherAirings?.single()?.time
+            }
+            compose.onNodeWithText(checkNotNull(nextAiring)).performScrollTo().performClick()
+            val secondPageChannel = compose.onNode(hasText("Channel Two") and !hasClickAction())
+            secondPageChannel.assertExists()
+            compose.runOnIdle { connection.session.publish(server.connected()) }
+            compose.onNodeWithText("About Evening News").assertExists()
+            compose.onNodeWithText("Overview").assertDoesNotExist()
+            compose.runOnIdle {
+                connection.session.publish(server.connected(epg = EpgSnapshot.create(server.snapshot.events + replacement)))
+            }
+            compose.onNodeWithText("About Evening News").assertExists()
+            secondPageChannel.assertDoesNotExist()
             compose.runOnIdle {
                 connection.session.publish(server.connected(epg = EpgSnapshot.create(server.snapshot.events.drop(1))))
             }
@@ -627,6 +672,24 @@ class GuideScreenTest {
         } finally {
             connection.close()
         }
+    }
+
+    @Test
+    @Config(qualifiers = PHONE)
+    fun predictiveBackPreviewsTheGuideWithoutReportingItsNavigationBar() {
+        motionScale.scaleFactor = 0f
+        show(overviewFixture(), detailsId = GLASS_HARBOR_ID, inShell = true)
+        val dispatcher = compose.activity.onBackPressedDispatcher
+        val bar = compose.onNode(hasText("Guide") and hasClickAction())
+        bar.assertDoesNotExist()
+        compose.runOnUiThread {
+            dispatcher.dispatchOnBackStarted(BackEventCompat(0f, 0f, 0f, BackEventCompat.EDGE_LEFT))
+            dispatcher.dispatchOnBackProgressed(BackEventCompat(0f, 0f, 0.5f, BackEventCompat.EDGE_LEFT))
+        }
+        compose.onNodeWithText("Overview").assertExists()
+        bar.assertDoesNotExist()
+        back()
+        bar.assertIsDisplayed()
     }
 
     @Test
@@ -890,10 +953,12 @@ class GuideScreenTest {
                 compose.setContent {
                     MaterialTheme(colorScheme = MobileDarkColors) {
                         val dvr = viewModel { DvrControls(connection.session, connection.noticeCenter) }
-                        GuideDestination(
-                            guide, channels, presentation, listOf(Destination.Guide), playingId = null,
-                            onWatch = null, dvr = dvr, onOpenConnections = {}, onSignIn = {},
-                        )
+                        DestinationFrame(initialDestination = Destination.Guide) {
+                            GuideDestination(
+                                guide, channels, presentation, listOf(Destination.Guide), playingId = null,
+                                onWatch = null, dvr = dvr, onOpenConnections = {}, onSignIn = {},
+                            )
+                        }
                     }
                 }
                 compose.onNodeWithText("By channel").assertIsSelected()
@@ -1149,10 +1214,12 @@ class GuideScreenTest {
             MaterialTheme(colorScheme = MobileDarkColors) {
                 val dvr = viewModel { DvrControls(session, connection.noticeCenter) }
                 CompositionLocalProvider(LocalLifecycleOwner provides (lifecycleOwner ?: LocalLifecycleOwner.current)) {
-                    if (shown()) GuideDestination(
-                        guide, channels, presentation, listOf(Destination.Guide), playingId = null, onWatch = null,
-                        dvr = dvr, onOpenConnections = {}, onSignIn = {},
-                    )
+                    if (shown()) DestinationFrame(initialDestination = Destination.Guide) {
+                        GuideDestination(
+                            guide, channels, presentation, listOf(Destination.Guide), playingId = null, onWatch = null,
+                            dvr = dvr, onOpenConnections = {}, onSignIn = {},
+                        )
+                    }
                 }
             }
         }
@@ -1168,9 +1235,16 @@ class GuideScreenTest {
         taps: MutableSharedFlow<Destination> = MutableSharedFlow(),
         state: () -> GuideState = { fixture },
         onOverviewViewport: ((List<String>) -> Unit)? = null,
+        extraDetails: ProgramDetails? = null,
+        inShell: Boolean = false,
         over: @Composable () -> Unit = {},
     ) {
-        var shownDetailsId by mutableStateOf(detailsId)
+        var visit = 0L
+        var stack by mutableStateOf(listOfNotNull(detailsId?.let { GuidePageKey.Details(it, visit++) }))
+        val openDetails: (String?) -> Unit = {
+            details += it
+            stack = if (it == null) stack.dropLast(1) else stack + GuidePageKey.Details(it, visit++)
+        }
         var selectedDay by mutableStateOf<Int?>(null)
         var selectedView by mutableStateOf(view)
         var selectedChannel by mutableStateOf(channel)
@@ -1178,10 +1252,8 @@ class GuideScreenTest {
             onWatch = { watched += it },
             onRecord = {},
             onRecordOptions = {},
-            onDetails = {
-                details += it
-                shownDetailsId = it
-            },
+            onDetails = openDetails,
+            onAiring = extraDetails?.let { openDetails },
             onDay = { selectedDay = it },
             onJump = {},
             onTag = {},
@@ -1198,14 +1270,22 @@ class GuideScreenTest {
         compose.setContent {
             MaterialTheme(colorScheme = MobileDarkColors) {
                 val current = state()
-                CompositionLocalProvider(LocalDestinationReselections provides taps) {
-                    GuideScreen(
-                        current.copy(
-                            details = current.details?.takeIf { it.id == shownDetailsId },
-                            selectedDay = selectedDay ?: current.selectedDay,
-                        ), actions,
-                        view = selectedView, channelId = selectedChannel, initiallyOpen = open,
-                    )
+                val pages = current.details.values + listOfNotNull(extraDetails)
+                DestinationFrame(initialDestination = Destination.Guide) {
+                    val screen: @Composable () -> Unit = {
+                        GuideScreen(
+                            current.copy(
+                                details = stack.mapNotNull { key ->
+                                    pages.firstOrNull { it.id == key.programId }?.let { key to it }
+                                }.toMap(),
+                                selectedDay = selectedDay ?: current.selectedDay,
+                            ), actions,
+                            view = selectedView, channelId = selectedChannel, initiallyOpen = open,
+                            onCloseAllDetails = { stack = emptyList() },
+                        )
+                    }
+                    if (inShell) screen()
+                    else CompositionLocalProvider(LocalDestinationReselections provides taps, content = screen)
                 }
                 over()
             }

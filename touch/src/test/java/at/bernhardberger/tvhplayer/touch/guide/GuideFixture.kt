@@ -63,7 +63,7 @@ private fun base(channels: List<GuideChannel>) = GuideState(
     days = listOf("Today", "Tomorrow", "Tue 17", "Wed 18", "Thu 19", "Fri 20", "Sat 21", "Sun 22"),
     date = "Sunday, November 15",
     jumps = listOf("8:15 PM", "10:00 PM"),
-    details = glassHarborDetails(),
+    details = mapOf(GuidePageKey.Details(GLASS_HARBOR_ID, 0) to glassHarborDetails()),
 )
 
 internal const val GLASS_HARBOR_ID = "amber-stage-7:50 PM-Glass Harbor"

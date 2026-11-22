@@ -45,6 +45,12 @@ internal enum class GuideLayout {
     val compact: Boolean get() = this == Phone
 }
 
+internal sealed interface GuidePageKey {
+    data object Browse : GuidePageKey
+    // Two visits to the same program must still have separate entry state.
+    data class Details(val programId: String, val visit: Long) : GuidePageKey
+}
+
 /**
  * The Guide on supplied state. The producer picks the channels for the tag, the programs for the
  * selected day and jump time, and formats text for the canvas it is shown on; the screen
@@ -65,8 +71,8 @@ internal data class GuideState(
     /** 0 is Now, then [jumps] by index plus one. */
     val selectedJump: Int = 0,
     val jumpTimes: List<Long> = emptyList(),
-    /** Details for the producer's current selection, if open and available. */
-    val details: ProgramDetails? = null,
+    /** Available Details visits, in back-stack order. */
+    val details: Map<GuidePageKey.Details, ProgramDetails> = emptyMap(),
     /** Whether there is a list yet, or saved content while offline. */
     val availability: GuideAvailability = GuideAvailability.Current,
     /** The picked day's or time's programs are still coming: a short wait inside the shown Guide. */

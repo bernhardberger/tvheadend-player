@@ -43,8 +43,8 @@ import java.util.Locale
 /**
  * The Guide destination of the app over the shared channel scope and the session's guide. Watch
  * plays a program on now through [onWatch], and the one on now on the [playingId] channel shows as
- * watched. Record and Cancel go through [dvr]; Record's options, Show in Guide and the other airings'
- * links are left out until they are wired.
+ * watched. Record and Cancel go through [dvr]; Record's options and Show in Guide are left out
+ * until they are wired.
  */
 @Suppress("LongParameterList") // The app's connection, its player and its pages.
 @Composable
@@ -64,7 +64,6 @@ internal fun GuideDestination(
     val observation by guide.observation.collectAsStateWithLifecycle()
     val selection by guide.selection.collectAsStateWithLifecycle()
     val pendingVersion by guide.pendingVersion.collectAsStateWithLifecycle()
-    val configuration = LocalConfiguration.current
     val result by guide.mapped.collectAsStateWithLifecycle()
     val activeClock = activeGuideClock()
     val clock = activeClock ?: result?.input?.clock
@@ -77,7 +76,7 @@ internal fun GuideDestination(
     LaunchedEffect(coverage, observation.currentSession?.generationIdentity) { coverage?.let(guide::request) }
     val input = GuideMappingInput(
         scope, presentation.connection, presentation.degraded, observation, selection, clock,
-        Configuration(configuration), AppClock.uses24Hour, LocalArtworkModels.current,
+        Configuration(LocalConfiguration.current), AppClock.uses24Hour, LocalArtworkModels.current,
         playingId, guide.overviewViewport.collectAsStateWithLifecycle().value,
     )
     SubmitGuideMapping(guide, channels, connection, input, activeClock)
@@ -86,7 +85,7 @@ internal fun GuideDestination(
     val dayLoading = remember(mapped.listed, coverage, pendingVersion, observation.currentSession?.generationIdentity) {
         mapped.listed && coverage?.let(guide::isPending) == true
     }
-    val state = mapped.withCurrentDetails(selection.detailsId, dayLoading).withSelectedDay(input, retained)
+    val state = mapped.withCurrentDetails(selection.details, dayLoading).withSelectedDay(input, retained)
     ArtworkFirstLoad("Guide", firstLoadWait(state, input))
     // Forget invalid choices, so they cannot silently return when a tag or the schedule changes again.
     val available = selection.availableIn(state)
@@ -98,6 +97,7 @@ internal fun GuideDestination(
         view = selection.view,
         channelId = selection.channelId,
         dayIndex = state.dayDates.indexOf(selection.day).coerceAtLeast(0),
+        onCloseAllDetails = guide::closeAllDetails,
         actions = GuideActions(
             onWatch = onWatch, onRecord = dvr::record,
             onRecordOptions = null,
@@ -106,7 +106,7 @@ internal fun GuideDestination(
             onJump = { guide.selectJump(state.jumpTimes.getOrNull(it - 1)) },
             onTag = { id -> channels.selectTag(id?.let { ChannelTagId(it.toLong()) }) },
             onShowInGuide = null,
-            onAiring = null,
+            onAiring = guide::openDetails,
             onRetry = { connection.reconnectNow() },
             onOpenConnectionSettings = onOpenConnections,
             onSignIn = onSignIn,
@@ -164,16 +164,16 @@ private fun GuideState.withSelectedDay(input: GuideMappingInput, result: GuideMa
     )
 }
 
-private fun GuideState.withCurrentDetails(detailsId: String?, dayLoading: Boolean): GuideState {
-    val current = details?.takeIf { it.id == detailsId }
-    return if (dayLoading || current !== details) copy(dayLoading = dayLoading, details = current) else this
-}
+private fun GuideState.withCurrentDetails(visits: List<GuidePageKey.Details>, dayLoading: Boolean): GuideState =
+    if (dayLoading || details.keys.any { it !in visits }) {
+        copy(dayLoading = dayLoading, details = details.filterKeys { it in visits })
+    } else this
 
 private fun GuideSelection.availableIn(state: GuideState): GuideSelection = copy(
     day = day?.takeIf { it in state.dayDates },
     jump = state.jumpTimes.getOrNull(state.selectedJump - 1),
     channelId = channelId?.takeIf { id -> state.channels.any { it.id == id } },
-    detailsId = detailsId.takeUnless { state.availability == GuideAvailability.Current && state.details == null },
+    details = if (state.availability == GuideAvailability.Current) details.filter { it in state.details } else details,
 )
 
 private fun firstLoadWait(state: GuideState, input: GuideMappingInput): String? = when {

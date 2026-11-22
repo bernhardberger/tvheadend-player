@@ -39,12 +39,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -57,6 +57,13 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.navigation3.runtime.NavEntry
+import androidx.navigation3.runtime.rememberDecoratedNavEntries
+import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
+import androidx.navigation3.scene.rememberNavigationEventState
+import androidx.navigation3.scene.rememberSceneState
+import androidx.navigation3.ui.NavDisplay
+import androidx.navigationevent.compose.NavigationBackHandler
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.channels.ChannelActionLabel
 import at.bernhardberger.tvhplayer.touch.ui.channelLogoSlot
@@ -67,8 +74,10 @@ import at.bernhardberger.tvhplayer.touch.ui.ListMessage
 import at.bernhardberger.tvhplayer.touch.ui.LocalBrowseMargin
 import at.bernhardberger.tvhplayer.touch.ui.MessageKind
 import at.bernhardberger.tvhplayer.touch.ui.OnDestinationReselected
+import at.bernhardberger.tvhplayer.touch.ui.ReportFrameBarsWhen
 import at.bernhardberger.tvhplayer.touch.ui.ScrollToStartOnReselect
 import at.bernhardberger.tvhplayer.touch.ui.TouchFrame
+import at.bernhardberger.tvhplayer.touch.ui.pageMove
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.filterNotNull
@@ -88,21 +97,69 @@ internal fun GuideScreen(
     dayIndex: Int = state.selectedDay,
     initiallyOpen: String? = null,
     destinations: List<Destination> = Destination.entries,
+    onCloseAllDetails: () -> Unit = {},
 ) {
     val layout = guideLayout()
+    val backStack = listOf<GuidePageKey>(GuidePageKey.Browse) + state.details.keys
+    val canHandleBack = LocalDestinationBackEnabled.current
+    val pop = { actions.onDetails(null) }
+    if (canHandleBack && backStack.size > 1) {
+        OnDestinationReselected(Destination.Guide) { onCloseAllDetails() }
+    }
+    // A scene can outlive its entry. Read live data while its key is present, and
+    // retain its last rendered Details during the exit when the key is removed.
+    val render by rememberUpdatedState<@Composable (GuidePageKey, ProgramDetails?) -> Unit> { key, initial ->
+        val isTop = key == backStack.last()
+        ReportFrameBarsWhen(isTop) {
+            when (key) {
+                GuidePageKey.Browse -> GuidePageReselection(isTop && canHandleBack) {
+                    GuideBrowse(state, actions, layout, view, channelId, dayIndex, initiallyOpen, destinations, isTop)
+                }
+                is GuidePageKey.Details -> {
+                    var last by remember { mutableStateOf(checkNotNull(initial)) }
+                    val details = state.details[key] ?: last
+                    SideEffect { last = details }
+                    TouchFrame(
+                        initialDestination = Destination.Guide,
+                        destinations = destinations,
+                        showTopBar = { false },
+                        showNavigation = { !layout.compact },
+                    ) {
+                        ProgramDetailsPage(details, layout, actions) { if (isTop && canHandleBack) pop() }
+                    }
+                }
+            }
+        }
+    }
+    val decorators = listOf(rememberSaveableStateHolderNavEntryDecorator<GuidePageKey>())
+    val entries = rememberDecoratedNavEntries(backStack, decorators) { key ->
+        val initial = (key as? GuidePageKey.Details)?.let(state.details::get)
+        NavEntry(key) { render(key, initial) }
+    }
+    val scene = rememberSceneState(entries, sceneStrategies = emptyList(), onBack = pop)
+    val navigation = rememberNavigationEventState(scene)
+    NavigationBackHandler(navigation, isBackEnabled = canHandleBack && backStack.size > 1, onBackCompleted = pop)
+    val forward = pageMove(forward = true)
+    val backward = pageMove(forward = false)
+    NavDisplay(
+        scene, navigation, modifier = modifier.fillMaxSize(),
+        transitionSpec = { forward },
+        popTransitionSpec = { backward },
+    )
+}
+
+@Composable
+private fun GuideBrowse(
+    state: GuideState, actions: GuideActions, layout: GuideLayout, view: GuideView, channelId: String?,
+    dayIndex: Int, initiallyOpen: String?, destinations: List<Destination>, isTop: Boolean,
+) {
     val listed = state.listed
     val channel = state.channels.firstOrNull { it.id == channelId } ?: state.channels.firstOrNull()
     val (openId, onOpen) = rememberOpenedGuideRow(state, view, channel, dayIndex, initiallyOpen)
-    val details = state.details
-    val page = details != null
-    val browse = rememberSaveableStateHolder()
 
     TouchFrame(
-        modifier = modifier,
         initialDestination = Destination.Guide,
         destinations = destinations,
-        showTopBar = { !(it == Destination.Guide && page) },
-        showNavigation = { !(it == Destination.Guide && page && layout.compact) },
         actions = { destination -> if (destination == Destination.Guide && listed) TagFilter(state, actions) },
         belowTopBar = { destination ->
             if (destination == Destination.Guide) {
@@ -115,19 +172,9 @@ internal fun GuideScreen(
             GuideStandIn(state.availability, layout, actions)
             return@TouchFrame
         }
-        // Registered after the frame's own handler, so the page and an opened program take Back first.
-        val closeDetails = { actions.onDetails(null) }
-        BackHandler(enabled = LocalDestinationBackEnabled.current && page, onBack = closeDetails)
-        BackHandler(enabled = LocalDestinationBackEnabled.current && !page && openId != null) { onOpen(null) }
-        if (details != null) {
-            OnDestinationReselected(Destination.Guide) { closeDetails() }
-            ProgramDetailsPage(details, layout, actions, closeDetails)
-            return@TouchFrame
-        }
-        browse.SaveableStateProvider("GuideBrowse") {
-            GuideList(state, layout, actions) {
-                GuidePages(state, layout, view, channel, dayIndex, openId, onOpen, actions)
-            }
+        BackHandler(enabled = LocalDestinationBackEnabled.current && isTop && openId != null) { onOpen(null) }
+        GuideList(state, layout, actions) {
+            GuidePages(state, layout, view, channel, dayIndex, openId, onOpen, actions)
         }
     }
 }
