@@ -66,7 +66,7 @@ import at.bernhardberger.tvhplayer.touch.ui.Destination
 import at.bernhardberger.tvhplayer.touch.ui.FrameNotices
 import at.bernhardberger.tvhplayer.touch.ui.BottomWindowNotices
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
-import at.bernhardberger.tvhplayer.touch.ui.LocalFrameSelection
+import at.bernhardberger.tvhplayer.touch.ui.DestinationFrame
 import at.bernhardberger.tvhplayer.touch.guide.GuideDestination
 import at.bernhardberger.tvhplayer.touch.guide.GuideViewModel
 import at.bernhardberger.tvhplayer.touch.recordings.RecordingsDestination
@@ -363,7 +363,7 @@ private fun ChannelsMappingKey.mappingReasons(
     }
 }
 
-/** Each destination's screen draws the frame, so the selection is kept here and picks the screen. */
+/** Only the selected destination and its header change inside the shared browse frame. */
 @Suppress("LongParameterList") // One view model per destination.
 @Composable
 private fun AppDestinations(
@@ -381,23 +381,26 @@ private fun AppDestinations(
     onOpenConnections: () -> Unit,
     onSignIn: () -> Unit,
 ) {
-    val selection = rememberSaveable { mutableStateOf(Destination.Channels) }
     val artwork = remember(session) { ArtworkModels(session) }
     ConfirmDvrChange(dvr)
-    CompositionLocalProvider(LocalFrameSelection provides selection, LocalArtworkModels provides artwork) {
-        when (selection.value) {
-            Destination.Recordings ->
-                RecordingsDestination(
-                    recordings, connection, AppDestinationList, dvr, onOpenConnections, onSignIn, onPlayRecording,
-                    playingRecordingId,
-                )
-            Destination.Guide ->
-                GuideDestination(
-                    guide, channels, connection, AppDestinationList, playingId, onWatch, dvr,
-                    onOpenConnections, onSignIn,
-                )
-            Destination.Channels ->
-                AppFrame(connection, channels, playingId, onWatch, dvr, onOpenConnections, onSignIn, channelsDispatcher)
+    CompositionLocalProvider(LocalArtworkModels provides artwork) {
+        DestinationFrame { destination ->
+            when (destination) {
+                Destination.Recordings ->
+                    RecordingsDestination(
+                        recordings, connection, AppDestinationList, dvr, onOpenConnections, onSignIn, onPlayRecording,
+                        playingRecordingId,
+                    )
+                Destination.Guide ->
+                    GuideDestination(
+                        guide, channels, connection, AppDestinationList, playingId, onWatch, dvr,
+                        onOpenConnections, onSignIn,
+                    )
+                Destination.Channels ->
+                    AppFrame(
+                        connection, channels, playingId, onWatch, dvr, onOpenConnections, onSignIn, channelsDispatcher,
+                    )
+            }
         }
     }
 }

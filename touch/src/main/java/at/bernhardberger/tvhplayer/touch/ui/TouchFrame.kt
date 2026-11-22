@@ -5,7 +5,12 @@ package at.bernhardberger.tvhplayer.touch.ui
 import androidx.activity.compose.BackHandler
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -39,7 +44,9 @@ import androidx.compose.material3.WideNavigationRail
 import androidx.compose.material3.WideNavigationRailItem
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,6 +54,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
@@ -65,11 +73,37 @@ internal enum class Destination(
     Recordings(R.string.nav_recordings, R.drawable.video_library_outline, R.drawable.video_library_filled),
 }
 
-/**
- * The selected destination when the app owns it: each destination's screen draws its own frame,
- * so the app keeps the selection above them and swaps the screen when it changes.
- */
-internal val LocalFrameSelection = staticCompositionLocalOf<MutableState<Destination>?> { null }
+private data class FrameBars(val top: Boolean = true, val navigation: Boolean = true)
+
+// The rendered destination owns its page chrome; the shell owns the navigation and notice host.
+private val LocalReportFrameBars = staticCompositionLocalOf<((FrameBars) -> Unit)?> { null }
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+internal fun DestinationFrame(
+    initialDestination: Destination = Destination.Channels,
+    content: @Composable (Destination) -> Unit,
+) {
+    var selected by rememberSaveable { mutableStateOf(initialDestination) }
+    var bars by remember { mutableStateOf(FrameBars()) }
+    val motion = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+    BackHandler(enabled = selected != Destination.Channels) { selected = Destination.Channels }
+    FrameShell(Modifier, Destination.entries, selected, { selected = it }, bars) { padding ->
+        AnimatedContent(
+            targetState = selected,
+            modifier = Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding),
+            transitionSpec = { (fadeIn(motion) togetherWith fadeOut(motion)) using null },
+            label = "Browse destination",
+        ) { destination ->
+            val report = remember(destination) {
+                { next: FrameBars -> if (destination == selected) bars = next }
+            }
+            CompositionLocalProvider(LocalReportFrameBars provides report) {
+                content(destination)
+            }
+        }
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -89,33 +123,54 @@ internal fun TouchFrame(
     belowTopBar: @Composable (Destination) -> Unit = {},
     content: @Composable (Destination) -> Unit = {},
 ) {
-    val own = rememberSaveable { mutableStateOf(initialDestination) }
-    var selected by LocalFrameSelection.current ?: own
-    val select: (Destination) -> Unit = { selected = it }
+    val report = LocalReportFrameBars.current
+    if (report != null) {
+        val bars = FrameBars(showTopBar(initialDestination), showNavigation(initialDestination))
+        SideEffect { report(bars) }
+        Scaffold(
+            modifier = modifier.fillMaxSize(),
+            topBar = { FrameTop(bars.top, initialDestination, lastActionIsIconOnly, actions, belowTopBar) },
+            contentWindowInsets = frameInsets(bars.top),
+        ) { innerPadding ->
+            Box(Modifier.fillMaxSize().padding(innerPadding)) { content(initialDestination) }
+        }
+        return
+    }
+    var selected by rememberSaveable { mutableStateOf(initialDestination) }
     BackHandler(enabled = selected != Destination.Channels) {
         selected = Destination.Channels
     }
+    val bars = FrameBars(showTopBar(selected), showNavigation(selected))
+    FrameShell(
+        modifier, destinations, selected, { selected = it }, bars,
+        top = { FrameTop(bars.top, selected, lastActionIsIconOnly, actions, belowTopBar) },
+    ) { innerPadding ->
+        Box(Modifier.fillMaxSize().padding(innerPadding)) { content(selected) }
+    }
+}
 
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun FrameShell(
+    modifier: Modifier,
+    destinations: List<Destination>,
+    selected: Destination,
+    select: (Destination) -> Unit,
+    bars: FrameBars,
+    top: (@Composable () -> Unit)? = null,
+    content: @Composable (PaddingValues) -> Unit,
+) {
     val window = currentWindowAdaptiveInfoV2().windowSizeClass
     val expanded = window.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND)
     val mediumOrWider = window.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND)
 
-    val topBar = showTopBar(selected)
-    val navigation = showNavigation(selected)
-    val bottomBar = !expanded && navigation && destinations.size > 1
+    val bottomBar = !expanded && bars.navigation && destinations.size > 1
     val notices = LocalFrameNotices.current
     Row(modifier.fillMaxSize()) {
-        if (expanded && navigation) DestinationRail(destinations, selected, select)
+        if (expanded && bars.navigation) DestinationRail(destinations, selected, select)
         Scaffold(
             modifier = Modifier.weight(1f),
-            topBar = {
-                if (topBar) {
-                    Column {
-                        DestinationTopBar(selected, mediumOrWider, expanded, lastActionIsIconOnly, actions)
-                        belowTopBar(selected)
-                    }
-                }
-            },
+            topBar = { top?.invoke() },
             bottomBar = {
                 if (bottomBar) {
                     DestinationBar(destinations, selected, mediumOrWider, select)
@@ -124,7 +179,7 @@ internal fun TouchFrame(
             snackbarHost = {
                 // Above the bar, or above the system bar when a page takes the whole window; at the
                 // start beside the rail on wider windows, across on the phone.
-                val insets = if (!topBar && !bottomBar) {
+                val insets = if (!bars.top && !bottomBar) {
                     Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
                 } else {
                     Modifier
@@ -136,12 +191,34 @@ internal fun TouchFrame(
                     notices(if (mediumOrWider) Modifier else Modifier.fillMaxWidth())
                 }
             },
-            contentWindowInsets = if (topBar) ScaffoldDefaults.contentWindowInsets else WindowInsets(0, 0, 0, 0),
-        ) { innerPadding ->
-            Box(Modifier.fillMaxSize().padding(innerPadding)) { content(selected) }
+            contentWindowInsets = frameInsets(top != null && bars.top),
+            content = content,
+        )
+    }
+}
+
+@Composable
+private fun FrameTop(
+    visible: Boolean,
+    destination: Destination,
+    lastActionIsIconOnly: Boolean,
+    actions: @Composable RowScope.(Destination) -> Unit,
+    belowTopBar: @Composable (Destination) -> Unit,
+) {
+    if (visible) {
+        val window = currentWindowAdaptiveInfoV2().windowSizeClass
+        val expanded = window.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND)
+        val medium = window.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND)
+        Column {
+            DestinationTopBar(destination, medium, expanded, lastActionIsIconOnly, actions)
+            belowTopBar(destination)
         }
     }
 }
+
+@Composable
+private fun frameInsets(top: Boolean) =
+    if (top) ScaffoldDefaults.contentWindowInsets else WindowInsets(0, 0, 0, 0)
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -189,7 +266,7 @@ private fun DestinationRail(
                 Image(
                     painter = painterResource(R.drawable.startup_brand_symbol),
                     contentDescription = null,
-                    modifier = Modifier.size(36.dp),
+                    modifier = Modifier.size(36.dp).testTag("browse-app-mark"),
                 )
             }
         },
