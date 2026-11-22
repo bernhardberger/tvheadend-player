@@ -57,8 +57,9 @@ empty heading or placeholder:
 3. On now
 4. Browse by genre
 5. Continue watching
-6. New recordings
-7. Upcoming recordings
+6. Expiring soon
+7. New recordings
+8. Upcoming recordings
 
 ### 3.1 Current activity
 
@@ -267,15 +268,21 @@ over about 450 ms); Left/Right keeps the focused card at the start position.
 - **Continue watching:** recordings that offer a resume position, with exactly
   the rule the Recordings resume dialog uses (`offeredResumePosition`). Newest
   recording first, up to 10. Progress shows the viewer position (orange).
-- **Recently recorded:** finished recordings from the last 7 days that haven't
+- **Expiring soon:** up to 10 recordings with time left to watch before removal,
+  soonest first.
+- **New recordings:** finished recordings from the last 7 days that haven't
   been started, newest first, up to 10. A recording in Continue watching is not
   repeated here.
-- Both rows end with an **All recordings** card that opens Recordings → Archive.
-- **Upcoming recordings:** next-first scheduled entries, up to 10, in the
-  text-card kit (56 dp high) on the same neutral grey surface as the other
-  end cards, each with a title and quiet day/time • channel line. Genres retain
-  their coloured surfaces. End with **All scheduled** and its event icon,
-  opening Recordings → Schedule.
+- Each shelf card shows the title, an optional episode line, and the date line.
+  The episode line is omitted if blank or identical to the title. The date
+  follows the title directly when there is no episode line, but the shelf
+  reserves three lines if any recording in it has one. Each shelf ends with
+  **All recordings**, which opens Recordings → Archive.
+- **Upcoming recordings:** next-first scheduled entries, up to 10, on neutral
+  gray text cards 76 dp high. Each card shows the title, an optional episode
+  line, and day/time • channel. If the episode line is omitted, the two
+  remaining lines are centered vertically. The **All scheduled** end card is
+  the same height and opens Recordings → Schedule.
   OK on an entry opens Schedule with that row focused and scrolled into view;
   if it has left the schedule, use the tab's normal initial focus. Back follows
   the existing drawer → Home path and restores the same Upcoming card.
@@ -295,7 +302,7 @@ Each card behaves like the screen it comes from.
 | Recent channel | Tune | The channel's menu, as in Channels |
 | On now | Tune, as in Channels immersive | The programme's menu (Details, Record, …) |
 | Active recording | The recording choice dialog (below) | Details, Stop recording, … |
-| Continue watching, Recently recorded | As in Recordings (resume or start over as today) | As in Recordings |
+| Continue watching, Expiring soon, New recordings | As in Recordings (resume or start over as today) | As in Recordings |
 | All recordings | Recordings → Archive | None |
 | Upcoming recording | Recordings → Schedule, focused on that entry (normal initial focus if gone) | None |
 | All scheduled | Recordings → Schedule | None |
@@ -410,9 +417,9 @@ How phase 2 is presented remains open; the removed tabs are not a requirement.
 6. Genres: Guide families in the Guide's order, only those with programmes in the
    next 24 hours; Guide opens at now and focuses the first match; Home's choice
    replaces the Guide filter.
-7. Recording shelves: Continue watching and Recently recorded (7 days) up to 10
-   each, ending with All recordings; Upcoming as text cards plus All scheduled; section order
-   as in [section 3](#3-content-order-and-hierarchy).
+7. Recording shelves: Continue watching, Expiring soon, and New recordings up to
+   10 each, ending with All recordings; Upcoming as text cards plus All scheduled.
+   See [section 3](#3-content-order-and-hierarchy).
 8. Initial focus and duplicate activity as in [section 5](#5-options-loading-and-interaction)
    and [3.1](#31-current-activity).
 

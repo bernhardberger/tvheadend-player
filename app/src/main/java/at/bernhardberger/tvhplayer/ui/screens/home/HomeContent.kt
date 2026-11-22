@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.screens.home
 
+import android.content.res.Resources
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
@@ -124,6 +125,7 @@ import at.bernhardberger.tvhplayer.ui.TvGridGutter
 import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
 import at.bernhardberger.tvhplayer.ui.TvLogoPlateColor
 import at.bernhardberger.tvhplayer.ui.TvTextColors
+import at.bernhardberger.tvhplayer.ui.TvTextSecondaryAlpha
 import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.common.formatClock
@@ -131,6 +133,7 @@ import at.bernhardberger.tvhplayer.ui.common.formatRecordedDuration
 import at.bernhardberger.tvhplayer.ui.common.formatRecordingDate
 import at.bernhardberger.tvhplayer.ui.common.formatRecordingExpiry
 import at.bernhardberger.tvhplayer.ui.common.formatTimeInterval
+import at.bernhardberger.tvhplayer.ui.common.programmeEpisodeLine
 import at.bernhardberger.tvhplayer.ui.common.rememberCurrentEpochSeconds
 import at.bernhardberger.tvhplayer.ui.components.CardGlowReach
 import at.bernhardberger.tvhplayer.ui.components.CompactZapRowOffscreen
@@ -141,6 +144,7 @@ import at.bernhardberger.tvhplayer.ui.components.HomeActivityCard
 import at.bernhardberger.tvhplayer.ui.components.HomeAllRecordingsCard
 import at.bernhardberger.tvhplayer.ui.components.HomeCardWidth
 import at.bernhardberger.tvhplayer.ui.components.HomeGenreCard
+import at.bernhardberger.tvhplayer.ui.components.HomeGenreCardHeight
 import at.bernhardberger.tvhplayer.ui.components.HomeRecentChannelTile
 import at.bernhardberger.tvhplayer.ui.components.HomeTextCard
 import at.bernhardberger.tvhplayer.ui.components.LocalBrowseDrawerState
@@ -209,6 +213,7 @@ private val HomeHeroGap = 16.dp
 private val HomeOnNowSectionGap = 16.dp
 internal val HomeRecentGap = 16.dp
 private val HomeGenreGap = 16.dp
+private val HomeUpcomingCardHeight = 76.dp
 
 private val HomeEmphasizedEasing = CubicBezierEasing(0.2f, 0f, 0f, 1f)
 
@@ -1439,6 +1444,13 @@ private fun HomeShelfRow(
 ) {
     // The All recordings end card is part of the row: a null item marks it.
     val rowItems: List<at.bernhardberger.tvhplayer.core.RecordingItem?> = items + listOf(null)
+    val resources = LocalContext.current.resources
+    val untitled = stringResource(R.string.no_epg)
+    val captions = items.map { item ->
+        val title = item.entry.title?.takeIf(String::isNotBlank) ?: untitled
+        title to item.entry.homeEpisodeLine(title, resources)
+    }
+    val reserveEpisodeLine = captions.any { (_, episodeLine) -> episodeLine != null }
     HomeCardRow(
         items = rowItems,
         itemKey = { it?.entry?.id?.value ?: "all-recordings" },
@@ -1464,7 +1476,6 @@ private fun HomeShelfRow(
             )
         } else {
             val recording = item.entry
-            val resources = LocalContext.current.resources
             val expiry = recordingExpiryTimeLeft(recordingExpiryTime(recording, nowSec), nowSec)
             val expiryDescription = expiry?.let {
                 resources.getString(R.string.recording_expires_in, formatRecordingExpiry(it, resources))
@@ -1478,8 +1489,7 @@ private fun HomeShelfRow(
                 offeredResumePosition(admission),
                 nowSec,
             ) as? RecordingWatchState.PartlyWatched)?.fraction?.toFloat()
-            val title = recording.title?.takeIf(String::isNotBlank)
-                ?: stringResource(R.string.no_epg)
+            val (title, episodeLine) = captions[index]
             val contextMenu = rememberBrowseContextMenuTrigger(
                 onOpen = { onContextMenu(index, "recording:${recording.id.value}") },
             )
@@ -1494,7 +1504,7 @@ private fun HomeShelfRow(
                 onLongClick = contextMenu.onLongClick,
                 modifier = itemModifier.then(contextMenu.modifier)
                     .semantics(mergeDescendants = true) {
-                        contentDescription = listOf(title, subtitle)
+                        contentDescription = listOfNotNull(title, episodeLine, subtitle)
                             .filter(String::isNotBlank)
                             .joinToString(", ")
                     }
@@ -1512,31 +1522,37 @@ private fun HomeShelfRow(
                         enter = at.bernhardberger.tvhplayer.ui.components.RowTextEnter,
                         exit = at.bernhardberger.tvhplayer.ui.components.RowTextExit,
                     ) {
-                        Text(
-                            title,
-                            Modifier.fillMaxWidth().padding(top = StandardCardTextGap),
-                            style = MaterialTheme.typography.titleSmall,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
+                        // The TV Material subtitle slot applies its own 60% layer alpha.
+                        Column {
+                            Text(
+                                title,
+                                Modifier.fillMaxWidth().padding(top = StandardCardTextGap),
+                                style = MaterialTheme.typography.titleSmall,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            val lineModifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+                            val lineStyle = MaterialTheme.typography.bodySmall
+                            if (episodeLine != null) {
+                                Text(
+                                    episodeLine, lineModifier, style = lineStyle,
+                                    color = LocalContentColor.current.copy(alpha = TvTextSecondaryAlpha),
+                                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                            Text(
+                                subtitle, lineModifier, style = lineStyle,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            )
+                            if (reserveEpisodeLine && episodeLine == null) {
+                                // Reserve a font-scaled line below the date, not a gap above it.
+                                Text("", lineModifier.clearAndSetSemantics {}, style = lineStyle, maxLines = 1)
+                            }
+                        }
                     }
                 },
-                subtitle = {
-                    AnimatedVisibility(
-                        visible = textShown,
-                        enter = at.bernhardberger.tvhplayer.ui.components.RowTextEnter,
-                        exit = at.bernhardberger.tvhplayer.ui.components.RowTextExit,
-                    ) {
-                        Text(
-                            subtitle,
-                            Modifier.fillMaxWidth().padding(top = 4.dp),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = TvTextColors.tertiary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                },
+                subtitle = {},
                 contentColor = CardContainerDefaults.contentColor(
                     contentColor = TvTextColors.secondary,
                     focusedContentColor = TvTextColors.primary,
@@ -1605,6 +1621,7 @@ private fun HomeUpcomingRow(
         rail = rail, ltr = ltr,
     ) { index, item, modifier ->
         if (item == null) HomeTextCard(stringResource(R.string.home_all_scheduled),
+            height = HomeUpcomingCardHeight,
             containerColor = TvSurfaceColors.containerHigh,
             leading = {
                 androidx.tv.material3.Icon(
@@ -1619,14 +1636,21 @@ private fun HomeUpcomingRow(
             val title = next.title?.takeIf(String::isNotBlank) ?: stringResource(R.string.no_epg)
             val whenText = next.start?.let { relativeDayTime(it.epochSeconds, nowSec, zone, locale) }.orEmpty()
             HomeTextCard(title, onClick = { onActivate(index, "recording:${next.id.value}") },
+                height = HomeUpcomingCardHeight,
                 containerColor = TvSurfaceColors.containerHigh,
+                middleLine = next.homeEpisodeLine(title, LocalContext.current.resources),
                 subtitle = listOf(whenText, next.channelName.orEmpty()).filter(String::isNotBlank).joinToString(" • "),
+                subtitleStyle = MaterialTheme.typography.bodySmall,
+                subtitleColor = TvTextColors.tertiary,
                 modifier = modifier.width(220.dp).testTag("home-upcoming-$index").onFocusChanged {
                     if (it.isFocused) onCardFocus(index, "recording:${next.id.value}")
                 })
         }
     }
 }
+
+private fun DvrEntry.homeEpisodeLine(title: String, resources: Resources): String? =
+    programmeEpisodeLine(episode, subtitle, resources).takeIf { it.isNotBlank() && it != title }
 
 /** The activity card's key in the same form the policy saves focus with. */
 private fun activityKey(item: at.bernhardberger.tvhplayer.core.CurrentActivityItem): String =
@@ -1664,7 +1688,8 @@ private fun HomeSection.focusOverflow(halfActivityWidth: Dp): Dp {
     val pictureHeight = when (this) {
         is HomeSection.CurrentActivity -> halfActivityWidth * 9f / 16f
         is HomeSection.RecentChannels -> 104.dp
-        is HomeSection.Genres, is HomeSection.Upcoming -> 56.dp
+        is HomeSection.Genres -> HomeGenreCardHeight
+        is HomeSection.Upcoming -> HomeUpcomingCardHeight
         else -> HomeCardWidth * 9f / 16f
     }
     return pictureHeight * ((TvCardFocusedScale - 1f) / 2f) +

@@ -16,6 +16,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy
 import at.bernhardberger.tvheadend.sdk.core.*
@@ -621,11 +622,29 @@ class HomeActionsTest {
     }
 
     @Test fun continueWatchingMarksOnlyRunningRecordings() {
-        recordingHome(running = true, onWatch = {}, onPlay = {}, alsoFinished = true)
+        val episode = "The coast road"
+        leaveTouchMode()
+        recordingHome(running = true, onWatch = {}, onPlay = {}, alsoFinished = true, subtitle = episode)
         compose.onNodeWithTag("home-shelf-rec-1", useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("home-shelf-rec-2", useUnmergedTree = true).assertDoesNotExist()
-        compose.onNodeWithTag("home-shelf-0").assertExists()
-        compose.onNodeWithTag("home-shelf-1").assertExists()
+        compose.pressKey(Key.DirectionDown)
+        val first = compose.onNodeWithTag("home-shelf-0").assertIsFocused()
+        val second = compose.onNodeWithTag("home-shelf-1")
+        compose.onNodeWithText(episode, useUnmergedTree = true).assertIsDisplayed()
+        val firstCaption = first.fetchSemanticsNode().config[SemanticsProperties.ContentDescription].first().split(", ", limit = 3)
+        val secondCaption = second.fetchSemanticsNode().config[SemanticsProperties.ContentDescription].first()
+        assertEquals(listOf("Test recording", episode), firstCaption.take(2))
+        assertFalse(secondCaption.startsWith("Finished recording, Finished recording"))
+        compose.onAllNodesWithText("Finished recording", useUnmergedTree = true).assertCountEquals(1)
+        val nextLine = compose.onNodeWithText(secondCaption.substringAfter(", "), useUnmergedTree = true)
+        assertEquals(compose.onNodeWithText(episode, useUnmergedTree = true).getUnclippedBoundsInRoot().top,
+            nextLine.getUnclippedBoundsInRoot().top)
+        val row = compose.onNodeWithTag("home-section-CONTINUE_WATCHING")
+        val height = row.getUnclippedBoundsInRoot().let { it.bottom - it.top }
+        repeat(7) { compose.pressKey(Key.DirectionRight) }
+        compose.onNodeWithTag("home-shelf-7").assertIsFocused()
+        first.assertDoesNotExist()
+        assertEquals(height, row.getUnclippedBoundsInRoot().let { it.bottom - it.top })
     }
 
     @Test fun groupButtonSelectsSharedScopeAndViewOptionsContainsOnlySections() {
@@ -702,13 +721,20 @@ class HomeActionsTest {
 
     @Test fun restoredShortLastRowHasNoEntryClampJump() {
         leaveTouchMode()
+        val episode = "The long climb"
+        val blankSubtitle = " "
         val sections = listOf<HomeSection>(HomeSection.RecentChannels(listOf(RecentChannelItem(channel))),
             HomeSection.OnNow(listOf(OnNowItem(channel, EpgEvent.create(EventId(1), channel.id,
                 Instant.fromEpochSeconds(now - 60), Instant.fromEpochSeconds(now + 600), title = "Programme")))),
             HomeSection.Genres(listOf(GenreItem(ProgrammeCategory.ALL))),
-            HomeSection.Upcoming(listOf(UpcomingItem(DvrEntry.create(DvrEntryId(1), title = "Scheduled",
-                state = DvrEntryState.SCHEDULED, start = Instant.fromEpochSeconds(now + 600),
-                stop = Instant.fromEpochSeconds(now + 1200))))))
+            HomeSection.Upcoming(listOf(
+                UpcomingItem(DvrEntry.create(DvrEntryId(1), title = "Scheduled", subtitle = episode,
+                    channelName = channel.name, state = DvrEntryState.SCHEDULED,
+                    start = Instant.fromEpochSeconds(now + 600), stop = Instant.fromEpochSeconds(now + 1200))),
+                UpcomingItem(DvrEntry.create(DvrEntryId(2), title = "Later", subtitle = blankSubtitle,
+                    state = DvrEntryState.SCHEDULED, start = Instant.fromEpochSeconds(now + 1500),
+                    stop = Instant.fromEpochSeconds(now + 2100))),
+            )))
         compose.mainClock.autoAdvance = false
         compose.setContent { TVHeadendPlayerTheme {
             HomeContent(sections, PaddingValues(), HomeFocusKey(HomeSectionKind.UPCOMING, "recording:1", 0), {})
@@ -732,6 +758,15 @@ class HomeActionsTest {
         }
         compose.onNodeWithTag("home-upcoming-0").assertIsFocused()
         assertEquals(before, compose.onNodeWithTag("home-upcoming-0").getUnclippedBoundsInRoot())
+        compose.onNodeWithText(episode, useUnmergedTree = true).assertIsDisplayed()
+        val caption = compose.onNodeWithTag("home-upcoming-0").fetchSemanticsNode()
+            .config[SemanticsProperties.ContentDescription].first()
+        assertTrue(caption.startsWith("Scheduled, $episode, "))
+        assertTrue(caption.endsWith(" • ${channel.name}"))
+        compose.onNodeWithText(blankSubtitle, useUnmergedTree = true).assertDoesNotExist()
+        val later = compose.onNodeWithTag("home-upcoming-1").fetchSemanticsNode()
+            .config[SemanticsProperties.ContentDescription].first()
+        assertTrue(later.startsWith("Later, ") && !later.startsWith("Later, $blankSubtitle, "))
     }
 
     @Test fun optionsToggleAllSectionsAndBackReturnsToHeaderWithoutTuning() {
@@ -1241,18 +1276,21 @@ class HomeActionsTest {
     @OptIn(TvheadendTestingApi::class, at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)
     private fun recordingHome(running: Boolean, onWatch: (ChannelId) -> Unit, onPlay: (RecordingPlaybackStart) -> Unit, playing: Boolean = false, outsideScope: Boolean = false,
         onWatchRecording: ((ChannelId) -> Unit)? = null, scheduled: Boolean = false, event: EpgEvent? = null, alsoFinished: Boolean = false,
-        warm: Boolean = false, layering: BrowseContentLayering? = null) {
-        val entry = DvrEntry.create(DvrEntryId(1), channelId = channel.id, title = "Test recording",
+        warm: Boolean = false, layering: BrowseContentLayering? = null, subtitle: String? = null) {
+        val entry = DvrEntry.create(DvrEntryId(1), channelId = channel.id, title = "Test recording", subtitle = subtitle,
             state = if (scheduled) DvrEntryState.SCHEDULED else if (running) DvrEntryState.RECORDING else DvrEntryState.COMPLETED,
             start = Instant.fromEpochSeconds(if (scheduled) now + 600 else now - 1800), stop = Instant.fromEpochSeconds(if (running || scheduled) now + 1800 else now),
             playPosition = 120.seconds,
             files = listOf(TvheadendTestResultFactory.recordingFile(serverPath = "test.ts",
                 start = Instant.fromEpochSeconds(now - 1800), stop = Instant.fromEpochSeconds(now))))
-        val entries = if (!alsoFinished) listOf(entry) else listOf(entry, DvrEntry.create(DvrEntryId(2), channelId = channel.id,
-            title = "Finished recording", state = DvrEntryState.COMPLETED, start = Instant.fromEpochSeconds(now - 7200),
-            stop = Instant.fromEpochSeconds(now - 3600), playPosition = 120.seconds,
-            files = listOf(TvheadendTestResultFactory.recordingFile(serverPath = "done.ts",
-                start = Instant.fromEpochSeconds(now - 7200), stop = Instant.fromEpochSeconds(now - 3600)))))
+        val entries = listOf(entry) + if (!alsoFinished) emptyList() else List(7) { index ->
+            val title = if (index == 0) "Finished recording" else "Finished recording ${index + 1}"
+            val start = Instant.fromEpochSeconds(now - 7200 - index * 60)
+            val stop = Instant.fromEpochSeconds(now - 3600)
+            DvrEntry.create(DvrEntryId(2L + index), channelId = channel.id, title = title, subtitle = title,
+                state = DvrEntryState.COMPLETED, start = start, stop = stop, playPosition = 120.seconds,
+                files = listOf(TvheadendTestResultFactory.recordingFile(serverPath = "done.ts", start = start, stop = stop)))
+        }
         val initialObservation = SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(channel))),

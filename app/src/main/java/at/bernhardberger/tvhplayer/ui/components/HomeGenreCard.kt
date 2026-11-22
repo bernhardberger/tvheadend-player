@@ -18,7 +18,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Card
 import androidx.tv.material3.CardDefaults
@@ -63,6 +65,10 @@ internal fun HomeTextCard(
     subtitle: String? = null,
     containerColor: Color = TvSurfaceColors.containerLowest,
     leading: (@Composable () -> Unit)? = null,
+    height: Dp = HomeGenreCardHeight,
+    middleLine: String? = null,
+    subtitleStyle: TextStyle = MaterialTheme.typography.labelSmall,
+    subtitleColor: Color = TvTextColors.secondary,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val ring = rememberCardFocusRing(interaction)
@@ -72,8 +78,10 @@ internal fun HomeTextCard(
         onLongClick = contextMenu.onLongClick,
         interactionSource = interaction,
         modifier = modifier
-            .height(HomeGenreCardHeight)
-            .semantics(mergeDescendants = true) { contentDescription = listOfNotNull(title, subtitle).joinToString(", ") }
+            .height(height)
+            .semantics(mergeDescendants = true) {
+                contentDescription = listOfNotNull(title, middleLine, subtitle).filter(String::isNotBlank).joinToString(", ")
+            }
             .cardFocusRing(ring, MaterialTheme.colorScheme.onSurface)
             .then(contextMenu.modifier),
         colors = CardDefaults.colors(
@@ -98,8 +106,10 @@ internal fun HomeTextCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.labelSmall,
+                if (middleLine != null) Text(middleLine, style = MaterialTheme.typography.bodySmall,
                     color = TvTextColors.secondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (subtitle != null) Text(subtitle, style = subtitleStyle,
+                    color = subtitleColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
