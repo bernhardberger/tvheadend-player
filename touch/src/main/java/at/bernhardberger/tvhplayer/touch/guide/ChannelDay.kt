@@ -41,6 +41,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.ui.PartsLine
@@ -279,9 +280,9 @@ internal fun ScheduledIcon(ruleSchedule: RuleSchedule?) {
 
 /** The compact By channel bar: the day picker, and the date at the end. The player's Info sheet shows it too. */
 @Composable
-internal fun DayBar(days: List<String>, selectedDay: Int, date: String, onDay: (Int) -> Unit) {
+internal fun DayBar(days: List<String>, selectedDay: Int, date: String, margin: Dp = 12.dp, onDay: (Int) -> Unit) {
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+        Modifier.fillMaxWidth().padding(horizontal = margin, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         MenuButton(R.drawable.calendar_month_outline, days, selectedDay, onDay)

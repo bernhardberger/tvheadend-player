@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import at.bernhardberger.tvhplayer.touch.R
@@ -30,6 +31,7 @@ import at.bernhardberger.tvhplayer.touch.ui.FirstLoadLine
 import at.bernhardberger.tvhplayer.touch.ui.FirstLoadList
 import at.bernhardberger.tvhplayer.touch.ui.ListFailure
 import at.bernhardberger.tvhplayer.touch.ui.ListMessage
+import at.bernhardberger.tvhplayer.touch.ui.LocalBrowseMargin
 import at.bernhardberger.tvhplayer.touch.ui.MessageKind
 import at.bernhardberger.tvhplayer.touch.ui.OfflineBanner
 import at.bernhardberger.tvhplayer.touch.ui.OfflineTexts
@@ -44,7 +46,7 @@ import at.bernhardberger.tvhplayer.touch.ui.SkeletonRow
 @Composable
 internal fun GuideStandIn(availability: GuideAvailability, layout: GuideLayout, actions: GuideActions) {
     when (availability) {
-        GuideAvailability.Loading -> GuideFirstLoad(layout)
+        GuideAvailability.Loading -> GuideFirstLoad(layout, LocalBrowseMargin.current)
         GuideAvailability.SignInNeeded -> ListMessage(
             MessageKind.SignInNeeded, actions.onSignIn ?: actions.onOpenConnectionSettings,
         )
@@ -57,16 +59,16 @@ internal fun GuideStandIn(availability: GuideAvailability, layout: GuideLayout, 
 
 /** The first load's progress line under the top bar. */
 @Composable
-internal fun GuideLoadingLine(availability: GuideAvailability, layout: GuideLayout) {
-    if (availability == GuideAvailability.Loading) FirstLoadLine(if (layout.compact) 0.dp else 24.dp)
+internal fun GuideLoadingLine(availability: GuideAvailability) {
+    if (availability == GuideAvailability.Loading) FirstLoadLine(LocalBrowseMargin.current)
 }
 
 /** The overview's shape: the phone's channel rows; the tablet's channel columns with their programs. */
 @Composable
-internal fun GuideFirstLoad(layout: GuideLayout) {
+internal fun GuideFirstLoad(layout: GuideLayout, margin: Dp = if (layout.compact) 12.dp else 24.dp) {
     val text = stringResource(SharedR.string.epg_loading)
     if (layout.compact) {
-        FirstLoadList(text, Modifier.padding(horizontal = 12.dp)) {
+        FirstLoadList(text, Modifier.padding(horizontal = margin)) {
             repeat(PHONE_ROWS) { index ->
                 SkeletonRow(index, PHONE_ROWS, 88.dp) {
                     SkeletonBlock(88.dp, 48.dp)
@@ -78,7 +80,7 @@ internal fun GuideFirstLoad(layout: GuideLayout) {
         return
     }
     val width = if (layout == GuideLayout.Wide) 264.dp else 232.dp
-    FirstLoadList(text, Modifier.padding(horizontal = 24.dp)) {
+    FirstLoadList(text, Modifier.padding(horizontal = margin)) {
         Row(
             Modifier.wrapContentWidth(Alignment.Start, unbounded = true),
             horizontalArrangement = Arrangement.spacedBy(16.dp),

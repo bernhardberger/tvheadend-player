@@ -27,12 +27,14 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.window.core.layout.WindowSizeClass
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.ui.Destination
 import at.bernhardberger.tvhplayer.touch.ui.ListFailure
 import at.bernhardberger.tvhplayer.touch.ui.ListMessage
+import at.bernhardberger.tvhplayer.touch.ui.LocalBrowseMargin
 import at.bernhardberger.tvhplayer.touch.ui.MessageKind
 import at.bernhardberger.tvhplayer.touch.ui.OfflineBanner
 import at.bernhardberger.tvhplayer.touch.ui.OfflineTexts
@@ -77,7 +79,7 @@ internal fun ChannelsScreen(
         },
         belowTopBar = { destination ->
             if (destination == Destination.Channels && state == ChannelsState.Loading) {
-                ChannelsLoadingLine(layout)
+                ChannelsLoadingLine(layout, LocalBrowseMargin.current)
             }
         },
     ) { destination ->
@@ -92,7 +94,6 @@ internal enum class ChannelsLayout {
 
     val tablet: Boolean get() = this != Phone
     val showNext: Boolean get() = this == Wide
-    val margin get() = if (tablet) 24.dp else 12.dp
     val rowHeight get() = if (tablet) 76.dp else 72.dp
 }
 
@@ -103,14 +104,15 @@ private fun ChannelsContent(
     actions: ChannelsActions,
     initiallyOpenChannelId: String?,
 ) {
+    val margin = LocalBrowseMargin.current
     when (state) {
-        ChannelsState.Loading -> ChannelsSkeleton(layout)
+        ChannelsState.Loading -> ChannelsSkeleton(layout, margin)
         ChannelsState.Unreachable -> ChannelsMessage(MessageKind.Unreachable, actions)
         ChannelsState.SignInFailed -> ChannelsMessage(MessageKind.SignInFailed, actions)
         ChannelsState.SignInNeeded -> ChannelsMessage(MessageKind.SignInNeeded, actions)
         is ChannelsState.Failed -> ListFailure(state.error, actions.onRetry, actions.onOpenConnectionSettings)
         is ChannelsState.Offline -> {
-            Column(Modifier.fillMaxSize().padding(horizontal = layout.margin)) {
+            Column(Modifier.fillMaxSize().padding(horizontal = margin)) {
                 OfflineBanner(
                     !layout.tablet, ChannelsOfflineTexts, actions.onOpenConnectionSettings, retryIn = state.retryIn,
                 )
@@ -119,12 +121,12 @@ private fun ChannelsContent(
             }
         }
         is ChannelsState.Ready -> {
-            Column(Modifier.fillMaxSize().padding(horizontal = layout.margin)) {
+            Column(Modifier.fillMaxSize().padding(horizontal = margin)) {
                 val list = state.list
                 if (!layout.tablet && list.canFilter) TagFilter(list, actions.onTag)
                 ChannelRows(list, layout, actions, initiallyOpenChannelId = initiallyOpenChannelId) {
                     val kind = if (list.selectedTagId == null) MessageKind.Empty else MessageKind.EmptyTag
-                    ChannelsMessage(kind, actions)
+                    ChannelsMessage(kind, actions, horizontalMargin = if (layout.tablet) margin else 0.dp)
                 }
             }
         }
@@ -133,13 +135,17 @@ private fun ChannelsContent(
 
 /** The shared message form with Channels' actions; sign-in needed opens the sign-in editor when there is one. */
 @Composable
-private fun ChannelsMessage(kind: MessageKind, actions: ChannelsActions) {
+private fun ChannelsMessage(
+    kind: MessageKind,
+    actions: ChannelsActions,
+    horizontalMargin: Dp = LocalBrowseMargin.current,
+) {
     val settings = if (kind == MessageKind.SignInNeeded) {
         actions.onSignIn ?: actions.onOpenConnectionSettings
     } else {
         actions.onOpenConnectionSettings
     }
-    ListMessage(kind, settings, actions.onRetry) { actions.onTag(null) }
+    ListMessage(kind, settings, actions.onRetry, horizontalMargin) { actions.onTag(null) }
 }
 
 private val ChannelsOfflineTexts = OfflineTexts(R.string.channels_offline, R.string.channels_saved)
