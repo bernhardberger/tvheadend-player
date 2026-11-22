@@ -273,7 +273,8 @@ class RecordingsScreenTest {
         assertLongEpisodeKeepsItsFacts()
         capture("phone-recordings-all", TouchCanvas.PHONE)
 
-        compose.onNodeWithContentDescription("View options").performClick()
+        // Open the sheet without starting a native press ripple on the screen behind it.
+        compose.onNodeWithContentDescription("View options").performSemanticsAction(SemanticsActions.OnClick)
         compose.onNodeWithText("Group by").assertIsDisplayed()
         captureSheetOver("phone-recordings-view", TouchCanvas.PHONE)
 
@@ -490,8 +491,9 @@ class RecordingsScreenTest {
     private fun assertPlayingActions() {
         val label = compose.activity.getString(SharedR.string.player_continue_watching)
         resumeButton().assertDoesNotExist()
-        compose.onNodeWithText(label).assertIsDisplayed().performClick()
-        compose.onNodeWithText("Watch from beginning").assertIsDisplayed().performClick()
+        // Verify the actions without leaving native press ripples in the next capture.
+        compose.onNodeWithText(label).assertIsDisplayed().performSemanticsAction(SemanticsActions.OnClick)
+        compose.onNodeWithText("Watch from beginning").assertIsDisplayed().performSemanticsAction(SemanticsActions.OnClick)
         assertEquals(listOf(PickedId to false, PickedId to true), played.takeLast(2))
     }
 
