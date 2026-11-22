@@ -79,40 +79,50 @@ internal class GuideViewModel(
         val changes = input.changesFrom(mappingInput)
         if (changes.isEmpty()) return
         mappingInput = input
+        // Like the TV's browse preparation: finish the captured projection, then take
+        // the newest EPG update. Metadata churn must not starve the first display.
+        if (mappingJob?.isActive == true && changes == listOf("epg")) return
         mappingJob?.cancel()
         val app = context.applicationContext
         mappingJob = viewModelScope.launch {
             yield()
-            val previous = mutableMapped.value
-            val result = withContext(mappingDispatcher) {
-                val sincePublished = input.changesFrom(previous?.input)
-                val epgOnly = sincePublished.singleOrNull() == "epg"
-                val projection = if (epgOnly) input.epgProjection() else null
-                if (epgOnly && previous != null &&
-                    projection == (previous.projection ?: previous.input.epgProjection())
-                ) {
-                    return@withContext GuideMappingResult(input, previous.state, projection)
-                }
-                val counts = if ("epg" in sincePublished) {
-                    app.epgChangeCounts(previous?.input?.observation, input.observation)
-                } else ""
-                val state = traceArtworkMapping(app, "Guide", sincePublished.joinToString("+") + counts) {
-                    val localized = app.createConfigurationContext(input.configuration)
-                    val texts = guideTexts(
-                        localized, input.configuration.locales[0], input.clock.zone, input.uses24Hour,
-                    )
-                    val state = guideState(
-                        input.scope, input.connection, input.degraded, input.observation, input.selection, false,
-                        input.clock, texts, input.artwork, input.playingId, ::ensureActive,
-                    )
-                    ensureActive()
-                    state
-                }
-                GuideMappingResult(input, state, projection)
+            while (true) {
+                val captured = checkNotNull(mappingInput)
+                val result = prepareGuide(app, captured, mutableMapped.value)
+                ensureActive()
+                mutableMapped.value = result
+                if (mappingInput === captured) break
             }
-            if (mappingInput === input) mutableMapped.value = result
         }
     }
+
+    private suspend fun prepareGuide(context: Context, input: GuideMappingInput, previous: GuideMappingResult?) =
+        withContext(mappingDispatcher) {
+            val sincePublished = input.changesFrom(previous?.input)
+            val epgOnly = sincePublished.singleOrNull() == "epg"
+            val projection = if (epgOnly) input.epgProjection() else null
+            if (epgOnly && previous != null &&
+                projection == (previous.projection ?: previous.input.epgProjection())
+            ) {
+                return@withContext GuideMappingResult(input, previous.state, projection)
+            }
+            val counts = if ("epg" in sincePublished) {
+                context.epgChangeCounts(previous?.input?.observation, input.observation)
+            } else ""
+            val state = traceArtworkMapping(context, "Guide", sincePublished.joinToString("+") + counts) {
+                val localized = context.createConfigurationContext(input.configuration)
+                val texts = guideTexts(
+                    localized, input.configuration.locales[0], input.clock.zone, input.uses24Hour,
+                )
+                val state = guideState(
+                    input.scope, input.connection, input.degraded, input.observation, input.selection, false,
+                    input.clock, texts, input.artwork, input.playingId, ::ensureActive,
+                )
+                ensureActive()
+                state
+            }
+            GuideMappingResult(input, state, projection)
+        }
 
     /** Asks the server for the [coverage] window's guide unless that request is already running. */
     fun request(coverage: GuideCoverage) {
