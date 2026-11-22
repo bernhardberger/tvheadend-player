@@ -1,9 +1,8 @@
 package at.bernhardberger.tvhplayer.touch.guide
 
-import at.bernhardberger.tvhplayer.touch.ui.programRecordControl
 import at.bernhardberger.tvhplayer.touch.ui.ruleSchedule
-import at.bernhardberger.tvhplayer.ui.screens.programmeRecordKeyAction
-import at.bernhardberger.tvhplayer.core.programmeArtwork
+import at.bernhardberger.tvhplayer.ui.screens.isScheduled
+
 import at.bernhardberger.tvhplayer.touch.ui.ArtworkModels
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
@@ -16,12 +15,10 @@ import at.bernhardberger.tvhplayer.core.browseAppError
 import at.bernhardberger.tvhplayer.core.forEmptyChannelPresentation
 import at.bernhardberger.tvhplayer.core.otherAirings
 import at.bernhardberger.tvhplayer.core.programmeAgeRating
-import at.bernhardberger.tvhplayer.core.runningRecordingForEvent
 import at.bernhardberger.tvhplayer.core.shouldPresentEmptyTag
 import at.bernhardberger.tvhplayer.touch.channels.ChannelTag
 import at.bernhardberger.tvhplayer.ui.common.isRunning
 import at.bernhardberger.tvhplayer.ui.common.progress
-import at.bernhardberger.tvhplayer.ui.screens.isScheduled
 import at.bernhardberger.tvhplayer.viewmodels.ChannelScopeState
 import java.time.Instant
 import java.time.LocalDate
@@ -93,6 +90,7 @@ internal fun guideState(
     texts: GuideTexts,
     artwork: ArtworkModels? = null,
     playing: String? = null,
+    overviewRows: GuideOverviewRows = GuideOverviewRows(),
     checkpoint: () -> Unit = {},
 ): GuideState {
     val browsing = scope.scope
@@ -123,7 +121,7 @@ internal fun guideState(
         else -> GuideMapper(
             browsing.visibleChannels, observation, snapshot.events, clock, today, texts, artwork, playing,
         )
-            .state(selection, tags, selectedTagId, checkpoint)
+            .state(selection, tags, selectedTagId, overviewRows, checkpoint)
             .copy(
                 dayLoading = dayLoading,
                 availability = if (degraded) GuideAvailability.Offline else GuideAvailability.Current,
@@ -246,6 +244,7 @@ internal class GuideMapper(
         selection: GuideSelection,
         tags: List<ChannelTag>,
         selectedTagId: String?,
+        rows: GuideOverviewRows,
         checkpoint: () -> Unit,
     ): GuideState {
         checkpoint()
@@ -258,9 +257,22 @@ internal class GuideMapper(
         val dayChannel = if (selection.view == GuideView.ByChannel) {
             channels.firstOrNull { it.id.value.toString() == selection.channelId } ?: channels.firstOrNull()
         } else null
-        val guideChannels = channels.map {
+        var phoneRows = 0
+        val guideChannels = channels.mapIndexed { index, channel ->
             checkpoint()
-            channel(it, window, includeDay = it == dayChannel)
+            val schedule = byChannel[channel.id].orEmpty()
+            val id = channel.id.value.toString()
+            val next = schedule.firstOrNull { it.stop.epochSeconds > window.anchorSec }
+            val hasLead = next != null && next.start.epochSeconds <= window.anchorSec
+            val phoneIndex = if (hasLead) phoneRows++ else null
+            val requested = dayChannel == null && rows.includes(index, phoneIndex, id)
+            val pending = !requested && channel != dayChannel
+            val logo = if (!pending || dayChannel != null) artwork?.logo(channel.icon, observation) else null
+            val head = GuideChannel(
+                id, channel.name.orEmpty(), logoModel = logo, overviewHasLead = hasLead, overviewPending = pending,
+                hasUnmappedLogo = pending && artwork != null && channel.icon != null,
+            )
+            if (pending) head else overviewChannel(head, schedule, window, channel == dayChannel, rows)
         }
         val details = selection.detailsId?.let { details(it) }
         return GuideState(
@@ -278,33 +290,34 @@ internal class GuideMapper(
         )
     }
 
-    private fun channel(channel: Channel, window: GuideWindow, includeDay: Boolean): GuideChannel {
-        val schedule = byChannel[channel.id].orEmpty()
+    private fun overviewChannel(
+        head: GuideChannel, schedule: List<EpgEvent>, window: GuideWindow, includeDay: Boolean, rows: GuideOverviewRows,
+    ): GuideChannel {
         val overviewEnd = maxOf(window.daySec.last + 1, window.anchorSec + OVERVIEW_SPAN_SEC)
         val overview = mutableListOf<EpgEvent>()
-        var gap: GuideGap? = null
-        val shown = schedule.filter { it.stop.epochSeconds > window.anchorSec && it.start.epochSeconds < overviewEnd }
+        var gap: Pair<Long, Long>? = null
+        val shown = schedule.asSequence()
+            .filter { it.stop.epochSeconds > window.anchorSec && it.start.epochSeconds < overviewEnd }
         for (event in shown) {
             val coveredThrough = overview.lastOrNull()?.stop?.epochSeconds ?: window.anchorSec
             if (event.start.epochSeconds > coveredThrough) {
-                gap = GuideGap(texts.clock(coveredThrough), texts.clock(event.start.epochSeconds))
+                gap = coveredThrough to event.start.epochSeconds
                 break
             }
             overview += event
         }
-        // Share formatting, artwork and DVR lookups for events visible in both lists.
-        val day = if (includeDay) schedule.asSequence()
-            .filter { it.overlaps(window.daySec) }
-            .associate { it.id to program(it) }
-        else emptyMap()
-        return GuideChannel(
-            id = channel.id.value.toString(),
-            name = channel.name.orEmpty(),
-            logoModel = logos[channel.id],
-            programs = overview.map { day[it.id] ?: program(it) },
-            gap = gap,
-            day = if (includeDay) day.values.toList() else null,
-        )
+        val day = if (includeDay) schedule.filter { it.overlaps(window.daySec) } else null
+        val marks = (overview + day.orEmpty()).distinctBy { it.id }
+            .associateWith { observation.overviewMarks(it, clock.nowSec, artwork) }
+        val key = GuideOverviewRowKey(head, overview, gap, day, marks)
+        return rows.getOrMap(key) {
+            val mappedDay = day?.associate { it.id to program(it, marks = marks.getValue(it)) }
+            head.copy(
+                programs = overview.map { mappedDay?.get(it.id) ?: program(it, marks = marks.getValue(it)) },
+                gap = gap?.let { GuideGap(texts.clock(it.first), texts.clock(it.second)) },
+                day = mappedDay?.values?.toList(),
+            )
+        }
     }
 
     /** The player can also be watching a past program, which belongs at the top of its Today list. */
@@ -325,7 +338,10 @@ internal class GuideMapper(
     private fun EpgEvent.overlaps(window: LongRange): Boolean =
         stop.epochSeconds > window.first && start.epochSeconds <= window.last
 
-    private fun program(event: EpgEvent, watched: EpgEvent? = null): GuideProgram {
+    private fun program(
+        event: EpgEvent, watched: EpgEvent? = null,
+        marks: GuideOverviewMarks = observation.overviewMarks(event, clock.nowSec, artwork),
+    ): GuideProgram {
         val running = event.isRunning(clock.nowSec)
         val channelId = event.channelId?.value?.toString().orEmpty()
         return GuideProgram(
@@ -340,16 +356,17 @@ internal class GuideMapper(
             timeRange = texts.timeRange(event.start.epochSeconds, event.stop.epochSeconds),
             episode = texts.episode(event),
             synopsis = event.synopsis(),
-            stillModel = artwork?.picture(programmeArtwork(event), observation),
+            stillModel = marks.picture,
             progress = event.progress(clock.nowSec).takeIf { running },
             timeLeft = texts.duration(event.stop.epochSeconds - clock.nowSec).takeIf { running },
-            recording = observation.runningRecordingForEvent(event) != null,
-            scheduled = observation.isScheduled(event),
-            ruleSchedule = observation.ruleSchedule(event),
-            record = programRecordControl(programmeRecordKeyAction(event, observation, clock.nowSec)),
+            recording = marks.recording,
+            scheduled = marks.scheduled,
+            ruleSchedule = marks.rule,
+            record = marks.control,
             watching = if (watched != null) event.id == watched.id else running && channelId == playing,
         )
     }
+
 
     fun details(id: String, watched: EpgEvent? = null): ProgramDetails? {
         val event = events.find { it.id.value.toString() == id }

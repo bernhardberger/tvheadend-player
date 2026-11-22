@@ -96,6 +96,7 @@ internal fun <T> traceArtworkMapping(
     screen: String,
     reason: String? = null,
     projectionMs: Long? = null,
+    rows: (() -> Int)? = null,
     map: () -> T,
 ): T {
     if (!context.isDebuggable) return map()
@@ -103,9 +104,11 @@ internal fun <T> traceArtworkMapping(
     return map().also {
         val trigger = reason?.let { " reason=$it" }.orEmpty()
         val projection = projectionMs?.let { " projectionMs=$it" }.orEmpty()
+        val formatted = rows?.let { " rows=${it()}" }.orEmpty()
         Log.d(
             ARTWORK_LOG_TAG,
-            "mapped $screen ms=${SystemClock.elapsedRealtime() - startMs} startMs=$startMs$trigger$projection",
+            "mapped $screen ms=${SystemClock.elapsedRealtime() - startMs} " +
+                "startMs=$startMs$trigger$projection$formatted",
         )
     }
 }

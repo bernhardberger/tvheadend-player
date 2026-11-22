@@ -54,6 +54,7 @@ internal class GuideViewModel(
     }
     private var coverageSession: SessionGenerationIdentity? = null
     private val mutableMapped = MutableStateFlow<GuideMappingResult?>(null)
+    val overviewViewport = MutableStateFlow<List<String>>(emptyList())
     val mapped = mutableMapped.asStateFlow()
     private var mappingInput: GuideMappingInput? = null
     private var mappingJob: Job? = null
@@ -84,7 +85,7 @@ internal class GuideViewModel(
         mappingInput = input
         // Like the TV's browse preparation: finish the captured projection, then take
         // the newest EPG update. Metadata churn must not starve the first display.
-        if (mappingJob?.isActive == true && changes == listOf("epg")) return
+        if (mappingJob?.isActive == true && changes.all { it in GUIDE_STREAM_CHANGES }) return
         mappingJob?.cancel()
         val app = context.applicationContext
         mappingJob = viewModelScope.launch {
@@ -102,29 +103,34 @@ internal class GuideViewModel(
     private suspend fun prepareGuide(context: Context, input: GuideMappingInput, previous: GuideMappingResult?) =
         withContext(mappingDispatcher) {
             val sincePublished = input.changesFrom(previous?.input)
-            val epgOnly = sincePublished.singleOrNull() == "epg"
-            val projection = if (epgOnly) input.epgProjection() else null
-            if (epgOnly && previous != null &&
-                projection == (previous.projection ?: previous.input.epgProjection())
-            ) {
-                return@withContext GuideMappingResult(input, previous.state, projection)
+            val metadataOnly = sincePublished.all { it == "epg" || it == "dvr" }
+            val projection = when {
+                !metadataOnly -> null
+                "epg" in sincePublished -> input.epgProjection()
+                else -> previous?.projection
+            }
+            if (metadataOnly && previous != null && previous.metadataUnchanged(input, sincePublished, projection)) {
+                return@withContext GuideMappingResult(input, previous.state, projection, previous.rows)
             }
             val counts = if ("epg" in sincePublished) {
                 context.epgChangeCounts(previous?.input?.observation, input.observation)
             } else ""
-            val state = traceArtworkMapping(context, "Guide", sincePublished.joinToString("+") + counts) {
+            val rows = GuideOverviewRows(input.viewport.toSet(), previous?.reusableRows(input))
+            val state = traceArtworkMapping(
+                context, "Guide", sincePublished.joinToString("+") + counts, rows = { rows.formattedCount },
+            ) {
                 val localized = context.createConfigurationContext(input.configuration)
                 val texts = guideTexts(
                     localized, input.configuration.locales[0], input.clock.zone, input.uses24Hour,
                 )
                 val state = guideState(
                     input.scope, input.connection, input.degraded, input.observation, input.selection, false,
-                    input.clock, texts, input.artwork, input.playingId, ::ensureActive,
+                    input.clock, texts, input.artwork, input.playingId, rows, ::ensureActive,
                 )
                 ensureActive()
                 state
             }
-            GuideMappingResult(input, state, projection)
+            GuideMappingResult(input, state, projection, rows)
         }
 
     /** Asks the server for the [coverage] window's guide unless that request is already running. */
@@ -164,6 +170,7 @@ internal class GuideMappingInput(
     val uses24Hour: Boolean,
     val artwork: ArtworkModels?,
     val playingId: String?,
+    val viewport: List<String> = emptyList(),
 ) {
     fun changesFrom(previous: GuideMappingInput?): List<String> {
         if (previous == null) return listOf("initial")
@@ -176,6 +183,7 @@ internal class GuideMappingInput(
             if (configuration != previous.configuration || uses24Hour != previous.uses24Hour) add("format")
             if (artwork !== previous.artwork) add("artwork")
             if (playingId != previous.playingId) add("playing")
+            if (viewport != previous.viewport) add("viewport")
         }
     }
 }
@@ -192,9 +200,37 @@ internal class GuideMappingResult(
     val input: GuideMappingInput,
     val state: GuideState,
     val projection: GuideEpgProjection? = null,
-)
+    val rows: GuideOverviewRows,
+) {
+    fun metadataUnchanged(
+        next: GuideMappingInput, changes: List<String>, nextProjection: GuideEpgProjection?,
+    ): Boolean = ("epg" !in changes || nextProjection == (projection ?: input.epgProjection())) &&
+            ("dvr" !in changes || dvrMarksUnchanged(next))
+
+    private fun dvrMarksUnchanged(next: GuideMappingInput): Boolean {
+        if (!rows.marksUnchanged(next)) return false
+        return state.details?.let { details ->
+            val ids = (details.otherAirings.map { it.id } + details.id).toHashSet()
+            input.observation.epgSnapshotForDisplay?.events.orEmpty().asSequence()
+                .filter { it.id.value.toString() in ids }
+                .all { event ->
+                    input.observation.overviewMarks(event, input.clock.nowSec, input.artwork) ==
+                        next.observation.overviewMarks(event, next.clock.nowSec, next.artwork)
+                }
+        } ?: true
+    }
+
+    fun reusableRows(next: GuideMappingInput): GuideOverviewRows? =
+        rows.takeIf {
+            input.scope.profileId == next.scope.profileId &&
+                input.clock == next.clock && input.configuration == next.configuration &&
+                input.uses24Hour == next.uses24Hour && input.artwork === next.artwork &&
+                input.playingId == next.playingId
+        }
+}
 
 /** The shown channels and the selected day's window a coverage request asks for. */
 internal data class GuideCoverage(val channelIds: List<ChannelId>, val startSec: Long, val throughSec: Long)
 
 private const val COVERAGE_TIMEOUT_MS = 30_000L
+private val GUIDE_STREAM_CHANGES = setOf("epg", "dvr", "viewport")

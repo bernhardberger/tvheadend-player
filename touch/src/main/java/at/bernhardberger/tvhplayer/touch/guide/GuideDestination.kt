@@ -72,7 +72,8 @@ internal fun GuideDestination(
     LaunchedEffect(coverage, observation.currentSession?.generationIdentity) { coverage?.let(guide::request) }
     val input = GuideMappingInput(
         scope, presentation.connection, presentation.degraded, observation, selection, clock,
-        Configuration(configuration), AppClock.uses24Hour, LocalArtworkModels.current, playingId,
+        Configuration(configuration), AppClock.uses24Hour, LocalArtworkModels.current,
+        playingId, guide.overviewViewport.collectAsStateWithLifecycle().value,
     )
     SideEffect { guide.map(context, input) }
     val result by guide.mapped.collectAsStateWithLifecycle()
@@ -94,8 +95,7 @@ internal fun GuideDestination(
         channelId = selection.channelId,
         dayIndex = state.dayDates.indexOf(selection.day).coerceAtLeast(0),
         actions = GuideActions(
-            onWatch = onWatch,
-            onRecord = dvr::record,
+            onWatch = onWatch, onRecord = dvr::record,
             onRecordOptions = null,
             onDetails = guide::openDetails,
             onDay = { state.dayDates.getOrNull(it)?.let(guide::selectDay) },
@@ -110,6 +110,7 @@ internal fun GuideDestination(
             onStop = dvr::stopProgram,
             onChannel = { guide.selectPage(GuideView.ByChannel, it) },
             onView = { guide.selectPage(it) },
+            onOverviewViewport = { guide.overviewViewport.value = it },
         ),
         destinations = destinations,
     )

@@ -87,6 +87,11 @@ internal class ServerGuide(val now: Instant, genres: List<ContentGenre?> = empty
     val scheduled = recording(SCHEDULED, "Late Film", first, now + 90.minutes, DvrEntryState.SCHEDULED, event = 3)
     val dvr = DvrSnapshot.create(entries = listOf(recordingNow, film, diary, scheduled))
 
+    fun withRecordingSize(bytes: Long) = listOf(
+        recording(RECORDING_NOW, "Evening News", first, now - 30.minutes, DvrEntryState.RECORDING, event = 1, size = bytes),
+        film, diary, scheduled,
+    )
+
     @OptIn(TvheadendTestingApi::class)
     fun filmWithErrors(hasFile: Boolean) = DvrEntry.create(
         film.id, channelId = first.id, start = film.start, stop = film.stop, title = film.title,
@@ -136,10 +141,11 @@ internal class ServerGuide(val now: Instant, genres: List<ContentGenre?> = empty
         image: ArtworkId? = null,
         rule: AutorecRuleId? = null,
         enabled: Boolean? = null,
+        size: Long? = null,
     ) = DvrEntry.create(
         id = DvrEntryId(id), channelId = channel.id, start = start, stop = start + 60.minutes, title = title,
         state = state, folder = folder?.let(::listOf), playCount = playCount, eventId = event?.let(::EventId),
-        image = image, autorecRuleId = rule, enabled = enabled,
+        image = image, autorecRuleId = rule, enabled = enabled, dataSizeBytes = size,
     )
 
     private companion object {

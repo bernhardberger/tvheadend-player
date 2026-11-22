@@ -527,10 +527,13 @@ class GuideScreenTest {
                 assertTrue(SystemClock.setCurrentTimeMillis(before + 5_000))
                 compose.mainClock.advanceTimeBy(5_016)
                 compose.runOnIdle { assertEquals("No remap within the same minute", 1, guideMappings()) }
-                compose.runOnIdle { connection.session.publish(guide.connected(epg = guide.refreshedEpg())) }
+                val entries = guide.withRecordingSize(512)
+                compose.runOnIdle { connection.session.publish(guide.connected(entries = entries)) }
+                compose.runOnIdle { assertEquals("Recording size does not change the Guide", 1, guideMappings()) }
+                compose.runOnIdle { connection.session.publish(guide.connected(entries, epg = guide.refreshedEpg())) }
                 compose.runOnIdle { assertEquals("No remap for an event outside the shown window", 1, guideMappings()) }
                 compose.runOnIdle {
-                    connection.session.publish(guide.connected(epg = guide.refreshedEpg("Updated News")))
+                    connection.session.publish(guide.connected(entries, epg = guide.refreshedEpg("Updated News")))
                 }
                 compose.onNodeWithText("Updated News").assertIsDisplayed()
                 compose.runOnIdle { assertEquals("One mapping for one visible publication", 2, guideMappings()) }
