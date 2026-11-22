@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -23,8 +24,18 @@ internal fun PhoneBrowseViewport(enabled: Boolean, active: Boolean, content: @Co
         return
     }
     val density = LocalDensity.current
+    val size = LocalWindowInfo.current.containerSize
     val inset = WindowInsets.safeDrawing.getBottom(density)
-    var height by rememberSaveable(LocalWindowInfo.current.containerSize, density, inset) { mutableStateOf(0f) }
+    val window = listOf<Any>(size.width, size.height, density.density, density.fontScale, inset)
+    // The inputs reset a live measurement, but Compose does not check them on restore.
+    val saver = Saver<Float, Any>(
+        save = { ArrayList(window + it) },
+        restore = { saved ->
+            val matching = (saved as? List<*>)?.takeIf { it.dropLast(1) == window }
+            (matching?.lastOrNull() as? Float) ?: 0f
+        },
+    )
+    var height by rememberSaveable(window, stateSaver = saver) { mutableStateOf(0f) }
     BoxWithConstraints {
         if (active && (height == 0f || maxHeight.value < height)) {
             SideEffect { height = maxHeight.value }

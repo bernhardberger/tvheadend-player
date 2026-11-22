@@ -7,7 +7,9 @@ import android.view.ViewGroup
 import androidx.activity.BackEventCompat
 import androidx.activity.ComponentActivity
 import androidx.activity.ComponentDialog
+import androidx.activity.compose.setContent
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshots.Snapshot
@@ -75,6 +77,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
@@ -370,16 +373,26 @@ class RecordingsScreenTest {
     fun predictiveBackPreviewsTheKeptFolderWithoutRestoringTheNavigationBarUntilCommit() {
         motionScale.scaleFactor = 0f
         state.value = foldersFixture()
-        show(initialPath = WeekPath)
+        val content = show(initialPath = WeekPath)
+        fun recreate() {
+            val scenario = compose.activityRule.scenario
+            scenario.recreate()
+            scenario.onActivity { it.setContent(content = content) }
+        }
         val list = compose.onNode(hasScrollToIndexAction())
         list.performScrollToIndex(3)
         fun position() = list.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
+        fun bottomGap() = compose.onRoot().fetchSemanticsNode().boundsInRoot.bottom -
+            list.fetchSemanticsNode().boundsInRoot.bottom
+        val gap = bottomGap()
+        val initialHeight = compose.onRoot().fetchSemanticsNode().boundsInRoot.height
         val scrolled = position()
         assertTrue(scrolled > 0f)
         val bar = compose.onNode(hasText("Recordings") and hasClickAction())
         bar.assertIsDisplayed()
 
         pickTheHalfWatchedMatch()
+        recreate()
         bar.assertDoesNotExist()
         val dispatcher = compose.activity.onBackPressedDispatcher
         compose.runOnUiThread {
@@ -395,6 +408,18 @@ class RecordingsScreenTest {
         compose.onNodeWithText("Watch from beginning").assertDoesNotExist()
         compose.onNodeWithText("Week 46").assertIsDisplayed()
         assertEquals(scrolled, position(), 0f)
+
+        pickTheHalfWatchedMatch()
+        bar.assertDoesNotExist()
+        compose.runOnIdle { RuntimeEnvironment.setQualifiers("+h760dp") }
+        recreate()
+        assertTrue(
+            "The restored window is taller",
+            compose.onRoot().fetchSemanticsNode().boundsInRoot.height > initialHeight,
+        )
+        back()
+        bar.assertIsDisplayed()
+        assertEquals("The restored list fills the space above navigation", gap, bottomGap(), 0f)
     }
 
     @Test
@@ -526,7 +551,7 @@ class RecordingsScreenTest {
         initialPath: List<String> = emptyList(),
         fontScale: Float? = null,
         taps: MutableSharedFlow<Destination>? = null,
-    ) {
+    ): @Composable () -> Unit {
         val actions = RecordingsActions(
             onView = { view ->
                 val regrouped = if (view.grouping == DvrArchiveGrouping.FOLDERS) foldersFixture() else flatFixture()
@@ -537,7 +562,7 @@ class RecordingsScreenTest {
             onMore = {},
             onStop = { stopped += it },
         )
-        compose.setContent {
+        val content: @Composable () -> Unit = {
             MaterialTheme(colorScheme = MobileDarkColors) {
                 val density = LocalDensity.current
                 CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale ?: density.fontScale)) {
@@ -560,6 +585,8 @@ class RecordingsScreenTest {
                 }
             }
         }
+        compose.setContent(content)
+        return content
     }
 
     /** Paint the shared dialog for capture only; TouchAppTest covers the Delete action and confirmation. */
