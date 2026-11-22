@@ -68,9 +68,15 @@ internal fun PhoneChannelSheet(
         SheetValue.PartiallyExpanded, setOf(SheetValue.PartiallyExpanded, SheetValue.Expanded),
     )
     var headerHeight by remember { mutableIntStateOf(0) }
+    var handleHeight by remember { mutableIntStateOf(0) }
     BoxWithConstraints(modifier.clipToBounds()) {
+        val density = LocalDensity.current
+        // The player draws edge to edge; keep the whole handle above system navigation.
+        val minimumPeek = with(density) {
+            (handleHeight + WindowInsets.navigationBars.getBottom(this)).toDp()
+        }.coerceAtMost(maxHeight)
         val peek = if (headerHeight == 0) BottomSheetDefaults.SheetPeekHeight else
-            (maxHeight - with(LocalDensity.current) { headerHeight.toDp() }).coerceAtLeast(1.dp)
+            (maxHeight - with(density) { headerHeight.toDp() }).coerceAtLeast(minimumPeek)
         BottomSheetScaffold(
             scaffoldState = rememberBottomSheetScaffoldState(sheet),
             containerColor = Color.Transparent,
@@ -79,6 +85,9 @@ internal fun PhoneChannelSheet(
             sheetContainerColor = colors.surfaceContainer,
             sheetContentColor = colors.onSurface,
             sheetShadowElevation = 0.dp,
+            sheetDragHandle = {
+                BottomSheetDefaults.DragHandle(Modifier.onSizeChanged { handleHeight = it.height })
+            },
             sheetContent = {
                 InlineChannelList(
                     state, ChannelsLayout.Phone, onChoice, onChannel, onRetry,
