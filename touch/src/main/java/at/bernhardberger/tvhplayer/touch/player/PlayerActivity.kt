@@ -110,6 +110,8 @@ class PlayerActivity : ComponentActivity() {
     private val fullScreen = PlayerFullScreen(this)
     private val requestFailed = MutableStateFlow<TuneFailure?>(null)
     private var leaving = false
+    private var stoppingToLeave = false
+    private var watchAfterStop: Intent? = null
     private val zap: (ChannelId) -> Unit = { channel ->
         if (!leaving && (requested.value as? Tune)?.channelId != channel) {
             setIntent(intent(this, channel))
@@ -140,7 +142,7 @@ class PlayerActivity : ComponentActivity() {
             },
         )
         lifecycleScope.launch {
-            runtime.sessionStops.first()
+            runtime.sessionStops.first { !leaving }
             leaving = true
             fullScreen.finishPlayer()
         }
@@ -182,8 +184,15 @@ class PlayerActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         val route = intent.playerRoute() ?: return
-        if (!::requested.isInitialized || leaving) return
-        if (route is RecordingRoute && runtime.enterPlayerScreen(this) == null) {
+        if (!::requested.isInitialized) return
+        if (leaving) {
+            if (stoppingToLeave) {
+                // A same-target Watch may only have asked to reopen this screen. It now needs
+                // to survive the earlier stop even if Browse didn't register a new tune.
+                if (route !is Tune || route.intent == null) runtime.notePlaybackIntent()
+                watchAfterStop = intent
+            }
+        } else if (route is RecordingRoute && runtime.enterPlayerScreen(this) == null) {
             leaving = true
             fullScreen.finishPlayer()
         } else if (route !is Tune || route.intent != null) {
@@ -262,12 +271,17 @@ class PlayerActivity : ComponentActivity() {
     private fun leave(browse: Boolean = false) {
         if (leaving) return
         leaving = true
+        stoppingToLeave = true
         lifecycleScope.launch {
             withContext(NonCancellable) { runtime.stop() }
-            if (browse) {
-                // A new Watch must not reach this singleTask activity or race its pending stop.
+            stoppingToLeave = false
+            val watch = watchAfterStop
+            watchAfterStop = null
+            if (browse || watch != null) {
+                // Remove the old singleTask player before handing off to another screen.
+                fullScreen.release()
                 finishAndRemoveTask()
-                packageManager.getLaunchIntentForPackage(packageName)?.let(::startActivity)
+                (watch ?: packageManager.getLaunchIntentForPackage(packageName))?.let(::startActivity)
             } else {
                 fullScreen.finishPlayer()
             }

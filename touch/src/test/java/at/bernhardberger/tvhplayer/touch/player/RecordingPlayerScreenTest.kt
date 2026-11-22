@@ -505,9 +505,17 @@ class RecordingPlayerScreenTest {
 
     @Test
     @OptIn(UnstableApi::class)
-    fun backRetiresThePlayerBeforeHandingOffToBrowse() {
+    fun backRetiresThePlayerBeforeOpeningTheLatestLiveWatch() = watchWhileBackIsStopping(recording = false)
+
+    @Test
+    @OptIn(UnstableApi::class)
+    fun backRetiresThePlayerBeforeOpeningTheLatestRecordingWatch() = watchWhileBackIsStopping(recording = true)
+
+    @OptIn(UnstableApi::class)
+    @kotlin.OptIn(FakePlaybackApi::class)
+    private fun watchWhileBackIsStopping(recording: Boolean) {
         val hold = MutableStateFlow(false)
-        withPlayerRoute(marked = true, live = false, holdSettings = hold) { activity, runtime, server, _ ->
+        withPlayerRoute(marked = true, live = false, holdSettings = hold) { activity, runtime, server, fake ->
             val player = activity.get()
             val session = org.koin.core.context.GlobalContext.get().get<TvheadendSession>()
             val selection = checkNotNull(currentRecordingPlaybackSelection(session.observation.value, server.film.id))
@@ -515,12 +523,17 @@ class RecordingPlayerScreenTest {
             val start = player.lifecycleScope.launch(start = CoroutineStart.UNDISPATCHED) {
                 runtime.playRecording(selection, recordingStart(true))
             }
+            val expected: Intent
             try {
                 player.onBackPressedDispatcher.onBackPressed()
                 settleRoute(runtime.player)
                 assertTrue(start.isActive)
+                activity.newIntent(RecordingRoute(server.film.id, recordingStart(false)).intent(player))
+                expected = if (recording) RecordingRoute(server.diary.id, recordingStart(true)).intent(player)
+                    else PlayerActivity.intent(player, server.first.id, runtime.notePlaybackIntent())
+                activity.newIntent(expected)
                 assertNull(
-                    "Browse must not receive Watch while the old player can still stop it",
+                    "The replacement must wait until the old player has stopped",
                     shadowOf(player).nextStartedActivity,
                 )
             } finally {
@@ -529,14 +542,21 @@ class RecordingPlayerScreenTest {
             }
             assertTrue("Watch must be routed away from the old player", player.isFinishing)
             assertNull(runtime.activeTarget.value)
-            assertBrowseLaunched(player)
-            Robolectric.buildActivity(MainActivity::class.java).setup().use { browse ->
-                browse.get().watchRecording(server.diary.id)
+            val launch = shadowOf(player).nextStartedActivity
+            assertEquals("Back must reopen the latest Watch, not Browse", expected.component, launch?.component)
+            checkNotNull(launch)
+            assertEquals(expected.recordingRoute(), launch.recordingRoute())
+            assertNull(shadowOf(player).nextStartedActivity)
+            if (!recording) {
+                assertEquals(expected.getLongExtra("watch_intent", -1), launch.getLongExtra("watch_intent", -1))
+                fake.scriptLivePlaybackSuccess()
+            }
+            val target = if (recording) AppPlaybackTarget.Recording(server.diary.id)
+                else AppPlaybackTarget.Live(server.first.id)
+            activity.pause().stop()
+            Robolectric.buildActivity(PlayerActivity::class.java, launch).setup().use {
                 settleRoute(runtime.player)
-                assertEquals(server.diary.id, shadowOf(browse.get()).nextStartedActivity?.recordingRoute()?.id)
-                activity.pause().stop()
-                settleRoute(runtime.player)
-                assertEquals(AppPlaybackTarget.Recording(server.diary.id), runtime.activeTarget.value)
+                assertEquals(target, runtime.activeTarget.value)
             }
         }
     }
