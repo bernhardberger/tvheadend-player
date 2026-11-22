@@ -62,14 +62,12 @@ internal fun ChannelsPageHost(
             destination = Destination.Channels,
             destinations = Destination.entries,
             layout = guideLayout(),
-            pages = pages.pages,
+            pageStack = pages,
             details = details,
             actions = GuideActions(
                 onWatch = onWatch, onRecord = dvr::record, onRecordOptions = null, onDay = {}, onJump = {}, onTag = {},
                 onCancel = dvr::cancel, onStop = dvr::stopProgram, onAiring = pages::openDetails,
             ),
-            onBack = pages::pop,
-            onReselect = pages::clear,
             onShowInGuide = null,
             channelPage = { entry, active, back -> page(entry.channelId, Modifier, false, active, back) },
         ) { top, modifier ->

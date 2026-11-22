@@ -59,25 +59,24 @@ internal fun GuideScreen(
     dayIndex: Int = state.selectedDay,
     initiallyOpen: String? = null,
     destinations: List<Destination> = Destination.entries,
-    pages: List<GuidePageKey> = emptyList(),
+    pageStack: ProgramPageStack = remember { ProgramPageStack() },
     details: Map<GuidePageKey.Details, ProgramDetails> = emptyMap(),
-    onCloseAllPages: () -> Unit = {},
     onShowInGuide: ((ProgramDetails) -> Unit)? = null,
     channelPage: @Composable (GuidePageKey.Channel, Boolean, () -> Unit) -> Unit = { _, _, _ -> },
 ) {
     val layout = guideLayout()
     ProgramPageHost(
-        Destination.Guide, destinations, layout, pages, details, actions, { actions.onDetails(null) },
-        onCloseAllPages, onShowInGuide, channelPage, modifier,
+        Destination.Guide, destinations, layout, pageStack, details, actions, onShowInGuide, channelPage, modifier,
     ) { top, frame ->
-        GuideBrowse(state, actions, layout, dayIndex, initiallyOpen, destinations, top, frame)
+        val backEnabled = top && pageStack.pages.isEmpty()
+        GuideBrowse(state, actions, layout, dayIndex, initiallyOpen, destinations, backEnabled, frame)
     }
 }
 
 @Composable
 private fun GuideBrowse(
     state: GuideState, actions: GuideActions, layout: GuideLayout,
-    dayIndex: Int, initiallyOpen: String?, destinations: List<Destination>, isTop: Boolean, modifier: Modifier,
+    dayIndex: Int, initiallyOpen: String?, destinations: List<Destination>, backEnabled: Boolean, modifier: Modifier,
 ) {
     val listed = state.listed
     val (openId, onOpen) = rememberOpenedGuideRow(state, dayIndex, initiallyOpen)
@@ -98,7 +97,7 @@ private fun GuideBrowse(
             GuideStandIn(state.availability, layout, actions)
             return@TouchFrame
         }
-        BackHandler(enabled = LocalDestinationBackEnabled.current && isTop && openId != null) { onOpen(null) }
+        BackHandler(enabled = LocalDestinationBackEnabled.current && backEnabled && openId != null) { onOpen(null) }
         GuideList(state, layout, actions) {
             Overview(state, layout, openId, onOpen, actions, actions.onDetails, actions.onChannel)
         }

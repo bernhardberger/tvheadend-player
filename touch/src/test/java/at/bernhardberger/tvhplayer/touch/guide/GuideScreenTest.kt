@@ -53,12 +53,15 @@ import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.compose.runtime.CompositionLocalProvider
+import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.EpgRepository
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.EpgSnapshot
 import at.bernhardberger.tvheadend.sdk.core.EventId
+import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi
 import at.bernhardberger.tvhplayer.touch.R
@@ -93,6 +96,7 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import android.content.res.Configuration
 import at.bernhardberger.tvhplayer.ui.common.AppClock
+import at.bernhardberger.tvhplayer.core.BrowseContextAction
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import kotlin.coroutines.EmptyCoroutineContext
@@ -185,7 +189,7 @@ class GuideScreenTest {
         compose.runOnIdle { state.value = fixture.withoutLogo("ridge-earth") }
         back()
 
-        compose.onNode(head).performClick()
+        compose.onNode(head).performSemanticsAction(SemanticsActions.OnClick) { click -> click(); click() }
         compose.onNodeWithContentDescription(compose.activity.getString(R.string.recordings_back)).assertIsDisplayed()
         compose.onNodeWithText("Today").assertIsSelected()
         compose.onNodeWithText("Ridge Earth").assertIsDisplayed()
@@ -196,6 +200,8 @@ class GuideScreenTest {
             listOf(guideStart, guideStart, guideStart), listOf(onNow.left, tab.left, rowBounds.left),
         )
         capture("tablet-channel-page-in-guide", TouchCanvas.TABLET)
+        back()
+        compose.onNode(head).assertIsDisplayed()
     }
 
     @Test
@@ -348,13 +354,23 @@ class GuideScreenTest {
     }
 
     @Test
-    @Config(qualifiers = PHONE)
+    @Config(qualifiers = PHONE, instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.common.TimeConverterKt"])
     fun channelWithoutGuideDataShowsTheEmptyState() {
-        val channel = byChannelFixture().channels.first { it.id == "glass-drama" }
-        showChannelFixture(channelPageFixture(channel, compose.activity), inPane = false)
-        compose.onNodeWithText("No schedule").assertIsDisplayed()
-        compose.onNodeWithText("Watch").assertDoesNotExist()
-        capture("phone-channel-page-empty", TouchCanvas.PHONE)
+        val server = ServerGuide(Instant.fromEpochMilliseconds(System.currentTimeMillis()))
+        val calls = mutableListOf<Triple<String, BrowseContextAction, String?>>()
+        val connection = FakeConnection()
+        try {
+            connection.session.publish(server.connected())
+            showChannelDestination(connection, server.second.id, onWatch = { id, action, recording ->
+                calls += Triple(id, action, recording)
+            })
+            compose.onNodeWithText("No schedule").assertIsDisplayed()
+            capture("phone-channel-page-empty", TouchCanvas.PHONE)
+            compose.onNodeWithContentDescription(compose.activity.getString(SharedR.string.context_watch)).performClick()
+            assertEquals(listOf(Triple(server.second.id.value.toString(), BrowseContextAction.WATCH, null)), calls)
+        } finally {
+            connection.close()
+        }
     }
 
     @Test
@@ -370,7 +386,6 @@ class GuideScreenTest {
         back()
         compose.onNodeWithContentDescription("Back").assertDoesNotExist()
         compose.onAllNodes(hasText("Other airings of Glass Harbor")).assertCountEquals(0)
-        assertEquals("System Back clears the producer's Details selection", listOf(GLASS_HARBOR_ID, null), details)
     }
 
     @Test
@@ -562,7 +577,6 @@ class GuideScreenTest {
 
         compose.onNodeWithContentDescription("Back").performClick()
         compose.onNodeWithContentDescription("Back").assertDoesNotExist()
-        assertEquals("The page's Back button clears Details too", listOf<String?>(null), details)
     }
 
     @Test
@@ -586,7 +600,7 @@ class GuideScreenTest {
         list.performScrollToIndex(channel.programs.lastIndex - 1)
         fun position() = list.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
         val scrolled = position()
-        compose.onNodeWithText(program.title).performSemanticsAction(SemanticsActions.OnClick)
+        compose.onNodeWithText(program.title).performSemanticsAction(SemanticsActions.OnClick) { click -> click(); click() }
         fun openAiring() {
             compose.onNodeWithText(airing.time).performScrollTo().performClick()
             compose.onNodeWithText(second.title).assertIsDisplayed()
@@ -675,6 +689,132 @@ class GuideScreenTest {
     }
 
     @Test
+    @Config(qualifiers = TABLET, instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.common.TimeConverterKt"])
+    fun guidePrunesAMissingChannelAndItsLaterPagesOnlyWithACurrentCatalogInItsSession() {
+        motionScale.scaleFactor = 0f
+        val connection = FakeConnection()
+        val now = Instant.parse("2027-01-15T12:00:00Z")
+        val server = ServerGuide(now)
+        val reduced = ChannelCatalog.create(listOf(server.first), listOf(server.news))
+        fun withCatalog(observation: SessionObservation, state: ChannelRepositoryState) = SessionObservation.create(
+            sessionState = observation.sessionState, channelState = state, epgState = observation.epgState,
+            dvrState = observation.dvrState,
+        )
+        try {
+            assertTrue(SystemClock.setCurrentTimeMillis(now.toEpochMilliseconds()))
+            connection.session.publish(server.connected())
+            val channelObservation = MutableStateFlow(connection.session.observation.value)
+            val channelSession = object : TvheadendSession by connection.session {
+                override val observation = channelObservation
+            }
+            val channels = ChannelsViewModel(channelSession, connection.channelTagSettings(), connection.owner.liveProfile)
+            val guide = showDestination(connection, channels = channels) {}
+            val head = compose.onNodeWithContentDescription("Open ${server.second.name}")
+            val pageBack = compose.onNodeWithContentDescription("Back")
+            head.performClick()
+            pageBack.assertIsDisplayed()
+            compose.runOnIdle { channels.selectTag(server.news.id) }
+            pageBack.assertIsDisplayed()
+            compose.runOnIdle {
+                connection.session.publish(withCatalog(server.connected(), ChannelRepositoryState.Stale(reduced)))
+                channelObservation.value = connection.session.observation.value
+            }
+            pageBack.assertIsDisplayed()
+
+            compose.runOnIdle {
+                // Let the Guide move on before its independently collected scope catches up.
+                connection.session.publish(withCatalog(server.connected(), ChannelRepositoryState.Current(reduced)))
+                channelObservation.value = connection.session.observation.value
+                connection.session.replaceGeneration(server.connected())
+            }
+            pageBack.assertIsDisplayed()
+            compose.runOnIdle {
+                channelObservation.value = connection.session.observation.value
+                guide.pageStack.openDetails(server.snapshot.events.first().id.value.toString())
+            }
+            compose.onNodeWithText("About Evening News").assertExists()
+            compose.runOnIdle {
+                connection.session.publish(withCatalog(server.connected(), ChannelRepositoryState.Current(reduced)))
+                channelObservation.value = connection.session.observation.value
+            }
+            pageBack.assertDoesNotExist()
+        } finally {
+            connection.close()
+        }
+    }
+
+    @Test
+    @Config(qualifiers = PHONE, instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.common.TimeConverterKt"])
+    fun backCancelsAnUnmappedDetailsVisitWithoutFoldingTheOverview() {
+        assertPendingOverviewDetailsAreCancelled { back() }
+    }
+
+    @Test
+    @Config(qualifiers = PHONE, instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.common.TimeConverterKt"])
+    fun reselectingGuideCancelsAnUnmappedDetailsVisit() {
+        assertPendingOverviewDetailsAreCancelled {
+            compose.onNode(hasText("Guide") and hasClickAction()).performClick()
+        }
+    }
+
+    private fun assertPendingOverviewDetailsAreCancelled(cancel: () -> Unit) {
+        motionScale.scaleFactor = 0f
+        val now = Instant.parse("2027-01-15T12:00:00Z")
+        val worker = StandardTestDispatcher()
+        val connection = FakeConnection()
+        try {
+            assertTrue(SystemClock.setCurrentTimeMillis(now.toEpochMilliseconds()))
+            connection.session.publish(ServerGuide(now).connected())
+            showDestination(connection, mappingDispatcher = worker, destinations = Destination.entries) {}
+            compose.waitForIdle()
+            worker.scheduler.runCurrent()
+            compose.onNodeWithText("Evening News").performClick()
+            val detailsButton = compose.onNodeWithText("Details")
+            val pageBack = compose.onNodeWithContentDescription("Back")
+            detailsButton.performScrollTo().performClick()
+            pageBack.assertDoesNotExist()
+            cancel()
+            compose.waitForIdle()
+            worker.scheduler.runCurrent()
+            pageBack.assertDoesNotExist()
+            detailsButton.assertIsDisplayed()
+        } finally {
+            connection.close()
+        }
+    }
+
+    @Test
+    @Config(qualifiers = TABLET, instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.common.TimeConverterKt"])
+    fun backClosesTheVisibleChannelAndCancelsItsUnmappedDetailsVisit() {
+        motionScale.scaleFactor = 0f
+        val now = Instant.parse("2027-01-15T12:00:00Z")
+        val worker = StandardTestDispatcher()
+        val connection = FakeConnection()
+        try {
+            assertTrue(SystemClock.setCurrentTimeMillis(now.toEpochMilliseconds()))
+            connection.session.publish(ServerGuide(now).connected())
+            showDestination(connection, mappingDispatcher = worker) {}
+            compose.waitForIdle()
+            worker.scheduler.runCurrent()
+            val head = compose.onNodeWithContentDescription("Open Channel One")
+            head.performClick()
+            compose.waitForIdle()
+            worker.scheduler.runCurrent()
+            val onNow = compose.onNodeWithText("On now")
+            onNow.assertIsDisplayed()
+            compose.onNodeWithText("Details").performClick()
+            onNow.assertIsDisplayed()
+            back()
+            head.assertIsDisplayed()
+            compose.waitForIdle()
+            worker.scheduler.runCurrent()
+            head.assertIsDisplayed()
+        } finally {
+            connection.close()
+        }
+    }
+
+    @Test
     @Config(qualifiers = PHONE, instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.common.TimeConverterKt"])
     fun aMissingProgramClosesDetailsWithoutReopeningOnASubsequentPublication() {
         motionScale.scaleFactor = 0f
@@ -705,6 +845,18 @@ class GuideScreenTest {
             nextAiring.performScrollTo().performClick()
             val secondPageChannel = compose.onNode(hasText("Channel Two") and !hasClickAction())
             secondPageChannel.assertExists()
+            compose.onNodeWithText(compose.activity.getString(R.string.channels_show_in_guide))
+                .performScrollTo().performClick()
+            val programRow = compose.onNode(hasText("Evening News") and hasClickAction())
+            programRow.performClick()
+            compose.onNode(hasText("Channel One") and hasClickAction()).assertExists()
+            compose.runOnIdle { connection.session.publish(server.connected()) }
+            compose.onNodeWithText("No schedule").assertIsDisplayed()
+            compose.runOnIdle {
+                connection.session.publish(server.connected(epg = EpgSnapshot.create(server.snapshot.events + replacement)))
+            }
+            programRow.assertIsDisplayed()
+            back()
             compose.runOnIdle { connection.session.publish(server.connected()) }
             compose.onNodeWithText("About Evening News").assertExists()
             compose.onNodeWithContentDescription("Back").assertIsDisplayed()
@@ -1137,10 +1289,11 @@ class GuideScreenTest {
             Robolectric.buildActivity(ComponentActivity::class.java).create(savedState).use { restored ->
                 val guide = ViewModelProvider.create(restored.get(), factory)[GuideViewModel::class]
                 assertEquals(
-                    "A fresh Guide restores the day, but not the jump or page stack",
+                    "A fresh Guide restores the day, but not the jump",
                     kept,
                     guide.selection.value,
                 )
+                assertTrue("A fresh Guide does not restore its page stack", guide.pageStack.pages.isEmpty())
                 connection.session.publish(firstSnapshot)
                 val channels = connection.channels()
                 val presentation = connection.presentation()
@@ -1421,6 +1574,7 @@ class GuideScreenTest {
         mappingDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate,
         lifecycleOwner: LifecycleOwner? = null,
         channels: ChannelsViewModel = connection.channels(),
+        destinations: List<Destination> = listOf(Destination.Guide),
         onCoverage: suspend (Instant) -> Unit,
     ): GuideViewModel {
         val session = connection.withCoverage(onCoverage)
@@ -1432,9 +1586,10 @@ class GuideScreenTest {
             MaterialTheme(colorScheme = TouchDarkColors) {
                 val dvr = viewModel { DvrControls(session, connection.noticeCenter) }
                 CompositionLocalProvider(LocalLifecycleOwner provides (lifecycleOwner ?: LocalLifecycleOwner.current)) {
-                    if (shown()) DestinationFrame(initialDestination = Destination.Guide) {
+                    if (shown()) DestinationFrame(initialDestination = Destination.Guide) { destination ->
+                        if (destination != Destination.Guide) return@DestinationFrame
                         GuideDestination(
-                            guide, channels, presentation, listOf(Destination.Guide), playingId = null, onWatch = null,
+                            guide, channels, presentation, destinations, playingId = null, onWatch = null,
                             dvr = dvr, onOpenConnections = {}, onSignIn = {},
                         )
                     }
@@ -1471,14 +1626,12 @@ class GuideScreenTest {
         channelFixture: ChannelPageState? = null,
         over: @Composable () -> Unit = {},
     ) {
-        var visit = 0L
-        var stack by mutableStateOf(listOfNotNull(
-            channel?.let { GuidePageKey.Channel(it, null, null, visit++) },
-            detailsId?.let { GuidePageKey.Details(it, visit++) },
-        ))
+        val stack = ProgramPageStack()
+        channel?.let { stack.openChannel(it) }
+        detailsId?.let(stack::openDetails)
         val openDetails: (String?) -> Unit = {
             details += it
-            stack = if (it == null) stack.dropLast(1) else stack + GuidePageKey.Details(it, visit++)
+            it?.let(stack::openDetails)
         }
         var selectedDay by mutableStateOf<Int?>(null)
         val pageActions = channelPageActions()
@@ -1497,7 +1650,7 @@ class GuideScreenTest {
             onCancel = { cancelled += it },
             onStop = { stopped += it },
             onOverviewViewport = onOverviewViewport,
-            onChannel = { stack = stack + GuidePageKey.Channel(it, null, null, visit++) },
+            onChannel = { stack.openChannel(it) },
         )
         compose.setContent {
             MaterialTheme(colorScheme = TouchDarkColors) {
@@ -1507,10 +1660,10 @@ class GuideScreenTest {
                     val screen: @Composable () -> Unit = {
                         GuideScreen(
                             current.copy(selectedDay = selectedDay ?: current.selectedDay), actions,
-                            details = stack.filterIsInstance<GuidePageKey.Details>().mapNotNull { key ->
+                            details = stack.pages.filterIsInstance<GuidePageKey.Details>().mapNotNull { key ->
                                 pages.firstOrNull { it.id == key.programId }?.let { key to it }
                             }.toMap(),
-                            initiallyOpen = open, pages = stack, onCloseAllPages = { stack = emptyList() },
+                            initiallyOpen = open, pageStack = stack,
                             channelPage = { entry, _, back ->
                                 val page = channelFixture ?: channelPageFixture(
                                     byChannelFixture().channels.first { it.id == entry.channelId }, LocalContext.current,
@@ -1560,6 +1713,7 @@ class GuideScreenTest {
         channels: ChannelsViewModel = connection.channels(),
         lifecycleOwner: LifecycleOwner? = null,
         active: () -> Boolean = { true },
+        onWatch: ((String, BrowseContextAction, String?) -> Unit)? = null,
         onCoverage: suspend (Instant) -> Unit = {},
     ) {
         val session = connection.withCoverage(onCoverage)
@@ -1570,6 +1724,7 @@ class GuideScreenTest {
                         session, channels, id.value.toString(), {}, { details += it }, {}, {}, {},
                         initialDay = initialDay, active = active(),
                         mappingDispatcher = mappingDispatcher, acquisitionContext = EmptyCoroutineContext,
+                        onWatch = onWatch,
                     )
                 }
             }
