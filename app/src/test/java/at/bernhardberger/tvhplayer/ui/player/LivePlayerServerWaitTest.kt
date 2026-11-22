@@ -68,6 +68,7 @@ import at.bernhardberger.tvheadend.sdk.core.ServerProfile
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition
 import at.bernhardberger.tvheadend.sdk.core.SessionState
+import at.bernhardberger.tvheadend.sdk.media3.LivePlaybackObservation
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult
 import at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendPlaybackCoordinator
@@ -107,6 +108,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -264,17 +266,14 @@ class LivePlayerServerWaitTest {
             compose.settleFrames(4)
             runTest(dispatcher) {
                 connection.emit(SubscriptionEvent.Status(SubscriptionCondition.STATUS_REPORTED, SubscriptionIssue.NO_FREE_ADAPTER))
+                awaitPublishedIssue(SubscriptionIssue.NO_FREE_ADAPTER)
             }
-            compose.settleFrames(10)
-            dispatcher.scheduler.runCurrent()
-            compose.settleFrames(4)
-            assertEquals("the SDK published the issue", SubscriptionIssue.NO_FREE_ADAPTER,
-                (runtime.livePlaybackObservation.value as? at.bernhardberger.tvheadend.sdk.media3.LivePlaybackObservation.Active)
-                    ?.subscriptionIssue)
+            compose.settleFrames(14)
             assertEquals("a server issue is not masked by Starting", 0, waits())
             compose.onNodeWithTag("player-channel-unavailable", useUnmergedTree = true).assertExists()
             runTest(dispatcher) {
                 connection.emit(SubscriptionEvent.Status(SubscriptionCondition.NO_DETAIL, null))
+                awaitPublishedIssue(null)
             }
             compose.settleFrames(4)
             assertEquals("a cleared issue returns to the pending picture", 1, waits())
@@ -595,6 +594,11 @@ class LivePlayerServerWaitTest {
         compose.settleFrames(4)
         compose.onNodeWithTag("tv-recovery-primary").assertIsFocused()
         assertEquals(0, waits())
+    }
+
+    /** The SDK reads subscription events on its own worker, so the published issue is the signal. */
+    private suspend fun awaitPublishedIssue(issue: SubscriptionIssue?) {
+        runtime.livePlaybackObservation.first { it is LivePlaybackObservation.Active && it.subscriptionIssue == issue }
     }
 
     private fun screen(
