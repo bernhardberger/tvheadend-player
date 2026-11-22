@@ -570,7 +570,7 @@ class GuideScreenTest {
         val taps = MutableSharedFlow<Destination>(extraBufferCapacity = 1)
         val fixture = byChannelFixture(phone = true)
         val channel = fixture.channels.first()
-        val program = channel.programs[4]
+        val program = channel.programs.last()
         val first = glassHarborDetails().copy(id = program.id)
         val airing = first.otherAirings.first()
         val returnAiring = airing.copy(id = first.id, time = "Today 8:00 PM")
@@ -582,12 +582,14 @@ class GuideScreenTest {
         val list = compose.onNode(
             hasScrollToIndexAction() and SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange),
         )
-        list.performScrollToIndex(4)
+        list.performScrollToIndex(channel.programs.lastIndex)
         fun position() = list.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
-        compose.onNodeWithText(program.title).performClick()
+        compose.onNodeWithText(program.title).performSemanticsAction(SemanticsActions.OnClick)
+        val detailsButton = compose.onNodeWithText("Details")
+        detailsButton.performScrollTo()
         val scrolled = position()
         assertTrue(scrolled > 0f)
-        compose.onNodeWithText("Details").performClick()
+        detailsButton.performSemanticsAction(SemanticsActions.OnClick)
         fun openAiring() {
             compose.onNodeWithText(airing.time).performScrollTo().performClick()
             compose.onNodeWithText(second.title).assertIsDisplayed()
@@ -597,9 +599,10 @@ class GuideScreenTest {
         compose.onNodeWithText(first.title).assertExists()
         back()
         compose.onNodeWithText("By channel").assertIsSelected()
-        compose.onNodeWithText("Details").assertExists()
-        assertEquals(scrolled, position(), 0f)
-        compose.onNodeWithText("Details").performClick()
+        val afterBack = position()
+        detailsButton.performScrollTo()
+        val beforeReselect = position()
+        detailsButton.performSemanticsAction(SemanticsActions.OnClick)
         openAiring()
         compose.onNodeWithText(returnAiring.time).performScrollTo().performClick()
         compose.onNodeWithText(first.title).assertExists()
@@ -607,9 +610,11 @@ class GuideScreenTest {
         compose.onNodeWithText(second.title).assertIsDisplayed()
         compose.runOnIdle { check(taps.tryEmit(Destination.Guide)) }
         compose.onNodeWithText("By channel").assertIsSelected()
-        assertEquals(scrolled, position(), 0f)
+        val afterReselect = position()
         compose.runOnIdle { check(taps.tryEmit(Destination.Guide)) }
         assertEquals(0f, position(), 0f)
+        assertEquals("Scroll after ordinary Back and after reselecting Guide",
+            listOf(scrolled, beforeReselect), listOf(afterBack, afterReselect))
     }
 
     @Test
@@ -675,12 +680,24 @@ class GuideScreenTest {
     }
 
     @Test
-    @Config(qualifiers = PHONE)
+    @Config(qualifiers = "en-rUS-w412dp-h558dp-port-xhdpi")
     fun predictiveBackPreviewsTheGuideWithoutReportingItsNavigationBar() {
         motionScale.scaleFactor = 0f
-        show(overviewFixture(), detailsId = GLASS_HARBOR_ID, inShell = true)
+        val fixture = phoneOverviewFixture()
+        val program = fixture.channels.last().programs.first()
+        val page = glassHarborDetails().copy(id = program.id, title = program.title)
+        show(fixture.copy(details = mapOf(GuidePageKey.Details(page.id, 0) to page)), inShell = true)
         val dispatcher = compose.activity.onBackPressedDispatcher
         val bar = compose.onNode(hasText("Guide") and hasClickAction())
+        val list = compose.onNode(hasScrollToIndexAction())
+        list.performScrollToIndex(fixture.channels.lastIndex)
+        compose.onNodeWithText(program.title).performSemanticsAction(SemanticsActions.OnClick)
+        val detailsButton = compose.onNodeWithText("Details")
+        detailsButton.performScrollTo()
+        fun position() = list.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
+        val scrolled = position()
+        assertTrue(scrolled > 0f)
+        detailsButton.performSemanticsAction(SemanticsActions.OnClick)
         bar.assertDoesNotExist()
         compose.runOnUiThread {
             dispatcher.dispatchOnBackStarted(BackEventCompat(0f, 0f, 0f, BackEventCompat.EDGE_LEFT))
@@ -688,8 +705,10 @@ class GuideScreenTest {
         }
         compose.onNodeWithText("Overview").assertExists()
         bar.assertDoesNotExist()
+        assertEquals("Scroll during predictive preview", scrolled, position(), 0f)
         back()
         bar.assertIsDisplayed()
+        assertEquals(scrolled, position(), 0f)
     }
 
     @Test

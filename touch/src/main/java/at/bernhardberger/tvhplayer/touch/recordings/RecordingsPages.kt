@@ -1,22 +1,14 @@
 package at.bernhardberger.tvhplayer.touch.recordings
 
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.rememberDecoratedNavEntries
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
@@ -27,6 +19,7 @@ import androidx.navigationevent.compose.NavigationBackHandler
 import at.bernhardberger.tvhplayer.touch.ui.Destination
 import at.bernhardberger.tvhplayer.touch.ui.LocalDestinationBackEnabled
 import at.bernhardberger.tvhplayer.touch.ui.OnDestinationReselected
+import at.bernhardberger.tvhplayer.touch.ui.PhoneBrowseViewport
 import at.bernhardberger.tvhplayer.touch.ui.ReportFrameBarsWhen
 import at.bernhardberger.tvhplayer.touch.ui.TouchFrame
 import at.bernhardberger.tvhplayer.touch.ui.pageMove
@@ -88,22 +81,4 @@ internal fun RecordingsPages(
         transitionSpec = { forward }, popTransitionSpec = { backward },
     )
     NavigationBackHandler(navigation, isBackEnabled = canHandleBack && pageItem != null, onBackCompleted = onClose)
-}
-
-/** Keep the phone list from growing and clamping its scroll while the shell hides its navigation bar. */
-@Composable
-private fun PhoneBrowseViewport(enabled: Boolean, active: Boolean, content: @Composable (Modifier) -> Unit) {
-    if (!enabled) {
-        content(Modifier)
-        return
-    }
-    val density = LocalDensity.current
-    val inset = WindowInsets.safeDrawing.getBottom(density)
-    var height by rememberSaveable(LocalWindowInfo.current.containerSize, density, inset) { mutableStateOf(0f) }
-    BoxWithConstraints {
-        if (active && (height == 0f || maxHeight.value < height)) {
-            SideEffect { height = maxHeight.value }
-        }
-        content(Modifier.heightIn(max = if (height > 0f) height.dp else maxHeight))
-    }
 }

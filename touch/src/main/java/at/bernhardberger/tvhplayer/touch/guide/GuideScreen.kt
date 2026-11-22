@@ -74,6 +74,7 @@ import at.bernhardberger.tvhplayer.touch.ui.ListMessage
 import at.bernhardberger.tvhplayer.touch.ui.LocalBrowseMargin
 import at.bernhardberger.tvhplayer.touch.ui.MessageKind
 import at.bernhardberger.tvhplayer.touch.ui.OnDestinationReselected
+import at.bernhardberger.tvhplayer.touch.ui.PhoneBrowseViewport
 import at.bernhardberger.tvhplayer.touch.ui.ReportFrameBarsWhen
 import at.bernhardberger.tvhplayer.touch.ui.ScrollToStartOnReselect
 import at.bernhardberger.tvhplayer.touch.ui.TouchFrame
@@ -112,8 +113,16 @@ internal fun GuideScreen(
         val isTop = key == backStack.last()
         ReportFrameBarsWhen(isTop) {
             when (key) {
-                GuidePageKey.Browse -> GuidePageReselection(isTop && canHandleBack) {
-                    GuideBrowse(state, actions, layout, view, channelId, dayIndex, initiallyOpen, destinations, isTop)
+                GuidePageKey.Browse -> {
+                    val active = isTop && canHandleBack
+                    GuidePageReselection(active) {
+                        PhoneBrowseViewport(layout.compact && destinations.size > 1, active) { frame ->
+                            GuideBrowse(
+                                state, actions, layout, view, channelId, dayIndex,
+                                initiallyOpen, destinations, isTop, frame,
+                            )
+                        }
+                    }
                 }
                 is GuidePageKey.Details -> {
                     var last by remember { mutableStateOf(checkNotNull(initial)) }
@@ -151,13 +160,14 @@ internal fun GuideScreen(
 @Composable
 private fun GuideBrowse(
     state: GuideState, actions: GuideActions, layout: GuideLayout, view: GuideView, channelId: String?,
-    dayIndex: Int, initiallyOpen: String?, destinations: List<Destination>, isTop: Boolean,
+    dayIndex: Int, initiallyOpen: String?, destinations: List<Destination>, isTop: Boolean, modifier: Modifier,
 ) {
     val listed = state.listed
     val channel = state.channels.firstOrNull { it.id == channelId } ?: state.channels.firstOrNull()
     val (openId, onOpen) = rememberOpenedGuideRow(state, view, channel, dayIndex, initiallyOpen)
 
     TouchFrame(
+        modifier = modifier,
         initialDestination = Destination.Guide,
         destinations = destinations,
         actions = { destination -> if (destination == Destination.Guide && listed) TagFilter(state, actions) },
