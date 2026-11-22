@@ -79,30 +79,41 @@ class HomeActionsTest {
     }
 
     @Test fun recentChannelsEndCardCaptionMatchesTheTileNames() {
-        val input = homeInput(listOf(channel), now, recentChannelIds = listOf(channel.id))
+        val second = Channel.create(ChannelId(2), name = "Second")
+        val event = EpgEvent.create(EventId(1), channel.id, Instant.fromEpochSeconds(now - 60),
+            Instant.fromEpochSeconds(now + 60), title = "The coast road")
+        var input by mutableStateOf(homeInput(listOf(channel, second), now,
+            currentEvents = mapOf(channel.id to event), recentChannelIds = listOf(channel.id, second.id),
+            hiddenSections = setOf(HomeSectionKind.ON_NOW)))
         compose.setContent { TVHeadendPlayerTheme {
             homeScreen(input)
         } }
-        compose.onNodeWithTag("home-recent-0").assertIsFocused()
-        fun caption(text: String): Triple<androidx.compose.ui.text.TextLayoutInput, Float, Float> {
-            val node = compose.onNode(hasText(text) and hasAnyAncestor(hasTestTag("home-section-RECENT_CHANNELS")),
+        val tile = compose.onNodeWithTag("home-recent-0").assertIsFocused()
+        val row = compose.onNodeWithTag("home-section-RECENT_CHANNELS")
+        fun caption(text: String) =
+            compose.onNode(hasText(text) and hasAnyAncestor(hasTestTag("home-section-RECENT_CHANNELS")),
                 useUnmergedTree = true)
+        fun leadingEdge(node: SemanticsNodeInteraction): Float {
             val results = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
             node.fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult]
                 .action?.invoke(results)
-            val bounds = node.getUnclippedBoundsInRoot()
-            return Triple(results.single().layoutInput, (bounds.bottom - bounds.top).value, bounds.top.value)
+            assertFalse(results.single().hasVisualOverflow)
+            return results.single().getLineLeft(0)
         }
-        val tile = caption("Test channel")
+        val title = caption("Test channel")
+        caption("The coast road").assertIsDisplayed()
+        assertEquals(listOf("Test channel, The coast road"),
+            tile.fetchSemanticsNode().config[SemanticsProperties.ContentDescription])
         val end = caption("All channels")
-        assertEquals(tile.first.style.fontSize, end.first.style.fontSize)
-        assertEquals(tile.first.style.fontWeight, end.first.style.fontWeight)
-        assertEquals(tile.first.style.lineHeight, end.first.style.lineHeight)
-        assertEquals(tile.first.style.letterSpacing, end.first.style.letterSpacing)
-        assertEquals(androidx.compose.ui.text.style.TextAlign.Center, end.first.style.textAlign)
-        assertEquals(2, end.first.maxLines)
-        assertEquals(tile.second, end.second, 0.5f)
-        assertEquals("captions start at the same line under equal pictures", tile.third, end.third, 0.5f)
+        assertEquals(0f, leadingEdge(title), 0.5f)
+        assertEquals(0f, leadingEdge(end), 0.5f)
+        assertEquals(title.getUnclippedBoundsInRoot().top, end.getUnclippedBoundsInRoot().top)
+        val height = row.getUnclippedBoundsInRoot().let { it.bottom - it.top }
+        compose.runOnIdle { input = input.copy(nowSec = now + 60) }
+        caption("The coast road").assertDoesNotExist()
+        tile.assertIsFocused()
+        assertEquals(listOf("Test channel"), tile.fetchSemanticsNode().config[SemanticsProperties.ContentDescription])
+        assertEquals(height, row.getUnclippedBoundsInRoot().let { it.bottom - it.top })
     }
 
     @Test fun rowReentryRestoresItemIdentityAfterAnEarlierItemLeaves() = recentRowRefresh(false)

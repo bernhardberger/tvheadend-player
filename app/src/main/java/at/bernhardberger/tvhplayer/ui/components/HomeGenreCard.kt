@@ -29,6 +29,7 @@ import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.core.ProgrammeCategory
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.TvTextColors
+import at.bernhardberger.tvhplayer.ui.TvTextSecondaryAlpha
 import at.bernhardberger.tvhplayer.ui.common.programmeCategoryLabel
 import at.bernhardberger.tvhplayer.ui.tvGenreColors
 
@@ -69,6 +70,7 @@ internal fun HomeTextCard(
     middleLine: String? = null,
     subtitleStyle: TextStyle = MaterialTheme.typography.labelSmall,
     subtitleColor: Color = TvTextColors.secondary,
+    lineSpacing: Dp = 0.dp,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val ring = rememberCardFocusRing(interaction)
@@ -98,7 +100,7 @@ internal fun HomeTextCard(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             leading?.invoke()
-            Column(Modifier.mutedTextPastRowStart()) {
+            Column(Modifier.mutedTextPastRowStart(), verticalArrangement = Arrangement.spacedBy(lineSpacing)) {
                 Text(
                     title,
                     style = MaterialTheme.typography.titleMedium,
@@ -107,7 +109,8 @@ internal fun HomeTextCard(
                     overflow = TextOverflow.Ellipsis,
                 )
                 if (middleLine != null) Text(middleLine, style = MaterialTheme.typography.bodySmall,
-                    color = TvTextColors.secondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = TvTextSecondaryAlpha),
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (subtitle != null) Text(subtitle, style = subtitleStyle,
                     color = subtitleColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }

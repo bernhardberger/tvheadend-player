@@ -84,6 +84,11 @@ empty heading or placeholder:
 - The channel that is currently playing is left out; it is on the current
   activity card.
 - No favourites dependency; the app has no favourites feature.
+- Below each tile, one line shows the channel number and name, and a quieter
+  line shows the current program. Both start at the tile's left edge and
+  truncate if needed. If no program is airing, its line stays blank without
+  changing the row height. **All channels** shows only its name, aligned with
+  the channel names.
 - No progress bars on these tiles.
 - No separate description panel or blank details area for this row.
 - Labels and focus effects stay visible without overlapping the next section.

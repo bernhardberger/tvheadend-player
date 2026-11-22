@@ -143,9 +143,12 @@ import at.bernhardberger.tvhplayer.ui.components.rememberBrowseContextMenuTrigge
 import at.bernhardberger.tvhplayer.ui.components.HomeActivityCard
 import at.bernhardberger.tvhplayer.ui.components.HomeAllRecordingsCard
 import at.bernhardberger.tvhplayer.ui.components.HomeCardWidth
+import at.bernhardberger.tvhplayer.ui.components.HomeCaptionLineGap
 import at.bernhardberger.tvhplayer.ui.components.HomeGenreCard
 import at.bernhardberger.tvhplayer.ui.components.HomeGenreCardHeight
 import at.bernhardberger.tvhplayer.ui.components.HomeRecentChannelTile
+import at.bernhardberger.tvhplayer.ui.components.HomeQuietCaptionColor
+import at.bernhardberger.tvhplayer.ui.components.HomeRecentTileSize
 import at.bernhardberger.tvhplayer.ui.components.HomeTextCard
 import at.bernhardberger.tvhplayer.ui.components.LocalBrowseDrawerState
 import at.bernhardberger.tvhplayer.ui.components.LocalBrowseNavigationFocus
@@ -1204,6 +1207,7 @@ private fun HomeRecentRow(
         } else {
             HomeRecentChannelTile(
                 channel = item.channel,
+                programTitle = item.event?.title,
                 width = width,
                 nameShown = textShown,
                 channelRecording = item.channel.id in recordingChannelIds,
@@ -1531,7 +1535,7 @@ private fun HomeShelfRow(
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
-                            val lineModifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+                            val lineModifier = Modifier.fillMaxWidth().padding(top = HomeCaptionLineGap)
                             val lineStyle = MaterialTheme.typography.bodySmall
                             if (episodeLine != null) {
                                 Text(
@@ -1542,7 +1546,7 @@ private fun HomeShelfRow(
                             }
                             Text(
                                 subtitle, lineModifier, style = lineStyle,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                color = HomeQuietCaptionColor,
                                 maxLines = 1, overflow = TextOverflow.Ellipsis,
                             )
                             if (reserveEpisodeLine && episodeLine == null) {
@@ -1642,6 +1646,7 @@ private fun HomeUpcomingRow(
                 subtitle = listOf(whenText, next.channelName.orEmpty()).filter(String::isNotBlank).joinToString(" • "),
                 subtitleStyle = MaterialTheme.typography.bodySmall,
                 subtitleColor = TvTextColors.tertiary,
+                lineSpacing = 2.dp,
                 modifier = modifier.width(220.dp).testTag("home-upcoming-$index").onFocusChanged {
                     if (it.isFocused) onCardFocus(index, "recording:${next.id.value}")
                 })
@@ -1687,7 +1692,7 @@ private fun HomeSection.headingTitle(): String? = when (this) {
 private fun HomeSection.focusOverflow(halfActivityWidth: Dp): Dp {
     val pictureHeight = when (this) {
         is HomeSection.CurrentActivity -> halfActivityWidth * 9f / 16f
-        is HomeSection.RecentChannels -> 104.dp
+        is HomeSection.RecentChannels -> HomeRecentTileSize
         is HomeSection.Genres -> HomeGenreCardHeight
         is HomeSection.Upcoming -> HomeUpcomingCardHeight
         else -> HomeCardWidth * 9f / 16f

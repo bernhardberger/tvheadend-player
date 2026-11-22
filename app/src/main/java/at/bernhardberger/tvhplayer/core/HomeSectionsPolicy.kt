@@ -85,7 +85,7 @@ data class CurrentActivityItem(
     val recording: DvrEntry?,
 )
 
-data class RecentChannelItem(val channel: Channel)
+data class RecentChannelItem(val channel: Channel, val event: EpgEventEntry? = null)
 
 data class OnNowItem(
     val channel: Channel,
@@ -214,7 +214,9 @@ private fun recentChannelsSection(input: HomeInput): HomeSection.RecentChannels?
         .filter { it != playingChannelId }
         .mapNotNull(channelsById::get)
         .take(RECENT_CHANNEL_LIMIT)
-        .map(::RecentChannelItem)
+        .map { channel ->
+            RecentChannelItem(channel, input.currentEvents[channel.id]?.takeIf { isRunningAt(it, input.nowSec) })
+        }
         .toList()
     if (items.isEmpty()) return null
     return HomeSection.RecentChannels(items)

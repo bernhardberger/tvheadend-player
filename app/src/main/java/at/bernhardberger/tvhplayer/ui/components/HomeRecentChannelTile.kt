@@ -20,11 +20,13 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import androidx.tv.material3.Card
 import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvhplayer.presentation.R
@@ -37,7 +39,7 @@ internal val HomeRecentTileSize = 104.dp
 
 /**
  * Home's recent-channels tile: a compact square card on the channel's ambient accent fill with
- * its picon top-centre, and the channel's name only while its row shows text, as in the approved
+ * its picon centered, and the channel and current program names while its row shows text, as in the approved
  * mockup. Focusing never tunes; actions are the caller's. The caller's modifier (focus requester,
  * test tag) belongs on the focusable card, so it is applied here rather than to the column.
  */
@@ -50,19 +52,21 @@ internal fun HomeRecentChannelTile(
     onLongClick: (() -> Unit)? = null,
     width: Dp = HomeRecentTileSize,
     channelRecording: Boolean = false,
+    programTitle: String? = null,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val ring = rememberCardFocusRing(interaction)
     val contextMenu = rememberBrowseContextMenuTrigger(onLongClick, menuKey = true)
     var focused by remember { mutableStateOf(false) }
     val name = channelTitleText(channel.visibleChannelNumber, channel.name.orEmpty())
+    val program = programTitle?.takeIf(String::isNotBlank)
     Column(Modifier.width(width)) {
         Card(
             onClick = onClick,
             onLongClick = contextMenu.onLongClick,
             interactionSource = interaction,
             modifier = modifier
-                .semantics(mergeDescendants = true) { contentDescription = name }
+                .semantics(mergeDescendants = true) { contentDescription = listOfNotNull(name, program).joinToString(", ") }
                 .cardFocusRing(ring, MaterialTheme.colorScheme.onSurface)
                 .fillMaxWidth()
                 .aspectRatio(1f)
@@ -89,11 +93,18 @@ internal fun HomeRecentChannelTile(
             }
         }
         AnimatedVisibility(visible = nameShown, enter = RowTextEnter, exit = RowTextExit) {
-            HomeRowCaption(
-                name,
-                Modifier.mutedTextPastRowStart(),
-                color = if (focused) TvTextColors.primary else TvTextColors.secondary,
-            )
+            Column(Modifier.mutedTextPastRowStart()) {
+                HomeRowCaption(name, color = if (focused) TvTextColors.primary else TvTextColors.secondary)
+                Text(
+                    program.orEmpty(),
+                    Modifier.fillMaxWidth().padding(top = HomeCaptionLineGap),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = HomeQuietCaptionColor,
+                    minLines = 1,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }
