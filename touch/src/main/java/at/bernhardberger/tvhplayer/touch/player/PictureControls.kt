@@ -65,7 +65,7 @@ import at.bernhardberger.tvhplayer.touch.channels.ChannelRow
 import at.bernhardberger.tvhplayer.touch.ui.channelLogoSlot
 
 private val OnPicture = Color.White
-private val DarkControl = Color(0xA82C2E2E)
+internal val DarkControl = Color(0xA82C2E2E)
 
 @Composable
 internal fun BoxScope.PictureControls(

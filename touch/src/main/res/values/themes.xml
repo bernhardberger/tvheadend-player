@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="TouchBrowseTheme" parent="android:style/Theme.Material.NoActionBar">
+        <!-- Match TouchDarkColors.surface behind the starting window and Compose content. -->
+        <item name="android:windowBackground">#0B151A</item>
+    </style>
+</resources>

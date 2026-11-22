@@ -68,7 +68,7 @@ import at.bernhardberger.tvhplayer.touch.ui.RecordingRemoveControl
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
-import at.bernhardberger.tvhplayer.ui.MobileDarkColors
+import at.bernhardberger.tvhplayer.touch.ui.TouchDarkColors
 import java.io.File
 import kotlinx.coroutines.flow.MutableSharedFlow
 import org.junit.Assert.assertEquals
@@ -563,7 +563,7 @@ class RecordingsScreenTest {
             onStop = { stopped += it },
         )
         val content: @Composable () -> Unit = {
-            MaterialTheme(colorScheme = MobileDarkColors) {
+            MaterialTheme(colorScheme = TouchDarkColors) {
                 val density = LocalDensity.current
                 CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale ?: density.fontScale)) {
                     DestinationFrame(initialDestination = Destination.Recordings) { destination ->

@@ -34,7 +34,7 @@ import at.bernhardberger.tvhplayer.touch.player.recordingStart
 import at.bernhardberger.tvhplayer.touch.player.startsRecording
 import at.bernhardberger.tvhplayer.playback.currentRecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.touch.di.Application
-import at.bernhardberger.tvhplayer.ui.MobileDarkColors
+import at.bernhardberger.tvhplayer.touch.ui.TouchDarkColors
 import at.bernhardberger.tvhplayer.ui.screens.onboarding.discoverServers
 import at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
@@ -84,7 +84,7 @@ class MainActivity : ComponentActivity() {
             }
         }
         setContent {
-            MaterialTheme(colorScheme = MobileDarkColors) {
+            MaterialTheme(colorScheme = TouchDarkColors) {
                 val target by sdk.playbackRuntime.activeTarget.collectAsStateWithLifecycle()
                 val playback by sdk.playbackRuntime.state.collectAsStateWithLifecycle()
                 CompositionLocalProvider(LocalChannelAccents provides get<ChannelAccents>()) {

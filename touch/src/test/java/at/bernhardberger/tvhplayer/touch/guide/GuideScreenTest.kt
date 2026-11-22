@@ -78,7 +78,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import at.bernhardberger.tvhplayer.ui.MobileDarkColors
+import at.bernhardberger.tvhplayer.touch.ui.TouchDarkColors
 import at.bernhardberger.tvhplayer.ui.screens.recordings.StopConfirmationTimes
 import at.bernhardberger.tvhplayer.ui.screens.recordings.stopConfirmationSentence
 import java.util.TimeZone
@@ -1161,7 +1161,7 @@ class GuideScreenTest {
                 val channels = connection.channels()
                 val presentation = connection.presentation()
                 setContent {
-                    MaterialTheme(colorScheme = MobileDarkColors) {
+                    MaterialTheme(colorScheme = TouchDarkColors) {
                         val dvr = viewModel { DvrControls(connection.session, connection.noticeCenter) }
                         DestinationFrame(initialDestination = Destination.Guide) {
                             GuideDestination(
@@ -1453,7 +1453,7 @@ class GuideScreenTest {
         )
         val presentation = connection.presentation()
         compose.setContent {
-            MaterialTheme(colorScheme = MobileDarkColors) {
+            MaterialTheme(colorScheme = TouchDarkColors) {
                 val dvr = viewModel { DvrControls(session, connection.noticeCenter) }
                 CompositionLocalProvider(LocalLifecycleOwner provides (lifecycleOwner ?: LocalLifecycleOwner.current)) {
                     if (shown()) DestinationFrame(initialDestination = Destination.Guide) {
@@ -1527,7 +1527,7 @@ class GuideScreenTest {
             },
         )
         compose.setContent {
-            MaterialTheme(colorScheme = MobileDarkColors) {
+            MaterialTheme(colorScheme = TouchDarkColors) {
                 val current = state()
                 val pages = current.details.values + listOfNotNull(extraDetails)
                 DestinationFrame(initialDestination = Destination.Guide) {

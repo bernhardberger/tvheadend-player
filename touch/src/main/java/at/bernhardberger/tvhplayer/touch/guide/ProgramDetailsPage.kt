@@ -224,7 +224,7 @@ private fun Lead(
                 if (metadata.isNotEmpty()) {
                     PartsLine(
                         metadata, Modifier.weight(1f, fill = false),
-                        style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline,
+                        style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 details.ageRating?.let { AgeRating(it) }

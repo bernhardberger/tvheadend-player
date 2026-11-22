@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -37,11 +36,10 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.FilledTonalToggleButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.ToggleButton
-import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -89,7 +87,7 @@ internal fun OverviewBar(state: GuideState, actions: GuideActions, compact: Bool
         val jumps = listOf(stringResource(R.string.guide_now)) + state.jumps
         Row(horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween)) {
             jumps.forEachIndexed { index, jump ->
-                ToggleButton(
+                FilledTonalToggleButton(
                     checked = index == state.selectedJump,
                     onCheckedChange = { actions.onJump(index) },
                     shapes = when (index) {
@@ -97,12 +95,6 @@ internal fun OverviewBar(state: GuideState, actions: GuideActions, compact: Bool
                         jumps.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
                         else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
                     },
-                    colors = ToggleButtonDefaults.colors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        contentColor = MaterialTheme.colorScheme.onSurface,
-                        checkedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-                        checkedContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                    ),
                     contentPadding = padding,
                 ) {
                     Text(jump, maxLines = 1)
@@ -241,7 +233,7 @@ private fun ColumnItem(
             program.progress?.takeIf { bare }?.let {
                 ProgramBar(
                     it, program.recording,
-                    Modifier.padding(start = 12.dp, end = 10.dp, bottom = 10.dp).fillMaxWidth().height(4.dp),
+                    Modifier.padding(start = 12.dp, end = 10.dp, bottom = 10.dp).fillMaxWidth(),
                     program.watching,
                 )
             }
@@ -385,7 +377,7 @@ private fun OverviewSupportingContent(program: GuideProgram, hasPicture: Boolean
         program.progress?.takeUnless { hasPicture }?.let {
             ProgramBar(
                 it, program.recording,
-                Modifier.padding(top = 4.dp).fillMaxWidth().height(4.dp), program.watching,
+                Modifier.padding(top = 4.dp).fillMaxWidth(), program.watching,
             )
         }
     }

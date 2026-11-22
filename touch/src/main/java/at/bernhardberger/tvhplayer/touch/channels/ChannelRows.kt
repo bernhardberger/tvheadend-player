@@ -28,9 +28,8 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.ListItemDefaults
@@ -150,7 +149,7 @@ private fun ColumnLabels(layout: ChannelsLayout, listHasLogos: Boolean) {
 private fun ColumnLabel(label: Int, modifier: Modifier) {
     Text(
         stringResource(label), modifier.semantics { heading() },
-        style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.outline,
+        style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }
 
@@ -241,16 +240,11 @@ private fun ExpandButton(row: ChannelRow, expanded: Boolean, offline: Boolean, t
     Box(Modifier.width(ExpandTarget), contentAlignment = Alignment.CenterEnd) {
         if (row.details != null || offline) {
             val label = if (expanded) R.string.channels_collapse else R.string.channels_expand
-            val scheme = MaterialTheme.colorScheme
             // ListItem counts its row padding towards the trailing touch target, but a tap there means Watch,
             // so the button keeps its own full target.
             CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides ExpandTarget) {
-                FilledIconButton(
+                FilledTonalIconButton(
                     onClick = toggle, enabled = !offline,
-                    colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = if (expanded) scheme.secondaryContainer else scheme.surfaceContainerHighest,
-                        contentColor = if (expanded) scheme.onSecondaryContainer else scheme.onSurface,
-                    ),
                 ) {
                     Icon(
                         painterResource(R.drawable.channels_expand), stringResource(label, row.name),
@@ -411,7 +405,7 @@ private fun NextProgram(program: ChannelProgram?, showMarks: Boolean, modifier: 
                     painterResource(program.ruleSchedule?.icon ?: R.drawable.channels_schedule),
                     stringResource(program.ruleSchedule?.markDescription ?: R.string.channels_scheduled),
                     Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.outline,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -441,8 +435,7 @@ private fun ChannelProgress(
                 val duration = airing.last + 1 - airing.first
                 (clock() - airing.first).coerceIn(0L, duration).toFloat() / duration
             }
-        }, modifier = modifier.height(4.dp), color = fill,
-        trackColor = scheme.onSurface.copy(alpha = TRACK_ALPHA), gapSize = 0.dp, drawStopIndicator = {},
+        }, modifier = modifier, color = fill,
     )
 }
 
@@ -481,5 +474,3 @@ private fun SupportingLine(text: String, modifier: Modifier = Modifier, maxLines
         maxLines = maxLines, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
     )
 }
-
-private const val TRACK_ALPHA = 0.2f

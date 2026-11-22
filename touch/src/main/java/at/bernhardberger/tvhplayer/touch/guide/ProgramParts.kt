@@ -245,17 +245,27 @@ internal fun OnNowBadge() {
  * list's playing row, when it is the item [watching] (section 13: orange wins over red).
  */
 @Composable
-internal fun ProgramBar(progress: Float, recording: Boolean, modifier: Modifier, watching: Boolean = false) {
+internal fun ProgramBar(
+    progress: Float,
+    recording: Boolean,
+    modifier: Modifier,
+    watching: Boolean = false,
+    pictureEdge: Boolean = false,
+) {
     val scheme = MaterialTheme.colorScheme
-    LinearProgressIndicator(
-        progress = { progress.coerceIn(0f, 1f) }, modifier = modifier,
-        color = when {
-            watching -> scheme.tertiary
-            recording -> TvRecordingColor
-            else -> scheme.primary
-        },
-        trackColor = scheme.onSurface.copy(alpha = TRACK_ALPHA), gapSize = 0.dp, drawStopIndicator = {},
-    )
+    val color = when {
+        watching -> scheme.tertiary
+        recording -> TvRecordingColor
+        else -> scheme.primary
+    }
+    if (pictureEdge) {
+        LinearProgressIndicator(
+            progress = { progress.coerceIn(0f, 1f) }, modifier = modifier, color = color,
+            trackColor = scheme.onSurface.copy(alpha = PICTURE_TRACK_ALPHA), gapSize = 0.dp, drawStopIndicator = {},
+        )
+    } else {
+        LinearProgressIndicator(progress = { progress.coerceIn(0f, 1f) }, modifier = modifier, color = color)
+    }
 }
 
 /** The bar with what is left after it. */
@@ -268,7 +278,7 @@ internal fun ProgramProgress(
     watching: Boolean = false,
 ) {
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        ProgramBar(progress, recording, Modifier.weight(1f).height(4.dp), watching)
+        ProgramBar(progress, recording, Modifier.weight(1f), watching)
         timeLeft?.let {
             Text(
                 stringResource(R.string.channels_time_left, it), Modifier.padding(start = 12.dp),
@@ -301,7 +311,10 @@ internal fun ProgramPicture(
         ArtworkImage(picture, model, Modifier.fillMaxSize(), ContentScale.Crop)
         if (recording) Box(Modifier.padding(6.dp)) { RecPill() }
         if (strip && progress != null) {
-            ProgramBar(progress, recording, Modifier.align(Alignment.BottomStart).fillMaxWidth().height(3.dp), watching)
+            ProgramBar(
+                progress, recording, Modifier.align(Alignment.BottomStart).fillMaxWidth().height(3.dp),
+                watching, pictureEdge = true,
+            )
         }
     }
 }
@@ -321,10 +334,6 @@ internal fun MenuButton(
         FilledTonalButton(
             onClick = { open = true },
             contentPadding = contentPadding,
-            colors = ButtonDefaults.filledTonalButtonColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                contentColor = MaterialTheme.colorScheme.onSurface,
-            ),
         ) {
             ChannelActionLabel(icon, options.getOrElse(selected) { "" })
             Spacer(Modifier.width(4.dp))
@@ -351,7 +360,7 @@ internal fun MenuButton(
 
 internal const val PICTURE_RATIO = 16f / 9f
 internal val PictureShape = RoundedCornerShape(12.dp)
-private const val TRACK_ALPHA = 0.2f
+private const val PICTURE_TRACK_ALPHA = 0.2f
 private const val BADGE_ALPHA = 0.16f
 
 internal val CompactButtonPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)

@@ -81,7 +81,7 @@ import at.bernhardberger.tvhplayer.touch.ui.Destination
 import at.bernhardberger.tvhplayer.touch.ui.DestinationFrame
 import at.bernhardberger.tvhplayer.touch.ui.LocalDestinationReselections
 import at.bernhardberger.tvhplayer.touch.ui.TouchFrame
-import at.bernhardberger.tvhplayer.ui.MobileDarkColors
+import at.bernhardberger.tvhplayer.touch.ui.TouchDarkColors
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -123,7 +123,7 @@ class TouchFrameTest {
     fun destinationFadesOutBeforeTheNextFadesInWhileTheRailStaysPut() {
         var outgoingClicks = 0
         compose.setContent {
-            MaterialTheme(colorScheme = MobileDarkColors) {
+            MaterialTheme(colorScheme = TouchDarkColors) {
                 DestinationFrame { current ->
                     TouchFrame(initialDestination = current) {
                         val outgoing = current == Destination.Channels
@@ -398,7 +398,7 @@ class TouchFrameTest {
         )
         val recordingsActions = RecordingsActions(onView = {}, onPlay = null, onDelete = null, onMore = null)
         compose.setContent {
-            MaterialTheme(colorScheme = MobileDarkColors) {
+            MaterialTheme(colorScheme = TouchDarkColors) {
                 DestinationFrame { current ->
                     when (current) {
                         Destination.Channels -> ChannelsScreen(channels, channelsActions)
@@ -480,7 +480,7 @@ class TouchFrameTest {
     @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
     fun singleDestinationLeavesThePhoneBarOut() {
         compose.setContent {
-            MaterialTheme(colorScheme = MobileDarkColors) { TouchFrame(destinations = listOf(Destination.Channels)) {} }
+            MaterialTheme(colorScheme = TouchDarkColors) { TouchFrame(destinations = listOf(Destination.Channels)) {} }
         }
         compose.onNode(destination).assertDoesNotExist()
         compose.onNode(heading and hasText("Channels")).assertIsDisplayed()
@@ -513,7 +513,7 @@ class TouchFrameTest {
         notice.value = shown
         val actions = RecordingsActions(onView = {}, onPlay = { _, _ -> }, onDelete = {}, onMore = {})
         compose.setContent {
-            MaterialTheme(colorScheme = MobileDarkColors) {
+            MaterialTheme(colorScheme = TouchDarkColors) {
                 val formatter = NoticeFormatter(LocalContext.current)
                 val host: @Composable (Modifier) -> Unit = { modifier ->
                     notice.value?.let { formatter.format(it) }?.let { TouchNotice(it.headline, it.detail, modifier) }
@@ -530,7 +530,7 @@ class TouchFrameTest {
 
     private fun show(restoration: StateRestorationTester? = null) {
         val content: @Composable () -> Unit = {
-            MaterialTheme(colorScheme = MobileDarkColors) {
+            MaterialTheme(colorScheme = TouchDarkColors) {
                 DestinationFrame { current ->
                     TouchFrame(
                         initialDestination = current,

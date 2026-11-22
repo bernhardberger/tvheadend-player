@@ -103,15 +103,13 @@ internal fun PictureOfferButton(
     icon: Int?,
     dragging: Boolean,
     onClick: () -> Unit,
-    bare: Boolean = false,
 ) {
-    val buttonFill = if (bare) Color(0xB3000000) else Color(0xCC37393A)
     Button(
         onClick = onClick, enabled = !dragging,
         modifier = Modifier.alpha(if (dragging) DRAG_ALPHA else 1f),
         colors = ButtonDefaults.buttonColors(
-            containerColor = buttonFill, contentColor = Color.White,
-            disabledContainerColor = buttonFill, disabledContentColor = Color.White,
+            containerColor = DarkControl, contentColor = Color.White,
+            disabledContainerColor = DarkControl, disabledContentColor = Color.White,
         ),
         contentPadding = PaddingValues(horizontal = 13.dp),
     ) {

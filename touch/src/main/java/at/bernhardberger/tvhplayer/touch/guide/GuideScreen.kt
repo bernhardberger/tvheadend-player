@@ -586,7 +586,7 @@ internal fun NoSchedule(onWatch: (() -> Unit)?) {
         ) {
             Icon(
                 painterResource(R.drawable.guide_event_busy), null, Modifier.size(56.dp),
-                tint = MaterialTheme.colorScheme.outline,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
                 stringResource(R.string.guide_no_schedule), Modifier.padding(top = 8.dp).semantics { heading() },

@@ -45,7 +45,7 @@ import at.bernhardberger.tvhplayer.touch.ui.TouchFrame
 import at.bernhardberger.tvhplayer.ui.screens.onboarding.SetupAction
 import at.bernhardberger.tvhplayer.ui.screens.onboarding.SetupFailure
 import at.bernhardberger.tvhplayer.ui.screens.onboarding.SetupMode
-import at.bernhardberger.tvhplayer.ui.MobileDarkColors
+import at.bernhardberger.tvhplayer.touch.ui.TouchDarkColors
 import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -337,7 +337,7 @@ class ConnectScreensTest {
 
     private fun show(content: @Composable () -> Unit) {
         compose.setContent {
-            MaterialTheme(colorScheme = MobileDarkColors) {
+            MaterialTheme(colorScheme = TouchDarkColors) {
                 Box(Modifier.fillMaxSize()) { content() }
             }
         }

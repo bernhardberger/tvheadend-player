@@ -89,7 +89,7 @@ import at.bernhardberger.tvhplayer.touch.testutil.capturePausedPlayer
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouch
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouchWindows
 import at.bernhardberger.tvhplayer.touch.ui.TouchNotice
-import at.bernhardberger.tvhplayer.ui.MobileDarkColors
+import at.bernhardberger.tvhplayer.touch.ui.TouchDarkColors
 import at.bernhardberger.tvhplayer.ui.notifications.NoticeFormatter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -959,7 +959,7 @@ class RecordingPlayerScreenTest {
     private fun show(info: RecordingPlayerInfo? = null) {
         val fixture = recordingPlayerFixture(position)
         compose.setContent {
-            MaterialTheme(colorScheme = MobileDarkColors) {
+            MaterialTheme(colorScheme = TouchDarkColors) {
                 val offer = fixtureAdOffer(position.longValue, choice.value)
                 PlayerScreen(
                     fixture.copy(

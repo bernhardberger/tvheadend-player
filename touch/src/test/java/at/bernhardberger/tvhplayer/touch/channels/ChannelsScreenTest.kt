@@ -58,7 +58,7 @@ import at.bernhardberger.tvhplayer.touch.ui.ArtworkModels
 import at.bernhardberger.tvhplayer.touch.ui.ArtworkImage
 import at.bernhardberger.tvhplayer.touch.ui.ChannelLogoTile
 import at.bernhardberger.tvhplayer.touch.ui.LocalChannelAccents
-import at.bernhardberger.tvhplayer.ui.MobileDarkColors
+import at.bernhardberger.tvhplayer.touch.ui.TouchDarkColors
 import coil3.asImage
 import coil3.decode.DataSource
 import coil3.intercept.Interceptor
@@ -97,7 +97,7 @@ class ChannelsScreenTest {
         val list = channelsFixture(playing = true)
         val state = mutableStateOf(ChannelsState.Ready(list))
         compose.setContent {
-            MaterialTheme(colorScheme = MobileDarkColors) {
+            MaterialTheme(colorScheme = TouchDarkColors) {
                 ChannelsScreen(state.value, fixtureActions(optional = true), initiallyOpenChannelId = "amber-stage")
             }
         }
@@ -151,7 +151,7 @@ class ChannelsScreenTest {
         val state = ChannelsState.Ready(channelsFixture(playing = true))
         val width = mutableStateOf(800.dp)
         compose.setContent {
-            MaterialTheme(colorScheme = MobileDarkColors) {
+            MaterialTheme(colorScheme = TouchDarkColors) {
                 ChannelsScreen(state, fixtureActions(), Modifier.width(width.value), initiallyOpenChannelId = "amber-stage")
             }
         }
@@ -271,7 +271,7 @@ class ChannelsScreenTest {
     ) {
         compose.setContent {
             val holder = rememberSaveableStateHolder()
-            MaterialTheme(colorScheme = MobileDarkColors) {
+            MaterialTheme(colorScheme = TouchDarkColors) {
                 if (visible.value) {
                     holder.SaveableStateProvider("Channels") {
                         CompositionLocalProvider(LocalDestinationReselections provides taps) {
@@ -331,7 +331,7 @@ class ChannelsScreenTest {
     fun aLogoOfAnyShapeFitsItsShareOfTheTileCentered() {
         val logos = markedLogos()
         compose.setContent {
-            MaterialTheme(colorScheme = MobileDarkColors) {
+            MaterialTheme(colorScheme = TouchDarkColors) {
                 Column {
                     logos.forEachIndexed { index, logo ->
                         ChannelLogoTile(logo, null, Modifier.size(112.dp, 56.dp).testTag("tile-$index"))
@@ -363,7 +363,7 @@ class ChannelsScreenTest {
                 compose.mainClock.autoAdvance = false
                 val pictureRequest = ImageRequest.Builder(compose.activity).data(picture).size(30, 30).build()
                 compose.setContent {
-                    MaterialTheme(colorScheme = MobileDarkColors) {
+                    MaterialTheme(colorScheme = TouchDarkColors) {
                         Column {
                             ArtworkImage(null, pictureRequest, Modifier.size(30.dp))
                             listOf("missing" to null, "failing" to failing, "loading" to loading).forEach { (tag, model) ->
@@ -376,7 +376,7 @@ class ChannelsScreenTest {
                 assertTrue("the picture starts in the first layout", picture in images.requested)
                 assertTrue("the logo starts in the same layout as the picture", loading in images.requested)
                 compose.mainClock.autoAdvance = true
-                val ground = MobileDarkColors.surfaceContainerHigh
+                val ground = TouchDarkColors.surfaceContainerHigh
                 val missingCenter = tileCenter("missing")
                 assertNotEquals("an absent model shows the fallback icon", setOf(ground), missingCenter)
                 assertEquals(setOf(failing, loading, picture), images.requested.toSet())
@@ -417,7 +417,7 @@ class ChannelsScreenTest {
         images.apply(object : Statement() {
             override fun evaluate() {
                 compose.setContent {
-                    MaterialTheme(colorScheme = MobileDarkColors) {
+                    MaterialTheme(colorScheme = TouchDarkColors) {
                         Column {
                             listOf("wide" to wide, "square" to square).forEach { (tag, model) ->
                                 ChannelLogoTile(null, null, Modifier.size(112.dp, 56.dp).testTag(tag), model = model)
@@ -462,7 +462,7 @@ class ChannelsScreenTest {
             val expectedFresh = mutableStateOf(neutral)
             compose.mainClock.autoAdvance = false
             compose.setContent {
-                MaterialTheme(colorScheme = MobileDarkColors) {
+                MaterialTheme(colorScheme = TouchDarkColors) {
                     CompositionLocalProvider(LocalChannelAccents provides accents) {
                         Column {
                             @Composable
@@ -493,7 +493,7 @@ class ChannelsScreenTest {
             }
             assertEquals("stored channel colour is painted on the first frame", ground("stored-reference"), ground("stored"))
             assertEquals("pending sample uses neutral tint", ground("fresh-reference"), ground("fresh"))
-            assertEquals("no logo leaves the neutral ground", MobileDarkColors.surfaceContainerHigh, ground("no-logo"))
+            assertEquals("no logo leaves the neutral ground", TouchDarkColors.surfaceContainerHigh, ground("no-logo"))
             assertEquals("explicit tint overrides the stored accent", ground("override-reference"), ground("override"))
             assertEquals("one request on the initial neutral ground", listOf(inkKey(neutral)), freshInkKeys)
 
@@ -517,7 +517,7 @@ class ChannelsScreenTest {
 
     private fun show(state: ChannelsState, actions: ChannelsActions = fixtureActions(), open: String? = null) {
         compose.setContent {
-            MaterialTheme(colorScheme = MobileDarkColors) {
+            MaterialTheme(colorScheme = TouchDarkColors) {
                 ChannelsScreen(state, actions, initiallyOpenChannelId = open)
             }
         }

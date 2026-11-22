@@ -133,7 +133,7 @@ private fun MessageLayout(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Icon(painterResource(icon), null, Modifier.size(48.dp), tint = MaterialTheme.colorScheme.outline)
+            Icon(painterResource(icon), null, Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(
                 title, Modifier.semantics { heading() },
                 style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center,

@@ -189,7 +189,7 @@ private fun Fact(key: String, value: String, keyWidth: Dp) {
     Row(Modifier.heightIn(min = 28.dp).padding(vertical = 4.dp)) {
         Text(
             key, Modifier.width(keyWidth), style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.outline,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(value, style = MaterialTheme.typography.bodyMedium)
     }

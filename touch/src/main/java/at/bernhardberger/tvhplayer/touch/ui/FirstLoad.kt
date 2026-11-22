@@ -50,7 +50,6 @@ import at.bernhardberger.tvhplayer.touch.R
 internal fun FirstLoadLine(horizontalMargin: Dp) {
     LinearProgressIndicator(
         Modifier.fillMaxWidth().padding(horizontal = horizontalMargin),
-        trackColor = MaterialTheme.colorScheme.surfaceVariant,
     )
 }
 
@@ -139,7 +138,10 @@ internal fun OfflineBanner(
                 } else {
                     stringResource(R.string.channels_reconnect_in, retryIn)
                 }
-                Text(reconnect, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                Text(
+                    reconnect, style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
             if (onSettings != null) {
                 TextButton(onClick = onSettings) { Text(stringResource(R.string.channels_connection_settings)) }

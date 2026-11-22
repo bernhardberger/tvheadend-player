@@ -184,10 +184,6 @@ private fun TitleActions(
             openViewOptions()
         },
         modifier = Modifier.padding(start = 16.dp).focusRequester(viewOptionsFocus),
-        colors = ButtonDefaults.filledTonalButtonColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-            contentColor = MaterialTheme.colorScheme.onSurface,
-        ),
     ) {
         Icon(painterResource(R.drawable.recordings_tune), null, Modifier.size(ButtonDefaults.IconSize))
         Spacer(Modifier.width(ButtonDefaults.IconSpacing))
@@ -330,7 +326,7 @@ private fun RecordingsMessage(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Icon(painterResource(icon), null, Modifier.size(56.dp), tint = MaterialTheme.colorScheme.outline)
+            Icon(painterResource(icon), null, Modifier.size(56.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(
                 stringResource(title), Modifier.padding(top = 8.dp).semantics { heading() },
                 style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center,
@@ -359,14 +355,14 @@ private fun Placeholder(level: RecordingFolder) {
         ) {
             Icon(
                 painterResource(R.drawable.video_library_outline), null, Modifier.size(48.dp).padding(bottom = 8.dp),
-                tint = MaterialTheme.colorScheme.outline,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
                 stringResource(R.string.recordings_pick),
                 Modifier.semantics { liveRegion = LiveRegionMode.Polite },
                 style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Text(count, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
+            Text(count, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

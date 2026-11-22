@@ -115,7 +115,7 @@ private fun Episode(details: ChannelDetails, timeRange: String? = null, compact:
         Text(it, fontSize = if (compact) 14.sp else 15.sp, style = MaterialTheme.typography.bodyMedium)
     }
     listOfNotNull(timeRange, details.metadata).forEach {
-        Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
+        Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -162,7 +162,7 @@ private fun Following(programs: List<ChannelProgram>, onShowInGuide: (() -> Unit
                 program.start?.let {
                     Text(
                         it, Modifier.widthIn(min = 84.dp),
-                        style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline,
+                        style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 Text(

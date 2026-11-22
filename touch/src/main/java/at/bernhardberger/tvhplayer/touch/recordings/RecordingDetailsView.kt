@@ -36,6 +36,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Text
@@ -75,6 +76,8 @@ import at.bernhardberger.tvhplayer.touch.ui.DetailsPictureScrim
 import at.bernhardberger.tvhplayer.touch.ui.DetailsSynopsis
 import at.bernhardberger.tvhplayer.touch.ui.RecordingRemoveControl
 import at.bernhardberger.tvhplayer.touch.ui.joinParts
+import at.bernhardberger.tvhplayer.touch.ui.watchedProgressColor
+import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 import at.bernhardberger.tvhplayer.ui.common.formatSpokenDuration
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
 
@@ -290,15 +293,17 @@ private fun Facts(item: RecordingItem) {
     val facts = listOfNotNull(item.length?.let { durationText(it) }, item.details.size, item.details.genre)
     Text(
         joinParts(facts), Modifier.padding(top = 8.dp), style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.outline,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }
 
 @Composable
 private fun Progress(state: RecordingProgress, clock: RecordingClock, modifier: Modifier) {
-    val label = when (state) {
-        is RecordingProgress.PartlyWatched -> stringResource(R.string.recordings_time_left, durationText(state.left))
-        is RecordingProgress.Recording -> stringResource(R.string.recordings_until, recordingTime(state.until, clock))
+    val (progress, label) = when (state) {
+        is RecordingProgress.PartlyWatched ->
+            state.progress to stringResource(R.string.recordings_time_left, durationText(state.left))
+        is RecordingProgress.Recording ->
+            state.progress to stringResource(R.string.recordings_until, recordingTime(state.until, clock))
         else -> return
     }
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -306,8 +311,10 @@ private fun Progress(state: RecordingProgress, clock: RecordingClock, modifier: 
             RecPill()
             Spacer(Modifier.width(12.dp))
         }
-        RecordingBar(
-            state, Modifier.weight(1f).height(4.dp), track = MaterialTheme.colorScheme.surfaceContainerHighest,
+        LinearProgressIndicator(
+            progress = { progress },
+            modifier = Modifier.weight(1f),
+            color = if (state is RecordingProgress.Recording) TvRecordingColor else watchedProgressColor(),
         )
         Text(
             label, Modifier.padding(start = 12.dp), style = MaterialTheme.typography.bodyMedium,

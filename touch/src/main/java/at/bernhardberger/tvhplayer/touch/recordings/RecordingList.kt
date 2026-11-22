@@ -198,7 +198,7 @@ internal fun LevelHead(
             Text(
                 names.reduce { a, b -> pathPattern.format(a, b) },
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.outline,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.StartEllipsis,
             )

@@ -264,7 +264,8 @@ private fun OpenLine(program: GuideProgram, modifier: Modifier) {
     val line = program.openLine()
     if (line.isNotEmpty()) {
         PartsLine(
-            line, modifier, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline,
+            line, modifier, style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }

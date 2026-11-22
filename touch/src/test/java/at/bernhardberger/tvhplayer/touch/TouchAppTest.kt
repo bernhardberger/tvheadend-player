@@ -101,7 +101,7 @@ import at.bernhardberger.tvhplayer.touch.testutil.captureTouch
 import at.bernhardberger.tvhplayer.touch.ui.ConfirmDvrChange
 import at.bernhardberger.tvhplayer.touch.ui.ArtworkModels
 import at.bernhardberger.tvhplayer.touch.ui.DvrControls
-import at.bernhardberger.tvhplayer.ui.MobileDarkColors
+import at.bernhardberger.tvhplayer.touch.ui.TouchDarkColors
 import at.bernhardberger.tvhplayer.ui.common.AppClock
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import java.time.ZoneId
@@ -1046,7 +1046,7 @@ class TouchAppTest {
                 ShownPrograms(shown.value, null), wall, rememberChannelsTexts(), artwork, observation,
             )
             SideEffect { channel.value = face }
-            MaterialTheme(colorScheme = MobileDarkColors) {
+            MaterialTheme(colorScheme = TouchDarkColors) {
                 PlayerScreen(
                     LivePlayerState(face, ChannelsState.Loading, null, timeline),
                     {}, {}, {}, {}, {},
@@ -1146,7 +1146,7 @@ class TouchAppTest {
         val clock = GuideClock(guide.now.epochSeconds, ZoneId.systemDefault())
         compose.setContent {
             val dvr = viewModel { DvrControls(connection.browseSession, connection.noticeCenter) { guide.now.epochSeconds } }
-            MaterialTheme(colorScheme = MobileDarkColors) {
+            MaterialTheme(colorScheme = TouchDarkColors) {
                 PlayerScreen(
                     state.copy(
                         schedule = playerSchedule(
@@ -1479,7 +1479,7 @@ class TouchAppTest {
         val recordings = connection.recordings()
         val guide = connection.guide()
         content = {
-            MaterialTheme(colorScheme = MobileDarkColors) {
+            MaterialTheme(colorScheme = TouchDarkColors) {
                 TouchApp(
                     connection.browseSession, connection.owner, presentation, channels, recordings, guide,
                     connection.noticeCenter, channelsDispatcher = mappingDispatcher(),

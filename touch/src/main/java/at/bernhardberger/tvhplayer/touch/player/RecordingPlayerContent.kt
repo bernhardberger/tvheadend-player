@@ -114,7 +114,7 @@ internal fun BareAdOffer(
     Row(modifier.testTag("recording-ad-prompt"), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         PictureOfferButton(SharedR.string.server_keep_watching, null, false, {
             onChoice(RecordingSkipChoice.Dismiss(offer))
-        }, bare = true)
+        })
         SkipAdButton(offer, false, bare = true, onChoice)
     }
 }
@@ -127,7 +127,7 @@ private fun SkipAdButton(
     else SharedR.string.skip_ad_break
     PictureOfferButton(label, R.drawable.player_skip_ad, dragging, {
         onChoice(RecordingSkipChoice.Accept(offer, fromControls = !bare))
-    }, bare)
+    })
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

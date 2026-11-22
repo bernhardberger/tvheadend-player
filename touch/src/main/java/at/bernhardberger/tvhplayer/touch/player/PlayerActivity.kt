@@ -51,7 +51,7 @@ import at.bernhardberger.tvhplayer.touch.channels.ChannelProgram
 import at.bernhardberger.tvhplayer.touch.channels.ChannelRow
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsTexts
 import at.bernhardberger.tvhplayer.touch.channels.rememberChannelsTexts
-import at.bernhardberger.tvhplayer.ui.MobileDarkColors
+import at.bernhardberger.tvhplayer.touch.ui.TouchDarkColors
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.common.formatTimeInterval
 import at.bernhardberger.tvhplayer.ui.common.progress
@@ -164,7 +164,7 @@ class PlayerActivity : ComponentActivity() {
         finishRecordingAtEof(lifecycleScope, runtime, requested)
         setContent {
             SystemBarsForOrientation(window, pictureWindow.inWindow.collectAsStateWithLifecycle().value)
-            MaterialTheme(colorScheme = MobileDarkColors) {
+            MaterialTheme(colorScheme = TouchDarkColors) {
                 CompositionLocalProvider(LocalChannelAccents provides get<ChannelAccents>()) {
                     // The window's one notice host, for the connection in use, as browsing builds it.
                     FrameNotices(notices, owner, session) {
