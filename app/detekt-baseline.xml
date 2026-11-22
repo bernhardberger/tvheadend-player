@@ -395,7 +395,6 @@
     <ID>MaxLineLength:ChannelNumberOverlay.kt:drawRoundRect</ID>
     <ID>MaxLineLength:ChannelNumberOverlay.kt:drawRoundRect(TvSurfaceColors.containerHighest, cornerRadius = CornerRadius(ChipTileCorner.toPx()), alpha = tile)</ID>
     <ID>MaxLineLength:ChannelNumberOverlay.kt:else</ID>
-    <ID>MaxLineLength:ChannelNumberOverlay.kt:it.nativeCanvas.drawRoundRect(insetX, insetY, right - insetX, size.height - insetY, corner, corner, shadow)</ID>
     <ID>MaxLineLength:ChannelNumberOverlay.kt:text = (destination as? ChannelNumberTarget.Channel)?.name ?: stringResource(R.string.player_channel_number_none)</ID>
     <ID>MaxLineLength:ChannelNumberOverlay.kt:transitionSpec = { if (targetState) snap() else tween(PlayerMotion.DestinationExitMs, easing = PlayerMotion.Standard) }</ID>
     <ID>MaxLineLength:ChannelPlaybackIndicator.kt:painterResource(if (indicator == ChannelPlaybackIndicator.PAUSED) R.drawable.ic_pause else R.drawable.ic_play_arrow)</ID>
@@ -539,7 +538,6 @@
     <ID>MaxLineLength:HomeContent.kt:val next = if (focusedSection == null) firstSection else renderedSections.getOrNull(index + 1)?.kind</ID>
     <ID>MaxLineLength:HomeContent.kt:val revealed = if (motion.revealFromBottom) (block.height * motion.block.value).toInt() else block.height</ID>
     <ID>MaxLineLength:HomeContent.kt:val target = if (restoreHeader) (if (restoreTags) tagsRequester else viewRequester) else initialKey?.let { requesters[it.section] } ?: emptyFocus ?: viewRequester</ID>
-    <ID>MaxLineLength:HomeGenreCard.kt:.</ID>
     <ID>MaxLineLength:HomeRecordingActions.kt:(current.sessionState as? SessionState.Ready)?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED</ID>
     <ID>MaxLineLength:HomeRecordingActions.kt:BrowseContextAction.CANCEL -&gt; capability?.let { pendingMutation = DvrMutationAction.Cancel(it, opened.id) }</ID>
     <ID>MaxLineLength:HomeRecordingActions.kt:BrowseContextAction.CONTINUE_WATCHING -&gt; onReturnToRecording(opened.id) { closeBehindPlayer(onClose) }</ID>
@@ -650,10 +648,8 @@
     <ID>MaxLineLength:PlayerInfoBar.kt:.</ID>
     <ID>MaxLineLength:PlayerInfoBar.kt:Text</ID>
     <ID>MaxLineLength:PlayerInfoBar.kt:color = MaterialTheme.colorScheme.onSurface</ID>
-    <ID>MaxLineLength:PlayerInfoBar.kt:else</ID>
     <ID>MaxLineLength:PlayerInfoBar.kt:if</ID>
     <ID>MaxLineLength:PlayerInfoBar.kt:private</ID>
-    <ID>MaxLineLength:PlayerInfoBar.kt:val</ID>
     <ID>MaxLineLength:PlayerInfoBar.kt:val max = if (constraints.hasBoundedWidth) (constraints.maxWidth - reserve.roundToPx()).coerceAtLeast(0) else constraints.maxWidth</ID>
     <ID>MaxLineLength:PlayerInfoBar.kt:}</ID>
     <ID>MaxLineLength:PlayerLayerState.kt:PlayerLayerState$if</ID>
@@ -678,7 +674,6 @@
     <ID>MaxLineLength:PlayerTimelinePresentationState.kt:LiveTimelinePresentationState$result.available &amp;&amp; it.wallClockMapping is at.bernhardberger.tvheadend.sdk.media3.TimeshiftWallClockMapping.Estimate</ID>
     <ID>MaxLineLength:PlayerTimelinePresentationState.kt:LiveTimelinePresentationState$val</ID>
     <ID>MaxLineLength:PlayerTopIdentity.kt:Text</ID>
-    <ID>MaxLineLength:PlayerTopIdentity.kt:else</ID>
     <ID>MaxLineLength:PlayerTopIdentity.kt:if</ID>
     <ID>MaxLineLength:PlayerTopIdentity.kt:modifier = Modifier.align(Alignment.CenterEnd).size(IdentityInset).testTag("player-top-identity-next")</ID>
     <ID>MaxLineLength:PlayerTopIdentity.kt:modifier = Modifier.align(Alignment.CenterStart).size(IdentityInset).testTag("player-top-identity-previous")</ID>
@@ -743,12 +738,8 @@
     <ID>MaxLineLength:ProgrammeInfoSheet.kt:Box(Modifier.fillMaxSize().padding(top = if (header != null) 156.dp else 0.dp)) { programme(it) }</ID>
     <ID>MaxLineLength:ProgrammeInfoSheet.kt:PlayerMotionFrame</ID>
     <ID>MaxLineLength:ProgrammeInfoSheet.kt:fun fraction</ID>
-    <ID>MaxLineLength:ProgrammeInfoSheet.kt:initialScale = if (railStrip) NowPlayingFromIdentityScale else 1f</ID>
     <ID>MaxLineLength:ProgrammeInfoSheet.kt:return if (inheritedFade == null || alpha == 0f) alpha else alpha / (1f - fraction(inheritedFade)).coerceAtLeast(0.001f)</ID>
-    <ID>MaxLineLength:ProgrammeInfoSheet.kt:scaleIn</ID>
-    <ID>MaxLineLength:ProgrammeInfoSheet.kt:scaleOut</ID>
     <ID>MaxLineLength:ProgrammeInfoSheet.kt:stringResource(if (header != null || railExpanded) R.string.nav_channels else R.string.details_back_to_tv)</ID>
-    <ID>MaxLineLength:ProgrammeInfoSheet.kt:targetScale = if (railStrip) NowPlayingFromIdentityScale else 1f</ID>
     <ID>MaxLineLength:ProgrammePane.kt:*</ID>
     <ID>MaxLineLength:ProgrammePane.kt:Modifier.align(Alignment.Center).fillMaxWidth(PictureLogoWidthFraction).fillMaxHeight(PictureLogoHeightFraction)</ID>
     <ID>MaxLineLength:ProgrammePane.kt:Modifier.layoutId(HeadlinePart.FACTS).padding(top = ProgrammeHeadlineGroupGap).testTag("$tagPrefix-facts")</ID>
@@ -1071,8 +1062,8 @@
     <ID>TopLevelPropertyNaming:PlayerErrorSurfaces.kt:internal const val PlayerChannelMessageTag = "player-channel-unavailable"</ID>
     <ID>TopLevelPropertyNaming:PlayerErrorSurfaces.kt:private const val NoDeadline = Long.MIN_VALUE</ID>
     <ID>TopLevelPropertyNaming:PlayerTopIdentity.kt:/** How much of a page's opening the identity takes to give way to the strip. */ private const val IdentityPageMorphMs = 200f</ID>
-    <ID>TopLevelPropertyNaming:PlayerTopIdentity.kt:/** The identity's share of the strip's chip: 48dp of 64dp. */ private const val IdentityMorphShrink = 0.25f</ID>
-    <ID>TopLevelPropertyNaming:PlayerTopIdentity.kt:/** The live top identity's test tag. */ internal const val PlayerTopIdentityTag = "player-top-identity"</ID>
+    <ID>TopLevelPropertyNaming:PlayerTopIdentity.kt:/** The legacy details-page exit, independent of the rail handoff. */ private const val IdentityMorphShrink = 1f / 3f</ID>
+    <ID>TopLevelPropertyNaming:PlayerTopIdentity.kt:/** The top identity's test tag. */ internal const val PlayerTopIdentityTag = "player-top-identity"</ID>
     <ID>TopLevelPropertyNaming:PlayerTopIdentity.kt:private const val ArrowAlpha = TvPassiveAlpha</ID>
     <ID>TopLevelPropertyNaming:ProgrammeDetailsPage.kt:/** Google TV's scrolled details page measured about 0.6 of the sharp art's brightness. */ private const val DetailsScrolledDimAlpha = .4f</ID>
     <ID>TopLevelPropertyNaming:ProgrammeDetailsPage.kt:/** The reader keeps at least its original dim, or the measured readable dim when that is stronger. */ private const val DetailsReadingDimAlpha = .6f</ID>
@@ -1081,10 +1072,12 @@
     <ID>TopLevelPropertyNaming:ProgrammeDetailsPage.kt:private const val DetailsBackdropBlurRadius = 3</ID>
     <ID>TopLevelPropertyNaming:ProgrammeDetailsPage.kt:private const val DetailsBackdropWidth = 160</ID>
     <ID>TopLevelPropertyNaming:ProgrammeDetailsPage.kt:private const val DetailsScrimReachY = 1.2f</ID>
-    <ID>TopLevelPropertyNaming:ProgrammeInfoSheet.kt:/** The live top identity's chip against the strip's: 64dp to 48dp. */ private const val NowPlayingFromIdentityScale = 64f / 48f</ID>
     <ID>TopLevelPropertyNaming:ProgrammePane.kt:/** The logo's room in the pane's picture: as wide as on the logo cards, half the picture tall. */ private const val PictureLogoWidthFraction = 0.6f</ID>
     <ID>TopLevelPropertyNaming:ProgrammePane.kt:private const val PictureLogoHeightFraction = 0.5f</ID>
     <ID>TopLevelPropertyNaming:QuickZapPresentation.kt:/** The peeking cards' emphasis relative to the action row: present, but quieter than the controls. */ private const val ChannelPeekAlpha = 0.6f</ID>
+    <ID>TopLevelPropertyNaming:RailIdentityTravel.kt:internal const val StripArrival = 0.875f</ID>
+    <ID>TopLevelPropertyNaming:RailIdentityTravel.kt:internal const val StripHandoffWindow = 0.0625f</ID>
+    <ID>TopLevelPropertyNaming:RailIdentityTravel.kt:internal const val StripIdentityScale = 7f / 12f</ID>
     <ID>TopLevelPropertyNaming:RecordingMarkTrack.kt:private const val AdTintAlpha = 0.26f</ID>
     <ID>TopLevelPropertyNaming:RecordingMarkTrack.kt:private const val AdTintSelectedAlpha = 0.80f</ID>
     <ID>TopLevelPropertyNaming:RecordingMarkTrack.kt:private const val TickAlpha = 0.55f</ID>

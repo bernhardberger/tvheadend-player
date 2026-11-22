@@ -175,7 +175,10 @@ private fun ChannelNumberEntryRow(
         label = "settle",
     ) { if (!it && settles) 1f else 0f }
 
-    val style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Normal, fontFeatureSettings = "tnum")
+    val style = MaterialTheme.typography.headlineSmall.copy(
+        fontWeight = FontWeight.Normal,
+        fontFeatureSettings = "tnum",
+    )
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
     // Measured once per lineup and text size: a number of maxDigits digits never shifts.
@@ -188,7 +191,9 @@ private fun ChannelNumberEntryRow(
     // Settling, the number becomes the channel's own, as its identity shows it: "01" settles as "1".
     val committing = !shown && settles
     val channel = entry.target as? ChannelNumberTarget.Channel
-    val committedNumber = if (committing) channel?.let { channelTitleNumber(it.number.toLongOrNull(), it.name) } else null
+    val committedNumber = if (committing) {
+        channel?.let { channelTitleNumber(it.number.toLongOrNull(), it.name) }
+    } else null
     val number = committedNumber?.toString() ?: entry.number
     val hideDigits = committing && channel != null && committedNumber == null
     val fieldInset = when {
@@ -445,7 +450,9 @@ private fun Modifier.channelNumberPlate(
             shadow.setShadowLayer(PlateShadowBlur.toPx(), 0f, PlateShadowOffset.toPx(),
                 Color.Black.copy(alpha = PlateShadowAlpha * p).toArgb())
             drawIntoCanvas {
-                it.nativeCanvas.drawRoundRect(left + insetX, insetY, left + width - insetX, size.height - insetY, corner, corner, shadow)
+                it.nativeCanvas.drawRoundRect(
+                    left + insetX, insetY, left + width - insetX, size.height - insetY, corner, corner, shadow,
+                )
             }
         } else {
             drawRoundRect(color, topLeft = Offset(left + insetX, insetY), size = Size(width - 2 * insetX, size.height - 2 * insetY),

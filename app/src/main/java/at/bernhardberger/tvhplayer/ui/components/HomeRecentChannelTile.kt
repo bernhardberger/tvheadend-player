@@ -66,7 +66,9 @@ internal fun HomeRecentChannelTile(
             onLongClick = contextMenu.onLongClick,
             interactionSource = interaction,
             modifier = modifier
-                .semantics(mergeDescendants = true) { contentDescription = listOfNotNull(name, program).joinToString(", ") }
+                .semantics(mergeDescendants = true) {
+                    contentDescription = listOfNotNull(name, program).joinToString(", ")
+                }
                 .cardFocusRing(ring, MaterialTheme.colorScheme.onSurface)
                 .fillMaxWidth()
                 .aspectRatio(1f)

@@ -82,7 +82,8 @@ internal fun HomeTextCard(
         modifier = modifier
             .height(height)
             .semantics(mergeDescendants = true) {
-                contentDescription = listOfNotNull(title, middleLine, subtitle).filter(String::isNotBlank).joinToString(", ")
+                contentDescription = listOfNotNull(title, middleLine, subtitle)
+                    .filter(String::isNotBlank).joinToString(", ")
             }
             .cardFocusRing(ring, MaterialTheme.colorScheme.onSurface)
             .then(contextMenu.modifier),

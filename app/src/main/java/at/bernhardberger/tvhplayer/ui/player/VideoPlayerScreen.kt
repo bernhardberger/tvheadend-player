@@ -2098,7 +2098,8 @@ fun VideoPlayerScreen(
         }
         PlayerPage(
             rail = quickZap,
-            chromeIdentityVisible = lowerChromeMode(keepControls = false) != PlayerChromeMode.HIDDEN && !chromePanelOpen,
+            chromeIdentityVisible = lowerChromeMode(keepControls = false) != PlayerChromeMode.HIDDEN &&
+                !chromePanelOpen,
             numberEntryShown = numberEntry.isNotEmpty(),
             nowPlaying = {
                 NowPlayingStrip(currentChannelId, currentChannelNumber()?.toString(), currentChannelName, currentChannel?.icon,

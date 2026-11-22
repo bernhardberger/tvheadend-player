@@ -24,12 +24,9 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
-import androidx.compose.ui.layout.FirstBaseline
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.ScaleFactor
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -187,8 +184,9 @@ private fun identitySpoken(content: PlayerChromeContent): String {
     info.recording?.let {
         return listOfNotNull(it.headline, recordingChannel(content)).joinToString(", ")
     }
-    val channel = if (info.channelNumber.isBlank()) info.channelName
-        else stringResource(R.string.player_channel_spoken, channelTitleText(info.channelNumber.toLongOrNull(), info.channelName))
+    val channel = if (info.channelNumber.isBlank()) info.channelName else stringResource(
+        R.string.player_channel_spoken, channelTitleText(info.channelNumber.toLongOrNull(), info.channelName),
+    )
     return if (content.showChannelMark) "$channel, ${stringResource(R.string.channel_recording_spoken)}" else channel
 }
 
@@ -214,8 +212,11 @@ private fun LiveIdentityContent(content: PlayerChromeContent, rail: QuickZapRail
                     fontWeight = FontWeight.Normal, fontFeatureSettings = "tnum"), 0, it.toString().length)
             }
         }
-        Row(Modifier.weight(1f, fill = false).travelToStrip(rail, railTextTravel(content.picon != null)),
-            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(IdentityTextGap)) {
+        Row(
+            Modifier.weight(1f, fill = false).travelToStrip(rail, railTextTravel(content.picon != null)),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(IdentityTextGap),
+        ) {
             Text(title,
                 style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Medium),
                 color = ink, maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -229,53 +230,6 @@ private fun LiveIdentityContent(content: PlayerChromeContent, rail: QuickZapRail
             }
         }
     }
-}
-
-private fun Modifier.travelToStrip(rail: QuickZapRailState?, dx: androidx.compose.ui.unit.Dp, logo: Boolean = false): Modifier {
-    if (rail == null) return this
-    return layout { measurable, constraints ->
-        val rtl = layoutDirection == LayoutDirection.Rtl
-        val part = measurable.measure(constraints)
-        val pivotY = if (logo) part.height / 2f else part[FirstBaseline].toFloat()
-        layout(part.width, part.height) {
-            if (!logo) rail.identityBaselineFromCenter = pivotY - part.height / 2f
-            part.placeRelativeWithLayer(0, 0) {
-                val e = rail.expansion.value
-                val travelling = rail.morphIdentity
-                railIdentityTransform(rail, dx, pivotY, logo, fromStrip = false, rtl = rtl)
-                val fadeStart = StripArrival + StripHandoffWindow
-                alpha = if (travelling) ((1f - e) / (1f - fadeStart)).coerceIn(0f, 1f) else 1f - e
-                compositingStrategy = CompositingStrategy.ModulateAlpha
-            }
-        }
-    }
-}
-
-internal val RailLogoTravel get() = (NowPlayingPlateWidth - ChipWidth) / 2
-
-internal fun railTextTravel(hasPicon: Boolean) = NowPlayingPlateWidth + NowPlayingPlateGap -
-    if (hasPicon) ChipWidth + IdentityTextGap else 0.dp
-
-internal fun GraphicsLayerScope.railIdentityTransform(
-    rail: QuickZapRailState,
-    dx: androidx.compose.ui.unit.Dp,
-    pivotY: Float,
-    logo: Boolean,
-    fromStrip: Boolean,
-    rtl: Boolean,
-) {
-    if (!rail.morphIdentity) return
-    // Arrive before the crossfade, so two displaced names never compete.
-    val e = rail.expansion.value
-    val travel = if (e <= 0.75f) e
-        else (0.75f + (e - 0.75f) * 0.25f / (StripArrival - 0.75f)).coerceAtMost(1f)
-    val distance = if (fromStrip) travel - 1f else travel
-    val scale = 1f - (1f - StripIdentityScale) * travel
-    transformOrigin = TransformOrigin(if (logo) 0.5f else if (rtl) 1f else 0f, pivotY / size.height.coerceAtLeast(1f))
-    translationX = dx.toPx() * if (rtl) -distance else distance
-    if (!logo) translationY = (rail.stripBaselineFromCenter - rail.identityBaselineFromCenter) * distance
-    scaleX = if (fromStrip) scale / StripIdentityScale else scale
-    scaleY = scaleX
 }
 
 private fun recordingChannel(content: PlayerChromeContent): String? =

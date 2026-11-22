@@ -79,7 +79,7 @@ fun PlayerInfoBar(
     val recorded = data.recording != null
     // A recording's metadata is its whole line; live's is the time range followed by the metadata.
     val facts = if (recorded) data.metadata.orEmpty()
-        else listOfNotNull(data.timeRange.takeIf(String::isNotBlank), data.metadata?.takeIf(String::isNotBlank)).joinToString(" • ")
+        else listOfNotNull(data.timeRange, data.metadata).filter(String::isNotBlank).joinToString(" • ")
     val next = data.next?.let { stringResource(R.string.player_next, it) }
     val remaining = data.remainingMinutes?.let { playerMinutesLeft(it, spoken = true) }
     val nextRecording = data.nextRecording.takeIf { next != null && !recorded }
@@ -90,8 +90,9 @@ fun PlayerInfoBar(
             channelTitleText(data.channelNumber.toLongOrNull(), data.channelName)),
         when {
             !recorded -> stringResource(R.string.player_now_spoken, data.title, data.spokenTimeRange)
-            data.recording?.recordedDate != null ->
-                stringResource(R.string.player_recorded_spoken, data.title, data.recording.recordedDate, data.spokenTimeRange)
+            data.recording?.recordedDate != null -> stringResource(
+                R.string.player_recorded_spoken, data.title, data.recording.recordedDate, data.spokenTimeRange,
+            )
             else -> listOf(data.title, data.spokenTimeRange).filter(String::isNotBlank).joinToString(", ")
         },
         subtitle,

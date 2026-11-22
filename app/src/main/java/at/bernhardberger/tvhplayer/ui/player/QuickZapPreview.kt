@@ -93,8 +93,7 @@ fun QuickZapPreview(
                         overflow = TextOverflow.Ellipsis, color = tertiary)
                     // As the info bar's Next line: centred on the text without adding to its height.
                     if (nextRecording != null) RecordingStatusIndicator(
-                        nextRecording.state, Modifier.noHeight()
-                            .then(if (nextRecording.state == DvrEntryState.SCHEDULED) Modifier.testTag("player-scheduled-marker") else Modifier),
+                        nextRecording.state, Modifier.noHeight().scheduledMarkerTag(nextRecording.state),
                         rule = nextRecording.rule, skipped = nextRecording.enabled == false,
                         textStyle = MaterialTheme.typography.labelLarge, scheduledTint = tertiary)
                 }
@@ -109,6 +108,9 @@ fun QuickZapPreview(
         )
     }
 }
+
+private fun Modifier.scheduledMarkerTag(state: DvrEntryState?) =
+    if (state == DvrEntryState.SCHEDULED) testTag("player-scheduled-marker") else this
 
 private val PreviewArtworkShape = RoundedCornerShape(12.dp)
 private val PreviewDescriptionGap = 16.dp

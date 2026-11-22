@@ -73,69 +73,44 @@ internal fun NowPlayingStrip(
     val current = displayed?.takeIf { it.isRunning(nowSec) || (at != null && it.isRunning(at)) }
     val rail = LocalPlayerRailHandoff.current
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
-    val scrim = LocalPlayerPageScrim.current
-    val labelsAndPlate = if (rail == null) Modifier else Modifier.layout { measurable, constraints ->
-        val row = measurable.measure(constraints)
-        val baseline = row[StripChannelBaseline] - row.height / 2f
-        layout(row.width, row.height) {
-            rail.stripBaselineFromCenter = baseline
-            row.placeRelative(0, 0)
-        }
-    }
-    val stripAlpha = {
-        val chrome = if (rail?.stripFollowsChromeAlpha == true) scrim?.alpha?.invoke() ?: 1f else 1f
-        chrome * (rail?.stripPresence?.value ?: 1f)
-    }
-    val surroundAlpha = { (rail?.expansion?.value ?: 1f) * stripAlpha() }
-    val identityAlpha = {
-        val e = rail?.expansion?.value ?: 1f
-        (if (rail?.morphIdentity == true) ((e - StripArrival) / StripHandoffWindow).coerceIn(0f, 1f) else e) * stripAlpha()
-    }
-    val captionAlpha = {
-        val e = rail?.expansion?.value ?: 1f
-        (if (rail?.morphIdentity == true) ((3f * e - 1f) / 2f).coerceIn(0f, 1f).pow(1.5f) else e) * stripAlpha()
-    }
+    val alphas = StripAlphas(rail, LocalPlayerPageScrim.current)
     val plateMotion = if (rail == null) Modifier else Modifier.graphicsLayer {
         railIdentityTransform(rail, RailLogoTravel, size.height / 2f, logo = true, fromStrip = true, rtl = rtl)
     }
-    Row(modifier.then(labelsAndPlate).testTag("player-now-playing").semantics(mergeDescendants = true) {},
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NowPlayingPlateGap)) {
+    Row(
+        modifier.stripBaseline(rail).testTag("player-now-playing").semantics(mergeDescendants = true) {},
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(NowPlayingPlateGap),
+    ) {
         NowPlayingPlate(picon, channelNumber, modifier = plateMotion, trimIdentityPicon = rail != null,
-            plateAlpha = surroundAlpha, markAlpha = if (picon == null) surroundAlpha else identityAlpha,
+            plateAlpha = alphas.surround, markAlpha = if (picon == null) alphas.surround else alphas.identity,
             decorativeNumber = true) {
             val progress = programmeProgress(current, nowSec)
             if (progress != null) ProgressStrip(
                 progress = progress,
-                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().stripAlpha(surroundAlpha),
+                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().stripAlpha(alphas.surround),
                 height = TvCompactProgressStripHeight,
                 color = progressColor(watchingIndicator(current, nowSec).isPlayingItem),
             )
         }
-        Column(Modifier.widthIn(max = 200.dp).width(IntrinsicSize.Max)
-            .then(if (rail == null) Modifier else Modifier.layout { measurable, constraints ->
-                val column = measurable.measure(constraints)
-                val baseline = column[FirstBaseline]
-                layout(column.width, column.height, mapOf(StripChannelBaseline to baseline)) {
-                    column.placeRelativeWithLayer(0, 0) {
-                        railIdentityTransform(rail, railTextTravel(picon != null), baseline.toFloat(),
-                            logo = false, fromStrip = true, rtl = rtl)
-                    }
-                }
-            })) {
+        Column(Modifier.widthIn(max = 200.dp).width(IntrinsicSize.Max).stripLabelTravel(rail, picon != null, rtl)) {
             // The playing card's marker: this strip is what plays, not what the rail or details show.
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(channelTitleText(channelNumber?.toLongOrNull(), channelName),
-                    Modifier.weight(1f, fill = false).stripAlpha(identityAlpha),
+                    Modifier.weight(1f, fill = false).stripAlpha(alphas.identity),
                     style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Box(Modifier.stripAlpha(captionAlpha)) {
+                Box(Modifier.stripAlpha(alphas.caption)) {
                     CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
                         ChannelPlaybackMarker(playbackIndicator, size = 16.dp)
                     }
                 }
             }
-            Text(current?.title.orEmpty(), modifier = Modifier.stripAlpha(captionAlpha), style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                current?.title.orEmpty(), modifier = Modifier.stripAlpha(alphas.caption),
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
@@ -143,10 +118,51 @@ internal fun NowPlayingStrip(
 internal val NowPlayingPlateWidth = 48.dp
 internal val NowPlayingPlateHeight = 27.dp
 internal val NowPlayingPlateGap = 12.dp
-internal const val StripIdentityScale = 7f / 12f
-internal const val StripArrival = 0.875f
-internal const val StripHandoffWindow = 0.0625f
 private val StripChannelBaseline = HorizontalAlignmentLine(::minOf)
+
+private class StripAlphas(rail: QuickZapRailState?, scrim: PlayerPageScrim?) {
+    private val strip = {
+        val chrome = if (rail?.stripFollowsChromeAlpha == true) scrim?.alpha?.invoke() ?: 1f else 1f
+        chrome * (rail?.stripPresence?.value ?: 1f)
+    }
+    val surround = { (rail?.expansion?.value ?: 1f) * strip() }
+    val identity = {
+        val e = rail?.expansion?.value ?: 1f
+        val handoff = if (rail?.morphIdentity == true) ((e - StripArrival) / StripHandoffWindow).coerceIn(0f, 1f) else e
+        handoff * strip()
+    }
+    val caption = {
+        val e = rail?.expansion?.value ?: 1f
+        val reveal = if (rail?.morphIdentity == true) ((3f * e - 1f) / 2f).coerceIn(0f, 1f).pow(1.5f) else e
+        reveal * strip()
+    }
+}
+
+private fun Modifier.stripBaseline(rail: QuickZapRailState?): Modifier {
+    if (rail == null) return this
+    return layout { measurable, constraints ->
+        val row = measurable.measure(constraints)
+        val baseline = row[StripChannelBaseline] - row.height / 2f
+        layout(row.width, row.height) {
+            rail.stripBaselineFromCenter = baseline
+            row.placeRelative(0, 0)
+        }
+    }
+}
+
+private fun Modifier.stripLabelTravel(rail: QuickZapRailState?, hasPicon: Boolean, rtl: Boolean): Modifier {
+    if (rail == null) return this
+    return layout { measurable, constraints ->
+        val column = measurable.measure(constraints)
+        val baseline = column[FirstBaseline]
+        layout(column.width, column.height, mapOf(StripChannelBaseline to baseline)) {
+            column.placeRelativeWithLayer(0, 0) {
+                railIdentityTransform(rail, railTextTravel(hasPicon), baseline.toFloat(),
+                    logo = false, fromStrip = true, rtl = rtl)
+            }
+        }
+    }
+}
 
 private fun Modifier.stripAlpha(read: () -> Float) = graphicsLayer {
     alpha = read()
