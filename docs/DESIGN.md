@@ -1431,9 +1431,14 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
   bar's bottom edge for a finished recording. For a growing recording it
   clears the behind-live box by 8dp, even when that label is not drawn. It
   moves to the trailing bottom corner as the Banner leaves.
+  Opening the controls with Up or Down passes on the current offer, even
+  if playback is paused. Skip remains in the control row while the position
+  is in the marked span. An offer that arrives with the controls already
+  open waits until they close.
   Each skip prompt has 10 seconds of shown time. The countdown pauses
-  behind controls or panels and while playback is paused, buffering, or
-  unseekable, then resumes with the time left. The program-start offer holds
+  behind Info or options (including quick lists) and while playback is
+  paused, buffering, or unseekable, then resumes with the time left.
+  The program-start offer holds
   back an overlapping Ask ad-break prompt. Dismissing it lets the ad-break
   prompt appear; accepting it can land inside the break, which then gets its
   own offer in Ask mode.

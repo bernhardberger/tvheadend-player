@@ -165,7 +165,7 @@ private fun SkipCountdown(color: Color, elapsed: () -> Float) {
 
 /**
  * The Skip prompt over the video while [shown]: it takes focus when it appears and
- * announces itself. The countdown pauses while hidden and resumes with the remaining time;
+ * announces itself. A hidden offer that is still current resumes with the remaining time;
  * after [SKIP_PROMPT_MS] of shown time, [onTimeout] withdraws the offer.
  */
 @Composable
@@ -257,7 +257,10 @@ internal fun RecordingSkipPrompt(
 internal fun RecordingSkipReserve(action: RecordingSkipAction, modifier: Modifier = Modifier, onReserve: (Dp) -> Unit) {
     val density = LocalDensity.current
     Layout(
-        content = { RecordingSkipButton({}, action, false, { 0f }) },
+        content = {
+            RecordingSkipButton({}, action, false, { 0f },
+                Modifier.focusProperties { canFocus = false }.clearAndSetSemantics {})
+        },
         modifier = modifier,
     ) { children, constraints ->
         val width = children.single().measure(constraints).width

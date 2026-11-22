@@ -33,9 +33,13 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isFocusable
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusManager
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.foundation.layout.padding
 import at.bernhardberger.tvhplayer.core.RecordingMark
 import at.bernhardberger.tvhplayer.core.RecordingMarkKind
@@ -87,6 +91,11 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.DvrCutpoint
+import at.bernhardberger.tvheadend.sdk.core.DvrCutpointAction
+import at.bernhardberger.tvheadend.sdk.core.DvrCutpointsResult
+import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
+import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.TvheadendTestResultFactory
@@ -103,6 +112,7 @@ import at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
+import kotlin.time.Duration.Companion.seconds
 import at.bernhardberger.tvhplayer.data.ConnectionState
 import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
@@ -150,6 +160,7 @@ import org.robolectric.annotation.Config
 class RecordingPlayerChromeScreenTest {
     @get:Rule val compose = createComposeRule()
     private lateinit var rootView: View
+    private lateinit var focusManager: FocusManager
     private val context = ApplicationProvider.getApplicationContext<Application>()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private lateinit var player: ExoPlayer
@@ -664,8 +675,6 @@ class RecordingPlayerChromeScreenTest {
         repeat(8) { settle() }
         assertTrue("playing without a presented frame: the Banner stays", exists("player-banner"))
         assertFalse(exists("recording-skip-prompt"))
-        fun titleBounds() = compose.onNodeWithTag("player-info-title", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        val shortTitle = titleBounds()
         presentFirstFrame()
         compose.settleFrames(20, frameMillis = 16)
         val offer = compose.onNodeWithTag("recording-skip-prompt")
@@ -673,7 +682,6 @@ class RecordingPlayerChromeScreenTest {
         val info = compose.onNodeWithTag("player-info-bar").fetchSemanticsNode().boundsInRoot
         val pill = offer.fetchSemanticsNode().boundsInRoot
         assertEquals("the focused pill ends at the bottom of the info bar", info.bottom, pill.bottom + pill.height * .05f, 1f)
-        assertEquals(shortTitle, titleBounds())
         compose.mainClock.advanceTimeBy(4_000)
         compose.waitForIdle()
         assertTrue("before 5000 ms after the first frame", exists("player-banner"))
@@ -689,27 +697,55 @@ class RecordingPlayerChromeScreenTest {
     @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
     fun theBannerMakesRoomForSkipUntilItLeavesButControlsDoNot() {
         val title = "A very long title that needs all of the available width in the recording player ".repeat(3)
-        positionMs = 1_000
-        screen(leadIn = true, title = title)
+        val ad = RecordingMark(RecordingMarkKind.AD_BREAK, 900_000, 910_000)
+        val start = RecordingMark(RecordingMarkKind.PROGRAM_START, 120_000, 120_000)
+        var offer by mutableStateOf<RecordingMark?>(ad)
+        var shown by mutableStateOf(false)
+        var mode by mutableStateOf(PlayerChromeMode.BANNER)
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                var inset by remember { mutableStateOf(0) }
+                var reserve by remember { mutableStateOf(0.dp) }
+                androidx.compose.foundation.layout.Box {
+                    RecordingChromeFixture(mode = mode, info = fixtureRecordingInfo(title = title),
+                        bannerSkipTextReserve = if (offer != null) reserve else 0.dp,
+                        onBannerSkipBottomInset = { inset = it })
+                    offer?.let {
+                        val action = at.bernhardberger.tvhplayer.playback.RecordingSkipAction(it, it.endMs)
+                        RecordingSkipReserve(action) { reserve = it }
+                        RecordingSkipPrompt(action, shown, {}, {},
+                            Modifier.align(Alignment.BottomEnd).padding(end = TvGridHorizontalMargin, bottom = TvGridVerticalMargin),
+                            bannerShown = true, bannerSkipBottomInset = { inset })
+                    }
+                }
+            }
+        }
+        compose.mainClock.autoAdvance = false
         fun bounds(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        playingWithoutFrame()
-        compose.settleFrames(14, frameMillis = 16)
-        val reservedBeforeFrame = bounds("player-info-title")
-        presentFirstFrame()
-        compose.settleFrames(14, frameMillis = 16)
+        fun titleBounds() = bounds("player-info-title")
+        fun update(change: () -> Unit) {
+            compose.runOnIdle(change)
+            compose.settleFrames(20, frameMillis = 16)
+        }
+        update {}
+        val narrow = titleBounds()
+        update { shown = true }
+        assertEquals("room is reserved before the offer appears", narrow, titleBounds())
+        update { offer = start }
+        val wide = titleBounds()
+        assertTrue("the wider offer reserves more space", wide.right < narrow.right)
         val pill = bounds("recording-skip-prompt")
         val gap = with(compose.density) { 20.dp.toPx() }
         assertTrue("the title ends before the focused offer",
-            bounds("player-info-title").right <= pill.left - pill.width * .05f - gap + 1)
-        assertEquals(reservedBeforeFrame, bounds("player-info-title"))
-        compose.pressKey(Key.Back, settleFrames = 14, frameMillis = 16)
+            wide.right <= pill.left - pill.width * .05f - gap + 1)
+        update { offer = ad }
+        assertEquals("the narrower offer cannot take back room", wide, titleBounds())
+        update { offer = null }
         assertFalse(exists("recording-skip-prompt"))
-        assertEquals("dismissing the offer must not change the Banner text", reservedBeforeFrame, bounds("player-info-title"))
-        compose.pressKey(Key.DirectionUp, settleFrames = 35, frameMillis = 16)
+        assertEquals("dismissing the offer must not change the Banner text", wide, titleBounds())
+        update { mode = PlayerChromeMode.CONTROLS }
         assertTrue(exists("player-actions"))
-        val controlsTitle = bounds("player-info-title")
-        assertTrue("controls title $controlsTitle should extend past Banner title $reservedBeforeFrame (pill $pill)",
-            controlsTitle.right > reservedBeforeFrame.right)
+        assertTrue("controls use the full width", titleBounds().right > wide.right)
     }
 
     @Test fun backDismissesTheOfferBeforeTheBanner() {
@@ -726,6 +762,29 @@ class RecordingPlayerChromeScreenTest {
         assertFalse(exists("player-banner"))
     }
 
+    @Test fun openingControlsPassesOnProgramStart() = openingControlsPassesOn(RecordingMarkKind.PROGRAM_START)
+
+    @Test fun openingControlsPassesOnAdBreak() = openingControlsPassesOn(RecordingMarkKind.AD_BREAK)
+
+    private fun openingControlsPassesOn(kind: RecordingMarkKind) {
+        positionMs = 1_000
+        screen(leadIn = kind == RecordingMarkKind.PROGRAM_START, adBreak = kind == RecordingMarkKind.AD_BREAK)
+        playing()
+        compose.settleFrames(20, frameMillis = 16)
+        compose.onNodeWithTag("recording-skip-prompt").assertIsFocused()
+        assertEquals(kind, runtime.recordingSkipPrompt.value?.mark?.kind)
+        compose.pressKey(Key.DirectionUp, settleFrames = 35, frameMillis = 16)
+        assertTrue(exists("player-actions"))
+        assertTrue(exists("recording-skip"))
+        assertTrue("opening controls does not toggle playback", player.playWhenReady)
+        assertEquals("opening controls does not skip", 1_000L, positionMs)
+        compose.pressKey(Key.Back, settleFrames = 20, frameMillis = 16)
+        assertFalse(exists("player-actions"))
+        assertFalse("the offer does not return after controls close", exists("recording-skip-prompt"))
+        compose.pressKey(Key.DirectionCenter, settleFrames = 2, frameMillis = 16)
+        assertFalse("the next OK pauses playback", player.playWhenReady)
+    }
+
     @Test fun resumingWithOkDrainsTheOpeningKeyBeforeTheNextPress() {
         positionMs = 1_000
         screen(leadIn = true)
@@ -733,6 +792,10 @@ class RecordingPlayerChromeScreenTest {
         compose.pressKey(Key.MediaPause, settleFrames = 20, frameMillis = 16)
         assertFalse(player.playWhenReady)
         assertFalse(exists("recording-skip-prompt"))
+        val surface = compose.onNodeWithContentDescription(context.getString(R.string.player_recording_surface))
+        surface.assertIsFocused()
+        compose.runOnIdle { focusManager.moveFocus(FocusDirection.Enter) }
+        surface.assertIsFocused()
         compose.onRoot().performKeyInput { keyDown(Key.DirectionCenter) }
         compose.settleFrames(20, frameMillis = 16)
         assertTrue(player.playWhenReady)
@@ -1036,10 +1099,10 @@ class RecordingPlayerChromeScreenTest {
         }
         compose.waitForIdle()
         assertTrue("the annotation names the distance from the recording head", texts("30:00 behind live"))
-        val distance = compose.onNodeWithText("30:00 behind live", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        val pill = compose.onNodeWithTag("recording-skip-prompt").fetchSemanticsNode().boundsInRoot
-        assertTrue("the focused pill clears the distance box",
-            pill.bottom + pill.height * .05f <= distance.top - with(compose.density) { 8.dp.toPx() } + 1f)
+        val distance = compose.onNodeWithTag("player-live-state", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val pill = compose.onNodeWithTag("recording-skip-prompt").assertIsFocused().fetchSemanticsNode().boundsInRoot
+        assertEquals("the focused pill clears the distance box by 8 dp",
+            distance.top - with(compose.density) { 8.dp.toPx() }, pill.bottom + pill.height * .05f, 1f)
         assertEquals("Behind live", description("player-live-state"))
         assertEquals("the length carries no recording dot", "1:00:00", endClock())
         compose.onNodeWithTag("player-info-timing-mark", useUnmergedTree = true).assertDoesNotExist()
@@ -1343,10 +1406,17 @@ class RecordingPlayerChromeScreenTest {
         compose.settleFrames(20)
     }
 
+    @OptIn(TvheadendTestingApi::class)
+    private fun sessionWithAdBreak(session: FakeTvheadendSession): TvheadendSession = object : TvheadendSession by session {
+        override fun bindRecordingPlayback(currentSession: CurrentSessionObservation, recordingId: DvrEntryId) =
+            TvheadendTestResultFactory.boundCompletedRecordingPlayback(session, currentSession, recordingId, cutpoints = {
+                DvrCutpointsResult.Available.create(listOf(DvrCutpoint(0.seconds, 90.seconds, DvrCutpointAction.COMMERCIAL_BREAK)))
+            })
+    }
+
     /** [listed] false: the server never lists the recording, so the screen stays in its loading state. */
     private fun screen(onClose: () -> Unit = {}, listed: Boolean = true, refusedEntry: DvrEntry? = null,
-        settleEntry: Boolean = true, inheritedAudio: AudioTrackChoice? = null, leadIn: Boolean = false,
-        title: String = "Zeit im Bild",
+        settleEntry: Boolean = true, inheritedAudio: AudioTrackChoice? = null, leadIn: Boolean = false, adBreak: Boolean = false,
     ): FakeTvheadendSession {
         val recording = DvrEntryId(7)
         val session = FakeTvheadendSession(SessionObservation.create(
@@ -1354,12 +1424,13 @@ class RecordingPlayerChromeScreenTest {
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(Channel.create(ChannelId(1), name = "Documentary")))),
             epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create(listOfNotNull(refusedEntry ?: DvrEntry.create(
-                id = recording, state = DvrEntryState.COMPLETED, title = title, channelName = "Documentary",
+                id = recording, state = DvrEntryState.COMPLETED, title = "Zeit im Bild", channelName = "Documentary",
                 channelId = ChannelId(1).takeIf { inheritedAudio != null },
                 start = kotlin.time.Instant.fromEpochSeconds(1_800).takeIf { leadIn },
                 startExtraMinutes = kotlin.time.Duration.parse("2m").takeIf { leadIn },
             ).takeIf { listed }))),
         )).apply { scriptRecordingPlaybackSuccess() }
+        val playbackSession = if (adBreak) sessionWithAdBreak(session) else session
         val settings = PlayerSettingsStore(trackChoiceData)
         val profile = inheritedAudio?.let {
             ServerProfileReadResult.anonymous(
@@ -1408,7 +1479,7 @@ class RecordingPlayerChromeScreenTest {
                 base.removeListener(listener)
             }
         }
-        runtime = AppPlaybackRuntime(controlled, session, coordinator, settings, profiles, scope,
+        runtime = AppPlaybackRuntime(controlled, playbackSession, coordinator, settings, profiles, scope,
             TvheadendAudioOutputProvider(context), PlaybackAudioFocus.None,
             PlaybackRuntimePolicy.fromPlayerSettings(object : PlaybackTrace {}),
             noticeCenter = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) { at.bernhardberger.tvhplayer.notices.NoticeContext(0, null) })
@@ -1439,6 +1510,7 @@ class RecordingPlayerChromeScreenTest {
         if (!settleEntry) compose.mainClock.autoAdvance = false
         compose.setContent {
             rootView = LocalView.current
+            focusManager = LocalFocusManager.current
             KoinApplication(application = { modules(noticeModule) }) {
             val target by runtime.activeTarget.collectAsState()
             val selection by runtime.recordingSelection.collectAsState()

@@ -356,6 +356,7 @@ fun RecordingPlayerScreen(
             if (timelineState.seekPending) {
                 timelineState.commitPendingSeek()
             }
+            skipPrompt?.let(session::dismissRecordingSkipPrompt)
             layers.restoreInfoFocus = false
             chrome.showControls()
             true
