@@ -26,10 +26,13 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.FirstBaseline
 import androidx.compose.ui.layout.HorizontalAlignmentLine
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -69,6 +72,7 @@ internal fun NowPlayingStrip(
         programmeAt(at) ?: programme else programme
     val current = displayed?.takeIf { it.isRunning(nowSec) || (at != null && it.isRunning(at)) }
     val rail = LocalPlayerRailHandoff.current
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     val scrim = LocalPlayerPageScrim.current
     val labelsAndPlate = if (rail == null) Modifier else Modifier.layout { measurable, constraints ->
         val row = measurable.measure(constraints)
@@ -78,23 +82,27 @@ internal fun NowPlayingStrip(
             row.placeRelative(0, 0)
         }
     }
-    val chromeAlpha = { if (rail == null || rail.morphIdentity) 1f else scrim?.alpha?.invoke() ?: 1f }
-    val surroundAlpha = { (rail?.expansion?.value ?: 1f) * chromeAlpha() }
+    val stripAlpha = {
+        val chrome = if (rail?.stripFollowsChromeAlpha == true) scrim?.alpha?.invoke() ?: 1f else 1f
+        chrome * (rail?.stripPresence?.value ?: 1f)
+    }
+    val surroundAlpha = { (rail?.expansion?.value ?: 1f) * stripAlpha() }
     val identityAlpha = {
         val e = rail?.expansion?.value ?: 1f
-        if (rail?.morphIdentity == true) ((e - StripArrival) / StripHandoffWindow).coerceIn(0f, 1f) else e * chromeAlpha()
+        (if (rail?.morphIdentity == true) ((e - StripArrival) / StripHandoffWindow).coerceIn(0f, 1f) else e) * stripAlpha()
     }
     val captionAlpha = {
         val e = rail?.expansion?.value ?: 1f
-        if (rail?.morphIdentity == true) ((3f * e - 1f) / 2f).coerceIn(0f, 1f).pow(1.5f) else e * chromeAlpha()
+        (if (rail?.morphIdentity == true) ((3f * e - 1f) / 2f).coerceIn(0f, 1f).pow(1.5f) else e) * stripAlpha()
     }
     val plateMotion = if (rail == null) Modifier else Modifier.graphicsLayer {
-        railIdentityTransform(rail, RailLogoTravel, size.height / 2f, logo = true, fromStrip = true)
+        railIdentityTransform(rail, RailLogoTravel, size.height / 2f, logo = true, fromStrip = true, rtl = rtl)
     }
     Row(modifier.then(labelsAndPlate).testTag("player-now-playing").semantics(mergeDescendants = true) {},
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NowPlayingPlateGap)) {
         NowPlayingPlate(picon, channelNumber, modifier = plateMotion, trimIdentityPicon = rail != null,
-            plateAlpha = surroundAlpha, markAlpha = if (picon == null) surroundAlpha else identityAlpha) {
+            plateAlpha = surroundAlpha, markAlpha = if (picon == null) surroundAlpha else identityAlpha,
+            decorativeNumber = true) {
             val progress = programmeProgress(current, nowSec)
             if (progress != null) ProgressStrip(
                 progress = progress,
@@ -108,9 +116,9 @@ internal fun NowPlayingStrip(
                 val column = measurable.measure(constraints)
                 val baseline = column[FirstBaseline]
                 layout(column.width, column.height, mapOf(StripChannelBaseline to baseline)) {
-                    column.placeWithLayer(0, 0) {
+                    column.placeRelativeWithLayer(0, 0) {
                         railIdentityTransform(rail, railTextTravel(picon != null), baseline.toFloat(),
-                            logo = false, fromStrip = true)
+                            logo = false, fromStrip = true, rtl = rtl)
                     }
                 }
             })) {
@@ -158,6 +166,7 @@ internal fun NowPlayingPlate(
     trimIdentityPicon: Boolean = false,
     plateAlpha: (() -> Float)? = null,
     markAlpha: (() -> Float)? = null,
+    decorativeNumber: Boolean = false,
     strip: @Composable BoxScope.() -> Unit = {},
 ) {
     val plate = if (plateAlpha == null) Modifier.background(TvSurfaceColors.containerLowest)
@@ -176,7 +185,8 @@ internal fun NowPlayingPlate(
                 scaleY = StripIdentityScale
             })
         } else if (picon != null || !AppChannelNumbers.shown) PiconBox(picon, mark.padding(3.dp))
-        else Text(channelNumber.orEmpty(), mark, style = MaterialTheme.typography.labelLarge,
+        else Text(channelNumber.orEmpty(), if (decorativeNumber) mark.clearAndSetSemantics {} else mark,
+            style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurface, maxLines = 1)
         strip()
     }

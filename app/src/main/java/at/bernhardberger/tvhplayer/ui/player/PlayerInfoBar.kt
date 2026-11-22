@@ -84,6 +84,7 @@ fun PlayerInfoBar(
     val remaining = data.remainingMinutes?.let { playerMinutesLeft(it, spoken = true) }
     val nextRecording = data.nextRecording.takeIf { next != null && !recorded }
     val nowRecordingState = data.nowRecordingStateOverride ?: data.nowRecording?.state
+    val subtitle = data.subtitle?.takeIf(String::isNotBlank)
     val description = listOfNotNull(
         if (data.channelNumber.isBlank()) data.channelName else stringResource(R.string.player_channel_spoken,
             channelTitleText(data.channelNumber.toLongOrNull(), data.channelName)),
@@ -93,6 +94,8 @@ fun PlayerInfoBar(
                 stringResource(R.string.player_recorded_spoken, data.title, data.recording.recordedDate, data.spokenTimeRange)
             else -> listOf(data.title, data.spokenTimeRange).filter(String::isNotBlank).joinToString(", ")
         },
+        subtitle,
+        facts.takeIf { recorded && data.nowRecording == null && it.isNotBlank() },
         data.nowRecording?.let { recordingStatusSpoken(nowRecordingState, it.rule) },
         remaining, next, nextRecording?.let { recordingStatusSpoken(it.state, it.rule, skipped = it.enabled == false) },
         badges.takeIf { it.isNotEmpty() }?.map { glanceBadgeSpoken(it) }?.joinToString(". "),
@@ -100,7 +103,6 @@ fun PlayerInfoBar(
     val faded = Modifier.graphicsLayer { alpha = contentAlpha() }
     // Live ends on Next; a recording has none, its episode stands on the subtitle's line.
     val lastText = next.takeIf { !recorded }
-    val subtitle = data.subtitle?.takeIf(String::isNotBlank)
     val reserved = Modifier.reserveEnd(lastLineEndReserve)
     // Without a last row, the lowest present line leaves the distance its room.
     val reserveOn = when {

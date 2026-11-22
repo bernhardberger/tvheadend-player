@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -37,6 +38,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -57,12 +59,14 @@ import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.LayoutDirection
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
@@ -97,16 +101,21 @@ class PlayerMotionTest {
     private val motionScale = object : MotionDurationScale { override var scaleFactor = 1f }
     @get:Rule val compose = createComposeRule(effectContext = motionScale)
 
-    @Test fun liveIdentityTravelsToTheStripAndCanTurnBack() {
+    @Test fun liveIdentityTravelsToTheStripAndCanTurnBack() = identityHandoff(LayoutDirection.Ltr)
+
+    @Test fun theIdentityLandsOnTheMirroredStrip() = identityHandoff(LayoutDirection.Rtl)
+
+    private fun identityHandoff(direction: LayoutDirection) {
         var expansion by mutableStateOf(0f)
         var expanded by mutableStateOf(false)
+        var recording by mutableStateOf(false)
         var identityFirstBaseline = 0f
         var stripFirstBaseline = 0f
         val icon = ChannelIcon.ImageCache(ArtworkId(1))
         val content = PlayerChromeContent(PlayerChromeClockSec,
             PlayerInfoBarData("1", "Ridge Earth", "", ""), picon = icon)
         compose.setContent {
-            TVHeadendPlayerTheme {
+            TVHeadendPlayerTheme { CompositionLocalProvider(LocalLayoutDirection provides direction) {
                 val rail = rememberQuickZapRail(expanded, detached = true)
                 LaunchedEffect(expansion) { rail.expansionAnimation.snapTo(expansion) }
                 val measurer = rememberTextMeasurer()
@@ -115,13 +124,21 @@ class PlayerMotionTest {
                 stripFirstBaseline = measurer.measure("1 Ridge Earth", MaterialTheme.typography.labelLarge).firstBaseline
                 PlayerPage(details = null as Unit?, rail = rail, chromeIdentityVisible = true,
                     nowPlaying = { NowPlayingStrip(ChannelId(1), "1", "Ridge Earth", icon, null, PlayerChromeClockSec) },
-                    player = { PlayerTopIdentity(content, Modifier.fillMaxSize()) }) { }
-            }
+                    player = {
+                        PlayerTopIdentity(
+                            if (recording) content.copy(info = content.info.copy(
+                                recording = RecordingIdentity("Recorded yesterday", "Yesterday"))) else content,
+                            Modifier.fillMaxSize(),
+                        )
+                    }) { }
+            } }
         }
 
         fun bounds(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         fun logo() = bounds("player-top-identity-logo")
         fun title() = bounds("player-top-identity-name")
+        fun Rect.start() = if (direction == LayoutDirection.Rtl) right else left
+        fun crosses(from: Float, to: Float, at: Float) = at in minOf(from, to)..maxOf(from, to)
         val restLogo = logo()
         val restTitle = title()
         fun identityBaseline() = title().let { it.top + identityFirstBaseline * (it.height / restTitle.height) }
@@ -133,31 +150,125 @@ class PlayerMotionTest {
         compose.changeState { expansion = 1f }
         val stripTitle = stripTitleBounds()
         val stripBaseline = stripTitle.top + stripFirstBaseline
-        val stripLogoCenter = strip.left + with(compose.density) { NowPlayingPlateWidth.toPx() / 2 }
+        val stripLogoCenter = strip.start() + with(compose.density) {
+            NowPlayingPlateWidth.toPx() / (if (direction == LayoutDirection.Rtl) -2 else 2)
+        }
+        if (direction == LayoutDirection.Rtl) assertTrue(restLogo.center.x > compose.onRoot()
+            .fetchSemanticsNode().boundsInRoot.center.x)
 
         compose.changeState { expansion = 1f / 3f }
         val middleLogo = logo()
         val middleTitle = title()
-        assertTrue("the logo centre travels toward the plate", middleLogo.center.x in stripLogoCenter..<restLogo.center.x)
-        assertTrue("text independently travels toward the strip", middleTitle.left in stripTitle.left..<restTitle.left)
+        assertTrue("the logo centre travels toward the plate", crosses(stripLogoCenter, restLogo.center.x, middleLogo.center.x))
+        assertTrue("text independently travels toward the strip", crosses(stripTitle.start(), restTitle.start(), middleTitle.start()))
         val middleBaseline = identityBaseline()
         assertTrue("the text's baseline rises toward the actual first line", middleBaseline in stripBaseline..<restBaseline)
         val movingStripTitle = stripTitleBounds()
-        assertEquals("both names share the moving start", middleTitle.left, movingStripTitle.left, 0.5f)
+        assertEquals("both names share the moving start", middleTitle.start(), movingStripTitle.start(), 0.5f)
         assertEquals("both names share the moving baseline", middleBaseline,
             movingStripTitle.top + stripFirstBaseline * movingStripTitle.height / stripTitle.height, 1f)
         assertEquals(restLogo.center.y, middleLogo.center.y, 0.5f)
 
         compose.changeState { expansion = 0.25f }
-        assertTrue("reversing sends the same logo back toward rest", logo().center.x in middleLogo.center.x..<restLogo.center.x)
-        assertTrue("text reverses independently", title().left in middleTitle.left..<restTitle.left)
+        assertTrue("reversing sends the same logo back toward rest", crosses(middleLogo.center.x, restLogo.center.x, logo().center.x))
+        assertTrue("text reverses independently", crosses(middleTitle.start(), restTitle.start(), title().start()))
         assertTrue("the baseline reverses from its current position", identityBaseline() in middleBaseline..<restBaseline)
 
         compose.changeState { expansion = 1f }
         assertEquals(stripLogoCenter, logo().center.x, 0.5f)
-        assertEquals(stripTitle.left, title().left, 0.5f)
+        assertEquals(stripTitle.start(), title().start(), 0.5f)
         assertEquals(stripBaseline, identityBaseline(), 1f)
         assertEquals(strip, bounds("player-now-playing"))
+        if (direction == LayoutDirection.Ltr) {
+            compose.changeState { recording = true }
+            compose.onNodeWithContentDescription("Recorded yesterday, Ridge Earth").assertExists()
+        }
+    }
+
+    @Test fun theRailKeepsItsGeometryWhenChromeLeavesAndTheRailReopens() {
+        var expanded by mutableStateOf(false)
+        var chrome by mutableStateOf(true)
+        lateinit var rail: QuickZapRailState
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                rail = rememberQuickZapRail(expanded, detached = true)
+                PlayerPage<Unit>(null, rail = rail, chromeIdentityVisible = chrome,
+                    nowPlaying = { NowPlayingStrip(ChannelId(1), "1", "Ridge Earth", null, null, PlayerChromeClockSec) },
+                    player = {
+                        QuickZapControls(rail, null) {
+                            PlayerTopIdentity(PlayerChromeContent(PlayerChromeClockSec,
+                                PlayerInfoBarData("1", "Ridge Earth", "", "")), Modifier.fillMaxSize())
+                        }
+                        QuickZapRail(rail, channelContent = {}, preview = {})
+                    }, programme = {})
+            }
+        }
+        fun stripTextStart() = compose.onNodeWithText("1 Ridge Earth", useUnmergedTree = true)
+            .fetchSemanticsNode().boundsInRoot.left
+        compose.mainClock.autoAdvance = false
+        compose.changeState { expanded = true }
+        compose.mainClock.advanceTimeByFrame()
+        assertFalse(compose.onNodeWithTag(PlayerTopIdentityTag, useUnmergedTree = true)
+            .fetchSemanticsNode().config.contains(SemanticsProperties.ContentDescription))
+        compose.onNodeWithText("1 Ridge Earth").assertExists()
+        compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+        val standing = stripTextStart()
+        compose.mainClock.autoAdvance = false
+        compose.changeState { expanded = false }
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithContentDescription("Channel 1 Ridge Earth").assertExists()
+        compose.onNodeWithText("1 Ridge Earth").assertDoesNotExist()
+        compose.mainClock.advanceTimeBy(PlayerMotion.MediumMs * 2L / 3)
+        val closing = stripTextStart()
+        assertTrue("the strip has left its endpoint", closing < standing)
+        compose.changeState { chrome = false }
+        compose.mainClock.advanceTimeByFrame()
+        val hidden = stripTextStart()
+        assertTrue("hiding chrome cannot snap the closing strip forward", hidden <= closing + 0.5f)
+        compose.changeState { expanded = true }
+        compose.mainClock.advanceTimeByFrame()
+        assertEquals("reopening changes direction without jumping", hidden, stripTextStart(), 10f)
+    }
+
+    @Test fun theDirectRailHasOneChannelNameAndNumberEntryTakesItsPlace() {
+        var expanded by mutableStateOf(false)
+        var entering by mutableStateOf(false)
+        var sample by mutableStateOf(1f)
+        lateinit var view: View
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                view = LocalView.current
+                val rail = rememberQuickZapRail(expanded, detached = true)
+                LaunchedEffect(sample) { if (sample < 1f || expanded) rail.expansionAnimation.snapTo(sample) }
+                PlayerPage<Unit>(null, rail = rail, numberEntryShown = entering,
+                    nowPlaying = { NowPlayingStrip(ChannelId(1), "1", "Ridge Earth", null, null, PlayerChromeClockSec) },
+                    player = {
+                        val scrim = LocalPlayerPageScrim.current
+                        androidx.compose.runtime.SideEffect { scrim?.alpha = { 1f } }
+                        QuickZapRail(rail, channelContent = {}, preview = {})
+                    }, programme = {})
+            }
+        }
+        compose.changeState { expanded = true }
+        val strip = compose.onNodeWithTag("player-now-playing")
+        val bounds = strip.fetchSemanticsNode().boundsInRoot
+        fun titleBounds() = compose.onNodeWithText("1 Ridge Earth", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val standing = titleBounds()
+        compose.changeState { sample = 1f / 3f }
+        assertEquals("a direct visit never travels", standing, titleBounds())
+        compose.changeState { sample = 1f }
+        val spoken = strip.fetchSemanticsNode().config[SemanticsProperties.Text].map { it.text }.filter(String::isNotBlank)
+        val visible = compose.drawnBrightness(view, bounds)
+        compose.mainClock.autoAdvance = false
+        compose.changeState { entering = true }
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithText("1 Ridge Earth").assertDoesNotExist()
+        compose.mainClock.advanceTimeBy(PlayerMotion.FastMs / 2L)
+        assertEquals("one channel name; entry must not pop the strip",
+            listOf("1 Ridge Earth") to true, spoken to (compose.drawnBrightness(view, bounds) in 1f..<visible))
+        compose.mainClock.advanceTimeBy(PlayerMotion.FastMs.toLong())
+        assertEquals(0f, compose.drawnBrightness(view, bounds), 0f)
     }
 
     @Test fun hidingControlsDropsFocusSemanticsAndKeysOnTheFirstExitFrame() {
@@ -782,6 +893,32 @@ class PlayerMotionTest {
         compose.mainClock.advanceTimeBy(PlayerMotion.DestinationExitMs - 20L)
         assertEquals("the number starts on the keyline", fieldStart, digits().left, 2f)
         assertEquals("the name one space after it", fieldStart + advance + space, name().left, 2f)
+    }
+
+    @Test fun aCommittedNumberMovesToTheMirroredIdentityWithOrWithoutALogo() {
+        var number by mutableStateOf("12")
+        var picon by mutableStateOf<ChannelIcon?>(null)
+        compose.setContent {
+            TVHeadendPlayerTheme { CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                PlayerTopIdentity(PlayerChromeContent(PlayerChromeClockSec,
+                    PlayerInfoBarData("12", "One", "", ""), picon = picon), Modifier.fillMaxSize())
+                PlayerTopIdentitySlot {
+                    ChannelNumberOverlay(number, ChannelNumberTarget.Channel("12", "One", picon), settles = number.isEmpty())
+                }
+            } }
+        }
+        fun right(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.right
+        for (icon in listOf(null, ChannelIcon.ImageCache(ArtworkId(1)))) {
+            compose.mainClock.autoAdvance = true
+            compose.changeState { picon = icon; number = "12" }
+            val identity = right("player-top-identity-name")
+            assertTrue(identity > compose.onRoot().fetchSemanticsNode().boundsInRoot.center.x)
+            compose.mainClock.autoAdvance = false
+            compose.changeState { number = "" }
+            compose.mainClock.advanceTimeByFrame()
+            compose.mainClock.advanceTimeBy(PlayerMotion.DestinationExitMs - 20L)
+            assertEquals(identity, right("channel-number-digits"), 2f)
+        }
     }
 
     @Test fun numberEntryKeepsTheChromeItInterruptedStillAndNeverRevealsHiddenChrome() {

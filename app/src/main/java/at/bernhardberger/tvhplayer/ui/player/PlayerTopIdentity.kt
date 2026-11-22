@@ -32,6 +32,7 @@ import androidx.compose.ui.layout.FirstBaseline
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.ScaleFactor
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.painterResource
@@ -44,6 +45,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Icon
@@ -78,10 +80,8 @@ internal fun PlayerTopIdentity(
     numberEntryShown: Boolean = false,
 ) {
     // Out as the entry's plate grows over it, back in at rest as the entry leaves.
-    val present = animateFloatAsState(if (numberEntryShown) 0f else 1f,
-        if (numberEntryShown) tween(PlayerMotion.FastMs, easing = PlayerMotion.StandardAccelerate)
-        else tween(PlayerMotion.ShortMs, easing = PlayerMotion.StandardDecelerate),
-        label = "identity under number entry")
+    val present = identityPresence(numberEntryShown)
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     val rail = LocalPlayerRailHandoff.current.takeIf { content.info.recording == null }
     val page = LocalPlayerPageProgress.current
     // 0 at rest, 1 once the strip stands in for the identity.
@@ -98,7 +98,8 @@ internal fun PlayerTopIdentity(
                     scaleX = 1f - IdentityMorphShrink * m
                     scaleY = scaleX
                     // The chip's start edge stays where the strip's chip stands.
-                    transformOrigin = TransformOrigin(IdentityInset.toPx() / size.width.coerceAtLeast(1f), 0.5f)
+                    val inset = IdentityInset.toPx() / size.width.coerceAtLeast(1f)
+                    transformOrigin = TransformOrigin(if (rtl) 1f - inset else inset, 0.5f)
                 }
                 val spoken = identitySpoken(content)
                 // Faded out under the entry, it is not read out either; the entry speaks for itself.
@@ -119,11 +120,18 @@ internal fun PlayerTopIdentity(
             val identity = measurables[1].measure(loose)
             val origin = identityOrigin(probe.height, identity.height)
             layout(constraints.maxWidth, constraints.maxHeight) {
-                identity.place(origin)
+                identity.placeRelative(origin)
             }
         }
     }
 }
+
+@Composable
+internal fun identityPresence(numberEntryShown: Boolean) =
+    animateFloatAsState(if (numberEntryShown) 0f else 1f,
+        if (numberEntryShown) tween(PlayerMotion.FastMs, easing = PlayerMotion.StandardAccelerate)
+        else tween(PlayerMotion.ShortMs, easing = PlayerMotion.StandardDecelerate),
+        label = "identity under number entry")
 
 /**
  * [content] where [PlayerTopIdentity] stands, whether or not the chrome is up: the channel number
@@ -152,7 +160,7 @@ internal fun PlayerTopIdentitySlot(
         val identity = measurables[1].measure(loose)
         val slot = measurables[2].measure(loose)
         layout(constraints.maxWidth, constraints.maxHeight) {
-            slot.place(identityOrigin(probe.height, identity.height))
+            slot.placeRelative(identityOrigin(probe.height, identity.height))
         }
     }
 }
@@ -226,14 +234,15 @@ private fun LiveIdentityContent(content: PlayerChromeContent, rail: QuickZapRail
 private fun Modifier.travelToStrip(rail: QuickZapRailState?, dx: androidx.compose.ui.unit.Dp, logo: Boolean = false): Modifier {
     if (rail == null) return this
     return layout { measurable, constraints ->
+        val rtl = layoutDirection == LayoutDirection.Rtl
         val part = measurable.measure(constraints)
         val pivotY = if (logo) part.height / 2f else part[FirstBaseline].toFloat()
         layout(part.width, part.height) {
             if (!logo) rail.identityBaselineFromCenter = pivotY - part.height / 2f
-            part.placeWithLayer(0, 0) {
+            part.placeRelativeWithLayer(0, 0) {
                 val e = rail.expansion.value
                 val travelling = rail.morphIdentity
-                railIdentityTransform(rail, dx, pivotY, logo, fromStrip = false)
+                railIdentityTransform(rail, dx, pivotY, logo, fromStrip = false, rtl = rtl)
                 val fadeStart = StripArrival + StripHandoffWindow
                 alpha = if (travelling) ((1f - e) / (1f - fadeStart)).coerceIn(0f, 1f) else 1f - e
                 compositingStrategy = CompositingStrategy.ModulateAlpha
@@ -253,6 +262,7 @@ internal fun GraphicsLayerScope.railIdentityTransform(
     pivotY: Float,
     logo: Boolean,
     fromStrip: Boolean,
+    rtl: Boolean,
 ) {
     if (!rail.morphIdentity) return
     // Arrive before the crossfade, so two displaced names never compete.
@@ -261,15 +271,15 @@ internal fun GraphicsLayerScope.railIdentityTransform(
         else (0.75f + (e - 0.75f) * 0.25f / (StripArrival - 0.75f)).coerceAtMost(1f)
     val distance = if (fromStrip) travel - 1f else travel
     val scale = 1f - (1f - StripIdentityScale) * travel
-    transformOrigin = TransformOrigin(if (logo) 0.5f else 0f, pivotY / size.height.coerceAtLeast(1f))
-    translationX = dx.toPx() * distance
+    transformOrigin = TransformOrigin(if (logo) 0.5f else if (rtl) 1f else 0f, pivotY / size.height.coerceAtLeast(1f))
+    translationX = dx.toPx() * if (rtl) -distance else distance
     if (!logo) translationY = (rail.stripBaselineFromCenter - rail.identityBaselineFromCenter) * distance
     scaleX = if (fromStrip) scale / StripIdentityScale else scale
     scaleY = scaleX
 }
 
 private fun recordingChannel(content: PlayerChromeContent): String? =
-    content.info.channelName.takeUnless { content.withoutChannel || it.isBlank() }
+    content.info.channelName.takeUnless(String::isBlank)
 
 @Composable
 private fun RecordingIdentityContent(content: PlayerChromeContent, recording: RecordingIdentity) {

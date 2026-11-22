@@ -263,7 +263,7 @@ class PlayerChromeEvidenceTest {
     }
 
     @Test fun noLogoNowPlayingPlateFollowsNumberVisibility() = assertNoLogoNumberVisibility("now-playing-plate") {
-        NowPlayingStrip(ChannelId(101), "101", "Ridge Earth HD", null, null, 0L)
+        NowPlayingPlate(null, "101")
     }
 
     @Test fun noLogoProgrammeHeroFollowsNumberVisibility() = assertNoLogoNumberVisibility("programme-hero") {
@@ -477,7 +477,7 @@ class PlayerChromeEvidenceTest {
         compose.setContent { TVHeadendPlayerTheme { Column(Modifier.width(800.dp)) {
             ProvideArtworkSession(session) { QuickZapPreview("Failed title", "Failed metadata", null, "21:00 Failed next",
                 ChannelIcon.ImageCache(ArtworkId(1)), nextRecording = DvrEntry.create(DvrEntryId(1),
-                    state = DvrEntryState.SCHEDULED, autorecRuleId = AutorecRuleId("rule"))) }
+                    state = DvrEntryState.SCHEDULED, enabled = false, autorecRuleId = AutorecRuleId("rule"))) }
             ProvideArtworkSession(session) { QuickZapPreview("Absent title", "Absent metadata", null, "21:00 Absent next", null) }
         } } }
         compose.waitForIdle()
@@ -489,7 +489,7 @@ class PlayerChromeEvidenceTest {
         assertTrue("$marker follows $scheduledNext", marker.left >= scheduledNext.right)
         assertEquals(scheduledNext.center.y, marker.center.y, 1f)
         compose.onNode(hasText("Next • 21:00 Failed next", substring = true) and hasContentDescription(
-            ApplicationProvider.getApplicationContext<Application>().getString(RecordingRule.AUTOMATIC.label), substring = true))
+            ApplicationProvider.getApplicationContext<Application>().getString(R.string.autorec_editor_skipped), substring = true))
             .assertExists()
         val failed = compose.onNodeWithText("Failed title", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         val absent = compose.onNodeWithText("Absent title", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot

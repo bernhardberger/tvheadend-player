@@ -296,6 +296,9 @@ class PlayerTopIdentityTest {
         for (mode in listOf(PlayerChromeMode.CONTROLS, PlayerChromeMode.BANNER)) {
             compose.runOnIdle { shownMode = mode }
             compose.settleFrames(20)
+            val speech = compose.onNodeWithTag("player-info-bar").fetchSemanticsNode()
+                .config[SemanticsProperties.ContentDescription].joinToString()
+            assertEquals(1, speech.split(requireNotNull(info.subtitle)).size - 1)
             val tile = compose.tagBounds("player-info-artwork-tile")
             val title = compose.onNode(hasTestTag("player-info-title") and hasAnyAncestor(hasTestTag("player-info-bar")), useUnmergedTree = true)
                 .fetchSemanticsNode().boundsInRoot
@@ -363,6 +366,7 @@ class PlayerTopIdentityTest {
         compose.setContent {
             TVHeadendPlayerTheme {
                 info = recordingInfoBarData(entry, 101, start.epochSeconds + 8000, 300_000, 7_200_000, growing)
+                    .copy(subtitle = "An episode")
                 RecordingChromeFixture(mode = PlayerChromeMode.BANNER, growing = growing, info = info)
             }
         }
@@ -381,8 +385,23 @@ class PlayerTopIdentityTest {
                     assertTrue("the recorded date and time are spoken", it.contains(date))
                     assertTrue("the time range is spoken", it.contains(info.spokenTimeRange))
                     assertTrue("the title is spoken", it.contains(info.title))
+                    assertEquals(1, it.split(requireNotNull(info.subtitle)).size - 1)
+                    if (!stillRecording) assertEquals(1, it.split(requireNotNull(info.metadata)).size - 1)
+                    assertEquals(1, it.split(info.spokenTimeRange).size - 1)
                 }
         }
+    }
+
+    @Test fun recordingIdentityKeepsTheStoredChannelNameWhenItsChannelIsGone() {
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                RecordingChromeFixture(withoutChannel = true, info = PlayerInfoBarData(
+                    "", "Former channel", "Programme", "", recording = RecordingIdentity("Recorded yesterday", null),
+                ))
+            }
+        }
+        assertEquals("Recorded yesterday, Former channel", identitySpeech(compose))
+        compose.onNodeWithText("Former channel", useUnmergedTree = true).assertExists()
     }
 
     private var timeshift by mutableStateOf(

@@ -1037,11 +1037,13 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
 - The top band shares the clock's center line. The live identity stands at the
   58dp keyline; as the channel rail rises, its logo and name move separately
   into the now-playing strip. The plate follows the logo, and the strip's labels
-  follow the name's first baseline until they arrive. The strip keeps the watched channel
-  above the rail, with its current programme, playback marker, and progress.
+  follow the name's first baseline until they arrive. The motion reverses from
+  its current position, including when the chrome fades before the rail closes.
+  The strip keeps the watched channel above the rail, with its current programme,
+  playback marker, and progress.
   Without a logo the identity's name starts on the keyline and the strip keeps
-  its number plate. The up affordance is centered above the rail; the clock is
-  on the right. Programme details do not show a now-playing strip.
+  its decorative number plate. The up affordance is centered above the rail;
+  the clock is at the trailing edge. Programme details do not show a now-playing strip.
 - Live TV and recordings share one chrome with four modes: hidden; the passive
   **Banner** (clock, info bar, timeline; nothing focusable); the **Banner step**
   (a quick step's preview inside the Banner, without a thumb); and the
@@ -1064,9 +1066,11 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
   single 24sp line: the number is regular at 80% on-surface and the name is
   medium at full on-surface. Without a picon the text starts on the keyline.
   The channel-number plate uses the same logo and type and settles on the
-  identity. A recording replaces the channel lockup with a library symbol
+  identity, and both the identity and strip fade under number entry. The layouts
+  mirror in right-to-left locales. A recording replaces the channel lockup with a library symbol
   or, while growing, a red recording mark. Its headline is `Recorded <date>`
-  or `Recording until HH:MM`; the unnumbered channel sits below it when known,
+  or `Recording until HH:MM`; the unnumbered channel sits below it when its name
+  is known, even if the channel no longer exists on the server,
   on the same baselines as the clock's time and date.
 - The info bar's artwork tile is 196×110dp (three grid columns), 8dp corners, and
   takes no focus. It shows the programme's artwork with the channel's logo in
@@ -1083,7 +1087,8 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
   (live: programme times and genre; recordings: `Ends at HH:MM` when known,
   or the recording's time range while growing), the title,
   the subtitle, and Next. A recording's episode stands under its title
-  and its last line stays empty. Nothing in the info bar shows tuning or
+  and its last line stays empty. The spoken description includes the subtitle
+  and a finished recording's displayed playback end. Nothing in the info bar shows tuning or
   buffering.
 - The programme block groups its title and subtitle closely: 4dp from the
   metadata row to the title, 2dp from title to subtitle, and 8dp before Next.

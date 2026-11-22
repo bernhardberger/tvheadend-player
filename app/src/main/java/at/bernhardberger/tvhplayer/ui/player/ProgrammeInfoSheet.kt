@@ -220,9 +220,14 @@ internal fun <T : Any> PlayerPage(
     val railStrip = rail?.takeIf { it.visiting.value }
     val previousIdentity = remember { booleanArrayOf(chromeIdentityVisible) }
     val morphIdentity = remember(railStrip) { previousIdentity[0] }
+    val stripPresence = identityPresence(numberEntryShown)
     androidx.compose.runtime.SideEffect {
         previousIdentity[0] = chromeIdentityVisible
-        railStrip?.morphIdentity = morphIdentity && (railExpanded || chromeIdentityVisible)
+        railStrip?.let {
+            it.morphIdentity = morphIdentity
+            it.stripFollowsChromeAlpha = !morphIdentity || (!railExpanded && !chromeIdentityVisible)
+            it.stripPresence = stripPresence
+        }
     }
     CompositionLocalProvider(LocalPlayerPageProgress provides readProgress, LocalPlayerPageScrim provides scrim,
         LocalPlayerRailPeek provides railPeek, LocalPlayerRailHandoff provides railStrip) {
@@ -238,7 +243,6 @@ internal fun <T : Any> PlayerPage(
                         Box(Modifier.align(Alignment.CenterStart)
                             .padding(start = TvGridHorizontalMargin).wrapContentHeight(unbounded = true)
                             .then(if (!railExpanded || numberEntryShown) Modifier.clearAndSetSemantics {} else Modifier)
-                            .drawWithContent { if (!numberEntryShown) drawContent() }
                             .testTag("player-now-playing-motion")) { nowPlaying() }
                     }
                 }

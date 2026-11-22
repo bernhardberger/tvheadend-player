@@ -49,6 +49,7 @@ class ChannelNowStatusPolicyTest {
         assertEquals(emptySet<ChannelId>(), activeRecordingChannelIds(listOf(postPadding), (boundary + 3.minutes).epochSeconds))
         assertEquals(emptySet<ChannelId>(), activeRecordingChannelIds(listOf(prePadding), (boundary - 2.minutes).epochSeconds))
         assertEquals(postPadding, aOnly.runningRecordingForEvent(a))
+        assertEquals("Next can show the same entry already running", postPadding, aOnly.nextRecordingForEvent(a))
         assertNull("A's post-padding does not mark B", aOnly.runningRecordingForEvent(b))
         assertEquals("B is marked in its own pre-padding", prePadding, observation(prePadding).runningRecordingForEvent(b))
         val both = observation(postPadding, prePadding)

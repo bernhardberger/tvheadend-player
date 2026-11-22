@@ -51,6 +51,7 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -64,6 +65,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.util.lerp
 import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
@@ -166,6 +168,7 @@ private fun ChannelNumberEntryRow(
         },
         label = "content",
     ) { if (it) 1f else 0f }
+    val startward = if (LocalLayoutDirection.current == LayoutDirection.Rtl) 1 else -1
     // An in-place move that comes to rest, so not an accelerating curve; a new entry starts at its field.
     val settle = transition.animateFloat(
         transitionSpec = { if (targetState) snap() else tween(PlayerMotion.DestinationExitMs, easing = PlayerMotion.Standard) },
@@ -231,7 +234,7 @@ private fun ChannelNumberEntryRow(
                     .graphicsLayer {
                         val emptySlot = if (channel?.picon == null && channel != null)
                             ChipWidth.roundToPx() + IdentityTextGap.roundToPx() else 0
-                        translationX = -settle.value * (fieldInset + emptySlot)
+                        translationX = startward * settle.value * (fieldInset + emptySlot)
                     },
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -433,7 +436,8 @@ private fun Modifier.channelNumberPlate(
         if (p <= 0f) return@onDrawBehind
         val insetX = IdentityInset.toPx() * (1f - p)
         val insetY = IdentityVerticalPadding.toPx() * (1f - p)
-        val right = end().takeIf { it > 0f } ?: size.width
+        val width = end().takeIf { it > 0f } ?: size.width
+        val left = if (layoutDirection == LayoutDirection.Rtl) size.width - width else 0f
         val corner = lerp(ChipTileCorner.toPx(), IdentityShape.topStart.toPx(size, this), p)
         if (shadow != null) {
             // The light plate lifts off the picture with a soft shadow; the container itself draws with it.
@@ -441,10 +445,10 @@ private fun Modifier.channelNumberPlate(
             shadow.setShadowLayer(PlateShadowBlur.toPx(), 0f, PlateShadowOffset.toPx(),
                 Color.Black.copy(alpha = PlateShadowAlpha * p).toArgb())
             drawIntoCanvas {
-                it.nativeCanvas.drawRoundRect(insetX, insetY, right - insetX, size.height - insetY, corner, corner, shadow)
+                it.nativeCanvas.drawRoundRect(left + insetX, insetY, left + width - insetX, size.height - insetY, corner, corner, shadow)
             }
         } else {
-            drawRoundRect(color, topLeft = Offset(insetX, insetY), size = Size(right - 2 * insetX, size.height - 2 * insetY),
+            drawRoundRect(color, topLeft = Offset(left + insetX, insetY), size = Size(width - 2 * insetX, size.height - 2 * insetY),
                 cornerRadius = CornerRadius(corner), alpha = p)
         }
     }

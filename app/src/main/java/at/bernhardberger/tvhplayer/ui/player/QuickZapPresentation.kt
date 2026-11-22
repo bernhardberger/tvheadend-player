@@ -90,6 +90,8 @@ internal class QuickZapRailState(
     internal val expansion: State<Float> = expansionAnimation.asState()
     internal val visiting = derivedStateOf { expanded || expansion.value > 0f }
     internal var morphIdentity by mutableStateOf(false)
+    internal var stripFollowsChromeAlpha by mutableStateOf(false)
+    internal var stripPresence: State<Float>? by mutableStateOf(null)
     internal var identityBaselineFromCenter by mutableFloatStateOf(0f)
     internal var stripBaselineFromCenter by mutableFloatStateOf(0f)
     internal val peek = ChannelPeek(resting)
