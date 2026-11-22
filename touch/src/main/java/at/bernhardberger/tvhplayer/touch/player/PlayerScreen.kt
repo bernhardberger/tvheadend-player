@@ -254,18 +254,15 @@ private fun UprightPlayer(
     reveal: (() -> Unit)?,
 ) = BoxWithConstraints(Modifier.fillMaxSize()) {
     var handleHeight by remember { mutableIntStateOf(0) }
+    var actionRowHeight by remember { mutableIntStateOf(0) }
     val minimumPeek = with(LocalDensity.current) {
         (handleHeight + WindowInsets.navigationBars.getBottom(this)).toDp()
     }
-    // Keep room for the sheet even when a full-width 16:9 picture would fill the window.
-    val pictureRoom = maxHeight - WindowInsets.statusBars.asPaddingValues().calculateTopPadding() - minimumPeek
+    val abovePeek = maxHeight - WindowInsets.statusBars.asPaddingValues().calculateTopPadding() - minimumPeek
+    // The row is measured inside verticalScroll, so its height does not depend on the remaining room.
+    val rowHeight = with(LocalDensity.current) { actionRowHeight.toDp() }
     val hasChannelSheet = !inWindow && layout == PlayerLayout.Phone && state is LivePlayerState
-    val pictureFrame = if (!hasChannelSheet || pictureRoom >= maxWidth * (9f / 16)) {
-        Modifier.fillMaxWidth().aspectRatio(16f / 9)
-    } else {
-        val height = pictureRoom.coerceAtLeast(0.dp)
-        Modifier.size(width = height * (16f / 9), height = height).clipToBounds()
-    }
+    val pictureFrame = uprightPictureFrame(maxWidth, abovePeek, rowHeight, hasChannelSheet)
     Column(
         Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)
             .windowInsetsPadding(WindowInsets.statusBars),
@@ -302,12 +299,20 @@ private fun UprightPlayer(
         if (!inWindow) UprightPlayerContent(
             state, layout, preview != null, onAction, panels, onChannel, onSeek, minimumPeek,
             onHandleHeight = { handleHeight = it },
+            onActionRowHeight = { actionRowHeight = it },
         )
     }
     // The upright phone's notice stands at the window's foot, as in browsing, not over the picture.
     if (!inWindow && layout == PlayerLayout.Phone) {
         notices(Modifier.align(Alignment.BottomCenter).fillMaxWidth().windowInsetsPadding(WindowInsets.navigationBars))
     }
+}
+
+private fun uprightPictureFrame(width: Dp, abovePeek: Dp, rowHeight: Dp, hasChannelSheet: Boolean): Modifier {
+    val pictureRoom = if (abovePeek >= rowHeight) abovePeek - rowHeight else abovePeek
+    if (!hasChannelSheet || pictureRoom >= width * (9f / 16)) return Modifier.fillMaxWidth().aspectRatio(16f / 9)
+    val height = pictureRoom.coerceAtLeast(0.dp)
+    return Modifier.size(width = height * (16f / 9), height = height).clipToBounds()
 }
 
 @Composable
