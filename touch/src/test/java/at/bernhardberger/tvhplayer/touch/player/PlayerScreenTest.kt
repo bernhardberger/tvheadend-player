@@ -85,6 +85,7 @@ import at.bernhardberger.tvhplayer.touch.guide.ridgeLightDetails
 import at.bernhardberger.tvhplayer.touch.guide.ridgeLightRepeatDetails
 import at.bernhardberger.tvhplayer.touch.testutil.TouchCanvas
 import at.bernhardberger.tvhplayer.touch.testutil.TouchFixtureArt
+import at.bernhardberger.tvhplayer.touch.testutil.capturePausedPlayer
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouch
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouchWindows
 import at.bernhardberger.tvhplayer.ui.MobileDarkColors
@@ -177,6 +178,7 @@ class PlayerScreenTest {
         show()
         val canvas = TouchCanvas.TABLET
         capture("tablet-player", canvas)
+        compose.capturePausedPlayer("tablet-live", canvas, ::button) { paused.value = it }
 
         timeline().performTouchInput { click(center) }
         compose.runOnIdle { assertTrue(seeks.isEmpty()) }
@@ -371,6 +373,7 @@ class PlayerScreenTest {
         val canvas = TouchCanvas.PHONE
         assertInlineChannels()
         capture("phone-player", canvas)
+        compose.capturePausedPlayer("phone-live", canvas, ::button) { paused.value = it }
         noticeOnlyOutsideTheWindow("phone-player-notice", canvas)
         val open = orangeProgressRows()
         tapPicture()

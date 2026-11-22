@@ -77,6 +77,7 @@ import at.bernhardberger.tvhplayer.touch.testutil.FakeConnection
 import at.bernhardberger.tvhplayer.touch.testutil.MemoryPreferences
 import at.bernhardberger.tvhplayer.touch.testutil.ServerGuide
 import at.bernhardberger.tvhplayer.touch.testutil.TouchCanvas
+import at.bernhardberger.tvhplayer.touch.testutil.capturePausedPlayer
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouch
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouchWindows
 import at.bernhardberger.tvhplayer.touch.ui.TouchNotice
@@ -120,6 +121,7 @@ class RecordingPlayerScreenTest {
     @get:Rule val overlapErrors = ErrorCollector()
 
     private val position = mutableLongStateOf(RECORDING_BEFORE_AD)
+    private val paused = mutableStateOf(false)
     private val hasMarks = mutableStateOf(true)
     private val markerRevision = mutableStateOf<Long?>(null)
     private val choice = mutableStateOf<AdBreakMode?>(null)
@@ -182,6 +184,7 @@ class RecordingPlayerScreenTest {
         show()
         val canvas = TouchCanvas.TABLET
         capture("tablet-recording", canvas)
+        compose.capturePausedPlayer("tablet-recording", canvas, ::button) { paused.value = it }
         button(R.string.player_markers).performClick()
         captureWindows("tablet-recording-markers", canvas)
         val mark = 1_440_000L
@@ -767,6 +770,7 @@ class RecordingPlayerScreenTest {
         button(R.string.player_markers).assertDoesNotExist()
         tag("recording-markers").assertIsDisplayed()
         capture("phone-recording", canvas)
+        compose.capturePausedPlayer("phone-recording", canvas, ::button) { paused.value = it }
         compose.runOnIdle { position.longValue = RECORDING_INSIDE_AD }
         capture("phone-recording-ad", canvas)
         compose.runOnIdle { position.longValue = RECORDING_BEFORE_AD }
@@ -781,6 +785,7 @@ class RecordingPlayerScreenTest {
                 val offer = fixtureAdOffer(position.longValue, choice.value)
                 PlayerScreen(
                     fixture.copy(
+                        paused = paused.value,
                         marks = fixture.marks.takeIf { hasMarks.value }.orEmpty(),
                         markerRevision = markerRevision.value,
                         adBreakPick = choice.value,
