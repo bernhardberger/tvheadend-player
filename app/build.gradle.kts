@@ -139,7 +139,7 @@ android {
         applicationId = "at.bernhardberger.tvhplayer"
         minSdk = 28
         targetSdk = 36
-        versionCode = 185
+        versionCode = 186
         versionName = "0.5.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
