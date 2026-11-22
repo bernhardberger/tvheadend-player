@@ -47,6 +47,7 @@ import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.click
@@ -255,6 +256,9 @@ class PlayerScreenTest {
         fun distance() = compose.onNodeWithText(compose.activity.getString(R.string.player_behind_live, "4:12"))
         distance().assertIsDisplayed()
         button(R.string.player_go_live).assertIsDisplayed()
+        val forward = button(R.string.player_forward_thirty)
+        forward.assertIsEnabled().performTouchInput { click() }
+        compose.runOnIdle { assertEquals(PlayerAction.ForwardThirty, actions.last()) }
         notice.value = Notice.CacheClear(success = true)
         val snackbar = compose.onNode(
             SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite),
@@ -275,6 +279,10 @@ class PlayerScreenTest {
         text(R.string.player_live).assertDoesNotExist()
         distance().assertDoesNotExist()
         button(R.string.player_go_live).assertDoesNotExist()
+        val actionsBeforeTap = compose.runOnIdle { actions.toList() }
+        forward.assertIsNotEnabled().performTouchInput { click() }
+        compose.runOnIdle { assertEquals(actionsBeforeTap, actions) }
+        button(R.string.player_back_ten).assertIsEnabled()
         val boundary = compose.activity.getString(
             SharedR.string.timeshift_buffer_start_description,
             formatPlaybackDuration((behind.live - checkNotNull(behind.bufferStart)) * 1_000L),

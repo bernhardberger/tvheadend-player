@@ -134,20 +134,31 @@ class LivePlayerMappingTest {
 
     @Test
     fun barFollowsTheTimeshiftSampleByTheTvProgramWindow() {
-        data class Case(val name: String, val sample: AppTimeshiftState, val expected: LiveTimeline?, val now: Instant = live)
+        data class Case(
+            val name: String,
+            val sample: AppTimeshiftState,
+            val expected: LiveTimeline?,
+            val now: Instant = live,
+            val canSkipForward: Boolean = false,
+        )
         val b = LocalTime.of(20, 0)
         val cases = listOf(
             Case("at the live edge", timeshift(50, 90, 90.minutes), LiveTimeline(b, 3_600, 0, 1_800, 1_800)),
             Case("within the live-edge tolerance", timeshift(50, 90, 90.minutes - 3.seconds),
                 LiveTimeline(b, 3_600, 0, 1_800, 1_800, behind = 0)),
             Case("paused while live moves on", timeshift(50, 92, 90.minutes, edge = live + 2.minutes),
-                LiveTimeline(b, 3_600, 0, 1_800, 1_920, behind = 120)),
+                LiveTimeline(b, 3_600, 0, 1_800, 1_920, behind = 120), canSkipForward = true),
             Case("behind and playing", timeshift(50, 90, 80.minutes, readerBehind = 10.minutes),
-                LiveTimeline(b, 3_600, 0, 1_200, 1_800, behind = 600)),
+                LiveTimeline(b, 3_600, 0, 1_200, 1_800, behind = 600), canSkipForward = true),
+            Case("less than one skip behind live", timeshift(50, 90, 90.minutes - 20.seconds),
+                LiveTimeline(b, 3_600, 0, 1_780, 1_800, behind = 20), canSkipForward = true),
             Case("buffer starts after the program", timeshift(70, 90, 80.minutes),
-                LiveTimeline(b, 3_600, 600, 1_200, 1_800, behind = 600)),
+                LiveTimeline(b, 3_600, 600, 1_200, 1_800, behind = 600), canSkipForward = true),
             Case("behind into the previous program", timeshift(50, 90, 55.minutes),
-                LiveTimeline(LocalTime.of(19, 0), 3_600, 3_000, 3_300, 3_600, behind = 2_100, liveEdge = false)),
+                LiveTimeline(LocalTime.of(19, 0), 3_600, 3_000, 3_300, 3_600, behind = 2_100, liveEdge = false),
+                canSkipForward = true),
+            Case("behind into a program the buffer no longer covers", timeshift(61, 90, 59.minutes),
+                LiveTimeline(LocalTime.of(19, 0), 3_600, 3_600, 3_600, 3_600, behind = 1_860, liveEdge = false)),
             Case("no timeshift: the program on air", AppTimeshiftState(),
                 LiveTimeline(b, 3_600, bufferStart = null, position = 1_800, live = 1_800)),
             Case("no timeshift and nothing on air", AppTimeshiftState(), null, now = live + 3.hours),
@@ -155,6 +166,7 @@ class LivePlayerMappingTest {
         cases.forEach { case ->
             val mapped = liveTimeline(case.sample, case.now.epochSeconds, ZoneOffset.UTC, ::eventAt)
             assertEquals(case.name, case.expected, mapped?.copy(programmeStartSec = null, segment = null))
+            assertEquals("${case.name}: can skip forward", case.canSkipForward, mapped?.canSkipForward == true)
         }
     }
 

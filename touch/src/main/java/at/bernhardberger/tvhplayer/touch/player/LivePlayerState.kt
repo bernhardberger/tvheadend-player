@@ -36,6 +36,7 @@ internal data class LivePlayerState(
 ) : PlayerFaceState {
     override val key get() = channel.id
     override val seekable get() = timeline.value?.seekable == true
+    override val canSkipForward get() = timeline.value?.canSkipForward == true
 }
 
 internal val ChannelsState.displayedList: ChannelList?
@@ -184,6 +185,9 @@ internal data class LiveTimeline(
 
     /** Pause, the skips and the drag have a buffer to move in. */
     val seekable: Boolean get() = bufferStart != null && bufferStart < live
+
+    val hasAhead get() = behind > 0
+    val canSkipForward get() = seekable && hasAhead
 
     fun canContinueDrag(next: LiveTimeline): Boolean =
         next.seekable && programmeStartSec == next.programmeStartSec &&

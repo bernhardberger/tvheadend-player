@@ -198,6 +198,7 @@ private fun Transport(
         else -> 60.dp
     }
     val canSeek by remember(state) { derivedStateOf { state.seekable } }
+    val canSkipForward by remember(state) { derivedStateOf { state.canSkipForward } }
     val skipSize = if (layout == PlayerLayout.Tablet) 72.dp else 52.dp
     val skipColors = IconButtonDefaults.filledTonalIconButtonColors(
         containerColor = DarkControl, contentColor = OnPicture,
@@ -241,7 +242,7 @@ private fun Transport(
         }
         FilledTonalIconButton(
             onClick = { onAction(PlayerAction.ForwardThirty) }, modifier = Modifier.size(skipSize),
-            enabled = canSeek, colors = skipColors,
+            enabled = canSkipForward, colors = skipColors,
         ) {
             PlayerIcon(
                 R.drawable.player_forward_thirty, R.string.player_forward_thirty, Modifier.size(layout.skipIconSize),

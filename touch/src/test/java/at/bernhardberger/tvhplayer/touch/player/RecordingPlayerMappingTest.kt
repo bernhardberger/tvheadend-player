@@ -169,11 +169,15 @@ class RecordingPlayerMappingTest {
         assertEquals(65_000L, range.displayEndMs)
         assertEquals(60_000L, range.endMs)
         val live = "head"
+        val state = map(AppPlaybackState.Playing, true)
         listOf(
-            Triple(54_999L, true, false), Triple(55_000L, true, true), Triple(60_000L, false, false),
+            Triple(54_999L, true, false), Triple(55_000L, true, true),
+            Triple(60_000L, true, true), Triple(59_000L, false, false),
         ).forEach { (position, growing, atHead) ->
             assertEquals(atHead, recordingPositionLabel(position, range.endMs, range.displayEndMs, growing, live) == live)
             assertEquals(atHead, RecordingMove.Seek(position).stepReadout(range, 0L, growing, live).atLive)
+            val face = state.copy(durationMs = range.endMs, positionMs = mutableLongStateOf(position), growing = growing)
+            assertEquals("can skip forward at $position (growing=$growing)", !atHead, face.canSkipForward)
         }
         val case = listOf(-1L to 0L, 24_000L to 24_000L, 64_000L to 60_000L)
         case.forEach { (targetMs, expected) ->
@@ -184,7 +188,7 @@ class RecordingPlayerMappingTest {
             Triple(PlayerAction.BackTen, null, 54_000L),
             Triple(PlayerAction.BackTen, 6_000L, 0L),
             Triple(PlayerAction.ForwardThirty, 1_000L, 31_000L),
-            Triple(PlayerAction.ForwardThirty, null, 60_000L),
+            Triple(PlayerAction.ForwardThirty, 59_000L, 60_000L),
         )
         stops.forEach { (action, pending, expected) ->
             assertEquals(RecordingMove.Seek(expected), recordingSkipMove(range, action, pending))

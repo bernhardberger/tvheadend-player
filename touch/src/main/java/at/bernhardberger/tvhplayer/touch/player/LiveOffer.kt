@@ -38,7 +38,8 @@ internal fun LiveOffer(
     // Only this row reads the sampled distance, so a sample recomposes it and not the face around it.
     val timeline = source.value
     val behind = timeline?.let { it.behindAt(preview ?: it.position) } ?: 0
-    val showBehind = live && behind > 0 && PlayerControl.Timeshift in offered
+    val hasAhead = if (preview == null) timeline?.hasAhead == true else behind > 0
+    val showBehind = live && hasAhead && PlayerControl.Timeshift in offered
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
         if (showBehind) {
             Text(
