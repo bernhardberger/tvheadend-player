@@ -279,8 +279,12 @@ internal data class GuideMappingResult(
     val days: Map<LocalDate, GuideCachedDay> = emptyMap(),
     private val overviewRows: GuideOverviewRows? = null,
 ) {
+    // Snapshot churn can change the marks, not the day. Keep its rows mounted until the worker
+    // rechecks the marks, without reusing them across a change in programme authority.
     fun daysFor(next: GuideMappingInput): Map<LocalDate, GuideCachedDay> =
-        if (sameDvrSnapshot(next)) formattedDays(next) else emptyMap()
+        if (sameDvrSnapshot(next) || input.observation.sameProgrammeAuthority(next.observation)) {
+            formattedDays(next)
+        } else emptyMap()
 
     // Only the worker may recheck the marks. Its publication stamps the surviving days with its DVR snapshot.
     fun validatedDays(next: GuideMappingInput): Map<LocalDate, GuideCachedDay> {

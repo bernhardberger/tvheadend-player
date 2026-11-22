@@ -624,6 +624,74 @@ class GuideScreenTest {
 
     @Test
     @Config(qualifiers = PHONE, instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.common.TimeConverterKt"])
+    fun phoneChannelDayStaysOpenAndScrolledDuringBackgroundPublications() {
+        val connection = FakeConnection()
+        val now = Instant.parse("2027-01-15T12:00:00Z")
+        val fixture = ServerGuide(now)
+        val end = fixture.snapshot.events.last().stop.epochSeconds
+        val schedule = fixture.snapshot.events + List(12) { index ->
+            val start = end + index * 900
+            EpgEvent.create(
+                EventId(100L + index), fixture.first.id,
+                Instant.fromEpochSeconds(start), Instant.fromEpochSeconds(start + 900), title = "Programme $index",
+            )
+        }
+        val worker = StandardTestDispatcher()
+        fun finishMapping() {
+            compose.waitForIdle()
+            worker.scheduler.runCurrent()
+            compose.waitForIdle()
+        }
+        try {
+            assertTrue(SystemClock.setCurrentTimeMillis(now.toEpochMilliseconds()))
+            connection.session.publish(fixture.connected(epg = EpgSnapshot.create(schedule)))
+            showDestination(connection, mappingDispatcher = worker) {}
+            finishMapping()
+            compose.onNodeWithText("By channel").performClick()
+            finishMapping()
+
+            val list = compose.onNode(
+                hasScrollToIndexAction() and SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange),
+            )
+            val loading = compose.onNodeWithContentDescription(compose.activity.getString(SharedR.string.epg_loading))
+            fun position() = list.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
+            val last = schedule.last()
+            list.performScrollToIndex(schedule.lastIndex)
+            compose.onNodeWithText(last.title.orEmpty()).performClick()
+            val detailsButton = compose.onNodeWithText("Details")
+            detailsButton.performScrollTo()
+            val scrolled = position()
+            assertTrue(scrolled > 0f)
+            fun assertDayHeld() {
+                loading.assertDoesNotExist()
+                assertEquals("The open list keeps its scroll position", scrolled, position(), 0f)
+                detailsButton.assertIsDisplayed()
+            }
+
+            val revised = listOf("Updated programme", "Revised programme").map { title ->
+                EpgSnapshot.create(schedule.dropLast(1) +
+                    EpgEvent.create(last.id, fixture.first.id, last.start, last.stop, title = title))
+            }
+            revised.forEach { epg ->
+                compose.runOnIdle { connection.session.publish(fixture.connected(epg = epg)) }
+                assertDayHeld()
+                finishMapping()
+                assertDayHeld()
+                compose.onNodeWithText(epg.events.last().title.orEmpty()).assertIsDisplayed()
+            }
+            compose.runOnIdle {
+                connection.session.publish(fixture.connected(fixture.withRecordingSize(4096), epg = revised.last()))
+            }
+            assertDayHeld()
+            finishMapping()
+            assertDayHeld()
+        } finally {
+            connection.close()
+        }
+    }
+
+    @Test
+    @Config(qualifiers = PHONE, instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.common.TimeConverterKt"])
     fun aMissingProgramClosesDetailsWithoutReopeningOnASubsequentPublication() {
         motionScale.scaleFactor = 0f
         val connection = FakeConnection()
@@ -780,10 +848,8 @@ class GuideScreenTest {
             val dateChanged = compose.onNodeWithText("Saturday, January 16").isDisplayed()
             finishMapping()
             compose.onNodeWithText("Saturday programme").assertIsDisplayed()
-            compose.runOnIdle {
-                val revised = fixture.refreshedEpg("Revised Friday programme").events
-                connection.session.publish(fixture.connected(epg = EpgSnapshot.create(revised + tomorrow)))
-            }
+            val revised = EpgSnapshot.create(fixture.refreshedEpg("Revised Friday programme").events + tomorrow)
+            compose.runOnIdle { connection.session.publish(fixture.connected(epg = revised)) }
             compose.onNodeWithText("Today").performClick()
             val returned = compose.onNodeWithText("Evening News").isDisplayed()
             assertEquals("Heading changes and Today returns before the worker runs", listOf(true, true),
@@ -791,18 +857,22 @@ class GuideScreenTest {
             finishMapping()
             compose.onNodeWithText("Revised Friday programme").assertIsDisplayed()
             compose.runOnIdle { AppClock.systemUses24Hour = !AppClock.systemUses24Hour }
-            val hiddenForClockFormat = !compose.onNodeWithText("Revised Friday programme").isDisplayed()
+            assertFalse("A format change waits for reformatted rows",
+                compose.onNodeWithText("Revised Friday programme").isDisplayed())
             finishMapping()
             compose.onNodeWithText("Revised Friday programme").assertIsDisplayed()
+            compose.onNodeWithText("Weather").performClick()
+            val cancel = compose.onNodeWithText(compose.activity.getString(SharedR.string.cancel_recording))
+            cancel.assertDoesNotExist()
             compose.runOnIdle {
                 connection.session.publish(fixture.connected(
                     entries = fixture.dvr.entries + fixture.scheduling(900L, 2),
-                    epg = EpgSnapshot.create(fixture.snapshot.events + tomorrow),
+                    epg = revised,
                 ))
             }
-            val hiddenForDvr = !compose.onNodeWithText("Revised Friday programme").isDisplayed()
-            assertEquals("Stale days are hidden for format and DVR mark changes",
-                listOf(true, true), listOf(hiddenForClockFormat, hiddenForDvr))
+            compose.onNodeWithText("Details").assertIsDisplayed()
+            finishMapping()
+            cancel.assertIsDisplayed()
         } finally {
             AppClock.systemUses24Hour = saved24Hour
             connection.close()
