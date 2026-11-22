@@ -7,7 +7,7 @@ without alpha, 320 to 3840 px, the long side at most twice the short side, up to
 eight per device type, and at least one Android TV screenshot; TV banner
 1280×720, JPEG or 24-bit PNG without alpha.
 
-## 3.0 Uploaded set (2026-10-29, screenshots replaced 2026-11-22 for 0.5.4)
+## 3.0 Uploaded set (2026-10-29, screenshots replaced 2026-11-22 for 0.5.5)
 
 Saved as a draft on the default (en-US) listing. The 0.4.0 set now in Play Console
 was made with an earlier version of these captures. Regenerate the feature
