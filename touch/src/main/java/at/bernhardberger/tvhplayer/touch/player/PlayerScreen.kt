@@ -2,6 +2,8 @@
 
 package at.bernhardberger.tvhplayer.touch.player
 
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -22,6 +24,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
@@ -48,6 +51,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.core.app.MultiWindowModeChangedInfo
+import androidx.core.util.Consumer
 import at.bernhardberger.tvhplayer.touch.R
 import kotlinx.coroutines.delay
 
@@ -252,8 +257,16 @@ private fun UprightPlayer(
         Box(Modifier.fillMaxWidth().aspectRatio(16f / 9).background(Color.Black)) {
             Picture(state, layout, controls, toggle, video, inWindow, opacity)
             if (!inWindow) {
+                val activity = LocalActivity.current as? ComponentActivity
+                var inMultiWindow by remember(activity) { mutableStateOf(activity?.isInMultiWindowMode == true) }
+                DisposableEffect(activity) {
+                    val listener = Consumer<MultiWindowModeChangedInfo> { inMultiWindow = it.isInMultiWindowMode }
+                    activity?.addOnMultiWindowModeChangedListener(listener)
+                    onDispose { activity?.removeOnMultiWindowModeChangedListener(listener) }
+                }
                 UprightPictureChrome(
-                    state.withFullScreenOffer(layout, inWindow), layout, controls, video != null, preview, onPreview,
+                    state.withFullScreenOffer(layout, inWindow = inMultiWindow), layout, controls, video != null,
+                    preview, onPreview,
                     onAction, onBrightness,
                     openOptions, onSeek, panels.onChoice, opacity, reveal,
                 )
