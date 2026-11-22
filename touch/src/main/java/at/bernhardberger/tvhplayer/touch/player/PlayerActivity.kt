@@ -204,10 +204,8 @@ class PlayerActivity : ComponentActivity() {
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
         // Android 12 and later enter the window by themselves (auto-enter); before that, here.
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S && ::pictureWindow.isInitialized &&
-            leavePlayer(LeaveTrigger.UserLeave, canUseWindow(), isInPictureInPictureMode, false) == Leave.EnterWindow
-        ) {
-            if (!pictureWindow.enter()) leave()
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S && ::pictureWindow.isInitialized) {
+            navigate(LeaveTrigger.UserLeave)
         }
     }
 
@@ -241,27 +239,38 @@ class PlayerActivity : ComponentActivity() {
 
     private fun navigate(trigger: LeaveTrigger) {
         if (leaving) return
-        val outcome = leavePlayer(trigger, canUseWindow(), isInPictureInPictureMode, false, fullScreen.isRequested)
+        val outcome = leavePlayer(
+            trigger, canUseWindow(), pictureWindow.isInOrEnteringWindow, false, fullScreen.request,
+        )
         when (outcome) {
             Leave.EnterWindowAndBrowse, Leave.StopAndBrowse -> {
+                fullScreen.release()
                 // PiP needs the player resumed, so try it before foregrounding the launcher task.
-                val enteredWindow = outcome == Leave.EnterWindowAndBrowse && pictureWindow.enter()
-                packageManager.getLaunchIntentForPackage(packageName)?.let(::startActivity)
-                if (!enteredWindow) leave()
+                if (outcome == Leave.EnterWindowAndBrowse && pictureWindow.enter()) {
+                    packageManager.getLaunchIntentForPackage(packageName)?.let(::startActivity)
+                } else {
+                    leave(browse = true)
+                }
             }
-            Leave.EnterWindow -> pictureWindow.enter()
+            Leave.EnterWindow -> if (!pictureWindow.enter() && trigger == LeaveTrigger.UserLeave) leave()
             Leave.ExitFullScreen -> fullScreen.release()
             Leave.Stop -> leave()
             Leave.Stay -> Unit
         }
     }
 
-    private fun leave() {
+    private fun leave(browse: Boolean = false) {
         if (leaving) return
         leaving = true
         lifecycleScope.launch {
             withContext(NonCancellable) { runtime.stop() }
-            fullScreen.finishPlayer()
+            if (browse) {
+                // A new Watch must not reach this singleTask activity or race its pending stop.
+                finishAndRemoveTask()
+                packageManager.getLaunchIntentForPackage(packageName)?.let(::startActivity)
+            } else {
+                fullScreen.finishPlayer()
+            }
         }
     }
 

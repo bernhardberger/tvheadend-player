@@ -35,6 +35,9 @@ internal class PlayerWindow(private val activity: ComponentActivity, private val
     /** The player shows in the window, or is on its way there. */
     val inWindow = MutableStateFlow(false)
 
+    val isInOrEnteringWindow: Boolean
+        get() = inWindow.value || activity.isInPictureInPictureMode
+
     private var view: PlayerView? = null
 
     /** The display mode the picture is drawn in, so the window takes the same shape. */
@@ -110,10 +113,10 @@ internal class PlayerWindow(private val activity: ComponentActivity, private val
         }
     }
 
-    /** False when the window can't be used, or the activity is finishing or already in it. */
+    /** False when the window can't be used, or the activity is finishing or already on its way in. */
     fun enter(): Boolean {
         available.value = activity.canUseWindow()
-        if (!available.value || activity.isFinishing || activity.isInPictureInPictureMode) return false
+        if (!available.value || activity.isFinishing || isInOrEnteringWindow) return false
         val entered = try {
             activity.enterPictureInPictureMode(params())
         } catch (gone: IllegalStateException) {

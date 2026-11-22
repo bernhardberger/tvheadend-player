@@ -1,11 +1,15 @@
 package at.bernhardberger.tvhplayer.touch.player
 
 import androidx.activity.ComponentActivity
+import android.app.Activity
+import android.app.PictureInPictureParams
 import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
+import android.hardware.Sensor
+import android.hardware.SensorManager
 import android.os.Looper
 import android.os.SystemClock
 import android.view.WindowInsets
@@ -110,10 +114,14 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.annotation.Implementation
+import org.robolectric.annotation.Implements
 import org.robolectric.android.controller.ActivityController
+import org.robolectric.shadows.SensorEventBuilder
+import org.robolectric.shadows.ShadowActivity
+import org.robolectric.shadows.ShadowSensor
 import org.robolectric.util.ReflectionHelpers
 import java.time.Duration
-import java.util.concurrent.atomic.AtomicLong
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
@@ -496,6 +504,44 @@ class RecordingPlayerScreenTest {
     }
 
     @Test
+    @OptIn(UnstableApi::class)
+    fun backRetiresThePlayerBeforeHandingOffToBrowse() {
+        val hold = MutableStateFlow(false)
+        withPlayerRoute(marked = true, live = false, holdSettings = hold) { activity, runtime, server, _ ->
+            val player = activity.get()
+            val session = org.koin.core.context.GlobalContext.get().get<TvheadendSession>()
+            val selection = checkNotNull(currentRecordingPlaybackSelection(session.observation.value, server.film.id))
+            hold.value = true
+            val start = player.lifecycleScope.launch(start = CoroutineStart.UNDISPATCHED) {
+                runtime.playRecording(selection, recordingStart(true))
+            }
+            try {
+                player.onBackPressedDispatcher.onBackPressed()
+                settleRoute(runtime.player)
+                assertTrue(start.isActive)
+                assertNull(
+                    "Browse must not receive Watch while the old player can still stop it",
+                    shadowOf(player).nextStartedActivity,
+                )
+            } finally {
+                hold.value = false
+                settleRoute(runtime.player)
+            }
+            assertTrue("Watch must be routed away from the old player", player.isFinishing)
+            assertNull(runtime.activeTarget.value)
+            assertBrowseLaunched(player)
+            Robolectric.buildActivity(MainActivity::class.java).setup().use { browse ->
+                browse.get().watchRecording(server.diary.id)
+                settleRoute(runtime.player)
+                assertEquals(server.diary.id, shadowOf(browse.get()).nextStartedActivity?.recordingRoute()?.id)
+                activity.pause().stop()
+                settleRoute(runtime.player)
+                assertEquals(AppPlaybackTarget.Recording(server.diary.id), runtime.activeTarget.value)
+            }
+        }
+    }
+
+    @Test
     @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
     fun aRefusedPictureInPictureButtonKeepsThePlayerOpen() = withPlayerRoute(
         live = true,
@@ -511,6 +557,27 @@ class RecordingPlayerScreenTest {
         assertTrue("A refused window button must leave the player open", !activity.get().isFinishing)
         assertEquals(AppPlaybackTarget.Live(server.first.id), runtime.activeTarget.value)
         assertNull(shadowOf(activity.get()).nextStartedActivity)
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi", shadows = [DelayedPictureInPictureShadow::class])
+    fun theWindowButtonDoesNotBrowseAndBackDuringEntryDoesNothing() = withPlayerRoute(
+        live = true,
+        offerPictureInPicture = true,
+    ) { activity, runtime, server, _ ->
+        val player = activity.get()
+        val window = button(R.string.player_picture_in_picture)
+        window.performClick()
+        settleRoute()
+        window.assertDoesNotExist()
+        assertTrue("The window request precedes the platform mode change", !player.isInPictureInPictureMode)
+        assertNull(shadowOf(player).nextStartedActivity)
+
+        player.onBackPressedDispatcher.onBackPressed()
+        settleRoute()
+        assertNull("Back during window entry must not launch Browse", shadowOf(player).nextStartedActivity)
+        assertTrue(!player.isFinishing)
+        assertEquals(AppPlaybackTarget.Live(server.first.id), runtime.activeTarget.value)
     }
 
     @Test
@@ -540,6 +607,10 @@ class RecordingPlayerScreenTest {
         val epoch = runtime.videoPresentation.value.epoch
         val item = runtime.player.currentMediaItem
         val playWhenReady = runtime.player.playWhenReady
+        val original = activity.get()
+        val sensors = shadowOf(original.getSystemService(SensorManager::class.java))
+        val accelerometer = ShadowSensor.newInstance(Sensor.TYPE_ACCELEROMETER)
+        sensors.addSensor(accelerometer)
         button(R.string.player_full_screen).performClick()
         settleRoute()
         assertEquals(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE, activity.get().requestedOrientation)
@@ -548,7 +619,6 @@ class RecordingPlayerScreenTest {
         assertTrue(item === runtime.player.currentMediaItem)
         assertEquals(playWhenReady, runtime.player.playWhenReady)
 
-        val original = activity.get()
         val sideways = Configuration(original.resources.configuration).apply {
             orientation = Configuration.ORIENTATION_LANDSCAPE
             val width = screenWidthDp
@@ -558,24 +628,36 @@ class RecordingPlayerScreenTest {
         activity.configurationChange(sideways)
         settleRoute()
         assertTrue("Orientation is handled without recreating the player activity", activity.get() === original)
-        val insets = checkNotNull(original.window.decorView.windowInsetsController)
-        val requestedBars = ReflectionHelpers.callInstanceMethod<Int>(insets, "getRequestedVisibleTypes")
-        assertEquals("Landscape requests hidden bars", 0, requestedBars and WindowInsets.Type.systemBars())
+        sensors.sendSensorEventToListeners(
+            SensorEventBuilder.newBuilder(accelerometer, floatArrayOf(SensorManager.GRAVITY_EARTH, 0f, 0f)).build(),
+        )
+        settleRoute()
         assertEquals(epoch, runtime.videoPresentation.value.epoch)
-        val generation = ReflectionHelpers.getField<AtomicLong>(runtime, "playbackRequests").get()
+        assertTrue(item === runtime.player.currentMediaItem)
         button(R.string.player_back).performClick()
         settleRoute()
-        assertEquals(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED, original.requestedOrientation)
-        assertNull(shadowOf(original).nextStartedActivity)
-        assertTrue(!original.isInPictureInPictureMode)
-        assertEquals(target, runtime.activeTarget.value)
-        assertEquals(generation, ReflectionHelpers.getField<AtomicLong>(runtime, "playbackRequests").get())
-
-        original.onBackPressedDispatcher.onBackPressed()
         assertBrowseLaunched(original)
+        assertEquals(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED, original.requestedOrientation)
         assertTrue(original.isInPictureInPictureMode)
         assertEquals(target, runtime.activeTarget.value)
         assertEquals(playWhenReady, runtime.player.playWhenReady)
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
+    fun splitScreenClearsTheRequestAndHidesFullScreen() = withRecordingRoute(marked = true) { activity, _ ->
+        val fullScreen = button(R.string.player_full_screen)
+        fullScreen.performClick()
+        val config = activity.resources.configuration
+        shadowOf(activity).setInMultiWindowMode(true)
+        activity.onMultiWindowModeChanged(true, config)
+        settleRoute()
+        assertEquals(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED, activity.requestedOrientation)
+        fullScreen.assertDoesNotExist()
+        shadowOf(activity).setInMultiWindowMode(false)
+        activity.onMultiWindowModeChanged(false, config)
+        settleRoute()
+        fullScreen.assertIsDisplayed()
     }
 
     private fun assertBrowseLaunched(activity: PlayerActivity) {
@@ -911,4 +993,17 @@ class RecordingPlayerScreenTest {
     private fun capture(name: String, canvas: TouchCanvas) = compose.captureTouch("slice3-player", name, canvas)
     private fun captureWindows(name: String, canvas: TouchCanvas) =
         compose.captureTouchWindows("slice3-player", name, canvas)
+}
+
+/** Accept the first request, but keep the platform mode unchanged until the transition completes. */
+@Implements(Activity::class)
+class DelayedPictureInPictureShadow : ShadowActivity() {
+    private var requested = false
+
+    @Implementation
+    override fun enterPictureInPictureMode(params: PictureInPictureParams): Boolean {
+        if (requested) return false
+        requested = true
+        return true
+    }
 }

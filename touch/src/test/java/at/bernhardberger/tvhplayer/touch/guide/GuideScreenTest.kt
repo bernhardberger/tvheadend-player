@@ -46,6 +46,7 @@ import at.bernhardberger.tvheadend.sdk.core.EpgSnapshot
 import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi
+import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.testutil.FakeConnection
 import at.bernhardberger.tvhplayer.touch.testutil.ServerGuide
 import at.bernhardberger.tvhplayer.touch.testutil.TouchCanvas
@@ -68,6 +69,7 @@ import at.bernhardberger.tvhplayer.ui.screens.recordings.stopConfirmationSentenc
 import java.util.TimeZone
 import java.time.ZoneOffset
 import android.content.res.Configuration
+import at.bernhardberger.tvhplayer.ui.common.AppClock
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.time.Instant
@@ -145,6 +147,37 @@ class GuideScreenTest {
         compose.onNode(head).performClick()
         compose.onNodeWithText("Sunday, November 15").assertIsDisplayed()
         compose.onNodeWithText("Six Bridges and a River That Changed Its Mind").assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = TABLET)
+    fun tabletOverviewRequestsLaterColumnsWhileCoverageIsPending() {
+        val fixture = overviewFixture()
+        val head = fixture.channels.first()
+        val program = head.programs.first()
+        val later = head.copy(programs = listOf(program))
+        val seed = List(8) { index ->
+            GuideChannel("empty-$index", "Channel ${index + 1}", gap = if (index == 0) GuideGap("8:00", "9:00") else null)
+        }
+        val state = mutableStateOf(
+            fixture.copy(channels = seed + later.copy(programs = emptyList(), overviewPending = true), dayLoading = true),
+        )
+        show(fixture, state = { state.value }, onOverviewViewport = { visible ->
+            if (later.id in visible) state.value = state.value.copy(channels = seed + later)
+        })
+
+        val noPrograms = compose.activity.getString(R.string.guide_no_programs)
+        val list = compose.onNode(
+            hasScrollToIndexAction() and SemanticsMatcher.keyIsDefined(SemanticsProperties.HorizontalScrollAxisRange),
+        )
+        list.assertIsDisplayed()
+        compose.onNodeWithText(noPrograms).assertDoesNotExist()
+        list.performScrollToIndex(seed.size)
+        compose.onNodeWithText(program.title).assertIsDisplayed()
+        list.performScrollToIndex(0)
+        compose.onNodeWithText(noPrograms).assertDoesNotExist()
+        compose.runOnIdle { state.value = state.value.copy(dayLoading = false) }
+        compose.onNodeWithText(noPrograms).assertIsDisplayed()
     }
 
     @Test
@@ -589,6 +622,7 @@ class GuideScreenTest {
             Instant.parse("2027-01-16T13:00:00Z"), title = "Saturday programme",
         )
         val worker = StandardTestDispatcher()
+        val saved24Hour = AppClock.systemUses24Hour
         fun finishMapping() {
             compose.waitForIdle()
             worker.scheduler.runCurrent()
@@ -616,6 +650,76 @@ class GuideScreenTest {
                 listOf(dateChanged, returned))
             finishMapping()
             compose.onNodeWithText("Revised Friday programme").assertIsDisplayed()
+            compose.runOnIdle { AppClock.systemUses24Hour = !AppClock.systemUses24Hour }
+            val hiddenForClockFormat = !compose.onNodeWithText("Revised Friday programme").isDisplayed()
+            finishMapping()
+            compose.onNodeWithText("Revised Friday programme").assertIsDisplayed()
+            compose.runOnIdle {
+                connection.session.publish(fixture.connected(
+                    entries = fixture.dvr.entries + fixture.scheduling(900L, 2),
+                    epg = EpgSnapshot.create(fixture.snapshot.events + tomorrow),
+                ))
+            }
+            val hiddenForDvr = !compose.onNodeWithText("Revised Friday programme").isDisplayed()
+            assertEquals("Stale days are hidden for format and DVR mark changes",
+                listOf(true, true), listOf(hiddenForClockFormat, hiddenForDvr))
+        } finally {
+            AppClock.systemUses24Hour = saved24Hour
+            connection.close()
+        }
+    }
+
+    @Test
+    @Config(instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.common.TimeConverterKt"])
+    fun byChannelDoesNotShowYesterdaysRowsUnderTodaysHeading() {
+        val connection = FakeConnection()
+        val savedZone = TimeZone.getDefault()
+        val before = Instant.parse("2027-01-15T23:59:58Z")
+        val worker = StandardTestDispatcher()
+        try {
+            TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+            assertTrue(SystemClock.setCurrentTimeMillis(before.toEpochMilliseconds()))
+            connection.session.publish(ServerGuide(before).connected())
+            showDestination(connection, mappingDispatcher = worker) {}
+            compose.waitForIdle()
+            worker.scheduler.runCurrent()
+            compose.onNodeWithText("By channel").performClick()
+            compose.waitForIdle()
+            worker.scheduler.runCurrent()
+            compose.onNodeWithText("Evening News").assertIsDisplayed()
+            assertTrue(SystemClock.setCurrentTimeMillis(before.toEpochMilliseconds() + 5_000))
+            compose.mainClock.advanceTimeBy(5_016)
+            assertEquals("Yesterday's day must not survive midnight while mapping is held",
+                false, compose.onNodeWithText("Evening News").isDisplayed())
+        } finally {
+            TimeZone.setDefault(savedZone)
+            connection.close()
+        }
+    }
+
+    @Test
+    @Config(instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.common.TimeConverterKt"])
+    fun guideDoesNotServeRowsFromThePreviousTagOrGenerationWhileMappingIsHeld() {
+        val connection = FakeConnection()
+        val now = Instant.parse("2027-01-15T12:00:00Z")
+        val worker = StandardTestDispatcher()
+        try {
+            assertTrue(SystemClock.setCurrentTimeMillis(now.toEpochMilliseconds()))
+            val fixture = ServerGuide(now)
+            connection.session.publish(fixture.connected())
+            showDestination(connection, mappingDispatcher = worker) {}
+            compose.waitForIdle()
+            worker.scheduler.runCurrent()
+            compose.onNodeWithText("Evening News").assertIsDisplayed()
+            compose.onNodeWithText("All channels").performClick()
+            compose.onNodeWithText("News", substring = false).performClick()
+            val hiddenAfterTag = !compose.onNodeWithText("Evening News").isDisplayed()
+            worker.scheduler.runCurrent()
+            compose.onNodeWithText("Evening News").assertIsDisplayed()
+            compose.runOnIdle { connection.session.replaceGeneration(fixture.connected()) }
+            val hiddenAfterReconnect = !compose.onNodeWithText("Evening News").isDisplayed()
+            assertEquals("Previous tag and generation rows are hidden",
+                listOf(true, true), listOf(hiddenAfterTag, hiddenAfterReconnect))
         } finally {
             connection.close()
         }
@@ -790,7 +894,8 @@ class GuideScreenTest {
                         )
 
                     request(connection.session.observation.value)
-                    request(fixture.connected(epg = fixture.refreshedEpg("Updated News")))
+                    connection.session.publish(fixture.connected(epg = fixture.refreshedEpg("Updated News")))
+                    request(connection.session.observation.value)
                 }
                 compose.runOnIdle {
                     assertEquals("Only the latest queued Guide input maps", 1, guideMappings())
@@ -897,6 +1002,7 @@ class GuideScreenTest {
         detailsId: String? = null,
         taps: MutableSharedFlow<Destination> = MutableSharedFlow(),
         state: () -> GuideState = { fixture },
+        onOverviewViewport: ((List<String>) -> Unit)? = null,
         over: @Composable () -> Unit = {},
     ) {
         var shownDetailsId by mutableStateOf(detailsId)
@@ -917,6 +1023,7 @@ class GuideScreenTest {
             onCancel = { cancelled += it },
             onStop = { stopped += it },
             onView = { selectedView = it },
+            onOverviewViewport = onOverviewViewport,
             onChannel = {
                 selectedChannels += it
                 selectedChannel = it

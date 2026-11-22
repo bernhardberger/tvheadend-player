@@ -115,7 +115,7 @@ internal fun OverviewBar(state: GuideState, actions: GuideActions, compact: Bool
 /** The tablet's magazine: one column per channel, each scrolling on its own. */
 @Composable
 internal fun OverviewColumns(
-    channels: List<GuideChannel>,
+    state: GuideState,
     layout: GuideLayout,
     openId: String?,
     onOpen: (String?) -> Unit,
@@ -124,6 +124,7 @@ internal fun OverviewColumns(
     onDetails: (String) -> Unit,
     contentPadding: PaddingValues,
 ) {
+    val channels = state.channels
     val width = if (layout == GuideLayout.Wide) 264.dp else 232.dp
     val list = rememberOverviewListState(channels, actions.onOverviewViewport)
     list.ScrollToStartOnReselect(Destination.Guide)
@@ -137,7 +138,7 @@ internal fun OverviewColumns(
             val scroll = rememberScrollState()
             Column(Modifier.width(width).fillParentMaxHeight()) {
                 ColumnHead(channel) { onChannel(channel.id) }
-                if (channel.overviewPending) {
+                if (channel.overviewPending || state.dayLoading && channel.programs.isEmpty()) {
                     OverviewRowSkeleton(compact = false)
                     return@Column
                 }
@@ -308,15 +309,17 @@ private fun segmentShape(index: Int, count: Int): RoundedCornerShape {
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun OverviewRows(
-    channels: List<GuideChannel>,
-    showLogoSlots: Boolean,
+    state: GuideState,
     openId: String?,
     onOpen: (String?) -> Unit,
     actions: GuideActions,
     onDetails: (String) -> Unit,
     contentPadding: PaddingValues,
 ) {
-    val rows = remember(channels) { channels.filter { it.programs.isNotEmpty() || it.overviewHasLead } }
+    val channels = state.channels
+    val rows = remember(channels, state.dayLoading) {
+        if (state.dayLoading) channels else channels.filter { it.programs.isNotEmpty() || it.overviewHasLead }
+    }
     val list = rememberOverviewListState(rows, actions.onOverviewViewport)
     list.ScrollToStartOnReselect(Destination.Guide)
     LazyColumn(
@@ -344,7 +347,7 @@ internal fun OverviewRows(
                         colors = ListItemDefaults.segmentedColors(containerColor = Color.Transparent),
                         leadingContent = channelLogoSlot(
                             channel.logo, channel.logoTint, Modifier.size(88.dp, 48.dp),
-                            model = channel.logoModel, showSlot = showLogoSlots,
+                            model = channel.logoModel, showSlot = state.overviewHasLogos,
                         ),
                         overlineContent = { PartsLine(listOf(channel.name, program.start)) },
                         supportingContent = { OverviewSupportingContent(program, picture != null) },
