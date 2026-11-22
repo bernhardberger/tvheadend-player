@@ -409,7 +409,9 @@ class PlayerScreenTest {
         val collapse = channelHandle(SemanticsActions.Collapse)
         val picture = tag("player-picture").getBoundsInRoot()
         val actions = tag("player-actions").assertIsDisplayed().getBoundsInRoot()
-        val restTop = expand.getBoundsInRoot().top
+        val restHandle = expand.getBoundsInRoot()
+        val restTop = restHandle.top
+        val stockHeight = restHandle.bottom - restTop
         assertTrue("The channel sheet rests below the action row", restTop >= actions.bottom)
 
         expand.performTouchInput { click() }
@@ -444,6 +446,18 @@ class PlayerScreenTest {
         sport.performTouchInput {
             swipe(center, center - Offset(0f, (restTop - picture.bottom).toPx()), durationMillis = 240)
         }
+        assertRaised()
+
+        collapse.performSemanticsAction(SemanticsActions.Collapse)
+        compose.runOnIdle {
+            channelId.value = null
+            val height = (420 * compose.activity.resources.displayMetrics.density).roundToInt()
+            compose.activity.window.setLayout(android.view.ViewGroup.LayoutParams.MATCH_PARENT, height)
+        }
+        val shortHandle = expand.getBoundsInRoot()
+        val shortHeight = shortHandle.bottom - shortHandle.top
+        assertTrue("Short window handle $shortHeight is shorter than the stock $stockHeight", shortHeight >= stockHeight)
+        expand.assertIsDisplayed().performSemanticsAction(SemanticsActions.Expand)
         assertRaised()
     }
 
