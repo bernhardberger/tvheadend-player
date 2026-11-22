@@ -53,6 +53,8 @@ import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.channels.ChannelRow
+import at.bernhardberger.tvhplayer.touch.ui.CompactBrowseMargin
+import at.bernhardberger.tvhplayer.touch.ui.WideBrowseMargin
 import at.bernhardberger.tvhplayer.touch.ui.rememberStandalonePicture
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
 
@@ -263,7 +265,7 @@ private fun UprightProgramActions(
     panels: PanelHost,
     modifier: Modifier = Modifier,
 ) {
-    val inset = if (layout == PlayerLayout.Phone) 16.dp else 24.dp
+    val inset = if (layout == PlayerLayout.Phone) CompactBrowseMargin else WideBrowseMargin
     Column(modifier.fillMaxWidth()) {
         Column(
             Modifier.fillMaxWidth().padding(horizontal = inset).padding(top = 16.dp)

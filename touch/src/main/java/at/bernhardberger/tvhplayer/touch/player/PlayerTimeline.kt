@@ -309,7 +309,7 @@ internal fun playerClock(programStart: LocalTime, seconds: Int): String {
 @Composable
 internal fun behindLive(seconds: Int): String =
     if (seconds == 0) stringResource(R.string.player_live)
-    else stringResource(R.string.player_behind_live, "%d:%02d".format(seconds / 60, seconds % 60))
+    else stringResource(R.string.player_behind_live, behindLiveOffset(seconds))
 
 private fun LiveTimeline.fraction(seconds: Int): Float = seconds.toFloat() / duration
 

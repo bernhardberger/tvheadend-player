@@ -38,6 +38,7 @@ import com.google.common.util.concurrent.ListenableFuture
 import org.junit.After
 import org.junit.Before
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -56,8 +57,10 @@ import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.getBoundsInRoot
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -77,6 +80,9 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsPropertyKey
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.unit.Density
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.channels.ChannelDetails
 import at.bernhardberger.tvhplayer.touch.channels.ChannelPlayback
@@ -386,6 +392,7 @@ class PlayerScreenTest {
         show()
         val canvas = TouchCanvas.PHONE
         assertInlineChannels()
+        assertPhoneListKeyline()
         capture("phone-player", canvas)
         compose.capturePausedPlayer("phone-live", canvas, ::button) { paused.value = it }
         noticeOnlyOutsideTheWindow("phone-player-notice", canvas)
@@ -403,6 +410,92 @@ class PlayerScreenTest {
         captureStatuses("phone", canvas)
         status.value = LivePlayerStatus.Playing
         checkPhoneChannelSheet(canvas)
+        checkLargeTextPhone()
+    }
+
+    private fun assertPhoneListKeyline() {
+        val current = checkNotNull(playerChannels.rows.first().now)
+        val row = firstPhoneChannel().getBoundsInRoot()
+        val title = compose.onNode(
+            hasText(current.title) and !hasAnyAncestor(hasTestTag("player-channel-list")),
+        ).getBoundsInRoot()
+        val time = compose.onNode(
+            hasText(checkNotNull(current.timeRange)) and !hasAnyAncestor(hasTestTag("player-channel-list")),
+        ).getBoundsInRoot()
+        assertEquals("First row spans the program keyline", title.left to time.right, row.left to row.right)
+    }
+
+    private fun firstPhoneChannel() = compose.onNode(
+        hasClickAction() and hasText(playerChannels.rows.first().name) and
+            hasAnyAncestor(hasTestTag("player-channel-list")),
+    )
+
+    private fun checkLargeTextPhone() {
+        channelHandle(SemanticsActions.Collapse).performSemanticsAction(SemanticsActions.Collapse)
+        compose.runOnIdle {
+            val density = compose.activity.resources.displayMetrics.density
+            compose.activity.window.setLayout((360 * density).roundToInt(), (640 * density).roundToInt())
+            fontScale.value = 2f
+        }
+        val picture = tag("player-picture").fetchSemanticsNode().boundsInRoot
+        val target = 48 * compose.activity.resources.displayMetrics.density
+        for (label in listOf(R.string.player_full_screen, R.string.player_go_live)) {
+            val name = compose.activity.getString(label)
+            val action = compose.onNode(hasClickAction() and (hasText(name) or hasContentDescription(name)))
+                .assertIsDisplayed()
+            assertEquals("$name is not clipped", action.getUnclippedBoundsInRoot(), action.getBoundsInRoot())
+            val bounds = action.fetchSemanticsNode().touchBoundsInRoot
+            assertTrue("$name keeps its touch target", bounds.width >= target && bounds.height >= target)
+            assertTrue(
+                "$name fits inside the picture",
+                bounds.left >= picture.left && bounds.right <= picture.right &&
+                    bounds.top >= picture.top && bounds.bottom <= picture.bottom,
+            )
+        }
+        val offset = behindLiveOffset(liveTimeline.value.behind)
+        val behind = compose.activity.getString(R.string.player_behind_live, offset)
+        val behindText = textLayout(compose.onNodeWithText(behind).assertIsDisplayed())
+        assertTrue("Only the wording after the timestamp gives way", behindText.isLineEllipsized(0))
+        assertTrue(behind.take(behindText.getLineEnd(0, visibleEnd = true)).contains(offset))
+        val goLiveLabel = compose.activity.getString(R.string.player_go_live)
+        val goLive = textLayout(compose.onNodeWithText(goLiveLabel, useUnmergedTree = true))
+        assertEquals("Go live keeps its visible label", goLiveLabel.length, goLive.getLineEnd(0, visibleEnd = true))
+        channelHandle(SemanticsActions.Expand).performSemanticsAction(SemanticsActions.Expand)
+        compose.onNode(
+            hasAnyAncestor(hasTestTag("player-channel-list")) and
+                SemanticsMatcher.keyIsDefined(SemanticsActions.ScrollToIndex),
+        ).performSemanticsAction(SemanticsActions.ScrollToIndex) { it(0) }
+        assertPhoneChannelHeading(compose.activity.getString(R.string.channels_all))
+        val longTag = playerChannels.tags.first().copy(label = "Documentaries, entertainment and current affairs")
+        compose.runOnIdle {
+            channelState.value = ChannelsState.Ready(playerChannels.copy(tags = listOf(longTag), selectedTagId = longTag.id))
+        }
+        assertPhoneChannelHeading(longTag.label)
+        val label = textLayout(compose.onNodeWithText(longTag.label, useUnmergedTree = true))
+        assertTrue("The wide tag label ellipsizes on one line", label.lineCount == 1 && label.isLineEllipsized(0))
+    }
+
+    private fun textLayout(node: SemanticsNodeInteraction): TextLayoutResult {
+        val results = mutableListOf<TextLayoutResult>()
+        node.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(results) }
+        return results.single()
+    }
+
+    private fun assertPhoneChannelHeading(label: String) {
+        val inSheet = hasAnyAncestor(hasTestTag("player-channel-list"))
+        val title = compose.onNode(hasText(compose.activity.getString(R.string.player_channels)) and inSheet, true)
+            .assertIsDisplayed().getUnclippedBoundsInRoot()
+        val tags = compose.onNode(hasText(label) and hasClickAction() and inSheet)
+            .assertIsDisplayed().getUnclippedBoundsInRoot()
+        val chevron = compose.onNodeWithTag("channel-tag-chevron", useUnmergedTree = true).assertIsDisplayed()
+        assertEquals("The tag chevron is not clipped", chevron.getUnclippedBoundsInRoot(), chevron.getBoundsInRoot())
+        val first = firstPhoneChannel().assertIsDisplayed().getUnclippedBoundsInRoot()
+        assertEquals("Heading and tag end share the first row's keyline", first.left to first.right, title.left to tags.right)
+        assertTrue("The tag wraps below the Channels title: ${tags.top} >= ${title.bottom}", tags.top >= title.bottom)
+        assertTrue(
+            "First row starts below both header items: ${first.top} >= ${maxOf(title.bottom, tags.bottom)}",
+            first.top >= maxOf(title.bottom, tags.bottom),
+        )
     }
 
     private fun checkPhoneChannelSheet(canvas: TouchCanvas) {
@@ -651,6 +744,8 @@ class PlayerScreenTest {
     private val scheduleHasRows = mutableStateOf(true)
     private val schedulePending = mutableStateOf(false)
     private val scheduleAvailability = mutableStateOf<GuideAvailability>(GuideAvailability.Current)
+    private val fontScale = mutableStateOf<Float?>(null)
+    private val playerChannels by lazy { channelsFixture(playing = true) }
 
     private val paused = mutableStateOf(false)
     private val brightness = mutableStateOf(.62f)
@@ -664,7 +759,7 @@ class PlayerScreenTest {
     private val hideMs = 1_000L
 
     private fun show(hideAfterMs: Long? = null) {
-        val channels = channelsFixture(playing = true)
+        val channels = playerChannels
         val channel = channels.rows.first().copy(
             details = ChannelDetails(
                 artwork = BitmapPainter(TouchFixtureArt.art("ridge-light").asImageBitmap()),
@@ -710,32 +805,38 @@ class PlayerScreenTest {
         )
         compose.setContent {
             MaterialTheme(colorScheme = MobileDarkColors) {
-                PlayerScreen(
-                    fixture.copy(
-                        channel = ((channelState.value as? ChannelsState.Ready)?.list ?: channels)
-                            .rows.firstOrNull { it.id == channelId.value } ?: fixture.channel,
-                        channels = channelState.value ?: fixture.channels,
-                        status = status.value, paused = paused.value, offered = offered.value,
-                        brightness = brightness.value,
-                        schedule = fixture.schedule?.let { schedule ->
-                            schedule.copy(
-                                programs = schedule.programs.takeIf { channelId.value == null && scheduleHasRows.value }
-                                    .orEmpty(),
-                                selectedDay = scheduleDay.value,
-                                dayLoading = schedulePending.value && scheduleAvailability.value == GuideAvailability.Current,
-                                availability = scheduleAvailability.value,
-                            )
-                        },
-                    ),
-                    {
-                        actions += it
-                        if (it == PlayerAction.TogglePlay) paused.value = !paused.value
-                    }, { seeks += it },
-                    { brightness.value = it; brightnessChanges += it }, { played += it }, { choices += it },
-                    inWindow = inWindow.value, hideAfterMs = hideAfterMs,
-                ) { modifier ->
-                    val formatter = NoticeFormatter(LocalContext.current)
-                    notice.value?.let { formatter.format(it) }?.let { TouchNotice(it.headline, it.detail, modifier) }
+                val density = LocalDensity.current
+                CompositionLocalProvider(
+                    LocalDensity provides (fontScale.value?.let { Density(density.density, it) } ?: density),
+                ) {
+                    PlayerScreen(
+                        fixture.copy(
+                            channel = ((channelState.value as? ChannelsState.Ready)?.list ?: channels)
+                                .rows.firstOrNull { it.id == channelId.value } ?: fixture.channel,
+                            channels = channelState.value ?: fixture.channels,
+                            status = status.value, paused = paused.value, offered = offered.value,
+                            brightness = brightness.value,
+                            schedule = fixture.schedule?.let { schedule ->
+                                schedule.copy(
+                                    programs = schedule.programs
+                                        .takeIf { channelId.value == null && scheduleHasRows.value }.orEmpty(),
+                                    selectedDay = scheduleDay.value,
+                                    dayLoading = schedulePending.value &&
+                                        scheduleAvailability.value == GuideAvailability.Current,
+                                    availability = scheduleAvailability.value,
+                                )
+                            },
+                        ),
+                        {
+                            actions += it
+                            if (it == PlayerAction.TogglePlay) paused.value = !paused.value
+                        }, { seeks += it },
+                        { brightness.value = it; brightnessChanges += it }, { played += it }, { choices += it },
+                        inWindow = inWindow.value, hideAfterMs = hideAfterMs,
+                    ) { modifier ->
+                        val formatter = NoticeFormatter(LocalContext.current)
+                        notice.value?.let { formatter.format(it) }?.let { TouchNotice(it.headline, it.detail, modifier) }
+                    }
                 }
             }
         }

@@ -107,7 +107,10 @@ internal val LocalDestinationBackEnabled = compositionLocalOf { true }
 internal val LocalDestinationReselections = staticCompositionLocalOf<Flow<Destination>> { emptyFlow() }
 
 /** The outer horizontal margin for browsing pages. */
-internal val LocalBrowseMargin = staticCompositionLocalOf { 24.dp }
+internal val CompactBrowseMargin = 16.dp
+internal val WideBrowseMargin = 24.dp
+
+internal val LocalBrowseMargin = staticCompositionLocalOf { WideBrowseMargin }
 
 @Composable
 internal fun OnDestinationReselected(destination: Destination, action: suspend () -> Unit) {
@@ -232,7 +235,7 @@ private fun FrameShell(
 
     val bottomBar = !expanded && bars.navigation && destinations.size > 1
     val notices = LocalFrameNotices.current
-    val browseMargin = if (mediumOrWider) 24.dp else 16.dp
+    val browseMargin = if (mediumOrWider) WideBrowseMargin else CompactBrowseMargin
     Row(modifier.fillMaxSize()) {
         if (expanded && bars.navigation) DestinationRail(destinations, selected, select)
         Scaffold(

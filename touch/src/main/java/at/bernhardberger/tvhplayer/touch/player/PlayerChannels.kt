@@ -1,13 +1,14 @@
 package at.bernhardberger.tvhplayer.touch.player
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -54,6 +55,7 @@ import at.bernhardberger.tvhplayer.touch.ui.ListMessage
 import at.bernhardberger.tvhplayer.touch.ui.MessageKind
 import at.bernhardberger.tvhplayer.touch.ui.OfflineBanner
 import at.bernhardberger.tvhplayer.touch.ui.OfflineTexts
+import at.bernhardberger.tvhplayer.touch.ui.CompactBrowseMargin
 
 private val ChannelListShape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
 
@@ -95,7 +97,7 @@ internal fun PhoneChannelSheet(
             sheetContent = {
                 InlineChannelList(
                     state, ChannelsLayout.Phone, onChoice, onChannel, onRetry,
-                    Modifier.fillMaxHeight().padding(horizontal = 12.dp),
+                    Modifier.fillMaxHeight().padding(horizontal = CompactBrowseMargin),
                 )
             },
         ) { padding ->
@@ -136,17 +138,25 @@ private fun InlineChannelList(
     modifier: Modifier,
 ) {
     Column(modifier.fillMaxWidth().testTag("player-channel-list").windowInsetsPadding(WindowInsets.navigationBars)) {
-        Row(
-            Modifier.fillMaxWidth().height(50.dp).padding(horizontal = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
+        Box(
+            Modifier.fillMaxWidth().heightIn(min = 50.dp)
+                .padding(horizontal = if (layout == ChannelsLayout.Phone) 0.dp else 12.dp),
+            contentAlignment = Alignment.CenterStart,
         ) {
-            Text(
-                stringResource(R.string.player_channels), Modifier.semantics { heading() },
-                color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleMedium,
-            )
-            state.displayedList?.takeIf { it.tags.isNotEmpty() }?.let { list ->
-                TagFilter(list, { onChoice(PlayerChoice.ChannelTag(it)) })
+            FlowRow(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                itemVerticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    stringResource(R.string.player_channels), Modifier.semantics { heading() },
+                    color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleMedium,
+                )
+                state.displayedList?.takeIf { it.tags.isNotEmpty() }?.let { list ->
+                    Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+                        TagFilter(list, { onChoice(PlayerChoice.ChannelTag(it)) })
+                    }
+                }
             }
         }
         PlayerChannelsContent(state, layout, onChannel, { onChoice(PlayerChoice.ChannelTag(it)) }, onRetry)
