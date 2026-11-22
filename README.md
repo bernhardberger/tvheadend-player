@@ -118,7 +118,8 @@ them before Tvheadend imports it.
 - The remote's media buttons work in the player: Play/Pause, Rewind and Fast
   forward at up to 32 times, and Record for the program you're watching.
 - Open the playing channel's schedule next to the picture.
-- Pick audio and subtitle tracks and set your preferred languages.
+- Pick audio and subtitle tracks and set your preferred languages. Channels and
+  recordings remember the tracks you pick.
 
 **Channels**
 
