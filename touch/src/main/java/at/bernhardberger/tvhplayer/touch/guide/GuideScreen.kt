@@ -223,6 +223,7 @@ private fun GuideList(state: GuideState, layout: GuideLayout, actions: GuideActi
     val body: @Composable () -> Unit = {
         when {
             state.channels.isNotEmpty() -> content()
+            state.dayLoading -> DayLoading()
             state.selectedTagId != null -> ListMessage(MessageKind.EmptyTag, actions.onOpenConnectionSettings) {
                 actions.onTag(null)
             }
@@ -288,14 +289,12 @@ private fun Overview(
             state, actions, layout.compact,
             Modifier.padding(start = margin, end = margin, top = 12.dp, bottom = 12.dp),
         )
-        if (state.dayLoading && state.channels.all { it.programs.isEmpty() }) {
-            DayLoading()
-        } else if (layout.compact) {
+        if (layout.compact) {
             val padding = PaddingValues(start = margin, end = margin, bottom = 16.dp)
-            OverviewRows(state.channels, state.overviewHasLogos, openId, onOpen, actions, onDetails, padding)
+            OverviewRows(state, openId, onOpen, actions, onDetails, padding)
         } else {
             val padding = PaddingValues(horizontal = margin)
-            OverviewColumns(state.channels, layout, openId, onOpen, onChannel, actions, onDetails, padding)
+            OverviewColumns(state, layout, openId, onOpen, onChannel, actions, onDetails, padding)
         }
     }
 }

@@ -46,6 +46,7 @@ import at.bernhardberger.tvheadend.sdk.core.EpgSnapshot
 import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi
+import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.testutil.FakeConnection
 import at.bernhardberger.tvhplayer.touch.testutil.ServerGuide
 import at.bernhardberger.tvhplayer.touch.testutil.TouchCanvas
@@ -146,6 +147,37 @@ class GuideScreenTest {
         compose.onNode(head).performClick()
         compose.onNodeWithText("Sunday, November 15").assertIsDisplayed()
         compose.onNodeWithText("Six Bridges and a River That Changed Its Mind").assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = TABLET)
+    fun tabletOverviewRequestsLaterColumnsWhileCoverageIsPending() {
+        val fixture = overviewFixture()
+        val head = fixture.channels.first()
+        val program = head.programs.first()
+        val later = head.copy(programs = listOf(program))
+        val seed = List(8) { index ->
+            GuideChannel("empty-$index", "Channel ${index + 1}", gap = if (index == 0) GuideGap("8:00", "9:00") else null)
+        }
+        val state = mutableStateOf(
+            fixture.copy(channels = seed + later.copy(programs = emptyList(), overviewPending = true), dayLoading = true),
+        )
+        show(fixture, state = { state.value }, onOverviewViewport = { visible ->
+            if (later.id in visible) state.value = state.value.copy(channels = seed + later)
+        })
+
+        val noPrograms = compose.activity.getString(R.string.guide_no_programs)
+        val list = compose.onNode(
+            hasScrollToIndexAction() and SemanticsMatcher.keyIsDefined(SemanticsProperties.HorizontalScrollAxisRange),
+        )
+        list.assertIsDisplayed()
+        compose.onNodeWithText(noPrograms).assertDoesNotExist()
+        list.performScrollToIndex(seed.size)
+        compose.onNodeWithText(program.title).assertIsDisplayed()
+        list.performScrollToIndex(0)
+        compose.onNodeWithText(noPrograms).assertDoesNotExist()
+        compose.runOnIdle { state.value = state.value.copy(dayLoading = false) }
+        compose.onNodeWithText(noPrograms).assertIsDisplayed()
     }
 
     @Test
@@ -970,6 +1002,7 @@ class GuideScreenTest {
         detailsId: String? = null,
         taps: MutableSharedFlow<Destination> = MutableSharedFlow(),
         state: () -> GuideState = { fixture },
+        onOverviewViewport: ((List<String>) -> Unit)? = null,
         over: @Composable () -> Unit = {},
     ) {
         var shownDetailsId by mutableStateOf(detailsId)
@@ -990,6 +1023,7 @@ class GuideScreenTest {
             onCancel = { cancelled += it },
             onStop = { stopped += it },
             onView = { selectedView = it },
+            onOverviewViewport = onOverviewViewport,
             onChannel = {
                 selectedChannels += it
                 selectedChannel = it
