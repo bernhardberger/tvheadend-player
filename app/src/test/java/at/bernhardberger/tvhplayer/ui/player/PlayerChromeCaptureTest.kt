@@ -271,8 +271,9 @@ class PlayerChromeCaptureTest {
                             content = PlayerChromeContent(
                                 clockSec = now,
                                 // Tide Watch is scheduled. The rail's Harbor Sport mark is an unlinked timer.
-                                info = liveInfoBarData(app.resources, playingIndex + 1L, names[playingIndex], programme, next, nextScheduled = !concert,
-                                    nowSec = now, unavailableTitle = "No program information"),
+                                info = liveInfoBarData(app.resources, playingIndex + 1L, names[playingIndex], programme, next,
+                                    nowSec = now, unavailableTitle = "No program information",
+                                    nextRecording = next?.let { DvrEntry.create(DvrEntryId(1), state = DvrEntryState.SCHEDULED) }),
                                 state = playerStateCell(false),
                                 picon = ChannelIcon.ImageCache(ArtworkId(201 + playingIndex)),
                                 artwork = programme.image?.let(ChannelIcon::ImageCache),
@@ -585,8 +586,9 @@ class PlayerChromeCaptureTest {
         }
         val content = PlayerChromeContent(
             clockSec = NOW,
-            info = liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 101, "Ridge Earth HD", programme.takeUnless { noEpg }, next.takeUnless { noEpg }, nextScheduled = true, nowSec = NOW,
-                unavailableTitle = "No program information").let { info ->
+            info = liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 101, "Ridge Earth HD", programme.takeUnless { noEpg }, next.takeUnless { noEpg }, nowSec = NOW,
+                unavailableTitle = "No program information",
+                nextRecording = DvrEntry.create(DvrEntryId(1), state = DvrEntryState.SCHEDULED)).let { info ->
                 when (scene) {
                     Scene.BANNER_LIVE -> info.copy(title = "Ridge Light")
                     Scene.BANNER_LONG_EYEBROW -> info.copy(metadata =
@@ -681,7 +683,8 @@ class PlayerChromeCaptureTest {
                 // The preview follows the focused card; the drawer lands on the playing channel.
                 ProvideArtworkSession(session) { QuickZapTrayPreview(channels[0], if (scene != Scene.TRAY_TEXT) programme else programme.copyWithoutImage(),
                     next, NOW, Modifier.padding(horizontal = androidx.compose.ui.unit.Dp(64f)),
-                    nextScheduled = scene == Scene.TRAY_NEXT_SCHEDULED) }
+                    nextRecording = if (scene == Scene.TRAY_NEXT_SCHEDULED)
+                        DvrEntry.create(DvrEntryId(1), state = DvrEntryState.SCHEDULED) else null) }
             })
             Scene.PROGRAMME_INFO_NO_EPG, Scene.PROGRAMME_INFO_NO_ART_RECORDING, Scene.PROGRAMME_AIRINGS,
             Scene.PROGRAMME_OPENED, Scene.PROGRAMME_MORE_INFO, Scene.RAIL_PROGRAMME_OPENED, Scene.PROGRAMME_CONFIRM_STOP -> {

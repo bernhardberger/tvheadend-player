@@ -953,7 +953,7 @@ class QuickZapPresentationTest {
                         ProvideArtworkSession(session) { PlayerChrome(
                             mode = PlayerChromeMode.CONTROLS,
                             content = PlayerChromeContent(0L, liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, playing?.value,
-                                playing?.let { lineUp[((it.value - 1) % lineUp.size).toInt()].name }.orEmpty(), null, null, false, 900, "")),
+                                playing?.let { lineUp[((it.value - 1) % lineUp.size).toInt()].name }.orEmpty(), null, null, 900, "")),
                             timeline = PlayerChromeTimeline.Live(AppTimeshiftState(), nowSec = 900, programme = playing?.let(::event)),
                             actions = PlayerChromeActions(active = layers.core.chrome.controlsVisible, restoreFocus = layers.core.restoreControl),
                             onDownFromActions = {

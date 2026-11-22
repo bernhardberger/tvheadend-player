@@ -1,6 +1,8 @@
 package at.bernhardberger.tvhplayer.core
 
 import at.bernhardberger.tvhplayer.ui.screens.isScheduled
+import at.bernhardberger.tvhplayer.ui.screens.nextRecordingForEvent
+import at.bernhardberger.tvheadend.sdk.core.AutorecRuleId
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
@@ -78,12 +80,15 @@ class ChannelNowStatusPolicyTest {
         assertNull(observation(previous).runningRecordingForEvent(stale))
         assertEquals(setOf(channel), activeRecordingChannelIds(listOf(previous), inside))
         val scheduled = DvrEntry.create(previous.id, channelId = channel, eventId = previous.eventId,
-            state = DvrEntryState.SCHEDULED)
+            state = DvrEntryState.SCHEDULED, autorecRuleId = AutorecRuleId("rule"))
+        val scheduledEvent = EpgEvent.create(EventId(1), channel, start - 30.minutes, start, dvrEntryId = scheduled.id)
         val withStaleSchedule = SessionObservation.create(
-            epgState = EpgRepositoryState.Current(EpgSnapshot.create(events = listOf(stale))),
+            epgState = EpgRepositoryState.Current(EpgSnapshot.create(events = listOf(scheduledEvent, stale))),
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = listOf(scheduled))),
         )
         assertFalse("A stale reverse link cannot put a clock on another programme", withStaleSchedule.isScheduled(stale))
+        assertNull(withStaleSchedule.nextRecordingForEvent(stale))
+        assertEquals(scheduled, withStaleSchedule.nextRecordingForEvent(scheduledEvent))
     }
 
     private fun observation(vararg entries: DvrEntry) =

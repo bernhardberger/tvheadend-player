@@ -14,7 +14,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import at.bernhardberger.tvhplayer.ui.components.ScheduledIndicator
 import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
 import at.bernhardberger.tvhplayer.ui.components.RecordingBadge
 import at.bernhardberger.tvhplayer.ui.components.recordingStatusSpoken
@@ -29,6 +28,7 @@ import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.programmeArtworkModel
 import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import coil3.compose.AsyncImage
 import at.bernhardberger.tvhplayer.ui.components.rememberProgrammeImageRequest
 
@@ -46,8 +46,6 @@ fun QuickZapPreview(
     image: ChannelIcon?,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
-    /** A recording is scheduled for Next; its title is followed by the info bar's clock. */
-    nextScheduled: Boolean = false,
     nextRecording: DvrEntry? = null,
     nowRecording: DvrEntry? = null,
 ) {
@@ -95,11 +93,9 @@ fun QuickZapPreview(
                         overflow = TextOverflow.Ellipsis, color = tertiary)
                     // As the info bar's Next line: centred on the text without adding to its height.
                     if (nextRecording != null) RecordingStatusIndicator(
-                        nextRecording.state, Modifier.noHeight(), rule = nextRecording.rule,
-                        textStyle = MaterialTheme.typography.labelLarge)
-                    else if (nextScheduled) ScheduledIndicator(Modifier.noHeight().testTag("player-scheduled-marker"),
-                        tint = tertiary, contentDescription = stringResource(R.string.player_scheduled),
-                        textStyle = MaterialTheme.typography.labelLarge)
+                        nextRecording.state, Modifier.noHeight()
+                            .then(if (nextRecording.state == DvrEntryState.SCHEDULED) Modifier.testTag("player-scheduled-marker") else Modifier),
+                        rule = nextRecording.rule, textStyle = MaterialTheme.typography.labelLarge, scheduledTint = tertiary)
                 }
             }
         }

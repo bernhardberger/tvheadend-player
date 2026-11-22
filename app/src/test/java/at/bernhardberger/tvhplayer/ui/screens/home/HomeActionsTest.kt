@@ -1461,16 +1461,17 @@ class HomeActionsTest {
         compose.mainClock.autoAdvance = true
     }
 
-    @Test fun onNowNextLineMarksAScheduledRecording() {
+    @Test fun onNowNextLineAnnouncesTheSchedulingRule() {
         val next = EpgEvent.create(EventId(50), ChannelId(1),
             Instant.fromEpochSeconds(now + 600), Instant.fromEpochSeconds(now + 1200), title = "Later")
         onNowRow(1, SessionObservation.create(
             epgState = EpgRepositoryState.Current(EpgSnapshot.create(events = listOf(next))),
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = listOf(
-                DvrEntry.create(id = DvrEntryId(9), eventId = next.id, state = DvrEntryState.SCHEDULED)))),
+                DvrEntry.create(id = DvrEntryId(9), eventId = next.id, state = DvrEntryState.SCHEDULED,
+                    autorecRuleId = AutorecRuleId("automatic-recording"))))),
         ))
         onNowInfo("Later").assertCountEquals(1)
         compose.onNode(hasAnyAncestor(hasTestTag("home-on-now-block")) and hasTestTag("channels-next-scheduled"), useUnmergedTree = true)
-            .assertExists()
+            .assert(hasContentDescription(compose.activity.getString(RecordingRule.AUTOMATIC.label)))
     }
 }

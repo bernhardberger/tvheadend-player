@@ -168,7 +168,7 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
                             if (scenario == "shelf-paused") 0.25f else 0.5f, 0f, 0.5f, 0.5f, true)
                         PlayerChrome(
                             mode = PlayerChromeMode.CONTROLS,
-                            content = PlayerChromeContent(0L, liveInfoBarData(androidx.compose.ui.platform.LocalContext.current.resources, 12, "Documentary 12", null, null, false, 0, "")),
+                            content = PlayerChromeContent(0L, liveInfoBarData(androidx.compose.ui.platform.LocalContext.current.resources, 12, "Documentary 12", null, null, 0, "")),
                             timeline = PlayerChromeTimeline.Live(
                                 AppTimeshiftState(available = true, bufferStartMs = -3_600_000,
                                 positionMs = if (scenario == "shelf-paused") -900_000 else 0, liveEdgeMs = 0),
@@ -214,7 +214,7 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
                             mode = PlayerChromeMode.CONTROLS,
                             content = PlayerChromeContent(0L, liveInfoBarData(androidx.compose.ui.platform.LocalContext.current.resources, 1, "Documentary HD",
                                 programme(long = large).takeUnless { scenario == "missing" || scenario.endsWith("-missing") },
-                                null, false, 1_783_020_600L, "Programme unavailable")),
+                                null, 1_783_020_600L, "Programme unavailable")),
                             timeline = PlayerChromeTimeline.Live(
                                 remember(scenario, tuningComplete) {
                                  if ((scenario.startsWith("field-") && !tuningComplete) || scenario in listOf("live", "long", "missing", "return-info", "timeline-passive-large")) AppTimeshiftState() else {

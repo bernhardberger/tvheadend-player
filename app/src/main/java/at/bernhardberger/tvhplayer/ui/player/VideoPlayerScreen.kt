@@ -153,7 +153,7 @@ import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.notices.Notice
 import at.bernhardberger.tvhplayer.notices.PauseUnavailableReason
 import at.bernhardberger.tvhplayer.ui.screens.postDvrFailure
-import at.bernhardberger.tvhplayer.ui.screens.isScheduled
+import at.bernhardberger.tvhplayer.ui.screens.nextRecordingForEvent
 import at.bernhardberger.tvhplayer.ui.screens.DvrMutationAction
 import at.bernhardberger.tvhplayer.ui.screens.DvrMutationActions
 import at.bernhardberger.tvhplayer.ui.screens.currentDvrMutation
@@ -1875,11 +1875,10 @@ fun VideoPlayerScreen(
             channelName = currentChannelName,
             event = controlsEvent,
             next = controlsNext,
-            nextScheduled = observation.isScheduled(controlsNext),
             nowSec = nowSec,
             unavailableTitle = unavailableTitle,
             nowRecording = observation.runningRecordingForEvent(controlsEvent),
-            nextRecording = observation.runningRecordingForEvent(controlsNext),
+            nextRecording = observation.nextRecordingForEvent(controlsNext),
         ),
         channelRecording = currentChannelId in recordingChannelIds,
         badges = trackGlance.badges,
@@ -2081,8 +2080,7 @@ fun VideoPlayerScreen(
                     nowSec,
                     Modifier.padding(horizontal = at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin),
                     scrolling = channelBrowser.scrolling,
-                    nextScheduled = observation.isScheduled(previewNext),
-                    nextRecording = observation.runningRecordingForEvent(previewNext),
+                    nextRecording = observation.nextRecordingForEvent(previewNext),
                     nowRecording = observation.runningRecordingForEvent(previewEvent))
             },
             peeks = channels.isNotEmpty(),

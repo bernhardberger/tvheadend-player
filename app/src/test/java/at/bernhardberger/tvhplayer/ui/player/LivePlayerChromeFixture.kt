@@ -266,7 +266,7 @@ abstract class LivePlayerChromeFixture {
             TVHeadendPlayerTheme {
                 PlayerChrome(
                     mode = PlayerChromeMode.CONTROLS,
-                    content = PlayerChromeContent(PlayerChromeClockSec, liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 1, "One", null, null, false, 1_800, "Programme"), state = state()),
+                    content = PlayerChromeContent(PlayerChromeClockSec, liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 1, "One", null, null, 1_800, "Programme"), state = state()),
                     timeline = PlayerChromeTimeline.Live(
                         at.bernhardberger.tvhplayer.playback.AppTimeshiftState(available = true, bufferStartMs = -600_000,
                             positionMs = -behindLiveMs(), liveEdgeMs = 0, timingKnown = true,

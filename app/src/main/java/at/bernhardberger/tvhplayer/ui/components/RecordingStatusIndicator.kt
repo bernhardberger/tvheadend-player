@@ -73,6 +73,7 @@ fun RecordingStatusIndicator(
     descriptionOverride: String? = null,
     textStyle: TextStyle = LocalTextStyle.current,
     size: Dp = recordingMarkSize(textStyle),
+    scheduledTint: Color = LocalContentColor.current,
 ) {
     val content = LocalContentColor.current
     val (@DrawableRes icon, tint) = when (state) {
@@ -87,7 +88,7 @@ fun RecordingStatusIndicator(
                 skipped -> AppR.drawable.ic_event_busy
                 rule != null -> AppR.drawable.ic_schedule_rule
                 else -> AppR.drawable.ic_schedule
-            }) to content
+            }) to scheduledTint
         else -> return
     }
     Icon(
@@ -132,19 +133,3 @@ fun recordingMarkColor(focused: Boolean): Color = if (focused) TvRecordingFocuse
 @Composable
 internal fun errorMarkColor(focused: Boolean): Color =
     if (focused) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.error
-
-/** Scheduled mark for places that only know "scheduled", not a DVR entry state. */
-@Composable
-fun ScheduledIndicator(
-    modifier: Modifier = Modifier,
-    tint: Color = LocalContentColor.current,
-    contentDescription: String? = null,
-    textStyle: TextStyle = LocalTextStyle.current,
-) {
-    Icon(
-        painter = painterResource(AppR.drawable.ic_schedule),
-        contentDescription = contentDescription,
-        modifier = modifier.size(recordingMarkSize(textStyle)),
-        tint = tint,
-    )
-}

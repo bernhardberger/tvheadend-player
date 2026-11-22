@@ -332,7 +332,7 @@ class PlayerTimelineGeometryTest {
         val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
         compose.setContent {
             TVHeadendPlayerTheme {
-                val info = liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 1, "One", airing, airing, false, now, "Programme")
+                val info = liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 1, "One", airing, airing, now, "Programme")
                 PlayerInfoBar(info, Modifier.testTag("player-info-bar"), lastLineEndReserve = reserve) {
                     Box(it.size(124.dp, 70.dp))
                 }
@@ -620,7 +620,7 @@ class PlayerTimelineGeometryTest {
             displayedProgrammeEvent(false, timeline.committedWindow, timeline.committedWindow, timeline.committedTimeshift,
                 timeline.programme, timeline.liveStart),
             displayedNextEvent(false, timeline.committedWindow, timeline.committedTimeshift, next, timeline.liveStart, timeline.programme) { next },
-            false, timeline.nowSec, unavailable,
+            timeline.nowSec, unavailable,
         )
         fun zapped(state: AppTimeshiftState, tuning: Boolean = false, window: ProgrammeWindow? = null) = live(
             state, programme = newAiring, tuning = tuning, fresh = true, window = window, channel = ChannelId(2),
@@ -1169,7 +1169,7 @@ class PlayerTimelineGeometryTest {
             Box(Modifier.fillMaxSize()) {
             PlayerChrome(
                 mode = frame.mode,
-                content = PlayerChromeContent(PlayerChromeClockSec, frame.info ?: liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 1, "One", airing, airing, false, now, "Programme"),
+                content = PlayerChromeContent(PlayerChromeClockSec, frame.info ?: liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 1, "One", airing, airing, now, "Programme"),
                     state = frame.cell),
                 timeline = frame.timeline,
                 actions = PlayerChromeActions(active = frame.mode == PlayerChromeMode.CONTROLS, paused = frame.cell == PlayerStateCell.PAUSED),

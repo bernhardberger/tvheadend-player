@@ -624,7 +624,7 @@ class PlayerChromeTimelineRowTest {
             TVHeadendPlayerTheme {
                 PlayerChrome(
                     mode = mode,
-                    content = PlayerChromeContent(PlayerChromeClockSec, liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 1, "One", null, null, false, now, "Programme")),
+                    content = PlayerChromeContent(PlayerChromeClockSec, liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 1, "One", null, null, now, "Programme")),
                     timeline = timeline(),
                     actions = PlayerChromeActions(active = mode == PlayerChromeMode.CONTROLS),
                     onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {}, onInteraction = {},

@@ -80,7 +80,6 @@ internal fun liveInfoBarData(
     channelName: String,
     event: EpgEventEntry?,
     next: EpgEventEntry?,
-    nextScheduled: Boolean,
     nowSec: Long,
     unavailableTitle: String,
     nowRecording: DvrEntry? = null,
@@ -96,9 +95,8 @@ internal fun liveInfoBarData(
     remainingMinutes = event?.takeIf { nowSec >= it.start.epochSeconds && nowSec < it.stop.epochSeconds }
         ?.let { ((it.stop.epochSeconds - nowSec + 59) / 60).toInt() },
     next = next?.title?.takeIf(String::isNotBlank)?.let { "${formatClock(next.start.epochSeconds)} $it" },
-    nextScheduled = nextScheduled && next != null,
     nowRecording = nowRecording,
-    nextRecording = nextRecording,
+    nextRecording = nextRecording.takeIf { !next?.title.isNullOrBlank() },
 )
 
 /** Positively audio-only: the player reports audio tracks and no video track. */
@@ -189,7 +187,6 @@ internal data class QuickZapPreviewSnapshot(
     val next: String?,
     val image: ChannelIcon?,
     val subtitle: String? = null,
-    val nextScheduled: Boolean = false,
     val nextRecording: DvrEntry? = null,
     val nowRecording: DvrEntry? = null,
 )
@@ -209,8 +206,6 @@ internal fun QuickZapTrayPreview(
     /** Without artwork and summary. */
     compact: Boolean = false,
     scrolling: Boolean = false,
-    /** A recording is scheduled for [next]. */
-    nextScheduled: Boolean = false,
     nextRecording: DvrEntry? = null,
     nowRecording: DvrEntry? = null,
 ) {
@@ -225,7 +220,6 @@ internal fun QuickZapTrayPreview(
             subtitle = event?.subtitle?.takeIf(String::isNotBlank),
             next = next?.title?.takeIf(String::isNotBlank)?.let { title -> "${formatClock(next.start.epochSeconds)} $title" },
             image = if (compact) null else event?.let(::programmeArtwork),
-            nextScheduled = nextScheduled && next != null,
             nextRecording = nextRecording,
             nowRecording = nowRecording.takeIf { programmeTitle != null },
         )
@@ -240,7 +234,6 @@ internal fun QuickZapTrayPreview(
                 next = it.next,
                 image = it.image,
                 subtitle = it.subtitle,
-                nextScheduled = it.nextScheduled,
                 nextRecording = it.nextRecording,
                 nowRecording = it.nowRecording,
             )

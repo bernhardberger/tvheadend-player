@@ -57,7 +57,7 @@ class TimeshiftCommandConsistencyTest {
             TVHeadendPlayerTheme {
                 PlayerChrome(
                     mode = PlayerChromeMode.CONTROLS,
-                    content = PlayerChromeContent(0L, liveInfoBarData(androidx.compose.ui.platform.LocalContext.current.resources, 1, "Fixture", null, null, false, 0, "")),
+                    content = PlayerChromeContent(0L, liveInfoBarData(androidx.compose.ui.platform.LocalContext.current.resources, 1, "Fixture", null, null, 0, "")),
                     timeline = PlayerChromeTimeline.Live(
                         state.value,
                         nowSec = 0L,
@@ -123,7 +123,7 @@ class TimeshiftCommandConsistencyTest {
             TVHeadendPlayerTheme {
                 PlayerChrome(
                     mode = PlayerChromeMode.CONTROLS,
-                    content = PlayerChromeContent(0L, liveInfoBarData(androidx.compose.ui.platform.LocalContext.current.resources, 1, "Fixture", null, null, false, 0, "")),
+                    content = PlayerChromeContent(0L, liveInfoBarData(androidx.compose.ui.platform.LocalContext.current.resources, 1, "Fixture", null, null, 0, "")),
                     timeline = PlayerChromeTimeline.Live(
                         AppTimeshiftState(available = true, bufferStartMs = 0L,
                         positionMs = 500L, liveEdgeMs = 1_000L),
@@ -178,7 +178,7 @@ class TimeshiftCommandConsistencyTest {
                     } else {
                         PlayerChrome(
                             mode = PlayerChromeMode.CONTROLS,
-                            content = PlayerChromeContent(0L, liveInfoBarData(androidx.compose.ui.platform.LocalContext.current.resources, 1, "Fixture", null, null, false, 0, "")),
+                            content = PlayerChromeContent(0L, liveInfoBarData(androidx.compose.ui.platform.LocalContext.current.resources, 1, "Fixture", null, null, 0, "")),
                             timeline = PlayerChromeTimeline.Live(
                                 preview?.let { projectedTimeshiftState(sample.value, it.decision.targetMs) }
                                 ?: sample.value,
@@ -287,7 +287,7 @@ class TimeshiftCommandConsistencyTest {
                 val preview = owner.previewForTimeline(sample.value.timeline)
                 PlayerChrome(
                     mode = PlayerChromeMode.CONTROLS,
-                    content = PlayerChromeContent(0L, liveInfoBarData(androidx.compose.ui.platform.LocalContext.current.resources, 1, "Fixture", null, null, false, 0, "")),
+                    content = PlayerChromeContent(0L, liveInfoBarData(androidx.compose.ui.platform.LocalContext.current.resources, 1, "Fixture", null, null, 0, "")),
                     timeline = PlayerChromeTimeline.Live(
                         preview?.let { projectedTimeshiftState(sample.value, it.decision.targetMs) }
                         ?: sample.value,

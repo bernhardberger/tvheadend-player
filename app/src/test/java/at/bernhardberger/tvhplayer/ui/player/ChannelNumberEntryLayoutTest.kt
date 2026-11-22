@@ -36,6 +36,9 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
 import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.DvrSnapshot
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
@@ -137,8 +140,8 @@ class ChannelNumberEntryLayoutTest {
                             content = PlayerChromeContent(
                                 clockSec = NOW,
                                 info = liveInfoBarData(ApplicationProvider.getApplicationContext<Application>().resources,
-                                    101, "Ridge Earth HD", programme, next, nextScheduled = true, nowSec = NOW,
-                                    unavailableTitle = "No program information"),
+                                    101, "Ridge Earth HD", programme, next, nowSec = NOW, unavailableTitle = "No program information",
+                                    nextRecording = DvrEntry.create(DvrEntryId(1), state = DvrEntryState.SCHEDULED)),
                                 state = playerStateCell(false),
                                 picon = ChannelIcon.ImageCache(LOGO),
                                 artwork = programme.image?.let(ChannelIcon::ImageCache),

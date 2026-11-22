@@ -67,6 +67,7 @@ import org.robolectric.annotation.GraphicsMode
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 import at.bernhardberger.tvhplayer.ui.components.RecordingBadge
+import at.bernhardberger.tvhplayer.ui.components.RecordingRule
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-xhdpi")
@@ -107,9 +108,11 @@ class PlayerChromeEvidenceTest {
     }
 
     @Test fun passiveBarAndSlotHaveMergedSemanticsAndNoFocusActions() {
+        val scheduled = DvrEntry.create(DvrEntryId(1), state = DvrEntryState.SCHEDULED, timerecRuleId = TimerecRuleId("timer"))
+        val ruleDescription = ApplicationProvider.getApplicationContext<Application>().getString(RecordingRule.TIMER.label)
         compose.setContent { TVHeadendPlayerTheme {
             Column {
-                InfoBar(info(false), Modifier.fillMaxWidth().testTag("bar"))
+                InfoBar(info(false).copy(nextRecording = scheduled), Modifier.fillMaxWidth().testTag("bar"))
                 PlayerStateCellView(PlayerStateCell.PLAYING, Modifier.testTag("chip"))
             }
         } }
@@ -117,7 +120,8 @@ class PlayerChromeEvidenceTest {
         val spoken = bar.config[SemanticsProperties.ContentDescription].joinToString(" ")
         assertTrue(spoken.contains("Channel 101 Ridge Earth HD"))
         assertTrue(spoken.contains("Now:"))
-        assertTrue(spoken.contains("Recording scheduled"))
+        assertTrue(spoken.contains(ruleDescription))
+        compose.onAllNodes(hasContentDescription(ruleDescription, substring = true), useUnmergedTree = true).assertCountEquals(1)
         assertTrue("the info bar announces the declared scan", spoken.contains("1080i lines"))
         assertTrue(spoken.contains("Audio DD 5.1"))
         assertTrue(spoken.contains("Audio description"))
@@ -462,7 +466,8 @@ class PlayerChromeEvidenceTest {
         images.install(failing)
         compose.setContent { TVHeadendPlayerTheme { Column(Modifier.width(800.dp)) {
             ProvideArtworkSession(session) { QuickZapPreview("Failed title", "Failed metadata", null, "21:00 Failed next",
-                ChannelIcon.ImageCache(ArtworkId(1)), nextScheduled = true) }
+                ChannelIcon.ImageCache(ArtworkId(1)), nextRecording = DvrEntry.create(DvrEntryId(1),
+                    state = DvrEntryState.SCHEDULED, autorecRuleId = AutorecRuleId("rule"))) }
             ProvideArtworkSession(session) { QuickZapPreview("Absent title", "Absent metadata", null, "21:00 Absent next", null) }
         } } }
         compose.waitForIdle()
@@ -474,7 +479,7 @@ class PlayerChromeEvidenceTest {
         assertTrue("$marker follows $scheduledNext", marker.left >= scheduledNext.right)
         assertEquals(scheduledNext.center.y, marker.center.y, 1f)
         compose.onNode(hasText("Next • 21:00 Failed next", substring = true) and hasContentDescription(
-            ApplicationProvider.getApplicationContext<Application>().getString(at.bernhardberger.tvhplayer.presentation.R.string.player_scheduled), substring = true))
+            ApplicationProvider.getApplicationContext<Application>().getString(RecordingRule.AUTOMATIC.label), substring = true))
             .assertExists()
         val failed = compose.onNodeWithText("Failed title", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         val absent = compose.onNodeWithText("Absent title", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
@@ -636,7 +641,8 @@ class PlayerChromeEvidenceTest {
 
     @Composable private fun info(recorded: Boolean) = PlayerInfoBarData("101", "Ridge Earth HD",
         "Die außergewöhnliche Reise durch die österreichischen Alpen", "20:15–21:45", "Drama • S3 E4",
-        "Eine neue Perspektive auf Menschen und ihre Geschichten", 38, if (recorded) null else "21:45 Nachrichten", !recorded,
-        if (recorded) playerRecordedDate(LocalDate.of(2026, 9, 12)) else null, spokenTimeRange = "20:15 to 21:45")
+        "Eine neue Perspektive auf Menschen und ihre Geschichten", 38, if (recorded) null else "21:45 Nachrichten",
+        if (recorded) playerRecordedDate(LocalDate.of(2026, 9, 12)) else null, spokenTimeRange = "20:15 to 21:45",
+        nextRecording = if (recorded) null else DvrEntry.create(DvrEntryId(1), state = DvrEntryState.SCHEDULED))
 
 }

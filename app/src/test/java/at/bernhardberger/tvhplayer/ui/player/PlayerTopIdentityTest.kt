@@ -401,7 +401,7 @@ class PlayerTopIdentityTest {
         timeshift: AppTimeshiftState = this.timeshift,
         livePause: LivePauseAvailability? = null,
         restore: String? = null,
-        info: PlayerInfoBarData = liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 1, "One", null, null, false, 1_800, "Programme"),
+        info: PlayerInfoBarData = liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 1, "One", null, null, 1_800, "Programme"),
         /** Composed beside the chrome. */
         extra: @androidx.compose.runtime.Composable () -> Unit = {},
     ) {

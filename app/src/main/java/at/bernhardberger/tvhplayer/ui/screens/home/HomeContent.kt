@@ -172,7 +172,6 @@ import at.bernhardberger.tvhplayer.ui.components.horizontalHold
 import at.bernhardberger.tvhplayer.ui.components.MutedPastRowStart
 import at.bernhardberger.tvhplayer.ui.components.browseScreenBackdrop
 import at.bernhardberger.tvhplayer.ui.components.rememberHeldBack
-import at.bernhardberger.tvhplayer.ui.screens.isScheduled
 import at.bernhardberger.tvhplayer.ui.components.overflowingRowViewport
 import at.bernhardberger.tvhplayer.ui.components.progressColor
 import at.bernhardberger.tvhplayer.ui.components.recordingStatusSpoken
@@ -1332,7 +1331,6 @@ private fun HomeOnNowDetails(
                 channel = shown.channel,
                 current = shown.event,
                 next = next,
-                nextScheduled = observation.isScheduled(next),
                 channelRecording = shown.channel.id in recordingChannelIds,
                 observation = observation,
                 nowSec = nowSec,
@@ -1352,7 +1350,6 @@ private fun HomeOnNowBlock(
     channel: Channel,
     current: EpgEvent?,
     next: EpgEvent?,
-    nextScheduled: Boolean,
     channelRecording: Boolean,
     observation: SessionObservation,
     nowSec: Long,
@@ -1363,7 +1360,6 @@ private fun HomeOnNowBlock(
         channel = channel,
         current = current,
         next = next,
-        nextScheduled = nextScheduled,
         channelRecording = channelRecording,
         now = nowSec,
         synopsisLines = 2,

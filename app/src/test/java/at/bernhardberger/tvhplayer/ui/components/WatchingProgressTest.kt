@@ -704,7 +704,7 @@ class WatchingProgressTest {
                                     programme = event, nowSec = now, piconPath = picon, playbackIndicator = indicator.value,
                                     onFocus = {}, onConfirm = {}, modifier = Modifier.padding(48.dp).width(396.dp))
                                 "channels-headline" -> at.bernhardberger.tvhplayer.ui.screens.ChannelsHeadline(channel, event, null,
-                                    false, false, now, 3, false, Modifier.padding(48.dp).width(600.dp),
+                                    false, now, 3, false, Modifier.padding(48.dp).width(600.dp),
                                     observation = at.bernhardberger.tvheadend.sdk.core.SessionObservation.create())
                                 "row" -> Column(Modifier.padding(48.dp).width(480.dp)) {
                                     RecordingListRow(recording, channel.icon, 60.seconds, false, onClick = {})

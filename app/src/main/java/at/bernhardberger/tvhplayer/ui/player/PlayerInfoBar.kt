@@ -24,7 +24,6 @@ import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.GlanceBadge
-import at.bernhardberger.tvhplayer.ui.components.ScheduledIndicator
 import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
 import at.bernhardberger.tvhplayer.ui.components.RecordingBadge
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
@@ -46,7 +45,6 @@ data class PlayerInfoBarData(
     val subtitle: String? = null,
     val remainingMinutes: Int? = null,
     val next: String? = null,
-    val nextScheduled: Boolean = false,
     val recordedDate: String? = null,
     val spokenTimeRange: String = "",
     val nowRecording: DvrEntry? = null,
@@ -84,18 +82,13 @@ fun PlayerInfoBar(
     val remaining = data.remainingMinutes?.let { playerMinutesLeft(it, spoken = true) }
     val nextRecording = data.nextRecording.takeIf { next != null && !recorded }
     val nowRecordingState = data.nowRecordingStateOverride ?: data.nowRecording?.state
-    val nextStatus = when {
-        nextRecording != null -> recordingStatusSpoken(nextRecording.state, nextRecording.rule)
-        data.nextScheduled && next != null && !recorded -> stringResource(R.string.player_scheduled)
-        else -> null
-    }
     val description = listOfNotNull(
         if (data.channelNumber.isBlank()) data.channelName else stringResource(R.string.player_channel_spoken,
             channelTitleText(data.channelNumber.toLongOrNull(), data.channelName)),
         if (data.recordedDate == null) stringResource(R.string.player_now_spoken, data.title, data.spokenTimeRange)
         else stringResource(R.string.player_recorded_spoken, data.title, data.recordedDate, data.spokenTimeRange),
         data.nowRecording?.let { recordingStatusSpoken(nowRecordingState, it.rule) },
-        remaining, next, nextStatus,
+        remaining, next, nextRecording?.let { recordingStatusSpoken(it.state, it.rule) },
         badges.takeIf { it.isNotEmpty() }?.map { glanceBadgeSpoken(it) }?.joinToString(". "),
     ).joinToString(". ")
     val faded = Modifier.graphicsLayer { alpha = contentAlpha() }
@@ -130,7 +123,7 @@ fun PlayerInfoBar(
             // Now above, Next on the artwork's bottom edge.
             Spacer(Modifier.weight(1f).heightIn(min = 8.dp))
             if (lastText != null) {
-                PlayerInfoNext(lastText, nextRecording, data.nextScheduled, lastLineEndReserve, faded)
+                PlayerInfoNext(lastText, nextRecording, lastLineEndReserve, faded)
             } else {
                 Text("", style = MaterialTheme.typography.labelLarge, maxLines = 1,
                     modifier = Modifier.clearAndSetSemantics {})
@@ -143,7 +136,6 @@ fun PlayerInfoBar(
 private fun PlayerInfoNext(
     title: String,
     recording: DvrEntry?,
-    scheduled: Boolean,
     endReserve: Dp,
     modifier: Modifier,
 ) {
@@ -158,11 +150,10 @@ private fun PlayerInfoNext(
                 .testTag("player-info-last-text").clearAndSetSemantics {})
         // Centred on the text line without adding to its height: the row is as tall as its text.
         if (recording != null) RecordingStatusIndicator(
-            recording.state, Modifier.noHeight(), rule = recording.rule, announceState = false,
-            textStyle = MaterialTheme.typography.labelLarge)
-        else if (scheduled) ScheduledIndicator(
-            Modifier.noHeight().testTag("player-scheduled-marker"), tint = secondary,
-            textStyle = MaterialTheme.typography.labelLarge)
+            recording.state, Modifier.noHeight()
+                .then(if (recording.state == DvrEntryState.SCHEDULED) Modifier.testTag("player-scheduled-marker") else Modifier),
+            rule = recording.rule, announceState = false,
+            textStyle = MaterialTheme.typography.labelLarge, scheduledTint = secondary)
     }
 }
 

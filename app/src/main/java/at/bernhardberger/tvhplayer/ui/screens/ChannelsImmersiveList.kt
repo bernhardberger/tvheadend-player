@@ -136,7 +136,6 @@ import at.bernhardberger.tvhplayer.ui.components.RecordingBadge
 import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
 import at.bernhardberger.tvhplayer.ui.components.recordingStatusSpoken
 import at.bernhardberger.tvhplayer.ui.components.rule
-import at.bernhardberger.tvhplayer.ui.components.ScheduledIndicator
 import at.bernhardberger.tvhplayer.ui.components.SkeletonLine
 import at.bernhardberger.tvhplayer.ui.components.StandardProgrammeCard
 import at.bernhardberger.tvhplayer.ui.components.StartKeylineBringIntoViewSpec
@@ -684,10 +683,9 @@ internal fun ChannelsImmersiveHero(
         val observation = frame.observation
         val current = remember(observation, id, now) { observation.eventAt(channel.id, Instant.fromEpochSeconds(now)) }
         val next = remember(observation, id, now) { observation.nextEvent(channel.id, Instant.fromEpochSeconds(now)) }
-        val nextScheduled = remember(observation, next) { observation.isScheduled(next) }
         // AnimatedContent hands its fixed height to the content; wrapping keeps short text on the row.
         // Beside the list the headline hangs from the picture, and the synopsis takes what is left.
-        ChannelsHeadline(channel, current, next, nextScheduled, channel.id in frame.recordingIds, now,
+        ChannelsHeadline(channel, current, next, channel.id in frame.recordingIds, now,
             synopsisLines = when {
                 besideList -> ImmersiveListSynopsisLines
                 else -> ImmersiveSynopsisLines
@@ -715,7 +713,7 @@ internal fun channelsProgrammeSynopsis(event: EpgEvent): String? =
  */
 @Composable
 internal fun ChannelsHeadline(
-    channel: Channel, current: EpgEvent?, next: EpgEvent?, nextScheduled: Boolean, channelRecording: Boolean, now: Long,
+    channel: Channel, current: EpgEvent?, next: EpgEvent?, channelRecording: Boolean, now: Long,
     synopsisLines: Int, loading: Boolean, modifier: Modifier, fitSynopsis: Boolean = false, showNext: Boolean = true,
     titleStyle: TextStyle = MaterialTheme.typography.headlineLarge,
     synopsisStyle: TextStyle = MaterialTheme.typography.bodyLarge,
@@ -730,7 +728,7 @@ internal fun ChannelsHeadline(
     }
     val recording = observation.runningRecordingForEvent(current)
     val showChannelMark = showChannelRecordingMark(channelRecording, recording != null)
-    val nextRecording = observation.runningRecordingForEvent(next)
+    val nextRecording = observation.nextRecordingForEvent(next)
     ProgrammeHeadline(
         eyebrow = {
             ProgrammeEyebrow(channel.icon, channelTitleText(channel.visibleChannelNumber, channel.name.orEmpty()),
@@ -760,14 +758,14 @@ internal fun ChannelsHeadline(
         synopsisStyle = synopsisStyle,
         // As the player's info bar has it: now above, what follows on the bottom edge, quieter.
         footer = next?.takeIf { showNext }?.let {
-            { footerModifier -> NextProgramme(it, nextScheduled, nextRecording, footerModifier) }
+            { footerModifier -> NextProgramme(it, nextRecording, footerModifier) }
         },
     )
 }
 
 /** What follows, with a scheduled recording marked on the programme as the rows mark theirs. */
 @Composable
-private fun NextProgramme(next: EpgEvent, scheduled: Boolean, recording: DvrEntry?, modifier: Modifier) {
+private fun NextProgramme(next: EpgEvent, recording: DvrEntry?, modifier: Modifier) {
     val color = TvTextColors.tertiary
     Row(modifier.testTag("channels-immersive-next"), verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -775,11 +773,10 @@ private fun NextProgramme(next: EpgEvent, scheduled: Boolean, recording: DvrEntr
         Text(stringResource(R.string.player_next, "${formatHm(next.start.epochSeconds)} $title"),
             Modifier.weight(1f, fill = false), style = MaterialTheme.typography.labelMedium, color = color,
             maxLines = 1, overflow = TextOverflow.Ellipsis)
-        if (recording != null) RecordingStatusIndicator(recording.state, rule = recording.rule,
-            textStyle = MaterialTheme.typography.labelMedium)
-        else if (scheduled) ScheduledIndicator(Modifier.testTag("channels-next-scheduled"), tint = color,
-            contentDescription = stringResource(R.string.player_scheduled),
-            textStyle = MaterialTheme.typography.labelMedium)
+        if (recording != null) RecordingStatusIndicator(
+            recording.state,
+            if (recording.state == DvrEntryState.SCHEDULED) Modifier.testTag("channels-next-scheduled") else Modifier,
+            rule = recording.rule, textStyle = MaterialTheme.typography.labelMedium, scheduledTint = color)
     }
 }
 

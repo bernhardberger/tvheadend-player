@@ -125,7 +125,7 @@ class PlayerEntryMotionTest {
             val context = LocalContext.current
             PlayerChrome(
                 mode = PlayerChromeMode.BANNER,
-                content = PlayerChromeContent(PlayerChromeClockSec, liveInfoBarData(context.resources, 1, "One", null, null, false, 1_800, "Programme")),
+                content = PlayerChromeContent(PlayerChromeClockSec, liveInfoBarData(context.resources, 1, "One", null, null, 1_800, "Programme")),
                 timeline = PlayerChromeTimeline.Live(
                     AppTimeshiftState(available = true, bufferStartMs = -600_000, positionMs = 0, liveEdgeMs = 0),
                     nowSec = 1_800,

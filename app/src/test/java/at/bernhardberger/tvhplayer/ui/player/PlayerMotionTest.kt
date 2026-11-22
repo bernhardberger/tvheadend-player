@@ -787,7 +787,7 @@ class PlayerMotionTest {
         compose.setContent {
             view = LocalView.current
             // With a logo: without one the identity has no chip for the entry's chip to stand on.
-            val content = PlayerChromeContent(0L, liveInfoBarData(LocalContext.current.resources, 1, "One", null, null, false, 0, "Programme"),
+            val content = PlayerChromeContent(0L, liveInfoBarData(LocalContext.current.resources, 1, "One", null, null, 0, "Programme"),
                 picon = ChannelIcon.parse("imagecache/2"))
             TVHeadendPlayerTheme {
                 // The entry's three-digit field, in tabular digits.
@@ -985,7 +985,7 @@ class PlayerMotionTest {
     ) {
         PlayerChrome(
             mode = mode,
-            content = PlayerChromeContent(0L, liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 1, "One", null, null, false, 1_800, title)),
+            content = PlayerChromeContent(0L, liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 1, "One", null, null, 1_800, title)),
             timeline = PlayerChromeTimeline.Live(AppTimeshiftState(), 1_800, null, motionKey = channelId),
             actions = PlayerChromeActions(
                 active = !optionsOpen,

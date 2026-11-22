@@ -1,8 +1,12 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.EventId
+import at.bernhardberger.tvheadend.sdk.core.TimerecRuleId
 import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
 import at.bernhardberger.tvhplayer.core.PlayerKeyAction
 import at.bernhardberger.tvhplayer.core.bannerFramePresented
@@ -151,23 +155,28 @@ class PlayerBannerTest {
     fun liveInfoBarCarriesTheDisplayedAndNextProgrammeAndOmitsMissingFacts() {
         val now = event(1, 3_600L, 7_200L, "Now", subtitle = "Part one")
         val next = event(2, 7_200L, 9_000L, "Later")
-        val data = liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 101L, "ORF 1 HD", now, next, nextScheduled = true, nowSec = 5_000L, unavailableTitle = "n/a")
+        val recording = DvrEntry.create(DvrEntryId(1), eventId = next.id, state = DvrEntryState.SCHEDULED,
+            timerecRuleId = TimerecRuleId("timer"))
+        val resources = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources
+        val data = liveInfoBarData(resources, 101L, "ORF 1 HD", now, next, nowSec = 5_000L, unavailableTitle = "n/a",
+            nextRecording = recording)
         assertEquals("101", data.channelNumber)
         assertEquals("Now", data.title)
         assertEquals("Part one", data.subtitle)
         assertEquals(37, data.remainingMinutes)
         assertEquals("${formatClock(7_200L)} Later", data.next)
-        assertTrue(data.nextScheduled)
+        assertEquals(recording, data.nextRecording)
         assertNull(data.recordedDate)
 
-        val bare = liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, null, "ORF 1 HD", null, null, nextScheduled = true, nowSec = 5_000L, unavailableTitle = "n/a")
+        val bare = liveInfoBarData(resources, null, "ORF 1 HD", null, null, nowSec = 5_000L, unavailableTitle = "n/a",
+            nextRecording = recording)
         assertEquals("", bare.channelNumber)
         assertEquals("n/a", bare.title)
         assertEquals("", bare.timeRange)
         assertNull(bare.metadata)
         assertNull(bare.remainingMinutes)
         assertNull(bare.next)
-        assertFalse(bare.nextScheduled)
+        assertNull(bare.nextRecording)
     }
 
     @Test

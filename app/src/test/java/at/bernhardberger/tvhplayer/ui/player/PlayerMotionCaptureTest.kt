@@ -610,7 +610,7 @@ class PlayerMotionCaptureTest {
         ProvideArtworkSession(session) { PlayerChrome(
             mode = mode,
             content = PlayerChromeContent(PlayerChromeClockSec, liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, if (zapped) 2 else 1,
-                if (zapped) "Science and Nature" else "Documentary", programme, null, false, 1_800, ""), picon = ChannelIcon.ImageCache(ArtworkId(1))),
+                if (zapped) "Science and Nature" else "Documentary", programme, null, 1_800, ""), picon = ChannelIcon.ImageCache(ArtworkId(1))),
             timeline = PlayerChromeTimeline.Live(
                 timeshift = timeshift,
                 nowSec = 1_800,

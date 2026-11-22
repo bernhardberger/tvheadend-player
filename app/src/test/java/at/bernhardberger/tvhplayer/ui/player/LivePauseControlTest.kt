@@ -164,7 +164,7 @@ class LivePauseControlTest {
                         if (visible) Box(Modifier.align(Alignment.BottomCenter)) {
                             PlayerChrome(
                                 mode = PlayerChromeMode.CONTROLS,
-                                content = PlayerChromeContent(0L, liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 7, "Documentary", null, null, false, 1_800, "")),
+                                content = PlayerChromeContent(0L, liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 7, "Documentary", null, null, 1_800, "")),
                                 timeline = PlayerChromeTimeline.Live(AppTimeshiftState(), nowSec = 1_800),
                                 actions = PlayerChromeActions(active = true, paused = paused, livePause = livePause),
                                 onTogglePause = { toggles++ },

@@ -825,7 +825,7 @@ class PlayerFooterLayoutTest {
                             markerNavigation = markerNavigation, markerRevision = markerRevision, onSeekMarker = onSeekMarker,
                         ) else ProvideArtworkSession(session) { PlayerChrome(
                             mode = PlayerChromeMode.CONTROLS,
-                            content = PlayerChromeContent(1_800L, liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 1, "Documentary", programme, null, false, 1_800, "")),
+                            content = PlayerChromeContent(1_800L, liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 1, "Documentary", programme, null, 1_800, "")),
                             timeline = PlayerChromeTimeline.Live(
                                 timeshift = AppTimeshiftState(
                                     available = timeshiftAvailable,
@@ -951,7 +951,7 @@ private fun QuickStepBanner(
     val context = androidx.compose.ui.platform.LocalContext.current
     PlayerChrome(
         mode = PlayerChromeMode.BANNER_STEP,
-        content = PlayerChromeContent(1_800L, liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 1, "Documentary", programmeWindow?.event, null, false, 1_800, "")),
+        content = PlayerChromeContent(1_800L, liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 1, "Documentary", programmeWindow?.event, null, 1_800, "")),
         timeline = PlayerChromeTimeline.Live(state, nowSec = 1_800, step = decision, programmeWindow = programmeWindow, stepSettled = settled),
         actions = PlayerChromeActions(active = false),
         onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {}, onInteraction = {},

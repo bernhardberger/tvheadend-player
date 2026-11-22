@@ -93,7 +93,7 @@ class ProgrammeWindowInputTest(private val scenario: String) {
                             )
                         } else PlayerChrome(
                             mode = PlayerChromeMode.CONTROLS,
-                            content = PlayerChromeContent(0L, liveInfoBarData(androidx.compose.ui.platform.LocalContext.current.resources, 1, "Fixture TV", null, null, false, 0, "")),
+                            content = PlayerChromeContent(0L, liveInfoBarData(androidx.compose.ui.platform.LocalContext.current.resources, 1, "Fixture TV", null, null, 0, "")),
                             timeline = PlayerChromeTimeline.Live(
                                 preview?.let { projectedTimeshiftState(state, it.decision.targetMs) } ?: state,
                                 nowSec = (base + 90.minutes).epochSeconds,
