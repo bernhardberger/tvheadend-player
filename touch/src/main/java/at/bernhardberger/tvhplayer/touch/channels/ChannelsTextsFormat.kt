@@ -13,15 +13,21 @@ import at.bernhardberger.tvhplayer.ui.common.programmeCategoryLabelRes
 import at.bernhardberger.tvhplayer.ui.common.programmeEpisodeLine
 import java.time.Instant
 import java.time.ZoneId
+import java.util.Locale
+
+internal data class ChannelsTextsFormat(val locale: Locale, val zone: ZoneId, val uses24Hour: Boolean)
+
+@Composable
+internal fun channelsTextFormat() = ChannelsTextsFormat(
+    LocalConfiguration.current.locales[0], ZoneId.systemDefault(), AppClock.uses24Hour,
+)
 
 /** The rows' texts from the shared formatters, in the device's locale and zone. */
 @Composable
-internal fun rememberChannelsTexts(): ChannelsTexts {
+internal fun rememberChannelsTexts(format: ChannelsTextsFormat = channelsTextFormat()): ChannelsTexts {
     val resources = LocalContext.current.resources
-    val locale = LocalConfiguration.current.locales[0]
-    val zone = ZoneId.systemDefault()
-    val uses24Hour = AppClock.uses24Hour
-    return remember(resources, locale, zone, uses24Hour) {
+    val (locale, zone, uses24Hour) = format
+    return remember(resources, format) {
         ChannelsTexts(
             clock = { formatClock(Instant.ofEpochSecond(it).atZone(zone), locale, uses24Hour) },
             timeRange = { start, stop -> formatTimeInterval(start, stop, locale = locale, uses24Hour = uses24Hour) },
