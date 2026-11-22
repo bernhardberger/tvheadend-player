@@ -25,11 +25,11 @@ internal fun leavePlayer(
     windowAvailable: Boolean,
     inWindow: Boolean,
     changingConfigurations: Boolean,
-    fullScreenRequested: Boolean = false,
+    fullScreen: FullScreenRequest = FullScreenRequest.Inactive,
 ): Leave = when (trigger) {
     LeaveTrigger.Back -> when {
         inWindow -> Leave.Stay
-        fullScreenRequested -> Leave.ExitFullScreen
+        fullScreen == FullScreenRequest.AwaitingSideways -> Leave.ExitFullScreen
         windowAvailable -> Leave.EnterWindowAndBrowse
         else -> Leave.StopAndBrowse
     }

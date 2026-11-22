@@ -241,9 +241,10 @@ class PlayerActivity : ComponentActivity() {
 
     private fun navigate(trigger: LeaveTrigger) {
         if (leaving) return
-        val outcome = leavePlayer(trigger, canUseWindow(), isInPictureInPictureMode, false, fullScreen.isRequested)
+        val outcome = leavePlayer(trigger, canUseWindow(), isInPictureInPictureMode, false, fullScreen.request)
         when (outcome) {
             Leave.EnterWindowAndBrowse, Leave.StopAndBrowse -> {
+                fullScreen.release()
                 // PiP needs the player resumed, so try it before foregrounding the launcher task.
                 val enteredWindow = outcome == Leave.EnterWindowAndBrowse && pictureWindow.enter()
                 packageManager.getLaunchIntentForPackage(packageName)?.let(::startActivity)

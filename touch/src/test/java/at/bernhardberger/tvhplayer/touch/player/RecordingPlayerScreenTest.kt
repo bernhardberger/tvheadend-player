@@ -6,6 +6,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
+import android.hardware.Sensor
+import android.hardware.SensorManager
 import android.os.Looper
 import android.os.SystemClock
 import android.view.WindowInsets
@@ -111,9 +113,10 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.android.controller.ActivityController
+import org.robolectric.shadows.SensorEventBuilder
+import org.robolectric.shadows.ShadowSensor
 import org.robolectric.util.ReflectionHelpers
 import java.time.Duration
-import java.util.concurrent.atomic.AtomicLong
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
@@ -540,6 +543,10 @@ class RecordingPlayerScreenTest {
         val epoch = runtime.videoPresentation.value.epoch
         val item = runtime.player.currentMediaItem
         val playWhenReady = runtime.player.playWhenReady
+        val original = activity.get()
+        val sensors = shadowOf(original.getSystemService(SensorManager::class.java))
+        val accelerometer = ShadowSensor.newInstance(Sensor.TYPE_ACCELEROMETER)
+        sensors.addSensor(accelerometer)
         button(R.string.player_full_screen).performClick()
         settleRoute()
         assertEquals(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE, activity.get().requestedOrientation)
@@ -548,7 +555,6 @@ class RecordingPlayerScreenTest {
         assertTrue(item === runtime.player.currentMediaItem)
         assertEquals(playWhenReady, runtime.player.playWhenReady)
 
-        val original = activity.get()
         val sideways = Configuration(original.resources.configuration).apply {
             orientation = Configuration.ORIENTATION_LANDSCAPE
             val width = screenWidthDp
@@ -558,24 +564,36 @@ class RecordingPlayerScreenTest {
         activity.configurationChange(sideways)
         settleRoute()
         assertTrue("Orientation is handled without recreating the player activity", activity.get() === original)
-        val insets = checkNotNull(original.window.decorView.windowInsetsController)
-        val requestedBars = ReflectionHelpers.callInstanceMethod<Int>(insets, "getRequestedVisibleTypes")
-        assertEquals("Landscape requests hidden bars", 0, requestedBars and WindowInsets.Type.systemBars())
+        sensors.sendSensorEventToListeners(
+            SensorEventBuilder.newBuilder(accelerometer, floatArrayOf(SensorManager.GRAVITY_EARTH, 0f, 0f)).build(),
+        )
+        settleRoute()
         assertEquals(epoch, runtime.videoPresentation.value.epoch)
-        val generation = ReflectionHelpers.getField<AtomicLong>(runtime, "playbackRequests").get()
+        assertTrue(item === runtime.player.currentMediaItem)
         button(R.string.player_back).performClick()
         settleRoute()
-        assertEquals(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED, original.requestedOrientation)
-        assertNull(shadowOf(original).nextStartedActivity)
-        assertTrue(!original.isInPictureInPictureMode)
-        assertEquals(target, runtime.activeTarget.value)
-        assertEquals(generation, ReflectionHelpers.getField<AtomicLong>(runtime, "playbackRequests").get())
-
-        original.onBackPressedDispatcher.onBackPressed()
         assertBrowseLaunched(original)
+        assertEquals(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED, original.requestedOrientation)
         assertTrue(original.isInPictureInPictureMode)
         assertEquals(target, runtime.activeTarget.value)
         assertEquals(playWhenReady, runtime.player.playWhenReady)
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
+    fun splitScreenClearsTheRequestAndHidesFullScreen() = withRecordingRoute(marked = true) { activity, _ ->
+        val fullScreen = button(R.string.player_full_screen)
+        fullScreen.performClick()
+        val config = activity.resources.configuration
+        shadowOf(activity).setInMultiWindowMode(true)
+        activity.onMultiWindowModeChanged(true, config)
+        settleRoute()
+        assertEquals(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED, activity.requestedOrientation)
+        fullScreen.assertDoesNotExist()
+        shadowOf(activity).setInMultiWindowMode(false)
+        activity.onMultiWindowModeChanged(false, config)
+        settleRoute()
+        fullScreen.assertIsDisplayed()
     }
 
     private fun assertBrowseLaunched(activity: PlayerActivity) {

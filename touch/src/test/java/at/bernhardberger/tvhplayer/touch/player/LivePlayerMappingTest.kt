@@ -321,24 +321,28 @@ class LivePlayerMappingTest {
             val available: Boolean,
             val inWindow: Boolean = false,
             val rotating: Boolean = false,
-            val fullScreen: Boolean = false,
+            val fullScreen: FullScreenRequest = FullScreenRequest.Inactive,
         )
+        val forcing = FullScreenRequest.AwaitingSideways
+        val sideways = FullScreenRequest.AwaitingUpright
         val cases = mapOf(
             Case(LeaveTrigger.Back, available = true) to Leave.EnterWindowAndBrowse,
             // Paused or playing alike: the pause state is no input.
             Case(LeaveTrigger.Back, available = false) to Leave.StopAndBrowse,
             Case(LeaveTrigger.Back, available = true, inWindow = true) to Leave.Stay,
-            Case(LeaveTrigger.Back, available = true, fullScreen = true) to Leave.ExitFullScreen,
-            Case(LeaveTrigger.Back, available = false, fullScreen = true) to Leave.ExitFullScreen,
-            Case(LeaveTrigger.WindowButton, available = true, fullScreen = true) to Leave.EnterWindow,
+            Case(LeaveTrigger.Back, available = true, fullScreen = forcing) to Leave.ExitFullScreen,
+            Case(LeaveTrigger.Back, available = false, fullScreen = forcing) to Leave.ExitFullScreen,
+            Case(LeaveTrigger.Back, available = true, fullScreen = sideways) to Leave.EnterWindowAndBrowse,
+            Case(LeaveTrigger.Back, available = false, fullScreen = sideways) to Leave.StopAndBrowse,
+            Case(LeaveTrigger.WindowButton, available = true, fullScreen = forcing) to Leave.EnterWindow,
             Case(LeaveTrigger.WindowButton, available = false) to Leave.EnterWindow,
-            Case(LeaveTrigger.UserLeave, available = true, fullScreen = true) to Leave.EnterWindow,
+            Case(LeaveTrigger.UserLeave, available = true, fullScreen = forcing) to Leave.EnterWindow,
             // Without the window the activity is hidden next, and that stops.
             Case(LeaveTrigger.UserLeave, available = false) to Leave.Stay,
             Case(LeaveTrigger.UserLeave, available = true, inWindow = true) to Leave.Stay,
             // Hidden outside a rotation: the window closed, or no window.
             Case(LeaveTrigger.Hidden, available = true, inWindow = true) to Leave.Stop,
-            Case(LeaveTrigger.Hidden, available = false, fullScreen = true) to Leave.Stop,
+            Case(LeaveTrigger.Hidden, available = false, fullScreen = forcing) to Leave.Stop,
             Case(LeaveTrigger.Hidden, available = true, rotating = true) to Leave.Stay,
         )
         cases.forEach { (case, expected) ->

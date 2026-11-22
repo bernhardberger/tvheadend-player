@@ -12,7 +12,7 @@ import kotlin.math.abs
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
-/** The measured picture layout is the authority, not a separate phone/tablet heuristic. */
+/** Only the measured phone layout offers rotation, and never in a system window (split-screen or PiP). */
 internal fun PlayerFaceState.withFullScreenOffer(layout: PlayerLayout, inWindow: Boolean): PlayerFaceState {
     val allowed = layout == PlayerLayout.Phone && !inWindow && status.hasTimeline
     if ((PlayerControl.FullScreen in offered) == allowed) return this
@@ -56,15 +56,18 @@ internal fun nextFullScreenRequest(
 
 /** An orientation request is independent of the route's playback and the window's video surface. */
 internal class PlayerFullScreen(private val activity: ComponentActivity) : DefaultLifecycleObserver {
-    private var request = FullScreenRequest.Inactive
+    var request = FullScreenRequest.Inactive
+        private set
     private var listener: OrientationEventListener? = null
-    val isRequested: Boolean get() = request != FullScreenRequest.Inactive
 
     fun restore(state: Bundle?, inWindow: StateFlow<Boolean>) {
         activity.lifecycle.addObserver(this)
+        activity.addOnMultiWindowModeChangedListener { if (it.isInMultiWindowMode) release() }
         val index = state?.getInt(SAVED_REQUEST, -1) ?: -1
         val restored = FullScreenRequest.entries.getOrNull(index) ?: FullScreenRequest.Inactive
-        update(nextFullScreenRequest(restored, PhoneOrientation.Unknown, activity.isInPictureInPictureMode))
+        update(nextFullScreenRequest(
+            restored, PhoneOrientation.Unknown, activity.isInPictureInPictureMode || activity.isInMultiWindowMode,
+        ))
         activity.lifecycleScope.launch {
             inWindow.collect { update(nextFullScreenRequest(request, PhoneOrientation.Unknown, it)) }
         }
@@ -75,7 +78,8 @@ internal class PlayerFullScreen(private val activity: ComponentActivity) : Defau
     }
 
     fun enter(inWindow: Boolean) {
-        if (inWindow || activity.isInPictureInPictureMode || activity.isFinishing) return
+        if (activity.isFinishing) return
+        if (inWindow || activity.isInPictureInPictureMode || activity.isInMultiWindowMode) return
         if (request == FullScreenRequest.Inactive) update(FullScreenRequest.AwaitingSideways)
     }
 
