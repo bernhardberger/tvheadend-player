@@ -35,6 +35,7 @@ import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.serverProfileDisplayName
 import at.bernhardberger.tvhplayer.ui.screens.settings.rememberSavedConnectionRestore
 import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
@@ -44,6 +45,7 @@ import at.bernhardberger.tvhplayer.touch.channels.ChannelsActions
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsScreen
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsState
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsTexts
+import at.bernhardberger.tvhplayer.touch.channels.MappedChannelRow
 import at.bernhardberger.tvhplayer.touch.channels.channelRowPrograms
 import at.bernhardberger.tvhplayer.touch.channels.sameProgrammeAuthority
 import at.bernhardberger.tvhplayer.touch.channels.channelsState
@@ -291,6 +293,7 @@ private class ChannelsMappingResult(
     val observation: SessionObservation,
     val programs: List<ChannelRowPrograms>,
     val state: ChannelsState,
+    val rows: Map<ChannelId, MappedChannelRow>,
     val atSec: Long,
     val nextBoundarySec: Long,
 ) {
@@ -320,18 +323,27 @@ private suspend fun ChannelsMappingKey.map(
     val boundary = programs.minOfOrNull { it.nextBoundary(now) } ?: Long.MAX_VALUE
     val projectionMs = started?.let { SystemClock.elapsedRealtime() - it }
     val reasons = mappingReasons(previous, observation, nowSec)
-    val sameRows = previous != null && reasons.all { it == "epg" } && previous.programs == programs
+    val sameRows = previous != null && reasons.all { it == "epg" } && previous.programs == programs &&
+        observation.currentSession != null &&
+        observation.channelCatalogForDisplay === previous.observation.channelCatalogForDisplay
+    val rows = mutableMapOf<ChannelId, MappedChannelRow>()
     val state = if (sameRows) previous.state else {
+        val previousRows = previous?.takeIf {
+            it.key.scope.profileId == scope.profileId && it.observation.currentSession === observation.currentSession &&
+                it.key.texts === texts && it.key.artwork === artwork && nowSec >= it.atSec
+        }?.rows.orEmpty()
         val counts = if ("epg" in reasons) context.epgChangeCounts(previous?.observation, observation) else ""
         traceArtworkMapping(context, "Channels", reasons.joinToString("+") + counts, projectionMs) {
             val mapped = channelsState(
                 scope, connection, degraded, observation, now, texts, playingId, artwork, programs, job::ensureActive,
+                previousRows = previousRows, mappedRows = rows,
             )
             job.ensureActive()
             mapped
         }
     }
-    return ChannelsMappingResult(this, observation, programs, state, nowSec, boundary)
+    return ChannelsMappingResult(this, observation, programs, state, if (sameRows) previous.rows else rows,
+        nowSec, boundary)
 }
 
 private fun ChannelsMappingKey.mappingReasons(

@@ -1,16 +1,21 @@
 package at.bernhardberger.tvhplayer.touch.channels
 
 import at.bernhardberger.tvheadend.sdk.core.Channel
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.DvrSnapshot
+import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
+import at.bernhardberger.tvheadend.sdk.core.EpgSnapshot
+import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition
 import at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi
+import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.core.AppErrorCondition
 import at.bernhardberger.tvhplayer.core.ChannelBrowsingScope
@@ -18,10 +23,12 @@ import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
 import at.bernhardberger.tvhplayer.touch.testutil.ServerGuide
 import at.bernhardberger.tvhplayer.touch.ui.ArtworkModels
+import at.bernhardberger.tvhplayer.touch.ui.ProgramRecordControl
 import at.bernhardberger.tvhplayer.viewmodels.ChannelScopeState
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
 import org.junit.Test
 
 @OptIn(TvheadendTestingApi::class)
@@ -128,6 +135,67 @@ class ChannelsMappingTest {
         // A channel without guide data has nothing to open.
         assertEquals(null, second.now)
         assertEquals(null, second.details)
+    }
+
+    @Test
+    fun aGuideUpdateReusesUnchangedRows() {
+        val channels = listOf(guide.first, guide.second)
+        val scope = ChannelScopeState(ChannelBrowsingScope(channels, channels, emptyList(), true, null), true)
+        val session = FakeTvheadendSession()
+        val otherShow = EpgEvent.create(
+            EventId(100), guide.second.id, guide.now - 10.minutes, guide.now + 10.minutes, title = "Other show",
+        )
+        fun publish(epg: EpgSnapshot): SessionObservation {
+            session.publish(guide.connected(epg = EpgSnapshot.create(epg.events + otherShow)))
+            return session.observation.value
+        }
+        val previous = mutableMapOf<ChannelId, MappedChannelRow>()
+        val before = channelsState(
+            scope, ConnectionUiState.Ready, false, publish(guide.snapshot), guide.now, texts, mappedRows = previous,
+        ) as ChannelsState.Ready
+        val after = channelsState(
+            scope, ConnectionUiState.Ready, false, publish(guide.refreshedEpg("Updated News")),
+            guide.now, texts, previousRows = previous,
+        ) as ChannelsState.Ready
+
+        assertEquals("Updated News", after.list.rows.first().now?.title)
+        assertSame(before.list.rows.last(), after.list.rows.last())
+    }
+
+    @Test
+    fun cachedRowsRefreshClockRecordingControlsAndPlayingMark() {
+        val channels = listOf(guide.first, guide.second)
+        val scope = ChannelScopeState(ChannelBrowsingScope(channels, channels, emptyList(), true, null), true)
+        var previous = emptyMap<ChannelId, MappedChannelRow>()
+        fun map(at: Instant, entries: List<DvrEntry>, playing: Channel): List<ChannelRow> {
+            val next = mutableMapOf<ChannelId, MappedChannelRow>()
+            val result = channelsState(
+                scope, ConnectionUiState.Ready, false, guide.connected(entries), at, texts, playing.id.value.toString(),
+                previousRows = previous, mappedRows = next,
+            ) as ChannelsState.Ready
+            previous = next
+            return result.list.rows
+        }
+        val before = map(guide.now, emptyList(), guide.first).first()
+        val minute = guide.now + 1.minutes
+        val afterMinute = map(minute, emptyList(), guide.first).first()
+        assertEquals("${HALF_HOUR - 60}s", afterMinute.now?.timeLeft)
+        check(requireNotNull(afterMinute.now?.progress) > requireNotNull(before.now?.progress))
+
+        val scheduled = map(minute, listOf(guide.scheduling(99, 1)), guide.first).first()
+        assertEquals(ProgramRecordControl.Cancel, scheduled.now?.record)
+        val recording = map(minute, listOf(guide.recordingNow), guide.first).first()
+        assertEquals(ChannelRecording.Program, recording.recording)
+        assertEquals(ProgramRecordControl.Stop, recording.now?.record)
+
+        val (notPlaying, playing) = map(minute, emptyList(), guide.second)
+        assertEquals(null, notPlaying.playback)
+        assertEquals(null, notPlaying.recording)
+        assertEquals(ProgramRecordControl.Record, notPlaying.now?.record)
+        assertEquals(ChannelPlayback(null), playing.playback)
+        val boundary = map(guide.now + 30.minutes, emptyList(), guide.second).first()
+        assertEquals(guide.programs[1], boundary.now?.title)
+        assertEquals(0f, boundary.now?.progress)
     }
 
     @Test
