@@ -69,9 +69,9 @@ internal fun GuideDestination(
     val clock = activeClock ?: result?.input?.clock
         ?: remember { GuideClock(Instant.now().epochSecond, ZoneId.systemDefault()) }
     val coverage = remember(
-        scope, observation, selection.view, selection.channelId, selection.day, clock.zone, clock.today,
+        scope, selection.view, selection.channelId, selection.day, clock.zone, clock.today,
     ) {
-        guideCoverage(scope, observation, selection, clock)
+        guideCoverage(scope, selection, clock)
     }
     LaunchedEffect(coverage, observation.currentSession?.generationIdentity) { coverage?.let(guide::request) }
     val input = GuideMappingInput(
@@ -93,7 +93,7 @@ internal fun GuideDestination(
         LaunchedEffect(selection, available) { guide.reconcileSelection(selection, available) }
     }
     GuideScreen(
-        state = state,
+        state = state.forBrowse(selection, clock.today),
         view = selection.view,
         channelId = selection.channelId,
         dayIndex = state.dayDates.indexOf(selection.day).coerceAtLeast(0),
@@ -171,7 +171,13 @@ private fun GuideState.withCurrentDetails(visits: List<GuidePageKey.Details>, da
     } else this
 
 private fun GuideSelection.isAwaitingDay(state: GuideState, today: LocalDate): Boolean =
-    state.dayLoading && view == GuideView.ByChannel && day != null && day > today && day !in state.dayDates
+    state.dayLoading && day != null && day > today && day !in state.dayDates
+
+// Use GuideList's loading state without removing channels from selection reconciliation.
+private fun GuideState.forBrowse(selection: GuideSelection, today: LocalDate): GuideState =
+    if (selection.view == GuideView.Overview && selection.isAwaitingDay(this, today)) {
+        copy(channels = emptyList())
+    } else this
 
 private fun GuideSelection.availableIn(state: GuideState, today: LocalDate): GuideSelection = copy(
     day = day?.takeIf { it in state.dayDates || isAwaitingDay(state, today) },
