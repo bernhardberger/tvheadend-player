@@ -27,6 +27,7 @@ class PlayerSettingsStoreTest {
         val defaults = store.playerSettings.first()
         assertEquals(AdBreakMode.ASK, defaults.adBreakMode)
         assertTrue(defaults.skipCuts)
+        assertTrue(defaults.offerProgramStart)
         assertEquals(SkipLanding.END, defaults.skipLanding)
         for (mode in AdBreakMode.entries) {
             store.setAdBreakMode(mode)
@@ -39,6 +40,8 @@ class PlayerSettingsStoreTest {
         for (enabled in listOf(false, true)) {
             store.setSkipCuts(enabled)
             assertEquals(enabled, PlayerSettingsStore(dataStore).playerSettings.first().skipCuts)
+            store.setOfferProgramStart(enabled)
+            assertEquals(enabled, PlayerSettingsStore(dataStore).playerSettings.first().offerProgramStart)
         }
     }
 

@@ -59,7 +59,9 @@ class RecordingSkipPolicy {
         val inside = marks.filter { it.containsEntry(positionMs) }.toSet()
         currentAdBreak = inside.firstOrNull { it.skippableAt(positionMs, settings.skipLanding) }
         offeredPrompt = offeredPrompt?.let { previous ->
-            if (previous.kind == RecordingMarkKind.PROGRAM_START) previous.takeIf { it in inside }
+            if (previous.kind == RecordingMarkKind.PROGRAM_START) {
+                previous.takeIf { settings.offerProgramStart && it in inside }
+            }
             else currentAdBreak?.takeIf { current ->
                 // A cutpoint refresh can revise the same break without creating another entry.
                 settings.adBreakMode == AdBreakMode.ASK &&
@@ -81,7 +83,9 @@ class RecordingSkipPolicy {
             return RecordingSkipDecision(recordingSkipLanding(cut, settings.skipLanding))
         }
         val previouslyOfferedAd = offeredPrompt?.takeIf { it.kind == RecordingMarkKind.AD_BREAK }
-        entered.firstOrNull { it.kind == RecordingMarkKind.PROGRAM_START }?.let { offeredPrompt = it }
+        if (settings.offerProgramStart) entered.firstOrNull { it.kind == RecordingMarkKind.PROGRAM_START }?.let {
+            offeredPrompt = it
+        }
         // A suppressed or displaced Ask entry stays eligible until it leaves the break;
         // a cutpoint refresh may move its landing ahead again while the programme prompt is up.
         occupied = inside.filterNot {

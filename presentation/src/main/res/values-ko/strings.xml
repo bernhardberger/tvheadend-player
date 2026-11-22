@@ -756,6 +756,7 @@
     <string name="recording_mark_program_ends">프로그램 끝</string>
     <string name="skip_ad_break">광고 구간 건너뛰기</string>
     <string name="skip_to_program_start">프로그램 시작으로 건너뛰기</string>
+    <string name="skip_to_program_start_description">프로그램 시작 전에 녹화가 시작되면 영상 위에 건너뛰기 버튼을 표시합니다</string>
     <string name="settings_section_recording_marks">녹화 마커</string>
     <string name="ad_breaks_setting">광고 구간</string>
     <string name="ad_breaks_ask">물어보기</string>

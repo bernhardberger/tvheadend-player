@@ -47,6 +47,7 @@ data class SettingsPlayerUiState(
     val startupBufferLearnedMillis: Int = 500,
     val adBreakMode: AdBreakMode = AdBreakMode.ASK,
     val skipCuts: Boolean = true,
+    val offerProgramStart: Boolean = true,
     val skipLanding: SkipLanding = SkipLanding.END,
 )
 
@@ -82,6 +83,7 @@ class SettingsPlayerViewModel(
             startupBufferMillis = settings.startupBufferMillis,
             adBreakMode = settings.adBreakMode,
             skipCuts = settings.skipCuts,
+            offerProgramStart = settings.offerProgramStart,
             skipLanding = settings.skipLanding,
         )
     }.combine(
@@ -165,6 +167,10 @@ class SettingsPlayerViewModel(
 
     fun onSkipCutsChanged(enabled: Boolean) {
         viewModelScope.launch { settingsStore.setSkipCuts(enabled) }
+    }
+
+    fun onOfferProgramStartChanged(enabled: Boolean) {
+        viewModelScope.launch { settingsStore.setOfferProgramStart(enabled) }
     }
 
     fun onSkipLandingChanged(landing: SkipLanding) {

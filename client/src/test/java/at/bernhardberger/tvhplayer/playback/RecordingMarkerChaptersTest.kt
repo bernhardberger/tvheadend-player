@@ -148,6 +148,22 @@ class RecordingMarkerChaptersTest {
 
     @Test
     @OptIn(TvheadendTestingApi::class, ExperimentalCoroutinesApi::class)
+    fun disablingTheProgramStartOfferDismissesItButKeepsTheControlsAction() = runTest {
+        val fixture = MarkerFixture(backgroundScope, entry = paddedEntry(1))
+        try {
+            fixture.response.complete(Unit)
+            fixture.markers.observeRecordingMarkersLocked(fixture.binding, fixture.entry.id)
+            runCurrent()
+            val mark = requireNotNull(fixture.markers.skipPrompt.value).mark
+            assertEquals(RecordingMarkKind.PROGRAM_START, mark.kind)
+            fixture.markers.applySettings(PlayerSettings(offerProgramStart = false))
+            assertEquals(null, fixture.markers.skipPrompt.value)
+            assertEquals(mark, fixture.markers.controlsSkip.value?.mark)
+        } finally { fixture.markers.clearRecordingMarkersAndJoin() }
+    }
+
+    @Test
+    @OptIn(TvheadendTestingApi::class, ExperimentalCoroutinesApi::class)
     fun expirySurvivesARevisionChangeButCannotDismissAReplacementOffer() = runTest {
         val fixture = MarkerFixture(backgroundScope, entry = paddedEntry(1))
         try {

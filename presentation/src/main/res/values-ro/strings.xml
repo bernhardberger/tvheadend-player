@@ -826,6 +826,7 @@
     <string name="recording_mark_program_ends">Sfârșitul emisiunii</string>
     <string name="skip_ad_break">Sari peste pauza publicitară</string>
     <string name="skip_to_program_start">Sari la începutul programului</string>
+    <string name="skip_to_program_start_description">Afișează peste videoclip un buton de salt când înregistrarea începe înaintea programului</string>
     <string name="settings_section_recording_marks">Marcajele înregistrării</string>
     <string name="ad_breaks_setting">Pauze publicitare</string>
     <string name="ad_breaks_ask">Întreabă</string>

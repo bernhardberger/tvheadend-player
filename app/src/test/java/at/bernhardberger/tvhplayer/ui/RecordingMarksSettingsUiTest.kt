@@ -17,6 +17,7 @@ import at.bernhardberger.tvheadend.sdk.core.ServerProfileListResult
 import at.bernhardberger.tvhplayer.ui.screens.settings.STREAM_PROFILE_LEVEL
 import at.bernhardberger.tvhplayer.ui.screens.settings.connectionScopeName
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -128,6 +129,7 @@ class RecordingMarksSettingsUiTest {
         var ui by mutableStateOf(SettingsPlayerUiState())
         val modes = mutableListOf<AdBreakMode>()
         val cuts = mutableListOf<Boolean>()
+        val programStart = mutableListOf<Boolean>()
         val landings = mutableListOf<SkipLanding>()
         compose.setContent {
             TVHeadendPlayerTheme {
@@ -137,6 +139,9 @@ class RecordingMarksSettingsUiTest {
                     settingsPlayerLevel(ui, {}, {}, {}, onSkipCutsChanged = {
                         cuts += it
                         ui = ui.copy(skipCuts = it)
+                    }, onOfferProgramStartChanged = {
+                        programStart += it
+                        ui = ui.copy(offerProgramStart = it)
                     }),
                     settingsAdBreaksLevel(ui.adBreakMode) {
                         modes += it
@@ -167,6 +172,11 @@ class RecordingMarksSettingsUiTest {
         compose.pressKey(Key.DirectionCenter)
         assertEquals(listOf(AdBreakMode.AUTOMATIC), modes)
         compose.onNode(isFocused() and hasText("Ad breaks") and hasText("Skip automatically")).assertExists()
+
+        compose.pressKey(Key.DirectionDown)
+        compose.onNode(isFocused() and hasTestTag("settings-row-skip-program-start")).assertExists()
+        compose.pressKey(Key.DirectionCenter)
+        assertEquals(listOf(false), programStart)
 
         downTo("Skip cuts")
         compose.pressKey(Key.DirectionCenter)

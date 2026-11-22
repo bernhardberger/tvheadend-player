@@ -303,16 +303,16 @@ class RecordingSkipFocusTest {
     }
 
     @Test fun theOfferStandsBackWhilePausedBufferingOrUnseekable() {
-        assertTrue(recordingSkipPromptShown(offered = true, playing = true, canSeek = true, bannerVisible = false))
+        assertTrue(recordingSkipPromptShown(offered = true, playing = true, canSeek = true, presented = true))
         for ((state, input) in mapOf(
             "paused" to (false to true),
             "buffering" to (false to true),
             "unseekable" to (true to false),
         )) {
-            assertFalse(state, recordingSkipPromptShown(true, input.first, input.second, bannerVisible = false))
+            assertFalse(state, recordingSkipPromptShown(true, input.first, input.second, presented = true))
         }
-        assertFalse(recordingSkipPromptShown(offered = true, playing = true, canSeek = true, bannerVisible = true))
-        assertFalse(recordingSkipPromptShown(offered = false, playing = true, canSeek = true, bannerVisible = false))
+        assertFalse(recordingSkipPromptShown(offered = true, playing = true, canSeek = true, presented = false))
+        assertFalse(recordingSkipPromptShown(offered = false, playing = true, canSeek = true, presented = true))
         val prompt = prompt()
         prompt.offer(ad)
         assertEquals(listOf("recording-skip-prompt"), compose.focusedTags())

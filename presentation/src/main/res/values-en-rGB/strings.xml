@@ -71,6 +71,7 @@
     <string name="appliance_companion_qr_description">QR code for the appliance companion setup steps</string>
     <string name="recording_mark_program_starts">Programme starts</string>
     <string name="skip_to_program_start">Skip to programme start</string>
+    <string name="skip_to_program_start_description">Shows a Skip button over the video when a recording starts before the programme</string>
     <string name="recording_mark_program_ends">Programme ends</string>
     <plurals name="problems_count_canceled">
         <item quantity="one">%1$d cancelled</item>

@@ -861,6 +861,7 @@
     <string name="recording_mark_program_ends">Koniec programu</string>
     <string name="skip_ad_break">Pomiń przerwę reklamową</string>
     <string name="skip_to_program_start">Pomiń do początku programu</string>
+    <string name="skip_to_program_start_description">Wyświetla na obrazie przycisk pomijania, gdy nagranie zaczyna się przed początkiem programu</string>
     <string name="settings_section_recording_marks">Znaczniki nagrania</string>
     <string name="ad_breaks_setting">Przerwy reklamowe</string>
     <string name="ad_breaks_ask">Pytaj</string>

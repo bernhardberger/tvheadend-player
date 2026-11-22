@@ -26,6 +26,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -426,6 +427,22 @@ fun RecordingPlayerScreen(
         chrome.updateAutoHideEligibility(autoHideEligible)
     }
 
+    val trackFactsAvailable = playbackAvailable && activeTarget == AppPlaybackTarget.Recording(recordingId) &&
+        retainedSelection != null && retainedSelection.currentSession === currentSession
+    val trackGlance = rememberTrackGlance(player, rememberPlayerTracks(player), available = trackFactsAvailable)
+    val bannerFramePresented = at.bernhardberger.tvhplayer.core.bannerFramePresented(
+        tuneConfirmed = trackFactsAvailable,
+        videoFrameVisible = videoPresentation.visible,
+        playing = playbackState is AppPlaybackState.Playing,
+        audioOnly = trackGlance.audioOnly,
+    )
+    val busyTarget = AppPlaybackTarget.Recording(recordingId)
+    val busyKey = Triple(busyTarget, currentSession, videoPresentation.epoch)
+    var recordingPresented by remember(busyKey) { mutableStateOf(false) }
+    LaunchedEffect(busyKey, bannerFramePresented) {
+        if (bannerFramePresented) recordingPresented = true
+    }
+    var bannerInfoBarBottomDistance by remember { mutableIntStateOf(0) }
     fun currentPlayerForegroundContext() =
         PlayerForegroundContext(
             confirmationVisible = false,
@@ -445,7 +462,7 @@ fun RecordingPlayerScreen(
                 offered = skipPrompt != null && playbackAvailable,
                 playing = isPlaying,
                 canSeek = timelineState.canSeek,
-                bannerVisible = chrome.bannerVisible,
+                presented = recordingPresented || bannerFramePresented,
             ),
         )
     val foregroundContext = currentPlayerForegroundContext()
@@ -458,28 +475,13 @@ fun RecordingPlayerScreen(
             layer == PlayerForegroundLayer.DISPATCHED_SEEK_PREVIEW
         return playerChromeMode(
             controls = layer == PlayerForegroundLayer.CONTROLS,
-            banner = bannerStep || (chrome.bannerVisible && layer == PlayerForegroundLayer.NONE),
+            banner = bannerStep || (chrome.bannerVisible &&
+                (layer == PlayerForegroundLayer.NONE || layer == PlayerForegroundLayer.SKIP_PROMPT)),
             stepPreview = bannerStep,
         )
     }
     val recordedLengthMs = durationMs.takeIf { it != C.TIME_UNSET && it > 0L }
     val chromeState = playerStateCell(paused = !playWhenReady)
-    val trackFactsAvailable = playbackAvailable && activeTarget == AppPlaybackTarget.Recording(recordingId) &&
-        retainedSelection != null && retainedSelection.currentSession === currentSession
-    val trackGlance = rememberTrackGlance(player, rememberPlayerTracks(player), available = trackFactsAvailable)
-    // The Banner hides after the first frame of the loaded recording; a newly loading one keeps it.
-    val bannerFramePresented = at.bernhardberger.tvhplayer.core.bannerFramePresented(
-        tuneConfirmed = trackFactsAvailable,
-        videoFrameVisible = videoPresentation.visible,
-        playing = playbackState is AppPlaybackState.Playing,
-        audioOnly = trackGlance.audioOnly,
-    )
-    val busyTarget = AppPlaybackTarget.Recording(recordingId)
-    val busyKey = Triple(busyTarget, currentSession, videoPresentation.epoch)
-    var recordingPresented by remember(busyKey) { mutableStateOf(false) }
-    LaunchedEffect(busyKey, bannerFramePresented) {
-        if (bannerFramePresented) recordingPresented = true
-    }
     val busyBlocked = foregroundContext.recoveryVisible || foregroundContext.terminalErrorVisible
     val startingEligible = tuningStatusEligible(
         playbackState, playWhenReady, activeTarget, busyTarget,
@@ -732,6 +734,7 @@ fun RecordingPlayerScreen(
             // The chrome shows its pictures with the session of the recording it plays.
             ProvideArtworkSession(retainedSelection?.currentSession, targetObservation) { PlayerChrome(
                 mode = chromeMode(foregroundLayer),
+                onBannerInfoBarBottomDistance = { bannerInfoBarBottomDistance = it },
                 content = PlayerChromeContent(
                     clockSec = wallClockMinute(nowSec),
                     info = recordingInfoBarData(entry, channel?.number, nowSec, timelineState.playbackPositionMs,
@@ -817,6 +820,8 @@ fun RecordingPlayerScreen(
             RecordingSkipPrompt(
                 prompt = skipPrompt,
                 shown = foregroundLayer == PlayerForegroundLayer.SKIP_PROMPT,
+                bannerShown = chrome.bannerVisible,
+                bannerInfoBarBottomDistance = { bannerInfoBarBottomDistance },
                 onSkip = { if (session.skipRecordingAdBreak(it)) timelineState.cancelPendingSeek() },
                 onTimeout = session::dismissRecordingSkipPrompt,
                 modifier = Modifier

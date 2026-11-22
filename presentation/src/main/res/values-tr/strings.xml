@@ -791,6 +791,7 @@
     <string name="recording_mark_program_ends">Program sonu</string>
     <string name="skip_ad_break">Reklam arasını atla</string>
     <string name="skip_to_program_start">Programın başına atla</string>
+    <string name="skip_to_program_start_description">Kayıt programdan önce başladığında videonun üzerinde bir atlama düğmesi gösterir</string>
     <string name="settings_section_recording_marks">Kayıt işaretleri</string>
     <string name="ad_breaks_setting">Reklam araları</string>
     <string name="ad_breaks_ask">Sor</string>

@@ -301,7 +301,7 @@ internal fun settingsPlayerLevels(navigation: DepthNavigationState, vm: Settings
     val ui by vm.ui.collectAsStateWithLifecycle()
     return listOf(
         settingsPlayerLevel(ui, vm::onTimeshiftEnabledChanged, vm::onAutoStartPlaybackChanged, vm::onTunnelingEnabledChanged,
-            vm::onSkipCutsChanged),
+            vm::onSkipCutsChanged, vm::onOfferProgramStartChanged),
         settingsAudioLevel(ui, vm::onAudioPassthroughEnabledChanged, vm::onAudioDescriptionChanged),
         settingsAdBreaksLevel(ui.adBreakMode) { vm.onAdBreakModeChanged(it); navigation.pop() },
         settingsSkipLandingLevel(ui.skipLanding) { vm.onSkipLandingChanged(it); navigation.pop() },
@@ -318,6 +318,7 @@ internal fun settingsPlayerLevel(
     onAutoStartPlaybackChanged: (Boolean) -> Unit = {},
     onTunnelingEnabledChanged: (Boolean) -> Unit = {},
     onSkipCutsChanged: (Boolean) -> Unit = {},
+    onOfferProgramStartChanged: (Boolean) -> Unit = {},
 ): DepthLevel {
     val profilesStatus = streamProfilesStatus(ui.profiles, ui.connected)
     return settingsLevel(SettingsSection.PLAYER.name, stringResource(R.string.settings_player), listOf(
@@ -333,7 +334,7 @@ internal fun settingsPlayerLevel(
             if (ui.timeshiftEnabled) keepChannelLabel(ui.keepChannelMinutes)
                 else stringResource(R.string.keep_channel_needs_timeshift, stringResource(R.string.timeshift_setting)),
             child = KEEP_CHANNEL_LEVEL.takeIf { ui.timeshiftEnabled }, enabled = ui.timeshiftEnabled),
-    ) + settingsRecordingMarksRows(ui, onSkipCutsChanged) + listOf(
+    ) + settingsRecordingMarksRows(ui, onSkipCutsChanged, onOfferProgramStartChanged) + listOf(
         settingsRow(STREAM_PROFILE_LEVEL, stringResource(R.string.profile),
             profilesStatus ?: streamProfileLabel(ui.profiles, ui.selectedProfileId),
             child = STREAM_PROFILE_LEVEL.takeIf { profilesStatus == null }, enabled = profilesStatus == null,

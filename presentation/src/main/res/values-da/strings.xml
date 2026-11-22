@@ -791,6 +791,7 @@
     <string name="recording_mark_program_ends">Programmet slutter</string>
     <string name="skip_ad_break">Spring reklamepause over</string>
     <string name="skip_to_program_start">Spring til programstart</string>
+    <string name="skip_to_program_start_description">Viser en knap til at springe over på videoen, når en optagelse starter før programmet</string>
     <string name="settings_section_recording_marks">Optagelsesmarkører</string>
     <string name="ad_breaks_setting">Reklamepauser</string>
     <string name="ad_breaks_ask">Spørg</string>

@@ -756,6 +756,7 @@
     <string name="recording_mark_program_ends">番組終了</string>
     <string name="skip_ad_break">CMをスキップ</string>
     <string name="skip_to_program_start">番組の開始までスキップ</string>
+    <string name="skip_to_program_start_description">録画が番組の開始前から始まる場合、映像の上にスキップボタンを表示します</string>
     <string name="settings_section_recording_marks">録画のマーカー</string>
     <string name="ad_breaks_setting">CM区間</string>
     <string name="ad_breaks_ask">確認する</string>

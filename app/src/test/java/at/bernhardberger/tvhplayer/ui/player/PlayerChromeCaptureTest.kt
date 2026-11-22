@@ -11,6 +11,7 @@ import androidx.compose.ui.semantics.getOrNull
 
 
 import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
+import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
 import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -189,6 +190,10 @@ class PlayerChromeCaptureTest {
     @Test fun english() = captures("en", 1f)
 
     @Category(VisualCapture::class)
+    @Test fun recordingSkipOffer() = captures("en", 1f,
+        scenes = setOf(Scene.RECORDING_SKIP_BANNER, Scene.RECORDING_SKIP_CORNER))
+
+    @Category(VisualCapture::class)
     @Test fun recordingControlsSkip() = captures("en", 1f,
         scenes = setOf(Scene.RECORDING_AD_SKIP, Scene.RECORDING_PADDING_SKIP))
 
@@ -336,7 +341,7 @@ class PlayerChromeCaptureTest {
         AUDIO_FOCUSED, RECORDING_STARTING, RECORDING_STARTING_CONTROLS, BANNER_LONG_EYEBROW,
         // The tray preview's Next line with a recording scheduled for it.
         TRAY_NEXT_SCHEDULED,
-        RECORDING_AD_SKIP, RECORDING_PADDING_SKIP,
+        RECORDING_AD_SKIP, RECORDING_PADDING_SKIP, RECORDING_SKIP_BANNER, RECORDING_SKIP_CORNER,
     }
 
     /** [Scene.CONTROLS_REVEAL_MID] composes the Banner, then the controls take it over. */
@@ -740,8 +745,10 @@ class PlayerChromeCaptureTest {
             Scene.RECORDING_BANNER, Scene.RECORDING_STEP, Scene.RECORDING_CONTROLS, Scene.RECORDING_GROWING, Scene.RECORDING_CONTROLS_STEP, Scene.RECORDING_INFO_FOCUSED,
             Scene.RECORDING_STEP_FORWARD, Scene.RECORDING_CONTROLS_STEP_FORWARD,
             Scene.RECORDING_STARTING, Scene.RECORDING_STARTING_CONTROLS,
-            Scene.RECORDING_AD_SKIP, Scene.RECORDING_PADDING_SKIP -> {
+            Scene.RECORDING_AD_SKIP, Scene.RECORDING_PADDING_SKIP,
+            Scene.RECORDING_SKIP_BANNER, Scene.RECORDING_SKIP_CORNER -> {
                 val growing = scene == Scene.RECORDING_GROWING
+                var infoDistance by remember { mutableStateOf(0) }
                 val position = when (scene) {
                     Scene.RECORDING_STARTING, Scene.RECORDING_STARTING_CONTROLS -> 0L
                     Scene.RECORDING_PADDING_SKIP -> 60_000L
@@ -755,6 +762,7 @@ class PlayerChromeCaptureTest {
                         Scene.RECORDING_CONTROLS, Scene.RECORDING_CONTROLS_STEP, Scene.RECORDING_CONTROLS_STEP_FORWARD, Scene.RECORDING_INFO_FOCUSED,
                         Scene.RECORDING_STARTING_CONTROLS, Scene.RECORDING_AD_SKIP,
                         Scene.RECORDING_PADDING_SKIP -> PlayerChromeMode.CONTROLS
+                        Scene.RECORDING_SKIP_CORNER -> PlayerChromeMode.HIDDEN
                         else -> PlayerChromeMode.BANNER
                     },
                     // 0:17:25 of 1:12:30; a quick step back 30 s previews 0:16:55.
@@ -788,7 +796,15 @@ class PlayerChromeCaptureTest {
                         else -> emptyList()
                     },
                     modifier = Modifier.align(Alignment.BottomCenter),
+                    onBannerInfoBarBottomDistance = { infoDistance = it },
                 ) }
+                if (scene == Scene.RECORDING_SKIP_BANNER || scene == Scene.RECORDING_SKIP_CORNER) {
+                    val mark = RecordingMark(RecordingMarkKind.PROGRAM_START, 120_000L)
+                    val action = remember { at.bernhardberger.tvhplayer.playback.RecordingSkipAction(mark, mark.startMs) }
+                    RecordingSkipPrompt(action, true, {}, {},
+                        Modifier.align(Alignment.BottomEnd).padding(end = TvGridHorizontalMargin, bottom = TvGridVerticalMargin),
+                        bannerShown = scene == Scene.RECORDING_SKIP_BANNER, bannerInfoBarBottomDistance = { infoDistance })
+                }
             }
         }
         PlayerBusyIndicator(when (scene) {

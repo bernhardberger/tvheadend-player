@@ -791,6 +791,7 @@
     <string name="recording_mark_program_ends">Programmet slutar</string>
     <string name="skip_ad_break">Hoppa över reklampaus</string>
     <string name="skip_to_program_start">Hoppa till programstart</string>
+    <string name="skip_to_program_start_description">Visar en knapp för att hoppa över ovanpå videon när inspelningen börjar före programmet</string>
     <string name="settings_section_recording_marks">Inspelningsmarkörer</string>
     <string name="ad_breaks_setting">Reklampauser</string>
     <string name="ad_breaks_ask">Fråga</string>

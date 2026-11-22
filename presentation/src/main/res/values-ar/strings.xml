@@ -931,6 +931,7 @@
     <string name="recording_mark_program_ends">نهاية البرنامج</string>
     <string name="skip_ad_break">تخطي الفاصل الإعلاني</string>
     <string name="skip_to_program_start">تخطي إلى بداية البرنامج</string>
+    <string name="skip_to_program_start_description">يظهر زر للتخطي فوق الفيديو عندما يبدأ التسجيل قبل بداية البرنامج</string>
     <string name="settings_section_recording_marks">علامات التسجيل</string>
     <string name="ad_breaks_setting">الفواصل الإعلانية</string>
     <string name="ad_breaks_ask">السؤال أولًا</string>

@@ -641,19 +641,43 @@ class RecordingPlayerChromeScreenTest {
     }
 
     @Test fun bannerHidesFiveSecondsAfterTheFirstFrame() {
-        screen()
+        positionMs = 1_000
+        screen(leadIn = true)
         repeat(8) { settle() }
         assertTrue("loading: the Banner stays", exists("player-banner"))
         playingWithoutFrame()
         repeat(8) { settle() }
         assertTrue("playing without a presented frame: the Banner stays", exists("player-banner"))
+        assertFalse(exists("recording-skip-prompt"))
         presentFirstFrame()
-        compose.mainClock.advanceTimeBy(4_800)
+        compose.settleFrames(20, frameMillis = 16)
+        val offer = compose.onNodeWithTag("recording-skip-prompt")
+        offer.assertIsFocused()
+        val info = compose.onNodeWithTag("player-info-bar").fetchSemanticsNode().boundsInRoot
+        assertTrue(offer.fetchSemanticsNode().boundsInRoot.bottom < info.top)
+        compose.mainClock.advanceTimeBy(4_000)
         compose.waitForIdle()
         assertTrue("before 5000 ms after the first frame", exists("player-banner"))
-        settle()
+        compose.mainClock.advanceTimeBy(1_100)
+        compose.settleFrames(20, frameMillis = 16)
         assertFalse("5000 ms after the first frame the Banner hides", exists("player-banner"))
         assertFalse(exists("player-actions"))
+        offer.assertIsFocused()
+        assertTrue(offer.fetchSemanticsNode().boundsInRoot.top > info.top)
+    }
+
+    @Test fun backDismissesTheOfferBeforeTheBanner() {
+        positionMs = 1_000
+        screen(leadIn = true)
+        playingWithoutFrame()
+        presentFirstFrame()
+        compose.settleFrames(20, frameMillis = 16)
+        compose.onNodeWithTag("recording-skip-prompt").assertIsFocused()
+        compose.pressKey(Key.Back, settleFrames = 14, frameMillis = 16)
+        assertFalse(exists("recording-skip-prompt"))
+        assertTrue(exists("player-banner"))
+        compose.pressKey(Key.Back, settleFrames = 20, frameMillis = 16)
+        assertFalse(exists("player-banner"))
     }
 
     @Test fun aStepQueuedAndCommittedBetweenTwoCompositionsIsAnnouncedAfresh() {
@@ -1242,7 +1266,7 @@ class RecordingPlayerChromeScreenTest {
 
     /** [listed] false: the server never lists the recording, so the screen stays in its loading state. */
     private fun screen(onClose: () -> Unit = {}, listed: Boolean = true, refusedEntry: DvrEntry? = null,
-        settleEntry: Boolean = true, inheritedAudio: AudioTrackChoice? = null): FakeTvheadendSession {
+        settleEntry: Boolean = true, inheritedAudio: AudioTrackChoice? = null, leadIn: Boolean = false): FakeTvheadendSession {
         val recording = DvrEntryId(7)
         val session = FakeTvheadendSession(SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
@@ -1251,6 +1275,8 @@ class RecordingPlayerChromeScreenTest {
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create(listOfNotNull(refusedEntry ?: DvrEntry.create(
                 id = recording, state = DvrEntryState.COMPLETED, title = "Zeit im Bild", channelName = "Documentary",
                 channelId = ChannelId(1).takeIf { inheritedAudio != null },
+                start = kotlin.time.Instant.fromEpochSeconds(1_800).takeIf { leadIn },
+                startExtraMinutes = kotlin.time.Duration.parse("2m").takeIf { leadIn },
             ).takeIf { listed }))),
         )).apply { scriptRecordingPlaybackSuccess() }
         val settings = PlayerSettingsStore(trackChoiceData)

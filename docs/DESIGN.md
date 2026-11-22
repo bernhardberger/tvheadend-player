@@ -1045,7 +1045,7 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
   its decorative number plate. The up affordance is centered above the rail;
   the clock is at the trailing edge. Programme details do not show a now-playing strip.
 - Live TV and recordings share one chrome with four modes: hidden; the passive
-  **Banner** (clock, info bar, timeline; nothing focusable); the **Banner step**
+  **Banner** (clock, info bar, timeline; its contents do not take focus); the **Banner step**
   (a quick step's preview inside the Banner, without a thumb); and the
   **controls** (the Banner's layout plus a focusable seekbar with thumb and the
   action row). Banner to controls is layout continuity: the info bar and timeline
@@ -1059,6 +1059,7 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
   layer at a time (the Banner too, also while paused) and then closes. Entering
   the player or a zap shows the Banner; it hides 5 s after the tune's first
   presented frame (a positively audio-only service lets its playing state stand in).
+  A recording's Skip offer can take focus over the passive Banner without delaying it.
 - The shared wall clock stands alone at the top right over its scrim, where it
   stands on the browse screens: its block is centred on the header band's centre
   line, which the identity shares. Live TV puts the trimmed picon in a 72×36dp
@@ -1419,10 +1420,13 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
   offered when playback naturally enters the lead-in, including when opening
   or resuming there. A deliberate seek into the lead-in does not offer it.
   The lead-in is never skipped automatically, regardless of the Ad breaks
-  setting. When shown, the prompt takes focus: OK accepts it, and Back dismisses
-  it without seeking.
+  setting. Playback → Recording marks can turn off the program-start offer
+  without removing Skip from the controls. The prompt takes focus after the
+  first frame: OK accepts it, and Back dismisses it before the Banner.
+  It sits above the Banner's info bar and moves to the trailing bottom corner
+  as the Banner leaves.
   Each skip prompt has 10 seconds of shown time. The countdown pauses
-  behind the Banner or controls and while playback is paused, buffering, or
+  behind controls or panels and while playback is paused, buffering, or
   unseekable, then resumes with the time left. The program-start offer holds
   back an overlapping Ask ad-break prompt. Dismissing it lets the ad-break
   prompt appear; accepting it can land inside the break, which then gets its

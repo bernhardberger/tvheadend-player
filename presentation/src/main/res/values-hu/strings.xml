@@ -791,6 +791,7 @@
     <string name="recording_mark_program_ends">Műsor vége</string>
     <string name="skip_ad_break">Reklámszünet átugrása</string>
     <string name="skip_to_program_start">Ugrás a műsor elejére</string>
+    <string name="skip_to_program_start_description">Átugrási gombot jelenít meg a videó fölött, ha a felvétel a műsor kezdete előtt indul</string>
     <string name="settings_section_recording_marks">Felvételjelölők</string>
     <string name="ad_breaks_setting">Reklámszünetek</string>
     <string name="ad_breaks_ask">Rákérdezés</string>

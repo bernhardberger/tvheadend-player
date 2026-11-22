@@ -96,6 +96,7 @@ internal fun RecordingChromeFixture(
     onActionFocused: (String) -> Unit = {},
     onFocusRestored: () -> Unit = {},
     entry: PlayerControlsEntry = PlayerControlsEntry.TRAVEL,
+    onBannerInfoBarBottomDistance: (Int) -> Unit = {},
 ) {
     val settings = PlayerSettings()
     val skip = recordingSkipAction(marks, positionMs, settings).takeIf { canSeek }
@@ -147,6 +148,7 @@ internal fun RecordingChromeFixture(
         panelOpen = panelOpen,
         markerNavigation = markerNavigation,
         onSeekMarker = onSeekMarker,
+        onBannerInfoBarBottomDistance = onBannerInfoBarBottomDistance,
         modifier = modifier,
     )
     PlayerBusyIndicator(PlayerBusyStatus.BUFFERING.takeIf { buffering && !paused }, Modifier.align(Alignment.Center))

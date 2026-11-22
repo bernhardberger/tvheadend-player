@@ -119,9 +119,12 @@ internal class RecordingMarkers(
 
     fun applySettings(value: PlayerSettings) {
         settings = value
-        if (value.adBreakMode != AdBreakMode.ASK &&
-            skipPolicy.offeredPrompt?.kind == RecordingMarkKind.AD_BREAK) skipPolicy.dismissPrompt()
+        val offeredKind = skipPolicy.offeredPrompt?.kind
+        val dropProgramStart = offeredKind == RecordingMarkKind.PROGRAM_START && !value.offerProgramStart
+        val dropAdBreak = offeredKind == RecordingMarkKind.AD_BREAK && value.adBreakMode != AdBreakMode.ASK
+        if (dropAdBreak || dropProgramStart) skipPolicy.dismissPrompt()
         publishSkipState(if (boundaryPositions.isNotEmpty() && isCurrent()) player.currentPosition else null)
+        if (dropProgramStart) requestEvaluation(boundaryGeneration)
     }
 
     private fun isCurrent(): Boolean = !targetInstallationInProgress() && mediaItem != null &&

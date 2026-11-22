@@ -30,9 +30,16 @@ internal fun settingsSkipLandingLevel(landing: SkipLanding, onSelect: (SkipLandi
 
 /** The Playback page's "Recording marks" group; its first row carries the section header. */
 @Composable
-internal fun settingsRecordingMarksRows(ui: SettingsPlayerUiState, onSkipCutsChanged: (Boolean) -> Unit) = listOf(
+internal fun settingsRecordingMarksRows(
+    ui: SettingsPlayerUiState,
+    onSkipCutsChanged: (Boolean) -> Unit,
+    onOfferProgramStartChanged: (Boolean) -> Unit,
+) = listOf(
     settingsRow(AD_BREAKS_LEVEL, stringResource(R.string.ad_breaks_setting), adBreakModeLabel(ui.adBreakMode),
         child = AD_BREAKS_LEVEL, section = stringResource(R.string.settings_section_recording_marks)),
+    settingsRow("skip-program-start", stringResource(R.string.skip_to_program_start),
+        supporting = stringResource(R.string.skip_to_program_start_description), checked = ui.offerProgramStart,
+        onClick = { onOfferProgramStartChanged(!ui.offerProgramStart) }),
     settingsRow("skip-cuts", stringResource(R.string.skip_cuts_setting),
         supporting = stringResource(R.string.skip_cuts_setting_description), checked = ui.skipCuts,
         onClick = { onSkipCutsChanged(!ui.skipCuts) }),

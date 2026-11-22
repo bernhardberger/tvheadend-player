@@ -114,6 +114,7 @@ internal fun PlayerChrome(
      * controls kept up under the entry take no focus.
      */
     numberEntryShown: Boolean = false,
+    onBannerInfoBarBottomDistance: (Int) -> Unit = {},
 ) {
     val liveBar = rememberLiveBarPresentation(timeline as? PlayerChromeTimeline.Live)
     PlayerControlsLayer(
@@ -202,6 +203,7 @@ internal fun PlayerChrome(
             // Passive: nothing in the Banner takes focus. Without the action row its info and
             // timeline rest on the bottom safe area, one action row lower than the controls'.
             PlayerOverlayChrome(
+                onInfoBarBottomDistance = onBannerInfoBarBottomDistance,
                 headerContent = { placed ->
                     header(placed)
                     PlayerTopIdentity(content, placed, numberEntryShown = numberEntryShown)

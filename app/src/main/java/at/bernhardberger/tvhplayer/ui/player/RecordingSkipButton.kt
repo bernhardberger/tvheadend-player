@@ -6,6 +6,7 @@ import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.TweenSpec
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
@@ -61,18 +62,17 @@ import androidx.compose.ui.layout.layout
 import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.RecordingMarkKind
 import at.bernhardberger.tvhplayer.playback.RecordingSkipAction
+import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
 import kotlin.math.roundToInt
 
 /** Total time the Skip prompt can be shown, excluding time behind other layers. */
 internal const val SKIP_PROMPT_MS = 10_000L
 
 /**
- * The offered prompt comes forward only while the recording plays and can seek, and stands
- * back while the Banner shows (it is not part of the passive Banner). Paused, buffering or
- * unseekable, OK keeps its usual meaning and the countdown pauses.
+ * The offer can take focus once playback is presented and seekable, independently of the Banner.
  */
-internal fun recordingSkipPromptShown(offered: Boolean, playing: Boolean, canSeek: Boolean, bannerVisible: Boolean): Boolean =
-    offered && playing && canSeek && !bannerVisible
+internal fun recordingSkipPromptShown(offered: Boolean, playing: Boolean, canSeek: Boolean, presented: Boolean): Boolean =
+    offered && playing && canSeek && presented
 
 internal val RecordingSkipActivationKeys = setOf(Key.DirectionCenter, Key.Enter, Key.NumPadEnter)
 
@@ -158,7 +158,7 @@ private fun SkipCountdown(color: Color, elapsed: () -> Float) {
 }
 
 /**
- * The Skip prompt over the hidden chrome while [shown]: it takes focus when it appears and
+ * The Skip prompt over the video while [shown]: it takes focus when it appears and
  * announces itself. The countdown pauses while hidden and resumes with the remaining time;
  * after [SKIP_PROMPT_MS] of shown time, [onTimeout] withdraws the offer.
  */
@@ -169,6 +169,8 @@ internal fun RecordingSkipPrompt(
     onSkip: (RecordingSkipAction) -> Unit,
     onTimeout: (RecordingSkipAction) -> Unit,
     modifier: Modifier = Modifier,
+    bannerShown: Boolean = false,
+    bannerInfoBarBottomDistance: () -> Int = { 0 },
 ) {
     var departing by remember { mutableStateOf(prompt) }
     SideEffect { if (prompt != null) departing = prompt }
@@ -185,6 +187,7 @@ internal fun RecordingSkipPrompt(
         timeout(prompt)
     }
     val visible = prompt != null && shown
+    val bannerLift = rememberSkipBannerLift(visible, bannerShown, bannerInfoBarBottomDistance)
     val visibility = remember { MutableTransitionState(false) }
     SideEffect { visibility.targetState = visible }
     LaunchedEffect(prompt, visibility.isIdle, visibility.currentState) {
@@ -219,7 +222,7 @@ internal fun RecordingSkipPrompt(
         Box((if (visible) Modifier else Modifier.clearAndSetSemantics {})
             .graphicsLayer {
                 alpha = opacity.value
-                translationY = travel.value.roundToInt().toFloat()
+                translationY = travel.value.roundToInt() - bannerLift()
             }
             .layout { measurable, constraints ->
                 val child = measurable.measure(constraints)
@@ -238,6 +241,31 @@ internal fun RecordingSkipPrompt(
                     .semantics { liveRegion = LiveRegionMode.Polite },
             )
         }
+    }
+}
+
+@Composable
+private fun rememberSkipBannerLift(
+    visible: Boolean,
+    bannerShown: Boolean,
+    infoBarBottomDistance: () -> Int,
+): () -> Float {
+    val target = if (bannerShown) 1f else 0f
+    val lift = remember { Animatable(target) }
+    var wasVisible by remember { mutableStateOf(false) }
+    val gapFromCorner = with(LocalDensity.current) { (20.dp - TvGridVerticalMargin).toPx() }
+    LaunchedEffect(visible, target) {
+        if (visible) {
+            if (wasVisible) lift.animateTo(target,
+                tween(PlayerMotion.MediumMs, easing = PlayerMotion.EmphasizedDecelerate))
+            else lift.snapTo(target)
+        }
+        wasVisible = visible
+    }
+    return {
+        val fraction = if (visible && !wasVisible) target else lift.value
+        val distance = infoBarBottomDistance()
+        if (distance > 0) fraction * (distance + gapFromCorner) else 0f
     }
 }
 

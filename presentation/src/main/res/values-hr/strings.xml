@@ -826,6 +826,7 @@
     <string name="recording_mark_program_ends">Kraj emisije</string>
     <string name="skip_ad_break">Preskoči reklamni blok</string>
     <string name="skip_to_program_start">Preskoči na početak emisije</string>
+    <string name="skip_to_program_start_description">Prikazuje gumb za preskakanje preko videozapisa kada snimka počinje prije emisije</string>
     <string name="settings_section_recording_marks">Oznake snimke</string>
     <string name="ad_breaks_setting">Reklamni blokovi</string>
     <string name="ad_breaks_ask">Pitaj</string>

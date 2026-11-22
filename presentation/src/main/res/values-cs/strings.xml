@@ -861,6 +861,7 @@
     <string name="recording_mark_program_ends">Konec pořadu</string>
     <string name="skip_ad_break">Přeskočit reklamní přestávku</string>
     <string name="skip_to_program_start">Přeskočit na začátek pořadu</string>
+    <string name="skip_to_program_start_description">Pokud nahrávka začíná před začátkem pořadu, zobrazí nad videem tlačítko pro přeskočení</string>
     <string name="settings_section_recording_marks">Značky nahrávky</string>
     <string name="ad_breaks_setting">Reklamní přestávky</string>
     <string name="ad_breaks_ask">Zeptat se</string>

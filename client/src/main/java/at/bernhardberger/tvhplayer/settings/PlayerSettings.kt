@@ -113,6 +113,7 @@ data class PlayerSettings(
     val adBreakMode: AdBreakMode = AdBreakMode.ASK,
     val skipCuts: Boolean = true,
     val skipLanding: SkipLanding = SkipLanding.END,
+    val offerProgramStart: Boolean = true,
 )
 
 /** Stored [PlayerSettings.startupBufferMillis] value for the learned, per-server buffer. */
@@ -199,6 +200,7 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
     private object Keys {
         val AD_BREAK_MODE = stringPreferencesKey("adBreakMode")
         val SKIP_CUTS = booleanPreferencesKey("skipCuts")
+        val OFFER_PROGRAM_START = booleanPreferencesKey("offerProgramStart")
         val SKIP_LANDING = stringPreferencesKey("skipLanding")
         val AUDIO_LANGUAGES = stringPreferencesKey("audioLanguages")
         val AUDIO_FORMAT = stringPreferencesKey("audioFormat")
@@ -226,6 +228,10 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
 
     suspend fun setSkipCuts(enabled: Boolean) {
         dataStore.edit { it[Keys.SKIP_CUTS] = enabled }
+    }
+
+    suspend fun setOfferProgramStart(enabled: Boolean) {
+        dataStore.edit { it[Keys.OFFER_PROGRAM_START] = enabled }
     }
 
     suspend fun setSkipLanding(landing: SkipLanding) {
@@ -388,6 +394,7 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
             return PlayerSettings(
                 adBreakMode = AdBreakMode.entries.firstOrNull { it.name == p[Keys.AD_BREAK_MODE] } ?: AdBreakMode.ASK,
                 skipCuts = p[Keys.SKIP_CUTS] ?: true,
+                offerProgramStart = p[Keys.OFFER_PROGRAM_START] ?: true,
                 skipLanding = SkipLanding.entries.firstOrNull { it.name == p[Keys.SKIP_LANDING] } ?: SkipLanding.END,
                 audioLanguages = normalizeAudioLanguages(p[Keys.AUDIO_LANGUAGES]?.split(',').orEmpty()),
                 audioFormat = runCatching { p[Keys.AUDIO_FORMAT]?.let(AudioFormatPreference::valueOf) }

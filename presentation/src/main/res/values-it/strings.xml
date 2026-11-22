@@ -826,6 +826,7 @@
     <string name="recording_mark_program_ends">Fine programma</string>
     <string name="skip_ad_break">Salta pausa pubblicitaria</string>
     <string name="skip_to_program_start">Salta all’inizio del programma</string>
+    <string name="skip_to_program_start_description">Mostra sul video un pulsante per saltare all’inizio del programma se la registrazione comincia prima</string>
     <string name="settings_section_recording_marks">Marcatori di registrazione</string>
     <string name="ad_breaks_setting">Pause pubblicitarie</string>
     <string name="ad_breaks_ask">Chiedi</string>

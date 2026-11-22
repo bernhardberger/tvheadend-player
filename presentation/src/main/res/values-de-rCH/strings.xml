@@ -18,4 +18,5 @@
     <string name="whats_new_badge">Neu</string>
     <string name="return_to_full_screen">Zurück zum Vollbild</string>
     <string name="skip_to_program_start">Zum Sendungsbeginn springen</string>
+    <string name="skip_to_program_start_description">Zeigt über dem Video eine Schaltfläche zum Überspringen, wenn die Aufnahme vor Sendungsbeginn startet</string>
 </resources>

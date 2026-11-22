@@ -10,6 +10,22 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class RecordingSkipPolicyTest {
+    @Test fun turningOffProgramStartLeavesTheControlsActionAndLetsAnOverlappingAdAppear() {
+        val start = RecordingMark(RecordingMarkKind.PROGRAM_START, 60_000)
+        val ad = RecordingMark(RecordingMarkKind.AD_BREAK, 0, 55_000)
+        val off = PlayerSettings(offerProgramStart = false)
+        val policy = RecordingSkipPolicy()
+        policy.evaluate(listOf(start), 1_000, playing = true, off)
+        assertNull(policy.offeredPrompt)
+        assertEquals(start, recordingSkipAction(listOf(start, ad), 1_000, off))
+
+        val overlapping = RecordingSkipPolicy()
+        overlapping.evaluate(listOf(start, ad), 1_000, playing = true, PlayerSettings())
+        assertEquals(start, overlapping.offeredPrompt)
+        overlapping.evaluate(listOf(start, ad), 1_000, playing = true, off)
+        assertEquals(ad, overlapping.offeredPrompt)
+    }
+
     private val ad = RecordingMark(RecordingMarkKind.AD_BREAK, 10_000, 20_000)
     private val cut = RecordingMark(RecordingMarkKind.CUT, 30_000, 40_000)
     private val marks = listOf(ad, cut)

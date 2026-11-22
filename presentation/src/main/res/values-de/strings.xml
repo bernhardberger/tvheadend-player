@@ -1115,6 +1115,7 @@
     <string name="recording_mark_program_ends">Sendung endet</string>
     <string name="skip_ad_break">Werbepause überspringen</string>
     <string name="skip_to_program_start">Zum Sendungsbeginn springen</string>
+    <string name="skip_to_program_start_description">Zeigt über dem Video eine Schaltfläche zum Überspringen, wenn die Aufnahme vor Sendungsbeginn startet</string>
     <string name="settings_section_recording_marks">Aufnahmemarken</string>
     <string name="ad_breaks_setting">Werbepausen</string>
     <string name="ad_breaks_ask">Fragen</string>
