@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilledIconButton
@@ -36,6 +37,7 @@ import androidx.compose.material3.SegmentedListItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -83,21 +85,39 @@ internal fun ChannelRows(
     offline: Boolean = false,
     initiallyOpenChannelId: String? = null,
     showColumnLabels: Boolean = layout.tablet,
+    emptyContent: @Composable () -> Unit = {},
 ) {
-    var openId by rememberSaveable(list.selectedTagId) { mutableStateOf(initiallyOpenChannelId) }
-    BackHandler(enabled = !offline && list.rows.any { it.id == openId && it.details != null }) { openId = null }
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
+    // Save the tag alongside the position: rememberSaveable inputs alone are not checked on restoration.
+    var savedTag by rememberSaveable { mutableStateOf(list.selectedTagId) }
+    var openId by rememberSaveable { mutableStateOf(initiallyOpenChannelId) }
+    val scroll = rememberLazyListState()
+    val sameTag = savedTag == list.selectedTagId
+    val opened = openId?.takeIf { id -> sameTag && list.rows.any { it.id == id } }
+    SideEffect {
+        if (!sameTag) {
+            scroll.requestScrollToItem(0)
+            savedTag = list.selectedTagId
+        }
+        if (openId != opened) openId = opened
+    }
+
+    if (list.rows.isEmpty()) {
+        emptyContent()
+        return
+    }
+    BackHandler(enabled = !offline && list.rows.any { it.id == opened && it.details != null }) { openId = null }
+    LazyColumn(state = scroll, verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
         if (showColumnLabels) item { ColumnLabels(layout, list.hasLogos) }
         itemsIndexed(list.rows, key = { _, row -> row.id }) { index, row ->
             ChannelItem(
                 row = row,
                 layout = layout,
                 listHasLogos = list.hasLogos,
-                expanded = !offline && openId == row.id && row.details != null,
+                expanded = !offline && opened == row.id && row.details != null,
                 offline = offline,
                 shapes = ListItemDefaults.segmentedShapes(index, list.rows.size),
                 actions = actions,
-                toggle = { openId = if (openId == row.id) null else row.id },
+                toggle = { openId = if (opened == row.id) null else row.id },
             )
         }
     }
