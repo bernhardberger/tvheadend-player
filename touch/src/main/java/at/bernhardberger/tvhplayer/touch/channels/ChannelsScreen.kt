@@ -127,24 +127,27 @@ private fun ChannelsContent(
     val scroll = rememberLazyListState()
     var savedTag by rememberSaveable { mutableStateOf(list?.selectedTagId) }
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
-    val paneChannel = list?.takeIf { layout == ChannelsLayout.Wide }?.let {
-        val preferred = selectedId ?: lastWatchedId
-        preferred?.let { id -> it.rows.firstOrNull { row -> row.id == id } } ?: it.rows.firstOrNull()
+    var revealedId by rememberSaveable { mutableStateOf<String?>(null) }
+    val paneChannel = list?.takeIf { layout == ChannelsLayout.Wide }?.rows?.let { rows ->
+        rows.firstOrNull { it.id == selectedId } ?: rows.firstOrNull { it.id == lastWatchedId } ?: rows.firstOrNull()
     }
     SideEffect {
         if (list != null && savedTag != list.selectedTagId) {
             scroll.requestScrollToItem(0)
             savedTag = list.selectedTagId
+            revealedId = null
         }
+        if (list != null && list.rows.none { it.id == selectedId }) selectedId = null
     }
     LaunchedEffect(paneChannel?.id, selectedId, list?.selectedTagId) {
-        if (list == null || paneChannel == null || paneChannel.id == selectedId) return@LaunchedEffect
+        if (list == null || paneChannel == null) return@LaunchedEffect
+        if (paneChannel.id == selectedId || paneChannel.id == revealedId) return@LaunchedEffect
         // Let the initial list lay out before deciding whether the automatically chosen row is visible.
         val layoutInfo = snapshotFlow { scroll.layoutInfo }.first { it.visibleItemsInfo.isNotEmpty() }
         if (layoutInfo.visibleItemsInfo.none { it.key == paneChannel.id }) {
             scroll.requestScrollToItem(list.rows.indexOf(paneChannel))
         }
-        selectedId = paneChannel.id
+        revealedId = paneChannel.id
     }
     if (list != null) {
         BrowseChannels(list, layout, actions, state as? ChannelsState.Offline, scroll, paneChannel, pane) {

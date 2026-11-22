@@ -39,6 +39,12 @@ import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasScrollToIndexAction
+import androidx.compose.ui.test.performScrollToIndex
+import at.bernhardberger.tvheadend.sdk.core.Channel
+import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.AutorecRuleId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrMutationResult
@@ -95,6 +101,8 @@ import at.bernhardberger.tvhplayer.touch.testutil.FakeConnection
 import at.bernhardberger.tvhplayer.touch.testutil.ImageLoaderRule
 import at.bernhardberger.tvhplayer.touch.testutil.ServerGuide
 import at.bernhardberger.tvhplayer.touch.testutil.TouchCanvas
+import at.bernhardberger.tvhplayer.touch.testutil.TouchFixtureArt
+import at.bernhardberger.tvhplayer.core.BrowseContextAction
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouch
 import at.bernhardberger.tvhplayer.touch.ui.ConfirmDvrChange
 import at.bernhardberger.tvhplayer.touch.ui.ArtworkModels
@@ -102,6 +110,11 @@ import at.bernhardberger.tvhplayer.touch.ui.DvrControls
 import at.bernhardberger.tvhplayer.touch.ui.TouchDarkColors
 import at.bernhardberger.tvhplayer.ui.common.AppClock
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
+import coil3.asImage
+import coil3.decode.DataSource
+import coil3.intercept.Interceptor
+import coil3.request.ErrorResult
+import coil3.request.SuccessResult
 import java.time.ZoneId
 import kotlin.time.toJavaInstant
 import kotlin.time.Clock
@@ -131,7 +144,18 @@ import org.robolectric.util.ReflectionHelpers
 class TouchAppTest {
     private val motionScale = object : MotionDurationScale { override var scaleFactor = 1f }
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>(effectContext = motionScale)
-    @get:Rule val images = ImageLoaderRule()
+    @get:Rule val images = ImageLoaderRule(
+        Interceptor { chain ->
+            val id = (chain.request.data as? AppArtworkSource)?.id
+            val art = when (id) {
+                captureLogo -> TouchFixtureArt.picon("northline-news")
+                capturePicture -> TouchFixtureArt.art("northline-tonight")
+                else -> null
+            }
+            if (art != null) SuccessResult(art.asImage(), chain.request, DataSource.MEMORY)
+            else ErrorResult(null, chain.request, IllegalStateException("No fixture art for this model"))
+        },
+    )
 
     private var connection = FakeConnection()
     private val server = DiscoveredTvheadendServer("Tvheadend", "192.168.1.20", 9982)
@@ -533,7 +557,7 @@ class TouchAppTest {
 
         compose.onNodeWithText(label(R.string.nav_epg)).assertIsDisplayed()
         compose.onNodeWithText(label(R.string.nav_recordings)).assertIsDisplayed()
-        compose.onNode(hasClickAction() and hasText(guide.first.name!!)).assertDoesNotExist()
+        compose.onNode(hasClickAction() and hasText(guide.first.name!!)).assertIsDisplayed()
         compose.onNodeWithContentDescription(
             compose.activity.getString(R.string.channels_watch_named, guide.first.name),
         ).assertDoesNotExist()
@@ -742,6 +766,159 @@ class TouchAppTest {
 
         compose.onNodeWithText(guide.first.name!!).assertIsDisplayed()
         compose.onNodeWithText(guide.second.name!!).assertDoesNotExist()
+    }
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun channelRowAndWatchButtonDoDifferentThingsOnPhone() {
+        val watches = mutableListOf<String>()
+        watchChannel = { watches += it }
+        watchWay = { id, way, _ ->
+            assertEquals(BrowseContextAction.WATCH, way)
+            watches += id
+        }
+        val guide = savedConnectionWithGuide(withChannelArt = true)
+        val name = guide.first.name!!
+        val row = compose.onNode(hasClickAction() and hasText(name))
+        val program = compose.onNode(hasClickAction() and hasText(label(R.string.channels_details)))
+        val navigation = compose.onNode(hasClickAction() and hasText(label(R.string.nav_epg)))
+
+        compose.onNodeWithContentDescription(
+            compose.activity.getString(R.string.channels_watch_named, name),
+        ).performClick()
+        assertEquals(listOf(guide.first.id.value.toString()), watches)
+        row.performClick()
+        compose.onNode(heading and hasText(name)).assertIsDisplayed()
+        assertEquals("Opening the row does not tune", 1, watches.size)
+        navigation.assertDoesNotExist()
+        compose.captureTouch("channels-step", "phone-channel-page", TouchCanvas.PHONE)
+        compose.onNodeWithContentDescription(label(SharedR.string.context_watch)).performClick()
+        assertEquals(listOf(guide.first.id.value.toString(), guide.first.id.value.toString()), watches)
+
+        program.performClick()
+        compose.onNodeWithText("About ${guide.programs[0]}").assertIsDisplayed()
+        compose.onNodeWithText(label(R.string.channels_show_in_guide)).assertDoesNotExist()
+        back()
+        program.assertIsDisplayed()
+        compose.onNodeWithContentDescription(label(R.string.recordings_back)).performClick()
+        row.assertIsDisplayed()
+        navigation.assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = TABLET, instrumentedPackages = [
+        "at.bernhardberger.tvhplayer.touch.TouchAppKt",
+        "at.bernhardberger.tvhplayer.ui.common.TimeConverterKt",
+    ])
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun channelDetailsCoverTheWidePaneAndBackRestoresIt() {
+        watchWay = { _, _, _ -> }
+        val minute = Instant.parse("2027-01-16T11:31:00Z")
+        assertTrue(SystemClock.setCurrentTimeMillis(minute.toEpochMilliseconds() + 7_000))
+        val guide = savedConnectionWithGuide(minute, withChannelArt = true)
+        val name = guide.first.name!!
+        val paneHeading = compose.onNode(heading and hasText(name))
+        paneHeading.assertIsDisplayed()
+        val timeLeft = compose.onAllNodes(hasText("left", substring = true), useUnmergedTree = true)
+            .fetchSemanticsNodes().flatMap { node -> node.config[SemanticsProperties.Text].map { it.text } }
+        val rowTimeLeft = timeLeft.single { it.startsWith("•") }.removePrefix("•").trim()
+        assertEquals("The pane shows the same time left as the picked row", rowTimeLeft,
+            timeLeft.single { !it.startsWith("•") })
+        compose.captureTouch("channels-step", "tablet-channels-pane", TouchCanvas.TABLET)
+        val detailsBack = compose.onNodeWithContentDescription(label(R.string.recordings_back))
+        val program = compose.onNode(hasClickAction() and hasText(label(R.string.channels_details)))
+        program.performClick()
+        detailsBack.assertIsDisplayed()
+        compose.captureTouch("channels-step", "tablet-channel-details-over-pane", TouchCanvas.TABLET)
+        back()
+        paneHeading.assertIsDisplayed()
+        detailsBack.assertDoesNotExist()
+
+        program.performClick()
+        compose.onNode(hasClickAction() and hasText(label(R.string.nav_channels))).performClick()
+        paneHeading.assertIsDisplayed()
+        detailsBack.assertDoesNotExist()
+
+        compose.runOnIdle {
+            playingChannel.value = guide.first.id.value.toString()
+            behindLive.value = playingChannel.value
+        }
+        val menu = compose.onNodeWithContentDescription(label(R.string.watch_options))
+        val live = compose.onNode(hasClickAction() and hasText(label(SharedR.string.context_watch_live)))
+        menu.performClick()
+        live.assertIsDisplayed()
+        compose.captureTouch("channels-step", "tablet-channels-pane-menu-open", TouchCanvas.TABLET)
+        compose.onNode(hasClickAction() and hasText(guide.second.name!!)).performClick()
+        compose.onNode(heading and hasText(guide.second.name!!)).assertIsDisplayed()
+        compose.onNode(hasClickAction() and hasText(name)).performClick()
+        menu.assertIsDisplayed()
+        live.assertDoesNotExist()
+    }
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun thePlayingChannelPageReturnsToPlayback() {
+        playingChannel = mutableStateOf("1")
+        val returned = mutableListOf<Pair<String, BrowseContextAction>>()
+        watchWay = { id, way, _ -> returned += id to way }
+        val guide = savedConnectionWithGuide(withChannelArt = true)
+        val id = guide.first.id.value.toString()
+        compose.onNode(hasClickAction() and hasText(guide.first.name!!)).performClick()
+        compose.captureTouch("channels-step", "phone-channel-page-playing", TouchCanvas.PHONE)
+        compose.onNodeWithContentDescription(label(SharedR.string.player_continue_watching)).performClick()
+        assertEquals(listOf(id to BrowseContextAction.CONTINUE_WATCHING), returned)
+
+        compose.runOnIdle { behindLive.value = id }
+        compose.onNodeWithContentDescription(label(R.string.watch_options)).performClick()
+        compose.captureTouch("channels-step", "phone-channel-page-menu-open", TouchCanvas.PHONE)
+        compose.onNode(hasClickAction() and hasText(label(SharedR.string.context_watch_live))).performClick()
+        assertEquals(id to BrowseContextAction.WATCH_LIVE, returned.last())
+    }
+
+    @Test
+    fun returningFromAChannelKeepsTheListUntilChannelsIsTappedAgain() {
+        val guide = savedConnectionWithGuide()
+        val extras = (3L..24L).map { id -> Channel.create(ChannelId(id), name = "Extra channel $id") }
+        val observation = guide.connected()
+        connection.session.publish(
+            SessionObservation.create(
+                sessionState = observation.sessionState,
+                channelState = ChannelRepositoryState.Current(ChannelCatalog.create(
+                    listOf(guide.first, guide.second) + extras, emptyList(),
+                )),
+                epgState = observation.epgState,
+            ),
+        )
+        compose.waitForIdle()
+        val first = compose.onNode(hasClickAction() and hasText(guide.first.name!!))
+        val name = extras.last().name!!
+        val row = compose.onNode(hasClickAction() and hasText(name))
+        compose.onNode(hasScrollToIndexAction()).performScrollToIndex(extras.size + 1)
+        row.performClick()
+        compose.onNode(heading and hasText(name)).assertIsDisplayed()
+        back()
+        row.assertIsDisplayed()
+        first.assertDoesNotExist()
+        compose.onNode(hasClickAction() and hasText(label(R.string.nav_channels))).performClick()
+        first.assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w800dp-h1280dp-port-xhdpi")
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun anUprightTabletOpensAChannelPageInsteadOfAPane() {
+        watchWay = { _, _, _ -> }
+        val guide = savedConnectionWithGuide(withChannelArt = true)
+        val channel = compose.onNode(heading and hasText(guide.first.name!!))
+        val row = compose.onNode(hasClickAction() and hasText(guide.first.name!!))
+        channel.assertDoesNotExist()
+        row.performClick()
+        channel.assertIsDisplayed()
+        row.assertDoesNotExist()
+        compose.captureTouch("channels-step", "tablet-upright-channel-page", TouchCanvas.TABLET_UPRIGHT)
+        compose.onNodeWithContentDescription(label(R.string.recordings_back)).performClick()
+        row.assertIsDisplayed()
+        channel.assertDoesNotExist()
     }
 
     @Test
@@ -1402,11 +1579,16 @@ class TouchAppTest {
 
     private fun savedConnectionWithGuide(
         now: Instant? = null,
+        withChannelArt: Boolean = false,
         mappingDispatcher: () -> CoroutineDispatcher = { Dispatchers.Main.immediate },
     ): ServerGuide {
         runBlocking { connection.store.addAnonymous(server.host, server.port, "Home server", true) }
-        show(mappingDispatcher)
         val guide = ServerGuide(now ?: Clock.System.now())
+        if (withChannelArt) {
+            captureLogo = (guide.logo as ChannelIcon.ImageCache).artworkId
+            capturePicture = guide.picture
+        }
+        show(mappingDispatcher)
         connection.session.publish(guide.connected())
         compose.waitForIdle()
         return guide
@@ -1424,6 +1606,12 @@ class TouchAppTest {
     }
 
     private var content: @Composable () -> Unit = {}
+    private var watchChannel: ((String) -> Unit)? = null
+    private var watchWay: ((String, BrowseContextAction, String?) -> Unit)? = null
+    private var playingChannel = mutableStateOf<String?>(null)
+    private val behindLive = mutableStateOf<String?>(null)
+    private var captureLogo: ArtworkId? = null
+    private var capturePicture: ArtworkId? = null
 
     private fun show(mappingDispatcher: () -> CoroutineDispatcher = { Dispatchers.Main.immediate }) {
         connection.start()
@@ -1435,7 +1623,9 @@ class TouchAppTest {
             MaterialTheme(colorScheme = TouchDarkColors) {
                 TouchApp(
                     connection.browseSession, connection.owner, presentation, channels, recordings, guide,
-                    connection.noticeCenter, channelsDispatcher = mappingDispatcher(),
+                    connection.noticeCenter, playingId = playingChannel.value, onWatch = watchChannel,
+                    onChannelWatch = watchWay, behindLiveId = behindLive.value,
+                    channelsDispatcher = mappingDispatcher(),
                 ) {
                     flowOf(TvheadendDiscoveryTestFactory.discovering(listOf(server)))
                 }

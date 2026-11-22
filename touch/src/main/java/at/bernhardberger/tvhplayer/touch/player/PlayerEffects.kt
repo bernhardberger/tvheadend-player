@@ -9,9 +9,13 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
+import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
+import at.bernhardberger.tvhplayer.stores.recentChannelToPersist
+import at.bernhardberger.tvhplayer.viewmodels.ChannelScopeState
 
 @Composable
 internal fun PlayerEffects(
@@ -22,7 +26,18 @@ internal fun PlayerEffects(
     session: TvheadendSession,
     runtime: AppPlaybackRuntime,
     notices: NoticeCenter,
+    scope: ChannelScopeState,
+    observation: SessionObservation,
+    status: LivePlayerStatus,
+    lastPlayed: LastPlayedChannelStore,
 ) {
+    val confirmed = recentChannelToPersist(
+        scope.profileId, shown.takeIf { status == LivePlayerStatus.Playing },
+        observation.currentSession != null && scope.observation?.currentSession === observation.currentSession,
+    )
+    LaunchedEffect(confirmed) {
+        confirmed?.let { (profile, channel) -> lastPlayed.setChannelId(profile, channel) }
+    }
     FollowTimeshift(
         timeshift, shown, fast, liveStart,
         eventAt = { session.observation.value.eventAt(shown, it) },

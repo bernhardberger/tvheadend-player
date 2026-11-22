@@ -54,6 +54,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -76,6 +77,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
+import at.bernhardberger.tvhplayer.core.BrowseContextAction
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.channels.ChannelActionLabel
@@ -83,6 +85,7 @@ import at.bernhardberger.tvhplayer.touch.ui.DetailsBackButton
 import at.bernhardberger.tvhplayer.touch.ui.LocalArtworkModels
 import at.bernhardberger.tvhplayer.touch.ui.LocalBrowseMargin
 import at.bernhardberger.tvhplayer.touch.ui.PartsLine
+import at.bernhardberger.tvhplayer.touch.ui.WatchButton
 import at.bernhardberger.tvhplayer.touch.ui.channelLogoSlot
 import at.bernhardberger.tvhplayer.touch.ui.rememberStandalonePicture
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
@@ -116,6 +119,8 @@ internal fun ChannelPage(
     active: Boolean = true,
     acquisitionContext: CoroutineContext = Dispatchers.Default,
     mappingDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    behindLive: Boolean = false,
+    onWatch: ((String, BrowseContextAction, String?) -> Unit)? = null,
 ) {
     val id = ChannelId(channelId.toLong())
     val model = viewModel(key = "channel-page:$channelId") {
@@ -129,7 +134,7 @@ internal fun ChannelPage(
     val input = clock?.let {
         ChannelPageInput(
             scope, observation, it, Configuration(LocalConfiguration.current), AppClock.uses24Hour,
-            LocalArtworkModels.current, playingId,
+            LocalArtworkModels.current, playingId, behindLive,
         )
     }
     val context = LocalContext.current
@@ -154,6 +159,10 @@ internal fun ChannelPage(
                 onCancel = onCancel, onStop = onStop,
             ),
             modifier, inPane, initialProgramId, fallbackName,
+            active = active,
+            onWatch = onWatch?.let { watch ->
+                { way -> if (active) watch(channelId, way, shown.watchRecordingId) }
+            },
         )
     }
 }
@@ -170,18 +179,32 @@ internal fun ChannelPageContent(
     inPane: Boolean = false,
     initialProgramId: String? = null,
     fallbackName: String = "",
+    active: Boolean = true,
+    onWatch: ((BrowseContextAction) -> Unit)? = null,
 ) {
-    Surface(modifier.fillMaxSize()) {
+    val watchWays = if (onWatch != null) state.watchWays else emptyList()
+    val colors = MaterialTheme.colorScheme
+    val ground = if (inPane) colors.surfaceContainerLow else colors.surface
+    Surface(modifier.fillMaxSize(), color = if (inPane) Color.Transparent else ground) {
         Column {
             ChannelPageHeading(state.channel, fallbackName, inPane, onBack)
-            val pageWidth = if (inPane) Modifier else Modifier.widthIn(max = 680.dp)
-            val body = Modifier.weight(1f).then(pageWidth).fillMaxWidth()
-                .windowInsetsPadding(WindowInsets.navigationBars)
-            Box(body) {
-                when {
-                    state.loading -> DayLoading()
-                    state.days.isEmpty() -> NoSchedule(onWatch = null)
-                    else -> ChannelSchedule(state, onDetails, onDay, actions, initialProgramId)
+            val capped = !inPane && guideLayout() == GuideLayout.Wide
+            val pageWidth = if (capped) Modifier.widthIn(max = 680.dp) else Modifier
+            val navigationInset = if (inPane) Modifier else Modifier.windowInsetsPadding(WindowInsets.navigationBars)
+            Box(Modifier.weight(1f).fillMaxWidth().then(navigationInset)) {
+                Box(pageWidth.fillMaxSize()) {
+                    when {
+                        state.loading -> DayLoading()
+                        state.days.isEmpty() -> NoSchedule(onWatch = null)
+                        else -> ChannelSchedule(
+                            state, onDetails, onDay, actions, initialProgramId, watchWays.isNotEmpty(), ground,
+                        )
+                    }
+                }
+                if (onWatch != null) {
+                    val inset = if (watchWays.size == 1) Modifier.padding(end = 16.dp, bottom = 16.dp) else Modifier
+                    WatchButton(watchWays, state.channel?.id, Modifier.align(Alignment.BottomEnd).then(inset),
+                        active = active, onWatch = onWatch)
                 }
             }
         }
@@ -224,6 +247,8 @@ private fun ChannelSchedule(
     onDay: (LocalDate) -> Unit,
     actions: GuideActions,
     initialProgramId: String?,
+    hasWatchButton: Boolean,
+    ground: Color,
 ) {
     val dates = state.days.keys.toList()
     val selected = dates.indexOf(state.selectedDay).coerceAtLeast(0)
@@ -245,7 +270,7 @@ private fun ChannelSchedule(
                 OnNow(onNow, actions, onDetails, padding)
             }
             stickyHeader(key = "days") {
-                ChannelDayTabs(state.days, pager.tabIndex(selected), onDay) { tabsHeight = it }
+                ChannelDayTabs(state.days, pager.tabIndex(selected), onDay, ground) { tabsHeight = it }
             }
             item(key = "schedule") {
                 HorizontalPager(
@@ -268,7 +293,7 @@ private fun ChannelSchedule(
                                 revealed = true
                             }
                         }
-                        ChannelProgramRows(programs, list, onDetails)
+                        ChannelProgramRows(programs, list, onDetails, hasWatchButton)
                     }
                 }
             }
@@ -288,7 +313,8 @@ private fun rememberHeaderCollapse(outer: LazyListState): NestedScrollConnection
 
 @Composable
 private fun ChannelDayTabs(
-    days: Map<LocalDate, String>, selected: Int, onDay: (LocalDate) -> Unit, onHeight: (Int) -> Unit,
+    days: Map<LocalDate, String>, selected: Int, onDay: (LocalDate) -> Unit,
+    ground: Color, onHeight: (Int) -> Unit,
 ) {
     val margin = LocalBrowseMargin.current
     // The stock text tab's own inset counts toward the browse margin.
@@ -298,6 +324,7 @@ private fun ChannelDayTabs(
         selectedTabIndex = selected,
         edgePadding = margin - labelInset,
         minTabWidth = minTarget,
+        containerColor = ground,
         modifier = Modifier.onSizeChanged { onHeight(it.height) },
     ) {
         days.entries.forEachIndexed { index, (date, label) ->
@@ -349,7 +376,9 @@ private fun OnNow(
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun ChannelProgramRows(programs: List<GuideProgram>, list: LazyListState, onDetails: (String) -> Unit) {
+private fun ChannelProgramRows(
+    programs: List<GuideProgram>, list: LazyListState, onDetails: (String) -> Unit, hasWatchButton: Boolean,
+) {
     val secondary = MaterialTheme.colorScheme.onSurfaceVariant
     val timeStyle = MaterialTheme.typography.bodyMedium
     val measure = rememberTextMeasurer()
@@ -361,7 +390,10 @@ private fun ChannelProgramRows(programs: List<GuideProgram>, list: LazyListState
     val timeWidth = with(LocalDensity.current) { timePixels.toDp() }
     LazyColumn(
         Modifier.fillMaxSize().testTag("channel-program-rows"), state = list,
-        contentPadding = PaddingValues(horizontal = LocalBrowseMargin.current, vertical = 8.dp),
+        contentPadding = PaddingValues(
+            start = LocalBrowseMargin.current, end = LocalBrowseMargin.current,
+            top = 8.dp, bottom = if (hasWatchButton) 80.dp else 8.dp,
+        ),
         verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
     ) {
         itemsIndexed(programs, key = { _, program -> program.id }) { index, program ->

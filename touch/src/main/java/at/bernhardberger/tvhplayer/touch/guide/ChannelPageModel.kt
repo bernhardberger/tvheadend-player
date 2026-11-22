@@ -5,14 +5,21 @@ import android.content.res.Configuration
 import android.text.format.DateFormat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.SessionGenerationIdentity
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
+import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
+import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
+import at.bernhardberger.tvhplayer.core.BrowseContextAction
+import at.bernhardberger.tvhplayer.core.channelContextActions
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import at.bernhardberger.tvhplayer.touch.ui.ArtworkModels
+import at.bernhardberger.tvhplayer.touch.ui.watchWays
 import at.bernhardberger.tvhplayer.ui.common.isRunning
 import at.bernhardberger.tvhplayer.ui.screens.GuideCoverageRequestOwner
 import at.bernhardberger.tvhplayer.viewmodels.ChannelScopeState
@@ -36,6 +43,8 @@ internal data class ChannelPageState(
     val selectedDay: LocalDate? = null,
     val retained: Map<LocalDate, List<GuideProgram>> = emptyMap(),
     val loading: Boolean = true,
+    val watchWays: List<BrowseContextAction> = emptyList(),
+    val watchRecordingId: String? = null,
 )
 
 internal data class ChannelPageInput(
@@ -46,6 +55,7 @@ internal data class ChannelPageInput(
     val uses24Hour: Boolean,
     val artwork: ArtworkModels?,
     val playingId: String?,
+    val behindLive: Boolean = false,
 ) {
     val generation get() = observation.currentSession?.generationIdentity
     val matchingGeneration get() = scope.observation?.currentSession?.generationIdentity === generation
@@ -203,12 +213,30 @@ private fun prepareChannelPage(
     val mapper = GuideMapper(
         listOf(channel), input.observation, emptyList(), clock, clock.today, texts, input.artwork, input.playingId,
     )
-    val onNow = events.firstOrNull { it.isRunning(clock.nowSec) }?.let { mapper.program(it) }
+    val now = events.firstOrNull { it.isRunning(clock.nowSec) }
     val shownDates = if (waiting && requested in retained) (dates + requested).distinct().sorted() else dates
     val tabs = channelDayLabels(shownDates, clock.today, context)
     val kept = retained.filterKeys { it in tabs }
     val rows = if (waiting) kept else kept + (selected to mapDayRows(events, clock, selected, mapper, checkpoint))
-    return ChannelPageState(head, onNow, tabs, selected, rows, loading = waiting && selected !in kept)
+    val state = ChannelPageState(
+        head, now?.let(mapper::program), tabs, selected, rows, loading = waiting && selected !in kept,
+    )
+    return state.withWatch(input, now, head.id)
+}
+
+@OptIn(ExperimentalTvheadendApi::class)
+private fun ChannelPageState.withWatch(input: ChannelPageInput, event: EpgEvent?, channelId: String): ChannelPageState {
+    val observation = input.observation
+    val recording = event?.let(observation::dvrEntryForEvent)
+    val canModify = observation.currentSession != null && observation.dvrState is DvrRepositoryState.Current &&
+        (observation.sessionState as? SessionState.Ready)?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
+    return copy(
+        watchWays = watchWays(channelContextActions(
+            event, input.clock.nowSec, recording, recording?.let(observation::recordingPlaybackAdmission), canModify,
+            playing = input.playingId == channelId, behindLive = input.behindLive,
+        )),
+        watchRecordingId = recording?.id?.value?.toString(),
+    )
 }
 
 internal fun channelDayLabels(dates: List<LocalDate>, today: LocalDate, context: Context): Map<LocalDate, String> {

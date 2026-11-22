@@ -46,6 +46,7 @@ import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.BackgroundPlaybackNotice
 import at.bernhardberger.tvhplayer.playback.currentLivePlaybackSelection
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
+import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.touch.channels.ChannelDetails
 import at.bernhardberger.tvhplayer.touch.channels.ChannelProgram
 import at.bernhardberger.tvhplayer.touch.channels.ChannelRow
@@ -98,6 +99,7 @@ class PlayerActivity : ComponentActivity() {
     private val session: TvheadendSession by inject()
     private val artwork by lazy { ArtworkModels(session) }
     private val settings: PlayerSettingsStore by inject()
+    private val lastPlayed: LastPlayedChannelStore by inject()
     private val notices: NoticeCenter by inject()
     private val owner: AppProfileOwner by inject()
     private val connection: AppConnectionViewModel by viewModel()
@@ -336,7 +338,7 @@ class PlayerActivity : ComponentActivity() {
         SideEffect { pictureWindow.mode = options.aspect }
         PlayerEffects(
             timeshift, shown, controlsShown && !paused && !inWindow, liveStart && !paused,
-            session, runtime, notices,
+            session, runtime, notices, scope, observation, status, lastPlayed,
         )
         val now = Instant.fromEpochSeconds(minute * SECONDS_PER_MINUTE)
         val programs = timeshift.programs.value

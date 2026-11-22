@@ -59,6 +59,7 @@ internal fun WatchButton(
     ways: List<BrowseContextAction>,
     subject: Any?,
     modifier: Modifier = Modifier,
+    active: Boolean = true,
     onWatch: (BrowseContextAction) -> Unit,
 ) {
     if (ways.isEmpty()) return
@@ -73,7 +74,7 @@ internal fun WatchButton(
             text = { Text(label) },
         )
     } else {
-        WatchMenu(ways, subject, modifier, onWatch)
+        WatchMenu(ways, subject, modifier, active, onWatch)
     }
 }
 
@@ -82,14 +83,15 @@ private fun WatchMenu(
     ways: List<BrowseContextAction>,
     subject: Any?,
     modifier: Modifier,
+    active: Boolean,
     onWatch: (BrowseContextAction) -> Unit,
 ) {
-    var expanded by remember(subject) { mutableStateOf(false) }
+    var expanded by remember(subject, active) { mutableStateOf(false) }
     val toggleFocus = remember { FocusRequester() }
     val close = { expanded = false }
     val closeLabel = stringResource(R.string.watch_options_close_menu)
 
-    BackHandler(enabled = expanded, onBack = close)
+    BackHandler(enabled = active && expanded, onBack = close)
 
     FloatingActionButtonMenu(
         modifier = modifier,

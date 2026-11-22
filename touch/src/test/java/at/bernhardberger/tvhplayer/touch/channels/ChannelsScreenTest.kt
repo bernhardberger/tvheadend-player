@@ -32,7 +32,6 @@ import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasClickAction
-import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.isSelected
 import androidx.compose.ui.test.hasProgressBarRangeInfo
@@ -59,7 +58,7 @@ import at.bernhardberger.tvhplayer.images.ChannelAccents
 import at.bernhardberger.tvhplayer.images.LogoInkTransformation
 import at.bernhardberger.tvhplayer.stores.ChannelAccentStore
 import at.bernhardberger.tvhplayer.touch.R
-import at.bernhardberger.tvhplayer.touch.ChannelPaneHeading
+import androidx.compose.material3.Text
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import at.bernhardberger.tvhplayer.touch.testutil.ImageLoaderRule
 import at.bernhardberger.tvhplayer.touch.testutil.LogoMark
@@ -120,7 +119,7 @@ class ChannelsScreenTest {
                         state.value, fixtureActions(onPlay = { played = it }),
                         lastWatchedId = "amber-stage",
                         pane = { id, modifier ->
-                            ChannelPaneHeading(state.value.list.rows.first { it.id == id }, modifier.testTag("channel-pane"))
+                            Text(state.value.list.rows.first { it.id == id }.name, modifier.testTag("channel-pane"))
                         },
                     )
                 }
@@ -132,7 +131,7 @@ class ChannelsScreenTest {
         pane.assertIsDisplayed()
         capture("tablet-channels", TouchCanvas.TABLET)
         val ridge = compose.onNode(
-            hasText("Ridge Earth") and !hasAnyAncestor(hasTestTag("channel-pane")), useUnmergedTree = true,
+            hasText("Ridge Earth") and !hasTestTag("channel-pane"), useUnmergedTree = true,
         )
         val watchRidge = compose.onNodeWithContentDescription("Continue watching Ridge Earth")
         val ridgeLogo = compose.onNode(
@@ -196,6 +195,31 @@ class ChannelsScreenTest {
         compose.runOnIdle { state.value = ChannelsState.Ready(list.copy(rows = emptyList(), selectedTagId = "news")) }
         pane.assertDoesNotExist()
         compose.onNodeWithText(compose.activity.getString(R.string.channels_empty_tag)).assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w1280dp-h800dp-land-xhdpi")
+    fun lastWatchedTakesOverFromAutomaticSelectionButNotFromAKeptPick() {
+        val list = channelsFixture(playing = true)
+        val state = mutableStateOf(ChannelsState.Ready(list))
+        val lastWatched = mutableStateOf<String?>(null)
+        compose.setContent {
+            MaterialTheme(colorScheme = TouchDarkColors) {
+                ChannelsScreen(state.value, fixtureActions(), lastWatchedId = lastWatched.value)
+            }
+        }
+        val ridge = compose.onNode(isSelected() and hasText("Ridge Earth"))
+        val amber = compose.onNode(isSelected() and hasText("Amber Stage"))
+        ridge.assertIsDisplayed()
+        compose.runOnIdle { lastWatched.value = "amber-stage" }
+        amber.assertIsDisplayed()
+        compose.onNode(hasClickAction() and hasText("Ridge Earth")).performClick()
+        ridge.assertIsDisplayed()
+
+        compose.runOnIdle { state.value = ChannelsState.Ready(list.copy(rows = list.rows.drop(1))) }
+        amber.assertIsDisplayed()
+        compose.runOnIdle { state.value = ChannelsState.Ready(list) }
+        amber.assertIsDisplayed()
     }
 
     @Test
@@ -406,7 +430,7 @@ class ChannelsScreenTest {
     fun tabletOffline() {
         val list = channelsFixture()
         show(ChannelsState.Offline(list, retryIn = "12 s")) { id, modifier ->
-            ChannelPaneHeading(list.rows.first { it.id == id }, modifier)
+            Text(list.rows.first { it.id == id }.name, modifier)
         }
         compose.onNodeWithText("Harbor Sport").assertIsDisplayed()
         compose.onNodeWithContentDescription("Recording", useUnmergedTree = true).assertDoesNotExist()

@@ -326,6 +326,7 @@ private fun DestinationTopBar(
     actions: @Composable RowScope.(Destination) -> Unit,
 ) {
     val keyline = LocalBrowseMargin.current
+    val titleInset = if (mediumOrWider && (!expanded || selected == Destination.Channels)) keyline - 16.dp else 0.dp
     // The stock bar leaves 4 dp at the end; a 24 dp symbol in its 48 dp target adds another 12 dp.
     val stockInset = if (lastActionIsIconOnly) 16.dp else 4.dp
     TopAppBar(
@@ -333,7 +334,7 @@ private fun DestinationTopBar(
             Text(
                 text = stringResource(selected.label),
                 modifier = Modifier
-                    .padding(start = if (mediumOrWider && !expanded) 8.dp else 0.dp)
+                    .padding(start = titleInset)
                     .semantics { heading() },
                 style = if (mediumOrWider) {
                     MaterialTheme.typography.headlineMediumEmphasized

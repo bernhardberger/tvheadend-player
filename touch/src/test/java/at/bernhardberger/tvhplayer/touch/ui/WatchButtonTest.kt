@@ -32,8 +32,6 @@ import at.bernhardberger.tvhplayer.core.BrowseContextAction.WATCH
 import at.bernhardberger.tvhplayer.core.BrowseContextAction.WATCH_LIVE
 import at.bernhardberger.tvhplayer.core.channelContextActions
 import at.bernhardberger.tvhplayer.touch.testutil.ServerGuide
-import at.bernhardberger.tvhplayer.touch.testutil.TouchCanvas
-import at.bernhardberger.tvhplayer.touch.testutil.captureTouch
 import kotlin.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -144,22 +142,6 @@ class WatchButtonTest {
         compose.onNodeWithText("Watch live").assertDoesNotExist()
     }
 
-    /** Design review only: five settled states on the same plain phone canvas. */
-    @Test
-    fun captureWatchButtonsForReview() {
-        val ways = mutableStateOf(listOf(WATCH))
-        show(ways)
-        capture("phone-watch-one")
-        compose.runOnIdle { ways.value = listOf(CONTINUE_WATCHING) }
-        capture("phone-watch-continue")
-        compose.runOnIdle { ways.value = twoWays }
-        capture("phone-watch-menu-closed")
-        toggle().performClick()
-        capture("phone-watch-menu-open-two")
-        compose.runOnIdle { ways.value = twoWays + START_OVER }
-        capture("phone-watch-menu-open-three")
-    }
-
     private fun show(
         ways: MutableState<List<BrowseContextAction>>,
         subject: MutableState<String> = mutableStateOf("first"),
@@ -191,8 +173,6 @@ class WatchButtonTest {
     }
 
     private fun toggle() = compose.onNodeWithContentDescription("Watch options")
-
-    private fun capture(name: String) = compose.captureTouch("channels-step", name, TouchCanvas.PHONE)
 
     private companion object {
         val twoWays = listOf(CONTINUE_WATCHING, WATCH_LIVE)

@@ -127,6 +127,9 @@ private class RowMapper(
     private val includeDetails: Boolean = true,
 ) {
     private val remainingLabels = mutableMapOf<Long, String?>()
+    // Match the Guide clock for the label only. Programme selection and progress use the actual instant.
+    private val labelMinute = Math.floorDiv(now.epochSeconds, SECONDS_PER_MINUTE)
+    private val labelNowSec = labelMinute * SECONDS_PER_MINUTE
     private val recordingChannels by lazy {
         val entries = observation.dvrSnapshotForDisplay?.entries.orEmpty().filterNot(::recordingWasRemoved)
         activeRecordingChannelIds(entries, now.epochSeconds)
@@ -149,8 +152,8 @@ private class RowMapper(
             programs, channel.name.orEmpty(), artwork?.logo(channel.icon, observation),
             if (includeDetails) running?.let { artwork?.picture(programmeArtwork(it), observation) } else null,
             playing, recording, if (includeDetails) running?.marks() else null, programs.ahead.map { it.marks() },
-            running?.let { remainingLabel(it.stop.epochSeconds - now.epochSeconds) },
-            running?.let { Math.floorDiv(now.epochSeconds, SECONDS_PER_MINUTE) },
+            running?.let { remainingLabel(it.stop.epochSeconds - labelNowSec) },
+            running?.let { labelMinute },
         )
         return if (previous?.inputs == inputs) previous
         else MappedChannelRow(buildRow(channel.id, inputs), inputs)
@@ -202,7 +205,7 @@ private class RowMapper(
             start = if (!running || includeDetails) texts.clock(start.epochSeconds) else null,
             timeRange = if (running && includeDetails) texts.timeRange(start.epochSeconds, stop.epochSeconds) else null,
             progress = progress(nowSec).takeIf { running },
-            timeLeft = if (running) remainingLabel(stop.epochSeconds - nowSec) else null,
+            timeLeft = if (running) remainingLabel(stop.epochSeconds - labelNowSec) else null,
             scheduled = marks?.scheduled == true,
             ruleSchedule = marks?.rule,
             record = marks?.record,

@@ -44,6 +44,7 @@ import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.stores.ChannelAccentStore
+import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -75,6 +76,7 @@ private val Channels = named("channels")
 val touchModule = module {
     single<CoroutineDispatcher>(qualifier = Io) { Dispatchers.IO }
     single { PlayerSettingsStore(androidContext()) }
+    single { LastPlayedChannelStore(androidContext()) }
     single {
         NoticeCenter(SystemClock::elapsedRealtime) {
             NoticeContext(

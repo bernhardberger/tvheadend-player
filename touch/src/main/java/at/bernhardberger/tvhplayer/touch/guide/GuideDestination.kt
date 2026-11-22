@@ -18,6 +18,7 @@ import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.currentStateAsState
 import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
+import at.bernhardberger.tvhplayer.core.BrowseContextAction
 import at.bernhardberger.tvhplayer.core.programmeCategory
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import at.bernhardberger.tvhplayer.touch.ui.Destination
@@ -57,6 +58,8 @@ internal fun GuideDestination(
     dvr: DvrControls,
     onOpenConnections: () -> Unit,
     onSignIn: () -> Unit,
+    behindLiveId: String? = null,
+    onChannelWatch: ((String, BrowseContextAction, String?) -> Unit)? = null,
 ) {
     val (state, selection) = projectedGuide(guide, channels, connection, playingId)
     val stack = guide.pageStack
@@ -75,6 +78,7 @@ internal fun GuideDestination(
                 initialDay = page.day, initialProgramId = page.programId, playingId = playingId,
                 active = active, acquisitionContext = guide.acquisitionContext,
                 mappingDispatcher = guide.mappingDispatcher,
+                behindLive = behindLiveId == page.channelId, onWatch = onChannelWatch,
             )
         },
         actions = GuideActions(

@@ -21,10 +21,16 @@ import androidx.media3.common.util.UnstableApi
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
+import at.bernhardberger.tvheadend.sdk.media3.LivePlaybackObservation
+import at.bernhardberger.tvheadend.sdk.media3.TimeshiftCommandDisposition
+import at.bernhardberger.tvhplayer.core.BrowseContextAction
+import at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation
 import at.bernhardberger.tvhplayer.di.SdkRuntimeOwner
 import at.bernhardberger.tvhplayer.images.ChannelAccents
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
+import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
+import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.touch.player.PlayerActivity
 import at.bernhardberger.tvhplayer.touch.player.playingChannelId
 import at.bernhardberger.tvhplayer.touch.player.playingRecordingId
@@ -48,6 +54,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -55,12 +65,14 @@ class MainActivity : ComponentActivity() {
     private val owner: AppProfileOwner by inject()
     private val sdk: SdkRuntimeOwner by inject()
     private val notices: NoticeCenter by inject()
+    private val lastPlayed: LastPlayedChannelStore by inject()
     private val connection: AppConnectionViewModel by viewModel()
     private val channels: ChannelsViewModel by inject()
     private val recordings: RecordingsViewModel by viewModel()
     private val guide: GuideViewModel by viewModel()
     private val applicationScope: CoroutineScope by inject(Application)
     private val watchRequests: WatchRequests by viewModels { viewModelFactory { initializer { WatchRequests() } } }
+    private val behindLiveChannel = MutableStateFlow<ChannelId?>(null)
     private var watchRequest: Int
         get() = watchRequests.latest
         set(value) { watchRequests.latest = value }
@@ -74,6 +86,7 @@ class MainActivity : ComponentActivity() {
         val context = applicationContext
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
+                launch { observeLiveEdge() }
                 val requests = watchRequests
                 requests.completedRecording.collect { completed ->
                     if (completed == null) return@collect
@@ -87,6 +100,8 @@ class MainActivity : ComponentActivity() {
             MaterialTheme(colorScheme = TouchDarkColors) {
                 val target by sdk.playbackRuntime.activeTarget.collectAsStateWithLifecycle()
                 val playback by sdk.playbackRuntime.state.collectAsStateWithLifecycle()
+                val lastWatched by lastPlayed.channelId.collectAsStateWithLifecycle(null)
+                val behindLive by behindLiveChannel.collectAsStateWithLifecycle()
                 CompositionLocalProvider(LocalChannelAccents provides get<ChannelAccents>()) {
                     TouchApp(
                         session, owner, connection, channels, recordings, guide, notices,
@@ -94,6 +109,9 @@ class MainActivity : ComponentActivity() {
                         playingRecordingId = playingRecordingId(target, playback),
                         onWatch = ::watch,
                         onPlayRecording = ::watchRecording,
+                        lastWatchedId = lastWatched,
+                        behindLiveId = behindLive?.value?.toString(),
+                        onChannelWatch = ::watchChannelWay,
                         discovery = { discoverServers(context) },
                     )
                 }
@@ -103,6 +121,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         super.onStop()
+        behindLiveChannel.value = null
         if (!isChangingConfigurations) watchRequests.pendingRecording?.cancel()
     }
 
@@ -115,6 +134,60 @@ class MainActivity : ComponentActivity() {
         val playing = playingChannelId(runtime.activeTarget.value, runtime.state.value)
         val watch = if (watchTunes(id, playing)) runtime.notePlaybackIntent() else null
         startActivity(PlayerActivity.intent(this, id, watch))
+    }
+
+    private fun watchChannelWay(channelId: String, way: BrowseContextAction, recordingId: String?) {
+        when (way) {
+            BrowseContextAction.WATCH -> watch(channelId)
+            BrowseContextAction.CONTINUE_WATCHING -> {
+                val id = ChannelId(channelId.toLong())
+                val runtime = sdk.playbackRuntime
+                if (playingChannelId(runtime.activeTarget.value, runtime.state.value) == id) {
+                    watchRequest++
+                    startActivity(PlayerActivity.intent(this, id))
+                }
+            }
+            BrowseContextAction.WATCH_LIVE -> watchLive(ChannelId(channelId.toLong()))
+            BrowseContextAction.START_OVER, BrowseContextAction.PLAY ->
+                recordingId?.let { watchRecording(it, startOver = true) }
+            else -> Unit
+        }
+    }
+
+    private fun watchLive(id: ChannelId) {
+        val runtime = sdk.playbackRuntime
+        val target = runtime.activeTarget.value
+        if ((target as? AppPlaybackTarget.Live)?.channelId != id) return
+        val request = ++watchRequest
+        lifecycleScope.launch {
+            val result = runtime.goLive()
+            val sameRequest = request == watchRequest && runtime.activeTarget.value === target
+            if (sameRequest && result.disposition == TimeshiftCommandDisposition.ACCEPTED &&
+                lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+                runtime.play()
+                startActivity(PlayerActivity.intent(this@MainActivity, id))
+            }
+        }
+    }
+
+    private suspend fun observeLiveEdge() {
+        val runtime = sdk.playbackRuntime
+        val observation = runtime.livePlaybackObservation
+            .map { (it as? LivePlaybackObservation.Active)?.timeshiftState }
+            .distinctUntilChanged()
+        combine(runtime.activeTarget, observation) { target, timeshift ->
+            (target as? AppPlaybackTarget.Live)?.takeIf { timeshift != null }
+        }.collectLatest { target ->
+            if (target == null) {
+                behindLiveChannel.value = null
+            } else {
+                val sample = runtime.sampleTimeshiftPresentation()
+                behindLiveChannel.value = target.channelId.takeIf {
+                    runtime.activeTarget.value === target && sample.available && sample.timingKnown &&
+                        !timeshiftPositionPresentation(sample).atLiveEdge
+                }
+            }
+        }
     }
 
     @OptIn(UnstableApi::class)

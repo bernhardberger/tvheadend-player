@@ -27,6 +27,11 @@ internal class ProgramPageStack {
 
     fun clear() { pages = emptyList() }
 
+    fun removeMissingChannels(available: Set<String>) {
+        val removed = pages.indexOfFirst { it is GuidePageKey.Channel && it.channelId !in available }
+        if (removed >= 0) pages = pages.take(removed)
+    }
+
     fun removeMissing(missing: Set<GuidePageKey.Details>) {
         pages = pages.filterNot { it in missing }
     }

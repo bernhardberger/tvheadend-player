@@ -77,6 +77,7 @@ import at.bernhardberger.tvhplayer.playback.currentRecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.settings.AdBreakMode
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.stores.ChannelAccentStore
+import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.MainActivity
 import at.bernhardberger.tvhplayer.touch.di.Application
@@ -305,6 +306,7 @@ class RecordingPlayerScreenTest {
             modules(module {
                 single { owner }
                 single { settings }
+                single { LastPlayedChannelStore(MemoryPreferences()) }
                 single { connection.owner }
                 single { connection.noticeCenter }
                 single { connection.browseSession }
