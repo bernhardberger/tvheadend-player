@@ -129,7 +129,7 @@ class PlayerActivity : ComponentActivity() {
         pictureWindow = PlayerWindow(this, runtime.player).also { it.open() }
         fullScreen.restore(savedInstanceState, pictureWindow.inWindow)
         enableEdgeToEdge(statusBarStyle = PlayerBarStyle, navigationBarStyle = PlayerBarStyle)
-        onBackPressedDispatcher.addCallback(this) { back() }
+        onBackPressedDispatcher.addCallback(this) { navigate(LeaveTrigger.Back) }
         // The window's previous/next step through the channel order Channels shows, as the TV's player.
         lifecycle.addObserver(
             PlayerMediaSession(this, runtime, session.observation) { direction ->
@@ -169,7 +169,7 @@ class PlayerActivity : ComponentActivity() {
                         when (val shown = requested.collectAsStateWithLifecycle().value) {
                             is Tune -> Player(shown)
                             is RecordingRoute -> RecordingPlayback(
-                                shown, runtime, session, settings, artwork, pictureWindow, window, ::back,
+                                shown, runtime, session, settings, artwork, pictureWindow, window, ::navigate,
                                 fullScreen = { fullScreen.enter(pictureWindow.inWindow.value) },
                             )
                         }
@@ -239,9 +239,18 @@ class PlayerActivity : ComponentActivity() {
         super.onDestroy()
     }
 
-    private fun back() {
-        when (leavePlayer(LeaveTrigger.Back, canUseWindow(), isInPictureInPictureMode, false)) {
-            Leave.EnterWindow -> if (!pictureWindow.enter()) leave()
+    private fun navigate(trigger: LeaveTrigger) {
+        if (leaving) return
+        val outcome = leavePlayer(trigger, canUseWindow(), isInPictureInPictureMode, false, fullScreen.isRequested)
+        when (outcome) {
+            Leave.EnterWindowAndBrowse, Leave.StopAndBrowse -> {
+                // PiP needs the player resumed, so try it before foregrounding the launcher task.
+                val enteredWindow = outcome == Leave.EnterWindowAndBrowse && pictureWindow.enter()
+                packageManager.getLaunchIntentForPackage(packageName)?.let(::startActivity)
+                if (!enteredWindow) leave()
+            }
+            Leave.EnterWindow -> pictureWindow.enter()
+            Leave.ExitFullScreen -> fullScreen.release()
             Leave.Stop -> leave()
             Leave.Stay -> Unit
         }
@@ -258,8 +267,8 @@ class PlayerActivity : ComponentActivity() {
 
     private val act: (PlayerAction, LiveTimeshift, Boolean) -> Unit = { action, timeshift, paused ->
         when (action) {
-            PlayerAction.Back -> back()
-            PlayerAction.PictureInPicture -> pictureWindow.enter()
+            PlayerAction.Back -> navigate(LeaveTrigger.Back)
+            PlayerAction.PictureInPicture -> navigate(LeaveTrigger.WindowButton)
             PlayerAction.FullScreen -> fullScreen.enter(pictureWindow.inWindow.value)
             PlayerAction.WatchLive -> {
                 runtime.consumeBackgroundNotice(BackgroundPlaybackNotice.LIMIT_EXPIRED)

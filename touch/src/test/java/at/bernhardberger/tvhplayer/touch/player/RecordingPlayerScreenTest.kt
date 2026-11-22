@@ -1,6 +1,8 @@
 package at.bernhardberger.tvhplayer.touch.player
 
 import androidx.activity.ComponentActivity
+import android.content.ComponentName
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
@@ -91,6 +93,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -108,6 +111,7 @@ import org.robolectric.annotation.GraphicsMode
 import org.robolectric.android.controller.ActivityController
 import org.robolectric.util.ReflectionHelpers
 import java.time.Duration
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
@@ -489,11 +493,14 @@ class RecordingPlayerScreenTest {
     ) { activity, runtime, server, _ ->
         val pip = compose.onNodeWithContentDescription(activity.get().getString(R.string.player_picture_in_picture))
         pip.assertIsDisplayed()
+        activity.userLeaving()
+        assertNull(shadowOf(activity.get()).nextStartedActivity)
         shadowOf(activity.get().packageManager).setSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE, false)
         pip.performSemanticsAction(SemanticsActions.OnClick)
         settleRoute()
         assertTrue("A refused window button must leave the player open", !activity.get().isFinishing)
         assertEquals(AppPlaybackTarget.Live(server.first.id), runtime.activeTarget.value)
+        assertNull(shadowOf(activity.get()).nextStartedActivity)
     }
 
     @Test
@@ -504,14 +511,21 @@ class RecordingPlayerScreenTest {
         assertEquals(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE, activity.requestedOrientation)
         activity.onBackPressedDispatcher.onBackPressed()
         settleRoute()
-        assertTrue(activity.isFinishing)
         assertEquals(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED, activity.requestedOrientation)
+        assertNull(shadowOf(activity).nextStartedActivity)
+        assertEquals(AppPlaybackState.Playing, runtime.state.value)
+        activity.onBackPressedDispatcher.onBackPressed()
+        settleRoute()
+        assertBrowseLaunched(activity)
+        assertTrue(activity.isFinishing)
     }
 
     @Test
     @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
     @OptIn(UnstableApi::class)
-    fun fullScreenTurnsTheLivePhoneWithoutChangingPlayback() = withPlayerRoute(live = true) { activity, runtime, _, _ ->
+    fun fullScreenTurnsTheLivePhoneWithoutChangingPlayback() = withPlayerRoute(
+        live = true, offerPictureInPicture = true,
+    ) { activity, runtime, _, _ ->
         val target = runtime.activeTarget.value
         val epoch = runtime.videoPresentation.value.epoch
         val item = runtime.player.currentMediaItem
@@ -538,6 +552,30 @@ class RecordingPlayerScreenTest {
         val requestedBars = ReflectionHelpers.callInstanceMethod<Int>(insets, "getRequestedVisibleTypes")
         assertEquals("Landscape requests hidden bars", 0, requestedBars and WindowInsets.Type.systemBars())
         assertEquals(epoch, runtime.videoPresentation.value.epoch)
+        val generation = ReflectionHelpers.getField<AtomicLong>(runtime, "playbackRequests").get()
+        button(R.string.player_back).performClick()
+        settleRoute()
+        assertEquals(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED, original.requestedOrientation)
+        assertNull(shadowOf(original).nextStartedActivity)
+        assertTrue(!original.isInPictureInPictureMode)
+        assertEquals(target, runtime.activeTarget.value)
+        assertEquals(generation, ReflectionHelpers.getField<AtomicLong>(runtime, "playbackRequests").get())
+
+        original.onBackPressedDispatcher.onBackPressed()
+        assertBrowseLaunched(original)
+        assertTrue(original.isInPictureInPictureMode)
+        assertEquals(target, runtime.activeTarget.value)
+        assertEquals(playWhenReady, runtime.player.playWhenReady)
+    }
+
+    private fun assertBrowseLaunched(activity: PlayerActivity) {
+        val launched = shadowOf(activity).nextStartedActivity
+        requireNotNull(launched) { "Back must launch the browse task" }
+        assertEquals(ComponentName(activity, MainActivity::class.java), launched.component)
+        assertEquals(Intent.ACTION_MAIN, launched.action)
+        assertEquals(setOf(Intent.CATEGORY_LAUNCHER), launched.categories)
+        assertEquals(Intent.FLAG_ACTIVITY_NEW_TASK, launched.flags)
+        assertNull(launched.extras)
     }
 
     @Test
