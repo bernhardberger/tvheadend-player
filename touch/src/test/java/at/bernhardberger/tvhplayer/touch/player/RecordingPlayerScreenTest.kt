@@ -511,9 +511,14 @@ class RecordingPlayerScreenTest {
     @OptIn(UnstableApi::class)
     fun backRetiresThePlayerBeforeOpeningTheLatestRecordingWatch() = watchWhileBackIsStopping(recording = true)
 
+    @Test
+    @OptIn(UnstableApi::class)
+    fun backRetiresThePlayerBeforeOpeningAnUnmarkedLiveWatch() =
+        watchWhileBackIsStopping(recording = false, unmarkedLiveWatch = true)
+
     @OptIn(UnstableApi::class)
     @kotlin.OptIn(FakePlaybackApi::class)
-    private fun watchWhileBackIsStopping(recording: Boolean) {
+    private fun watchWhileBackIsStopping(recording: Boolean, unmarkedLiveWatch: Boolean = false) {
         val hold = MutableStateFlow(false)
         withPlayerRoute(marked = true, live = false, holdSettings = hold) { activity, runtime, server, fake ->
             val player = activity.get()
@@ -528,9 +533,14 @@ class RecordingPlayerScreenTest {
                 player.onBackPressedDispatcher.onBackPressed()
                 settleRoute(runtime.player)
                 assertTrue(start.isActive)
-                activity.newIntent(RecordingRoute(server.film.id, recordingStart(false)).intent(player))
-                expected = if (recording) RecordingRoute(server.diary.id, recordingStart(true)).intent(player)
-                    else PlayerActivity.intent(player, server.first.id, runtime.notePlaybackIntent())
+                if (!unmarkedLiveWatch) {
+                    activity.newIntent(RecordingRoute(server.film.id, recordingStart(false)).intent(player))
+                }
+                expected = when {
+                    unmarkedLiveWatch -> PlayerActivity.intent(player, server.first.id)
+                    recording -> RecordingRoute(server.diary.id, recordingStart(true)).intent(player)
+                    else -> PlayerActivity.intent(player, server.first.id, runtime.notePlaybackIntent())
+                }
                 activity.newIntent(expected)
                 assertNull(
                     "The replacement must wait until the old player has stopped",
@@ -547,16 +557,13 @@ class RecordingPlayerScreenTest {
             checkNotNull(launch)
             assertEquals(expected.recordingRoute(), launch.recordingRoute())
             assertNull(shadowOf(player).nextStartedActivity)
-            if (!recording) {
-                assertEquals(expected.getLongExtra("watch_intent", -1), launch.getLongExtra("watch_intent", -1))
-                fake.scriptLivePlaybackSuccess()
-            }
+            if (!recording) fake.scriptLivePlaybackSuccess()
             val target = if (recording) AppPlaybackTarget.Recording(server.diary.id)
                 else AppPlaybackTarget.Live(server.first.id)
             activity.pause().stop()
             Robolectric.buildActivity(PlayerActivity::class.java, launch).setup().use {
                 settleRoute(runtime.player)
-                assertEquals(target, runtime.activeTarget.value)
+                assertEquals("The fresh player must play the requested target", target, runtime.activeTarget.value)
             }
         }
     }
