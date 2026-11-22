@@ -44,6 +44,7 @@ import androidx.compose.foundation.layout.padding
 import at.bernhardberger.tvhplayer.core.RecordingMark
 import at.bernhardberger.tvhplayer.core.RecordingMarkKind
 import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
+import at.bernhardberger.tvhplayer.ui.TvGridGutter
 import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
@@ -666,9 +667,11 @@ class RecordingPlayerChromeScreenTest {
             padded.recording?.headline)
     }
 
-    @Test fun bannerHidesFiveSecondsAfterTheFirstFrame() {
+    @Test
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    fun bannerHidesFiveSecondsAfterTheFirstFrame() {
         positionMs = 1_000
-        screen(leadIn = true)
+        screen(leadIn = true, title = "A very long title that needs all of the available width in the recording player ".repeat(3))
         repeat(8) { settle() }
         assertTrue("loading: the Banner stays", exists("player-banner"))
         playingWithoutFrame()
@@ -681,6 +684,9 @@ class RecordingPlayerChromeScreenTest {
         offer.assertIsFocused()
         val info = compose.onNodeWithTag("player-info-bar").fetchSemanticsNode().boundsInRoot
         val pill = offer.fetchSemanticsNode().boundsInRoot
+        val title = compose.onNodeWithTag("player-info-title", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        assertEquals("the long title leaves one grid gutter before the focused pill",
+            with(compose.density) { TvGridGutter.toPx() }, pill.left - pill.width * .05f - title.right, 1f)
         assertEquals("the focused pill ends at the bottom of the info bar", info.bottom, pill.bottom + pill.height * .05f, 1f)
         compose.mainClock.advanceTimeBy(4_000)
         compose.waitForIdle()
@@ -741,7 +747,6 @@ class RecordingPlayerChromeScreenTest {
         update { offer = ad }
         assertEquals("the narrower offer cannot take back room", wide, titleBounds())
         update { offer = null }
-        assertFalse(exists("recording-skip-prompt"))
         assertEquals("dismissing the offer must not change the Banner text", wide, titleBounds())
         update { mode = PlayerChromeMode.CONTROLS }
         assertTrue(exists("player-actions"))
@@ -764,25 +769,32 @@ class RecordingPlayerChromeScreenTest {
 
     @Test fun openingControlsPassesOnProgramStart() = openingControlsPassesOn(RecordingMarkKind.PROGRAM_START)
 
-    @Test fun openingControlsPassesOnAdBreak() = openingControlsPassesOn(RecordingMarkKind.AD_BREAK)
+    @Test fun openingControlsPassesOnAdBreakWhilePaused() = openingControlsPassesOn(RecordingMarkKind.AD_BREAK, paused = true)
 
-    private fun openingControlsPassesOn(kind: RecordingMarkKind) {
+    private fun openingControlsPassesOn(kind: RecordingMarkKind, paused: Boolean = false) {
         positionMs = 1_000
         screen(leadIn = kind == RecordingMarkKind.PROGRAM_START, adBreak = kind == RecordingMarkKind.AD_BREAK)
         playing()
         compose.settleFrames(20, frameMillis = 16)
         compose.onNodeWithTag("recording-skip-prompt").assertIsFocused()
         assertEquals(kind, runtime.recordingSkipPrompt.value?.mark?.kind)
-        compose.pressKey(Key.DirectionUp, settleFrames = 35, frameMillis = 16)
+        if (paused) {
+            compose.pressKey(Key.MediaPause, settleFrames = 20, frameMillis = 16)
+            assertFalse(player.playWhenReady)
+            assertFalse(exists("recording-skip-prompt"))
+            assertEquals(kind, runtime.recordingSkipPrompt.value?.mark?.kind)
+        }
+        compose.pressKey(if (paused) Key.DirectionDown else Key.DirectionUp, settleFrames = 35, frameMillis = 16)
+        assertEquals("opening controls passes on the pending offer", null, runtime.recordingSkipPrompt.value)
         assertTrue(exists("player-actions"))
         assertTrue(exists("recording-skip"))
-        assertTrue("opening controls does not toggle playback", player.playWhenReady)
+        assertEquals("opening controls does not toggle playback", !paused, player.playWhenReady)
         assertEquals("opening controls does not skip", 1_000L, positionMs)
         compose.pressKey(Key.Back, settleFrames = 20, frameMillis = 16)
         assertFalse(exists("player-actions"))
+        compose.pressKey(Key.DirectionCenter, settleFrames = 20, frameMillis = 16)
+        assertEquals("the next OK toggles playback", paused, player.playWhenReady)
         assertFalse("the offer does not return after controls close", exists("recording-skip-prompt"))
-        compose.pressKey(Key.DirectionCenter, settleFrames = 2, frameMillis = 16)
-        assertFalse("the next OK pauses playback", player.playWhenReady)
     }
 
     @Test fun resumingWithOkDrainsTheOpeningKeyBeforeTheNextPress() {
@@ -1082,9 +1094,9 @@ class RecordingPlayerChromeScreenTest {
     }
 
     @Test fun aGrowingRecordingShowsItsLengthAndBehindLiveAndMarksOnlyItsIdentity() {
+        var inset by mutableStateOf(0)
         compose.setContent {
             TVHeadendPlayerTheme {
-                var inset by mutableStateOf(0)
                 androidx.compose.foundation.layout.Box {
                     RecordingChromeFixture(mode = PlayerChromeMode.BANNER, growing = true,
                         info = fixtureRecordingInfo(growing = true, state = DvrEntryState.SCHEDULED),
@@ -1417,6 +1429,7 @@ class RecordingPlayerChromeScreenTest {
     /** [listed] false: the server never lists the recording, so the screen stays in its loading state. */
     private fun screen(onClose: () -> Unit = {}, listed: Boolean = true, refusedEntry: DvrEntry? = null,
         settleEntry: Boolean = true, inheritedAudio: AudioTrackChoice? = null, leadIn: Boolean = false, adBreak: Boolean = false,
+        title: String = "Zeit im Bild",
     ): FakeTvheadendSession {
         val recording = DvrEntryId(7)
         val session = FakeTvheadendSession(SessionObservation.create(
@@ -1424,7 +1437,7 @@ class RecordingPlayerChromeScreenTest {
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(Channel.create(ChannelId(1), name = "Documentary")))),
             epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create(listOfNotNull(refusedEntry ?: DvrEntry.create(
-                id = recording, state = DvrEntryState.COMPLETED, title = "Zeit im Bild", channelName = "Documentary",
+                id = recording, state = DvrEntryState.COMPLETED, title = title, channelName = "Documentary",
                 channelId = ChannelId(1).takeIf { inheritedAudio != null },
                 start = kotlin.time.Instant.fromEpochSeconds(1_800).takeIf { leadIn },
                 startExtraMinutes = kotlin.time.Duration.parse("2m").takeIf { leadIn },
