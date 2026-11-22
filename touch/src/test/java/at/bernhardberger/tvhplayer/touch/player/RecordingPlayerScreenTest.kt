@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.os.Looper
+import android.os.SystemClock
 import android.view.WindowInsets
 import androidx.annotation.OptIn
 import androidx.compose.material3.MaterialTheme
@@ -461,9 +462,15 @@ class RecordingPlayerScreenTest {
             activity.lifecycleScope.launch(start = CoroutineStart.UNDISPATCHED) {
                 runtime.playRecording(selection, recordingStart(true))
             }
-            runtime.player.seekTo(runtime.player.duration)
-            settleRoute(runtime.player)
-            assertEquals(AppPlaybackState.Finished, runtime.state.value)
+            val playback = shadowOf(runtime.player.playbackLooper)
+            playback.pause()
+            try {
+                runtime.player.seekTo(runtime.player.duration)
+                awaitRecordingEnd(runtime)
+                assertEquals(AppPlaybackState.Finished, runtime.state.value)
+            } finally {
+                playback.unPause()
+            }
             hold.value = false
             settleRoute(runtime.player)
             assertEquals(AppPlaybackTarget.Recording(replacement), runtime.activeTarget.value)
@@ -651,10 +658,26 @@ class RecordingPlayerScreenTest {
 
     @OptIn(UnstableApi::class)
     private fun settleRoute(player: ExoPlayer? = null) {
-        shadowOf(Looper.getMainLooper()).idle()
-        player?.let { shadowOf(it.playbackLooper).idle() }
-        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(32))
+        val main = shadowOf(Looper.getMainLooper())
+        main.idle()
+        // Run Media3 work made due by the advance, then deliver its callbacks to the runtime.
+        (player?.let { shadowOf(it.playbackLooper) } ?: main).idleFor(Duration.ofMillis(32))
+        main.idle()
         compose.waitForIdle()
+    }
+
+    @OptIn(UnstableApi::class)
+    private fun awaitRecordingEnd(runtime: AppPlaybackRuntime) {
+        val main = shadowOf(Looper.getMainLooper())
+        val playback = shadowOf(runtime.player.playbackLooper)
+        val deadline = Duration.ofMillis(SystemClock.uptimeMillis()).plusSeconds(1)
+        main.idle()
+        while (runtime.state.value != AppPlaybackState.Finished) {
+            val next = playback.nextScheduledTaskTime
+            if (next.isZero || next > deadline) break
+            playback.runToNextTask()
+            main.idle()
+        }
     }
 
     @Test
