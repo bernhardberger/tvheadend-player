@@ -88,7 +88,7 @@ fun PlayerInfoBar(
         if (data.recordedDate == null) stringResource(R.string.player_now_spoken, data.title, data.spokenTimeRange)
         else stringResource(R.string.player_recorded_spoken, data.title, data.recordedDate, data.spokenTimeRange),
         data.nowRecording?.let { recordingStatusSpoken(nowRecordingState, it.rule) },
-        remaining, next, nextRecording?.let { recordingStatusSpoken(it.state, it.rule) },
+        remaining, next, nextRecording?.let { recordingStatusSpoken(it.state, it.rule, skipped = it.enabled == false) },
         badges.takeIf { it.isNotEmpty() }?.map { glanceBadgeSpoken(it) }?.joinToString(". "),
     ).joinToString(". ")
     val faded = Modifier.graphicsLayer { alpha = contentAlpha() }
@@ -152,7 +152,7 @@ private fun PlayerInfoNext(
         if (recording != null) RecordingStatusIndicator(
             recording.state, Modifier.noHeight()
                 .then(if (recording.state == DvrEntryState.SCHEDULED) Modifier.testTag("player-scheduled-marker") else Modifier),
-            rule = recording.rule, announceState = false,
+            rule = recording.rule, announceState = false, skipped = recording.enabled == false,
             textStyle = MaterialTheme.typography.labelLarge, scheduledTint = secondary)
     }
 }

@@ -776,7 +776,8 @@ private fun NextProgramme(next: EpgEvent, recording: DvrEntry?, modifier: Modifi
         if (recording != null) RecordingStatusIndicator(
             recording.state,
             if (recording.state == DvrEntryState.SCHEDULED) Modifier.testTag("channels-next-scheduled") else Modifier,
-            rule = recording.rule, textStyle = MaterialTheme.typography.labelMedium, scheduledTint = color)
+            rule = recording.rule, skipped = recording.enabled == false,
+            textStyle = MaterialTheme.typography.labelMedium, scheduledTint = color)
     }
 }
 

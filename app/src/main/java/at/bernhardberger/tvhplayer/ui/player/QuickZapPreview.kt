@@ -95,7 +95,8 @@ fun QuickZapPreview(
                     if (nextRecording != null) RecordingStatusIndicator(
                         nextRecording.state, Modifier.noHeight()
                             .then(if (nextRecording.state == DvrEntryState.SCHEDULED) Modifier.testTag("player-scheduled-marker") else Modifier),
-                        rule = nextRecording.rule, textStyle = MaterialTheme.typography.labelLarge, scheduledTint = tertiary)
+                        rule = nextRecording.rule, skipped = nextRecording.enabled == false,
+                        textStyle = MaterialTheme.typography.labelLarge, scheduledTint = tertiary)
                 }
             }
         }

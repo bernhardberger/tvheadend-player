@@ -41,6 +41,7 @@ import at.bernhardberger.tvheadend.sdk.testing.FakeSessionObservation
 import at.bernhardberger.tvheadend.sdk.playback.*
 import at.bernhardberger.tvhplayer.core.*
 import at.bernhardberger.tvhplayer.playback.*
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import coil3.ImageLoader
@@ -108,10 +109,13 @@ class PlayerChromeEvidenceTest {
     }
 
     @Test fun passiveBarAndSlotHaveMergedSemanticsAndNoFocusActions() {
-        val scheduled = DvrEntry.create(DvrEntryId(1), state = DvrEntryState.SCHEDULED, timerecRuleId = TimerecRuleId("timer"))
-        val ruleDescription = ApplicationProvider.getApplicationContext<Application>().getString(RecordingRule.TIMER.label)
+        var enabled by mutableStateOf(true)
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val ruleDescription = app.getString(RecordingRule.TIMER.label)
         compose.setContent { TVHeadendPlayerTheme {
             Column {
+                val scheduled = DvrEntry.create(DvrEntryId(1), state = DvrEntryState.SCHEDULED,
+                    timerecRuleId = TimerecRuleId("timer"), enabled = enabled)
                 InfoBar(info(false).copy(nextRecording = scheduled), Modifier.fillMaxWidth().testTag("bar"))
                 PlayerStateCellView(PlayerStateCell.PLAYING, Modifier.testTag("chip"))
             }
@@ -128,6 +132,12 @@ class PlayerChromeEvidenceTest {
         assertTrue(bar.children.isEmpty())
         compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsActions.RequestFocus), useUnmergedTree = true).assertCountEquals(0)
         compose.onAllNodes(hasClickAction(), useUnmergedTree = true).assertCountEquals(0)
+
+        compose.runOnIdle { enabled = false }
+        val skipped = app.getString(R.string.autorec_editor_skipped)
+        compose.onNodeWithTag("bar").assert(hasContentDescription(skipped, substring = true))
+        compose.onAllNodes(hasContentDescription(skipped, substring = true), useUnmergedTree = true).assertCountEquals(1)
+        compose.onAllNodes(hasContentDescription(ruleDescription, substring = true), useUnmergedTree = true).assertCountEquals(0)
     }
 
     @Test fun quickZapPreviewCrossfadeKeepsTheOutgoingProgrammeAndOnlyTheIncomingIsAnnounced() {
