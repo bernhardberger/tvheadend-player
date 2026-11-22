@@ -17,10 +17,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.structuralEqualityPolicy
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -40,6 +42,7 @@ import at.bernhardberger.tvhplayer.ui.screens.settings.rememberSavedConnectionRe
 import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvheadend.sdk.core.SessionGenerationIdentity
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.touch.channels.ChannelRowPrograms
@@ -248,6 +251,10 @@ private fun AppFrame(
     cache: ChannelsMappingCache,
 ) {
     val scope = channels.scope.collectAsStateWithLifecycle().value
+    val observedSession = channels.observation.collectAsStateWithLifecycle()
+    val generation by remember(observedSession) {
+        derivedStateOf(structuralEqualityPolicy()) { observedSession.value.currentSession?.generationIdentity }
+    }
     val format = channelsTextFormat()
     val texts = rememberChannelsTexts(format)
     val context = LocalContext.current.applicationContext
@@ -261,6 +268,10 @@ private fun AppFrame(
                 )
                 key to observation
             }.collectLatest { (key, observation) ->
+                // The catalog scope and the session can arrive on separate flow emissions.
+                if (key.scope.observation?.currentSession?.generationIdentity !==
+                    observation.currentSession?.generationIdentity
+                ) return@collectLatest
                 while (true) {
                     // A clock wake and a data update in the same UI turn need only the newest inputs.
                     yield()
@@ -270,14 +281,15 @@ private fun AppFrame(
                     val result = if (reasons.isEmpty() && previous != null) previous else {
                         withContext(mappingDispatcher) { key.map(context, observation, previous, now, reasons, texts) }
                     }
+                    // The source may already have changed before combine can cancel this pass.
+                    if (!key.inputsAreCurrent(channels, connection, observation)) return@collectLatest
                     cache.mapped = result
                     delay((result.nextWakeSec * MILLIS_PER_SECOND - System.currentTimeMillis()).coerceAtLeast(1L))
                 }
             }
         }
     }
-    val state = cache.mapped?.takeIf { it.key.scope.profileId == scope.profileId && it.key.format == format }
-        ?.state ?: ChannelsState.Loading
+    val state = cache.mapped?.takeIf { it.matchesDisplay(scope, generation, format) }?.state ?: ChannelsState.Loading
     ArtworkFirstLoad("Channels", if (state == ChannelsState.Loading) when {
         !scope.settingsLoaded -> "settings"
         scope.scope.visibleChannels.isEmpty() -> "channels"
@@ -313,7 +325,17 @@ private data class ChannelsMappingKey(
     val format: ChannelsTextsFormat,
     val playingId: String?,
     val artwork: ArtworkModels?,
-)
+) {
+    fun inputsAreCurrent(
+        channels: ChannelsViewModel,
+        connectionViewModel: AppConnectionViewModel,
+        observation: SessionObservation,
+    ): Boolean {
+        if (scope !== channels.scope.value || observation !== channels.observation.value) return false
+        val current = connectionViewModel.uiState.value
+        return connection == current.connection && degraded == current.degraded
+    }
+}
 
 private class ChannelsMappingResult(
     val key: ChannelsMappingKey,
@@ -325,6 +347,15 @@ private class ChannelsMappingResult(
     val nextBoundarySec: Long,
 ) {
     val nextWakeSec: Long get() = minOf(nextBoundarySec, nextChannelMinute(atSec))
+
+    fun matchesDisplay(
+        scope: ChannelScopeState,
+        generation: SessionGenerationIdentity?,
+        format: ChannelsTextsFormat,
+    ): Boolean {
+        val sameScope = key.scope.profileId == scope.profileId && key.scope.scope.activeTagId == scope.scope.activeTagId
+        return sameScope && observation.currentSession?.generationIdentity === generation && key.format == format
+    }
 }
 
 private const val MILLIS_PER_SECOND = 1_000L

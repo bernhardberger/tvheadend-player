@@ -681,6 +681,37 @@ class TouchAppTest {
         back()
         loading.assertDoesNotExist()
         mappedAfterStop.assertIsDisplayed()
+
+        openGuide()
+        compose.onNode(hasClickAction() and hasText(label(R.string.channels_all))).performClick()
+        compose.onNode(hasClickAction() and hasText(guide.news.name!!)).performClick()
+        back()
+        compose.onNodeWithText(guide.second.name!!).assertDoesNotExist()
+        loading.assertIsDisplayed()
+        releaseMapping()
+        mappedAfterStop.assertIsDisplayed()
+        compose.onNodeWithText(guide.second.name!!).assertDoesNotExist()
+    }
+
+    @Test
+    fun channelsHideKeptRowsWhenTheSessionIsReplaced() {
+        val dispatcher = mutableStateOf<CoroutineDispatcher>(Dispatchers.Main.immediate)
+        val guide = savedConnectionWithGuide(mappingDispatcher = { dispatcher.value })
+        val channel = compose.onNodeWithText(guide.first.name!!)
+        val stopRecording = compose.onNode(hasClickAction() and hasText(label(SharedR.string.stop_recording)))
+        compose.onNodeWithContentDescription(compose.activity.getString(R.string.channels_expand, guide.first.name))
+            .performClick()
+        stopRecording.assertIsDisplayed()
+
+        val held = StandardTestDispatcher()
+        compose.runOnIdle { dispatcher.value = held }
+        compose.runOnIdle { connection.session.replaceGeneration(guide.connected()) }
+        channel.assertDoesNotExist()
+        stopRecording.assertDoesNotExist()
+        compose.onNodeWithText(label(R.string.channels_loading)).assertIsDisplayed()
+
+        compose.runOnIdle { dispatcher.value = Dispatchers.Main.immediate }
+        channel.assertIsDisplayed()
     }
 
     @Test
