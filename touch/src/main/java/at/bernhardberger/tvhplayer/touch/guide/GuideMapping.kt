@@ -183,19 +183,19 @@ internal fun guideDays(events: List<EpgEvent>, clock: GuideClock): List<LocalDat
 /** The guide the selected day needs: the visible channels through the end of that day. */
 internal fun guideCoverage(
     scope: ChannelScopeState,
-    observation: SessionObservation,
     selection: GuideSelection,
     clock: GuideClock,
 ): GuideCoverage? {
     val channels = scope.scope.visibleChannels
-    return if (selection.view == GuideView.Overview) {
-        guideCoverage(channels.map { it.id }, observation, selection, clock)
+    val ids = if (selection.view == GuideView.Overview) {
+        channels.map { it.id }
     } else {
         val requestedId = selection.channelId?.toLongOrNull()
         val channel = requestedId?.let { id -> channels.firstOrNull { it.id.value == id } } ?: channels.firstOrNull()
-        val window = guideWindow(maxOf(selection.day ?: clock.today, clock.today), null, clock)
-        channel?.let { GuideCoverage(listOf(it.id), window.daySec.first, window.daySec.last + 1) }
+        listOfNotNull(channel?.id)
     }
+    val window = guideWindow(maxOf(selection.day ?: clock.today, clock.today), null, clock)
+    return ids.takeIf { it.isNotEmpty() }?.let { GuideCoverage(it, window.daySec.first, window.daySec.last + 1) }
 }
 
 internal fun guideCoverage(

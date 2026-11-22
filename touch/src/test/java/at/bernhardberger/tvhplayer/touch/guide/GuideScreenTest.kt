@@ -2,6 +2,7 @@ package at.bernhardberger.tvhplayer.touch.guide
 
 import android.content.pm.ApplicationInfo
 import android.os.Bundle
+import android.os.Looper
 import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.activity.BackEventCompat
@@ -72,6 +73,7 @@ import at.bernhardberger.tvhplayer.touch.ui.LocalDestinationReselections
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import at.bernhardberger.tvhplayer.ui.MobileDarkColors
@@ -80,6 +82,7 @@ import at.bernhardberger.tvhplayer.ui.screens.recordings.stopConfirmationSentenc
 import java.util.TimeZone
 import java.time.ZoneId
 import java.time.ZoneOffset
+import java.time.Duration
 import android.content.res.Configuration
 import at.bernhardberger.tvhplayer.ui.common.AppClock
 import at.bernhardberger.tvhplayer.ui.common.formatDayHeader
@@ -108,6 +111,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowLog
@@ -941,14 +945,28 @@ class GuideScreenTest {
     @Test
     @Config(instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.common.TimeConverterKt"])
     fun guideRestoresItsPlaceAndLetsAnExpiredDayFallBackToToday() {
-        val connection = FakeConnection()
         val now = Instant.parse("2027-01-15T12:00:00Z")
+        assertTrue(SystemClock.setCurrentTimeMillis(now.toEpochMilliseconds()))
+        var content by mutableStateOf<(@Composable () -> Unit)?>(null)
+        compose.setContent { content?.invoke() }
+        GuideView.entries.forEach { view ->
+            assertRestoredGuideDay(view, now) { body ->
+                compose.runOnIdle { content = { key(view) { body() } } }
+            }
+        }
+    }
+
+    private fun assertRestoredGuideDay(view: GuideView, now: Instant, setContent: (@Composable () -> Unit) -> Unit) {
+        val connection = FakeConnection()
         val fixture = ServerGuide(now)
         val zone = ZoneId.systemDefault()
         val today = GuideClock(now.epochSeconds, zone).today
         val tomorrow = today.plusDays(1)
+        val missingDay = if (view == GuideView.Overview) today.plusDays(90) else tomorrow
+        val tomorrowThrough = Instant.fromEpochSeconds(tomorrow.plusDays(1).atStartOfDay(zone).toEpochSecond())
+        val missingThrough = Instant.fromEpochSeconds(missingDay.plusDays(1).atStartOfDay(zone).toEpochSecond())
         val channelId = fixture.second.id.value.toString()
-        val start = Instant.fromEpochSeconds(tomorrow.atTime(12, 0).atZone(zone).toEpochSecond())
+        val start = Instant.fromEpochSeconds(tomorrow.atStartOfDay(zone).toEpochSecond())
         val future = EpgEvent.create(EventId(800), fixture.second.id, start,
             Instant.fromEpochSeconds(start.epochSeconds + 3600), title = "Kept day programme")
         val current = EpgEvent.create(EventId(801), fixture.second.id, now, fixture.snapshot.events.first().stop,
@@ -956,7 +974,11 @@ class GuideScreenTest {
         val firstSnapshot = fixture.connected(epg = EpgSnapshot.create(listOf(current)))
         val refilled = fixture.connected(epg = EpgSnapshot.create(listOf(current, future)))
         var release = CompletableDeferred<Unit>()
-        val session = connection.withCoverage { release.await() }
+        val requestedWindows = mutableListOf<Instant>()
+        val session = connection.withCoverage { through ->
+            requestedWindows += through
+            if (through == tomorrowThrough || through == missingThrough) release.await()
+        }
         val factory = viewModelFactory {
             initializer {
                 GuideViewModel(
@@ -964,13 +986,13 @@ class GuideScreenTest {
                 )
             }
         }
-        val kept = GuideSelection(view = GuideView.ByChannel, day = tomorrow, channelId = channelId)
+        val kept = GuideSelection(view = view, day = tomorrow, channelId = channelId)
         try {
             motionScale.scaleFactor = 0f
             val savedState = Bundle()
             Robolectric.buildActivity(ComponentActivity::class.java).create().use { original ->
                 val guide = ViewModelProvider.create(original.get(), factory)[GuideViewModel::class]
-                guide.selectPage(GuideView.ByChannel, channelId)
+                guide.selectPage(view, channelId)
                 guide.selectDay(tomorrow)
                 guide.selectJump(1L)
                 guide.openDetails(fixture.snapshot.events.first().id.value.toString())
@@ -983,11 +1005,10 @@ class GuideScreenTest {
                     kept,
                     guide.selection.value,
                 )
-                assertTrue(SystemClock.setCurrentTimeMillis(now.toEpochMilliseconds()))
                 connection.session.publish(firstSnapshot)
                 val channels = connection.channels()
                 val presentation = connection.presentation()
-                compose.setContent {
+                setContent {
                     MaterialTheme(colorScheme = MobileDarkColors) {
                         val dvr = viewModel { DvrControls(connection.session, connection.noticeCenter) }
                         DestinationFrame(initialDestination = Destination.Guide) {
@@ -998,10 +1019,15 @@ class GuideScreenTest {
                         }
                     }
                 }
-                compose.onNodeWithText("By channel").assertIsSelected()
-                compose.onNodeWithText("Channel Two").assertIsSelected()
+                compose.onNodeWithText(compose.activity.getString(view.label)).assertIsSelected()
+                if (view == GuideView.ByChannel) compose.onNodeWithText("Channel Two").assertIsSelected()
                 compose.runOnIdle {
-                    assertEquals("The first snapshot must not forget a day still loading", kept, guide.selection.value)
+                    assertEquals(
+                        "$view must not forget a kept day while coverage is pending",
+                        kept,
+                        guide.selection.value,
+                    )
+                    assertEquals(tomorrowThrough, requestedWindows.last())
                 }
                 val loading = compose.onNodeWithContentDescription(compose.activity.getString(SharedR.string.epg_loading))
                 val locale = compose.activity.resources.configuration.locales[0]
@@ -1011,28 +1037,37 @@ class GuideScreenTest {
                     connection.session.publish(refilled)
                     release.complete(Unit)
                 }
-                compose.onNodeWithText(formatDayHeader(tomorrow, locale)).assertIsDisplayed()
+                val keptDayLabel = if (view == GuideView.Overview) {
+                    compose.activity.getString(SharedR.string.channel_schedule_tomorrow)
+                } else formatDayHeader(tomorrow, locale)
+                compose.onNodeWithText(keptDayLabel).assertIsDisplayed()
                 compose.onNodeWithText(future.title!!).assertIsDisplayed()
                 compose.runOnIdle { assertEquals(kept, guide.selection.value) }
 
                 compose.runOnIdle {
                     release = CompletableDeferred()
+                    if (missingDay != tomorrow) guide.selectDay(missingDay)
                     connection.session.replaceGeneration(firstSnapshot)
                 }
                 loading.assertIsDisplayed()
                 compose.runOnIdle {
-                    assertEquals("The replacement session is still loading the kept day", kept, guide.selection.value)
-                    release.complete(Unit)
+                    assertEquals("The replacement session is still loading the kept day",
+                        kept.copy(day = missingDay), guide.selection.value)
+                    if (view == GuideView.ByChannel) release.complete(Unit)
                 }
+                if (view == GuideView.Overview) shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(30))
                 compose.onNodeWithText("Today").assertIsDisplayed()
                 compose.onNodeWithText(current.title!!).assertIsDisplayed()
                 compose.runOnIdle {
                     assertEquals(
                         "The day is forgotten once coverage settles without it", kept.copy(day = null), guide.selection.value,
                     )
+                    if (view == GuideView.Overview) {
+                        assertEquals("Do not retry an unreachable day", 1, requestedWindows.count { it == missingThrough })
+                    }
                     guide.selectDay(today.minusDays(1))
                 }
-                compose.onNodeWithText(formatDayHeader(today, locale)).assertIsDisplayed()
+                compose.onNodeWithText(current.title!!).assertIsDisplayed()
                 compose.runOnIdle {
                     assertEquals("An expired day is forgotten", kept.copy(day = null), guide.selection.value)
                 }
