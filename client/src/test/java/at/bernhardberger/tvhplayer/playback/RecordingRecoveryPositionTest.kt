@@ -11,6 +11,7 @@ package at.bernhardberger.tvhplayer.playback
 import android.app.Application
 import android.net.Uri
 import android.os.Looper
+import android.os.SystemClock
 import androidx.media3.common.C
 import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
@@ -33,6 +34,7 @@ import androidx.media3.exoplayer.source.MediaLoadData
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.exoplayer.source.SampleStream
+import androidx.media3.exoplayer.source.WrappingMediaSource
 import androidx.media3.extractor.Extractor
 import androidx.media3.extractor.ExtractorInput
 import androidx.media3.extractor.ExtractorOutput
@@ -63,7 +65,6 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlin.time.Duration.Companion.seconds
 import androidx.media3.test.utils.FakeClock
-import androidx.media3.test.utils.robolectric.TestPlayerRunHelper
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -85,7 +86,7 @@ class RecordingRecoveryPositionTest {
         settings.setTunnelingEnabled(true)
         playGrowing()
         appendGrowing()
-        driver.advanceLive(player, clock, 2_000)
+        advancePlayback(2_000)
         val position = player.currentPosition
         assertTrue("the real source must have played before failing", position >= 1_000)
         assertTrue("tunneling must be requested before the output failure", player.trackSelectionParameters.tunnelingRequested)
@@ -99,15 +100,15 @@ class RecordingRecoveryPositionTest {
             launch { coordinator.recordingPlaybackFailure.collect { sdkFailures += scheduler.currentTime to (it != null) } }
         }
         player.failAudioTrackInitialization()
-        driver.advanceLive(player, clock, 100)
+        advancePlayback(100)
         driver.await("recording fallback or failure") {
             player.currentMediaItem !== previous || runtime.state.value is AppPlaybackState.Failed
         }
         assertNotSame("refused tunneled audio must reinstall the recording", previous, player.currentMediaItem)
         driver.await("real recovered recording loaded") { requireNotNull(realRecording).waitingReads.value > 0 }
-        driver.advanceLive(player, clock, 100)
-        TestPlayerRunHelper.advance(player).untilState(Player.STATE_READY)
-        driver.settleLive(player)
+        advancePlayback(100)
+        awaitMain { player.playbackState == Player.STATE_READY }
+        driver.settle(player)
         assertTrue("recovered recording must play", player.isPlaying)
         assertTrue("the SDK must see the prepared source failure: $sdkFailures", sdkFailures.any { it.second })
         assertNull("reinstall clears the SDK failure: $sdkFailures", coordinator.recordingPlaybackFailure.value)
@@ -120,12 +121,12 @@ class RecordingRecoveryPositionTest {
         observing.cancelAndJoin()
         val recovered = player.currentMediaItem
         player.failAudioTrackInitialization()
-        driver.advanceLive(player, clock, 100)
+        advancePlayback(100)
         driver.awaitCurrent("untunneled recording failure") { runtime.state.value is AppPlaybackState.Failed }
         assertNotNull(runtime.recordingPlaybackFailure.value)
         assertEquals(PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED,
             (runtime.state.value as AppPlaybackState.Failed).playerErrorNumber)
-        driver.settleLive(player)
+        driver.settle(player)
         assertSame("an untunneled failure must not reinstall the recording", recovered, player.currentMediaItem)
     }
 
@@ -141,7 +142,7 @@ class RecordingRecoveryPositionTest {
         }
         val previous = player.currentMediaItem
         player.failAudioTrackInitialization()
-        driver.advanceLive(player, clock, 100)
+        advancePlayback(100)
         driver.await("recording fallback or failure") {
             player.currentMediaItem !== previous || runtime.state.value is AppPlaybackState.Failed
         }
@@ -169,7 +170,7 @@ class RecordingRecoveryPositionTest {
                 }
             })
             player.failAudioTrackInitialization()
-            driver.advanceLive(player, clock, 100)
+            advancePlayback(100)
             detaching?.await()
             driver.awaitCurrent("$invalidation exposes the declined failure") {
                 runtime.recordingPlaybackFailure.value != null &&
@@ -180,7 +181,7 @@ class RecordingRecoveryPositionTest {
                     (runtime.state.value as AppPlaybackState.Failed).playerErrorNumber)
                 assertFalse(player.trackSelectionParameters.tunnelingRequested)
             }
-            driver.settleLive(player)
+            driver.settle(player)
             assertSame("$invalidation must prevent the automatic restart", previous, player.currentMediaItem)
         }
     }
@@ -191,7 +192,7 @@ class RecordingRecoveryPositionTest {
         assertTrue("the TS extent must be known", oldEnd > 0)
         appendGrowing()
 
-        driver.advanceLive(player, clock, oldEnd + 1_000)
+        advancePlayback(oldEnd + 1_000)
 
         assertTrue("position=${player.currentPosition}, old end=$oldEnd", player.currentPosition > oldEnd)
         assertTrue(player.isPlaying)
@@ -206,7 +207,7 @@ class RecordingRecoveryPositionTest {
 
         // Media3 may retry a failed load. Let its retry/backoff run on the controlled clock,
         // then require playback beyond the bytes available before the interruption.
-        driver.advanceLive(player, clock, oldEnd + 5_000)
+        advancePlayback(oldEnd + 5_000)
 
         assertNoRecordingFailure()
         assertTrue("position=${player.currentPosition}, old end=$oldEnd", player.currentPosition > oldEnd)
@@ -219,9 +220,9 @@ class RecordingRecoveryPositionTest {
         requireNotNull(realRecording).finish()
         session.publish(growingObservation(completed = true))
 
-        driver.advanceLive(player, clock, 15_000)
-        TestPlayerRunHelper.advance(player).untilState(Player.STATE_ENDED)
-        driver.settleLive(player)
+        advancePlayback(15_000)
+        awaitMain { player.playbackState == Player.STATE_ENDED }
+        driver.settle(player)
 
         assertNoRecordingFailure()
         assertEquals(Player.STATE_ENDED, player.playbackState)
@@ -607,11 +608,11 @@ class RecordingRecoveryPositionTest {
                 assertTrue(player.trackSelectionParameters.tunnelingRequested)
                 val continued = player.currentMediaItem
                 player.failAudioTrackInitialization()
-                driver.advanceLive(player, clock, 100)
+                advancePlayback(100)
                 driver.await("tunneled output rejected") {
                     !player.trackSelectionParameters.tunnelingRequested
                 }
-                driver.settleLive(player)
+                driver.settle(player)
                 assertNotSame("paused continuation must recover without tunneling", continued, player.currentMediaItem)
                 awaitPlayback {
                     near(position, player.currentPosition) && player.playbackState == Player.STATE_READY
@@ -791,18 +792,20 @@ class RecordingRecoveryPositionTest {
                         mediaLoadData: MediaLoadData,
                         error: IOException,
                         wasCanceled: Boolean,
-                    ) { media.loadErrorReported = true }
+                    ) {
+                        if (error is FileNotFoundException) media.reportLoadFailure(loadEventInfo.dataSpec.uri)
+                    }
                 })
             }
 
-        // The SDK installs its recording item as usual; the fake server has no bytes, so the
-        // same item plays from the controlled recording instead.
+        // The fake server has no playable file. Substitute its media periods, not the SDK's
+        // prepare/release lifecycle: the SDK uses that lifecycle to identify stale player errors.
         val coordinator = createTvheadendPlaybackCoordinator(if (realRecording != null) player else object : ExoPlayer by player {
             override fun setMediaSource(mediaSource: MediaSource) {
-                player.setMediaSource(media.source(mediaSource.mediaItem))
+                player.setMediaSource(media.source(mediaSource))
             }
             override fun setMediaSource(mediaSource: MediaSource, startPositionMs: Long) {
-                player.setMediaSource(media.source(mediaSource.mediaItem), startPositionMs)
+                player.setMediaSource(media.source(mediaSource), startPositionMs)
             }
         }, workDispatcher = work).also { it.launchIn(scope) }
 
@@ -836,8 +839,7 @@ class RecordingRecoveryPositionTest {
         suspend fun playGrowing() {
             scope.launch(UnconfinedTestDispatcher(scheduler)) { runtime.state.collect { growingStates += it } }
             val install = scope.async { runtime.playRecording(selection(FIRST), RecordingPlaybackStart.START_OVER) }
-            driver.settleLive(player)
-            assertTrue("recording installation must complete", install.isCompleted)
+            driver.await("recording installation") { install.isCompleted }
             val installed = install.await()
             assertTrue("installation: $installed; state: ${runtime.state.value}", installed?.isStarted == true)
             // untilBackgroundThreadCondition rechecks through the player's clock after 1ms,
@@ -846,8 +848,8 @@ class RecordingRecoveryPositionTest {
             driver.await("growing recording loader caught up") {
                 requireNotNull(realRecording).waitingReads.value > 0
             }
-            driver.advanceLive(player, clock, 100)
-            TestPlayerRunHelper.advance(player).untilState(Player.STATE_READY)
+            advancePlayback(100)
+            awaitMain { player.playbackState == Player.STATE_READY }
             assertGrowingTarget()
             assertTrue(player.isPlaying)
             assertNoRecordingFailure()
@@ -857,7 +859,7 @@ class RecordingRecoveryPositionTest {
             val recording = requireNotNull(realRecording)
             recording.append(TS.copyOfRange(TS_SPLIT, TS.size))
             session.publish(growingObservation())
-            driver.settleLive(player)
+            driver.settle(player)
         }
 
         fun assertNoRecordingFailure() {
@@ -905,7 +907,7 @@ class RecordingRecoveryPositionTest {
                 runtime.restoreRecordingRoute(selection(recordingId), RecordingPlaybackStart.START_OVER)
             }
             awaitCurrent { restore.isCompleted }
-            driver.advanceLive(player, clock, 100)
+            advancePlayback(100)
             return restore.await()
         }
 
@@ -968,8 +970,10 @@ class RecordingRecoveryPositionTest {
                 near(positionMs, player.currentPosition) && player.isPlaying
             }
             val arrivedMs = player.currentPosition
-            driver.advanceLive(player, clock, 1_000)
-            assertTrue("resumed playback must progress: ${playback()}", player.currentPosition >= arrivedMs + 1_000)
+            advancePlayback(1_000)
+            driver.await("resumed playback progressed", diagnostics = {
+                "arrived=$arrivedMs ${failurePlayback()}"
+            }) { player.currentPosition >= arrivedMs + 1_000 }
             assertNull("player error: ${playback()}", player.playerError)
             assertTrue("not playing: ${playback()}", player.isPlaying)
             assertNear(positionMs, player.currentPosition)
@@ -981,65 +985,79 @@ class RecordingRecoveryPositionTest {
         private fun failurePlayback() = "position=${player.currentPosition} " +
             "buffered=${player.bufferedPosition} state=${player.playbackState} loading=${player.isLoading} " +
             "playing=${player.isPlaying} suppression=${player.playbackSuppressionReason} clock=${clock.elapsedRealtime()} " +
-            "playWhenReady=${player.playWhenReady} readByte=${media.readPosition} armedByte=${media.failFromByte}"
+            "uptime=${SystemClock.uptimeMillis()} playWhenReady=${player.playWhenReady} " +
+            "readByte=${media.readPosition} armedByte=${media.failFromByte} " +
+            "error=${player.playerError?.errorCodeName} runtime=${runtime.state.value}"
 
         val driver = PlaybackTestDriver(scheduler, waitTimeoutMillis = 10_000)
 
         fun awaitReadFailure() {
-            driver.settleLive(player)
-            // Media3's real loader must reach the armed byte before virtual playback drains it.
-            driver.await("loader reached armed read", diagnostics = { failurePlayback() }) {
-                media.readPosition >= media.failFromByte
+            driver.settle(player)
+            // Only the installed recording's fatal read callback can release the clock.
+            driver.await("loader reported armed read failure", diagnostics = ::failurePlayback) {
+                media.loadFailed(player.currentMediaItem)
             }
-            // The real loader reports the read failure through its analytics callback.
-            driver.await("loader reported read failure", diagnostics = { failurePlayback() }) { media.loadErrorReported }
             // Analytics posts before the playback thread finishes its loader-error callback.
             driver.settle(player)
             // Keep the existing five-second startup/consumption envelope, but stop as soon
             // as the two-second prefix fails. Acknowledge every step on the playback thread.
             repeat(50) {
                 if (player.playerError != null) return
-                driver.advanceLive(player, clock, 100)
-                driver.settle(player)
+                advancePlayback(100)
             }
             assertNotNull("armed read failure: ${failurePlayback()}", player.playerError)
         }
 
         fun awaitPlayback(condition: () -> Boolean) {
-            // A real loader fills the prefix; only then advance the non-auto player clock.
-            fun awaitPrefix() = driver.await("loaded playback prefix", diagnostics = { failurePlayback() }) {
-                media.readPosition >= byteAt(minOf(player.currentPosition + 5_000, media.lengthMs))
+            // A read offset from a retired source or before a seek is not a playable prefix.
+            fun awaitPrefix() = driver.await("extracted playback prefix", diagnostics = ::failurePlayback) {
+                val position = player.currentPosition
+                media.hasExtracted(player.currentMediaItem, byteAt(position), byteAt(minOf(position + 5_000, media.lengthMs)))
             }
             awaitPrefix()
-            driver.advanceLive(player, clock, 100)
+            advancePlayback(100)
             // Becoming ready can apply the pending resume/cut skip and start another real load.
             if (!condition()) {
                 awaitPrefix()
-                driver.advanceLive(player, clock, 100)
+                advancePlayback(100)
             }
             driver.settle(player)
             // The five-second prefix bounds consumption; allow another 500 ms for startup.
             repeat(55) {
                 if (condition()) return
-                driver.advanceLive(player, clock, 100)
-                driver.settle(player)
+                advancePlayback(100)
             }
             assertTrue("recording playback: ${playback()}", condition())
         }
 
         // Real progressive extraction and playback-thread notifications must reach the main looper.
-        fun awaitMain(condition: () -> Boolean) = driver.await("recording playback condition", predicate = condition)
+        fun awaitMain(condition: () -> Boolean) =
+            driver.await("recording playback condition", diagnostics = ::failurePlayback, predicate = condition)
 
         fun awaitCurrent(condition: () -> Boolean) {
-            driver.settleLive(player)
+            driver.settle(player)
             driver.awaitCurrent("recording runtime condition", condition)
         }
 
-        fun settleMain() = driver.advanceLive(player, clock, 1_000)
+        // The live driver's Media3 command drain can advance Robolectric's Android clock
+        // while waiting on a real thread. Leave Android Handler timers alone in these tests.
+        fun advancePlayback(millis: Long) {
+            driver.settle(player)
+            var remaining = millis
+            while (remaining > 0) {
+                val step = minOf(remaining, 100)
+                scheduler.advanceTimeBy(step)
+                clock.advanceTime(step)
+                driver.settle(player)
+                remaining -= step
+            }
+        }
+
+        fun settleMain() = advancePlayback(1_000)
 
         suspend fun awaitRecoveryTimeout() {
             assertNotNull(coordinator.pendingRecordingRecoveryPosition.value)
-            driver.advanceLive(player, clock, 20_000)
+            advancePlayback(20_000)
             // The SDK's growing-resume settle bound is a 20 s Android Handler, not player-clock work.
             shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(20))
             awaitCurrent { coordinator.pendingRecordingRecoveryPosition.value == null }
@@ -1090,21 +1108,50 @@ class RecordingRecoveryPositionTest {
      */
     private class ControlledRecording {
         @Volatile var failFromByte = Long.MAX_VALUE
-        /** The byte offset the most recent read reached, for diagnostics. */
-        @Volatile var readPosition = 0L
-        var loadErrorReported = false
+        private var current: Load? = null
+        val readPosition get() = current?.readPosition ?: 0L
         @Volatile var seekable = true
         @Volatile var unknownDuration = false
         /** The length a new open of the recording serves, as a growing file's probe reports it. */
         @Volatile var lengthMs = RECORDING_MS.toLong()
         private val held = mutableListOf<Pair<ExtractorOutput, SeekMap>>()
 
-        fun source(item: MediaItem): MediaSource {
-            readPosition = 0
-            loadErrorReported = false
-            return ProgressiveMediaSource.Factory(DataSource.Factory { ControlledDataSource() }, ExtractorsFactory {
-                arrayOf<Extractor>(GatedExtractor())
-            }).setContinueLoadingCheckIntervalBytes(LOAD_CHECK_BYTES).createMediaSource(item)
+        private class Load(val item: MediaItem) {
+            @Volatile var readPosition = 0L
+            @Volatile var extracted = LongRange.EMPTY
+            var failed = false
+        }
+
+        fun reportLoadFailure(uri: Uri) {
+            current?.takeIf { it.item.localConfiguration?.uri == uri }?.failed = true
+        }
+
+        fun loadFailed(item: MediaItem?) = current?.takeIf { it.item === item }?.failed == true
+
+        fun hasExtracted(item: MediaItem?, start: Long, end: Long): Boolean {
+            val extracted = current?.takeIf { it.item === item }?.extracted ?: return false
+            return start in extracted && end in extracted
+        }
+
+        fun source(sdkSource: MediaSource): MediaSource {
+            val load = Load(sdkSource.mediaItem).also { current = it }
+            val controlled = ProgressiveMediaSource.Factory(DataSource.Factory { ControlledDataSource(load) }, ExtractorsFactory {
+                arrayOf<Extractor>(GatedExtractor(load))
+            }).setContinueLoadingCheckIntervalBytes(LOAD_CHECK_BYTES).createMediaSource(load.item)
+            return object : WrappingMediaSource(controlled) {
+                private val lifecycle = MediaSource.MediaSourceCaller { _, _ -> }
+
+                override fun prepareSourceInternal() {
+                    load.extracted = LongRange.EMPTY
+                    sdkSource.prepareSource(lifecycle, playerId, bandwidthMeter)
+                    super.prepareSourceInternal()
+                }
+
+                override fun releaseSourceInternal() {
+                    sdkSource.releaseSource(lifecycle)
+                    super.releaseSourceInternal()
+                }
+            }
         }
 
         fun openSeeking() {
@@ -1115,7 +1162,7 @@ class RecordingRecoveryPositionTest {
             pending.forEach { (output, seekMap) -> output.seekMap(seekMap) }
         }
 
-        private inner class ControlledDataSource : BaseDataSource(false) {
+        private inner class ControlledDataSource(private val load: Load) : BaseDataSource(false) {
             private val bytes = ByteArrayDataSource(if (lengthMs == RECORDING_MS.toLong()) WAV else wav(lengthMs.toInt()))
             private var position = 0L
             override fun open(dataSpec: DataSpec): Long {
@@ -1126,14 +1173,15 @@ class RecordingRecoveryPositionTest {
                 val failFrom = failFromByte
                 if (position >= failFrom) throw FileNotFoundException("recording read failed")
                 val allowed = minOf(length.toLong(), 1_000L, failFrom - position).toInt()
-                return bytes.read(buffer, offset, allowed).also { if (it > 0) position += it; readPosition = position }
+                return bytes.read(buffer, offset, allowed).also { if (it > 0) position += it; load.readPosition = position }
             }
             override fun getUri(): Uri? = bytes.uri
             override fun close() = bytes.close()
         }
 
-        private inner class GatedExtractor : Extractor {
+        private inner class GatedExtractor(private val load: Load) : Extractor {
             private val wav = WavExtractor()
+            private var start = 0L
             override fun sniff(input: ExtractorInput): Boolean = wav.sniff(input)
             override fun init(output: ExtractorOutput) = wav.init(object : ExtractorOutput by output {
                 override fun seekMap(seekMap: SeekMap) {
@@ -1143,8 +1191,14 @@ class RecordingRecoveryPositionTest {
                     output.seekMap(if (gated) SeekMap.Unseekable(if (unknownDuration) C.TIME_UNSET else seekMap.durationUs) else seekMap)
                 }
             })
-            override fun read(input: ExtractorInput, seekPosition: PositionHolder): Int = wav.read(input, seekPosition)
-            override fun seek(position: Long, timeUs: Long) = wav.seek(position, timeUs)
+            override fun read(input: ExtractorInput, seekPosition: PositionHolder): Int =
+                wav.read(input, seekPosition).also { load.extracted = start..input.position }
+
+            override fun seek(position: Long, timeUs: Long) {
+                load.extracted = LongRange.EMPTY
+                start = position
+                wav.seek(position, timeUs)
+            }
             override fun release() = wav.release()
         }
     }
