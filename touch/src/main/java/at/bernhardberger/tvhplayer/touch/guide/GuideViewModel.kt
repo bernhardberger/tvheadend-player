@@ -66,6 +66,9 @@ internal class GuideViewModel(
 
     fun selectDay(day: LocalDate?) = mutableSelection.update { it.copy(day = day, jump = null) }
 
+    fun selectPage(view: GuideView, channelId: String? = null) =
+        mutableSelection.update { it.copy(view = view, channelId = channelId ?: it.channelId) }
+
     fun selectJump(jump: Long?) = mutableSelection.update { it.copy(jump = jump) }
 
     fun reconcileSelection(expected: GuideSelection, available: GuideSelection) {

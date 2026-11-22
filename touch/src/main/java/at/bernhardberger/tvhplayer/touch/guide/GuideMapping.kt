@@ -29,7 +29,13 @@ import java.time.LocalTime
 import java.time.ZoneId
 
 /** A null day follows today; a null jump follows Now. A jump belongs to one instant, not a tab. */
-internal data class GuideSelection(val day: LocalDate? = null, val jump: Long? = null, val detailsId: String? = null) {
+internal data class GuideSelection(
+    val day: LocalDate? = null,
+    val jump: Long? = null,
+    val detailsId: String? = null,
+    val channelId: String? = null,
+    val view: GuideView = GuideView.Overview,
+) {
     fun dateIn(days: List<LocalDate>): LocalDate = day?.takeIf { it in days } ?: days.first()
 }
 
@@ -175,7 +181,14 @@ internal fun guideCoverage(
     observation: SessionObservation,
     selection: GuideSelection,
     clock: GuideClock,
-): GuideCoverage? = guideCoverage(scope.scope.visibleChannels.map { it.id }, observation, selection, clock)
+): GuideCoverage? {
+    val ids = scope.scope.visibleChannels.map { it.id }
+    val coverage = guideCoverage(ids, observation, selection, clock) ?: return null
+    return if (selection.view == GuideView.Overview) coverage else {
+        val channel = ids.firstOrNull { it.value.toString() == selection.channelId } ?: ids.first()
+        coverage.copy(channelIds = listOf(channel))
+    }
+}
 
 internal fun guideCoverage(
     ids: List<ChannelId>,
@@ -242,9 +255,12 @@ internal class GuideMapper(
             .filter { it > clock.nowSec }
         val jumpIndex = jumps.indexOf(selection.jump) + 1
         val window = guideWindow(date, jumps.getOrNull(jumpIndex - 1), clock)
+        val dayChannel = if (selection.view == GuideView.ByChannel) {
+            channels.firstOrNull { it.id.value.toString() == selection.channelId } ?: channels.firstOrNull()
+        } else null
         val guideChannels = channels.map {
             checkpoint()
-            channel(it, window)
+            channel(it, window, includeDay = it == dayChannel)
         }
         val details = selection.detailsId?.let { details(it) }
         return GuideState(
@@ -262,7 +278,7 @@ internal class GuideMapper(
         )
     }
 
-    private fun channel(channel: Channel, window: GuideWindow): GuideChannel {
+    private fun channel(channel: Channel, window: GuideWindow, includeDay: Boolean): GuideChannel {
         val schedule = byChannel[channel.id].orEmpty()
         val overviewEnd = maxOf(window.daySec.last + 1, window.anchorSec + OVERVIEW_SPAN_SEC)
         val overview = mutableListOf<EpgEvent>()
@@ -277,16 +293,17 @@ internal class GuideMapper(
             overview += event
         }
         // Share formatting, artwork and DVR lookups for events visible in both lists.
-        val day = schedule.asSequence()
+        val day = if (includeDay) schedule.asSequence()
             .filter { it.overlaps(window.daySec) }
             .associate { it.id to program(it) }
+        else emptyMap()
         return GuideChannel(
             id = channel.id.value.toString(),
             name = channel.name.orEmpty(),
             logoModel = logos[channel.id],
             programs = overview.map { day[it.id] ?: program(it) },
             gap = gap,
-            day = day.values.toList(),
+            day = if (includeDay) day.values.toList() else null,
         )
     }
 

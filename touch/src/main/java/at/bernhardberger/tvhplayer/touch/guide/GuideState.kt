@@ -47,8 +47,8 @@ internal enum class GuideLayout {
 
 /**
  * The Guide on supplied state. The producer picks the channels for the tag, the programs for the
- * selected day and jump time, and formats every text for the canvas it is shown on; the screen
- * keeps the view, the channel picked in By channel and the opened program.
+ * selected day and jump time, and formats text for the canvas it is shown on; the screen
+ * keeps only the opened program.
  */
 internal data class GuideState(
     val channels: List<GuideChannel>,
@@ -98,7 +98,7 @@ internal data class GuideChannel(
     val programs: List<GuideProgram> = emptyList(),
     /** A gap after [programs], or at the selected time if there is no lead program. */
     val gap: GuideGap? = null,
-    /** The selected day in By channel when it differs from the overview's [programs]; null uses them. */
+    /** The mapped day for the selected channel. Null means this channel's day wasn't mapped. */
     val day: List<GuideProgram>? = null,
     /** The server image's model for the touch-level image composable; the fixture painter wins. */
     val logoModel: Any? = null,
@@ -248,6 +248,8 @@ internal class GuideActions(
     /** Cancel of a scheduled program's recording; it asks first. */
     val onCancel: ((programId: String) -> Unit)? = null,
     val onStop: ((programId: String) -> Unit)? = null,
+    val onChannel: (String) -> Unit = {},
+    val onView: (GuideView) -> Unit = {},
 ) {
     /** Whether there is something behind a program's [record] control. */
     fun offers(record: ProgramRecordControl?): Boolean = when (record) {
