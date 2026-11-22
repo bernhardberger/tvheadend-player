@@ -45,7 +45,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -198,6 +202,7 @@ private fun Transport(
     val skipColors = IconButtonDefaults.filledTonalIconButtonColors(
         containerColor = DarkControl, contentColor = OnPicture,
     )
+    val playPauseLabel = stringResource(if (state.paused) R.string.player_play else R.string.player_pause)
     Row(
         modifier.testTag("player-transport"),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -213,7 +218,14 @@ private fun Transport(
             checked = state.paused,
             onCheckedChange = { onAction(PlayerAction.TogglePlay) },
             shapes = IconButtonDefaults.toggleableShapes(),
-            modifier = Modifier.size(main),
+            modifier = Modifier.size(main).clearAndSetSemantics {
+                role = Role.Button
+                contentDescription = playPauseLabel
+                onClick {
+                    onAction(PlayerAction.TogglePlay)
+                    true
+                }
+            },
             colors = IconButtonDefaults.filledTonalIconToggleButtonColors(
                 containerColor = DarkControl,
                 contentColor = OnPicture,
@@ -221,9 +233,9 @@ private fun Transport(
                 checkedContentColor = Color.Black,
             ),
         ) {
-            PlayerIcon(
-                if (state.paused) R.drawable.channels_play else R.drawable.player_pause,
-                if (state.paused) R.string.player_play else R.string.player_pause,
+            Icon(
+                painterResource(if (state.paused) R.drawable.channels_play else R.drawable.player_pause),
+                null,
                 Modifier.size(main * .4f),
             )
         }

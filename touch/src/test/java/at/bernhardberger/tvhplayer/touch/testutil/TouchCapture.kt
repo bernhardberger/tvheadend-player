@@ -13,12 +13,15 @@ import android.view.WindowManager
 import android.view.inspector.WindowInspector
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
-import androidx.compose.ui.test.assertIsOff
-import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.AndroidComposeTestRule
 import androidx.compose.ui.test.hasAnyDescendant
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.isRoot
 import androidx.core.graphics.Insets
@@ -43,12 +46,20 @@ fun AndroidComposeTestRule<*, out ComponentActivity>.capturePausedPlayer(
     button: (Int) -> SemanticsNodeInteraction,
     setPaused: (Boolean) -> Unit,
 ) {
-    button(R.string.player_pause).assertIsOff()
+    fun assertTransportAction(label: Int) {
+        button(label)
+            .assert(hasContentDescription(activity.getString(label)))
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.ToggleableState))
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.StateDescription))
+    }
+
+    assertTransportAction(R.string.player_pause)
     runOnIdle { setPaused(true) }
-    button(R.string.player_play).assertIsOn()
+    assertTransportAction(R.string.player_play)
     captureTouch("review", "$name-paused", canvas)
     runOnIdle { setPaused(false) }
-    button(R.string.player_pause).assertIsOff()
+    assertTransportAction(R.string.player_pause)
 }
 
 /**

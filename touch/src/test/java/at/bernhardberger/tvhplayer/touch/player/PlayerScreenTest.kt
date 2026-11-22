@@ -70,6 +70,7 @@ import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsPropertyKey
 import androidx.compose.runtime.snapshots.Snapshot
@@ -301,6 +302,16 @@ class PlayerScreenTest {
         // Before composing: idling with the clock running would let the count run out unseen.
         compose.mainClock.autoAdvance = false
         show(hideAfterMs = hideMs)
+        pressPlayPause(R.string.player_pause)
+        compose.mainClock.advanceTimeBy(hideMs * 2)
+        tag("player-transport").assertIsDisplayed()
+        // The end of the pause starts the count anew.
+        pressPlayPause(R.string.player_play)
+        compose.mainClock.advanceTimeBy(hideMs * 3 / 4)
+        tag("player-transport").assertIsDisplayed()
+        compose.mainClock.advanceTimeBy(hideMs / 2)
+        tag("player-transport").assertDoesNotExist()
+        tapPicture()
         compose.mainClock.advanceTimeBy(hideMs * 3 / 4)
         // A finger resting on the bar holds them; lifting it starts the count anew.
         timeline().performTouchInput { down(center) }
@@ -313,17 +324,6 @@ class PlayerScreenTest {
         tag("player-transport").assertDoesNotExist()
         // Upright, only the layer over the picture leaves: the list below stays.
         assertInlineChannels()
-        tapPicture()
-        compose.mainClock.advanceTimeByFrame()
-        paused.value = true
-        compose.mainClock.advanceTimeBy(hideMs * 2)
-        tag("player-transport").assertIsDisplayed()
-        // The end of the hold starts the count anew.
-        paused.value = false
-        compose.mainClock.advanceTimeBy(hideMs * 3 / 4)
-        tag("player-transport").assertIsDisplayed()
-        compose.mainClock.advanceTimeBy(hideMs / 2)
-        tag("player-transport").assertDoesNotExist()
         // A list whose control leaves (audio down to one track) closes and stops holding them.
         tapPicture()
         compose.mainClock.advanceTimeByFrame()
@@ -685,7 +685,10 @@ class PlayerScreenTest {
                             )
                         },
                     ),
-                    { actions += it }, { seeks += it },
+                    {
+                        actions += it
+                        if (it == PlayerAction.TogglePlay) paused.value = !paused.value
+                    }, { seeks += it },
                     { brightness.value = it; brightnessChanges += it }, { played += it }, { choices += it },
                     inWindow = inWindow.value, hideAfterMs = hideAfterMs,
                 ) { modifier ->
@@ -985,6 +988,17 @@ class PlayerScreenTest {
     private fun text(id: Int) = compose.onNodeWithText(compose.activity.getString(id))
     private fun button(id: Int) = compose.activity.getString(id).let {
         compose.onNode(hasClickAction() and (hasText(it) or hasContentDescription(it)))
+    }
+
+    private fun pressPlayPause(label: Int) {
+        button(label)
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.ToggleableState))
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.StateDescription))
+            .assert(hasContentDescription(compose.activity.getString(label)))
+            .performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
+        compose.mainClock.advanceTimeByFrame()
+        compose.runOnIdle { assertEquals(label == R.string.player_pause, paused.value) }
     }
     /** System Back to the window on top: a bottom sheet's dialog, else the activity. */
     private fun back() {
