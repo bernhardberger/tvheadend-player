@@ -593,10 +593,21 @@ class GuideScreenTest {
         val airing = first.otherAirings.first()
         val returnAiring = airing.copy(id = first.id, time = "Today 8:00 PM")
         val second = first.copy(id = airing.id, title = "The next showing", otherAirings = listOf(returnAiring))
+        val page = channelPageFixture(channel, compose.activity)
+        val running = checkNotNull(page.onNow)
+        val synopsis = "${checkNotNull(running.synopsis)} ".repeat(5).trimEnd()
         show(
             fixture, detailsFixture = listOf(first), extraDetails = second,
-            channel = channel.id, taps = taps, channelFixture = channelPageFixture(channel, compose.activity),
+            channel = channel.id, taps = taps, channelFixture = page.copy(onNow = running.copy(synopsis = synopsis)),
         )
+        val layouts = mutableListOf<TextLayoutResult>()
+        compose.onNodeWithText(synopsis)
+            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        val layout = layouts.single()
+        assertTrue("On now synopsis used ${layout.lineCount} lines; expected at most three", layout.lineCount <= 3)
+        assertTrue("The long On now synopsis has visual overflow", layout.hasVisualOverflow)
+        compose.onNodeWithText(compose.activity.getString(R.string.channels_record)).assertIsDisplayed()
+        compose.onNodeWithText(page.days.values.first()).assertIsDisplayed()
         val list = channelRows()
         compose.onNode(hasTestTag("channel-page-scroll")).performScrollToIndex(1)
         list.performScrollToIndex(channel.programs.lastIndex - 1)
