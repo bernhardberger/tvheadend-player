@@ -169,7 +169,7 @@ internal fun rememberPlayerOptions(
         aspect = aspect.mode,
     ) { choice ->
         when (choice) {
-            is PlayerChoice.Audio -> runtime.selectQuickListAudio(epoch, audio.pickOverride(choice.pick))
+            is PlayerChoice.Audio -> runtime.selectAudio(audio.pickOverride(choice.pick), quickListEpoch = epoch)
             is PlayerChoice.Subtitles ->
                 runtime.selectSubtitles(subtitles.pickOverride(choice.pick), choice.pick == TrackPick.Off, epoch)
             is PlayerChoice.Profile -> if (live != null) {
