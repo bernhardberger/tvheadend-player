@@ -129,10 +129,10 @@ class DetailsTintTest {
         else releaseSample.complete(Unit)
         showPage(hasArt = { false })
         assertNotNull(store["tint-test-2"])
-        awaitGlow()
         val accent = if (stored) 0x336699 else requireNotNull(store["tint-test-2"])
-        assertNear(1919, 0, Color(0xFF000000.toInt() or accent).copy(alpha = .55f)
-            .compositeOver(neutral))
+        val pictureTint = Color(0xFF000000.toInt() or detailsTintRgb(accent))
+        awaitGlow(pictureTint)
+        assertPixel(0, 1079, pictureTint.toArgb())
         if (!stored) assertEquals(1, samples.get())
     }
 
@@ -166,7 +166,7 @@ class DetailsTintTest {
         val initial = if (changedInPlace) sampled to picon else noLogo to null
         val next = sampled to if (changedInPlace) replaced else picon
         compose.mainClock.advanceTimeUntil { initial in settled }
-        if (changedInPlace) awaitGlow()
+        if (!changedInPlace) assertPixel(0, 1079, neutral.toArgb())
         compose.runOnIdle { if (changedInPlace) logo = replaced else shown = sampled }
         compose.mainClock.advanceTimeBy(1000)
         compose.waitForIdle()
@@ -177,8 +177,10 @@ class DetailsTintTest {
         compose.mainClock.advanceTimeUntil { next in settled }
         if (!changedInPlace) assertEquals(listOf(initial, next), settled)
         val sampledKey = if (changedInPlace) "tint-test-5" else "tint-test-2"
-        assertNear(1919, 0, Color(0xFF000000.toInt() or requireNotNull(store[sampledKey])).copy(alpha = .55f)
-            .compositeOver(neutral))
+        val accent = requireNotNull(store[sampledKey])
+        val pictureTint = Color(0xFF000000.toInt() or detailsTintRgb(accent))
+        assertNear(1919, 0, Color(0xFF000000.toInt() or accent).copy(alpha = .55f)
+            .compositeOver(pictureTint))
     }
 
     @Test fun failedArtUsesTheSameLogoFallbackAsAbsentArt() {
@@ -278,7 +280,10 @@ class DetailsTintTest {
     }
 
     /** The effect clock covers both the sample publication and the glow bake. */
-    private fun awaitGlow() = compose.mainClock.advanceTimeUntil { pixel(1919, 0) != neutral.toArgb() }
+    private fun awaitGlow(pictureTint: Color) = compose.mainClock.advanceTimeUntil {
+        val corner = pixel(1919, 0)
+        corner != neutral.toArgb() && corner != pictureTint.toArgb()
+    }
 
     private fun pixel(x: Int, y: Int): Int {
         compose.waitForIdle()

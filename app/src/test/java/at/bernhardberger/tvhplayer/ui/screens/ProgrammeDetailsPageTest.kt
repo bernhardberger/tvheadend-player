@@ -1092,11 +1092,10 @@ class ProgrammeDetailsPageTest {
         val background = android.graphics.Color.rgb(19, 19, 19)
         compose.mainClock.advanceTimeUntil { snapshot().let { it.getPixel(1910, 5).also { _ -> it.recycle() } } != background }
         val top = snapshot()
-        // Lit at the top right, the page's own background toward the left.
+        // The glow is stronger at the top right than the ambient base toward the left.
         Assert.assertNotEquals(background, top.getPixel(1910, 5))
         fun light(pixel: Int) = android.graphics.Color.red(pixel) + android.graphics.Color.green(pixel) + android.graphics.Color.blue(pixel)
         Assert.assertTrue(light(top.getPixel(1910, 5)) > light(top.getPixel(5, 540)) + 30)
-        Assert.assertEquals(19f, android.graphics.Color.red(top.getPixel(5, 540)).toFloat(), 2f)
         val glow = top.getPixel(1910, 5)
         top.recycle()
         compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }

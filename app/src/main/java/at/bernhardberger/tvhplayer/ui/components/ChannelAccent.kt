@@ -31,6 +31,7 @@ import androidx.tv.material3.MaterialTheme
 import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.core.NEUTRAL_ACCENT_RGB
+import at.bernhardberger.tvhplayer.core.detailsTintRgb
 import at.bernhardberger.tvhplayer.core.logoGlowPixels
 import at.bernhardberger.tvhplayer.images.ChannelAccents
 import kotlin.math.roundToInt
@@ -81,13 +82,13 @@ fun rememberChannelAccent(
 }
 
 /**
- * The page background lit by the channel's colour from its logo, the logo cards' colour, for a
- * programme without a picture: [logoGlowPixels], a soft glow from the top right. Opaque. It is
+ * The opaque backdrop for a programme without a picture: [logoGlowPixels], a soft glow from the
+ * top right over the logo's ambient tint, at the same strength as a picture's tint. It is
  * baked once per colour and size off the main thread, at half the size and stretched smoothly,
  * so it costs a frame no more than a picture does. It is looked up or baked only once the colour
- * has settled; until then the plain background shows, and only then does [onSettled] report it.
- * As [scrolled] goes to 1 the glow gives way to an even tint of the same colour over the whole
- * page, as a scrolled picture does to its even dim; a flat fill cannot band.
+ * has settled. The theme background shows until then and remains the base if no usable logo
+ * colour is found. The base shows while baking, and [onSettled] reports only a ready glow.
+ * As [scrolled] goes to 1 the glow gives way to an even wash of the logo colour over the base.
  */
 @Composable
 internal fun ChannelLogoGlow(
@@ -100,10 +101,15 @@ internal fun ChannelLogoGlow(
     // The settled colour only: baking the accent's crossfade would bake every frame of it.
     var accentSettled by remember(channelId, picon) { mutableStateOf(false) }
     val accent = rememberChannelAccent(picon, channelId, onSettled = { accentSettled = true })
-    val background = MaterialTheme.colorScheme.background
+    val accentRgb = accent.toArgb() and 0xffffff
+    val background = if (accentSettled && accentRgb != NEUTRAL_ACCENT_RGB) {
+        Color(0xFF000000.toInt() or detailsTintRgb(accentRgb))
+    } else {
+        MaterialTheme.colorScheme.background
+    }
     val samplingContext = LocalArtworkSamplingContext.current
     var size by remember { mutableStateOf(IntSize.Zero) }
-    val key = LogoGlowKey(accent.toArgb() and 0xffffff, background.toArgb() and 0xffffff,
+    val key = LogoGlowKey(accentRgb, background.toArgb() and 0xffffff,
         (size.width / LogoGlowScale).coerceAtLeast(1), (size.height / LogoGlowScale).coerceAtLeast(1))
     // Kept with the key it was baked for: a glow of a colour not yet settled, or of an earlier
     // colour or size, is neither shown nor reported. A logo changed in place keeps its old colour
@@ -124,7 +130,7 @@ internal fun ChannelLogoGlow(
         val toTint = scrolled().coerceIn(0f, 1f)
         if (baked == null) {
             drawRect(background)
-            if (toTint > 0f) drawRect(tint, alpha = toTint)
+            if (accentSettled && toTint > 0f) drawRect(tint, alpha = toTint)
         } else {
             if (toTint > 0f) drawRect(tint)
             if (toTint < 1f) drawImage(baked, dstSize = IntSize(this.size.width.roundToInt(), this.size.height.roundToInt()),

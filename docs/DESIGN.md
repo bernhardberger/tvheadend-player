@@ -875,9 +875,11 @@ only.
 - **Immersive backdrop.** With programme art, the focused programme's
   picture fills the top-end corner from the screen's top edge, as the kit's
   immersive list does, under its cinematic scrim over the programme's ambient
-  tint. Without art, the channel's logo colour fills the screen behind a blurred
-  copy of the logo, and the 240×135 logo stands at the top end. The backdrop stays
-  in place when the drawer opens; only the sharp logo moves with the content.
+  tint. Without art, the channel's logo colour glows from the top right over
+  the logo's ambient tint, at the same strength as the picture's tint. With no
+  usable logo colour the base stays neutral. The sharp 240×135 logo stands
+  at the top end. The backdrop stays in place when the drawer opens; only the
+  sharp logo moves with the content.
 - **Grid.** Four columns of the immersive row's compact cards form a wall,
   without a programme headline or backdrop. The header scrolls away with the
   rows and returns at the first row, with no fade or scrim. At rest on the
@@ -899,8 +901,7 @@ only.
   picture and then fades in over the old one in 225ms, growing from 97% about its middle as on the Google TV launcher, so there is no dip to grey.
   While focus rests, the backdrops one step away along the row load unseen, so a
   first visit starts as quickly as a return.
-  Before a session, saved logos give their stored colour and blur from the first
-  frame.
+  Before a session, saved logos can supply their stored colour for the backdrop.
 
 ### Guide and Recordings • browse cohesion
 
@@ -1561,6 +1562,9 @@ timeshift window is listed; this display estimate is not a seek grant.
   averaging the picture, run off the UI thread, and relax a protective veil
   through the existing page motion after a decode. Intentionally quiet rows
   retain their existing emphasis; they become readable when focused.
+- Details without artwork uses the same logo-sourced ambient tint and
+  top-right glow as Channels Immersive. The logo scrolls away and the glow
+  gives way to an even wash of the logo colour over that tint.
 - Option lists inside the player stay in the modal side panel above.
 
 ## 11. Icons
