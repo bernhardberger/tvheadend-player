@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Button
@@ -62,6 +63,7 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.click
+import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsActions
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsScreen
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsState
@@ -74,6 +76,7 @@ import at.bernhardberger.tvhplayer.touch.guide.overviewFixture
 import at.bernhardberger.tvhplayer.touch.guide.phoneOverviewFixture
 import at.bernhardberger.tvhplayer.touch.testutil.TouchCanvas
 import at.bernhardberger.tvhplayer.touch.testutil.captureTouch
+import at.bernhardberger.tvhplayer.touch.testutil.reserveSystemBars
 import at.bernhardberger.tvhplayer.touch.ui.Destination
 import at.bernhardberger.tvhplayer.touch.ui.DestinationFrame
 import at.bernhardberger.tvhplayer.touch.ui.LocalDestinationReselections
@@ -239,6 +242,93 @@ class TouchFrameTest {
             assertEquals("The first restored layout must not reserve navigation space", fullHeight, heights.first())
         }
     }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
+    fun phoneNavigationFadesInAndOut() {
+        val inset = showNavigationWithNotice()
+        val shownBottom = bottomOf("frame-content")
+        val windowBottom = compose.onRoot().fetchSemanticsNode().boundsInRoot.bottom
+        // Sample an unoccupied part of the bar, above the system gesture inset.
+        val y = ((shownBottom + windowBottom - inset) / 2).toInt()
+        fun barPixel() = compose.onRoot().captureToImage().toPixelMap()[2, y]
+        val shown = barPixel()
+        setBrowsing(false)
+        val hidden = barPixel()
+        assertTrue(shown != hidden)
+
+        for (visible in listOf(true, false)) {
+            compose.mainClock.autoAdvance = false
+            setBrowsing(visible)
+            compose.mainClock.advanceTimeBy(64)
+            val moving = barPixel()
+            assertTrue(
+                "Navigation should be partially transparent (showing=$visible)",
+                moving != shown && moving != hidden,
+            )
+            assertEquals(shownBottom, bottomOf("frame-content"))
+            assertEquals(shownBottom, bottomOf("frame-notice"))
+            compose.mainClock.autoAdvance = true
+            assertEquals(if (visible) shown else hidden, barPixel())
+        }
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
+    fun phoneNavigationWithoutMotionKeepsTheSettledBoundsAndSystemInset() {
+        motionScale.scaleFactor = 0f
+        val navigationInset = showNavigationWithNotice()
+        val windowBottom = compose.onRoot().fetchSemanticsNode().boundsInRoot.bottom
+        val shownBottom = bottomOf("frame-content")
+        assertEquals(shownBottom, bottomOf("frame-notice"))
+        assertTrue(shownBottom < windowBottom - navigationInset)
+
+        compose.mainClock.autoAdvance = false
+        setBrowsing(false)
+        // The page reports its bars after composition; allow composition and the transition's first frame.
+        repeat(3) { compose.mainClock.advanceTimeByFrame() }
+        compose.onNode(destination).assertDoesNotExist()
+        assertEquals(windowBottom, bottomOf("frame-content"))
+        assertEquals(windowBottom - navigationInset, bottomOf("frame-notice"))
+
+        setBrowsing(true)
+        repeat(3) { compose.mainClock.advanceTimeByFrame() }
+        compose.onNode(destination and hasText("Guide")).assertIsDisplayed()
+        assertEquals(shownBottom, bottomOf("frame-content"))
+        assertEquals(shownBottom, bottomOf("frame-notice"))
+    }
+
+    private val browsing = mutableStateOf(true)
+
+    private fun setBrowsing(value: Boolean) = compose.runOnUiThread {
+        browsing.value = value
+        Snapshot.sendApplyNotifications()
+    }
+
+    private fun showNavigationWithNotice(): Float {
+        compose.setContent {
+            MaterialTheme {
+                val host: @Composable (Modifier) -> Unit = { modifier ->
+                    Box(modifier.height(40.dp).testTag("frame-notice"))
+                }
+                CompositionLocalProvider(LocalFrameNotices provides host) {
+                    DestinationFrame { current ->
+                        TouchFrame(
+                            initialDestination = current,
+                            showTopBar = { browsing.value },
+                            showNavigation = { browsing.value },
+                        ) {
+                            Box(Modifier.fillMaxSize().testTag("frame-content"))
+                        }
+                    }
+                }
+            }
+        }
+        val inset = compose.reserveSystemBars(TouchCanvas.PHONE)
+        return with(compose.density) { inset.toPx() }
+    }
+
+    private fun bottomOf(tag: String): Float = compose.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot.bottom
 
     @Composable
     private fun SavedList() {
