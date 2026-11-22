@@ -270,9 +270,8 @@ internal fun QuickZapTrayPreviewFrame(
 }
 
 /**
- * The info bar keeps the recorded date and start time above the title, followed by the estimated
- * playback end or, while still recording, the padded recording stop. The episode fills the last row.
- * A recording has no real next item, so there is no Next (UX-02).
+ * The identity gives the recorded date and start time, or the padded stop while still recording.
+ * The info bar shows the playback end or the growing recording's time range.
  */
 @Composable
 internal fun recordingInfoBarData(
@@ -289,25 +288,29 @@ internal fun recordingInfoBarData(
         val local = java.time.Instant.ofEpochSecond(it.epochSeconds).atZone(ZoneId.systemDefault())
         "${playerRecordedDate(local.toLocalDate())} ${formatClock(it.epochSeconds)}"
     }
+    val timeRange = if (start != null && stop != null) formatTimeInterval(start.epochSeconds, stop.epochSeconds) else ""
+    val paddedStop = if (growing) recordingPaddedStop(entry) else null
+    val headline = when {
+        paddedStop != null -> stringResource(R.string.player_recording_until, formatClock(paddedStop.epochSeconds))
+        recordedDate != null -> stringResource(R.string.player_recorded_on, recordedDate)
+        else -> null
+    }
     val endsAt = recordingEndsAtSec(nowSec, positionMs, durationMs)
     return PlayerInfoBarData(
         channelNumber = channelNumber?.toString().orEmpty(),
         channelName = entry.channelName.orEmpty(),
         title = entry.title.orEmpty(),
-        timeRange = if (start != null && stop != null) formatTimeInterval(start.epochSeconds, stop.epochSeconds) else "",
+        timeRange = timeRange,
         spokenTimeRange = if (start != null && stop != null) {
             formatTimeIntervalSpoken(start.epochSeconds, stop.epochSeconds, androidx.compose.ui.platform.LocalResources.current)
         } else "",
         metadata = when {
-            growing -> listOfNotNull(
-                recordedDate?.let { stringResource(R.string.player_recorded_on, it) },
-                recordingPaddedStop(entry)?.let { stringResource(R.string.player_recording_until, formatClock(it.epochSeconds)) },
-            ).joinToString(" • ").takeIf(String::isNotBlank)
-            recordedDate != null && endsAt != null -> stringResource(R.string.player_recorded_ends, recordedDate, formatClock(endsAt))
+            growing -> timeRange
+            endsAt != null -> stringResource(R.string.player_ends_in, formatClock(endsAt))
             else -> null
         },
         subtitle = entry.subtitle,
-        recordedDate = recordedDate,
+        recording = RecordingIdentity(headline, recordedDate),
         nowRecording = entry.takeIf { growing },
         nowRecordingStateOverride = DvrEntryState.RECORDING.takeIf { growing && !recordingIsRunning(entry) },
     )

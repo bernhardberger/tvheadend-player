@@ -935,7 +935,6 @@
     <string name="player_recording">Snimanje u tijeku</string>
     <string name="channel_recording_spoken">Snimanje u tijeku na ovom kanalu</string>
     <string name="player_recorded_on">Snimljeno %1$s</string>
-    <string name="player_recorded_ends">Snimljeno %1$s • Završava %2$s</string>
     <string name="player_recording_until">Snimanje do %1$s</string>
     <string name="recordings_until">do %1$s</string>
     <string name="recordings_stopped_early">Zaustavljeno ranije</string>

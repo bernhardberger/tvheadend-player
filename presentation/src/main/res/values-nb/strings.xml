@@ -900,7 +900,6 @@
     <string name="player_recording">Tar opp nå</string>
     <string name="channel_recording_spoken">Tar opp på denne kanalen</string>
     <string name="player_recorded_on">Tatt opp %1$s</string>
-    <string name="player_recorded_ends">Tatt opp %1$s • Slutter %2$s</string>
     <string name="player_recording_until">Tar opp til %1$s</string>
     <string name="recordings_until">til %1$s</string>
     <string name="recordings_stopped_early">Stoppet tidlig</string>

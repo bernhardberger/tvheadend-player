@@ -900,7 +900,6 @@
     <string name="player_recording">Εγγραφή τώρα</string>
     <string name="channel_recording_spoken">Γίνεται εγγραφή σε αυτό το κανάλι</string>
     <string name="player_recorded_on">Εγγράφηκε %1$s</string>
-    <string name="player_recorded_ends">Εγγράφηκε %1$s • Λήγει %2$s</string>
     <string name="player_recording_until">Εγγραφή έως %1$s</string>
     <string name="recordings_until">έως %1$s</string>
     <string name="recordings_stopped_early">Διακόπηκε νωρίς</string>

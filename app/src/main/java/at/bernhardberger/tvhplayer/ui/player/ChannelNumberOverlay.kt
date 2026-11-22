@@ -59,6 +59,7 @@ import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -71,8 +72,9 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.ui.TvPanelDenseAlpha
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
+import at.bernhardberger.tvhplayer.ui.TvTextSecondaryAlpha
 import at.bernhardberger.tvhplayer.ui.TvTextTertiaryAlpha
-import at.bernhardberger.tvhplayer.ui.components.PiconBox
+import at.bernhardberger.tvhplayer.ui.components.channelTitleNumber
 
 /** What the typed digits lead to: the matching channel, none yet, or none at all. */
 @Immutable
@@ -170,7 +172,7 @@ private fun ChannelNumberEntryRow(
         label = "settle",
     ) { if (!it && settles) 1f else 0f }
 
-    val style = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = "tnum")
+    val style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Normal, fontFeatureSettings = "tnum")
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
     // Measured once per lineup and text size: a number of maxDigits digits never shifts.
@@ -180,11 +182,17 @@ private fun ChannelNumberEntryRow(
     // One space, as between the rest identity's number and name.
     val spaceWidth = remember(measurer, style, density) { measurer.measure("0 0", style).size.width -
         measurer.measure("00", style).size.width }
-    val advance = fieldWidth / maxDigits.toFloat()
     // Settling, the number becomes the channel's own, as its identity shows it: "01" settles as "1".
-    val number = (entry.target as? ChannelNumberTarget.Channel)?.number
-        ?.takeIf { !shown && settles && it.isNotEmpty() } ?: entry.number
-    val digits = number.length
+    val committing = !shown && settles
+    val channel = entry.target as? ChannelNumberTarget.Channel
+    val committedNumber = if (committing) channel?.let { channelTitleNumber(it.number.toLongOrNull(), it.name) } else null
+    val number = committedNumber?.toString() ?: entry.number
+    val hideDigits = committing && channel != null && committedNumber == null
+    val fieldInset = when {
+        !committing -> 0
+        hideDigits -> fieldWidth + spaceWidth
+        else -> fieldWidth - measurer.measure(number, style, maxLines = 1, softWrap = false).size.width
+    }
 
     val noChannel = stringResource(R.string.player_channel_number_none)
     val spoken = when (val target = entry.target) {
@@ -220,12 +228,15 @@ private fun ChannelNumberEntryRow(
                 Modifier
                     .padding(start = IdentityTextGap)
                     .widthIn(max = IdentityTextMaxWidth)
-                    // Into the rest identity's alignment: the number's start on the field's start, the
-                    // name one space after it.
-                    .graphicsLayer { translationX = -settle.value * (maxDigits - digits).coerceAtLeast(0) * advance },
+                    .graphicsLayer {
+                        val emptySlot = if (channel?.picon == null && channel != null)
+                            ChipWidth.roundToPx() + IdentityTextGap.roundToPx() else 0
+                        translationX = -settle.value * (fieldInset + emptySlot)
+                    },
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                ChannelNumberDigits(number, with(density) { fieldWidth.toDp() }, style)
+                ChannelNumberDigits(number, with(density) { fieldWidth.toDp() }, style,
+                    Modifier.graphicsLayer { if (hideDigits) alpha = 1f - settle.value })
                 ChannelNumberName(entry.target, Modifier.weight(1f, fill = false).padding(start = with(density) { spaceWidth.toDp() }))
             }
         }
@@ -238,7 +249,7 @@ private fun ChannelNumberEntryRow(
  * mid-slide moves every other digit on from where it stands. A new entry starts at rest.
  */
 @Composable
-private fun ChannelNumberDigits(number: String, width: Dp, style: TextStyle) {
+private fun ChannelNumberDigits(number: String, width: Dp, style: TextStyle, modifier: Modifier) {
     val applied = remember { object { var arrivals = DigitArrivals("", LongArray(0)) } }
     val arrivals = remember(number) { applied.arrivals.next(number) }
     SideEffect { applied.arrivals = arrivals }
@@ -253,10 +264,11 @@ private fun ChannelNumberDigits(number: String, width: Dp, style: TextStyle) {
             }
         } while (!arrivals.settledAt(time))
     }
-    Box(Modifier.width(width), contentAlignment = Alignment.CenterEnd) {
+    Box(modifier.width(width), contentAlignment = Alignment.CenterEnd) {
         Text(
             text = number,
             style = style,
+            color = LocalContentColor.current.copy(alpha = TvTextSecondaryAlpha),
             maxLines = 1,
             softWrap = false,
             modifier = Modifier
@@ -367,9 +379,9 @@ private fun ChannelNumberChip(target: ChannelNumberTarget, plate: ChannelNumberP
             label = "chip",
         ) { shownPicon ->
             if (shownPicon != null) {
-                PiconBox(
+                IdentityPicon(
                     shownPicon,
-                    Modifier.padding(4.dp).testTag("channel-number-picon"),
+                    Modifier.testTag("channel-number-picon"),
                     ground = if (plate == ChannelNumberPlate.Light) TvSurfaceColors.containerHighest
                         else MaterialTheme.colorScheme.background,
                 )
@@ -393,7 +405,7 @@ private fun ChannelNumberName(target: ChannelNumberTarget, modifier: Modifier) {
         if (destination != null) {
             Text(
                 text = (destination as? ChannelNumberTarget.Channel)?.name ?: stringResource(R.string.player_channel_number_none),
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Medium),
                 color = if (destination == ChannelNumberTarget.None) LocalContentColor.current.copy(alpha = TvTextTertiaryAlpha)
                     else LocalContentColor.current,
                 maxLines = 1,

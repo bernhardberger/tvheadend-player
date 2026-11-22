@@ -632,7 +632,6 @@
     <ID>MaxLineLength:PlayerChromeParts.kt:Text</ID>
     <ID>MaxLineLength:PlayerChromeParts.kt:formatTimeIntervalSpoken(start.epochSeconds, stop.epochSeconds, androidx.compose.ui.platform.LocalResources.current)</ID>
     <ID>MaxLineLength:PlayerChromeParts.kt:next = next?.title?.takeIf(String::isNotBlank)?.let { title -&gt; "${formatClock(next.start.epochSeconds)} $title" }</ID>
-    <ID>MaxLineLength:PlayerChromeParts.kt:recordedDate != null &amp;&amp; endsAt != null -&gt; stringResource(R.string.player_recorded_ends, recordedDate, formatClock(endsAt))</ID>
     <ID>MaxLineLength:PlayerChromeParts.kt:recordingPaddedStop(entry)?.let { stringResource(R.string.player_recording_until, formatClock(it.epochSeconds)) }</ID>
     <ID>MaxLineLength:PlayerChromeParts.kt:spokenTimeRange = event?.let { formatTimeIntervalSpoken(it.start.epochSeconds, it.stop.epochSeconds, resources) }.orEmpty()</ID>
     <ID>MaxLineLength:PlayerChromeParts.kt:summary = if (compact) null else event?.summary?.takeIf(String::isNotBlank) ?: event?.description?.takeIf(String::isNotBlank)</ID>

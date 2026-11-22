@@ -1040,7 +1040,6 @@
     <string name="player_recording">جارٍ التسجيل</string>
     <string name="channel_recording_spoken">جارٍ التسجيل على هذه القناة</string>
     <string name="player_recorded_on">سُجّل %1$s</string>
-    <string name="player_recorded_ends">سُجّل %1$s • ينتهي في %2$s</string>
     <string name="player_recording_until">جارٍ التسجيل حتى %1$s</string>
     <string name="recordings_until">حتى %1$s</string>
     <string name="recordings_stopped_early">توقف مبكرًا</string>

@@ -195,8 +195,8 @@ class PlayerIdentityCardTest {
             "no subtitle" to info.copy(subtitle = null),
             "no Next" to info.copy(next = null),
             "title only" to info.copy(subtitle = null, next = null, timeRange = ""),
-            "recording with its episode" to info.copy(next = null, recordedDate = "14 Nov"),
-            "recording without one" to info.copy(subtitle = null, next = null, recordedDate = "14 Nov"),
+            "recording with its episode" to info.copy(next = null, recording = RecordingIdentity(null, "14 Nov")),
+            "recording without one" to info.copy(subtitle = null, next = null, recording = RecordingIdentity(null, "14 Nov")),
         )
         for ((name, case) in cases) {
             compose.runOnIdle { info = case }

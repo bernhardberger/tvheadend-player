@@ -935,7 +935,6 @@
     <string name="player_recording">הקלטה פעילה</string>
     <string name="channel_recording_spoken">הקלטה פעילה בערוץ הזה</string>
     <string name="player_recorded_on">הקלטת %1$s</string>
-    <string name="player_recorded_ends">הקלטת %1$s • מסתיימת ב-%2$s</string>
     <string name="player_recording_until">הקלטה עד %1$s</string>
     <string name="recordings_until">עד %1$s</string>
     <string name="recordings_stopped_early">נעצרה מוקדם</string>

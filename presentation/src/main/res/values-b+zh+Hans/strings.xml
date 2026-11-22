@@ -837,7 +837,6 @@
     <string name="player_recording">正在录制</string>
     <string name="channel_recording_spoken">此频道正在录制</string>
     <string name="player_recorded_on">录制于%1$s</string>
-    <string name="player_recorded_ends">录制于%1$s • %2$s结束</string>
     <string name="player_recording_until">录制至%1$s</string>
     <string name="recordings_until">至%1$s</string>
     <string name="recordings_stopped_early">提前停止</string>

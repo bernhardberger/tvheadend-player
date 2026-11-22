@@ -883,7 +883,6 @@
     <string name="player_recording">Aufnahme läuft</string>
     <string name="channel_recording_spoken">Auf diesem Sender läuft eine Aufnahme</string>
     <string name="player_recorded_on">Aufgenommen am %1$s</string>
-    <string name="player_recorded_ends">Aufgenommen am %1$s • Endet %2$s</string>
     <string name="player_recording_until">Aufnahme bis %1$s</string>
     <string name="recordings_until">bis %1$s</string>
     <string name="recordings_stopped_early">Vorzeitig beendet</string>

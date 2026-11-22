@@ -166,7 +166,7 @@ class PlayerBannerTest {
         assertEquals(37, data.remainingMinutes)
         assertEquals("${formatClock(7_200L)} Later", data.next)
         assertEquals(recording, data.nextRecording)
-        assertNull(data.recordedDate)
+        assertNull(data.recording)
 
         val bare = liveInfoBarData(resources, null, "ORF 1 HD", null, null, nowSec = 5_000L, unavailableTitle = "n/a",
             nextRecording = recording)

@@ -900,7 +900,6 @@
     <string name="player_recording">Spelas in nu</string>
     <string name="channel_recording_spoken">Spelas in på den här kanalen</string>
     <string name="player_recorded_on">Inspelat %1$s</string>
-    <string name="player_recorded_ends">Inspelat %1$s • Slutar %2$s</string>
     <string name="player_recording_until">Spelas in till %1$s</string>
     <string name="recordings_until">till %1$s</string>
     <string name="recordings_stopped_early">Stoppad i förtid</string>

@@ -900,7 +900,6 @@
     <string name="player_recording">Tallennetaan</string>
     <string name="channel_recording_spoken">Tallennetaan tällä kanavalla</string>
     <string name="player_recorded_on">Tallennettu %1$s</string>
-    <string name="player_recorded_ends">Tallennettu %1$s • Päättyy %2$s</string>
     <string name="player_recording_until">Tallennetaan, kunnes kello on %1$s</string>
     <string name="recordings_until">päättyy %1$s</string>
     <string name="recordings_stopped_early">Pysäytetty ennen loppua</string>

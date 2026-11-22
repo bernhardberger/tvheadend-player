@@ -900,7 +900,6 @@
     <string name="player_recording">Optager nu</string>
     <string name="channel_recording_spoken">Optager på denne kanal</string>
     <string name="player_recorded_on">Optaget %1$s</string>
-    <string name="player_recorded_ends">Optaget %1$s • Slutter %2$s</string>
     <string name="player_recording_until">Optager indtil %1$s</string>
     <string name="recordings_until">indtil %1$s</string>
     <string name="recordings_stopped_early">Stoppet før tid</string>

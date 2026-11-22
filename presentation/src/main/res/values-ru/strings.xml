@@ -970,7 +970,6 @@
     <string name="player_recording">Идёт запись</string>
     <string name="channel_recording_spoken">На этом канале идёт запись</string>
     <string name="player_recorded_on">Записано %1$s</string>
-    <string name="player_recorded_ends">Записано %1$s • Конец %2$s</string>
     <string name="player_recording_until">Запись до %1$s</string>
     <string name="recordings_until">до %1$s</string>
     <string name="recordings_stopped_early">Остановлена досрочно</string>

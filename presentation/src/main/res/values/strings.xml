@@ -1074,7 +1074,6 @@
     <!-- Spoken description of a channel-level recording mark, not a mark for a specific programme. -->
     <string name="channel_recording_spoken">Recording on this channel</string>
     <string name="player_recorded_on">Recorded %1$s</string>
-    <string name="player_recorded_ends">Recorded %1$s • Ends %2$s</string>
     <string name="player_recording_until">Recording until %1$s</string>
     <string name="recordings_until">until %1$s</string>
     <string name="recordings_stopped_early">Stopped early</string>

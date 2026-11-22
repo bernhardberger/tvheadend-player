@@ -1059,7 +1059,15 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
   presented frame (a positively audio-only service lets its playing state stand in).
 - The shared wall clock stands alone at the top right over its scrim, where it
   stands on the browse screens: its block is centred on the header band's centre
-  line, which the identity shares. There are no status tags. The info bar holds the identity card and the programme block.
+  line, which the identity shares. Live TV puts the trimmed picon in a 72×36dp
+  box on the 58dp keyline, with the channel 20dp after it. The channel is a
+  single 24sp line: the number is regular at 80% on-surface and the name is
+  medium at full on-surface. Without a picon the text starts on the keyline.
+  The channel-number plate uses the same logo and type and settles on the
+  identity. A recording replaces the channel lockup with a library symbol
+  or, while growing, a red recording mark. Its headline is `Recorded <date>`
+  or `Recording until HH:MM`; the unnumbered channel sits below it when known,
+  on the same baselines as the clock's time and date.
 - The info bar's artwork tile is 196×110dp (three grid columns), 8dp corners, and
   takes no focus. It shows the programme's artwork with the channel's logo in
   the picture's own corner (section 2), so the channel reads beside the
@@ -1072,8 +1080,8 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
 - The programme block has four lines that keep their places whether they have
   content or not, so nothing moves between programmes. It is bottom-aligned with
   the fixed-size card and may be slightly taller. The lines are a metadata row
-  (live: programme times and genre; recordings:
-  `Recorded <date> • Ends HH:MM`, or `Recording until HH:MM` while growing), the title,
+  (live: programme times and genre; recordings: `Ends at HH:MM` when known,
+  or the recording's time range while growing), the title,
   the subtitle, and Next. A recording's episode stands under its title
   and its last line stays empty. Nothing in the info bar shows tuning or
   buffering.
@@ -1119,9 +1127,9 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
     target. Without EPG and without timeshift there is no track.
   - Recordings: the start label is the playback position, never a step target; the
     end is the length. Completed recordings have no remaining-time label; their
-    information row retains `Ends HH:MM`. A growing recording shows its current
+    information row shows `Ends at HH:MM` when known. A growing recording shows its current
     length and the same `3:23 behind live` annotation above it when behind its
-    recording head; the `● REC` badge starting its facts line names it. At the head the annotation is hidden.
+    recording head; the red mark in the top identity names it. At the head the annotation is hidden.
     Without a known length there is no end or behind-live annotation.
   - A zap shows the new channel's airing programme (bar, title, Next) from the
     channel change until the committed programme window resolves; only a pause or

@@ -900,7 +900,6 @@
     <string name="player_recording">Felvétel folyamatban</string>
     <string name="channel_recording_spoken">Felvétel folyamatban ezen a csatornán</string>
     <string name="player_recorded_on">Felvéve: %1$s</string>
-    <string name="player_recorded_ends">Felvéve: %1$s • Vége: %2$s</string>
     <string name="player_recording_until">Felvétel vége: %1$s</string>
     <string name="recordings_until">eddig: %1$s</string>
     <string name="recordings_stopped_early">Korábban leállítva</string>

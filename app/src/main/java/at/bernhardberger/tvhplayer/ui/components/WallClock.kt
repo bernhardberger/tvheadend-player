@@ -7,6 +7,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.FirstBaseline
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.MeasureResult
+import androidx.compose.ui.layout.MeasureScope
+import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -94,13 +97,19 @@ fun WallClock(nowSec: () -> Long, modifier: Modifier = Modifier) {
         val lineConstraints = Constraints.fixedWidth(widthPx)
         val time = measurables[0].measure(lineConstraints)
         val day = measurables[1].measure(lineConstraints)
-        val dateTop = time[FirstBaseline] + WallClockBaselineStep.roundToPx() - day[FirstBaseline]
-        val height = constraints.constrainHeight(TvBrowseHeaderHeight.roundToPx())
-        val top = (height - dateTop - day.height) / 2
-        layout(constraints.constrainWidth(widthPx), height) {
-            time.placeRelative(0, top)
-            day.placeRelative(0, top + dateTop)
-        }
+        placeHeaderLines(time, day, constraints, widthPx)
+    }
+}
+
+internal fun MeasureScope.placeHeaderLines(
+    first: Placeable, second: Placeable, constraints: Constraints, widthPx: Int,
+): MeasureResult {
+    val secondTop = first[FirstBaseline] + WallClockBaselineStep.roundToPx() - second[FirstBaseline]
+    val height = constraints.constrainHeight(TvBrowseHeaderHeight.roundToPx())
+    val top = (height - secondTop - second.height) / 2
+    return layout(constraints.constrainWidth(widthPx), height) {
+        first.placeRelative(0, top)
+        second.placeRelative(0, top + secondTop)
     }
 }
 

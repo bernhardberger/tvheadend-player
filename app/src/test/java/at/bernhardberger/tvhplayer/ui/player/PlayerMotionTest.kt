@@ -41,6 +41,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.hasClickAction
@@ -690,15 +691,16 @@ class PlayerMotionTest {
         compose.waitForIdle()
         assertEquals(restDigits, digits())
         compose.mainClock.autoAdvance = false
-        // Committed: the number's start moves onto the field's start (one missing digit) with the name.
+        // Committed without a logo: the number and name move to the keyline together.
         compose.changeState { settles = true; number = "" }
         compose.mainClock.advanceTimeByFrame()
         compose.mainClock.advanceTimeBy(PlayerMotion.DestinationExitMs / 2L)
         val sliding = digits().left
-        assertTrue("the number slides start-ward: $sliding", sliding < restDigits.left - 0.5f && sliding > restDigits.left - advance)
+        val keyline = restDigits.left - advance - ChipWidth.value - IdentityTextGap.value
+        assertTrue("the number slides start-ward: $sliding", sliding < restDigits.left - 0.5f && sliding > keyline)
         assertEquals(restName.left - restDigits.left, name().left - digits().left, 0.5f)
         compose.mainClock.advanceTimeBy(PlayerMotion.DestinationExitMs / 2L - 20L)
-        assertEquals(restDigits.left - advance, digits().left, 2f)
+        assertEquals(keyline, digits().left, 2f)
         compose.mainClock.advanceTimeBy(100L)
         compose.onNodeWithTag("number").assertDoesNotExist()
 
@@ -708,13 +710,13 @@ class PlayerMotionTest {
         compose.waitForIdle()
         val typed = digits()
         val space = name().left - typed.right
-        val fieldStart = typed.right - 3 * advance
+        val fieldStart = typed.right - 3 * advance - ChipWidth.value - IdentityTextGap.value
         compose.mainClock.autoAdvance = false
         compose.changeState { settles = true; number = "" }
         compose.mainClock.advanceTimeByFrame()
         compose.onNodeWithTag("channel-number-digits").assertTextEquals("1")
         compose.mainClock.advanceTimeBy(PlayerMotion.DestinationExitMs - 20L)
-        assertEquals("the number starts on the field's start", fieldStart, digits().left, 2f)
+        assertEquals("the number starts on the keyline", fieldStart, digits().left, 2f)
         assertEquals("the name one space after it", fieldStart + advance + space, name().left, 2f)
     }
 
@@ -782,6 +784,7 @@ class PlayerMotionTest {
     @Test fun theTopIdentityAndTheNumberEntryCrossInPlace() {
         var number by mutableStateOf("")
         var withEntry by mutableStateOf(false)
+        var settles by mutableStateOf(false)
         lateinit var view: View
         var fieldWidth = 0
         compose.setContent {
@@ -792,12 +795,13 @@ class PlayerMotionTest {
             TVHeadendPlayerTheme {
                 // The entry's three-digit field, in tabular digits.
                 val measurer = rememberTextMeasurer()
-                val style = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = "tnum")
+                val style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Normal, fontFeatureSettings = "tnum")
                 fieldWidth = measurer.measure("000", style, softWrap = false).size.width
                 Box(Modifier.fillMaxSize().background(Color.Black)) {
                     PlayerTopIdentity(content, numberEntryShown = number.isNotEmpty())
                     if (withEntry) PlayerTopIdentitySlot {
-                        ChannelNumberOverlay(number, ChannelNumberTarget.Channel("1", "One", null), Modifier.testTag("number"))
+                        ChannelNumberOverlay(number, ChannelNumberTarget.Channel("1", "One", content.picon),
+                            Modifier.testTag("number"), settles = settles)
                     }
                 }
             }
@@ -840,6 +844,13 @@ class PlayerMotionTest {
         val digits = compose.onNodeWithTag("channel-number-digits").fetchSemanticsNode().boundsInRoot
         assertEquals("the field starts with the identity's text", name.left, digits.right - fieldWidth, 0.5f)
         assertEquals(chip.center.y, digits.center.y, 0.5f)
+
+        compose.mainClock.autoAdvance = false
+        compose.changeState { settles = true; number = "" }
+        compose.mainClock.advanceTimeByFrame()
+        compose.mainClock.advanceTimeBy(PlayerMotion.DestinationExitMs - 20L)
+        val settlingDigits = compose.onNodeWithTag("channel-number-digits").fetchSemanticsNode().boundsInRoot
+        assertEquals("a committed digit lands on the identity's text start", name.left, settlingDigits.left, 1f)
     }
 
     @Test fun recoveryFocusesRetryAsItStartsToAppearAndLetsGoAtOnce() {

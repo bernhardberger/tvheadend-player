@@ -900,7 +900,6 @@
     <string name="player_recording">Şimdi kaydediliyor</string>
     <string name="channel_recording_spoken">Bu kanalda kayıt yapılıyor</string>
     <string name="player_recorded_on">Kayıt tarihi: %1$s</string>
-    <string name="player_recorded_ends">Kayıt tarihi: %1$s • Bitiş: %2$s</string>
     <string name="player_recording_until">Kayıt bitişi: %1$s</string>
     <string name="recordings_until">bitiş %1$s</string>
     <string name="recordings_stopped_early">Erken durduruldu</string>

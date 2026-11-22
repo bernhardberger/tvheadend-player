@@ -652,7 +652,8 @@ class PlayerChromeEvidenceTest {
     @Composable private fun info(recorded: Boolean) = PlayerInfoBarData("101", "Ridge Earth HD",
         "Die außergewöhnliche Reise durch die österreichischen Alpen", "20:15–21:45", "Drama • S3 E4",
         "Eine neue Perspektive auf Menschen und ihre Geschichten", 38, if (recorded) null else "21:45 Nachrichten",
-        if (recorded) playerRecordedDate(LocalDate.of(2026, 9, 12)) else null, spokenTimeRange = "20:15 to 21:45",
+        recording = if (recorded) RecordingIdentity(null, playerRecordedDate(LocalDate.of(2026, 9, 12))) else null,
+        spokenTimeRange = "20:15 to 21:45",
         nextRecording = if (recorded) null else DvrEntry.create(DvrEntryId(1), state = DvrEntryState.SCHEDULED))
 
 }

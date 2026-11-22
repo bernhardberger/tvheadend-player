@@ -879,7 +879,6 @@
     <string name="player_recording">Gravando agora</string>
     <string name="channel_recording_spoken">Gravando neste canal</string>
     <string name="player_recorded_on">Gravado em %1$s</string>
-    <string name="player_recorded_ends">Gravado em %1$s • Termina às %2$s</string>
     <string name="player_recording_until">Gravando até %1$s</string>
     <string name="recordings_until">até %1$s</string>
     <string name="recordings_stopped_early">Parou antes do fim</string>

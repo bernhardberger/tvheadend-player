@@ -935,7 +935,6 @@
     <string name="player_recording">Se înregistrează</string>
     <string name="channel_recording_spoken">Se înregistrează pe acest canal</string>
     <string name="player_recorded_on">Înregistrat %1$s</string>
-    <string name="player_recorded_ends">Înregistrat %1$s • Se termină %2$s</string>
     <string name="player_recording_until">Se înregistrează până la %1$s</string>
     <string name="recordings_until">până la %1$s</string>
     <string name="recordings_stopped_early">Oprită mai devreme</string>

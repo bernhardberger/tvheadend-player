@@ -353,29 +353,34 @@ class PlayerTopIdentityTest {
         assertTrue("details remains reachable", compose.tagExists("player-info"))
     }
 
-    @Test fun recordingInfoKeepsTheRecordedDateAndStartTimeWhileGrowing() {
+    @Test fun recordingIdentityNamesTheDateAndChannelWhileTheInfoBarStillSpeaksTheFacts() {
         var growing by mutableStateOf(false)
         val start = kotlin.time.Instant.parse("2026-09-15T19:00:00Z")
         val entry = at.bernhardberger.tvheadend.sdk.core.DvrEntry.create(
-            at.bernhardberger.tvheadend.sdk.core.DvrEntryId(1), title = "Ridge Light", start = start,
+            at.bernhardberger.tvheadend.sdk.core.DvrEntryId(1), title = "Ridge Light", channelName = "Ridge Earth", start = start,
             stop = kotlin.time.Instant.parse("2026-09-15T21:00:00Z"))
         lateinit var info: PlayerInfoBarData
         compose.setContent {
             TVHeadendPlayerTheme {
                 info = recordingInfoBarData(entry, 101, start.epochSeconds + 8000, 300_000, 7_200_000, growing)
-                PlayerInfoBar(info, Modifier.testTag("recorded-info"), identity = {})
+                RecordingChromeFixture(mode = PlayerChromeMode.BANNER, growing = growing, info = info)
             }
         }
         for (stillRecording in listOf(false, true)) {
             compose.runOnIdle { growing = stillRecording }
             compose.waitForIdle()
-            val date = requireNotNull(info.recordedDate)
+            val date = requireNotNull(info.recording?.recordedDate)
             assertTrue("recorded time follows the local clock", date.endsWith(at.bernhardberger.tvhplayer.ui.common.formatClock(start.epochSeconds)))
-            assertTrue("the growing status never replaces the recorded date", requireNotNull(info.metadata).contains(date))
+            val headline = if (stillRecording) R.string.player_recording_until else R.string.player_recorded_on
+            val time = if (stillRecording) at.bernhardberger.tvhplayer.ui.common.formatClock(requireNotNull(entry.stop).epochSeconds) else date
+            val expected = ApplicationProvider.getApplicationContext<Application>().getString(headline, time)
+            assertEquals("$expected, ${entry.channelName}", identitySpeech(compose))
             compose.onNodeWithTag("player-info-programme", useUnmergedTree = true).assertExists()
-            compose.onNodeWithTag("recorded-info")
+            compose.onNodeWithTag("player-info-bar")
                 .fetchSemanticsNode().config[SemanticsProperties.ContentDescription].joinToString().let {
                     assertTrue("the recorded date and time are spoken", it.contains(date))
+                    assertTrue("the time range is spoken", it.contains(info.spokenTimeRange))
+                    assertTrue("the title is spoken", it.contains(info.title))
                 }
         }
     }

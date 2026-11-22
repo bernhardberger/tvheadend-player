@@ -970,7 +970,6 @@
     <string name="player_recording">Trwa nagrywanie</string>
     <string name="channel_recording_spoken">Trwa nagrywanie na tym kanale</string>
     <string name="player_recorded_on">Nagrano %1$s</string>
-    <string name="player_recorded_ends">Nagrano %1$s • Koniec %2$s</string>
     <string name="player_recording_until">Nagrywanie do %1$s</string>
     <string name="recordings_until">do %1$s</string>
     <string name="recordings_stopped_early">Zatrzymane wcześniej</string>

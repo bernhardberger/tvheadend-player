@@ -865,7 +865,6 @@
     <string name="player_recording">녹화 중</string>
     <string name="channel_recording_spoken">이 채널에서 녹화 중</string>
     <string name="player_recorded_on">%1$s 녹화</string>
-    <string name="player_recorded_ends">%1$s 녹화 • %2$s 종료</string>
     <string name="player_recording_until">%1$s까지 녹화</string>
     <string name="recordings_until">%1$s까지</string>
     <string name="recordings_stopped_early">일찍 중지됨</string>

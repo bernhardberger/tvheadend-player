@@ -970,7 +970,6 @@
     <string name="player_recording">Právě se nahrává</string>
     <string name="channel_recording_spoken">Na tomto kanálu se právě nahrává</string>
     <string name="player_recorded_on">Nahráno %1$s</string>
-    <string name="player_recorded_ends">Nahráno %1$s • Končí %2$s</string>
     <string name="player_recording_until">Nahrávání do %1$s</string>
     <string name="recordings_until">do %1$s</string>
     <string name="recordings_stopped_early">Zastaveno předčasně</string>

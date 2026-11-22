@@ -865,7 +865,6 @@
     <string name="player_recording">録画中</string>
     <string name="channel_recording_spoken">このチャンネルで録画中</string>
     <string name="player_recorded_on">%1$sに録画</string>
-    <string name="player_recorded_ends">%1$sに録画 • %2$sに終了</string>
     <string name="player_recording_until">%1$sまで録画</string>
     <string name="recordings_until">%1$sまで</string>
     <string name="recordings_stopped_early">予定より早く停止</string>

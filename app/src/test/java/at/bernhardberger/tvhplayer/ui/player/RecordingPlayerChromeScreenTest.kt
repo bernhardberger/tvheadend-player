@@ -622,7 +622,7 @@ class RecordingPlayerChromeScreenTest {
         assertTrue("at the bottom start: $chip in $root", chip.left < root.right * 0.1f && chip.top > root.bottom * 0.75f)
     }
 
-    @Test fun theInfoBarSaysWhenPlaybackEndsOrUntilWhenItRecords() {
+    @Test fun theInfoBarSaysWhenPlaybackEndsOrShowsTheRecordingTimeRange() {
         lateinit var finished: PlayerInfoBarData
         lateinit var growing: PlayerInfoBarData
         lateinit var padded: PlayerInfoBarData
@@ -633,10 +633,11 @@ class RecordingPlayerChromeScreenTest {
                 stopExtra = kotlin.time.Duration.parse("2h"))
         }
         compose.waitForIdle()
-        assertEquals("Recorded ${finished.recordedDate} • Ends ${formatClock(1_700_010_000 + 1_800)}", finished.metadata)
-        assertEquals("Recorded ${growing.recordedDate} • Recording until ${formatClock(1_700_003_600)}", growing.metadata)
-        // Tvheadend stops after the post-padding, not at the programme's end.
-        assertEquals("Recorded ${padded.recordedDate} • Recording until ${formatClock(1_700_003_600 + 7_200)}", padded.metadata)
+        assertEquals(context.getString(R.string.player_ends_in, formatClock(1_700_010_000 + 1_800)), finished.metadata)
+        assertEquals(growing.timeRange, growing.metadata)
+        assertEquals(padded.timeRange, padded.metadata)
+        assertEquals(context.getString(R.string.player_recording_until, formatClock(1_700_003_600 + 7_200)),
+            padded.recording?.headline)
     }
 
     @Test fun bannerHidesFiveSecondsAfterTheFirstFrame() {
@@ -927,7 +928,7 @@ class RecordingPlayerChromeScreenTest {
         assertEquals("closing details shows the controls on Info", listOf("player-info"), focused())
     }
 
-    @Test fun aGrowingRecordingShowsItsLengthAndBehindLiveAndMarksItsTimingLine() {
+    @Test fun aGrowingRecordingShowsItsLengthAndBehindLiveAndMarksOnlyItsIdentity() {
         compose.setContent {
             TVHeadendPlayerTheme {
                 RecordingChromeFixture(mode = PlayerChromeMode.BANNER, growing = true,
@@ -938,9 +939,8 @@ class RecordingPlayerChromeScreenTest {
         assertTrue("the annotation names the distance from the recording head", texts("30:00 behind live"))
         assertEquals("Behind live", description("player-live-state"))
         assertEquals("the length carries no recording dot", "1:00:00", endClock())
-        val mark = compose.onNodeWithTag("player-info-timing-mark", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        val facts = compose.onNodeWithTag("player-info-programme", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        assertTrue(mark.right < facts.left && mark.center.y in facts.top..facts.bottom)
+        compose.onNodeWithTag("player-info-timing-mark", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithTag("player-identity-recording-mark", useUnmergedTree = true).assertExists()
         assertTrue(description("player-info-bar").contains("Recording now"))
         assertFalse(identitySpeech(compose).contains("Recording now"))
     }

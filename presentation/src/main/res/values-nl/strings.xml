@@ -900,7 +900,6 @@
     <string name="player_recording">Wordt opgenomen</string>
     <string name="channel_recording_spoken">Er wordt opgenomen op deze zender</string>
     <string name="player_recorded_on">Opgenomen %1$s</string>
-    <string name="player_recorded_ends">Opgenomen %1$s • Eindigt %2$s</string>
     <string name="player_recording_until">Opname tot %1$s</string>
     <string name="recordings_until">tot %1$s</string>
     <string name="recordings_stopped_early">Voortijdig gestopt</string>

@@ -33,8 +33,8 @@ import at.bernhardberger.tvhplayer.ui.components.rule
 private val InfoBarFactsBadgeGap = 12.dp
 
 /**
- * Presentation strings follow the displayed programme/seek target. Callers pass no next for
- * recordings; a recording's [metadata] is its whole eyebrow (`Recorded 14 Nov • Ends 23:45`).
+ * Presentation strings follow the displayed programme/seek target. A recording's [metadata]
+ * is its entire facts line, and it has no Next.
  */
 data class PlayerInfoBarData(
     val channelNumber: String,
@@ -45,12 +45,14 @@ data class PlayerInfoBarData(
     val subtitle: String? = null,
     val remainingMinutes: Int? = null,
     val next: String? = null,
-    val recordedDate: String? = null,
+    val recording: RecordingIdentity? = null,
     val spokenTimeRange: String = "",
     val nowRecording: DvrEntry? = null,
     val nextRecording: DvrEntry? = null,
     val nowRecordingStateOverride: DvrEntryState? = null,
 )
+
+data class RecordingIdentity(val headline: String?, val recordedDate: String?)
 
 /**
  * The [identity] slot (the programme's artwork) one grid gutter before the programme block, both
@@ -74,9 +76,9 @@ fun PlayerInfoBar(
     badges: List<GlanceBadge> = emptyList(),
     identity: @Composable (Modifier) -> Unit,
 ) {
-    val recorded = data.recordedDate != null
+    val recorded = data.recording != null
     // A recording's metadata is its whole line; live's is the time range followed by the metadata.
-    val facts = if (data.recordedDate != null) data.metadata ?: stringResource(R.string.player_recorded_on, data.recordedDate)
+    val facts = if (recorded) data.metadata.orEmpty()
         else listOfNotNull(data.timeRange.takeIf(String::isNotBlank), data.metadata?.takeIf(String::isNotBlank)).joinToString(" • ")
     val next = data.next?.let { stringResource(R.string.player_next, it) }
     val remaining = data.remainingMinutes?.let { playerMinutesLeft(it, spoken = true) }
@@ -85,8 +87,12 @@ fun PlayerInfoBar(
     val description = listOfNotNull(
         if (data.channelNumber.isBlank()) data.channelName else stringResource(R.string.player_channel_spoken,
             channelTitleText(data.channelNumber.toLongOrNull(), data.channelName)),
-        if (data.recordedDate == null) stringResource(R.string.player_now_spoken, data.title, data.spokenTimeRange)
-        else stringResource(R.string.player_recorded_spoken, data.title, data.recordedDate, data.spokenTimeRange),
+        when {
+            !recorded -> stringResource(R.string.player_now_spoken, data.title, data.spokenTimeRange)
+            data.recording?.recordedDate != null ->
+                stringResource(R.string.player_recorded_spoken, data.title, data.recording.recordedDate, data.spokenTimeRange)
+            else -> listOf(data.title, data.spokenTimeRange).filter(String::isNotBlank).joinToString(", ")
+        },
         data.nowRecording?.let { recordingStatusSpoken(nowRecordingState, it.rule) },
         remaining, next, nextRecording?.let { recordingStatusSpoken(it.state, it.rule, skipped = it.enabled == false) },
         badges.takeIf { it.isNotEmpty() }?.map { glanceBadgeSpoken(it) }?.joinToString(". "),
@@ -108,7 +114,7 @@ fun PlayerInfoBar(
         horizontalArrangement = Arrangement.spacedBy(TvGridGutter), verticalAlignment = Alignment.Top) {
         identity(faded)
         Column(Modifier.weight(1f).fillMaxHeight()) {
-            PlayerInfoFacts(facts, badges, data.nowRecording, nowRecordingState,
+            PlayerInfoFacts(facts, badges, data.nowRecording.takeUnless { recorded }, nowRecordingState,
                 faded.then(if (reserveOn == "facts") reserved else Modifier))
             Spacer(Modifier.height(4.dp))
             Text(data.title, style = MaterialTheme.typography.headlineMedium, maxLines = 1,

@@ -935,7 +935,6 @@
     <string name="player_recording">Registrazione in corso</string>
     <string name="channel_recording_spoken">Registrazione in corso su questo canale</string>
     <string name="player_recorded_on">Registrato il %1$s</string>
-    <string name="player_recorded_ends">Registrato il %1$s • Termina alle %2$s</string>
     <string name="player_recording_until">Registrazione fino alle %1$s</string>
     <string name="recordings_until">fino alle %1$s</string>
     <string name="recordings_stopped_early">Interrotta in anticipo</string>
