@@ -3,6 +3,7 @@ package at.bernhardberger.tvhplayer.touch.player
 import androidx.compose.runtime.State
 import androidx.compose.ui.graphics.painter.Painter
 import at.bernhardberger.tvhplayer.core.RecordingMark
+import at.bernhardberger.tvhplayer.core.recordingBarEnd
 import at.bernhardberger.tvhplayer.core.recordingMarkStops
 import at.bernhardberger.tvhplayer.playback.RecordingSkipAction
 import at.bernhardberger.tvhplayer.settings.AdBreakMode
@@ -23,6 +24,7 @@ internal sealed interface PlayerFaceState {
     val options: PlaybackOptions
     val offered: Set<PlayerControl>
     val seekable: Boolean
+    val canSkipForward: Boolean
 }
 
 internal data class RecordingPlayerState(
@@ -64,6 +66,8 @@ internal data class RecordingPlayerState(
     val stops = recordingMarkStops(marks, durationMs)
     val hasMarkers get() = PlayerControl.Markers in offered && stops.isNotEmpty()
     override val seekable get() = durationMs > 0
+    override val canSkipForward get() =
+        seekable && (!growing || recordingBarEnd(positionMs.value, durationMs, growing)?.atLive == false)
 }
 
 /** The recording's Details and any EPG metadata supplied for it. */
