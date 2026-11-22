@@ -88,7 +88,7 @@ internal fun GuideDestination(
     val state = mapped.withCurrentDetails(selection.details, dayLoading).withSelectedDay(input, retained)
     ArtworkFirstLoad("Guide", firstLoadWait(state, input))
     // Forget invalid choices, so they cannot silently return when a tag or the schedule changes again.
-    val available = selection.availableIn(state)
+    val available = selection.availableIn(state, clock.today)
     if (state.listed && selection != available && input.changesFrom(retained?.input).isEmpty()) {
         LaunchedEffect(selection, available) { guide.reconcileSelection(selection, available) }
     }
@@ -157,7 +157,8 @@ private fun SubmitGuideMapping(
 private fun GuideState.withSelectedDay(input: GuideMappingInput, result: GuideMappingResult?): GuideState {
     if (input.selection.view != GuideView.ByChannel) return this
     val day = input.selection.day?.takeIf { it >= input.clock.today && it in dayDates } ?: input.clock.today
-    val days = result?.daysFor(input).orEmpty()
+    // The kept day has no tab yet; leave the list in its loading state instead of showing today's rows.
+    val days = result?.takeUnless { input.selection.isAwaitingDay(this, input.clock.today) }?.daysFor(input).orEmpty()
     return copy(
         date = formatDayHeader(day, input.configuration.locales[0]),
         retainedDays = days.mapValues { it.value.programs },
@@ -169,8 +170,11 @@ private fun GuideState.withCurrentDetails(visits: List<GuidePageKey.Details>, da
         copy(dayLoading = dayLoading, details = details.filterKeys { it in visits })
     } else this
 
-private fun GuideSelection.availableIn(state: GuideState): GuideSelection = copy(
-    day = day?.takeIf { it in state.dayDates },
+private fun GuideSelection.isAwaitingDay(state: GuideState, today: LocalDate): Boolean =
+    state.dayLoading && view == GuideView.ByChannel && day != null && day > today && day !in state.dayDates
+
+private fun GuideSelection.availableIn(state: GuideState, today: LocalDate): GuideSelection = copy(
+    day = day?.takeIf { it in state.dayDates || isAwaitingDay(state, today) },
     jump = state.jumpTimes.getOrNull(state.selectedJump - 1),
     channelId = channelId?.takeIf { id -> state.channels.any { it.id == id } },
     details = if (state.availability == GuideAvailability.Current) details.filter { it in state.details } else details,
