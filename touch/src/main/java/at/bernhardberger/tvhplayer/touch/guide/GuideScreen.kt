@@ -64,6 +64,7 @@ import at.bernhardberger.tvhplayer.touch.ui.Destination
 import at.bernhardberger.tvhplayer.touch.ui.LocalDestinationBackEnabled
 import at.bernhardberger.tvhplayer.touch.ui.LocalDestinationReselections
 import at.bernhardberger.tvhplayer.touch.ui.ListMessage
+import at.bernhardberger.tvhplayer.touch.ui.LocalBrowseMargin
 import at.bernhardberger.tvhplayer.touch.ui.MessageKind
 import at.bernhardberger.tvhplayer.touch.ui.OnDestinationReselected
 import at.bernhardberger.tvhplayer.touch.ui.ScrollToStartOnReselect
@@ -176,7 +177,7 @@ private fun GuideState.lostOpenedRow(
 /** The view switch under the top bar once there is a list; the first load's progress line before. */
 @Composable
 private fun GuideBelowTopBar(state: GuideState, view: GuideView, layout: GuideLayout, onView: (GuideView) -> Unit) {
-    if (state.listed) ViewTabs(view, layout, onView) else GuideLoadingLine(state.availability, layout)
+    if (state.listed) ViewTabs(view, layout, onView) else GuideLoadingLine(state.availability)
 }
 
 @Composable
@@ -236,10 +237,11 @@ private fun GuideList(state: GuideState, layout: GuideLayout, actions: GuideActi
         body()
         return
     }
+    val margin = LocalBrowseMargin.current
     Column(Modifier.fillMaxSize()) {
         GuideOfflineBanner(
             layout, actions.onOpenConnectionSettings,
-            Modifier.padding(start = margin(layout), end = margin(layout), top = 8.dp),
+            Modifier.padding(start = margin, end = margin, top = 8.dp),
         )
         Box(Modifier.weight(1f)) { body() }
     }
@@ -270,7 +272,8 @@ private fun ViewTabs(view: GuideView, layout: GuideLayout, onView: (GuideView) -
         PrimaryTabRow(selectedTabIndex = view.ordinal) { tabs() }
     } else {
         PrimaryScrollableTabRow(
-            selectedTabIndex = view.ordinal, edgePadding = if (layout == GuideLayout.Wide) 8.dp else 24.dp,
+            selectedTabIndex = view.ordinal,
+            edgePadding = if (layout == GuideLayout.Wide) 8.dp else LocalBrowseMargin.current,
         ) { tabs() }
     }
 }
@@ -285,7 +288,7 @@ private fun Overview(
     onDetails: (String) -> Unit,
     onChannel: (String) -> Unit,
 ) {
-    val margin = margin(layout)
+    val margin = LocalBrowseMargin.current
     Column(Modifier.fillMaxSize()) {
         OverviewBar(
             state, actions, layout.compact,
@@ -301,8 +304,6 @@ private fun Overview(
     }
 }
 
-private fun margin(layout: GuideLayout) = if (layout.compact) 12.dp else 24.dp
-
 @Composable
 private fun ByChannel(
     state: GuideState,
@@ -313,6 +314,7 @@ private fun ByChannel(
     onOpen: (String?) -> Unit,
     actions: GuideActions,
 ) {
+    val margin = LocalBrowseMargin.current
     if (layout.compact) {
         val keys = state.channels.map { it.id }
         val pager = rememberGuidePager(keys, keys.indexOf(channel.id)) { index ->
@@ -320,7 +322,7 @@ private fun ByChannel(
         }
         Column(Modifier.fillMaxSize()) {
             ChannelTabs(state.channels, channel.id, actions.onChannel)
-            DayBar(state.days, dayIndex, state.date, actions.onDay)
+            DayBar(state.days, dayIndex, state.date, margin, actions.onDay)
             HorizontalPager(pager, Modifier.fillMaxSize(), key = { keys[it] }) { index ->
                 val page = state.channels[index]
                 val programs = state.dayProgramsFor(page, dayIndex)
@@ -328,14 +330,14 @@ private fun ByChannel(
                 GuidePageReselection(enabled = page.id == channel.id) {
                     Day(
                         page, programs, state.dayLoading, layout,
-                        openId.takeIf { page.id == channel.id }, onOpen, actions, Modifier.padding(horizontal = 12.dp),
+                        openId.takeIf { page.id == channel.id }, onOpen, actions, Modifier.padding(horizontal = margin),
                     )
                 }
             }
         }
         return
     }
-    Row(Modifier.fillMaxSize().padding(start = 24.dp, end = 24.dp, top = 8.dp)) {
+    Row(Modifier.fillMaxSize().padding(start = margin, end = margin, top = 8.dp)) {
         ChannelList(
             state.channels, state.channelsHaveLogos, channel.id, actions.onChannel,
             if (layout == GuideLayout.Wide) Modifier.width(344.dp).fillMaxHeight() else Modifier.weight(1f),
@@ -485,7 +487,8 @@ private fun ChannelList(
 @Composable
 private fun ChannelTabs(channels: List<GuideChannel>, selectedId: String, onChannel: (String) -> Unit) {
     PrimaryScrollableTabRow(
-        selectedTabIndex = channels.indexOfFirst { it.id == selectedId }.coerceAtLeast(0), edgePadding = 12.dp,
+        selectedTabIndex = channels.indexOfFirst { it.id == selectedId }.coerceAtLeast(0),
+        edgePadding = LocalBrowseMargin.current,
     ) {
         channels.forEach { channel ->
             val logo = channelLogoSlot(
@@ -504,7 +507,10 @@ private fun ChannelTabs(channels: List<GuideChannel>, selectedId: String, onChan
 /** Section 12's empty list for a channel without guide data; Watch is the way on. */
 @Composable
 internal fun NoSchedule(onWatch: (() -> Unit)?) {
-    Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+    Box(
+        Modifier.fillMaxSize().padding(horizontal = LocalBrowseMargin.current, vertical = 24.dp),
+        contentAlignment = Alignment.Center,
+    ) {
         Column(
             Modifier.widthIn(max = 400.dp),
             horizontalAlignment = Alignment.CenterHorizontally,

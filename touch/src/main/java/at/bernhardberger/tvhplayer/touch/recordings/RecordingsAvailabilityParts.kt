@@ -21,6 +21,7 @@ import at.bernhardberger.tvhplayer.touch.ui.FirstLoadLine
 import at.bernhardberger.tvhplayer.touch.ui.FirstLoadList
 import at.bernhardberger.tvhplayer.touch.ui.ListFailure
 import at.bernhardberger.tvhplayer.touch.ui.ListMessage
+import at.bernhardberger.tvhplayer.touch.ui.LocalBrowseMargin
 import at.bernhardberger.tvhplayer.touch.ui.MessageKind
 import at.bernhardberger.tvhplayer.touch.ui.OfflineBanner
 import at.bernhardberger.tvhplayer.touch.ui.OfflineTexts
@@ -53,19 +54,20 @@ internal fun RecordingsStandIn(
 
 /** The first load's progress line under the top bar. */
 @Composable
-internal fun RecordingsLoadingLine(availability: RecordingsAvailability, layout: RecordingsLayout) {
-    if (availability == RecordingsAvailability.Loading) FirstLoadLine(if (layout.compact) 0.dp else 24.dp)
+internal fun RecordingsLoadingLine(availability: RecordingsAvailability) {
+    if (availability == RecordingsAvailability.Loading) FirstLoadLine(LocalBrowseMargin.current)
 }
 
 @Composable
 private fun RecordingsFirstLoad(layout: RecordingsLayout) {
     val text = stringResource(SharedR.string.recordings_loading)
+    val margin = LocalBrowseMargin.current
     val rows = if (layout.compact) PHONE_SKELETON_ROWS else TABLET_SKELETON_ROWS
     val list: @Composable (Modifier) -> Unit = { modifier ->
         FirstLoadList(text, modifier) { repeat(rows) { SkeletonRecording(it, rows) } }
     }
     when (layout) {
-        RecordingsLayout.Wide -> Row(Modifier.fillMaxSize().padding(start = 8.dp, end = 24.dp)) {
+        RecordingsLayout.Wide -> Row(Modifier.fillMaxSize().padding(start = 8.dp, end = margin)) {
             list(Modifier.weight(1f))
             Spacer(Modifier.width(24.dp))
             Surface(
@@ -74,8 +76,7 @@ private fun RecordingsFirstLoad(layout: RecordingsLayout) {
                 color = MaterialTheme.colorScheme.surfaceContainerLow,
             ) {}
         }
-        RecordingsLayout.Upright -> list(Modifier.padding(horizontal = 24.dp))
-        RecordingsLayout.Phone -> list(Modifier.padding(horizontal = 12.dp))
+        RecordingsLayout.Upright, RecordingsLayout.Phone -> list(Modifier.padding(horizontal = margin))
     }
 }
 

@@ -168,8 +168,9 @@ internal fun LevelHead(
     val level = levels.last()
     val counts = joinParts(levelCounts(view, level, root = levels.size == 1, compact = layout.compact))
     if (levels.size == 1) {
+        val inset = if (layout.compact) 0.dp else 4.dp
         Row(
-            Modifier.fillMaxWidth().padding(start = 4.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
+            Modifier.fillMaxWidth().padding(start = inset, end = inset, top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.Bottom,
         ) {
             Text(

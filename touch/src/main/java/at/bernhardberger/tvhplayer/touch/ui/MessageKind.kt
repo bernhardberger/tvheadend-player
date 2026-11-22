@@ -25,6 +25,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.core.AppError
 import at.bernhardberger.tvhplayer.core.AppErrorAction
@@ -71,13 +72,14 @@ internal fun ListMessage(
     kind: MessageKind,
     onSettings: (() -> Unit)?,
     onRetry: () -> Unit = {},
+    horizontalMargin: Dp = LocalBrowseMargin.current,
     onShowAll: () -> Unit = {},
 ) {
     val reason = stringResource(kind.reason)
     val hint = kind.hint?.let { stringResource(it) }
     val hasButtons = onSettings != null || kind == MessageKind.Unreachable || kind == MessageKind.EmptyTag
     MessageLayout(
-        kind.icon, stringResource(kind.title), if (hint == null) reason else "$reason $hint",
+        kind.icon, stringResource(kind.title), if (hint == null) reason else "$reason $hint", horizontalMargin,
         buttons = if (hasButtons) ({ MessageButtons(kind, onSettings, onRetry, onShowAll) }) else null,
     )
 }
@@ -110,7 +112,7 @@ internal fun ListFailure(error: AppError, onRetry: () -> Unit, onSettings: (() -
     })
     MessageLayout(
         icon, stringResource(condition.touchTitleRes()),
-        listOfNotNull(text.reason(condition), hint).joinToString(" "), buttons,
+        listOfNotNull(text.reason(condition), hint).joinToString(" "), LocalBrowseMargin.current, buttons,
     )
 }
 
@@ -119,9 +121,13 @@ private fun MessageLayout(
     @DrawableRes icon: Int,
     title: String,
     paragraph: String,
+    horizontalMargin: Dp,
     buttons: (@Composable FlowRowScope.() -> Unit)?,
 ) {
-    Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+    Box(
+        Modifier.fillMaxSize().padding(horizontal = horizontalMargin, vertical = 24.dp),
+        contentAlignment = Alignment.Center,
+    ) {
         Column(
             Modifier.widthIn(max = 340.dp),
             horizontalAlignment = Alignment.CenterHorizontally,

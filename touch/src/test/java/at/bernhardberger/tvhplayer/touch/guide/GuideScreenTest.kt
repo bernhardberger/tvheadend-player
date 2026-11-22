@@ -29,6 +29,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
 import androidx.compose.ui.text.TextLayoutResult
@@ -121,7 +122,8 @@ class GuideScreenTest {
         // A tap opens the program where it is and plays nothing; only on-air programs offer Watch.
         val row = compose.onAllNodesWithText("Coastal Miles")[0]
         val titleTop = row.getBoundsInRoot().top
-        row.performClick()
+        // Open the program without leaving a native press ripple in the next captures.
+        row.performSemanticsAction(SemanticsActions.OnClick)
         compose.onNodeWithText(COASTAL_MILES_SYNOPSIS_START, substring = true).assertIsDisplayed()
         compose.onNodeWithText("50m • Travel", useUnmergedTree = true).assertIsDisplayed()
         compose.onAllNodes(hasText("Watch")).assertCountEquals(0)

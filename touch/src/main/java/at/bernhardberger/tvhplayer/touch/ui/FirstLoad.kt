@@ -45,7 +45,7 @@ import at.bernhardberger.tvhplayer.touch.R
  * edge, the loading text in the line above the list, and skeleton rows in the list's own shape.
  */
 
-/** The progress line under the top bar; the tablet insets it to the list's margin. */
+/** The progress line under the top bar, inset to the browse keyline when shown in the frame. */
 @Composable
 internal fun FirstLoadLine(horizontalMargin: Dp) {
     LinearProgressIndicator(

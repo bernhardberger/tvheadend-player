@@ -106,6 +106,9 @@ internal val LocalDestinationBackEnabled = compositionLocalOf { true }
 /** The shown page may collect taps on its already selected destination; events are not replayed. */
 internal val LocalDestinationReselections = staticCompositionLocalOf<Flow<Destination>> { emptyFlow() }
 
+/** The outer horizontal margin for browsing pages. */
+internal val LocalBrowseMargin = staticCompositionLocalOf { 24.dp }
+
 @Composable
 internal fun OnDestinationReselected(destination: Destination, action: suspend () -> Unit) {
     val taps = LocalDestinationReselections.current
@@ -229,11 +232,14 @@ private fun FrameShell(
 
     val bottomBar = !expanded && bars.navigation && destinations.size > 1
     val notices = LocalFrameNotices.current
+    val browseMargin = if (mediumOrWider) 24.dp else 16.dp
     Row(modifier.fillMaxSize()) {
         if (expanded && bars.navigation) DestinationRail(destinations, selected, select)
         Scaffold(
             modifier = Modifier.weight(1f),
-            topBar = { top?.invoke() },
+            topBar = {
+                CompositionLocalProvider(LocalBrowseMargin provides browseMargin) { top?.invoke() }
+            },
             bottomBar = {
                 if (bottomBar) {
                     DestinationBar(destinations, selected, mediumOrWider, select)
@@ -255,7 +261,9 @@ private fun FrameShell(
                 }
             },
             contentWindowInsets = frameInsets(top != null && bars.top),
-            content = content,
+            content = { padding ->
+                CompositionLocalProvider(LocalBrowseMargin provides browseMargin) { content(padding) }
+            },
         )
     }
 }
@@ -292,7 +300,7 @@ private fun DestinationTopBar(
     lastActionIsIconOnly: Boolean,
     actions: @Composable RowScope.(Destination) -> Unit,
 ) {
-    val keyline = if (mediumOrWider) 24.dp else 16.dp
+    val keyline = LocalBrowseMargin.current
     // The stock bar leaves 4 dp at the end; a 24 dp symbol in its 48 dp target adds another 12 dp.
     val stockInset = if (lastActionIsIconOnly) 16.dp else 4.dp
     TopAppBar(

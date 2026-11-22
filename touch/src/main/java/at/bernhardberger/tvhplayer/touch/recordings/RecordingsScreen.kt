@@ -43,10 +43,12 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.window.core.layout.WindowSizeClass
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.ui.Destination
+import at.bernhardberger.tvhplayer.touch.ui.LocalBrowseMargin
 import at.bernhardberger.tvhplayer.touch.ui.LocalDestinationBackEnabled as PageBack
 import at.bernhardberger.tvhplayer.touch.ui.OnDestinationReselected
 import at.bernhardberger.tvhplayer.touch.ui.TouchFrame
@@ -97,7 +99,7 @@ internal fun RecordingsScreen(
                 }
             },
             belowTopBar = { destination ->
-                if (destination == Destination.Recordings) RecordingsLoadingLine(state.availability, layout)
+                if (destination == Destination.Recordings) RecordingsLoadingLine(state.availability)
             },
         ) { destination ->
             if (destination != Destination.Recordings) return@TouchFrame
@@ -231,10 +233,11 @@ private fun Browse(
     onUp: () -> Unit,
     onPick: (String) -> Unit,
 ) {
-    val margin = when (layout) {
-        RecordingsLayout.Wide -> Modifier.padding(start = 8.dp, end = BrowseEndInset)
-        RecordingsLayout.Upright -> Modifier.padding(horizontal = BrowseEndInset)
-        RecordingsLayout.Phone -> Modifier.padding(horizontal = 12.dp)
+    val keyline = LocalBrowseMargin.current
+    val margin = if (layout == RecordingsLayout.Wide) {
+        Modifier.padding(start = 8.dp, end = keyline)
+    } else {
+        Modifier.padding(horizontal = keyline)
     }
     if (state.availability != RecordingsAvailability.Offline) {
         BrowseLevel(state, levels, layout, margin, picked, actions, onOpen, onUp, onPick)
@@ -268,7 +271,7 @@ private fun BrowseLevel(
         )
         level.isEmpty -> Column(margin.fillMaxSize()) {
             head()
-            FilterEmpty(state.view, actions.onView)
+            FilterEmpty(state.view, actions.onView, if (layout.compact) 0.dp else LocalBrowseMargin.current)
         }
         layout == RecordingsLayout.Wide -> Row(margin.fillMaxSize()) {
             RecordingList(level, state.clock, oneChannel, picked?.id, head, onOpen, onPick, Modifier.weight(1f))
@@ -290,7 +293,7 @@ private fun BrowseLevel(
 private val RecordingFolder.isEmpty: Boolean get() = folders.isEmpty() && recordings.isEmpty()
 
 @Composable
-private fun FilterEmpty(view: DvrArchiveView, onView: (DvrArchiveView) -> Unit) {
+private fun FilterEmpty(view: DvrArchiveView, onView: (DvrArchiveView) -> Unit, horizontalMargin: Dp) {
     val (icon, title, reason) = when (view.show) {
         DvrArchiveShow.UNWATCHED -> Triple(
             R.drawable.recordings_done_all, R.string.recordings_empty_unwatched,
@@ -305,7 +308,7 @@ private fun FilterEmpty(view: DvrArchiveView, onView: (DvrArchiveView) -> Unit) 
             R.string.recordings_empty_watched_reason,
         )
     }
-    RecordingsMessage(icon, title, reason) {
+    RecordingsMessage(icon, title, reason, horizontalMargin) {
         FilledTonalButton(onClick = { onView(view.copy(show = DvrArchiveShow.ALL)) }) {
             Text(stringResource(R.string.recordings_show_everything))
         }
@@ -313,8 +316,17 @@ private fun FilterEmpty(view: DvrArchiveView, onView: (DvrArchiveView) -> Unit) 
 }
 
 @Composable
-private fun RecordingsMessage(icon: Int, title: Int, reason: Int, action: @Composable () -> Unit = {}) {
-    Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+private fun RecordingsMessage(
+    icon: Int,
+    title: Int,
+    reason: Int,
+    horizontalMargin: Dp = LocalBrowseMargin.current,
+    action: @Composable () -> Unit = {},
+) {
+    Box(
+        Modifier.fillMaxSize().padding(horizontal = horizontalMargin, vertical = 24.dp),
+        contentAlignment = Alignment.Center,
+    ) {
         Column(
             Modifier.widthIn(max = 400.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -361,7 +373,6 @@ private fun Placeholder(level: RecordingFolder) {
     }
 }
 
-private val BrowseEndInset = 24.dp
 private const val PERCENT = 100
 
 /** The list shows while it is current or saved; otherwise a stand-in takes its place. */
