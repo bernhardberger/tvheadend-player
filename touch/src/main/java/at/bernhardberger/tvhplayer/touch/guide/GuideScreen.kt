@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
@@ -35,12 +37,17 @@ import androidx.compose.material3.SecondaryScrollableTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
@@ -55,6 +62,9 @@ import at.bernhardberger.tvhplayer.touch.ui.Destination
 import at.bernhardberger.tvhplayer.touch.ui.ListMessage
 import at.bernhardberger.tvhplayer.touch.ui.MessageKind
 import at.bernhardberger.tvhplayer.touch.ui.TouchFrame
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.launch
 
 /**
  * Section 7's Guide in the frame's Guide destination: the overview and one channel's day. A tap
@@ -65,16 +75,21 @@ internal fun GuideScreen(
     state: GuideState,
     actions: GuideActions,
     modifier: Modifier = Modifier,
-    initialView: GuideView = GuideView.Overview,
-    initialChannelId: String? = null,
+    view: GuideView = GuideView.Overview,
+    channelId: String? = null,
+    dayIndex: Int = state.selectedDay,
     initiallyOpen: String? = null,
     destinations: List<Destination> = Destination.entries,
 ) {
     val layout = guideLayout()
     val listed = state.listed
-    var view by rememberSaveable { mutableStateOf(initialView) }
-    var channelId by rememberSaveable { mutableStateOf(initialChannelId) }
-    var openId by rememberSaveable { mutableStateOf(initiallyOpen) }
+    val channel = state.channels.firstOrNull { it.id == channelId } ?: state.channels.firstOrNull()
+    val pageKey = "${view.name}:${channel?.id}:${state.dayDates.getOrNull(dayIndex) ?: dayIndex}"
+    var openedPage by rememberSaveable { mutableStateOf(pageKey) }
+    var openedId by rememberSaveable { mutableStateOf(initiallyOpen) }
+    val openId = openedId.takeIf { openedPage == pageKey }
+    LaunchedEffect(pageKey) { if (openedPage != pageKey) openedId = null }
+    val onOpen: (String?) -> Unit = { openedPage = pageKey; openedId = it }
     val details = state.details
     val page = details != null
 
@@ -87,10 +102,7 @@ internal fun GuideScreen(
         actions = { destination -> if (destination == Destination.Guide && listed) TagFilter(state, actions) },
         belowTopBar = { destination ->
             if (destination == Destination.Guide) {
-                GuideBelowTopBar(state, view, layout) {
-                    view = it
-                    openId = null
-                }
+                GuideBelowTopBar(state, view, layout, actions.onView)
             }
         },
     ) { destination ->
@@ -101,26 +113,13 @@ internal fun GuideScreen(
         }
         // Registered after the frame's own handler, so the page and an opened program take Back first.
         BackHandler(enabled = page) { actions.onDetails(null) }
-        BackHandler(enabled = !page && openId != null) { openId = null }
+        BackHandler(enabled = !page && openId != null) { onOpen(null) }
         if (details != null) {
             ProgramDetailsPage(details, layout, actions) { actions.onDetails(null) }
             return@TouchFrame
         }
-        val onOpen: (String?) -> Unit = { openId = it }
         GuideList(state, layout, actions) {
-            when (view) {
-                GuideView.Overview -> Overview(state, layout, openId, onOpen, actions, actions.onDetails) {
-                    channelId = it
-                    openId = null
-                    view = GuideView.ByChannel
-                }
-                GuideView.ByChannel -> ByChannel(
-                    state, layout, channelId, openId, onOpen, actions, actions.onDetails,
-                ) {
-                    channelId = it
-                    openId = null
-                }
-            }
+            GuidePages(state, layout, view, channel, dayIndex, openId, onOpen, actions)
         }
     }
 }
@@ -129,6 +128,33 @@ internal fun GuideScreen(
 @Composable
 private fun GuideBelowTopBar(state: GuideState, view: GuideView, layout: GuideLayout, onView: (GuideView) -> Unit) {
     if (state.listed) ViewTabs(view, layout, onView) else GuideLoadingLine(state.availability, layout)
+}
+
+@Composable
+private fun GuidePages(
+    state: GuideState,
+    layout: GuideLayout,
+    view: GuideView,
+    channel: GuideChannel?,
+    dayIndex: Int,
+    openId: String?,
+    onOpen: (String?) -> Unit,
+    actions: GuideActions,
+) {
+    val pager = rememberGuidePager(GuideView.entries, view.ordinal)
+    HorizontalPager(pager, Modifier.fillMaxSize(), userScrollEnabled = false) { index ->
+        when (GuideView.entries[index]) {
+            GuideView.Overview -> Overview(
+                state, layout, openId.takeIf { view == GuideView.Overview }, onOpen, actions, actions.onDetails,
+                actions.onChannel,
+            )
+            GuideView.ByChannel -> if (channel != null) {
+                ByChannel(
+                    state, layout, channel, dayIndex, openId.takeIf { view == GuideView.ByChannel }, onOpen, actions,
+                )
+            }
+        }
+    }
 }
 
 /** The listed Guide: the offline line above saved content, and Channels' empty forms without channels. */
@@ -220,67 +246,107 @@ private fun margin(layout: GuideLayout) = if (layout.compact) 12.dp else 24.dp
 private fun ByChannel(
     state: GuideState,
     layout: GuideLayout,
-    channelId: String?,
+    channel: GuideChannel,
+    dayIndex: Int,
     openId: String?,
     onOpen: (String?) -> Unit,
     actions: GuideActions,
-    onDetails: (String) -> Unit,
-    onChannel: (String) -> Unit,
 ) {
-    val channel = state.channels.find { it.id == channelId } ?: state.channels.firstOrNull() ?: return
     if (layout.compact) {
+        val keys = state.channels.map { it.id }
+        val pager = rememberGuidePager(keys, keys.indexOf(channel.id)) { index ->
+            actions.onChannel(keys[index])
+        }
         Column(Modifier.fillMaxSize()) {
-            ChannelTabs(state.channels, channel.id, onChannel)
-            DayBar(state.days, state.selectedDay, state.date, actions.onDay)
-            Day(
-                channel, state.dayLoading, layout, openId, onOpen, actions, onDetails,
-                Modifier.padding(horizontal = 12.dp),
-            )
+            ChannelTabs(state.channels, channel.id, actions.onChannel)
+            DayBar(state.days, dayIndex, state.date, actions.onDay)
+            HorizontalPager(pager, Modifier.fillMaxSize(), key = { keys[it] }) { index ->
+                val page = state.channels[index]
+                Day(
+                    page, state.dayProgramsFor(page, dayIndex), state.dayLoading, layout,
+                    openId.takeIf { page.id == channel.id }, onOpen, actions, Modifier.padding(horizontal = 12.dp),
+                )
+            }
         }
         return
     }
     Row(Modifier.fillMaxSize().padding(start = 24.dp, end = 24.dp, top = 8.dp)) {
         ChannelList(
-            state.channels, state.channelsHaveLogos, channel.id, onChannel,
+            state.channels, state.channelsHaveLogos, channel.id, actions.onChannel,
             if (layout == GuideLayout.Wide) Modifier.width(344.dp).fillMaxHeight() else Modifier.weight(1f),
         )
         Spacer(Modifier.size(24.dp))
         Column(Modifier.weight(1f)) {
-            val hasDay = channel.dayPrograms.isNotEmpty() || state.dayLoading
+            val programs = state.dayProgramsFor(channel, dayIndex)
+            val hasDay = programs == null || programs.isNotEmpty() || state.dayLoading
             DayHead(channel, state.date.takeIf { hasDay })
-            if (hasDay) {
-                SecondaryScrollableTabRow(selectedTabIndex = state.selectedDay, edgePadding = 0.dp) {
+            if (hasDay || state.days.size > 1) {
+                SecondaryScrollableTabRow(selectedTabIndex = dayIndex, edgePadding = 0.dp) {
                     state.days.forEachIndexed { index, day ->
-                        Tab(selected = index == state.selectedDay, onClick = { actions.onDay(index) }) {
+                        Tab(selected = index == dayIndex, onClick = { actions.onDay(index) }) {
                             Text(day, Modifier.padding(vertical = 12.dp, horizontal = 4.dp), maxLines = 1)
                         }
                     }
                 }
             }
-            Day(channel, state.dayLoading, layout, openId, onOpen, actions, onDetails, Modifier.padding(top = 12.dp))
+            val keys = state.dayDates.ifEmpty { state.days }
+            val pager = rememberGuidePager(keys, dayIndex, actions.onDay)
+            HorizontalPager(pager, Modifier.fillMaxSize(), key = { keys[it] }) { index ->
+                Day(
+                    channel, state.dayProgramsFor(channel, index), state.dayLoading, layout,
+                    openId.takeIf { index == dayIndex }, onOpen, actions, Modifier.padding(top = 12.dp),
+                )
+            }
         }
     }
+}
+
+/** Pager position is transient. Only a settled user move writes back to the selected tab. */
+@Composable
+private fun rememberGuidePager(keys: List<Any>, selected: Int, onSettle: ((Int) -> Unit)? = null): PagerState {
+    val count by rememberUpdatedState(keys.size)
+    val select by rememberUpdatedState(onSettle)
+    val pager = remember { PagerState(currentPage = selected) { count } }
+    LaunchedEffect(pager, keys, selected) {
+        // A gesture can interrupt animation without cancelling the settled-page observer.
+        launch {
+            if (coroutineContext[MotionDurationScale]?.scaleFactor == 0f) pager.scrollToPage(selected)
+            else pager.animateScrollToPage(selected)
+        }.join()
+        if (onSettle != null) {
+            snapshotFlow { pager.settledPage.takeUnless { pager.isScrollInProgress } }
+                .filterNotNull().distinctUntilChanged().collect { index ->
+                    if (index != selected && index in keys.indices) select?.invoke(index)
+                }
+        }
+    }
+    return pager
+}
+
+private fun GuideState.dayProgramsFor(channel: GuideChannel, dayIndex: Int): List<GuideProgram>? = when {
+    dayIndex != selectedDay -> null
+    dayDates.isEmpty() -> channel.dayPrograms
+    else -> channel.day
 }
 
 @Composable
 private fun Day(
     channel: GuideChannel,
+    programs: List<GuideProgram>?,
     loading: Boolean,
     layout: GuideLayout,
     openId: String?,
     onOpen: (String?) -> Unit,
     actions: GuideActions,
-    onDetails: (String) -> Unit,
     modifier: Modifier,
 ) {
-    val programs = channel.dayPrograms
-    if (programs.isEmpty()) {
+    if (programs.isNullOrEmpty()) {
         val watch = actions.onWatch
-        if (loading) DayLoading() else NoSchedule(watch?.let { { it(channel.id) } })
+        if (programs == null || loading) DayLoading() else NoSchedule(watch?.let { { it(channel.id) } })
         return
     }
     ChannelDay(
-        programs, openId, onOpen, layout, actions, onDetails, modifier.fillMaxSize(),
+        programs, openId, onOpen, layout, actions, actions.onDetails, modifier.fillMaxSize(),
         listState = rememberLazyListState(),
     )
 }

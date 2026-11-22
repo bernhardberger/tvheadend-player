@@ -93,12 +93,13 @@ class GuideMappingTest {
 
     @Test
     fun overviewRunsFromNowWithMarksAndProgress() {
-        val state = state(GuideSelection())
+        val state = state(GuideSelection(view = GuideView.ByChannel))
         val (first, second) = state.channels
 
         assertEquals(guide.programs, first.programs.map { it.title })
         val onNow = first.programs[0]
         assertSame("overview and the channel day reuse the same mapped program", onNow, first.day?.first())
+        assertEquals("other channel days aren't mapped", null, state.channels[1].day)
         assertEquals(0.5f, onNow.progress)
         assertEquals("30m", onNow.timeLeft)
         assertEquals("07:30", onNow.start)
@@ -122,7 +123,11 @@ class GuideMappingTest {
         assertEquals(GuideGap("11:30", "13:00"), today.channels[0].gap)
         assertEquals(listOf("Today", "2027-01-16"), today.days)
 
-        val next = state(GuideSelection(day = LocalDate.parse("2027-01-16")), events)
+        val next = state(
+            GuideSelection(day = LocalDate.parse("2027-01-16"), channelId = guide.second.id.value.toString(),
+                view = GuideView.ByChannel),
+            events,
+        )
         assertEquals(listOf("Tomorrow show"), next.channels[1].day?.map { it.title })
         assertEquals(GuideGap("00:00", "08:00"), next.channels[1].gap)
     }
@@ -163,7 +168,7 @@ class GuideMappingTest {
         val endingAtMidnight = event(EVENT_TOMORROW, guide.first, guide.now + 39.hours)
         assertEquals(listOf("Today", "2027-01-16"), state(GuideSelection(), listOf(late, endingAtMidnight)).days)
         assertEquals(listOf("Today", "2027-01-16"), state(GuideSelection(), listOf(late)).days)
-        val next = state(GuideSelection(day = LocalDate.parse("2027-01-16")), listOf(late))
+        val next = state(GuideSelection(day = LocalDate.parse("2027-01-16"), view = GuideView.ByChannel), listOf(late))
         assertEquals(listOf("Late show"), next.channels[0].day?.map { it.title })
         assertEquals(listOf("Late show"), next.channels[0].programs.map { it.title })
     }

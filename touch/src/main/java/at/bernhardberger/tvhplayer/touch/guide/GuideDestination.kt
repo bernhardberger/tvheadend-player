@@ -64,7 +64,9 @@ internal fun GuideDestination(
     val configuration = LocalConfiguration.current
     val nowSec = rememberDetailsEpochSeconds()
     val clock = GuideClock(nowSec - Math.floorMod(nowSec, 60L), ZoneId.systemDefault())
-    val coverage = remember(scope, observation, selection.day, clock.zone, clock.today) {
+    val coverage = remember(
+        scope, observation, selection.view, selection.channelId, selection.day, clock.zone, clock.today,
+    ) {
         guideCoverage(scope, observation, selection, clock)
     }
     LaunchedEffect(coverage, observation.currentSession?.generationIdentity) { coverage?.let(guide::request) }
@@ -79,21 +81,18 @@ internal fun GuideDestination(
     val dayLoading = remember(mapped.listed, coverage, pendingVersion, observation.currentSession?.generationIdentity) {
         mapped.listed && coverage?.let(guide::isPending) == true
     }
-    val details = mapped.details?.takeIf { it.id == selection.detailsId }
-    val state = if (dayLoading || details !== mapped.details) {
-        mapped.copy(dayLoading = dayLoading, details = details)
-    } else mapped
+    val state = mapped.withCurrentDetails(selection.detailsId, dayLoading)
     ArtworkFirstLoad("Guide", firstLoadWait(state, input))
     // Forget invalid choices, so they cannot silently return when a tag or the schedule changes again.
-    val available = selection.copy(
-        day = selection.day?.takeIf { it in state.dayDates },
-        jump = state.jumpTimes.getOrNull(state.selectedJump - 1),
-    )
+    val available = selection.availableIn(state)
     if (state.listed && selection != available && input.changesFrom(retained?.input).isEmpty()) {
         LaunchedEffect(selection, available) { guide.reconcileSelection(selection, available) }
     }
     GuideScreen(
         state = state,
+        view = selection.view,
+        channelId = selection.channelId,
+        dayIndex = state.dayDates.indexOf(selection.day).coerceAtLeast(0),
         actions = GuideActions(
             onWatch = onWatch,
             onRecord = dvr::record,
@@ -109,10 +108,23 @@ internal fun GuideDestination(
             onSignIn = onSignIn,
             onCancel = dvr::cancel,
             onStop = dvr::stopProgram,
+            onChannel = { guide.selectPage(GuideView.ByChannel, it) },
+            onView = { guide.selectPage(it) },
         ),
         destinations = destinations,
     )
 }
+
+private fun GuideState.withCurrentDetails(detailsId: String?, dayLoading: Boolean): GuideState {
+    val current = details?.takeIf { it.id == detailsId }
+    return if (dayLoading || current !== details) copy(dayLoading = dayLoading, details = current) else this
+}
+
+private fun GuideSelection.availableIn(state: GuideState): GuideSelection = copy(
+    day = day?.takeIf { it in state.dayDates },
+    jump = state.jumpTimes.getOrNull(state.selectedJump - 1),
+    channelId = channelId?.takeIf { id -> state.channels.any { it.id == id } },
+)
 
 private fun firstLoadWait(state: GuideState, input: GuideMappingInput): String? = when {
     state.availability != GuideAvailability.Loading -> null

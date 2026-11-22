@@ -4,10 +4,13 @@ import android.content.pm.ApplicationInfo
 import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.MotionDurationScale
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
@@ -20,7 +23,10 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipe
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.lifecycle.viewmodel.compose.viewModel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
@@ -76,12 +82,14 @@ import org.robolectric.shadows.ShadowLog
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @OptIn(TvheadendTestingApi::class)
 class GuideScreenTest {
-    @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
+    private val motionScale = object : MotionDurationScale { override var scaleFactor = 1f }
+    @get:Rule val compose = createAndroidComposeRule<ComponentActivity>(effectContext = motionScale)
 
     private val details = mutableListOf<String?>()
     private val watched = mutableListOf<String>()
     private val cancelled = mutableListOf<String>()
     private val stopped = mutableListOf<String>()
+    private val selectedChannels = mutableListOf<String>()
 
     @Test
     @Config(qualifiers = TABLET)
@@ -228,6 +236,11 @@ class GuideScreenTest {
 
         compose.onNodeWithText("Watch").performClick()
         assertEquals(listOf("ridge-earth"), watched)
+
+        swipeDay(left = true, tablet = true)
+        compose.onNodeWithText(fixture.days[1]).assertIsSelected()
+        compose.onNodeWithText(fixture.days[0]).performClick()
+        compose.onNodeWithText(fixture.days[0]).assertIsSelected()
 
         val otherChannel = fixture.channels.first { it.id == "glass-drama" }
         state = fixture.copy(channels = listOf(otherChannel), selectedTagId = "other")
@@ -393,6 +406,42 @@ class GuideScreenTest {
         compose.onAllNodes(hasText("Winter on the ridge", substring = true)).assertCountEquals(0)
         compose.onAllNodes(hasText("10:00–10:45 PM", substring = true)).assertCountEquals(1)
         compose.onNodeWithText("45m • Documentary").assertIsDisplayed()
+
+        swipeDay(left = false)
+        compose.onNodeWithText(channel.name).assertIsSelected()
+        swipeDay(left = true, distance = 0.04f)
+        compose.onNodeWithText(channel.name).assertIsSelected()
+        assertEquals(emptyList<String>(), selectedChannels)
+        swipeDay(left = true)
+        val next = fixture.channels[1]
+        compose.onNode(hasText(next.name) and androidx.compose.ui.test.isSelectable()).assertIsSelected()
+        compose.onNodeWithText("By channel").assertIsSelected()
+        assertEquals(listOf(next.id), selectedChannels)
+        motionScale.scaleFactor = 0f
+        compose.mainClock.autoAdvance = false
+        try {
+            compose.onNodeWithText(channel.name).performClick()
+            compose.mainClock.advanceTimeByFrame()
+            compose.onNodeWithText(channel.name).assertIsSelected()
+            compose.onNodeWithText("Snowline").assertIsDisplayed()
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+        compose.onRoot().performTouchInput {
+            swipe(Offset(center.x, height * 0.83f), Offset(center.x, height * 0.45f))
+        }
+        compose.onNodeWithText(channel.name).assertIsSelected()
+        compose.onNodeWithText("Overview").performClick()
+        compose.onNodeWithText("Overview").assertIsSelected()
+    }
+
+    private fun swipeDay(left: Boolean, tablet: Boolean = false, distance: Float = 0.5f) {
+        compose.onRoot().performTouchInput {
+            val right = width * 0.89f
+            val other = right - width * (if (tablet) 0.28f else distance)
+            val y = height * 0.54f
+            swipe(Offset(if (left) right else other, y), Offset(if (left) other else right, y))
+        }
     }
 
     @Test
@@ -659,6 +708,9 @@ class GuideScreenTest {
         over: @Composable () -> Unit = {},
     ) {
         var shownDetailsId by mutableStateOf(detailsId)
+        var selectedDay by mutableStateOf<Int?>(null)
+        var selectedView by mutableStateOf(view)
+        var selectedChannel by mutableStateOf(channel)
         val actions = GuideActions(
             onWatch = { watched += it },
             onRecord = {},
@@ -667,18 +719,27 @@ class GuideScreenTest {
                 details += it
                 shownDetailsId = it
             },
-            onDay = {},
+            onDay = { selectedDay = it },
             onJump = {},
             onTag = {},
             onCancel = { cancelled += it },
             onStop = { stopped += it },
+            onView = { selectedView = it },
+            onChannel = {
+                selectedChannels += it
+                selectedChannel = it
+                selectedView = GuideView.ByChannel
+            },
         )
         compose.setContent {
             MaterialTheme(colorScheme = MobileDarkColors) {
                 val current = state()
                 GuideScreen(
-                    current.copy(details = current.details?.takeIf { it.id == shownDetailsId }), actions,
-                    initialView = view, initialChannelId = channel, initiallyOpen = open,
+                    current.copy(
+                        details = current.details?.takeIf { it.id == shownDetailsId },
+                        selectedDay = selectedDay ?: current.selectedDay,
+                    ), actions,
+                    view = selectedView, channelId = selectedChannel, initiallyOpen = open,
                 )
                 over()
             }
