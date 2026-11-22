@@ -374,11 +374,12 @@ private fun ByChannel(
     val margin = LocalBrowseMargin.current
     if (layout.compact) {
         val keys = state.channels.map { it.id }
-        val pager = rememberGuidePager(keys, keys.indexOf(channel.id)) { index ->
+        val channelIndex = keys.indexOf(channel.id)
+        val pager = rememberGuidePager(keys, channelIndex) { index ->
             actions.onChannel(keys[index])
         }
         Column(Modifier.fillMaxSize()) {
-            ChannelTabs(state.channels, channel.id, actions.onChannel)
+            ChannelTabs(state.channels, pager.tabIndex(channelIndex), actions.onChannel)
             DayBar(state.days, dayIndex, state.date, margin, actions.onDay)
             HorizontalPager(pager, Modifier.fillMaxSize(), key = { keys[it] }) { index ->
                 val page = state.channels[index]
@@ -403,18 +404,19 @@ private fun ByChannel(
         Column(Modifier.weight(1f)) {
             val programs = state.dayProgramsFor(channel, dayIndex)
             val hasDay = programs == null || programs.isNotEmpty() || state.dayLoading
+            val keys = state.dayDates.ifEmpty { state.days }
+            val pager = rememberGuidePager(keys, dayIndex, actions.onDay)
             DayHead(channel, state.date.takeIf { hasDay })
             if (hasDay || state.days.size > 1) {
-                SecondaryScrollableTabRow(selectedTabIndex = dayIndex, edgePadding = 0.dp) {
+                val selectedTab = pager.tabIndex(dayIndex)
+                SecondaryScrollableTabRow(selectedTabIndex = selectedTab, edgePadding = 0.dp) {
                     state.days.forEachIndexed { index, day ->
-                        Tab(selected = index == dayIndex, onClick = { actions.onDay(index) }) {
+                        Tab(selected = index == selectedTab, onClick = { actions.onDay(index) }) {
                             Text(day, Modifier.padding(vertical = 12.dp, horizontal = 4.dp), maxLines = 1)
                         }
                     }
                 }
             }
-            val keys = state.dayDates.ifEmpty { state.days }
-            val pager = rememberGuidePager(keys, dayIndex, actions.onDay)
             HorizontalPager(pager, Modifier.fillMaxSize(), key = { keys[it] }) { index ->
                 GuidePageReselection(enabled = index == dayIndex) {
                     Day(
@@ -425,6 +427,15 @@ private fun ByChannel(
             }
         }
     }
+}
+
+/** Prefer a new selection until the pager reaches it; a settled swipe must not re-arm the preference. */
+@Composable
+private fun PagerState.tabIndex(selected: Int): Int {
+    var pending by remember(this, selected) { mutableStateOf(true) }
+    if (!pending) return currentPage
+    if (!isScrollInProgress && currentPage == selected) SideEffect { pending = false }
+    return selected
 }
 
 /** Pager position is transient. Only a settled user move writes back to the selected tab. */
@@ -542,17 +553,17 @@ private fun ChannelList(
 
 /** The phone's channels as scrollable tabs with their logos. */
 @Composable
-private fun ChannelTabs(channels: List<GuideChannel>, selectedId: String, onChannel: (String) -> Unit) {
+private fun ChannelTabs(channels: List<GuideChannel>, selectedTab: Int, onChannel: (String) -> Unit) {
     PrimaryScrollableTabRow(
-        selectedTabIndex = channels.indexOfFirst { it.id == selectedId }.coerceAtLeast(0),
+        selectedTabIndex = selectedTab,
         edgePadding = LocalBrowseMargin.current,
     ) {
-        channels.forEach { channel ->
+        channels.forEachIndexed { index, channel ->
             val logo = channelLogoSlot(
                 channel.logo, channel.logoTint, Modifier.size(52.dp, 30.dp), RoundedCornerShape(7.dp),
                 channel.logoModel,
             )
-            val selected = channel.id == selectedId
+            val selected = index == selectedTab
             val pick = { onChannel(channel.id) }
             val text: @Composable () -> Unit = { Text(channel.name, maxLines = 1) }
             if (logo != null) LeadingIconTab(selected, pick, icon = logo, text = text)

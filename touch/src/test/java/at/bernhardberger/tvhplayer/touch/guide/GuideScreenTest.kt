@@ -23,6 +23,8 @@ import androidx.compose.ui.test.hasProgressBarRangeInfo
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasScrollToIndexAction
+import androidx.compose.ui.test.isSelectable
+import androidx.compose.ui.test.isSelected
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.isDisplayed
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -129,6 +131,7 @@ class GuideScreenTest {
     private val cancelled = mutableListOf<String>()
     private val stopped = mutableListOf<String>()
     private val selectedChannels = mutableListOf<String>()
+    private val selectedDays = mutableListOf<Int>()
 
     @Test
     @Config(qualifiers = TABLET)
@@ -323,10 +326,14 @@ class GuideScreenTest {
         state = fixture
         compose.onNodeWithText("60m • 2024 • Documentary").assertDoesNotExist()
 
-        swipeDay(left = true, tablet = true)
+        dragPastHalfway(tablet = true) {
+            assertEquals(emptyList<Int>(), selectedDays)
+            compose.onNodeWithText(fixture.days[1]).assertIsSelected()
+        }
         compose.onNodeWithText(fixture.days[1]).assertIsSelected()
-        compose.onNodeWithText(fixture.days[0]).performClick()
-        compose.onNodeWithText(fixture.days[0]).assertIsSelected()
+        assertEquals(listOf(1), selectedDays)
+        tapDistantTab(fixture.days.last(), fixture.days)
+        assertEquals(listOf(1, fixture.days.lastIndex), selectedDays)
 
         val otherChannel = fixture.channels.first { it.id == "glass-drama" }
         state = fixture.copy(channels = listOf(otherChannel), selectedTagId = "other")
@@ -504,6 +511,7 @@ class GuideScreenTest {
     fun phoneChannelDay() {
         val fixture = byChannelFixture(phone = true)
         val channel = fixture.channels.first()
+        var channelOverride by mutableStateOf<String?>(channel.id)
         val snowline = channel.programs.first { it.title == "Snowline" }
         val programs = channel.programs.map {
             if (it.id == snowline.id) it.copy(timeRange = "10:00–10:45 PM") else it
@@ -511,6 +519,7 @@ class GuideScreenTest {
         show(
             fixture.copy(channels = listOf(channel.copy(programs = programs)) + fixture.channels.drop(1)),
             GuideView.ByChannel, open = RIDGE_LIGHT_ID,
+            channelOverride = { channelOverride },
         )
         capture("phone-guide-channel", TouchCanvas.PHONE)
 
@@ -525,12 +534,40 @@ class GuideScreenTest {
         swipeDay(left = true, distance = 0.04f)
         compose.onNodeWithText(channel.name).assertIsSelected()
         assertEquals(emptyList<String>(), selectedChannels)
-        swipeDay(left = true)
         val next = fixture.channels[1]
-        compose.onNode(hasText(next.name) and androidx.compose.ui.test.isSelectable()).assertIsSelected()
+        val tabs = guideTabs(fixture.channels.map { it.name })
+        val selectedTabs = compose.onAllNodes(tabs and isSelected())
+        val neighbor = hasText(next.name)
+        val assertNeighborSelected = {
+            val selected = selectedTabs.fetchSemanticsNodes()
+            assertEquals(1, selected.size)
+            assertTrue("The neighboring tab must stay selected", neighbor.matches(selected.single()))
+        }
+        motionScale.scaleFactor = 0f
+        dragPastHalfway(afterRelease = {
+            var remainingFrames = 60
+            while (selectedChannels.isEmpty() && remainingFrames-- > 0) {
+                compose.mainClock.advanceTimeByFrame()
+                assertNeighborSelected()
+            }
+            assertEquals(listOf(next.id), selectedChannels)
+            // The screen can still be showing the previous ViewModel value when the callback fires.
+            repeat(2) {
+                compose.mainClock.advanceTimeByFrame()
+                assertNeighborSelected()
+            }
+            compose.runOnUiThread { channelOverride = null }
+            repeat(2) {
+                compose.mainClock.advanceTimeByFrame()
+                assertNeighborSelected()
+            }
+        }) {
+            assertEquals(emptyList<String>(), selectedChannels)
+            assertNeighborSelected()
+        }
+        compose.onNode(hasText(next.name) and isSelectable()).assertIsSelected()
         compose.onNodeWithText("By channel").assertIsSelected()
         assertEquals(listOf(next.id), selectedChannels)
-        motionScale.scaleFactor = 0f
         compose.mainClock.autoAdvance = false
         try {
             compose.onNodeWithText(channel.name).performClick()
@@ -544,17 +581,62 @@ class GuideScreenTest {
             swipe(Offset(center.x, height * 0.83f), Offset(center.x, height * 0.45f))
         }
         compose.onNodeWithText(channel.name).assertIsSelected()
+        assertEquals(listOf(next.id, channel.id), selectedChannels)
         compose.onNodeWithText("Overview").performClick()
         compose.onNodeWithText("Overview").assertIsSelected()
     }
 
-    private fun swipeDay(left: Boolean, tablet: Boolean = false, distance: Float = 0.5f) {
+    private fun swipeDay(left: Boolean, distance: Float = 0.5f) {
         compose.onRoot().performTouchInput {
             val right = width * 0.89f
-            val other = right - width * (if (tablet) 0.28f else distance)
+            val other = right - width * distance
             val y = height * 0.54f
             swipe(Offset(if (left) right else other, y), Offset(if (left) other else right, y))
         }
+    }
+
+    private fun dragPastHalfway(
+        tablet: Boolean = false,
+        afterRelease: () -> Unit = {},
+        assertDuringDrag: () -> Unit,
+    ) {
+        compose.mainClock.autoAdvance = false
+        try {
+            compose.onRoot().performTouchInput {
+                val start = Offset(width * 0.96f, height * 0.54f)
+                down(start)
+                moveTo(start - Offset(width * (if (tablet) 0.36f else 0.65f), 0f))
+            }
+            try {
+                compose.mainClock.advanceTimeByFrame()
+                assertDuringDrag()
+            } finally {
+                compose.onRoot().performTouchInput { up() }
+            }
+            afterRelease()
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+    }
+
+    private fun guideTabs(labels: List<String>) = isSelectable() and labels.map { hasText(it) }.reduce { a, b -> a or b }
+
+    private fun tapDistantTab(label: String, labels: List<String>) {
+        val tabs = guideTabs(labels)
+        val destination = compose.onNode(hasText(label) and tabs)
+        destination.performScrollTo()
+        compose.mainClock.autoAdvance = false
+        try {
+            destination.performClick()
+            repeat(4) {
+                compose.mainClock.advanceTimeByFrame()
+                compose.onAllNodes(tabs and isSelected()).assertCountEquals(1)
+                destination.assertIsSelected()
+            }
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+        destination.assertIsSelected()
     }
 
     @Test
@@ -1410,6 +1492,7 @@ class GuideScreenTest {
         onOverviewViewport: ((List<String>) -> Unit)? = null,
         extraDetails: ProgramDetails? = null,
         inShell: Boolean = false,
+        channelOverride: () -> String? = { null },
         over: @Composable () -> Unit = {},
     ) {
         var visit = 0L
@@ -1427,7 +1510,10 @@ class GuideScreenTest {
             onRecordOptions = {},
             onDetails = openDetails,
             onAiring = extraDetails?.let { openDetails },
-            onDay = { selectedDay = it },
+            onDay = {
+                selectedDays += it
+                selectedDay = it
+            },
             onJump = {},
             onTag = {},
             onCancel = { cancelled += it },
@@ -1453,7 +1539,7 @@ class GuideScreenTest {
                                 }.toMap(),
                                 selectedDay = selectedDay ?: current.selectedDay,
                             ), actions,
-                            view = selectedView, channelId = selectedChannel, initiallyOpen = open,
+                            view = selectedView, channelId = channelOverride() ?: selectedChannel, initiallyOpen = open,
                             onCloseAllDetails = { stack = emptyList() },
                         )
                     }
