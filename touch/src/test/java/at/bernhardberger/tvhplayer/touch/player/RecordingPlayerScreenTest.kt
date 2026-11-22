@@ -1,6 +1,8 @@
 package at.bernhardberger.tvhplayer.touch.player
 
 import androidx.activity.ComponentActivity
+import android.app.Activity
+import android.app.PictureInPictureParams
 import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -112,8 +114,11 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.annotation.Implementation
+import org.robolectric.annotation.Implements
 import org.robolectric.android.controller.ActivityController
 import org.robolectric.shadows.SensorEventBuilder
+import org.robolectric.shadows.ShadowActivity
 import org.robolectric.shadows.ShadowSensor
 import org.robolectric.util.ReflectionHelpers
 import java.time.Duration
@@ -499,6 +504,44 @@ class RecordingPlayerScreenTest {
     }
 
     @Test
+    @OptIn(UnstableApi::class)
+    fun backRetiresThePlayerBeforeHandingOffToBrowse() {
+        val hold = MutableStateFlow(false)
+        withPlayerRoute(marked = true, live = false, holdSettings = hold) { activity, runtime, server, _ ->
+            val player = activity.get()
+            val session = org.koin.core.context.GlobalContext.get().get<TvheadendSession>()
+            val selection = checkNotNull(currentRecordingPlaybackSelection(session.observation.value, server.film.id))
+            hold.value = true
+            val start = player.lifecycleScope.launch(start = CoroutineStart.UNDISPATCHED) {
+                runtime.playRecording(selection, recordingStart(true))
+            }
+            try {
+                player.onBackPressedDispatcher.onBackPressed()
+                settleRoute(runtime.player)
+                assertTrue(start.isActive)
+                assertNull(
+                    "Browse must not receive Watch while the old player can still stop it",
+                    shadowOf(player).nextStartedActivity,
+                )
+            } finally {
+                hold.value = false
+                settleRoute(runtime.player)
+            }
+            assertTrue("Watch must be routed away from the old player", player.isFinishing)
+            assertNull(runtime.activeTarget.value)
+            assertBrowseLaunched(player)
+            Robolectric.buildActivity(MainActivity::class.java).setup().use { browse ->
+                browse.get().watchRecording(server.diary.id)
+                settleRoute(runtime.player)
+                assertEquals(server.diary.id, shadowOf(browse.get()).nextStartedActivity?.recordingRoute()?.id)
+                activity.pause().stop()
+                settleRoute(runtime.player)
+                assertEquals(AppPlaybackTarget.Recording(server.diary.id), runtime.activeTarget.value)
+            }
+        }
+    }
+
+    @Test
     @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
     fun aRefusedPictureInPictureButtonKeepsThePlayerOpen() = withPlayerRoute(
         live = true,
@@ -514,6 +557,27 @@ class RecordingPlayerScreenTest {
         assertTrue("A refused window button must leave the player open", !activity.get().isFinishing)
         assertEquals(AppPlaybackTarget.Live(server.first.id), runtime.activeTarget.value)
         assertNull(shadowOf(activity.get()).nextStartedActivity)
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi", shadows = [DelayedPictureInPictureShadow::class])
+    fun theWindowButtonDoesNotBrowseAndBackDuringEntryDoesNothing() = withPlayerRoute(
+        live = true,
+        offerPictureInPicture = true,
+    ) { activity, runtime, server, _ ->
+        val player = activity.get()
+        val window = button(R.string.player_picture_in_picture)
+        window.performClick()
+        settleRoute()
+        window.assertDoesNotExist()
+        assertTrue("The window request precedes the platform mode change", !player.isInPictureInPictureMode)
+        assertNull(shadowOf(player).nextStartedActivity)
+
+        player.onBackPressedDispatcher.onBackPressed()
+        settleRoute()
+        assertNull("Back during window entry must not launch Browse", shadowOf(player).nextStartedActivity)
+        assertTrue(!player.isFinishing)
+        assertEquals(AppPlaybackTarget.Live(server.first.id), runtime.activeTarget.value)
     }
 
     @Test
@@ -929,4 +993,17 @@ class RecordingPlayerScreenTest {
     private fun capture(name: String, canvas: TouchCanvas) = compose.captureTouch("slice3-player", name, canvas)
     private fun captureWindows(name: String, canvas: TouchCanvas) =
         compose.captureTouchWindows("slice3-player", name, canvas)
+}
+
+/** Accept the first request, but keep the platform mode unchanged until the transition completes. */
+@Implements(Activity::class)
+class DelayedPictureInPictureShadow : ShadowActivity() {
+    private var requested = false
+
+    @Implementation
+    override fun enterPictureInPictureMode(params: PictureInPictureParams): Boolean {
+        if (requested) return false
+        requested = true
+        return true
+    }
 }
