@@ -350,7 +350,7 @@ Paths below are relative to `app/src/main/java/at/bernhardberger/tvhplayer/ui/`.
 | Picon | `components/PiconBox.kt` — dimmed TV icon while loading, normal-strength TV icon when there is no logo or it fails |
 | Focused card's info above a row | `components/FocusedInfo.kt` — on Home's On now, Channels Immersive and List (with the List's picture), the Guide's headline and the zap rail: a 300 ms linear swap in which old and new text meet faintly, the List's picture crossfading over the same 300 ms; while a direction is held, Home, Channels Immersive/List and the Guide keep the last text and picture until focus rests (300 ms, with the backdrop), and the zap rail hides its info and brings it back 250 ms after release; a new programme on the same card updates in place |
 | Channel logo on a programme picture | `components/ProgrammeArtwork.kt` — `ArtworkCornerLogo` and `ArtworkChannelName`; the corner and ground come from `artworkLogoPlaces` in `../images/ProgrammeArtworkPolicy.kt`, noted with the decoded picture by `ArtworkLogoCornerTransformation` |
-| Now-playing plate | `player/NowPlayingStrip.kt` — `NowPlayingPlate`: 48×27 picon plate (channel number without a logo) with the 2dp viewer-position strip, shared by the player strip and the rail's playing slot |
+| Now-playing plate | `player/NowPlayingStrip.kt` — `NowPlayingPlate`: 48×27 picon plate (channel number without a logo) with the 2dp viewer-position strip. The strip above the player's channel rail uses the top identity's trimmed picon in a 42×21 box; the browse side rail keeps its normal picon |
 | Image load fade | `../images/TvheadendArtworkLoader.kt` — the shared loader fades every logo and programme picture in over 200 ms when actually loaded; memory-cache hits show at once |
 | Reading box | `components/ProgrammeDetailsLayout.kt` — `ProgrammeDetailsFullDescription` |
 | Context menu | `components/BrowseContextMenu.kt` |
@@ -1034,14 +1034,14 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
 
 ### Player chrome (revised 2026-09-30)
 
-- The page top band shares the clock's center line: passive now-playing strip
-  left at the 58dp grid keyline, up affordance centered, clock right. The strip
-  always identifies the watched channel, with a small picon, two-line identity
-  and programme text, and programme progress. Without a picon there is no logo
-  slot: the name starts on the keyline and carries the number once. It stays pinned between rail and
-  rail schedule; controls-to-details fades it in over 200–400 ms (reversed on Back).
-  Program-details tabs start on the 58dp keyline; only their body keeps the 72dp
-  content inset (x=130dp). Rail-schedule heading and rows remain at x=58dp.
+- The top band shares the clock's center line. The live identity stands at the
+  58dp keyline; as the channel rail rises, its logo and name move separately
+  into the now-playing strip. The plate follows the logo, and the strip's labels
+  follow the name's first baseline until they arrive. The strip keeps the watched channel
+  above the rail, with its current programme, playback marker, and progress.
+  Without a logo the identity's name starts on the keyline and the strip keeps
+  its number plate. The up affordance is centered above the rail; the clock is
+  on the right. Programme details do not show a now-playing strip.
 - Live TV and recordings share one chrome with four modes: hidden; the passive
   **Banner** (clock, info bar, timeline; nothing focusable); the **Banner step**
   (a quick step's preview inside the Banner, without a thumb); and the

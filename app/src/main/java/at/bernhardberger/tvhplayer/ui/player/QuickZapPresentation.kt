@@ -88,6 +88,10 @@ internal class QuickZapRailState(
 ) {
     val expanded by expandedState
     internal val expansion: State<Float> = expansionAnimation.asState()
+    internal val visiting = derivedStateOf { expanded || expansion.value > 0f }
+    internal var morphIdentity by mutableStateOf(false)
+    internal var identityBaselineFromCenter by mutableFloatStateOf(0f)
+    internal var stripBaselineFromCenter by mutableFloatStateOf(0f)
     internal val peek = ChannelPeek(resting)
     internal var viewportHeight by mutableIntStateOf(0)
     internal var railHeight by mutableIntStateOf(0)
@@ -192,8 +196,7 @@ internal fun QuickZapRail(
     val hosted = rail.hosted
     LaunchedEffect(expanded) {
         val target = if (expanded) 1f else 0f
-        // Away from the controls, or arriving with them, the rail stands as a rail composed with
-        // them would begin.
+        // A direct open stands at the rail position; its strip fades with the arriving chrome.
         if (!hosted || expansion.value == target) {
             rail.expansionAnimation.snapTo(target)
         } else {
@@ -296,6 +299,7 @@ internal fun QuickZapRail(
 
 /** How far the rail has opened, for the controls' footer to give way to it. */
 internal val LocalRailExpansion = compositionLocalOf<() -> Float> { { 0f } }
+internal val LocalPlayerRailHandoff = compositionLocalOf<QuickZapRailState?> { null }
 
 /** How much of the closed rail's cards shows at the bottom edge. */
 private val ChannelPeekDepth = 24.dp

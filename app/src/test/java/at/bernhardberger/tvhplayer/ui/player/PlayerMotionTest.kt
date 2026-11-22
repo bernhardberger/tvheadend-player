@@ -64,6 +64,7 @@ import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
 import at.bernhardberger.tvhplayer.core.PlayerForegroundContext
 import at.bernhardberger.tvhplayer.core.PlayerForegroundLayer
@@ -95,6 +96,69 @@ import org.robolectric.annotation.GraphicsMode
 class PlayerMotionTest {
     private val motionScale = object : MotionDurationScale { override var scaleFactor = 1f }
     @get:Rule val compose = createComposeRule(effectContext = motionScale)
+
+    @Test fun liveIdentityTravelsToTheStripAndCanTurnBack() {
+        var expansion by mutableStateOf(0f)
+        var expanded by mutableStateOf(false)
+        var identityFirstBaseline = 0f
+        var stripFirstBaseline = 0f
+        val icon = ChannelIcon.ImageCache(ArtworkId(1))
+        val content = PlayerChromeContent(PlayerChromeClockSec,
+            PlayerInfoBarData("1", "Ridge Earth", "", ""), picon = icon)
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                val rail = rememberQuickZapRail(expanded, detached = true)
+                LaunchedEffect(expansion) { rail.expansionAnimation.snapTo(expansion) }
+                val measurer = rememberTextMeasurer()
+                identityFirstBaseline = measurer.measure("1 Ridge Earth",
+                    MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Medium)).firstBaseline
+                stripFirstBaseline = measurer.measure("1 Ridge Earth", MaterialTheme.typography.labelLarge).firstBaseline
+                PlayerPage(details = null as Unit?, rail = rail, chromeIdentityVisible = true,
+                    nowPlaying = { NowPlayingStrip(ChannelId(1), "1", "Ridge Earth", icon, null, PlayerChromeClockSec) },
+                    player = { PlayerTopIdentity(content, Modifier.fillMaxSize()) }) { }
+            }
+        }
+
+        fun bounds(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        fun logo() = bounds("player-top-identity-logo")
+        fun title() = bounds("player-top-identity-name")
+        val restLogo = logo()
+        val restTitle = title()
+        fun identityBaseline() = title().let { it.top + identityFirstBaseline * (it.height / restTitle.height) }
+        val restBaseline = identityBaseline()
+        compose.changeState { expanded = true }
+        val strip = bounds("player-now-playing")
+        fun stripTitleBounds() =
+            compose.onNodeWithText("1 Ridge Earth", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        compose.changeState { expansion = 1f }
+        val stripTitle = stripTitleBounds()
+        val stripBaseline = stripTitle.top + stripFirstBaseline
+        val stripLogoCenter = strip.left + with(compose.density) { NowPlayingPlateWidth.toPx() / 2 }
+
+        compose.changeState { expansion = 1f / 3f }
+        val middleLogo = logo()
+        val middleTitle = title()
+        assertTrue("the logo centre travels toward the plate", middleLogo.center.x in stripLogoCenter..<restLogo.center.x)
+        assertTrue("text independently travels toward the strip", middleTitle.left in stripTitle.left..<restTitle.left)
+        val middleBaseline = identityBaseline()
+        assertTrue("the text's baseline rises toward the actual first line", middleBaseline in stripBaseline..<restBaseline)
+        val movingStripTitle = stripTitleBounds()
+        assertEquals("both names share the moving start", middleTitle.left, movingStripTitle.left, 0.5f)
+        assertEquals("both names share the moving baseline", middleBaseline,
+            movingStripTitle.top + stripFirstBaseline * movingStripTitle.height / stripTitle.height, 1f)
+        assertEquals(restLogo.center.y, middleLogo.center.y, 0.5f)
+
+        compose.changeState { expansion = 0.25f }
+        assertTrue("reversing sends the same logo back toward rest", logo().center.x in middleLogo.center.x..<restLogo.center.x)
+        assertTrue("text reverses independently", title().left in middleTitle.left..<restTitle.left)
+        assertTrue("the baseline reverses from its current position", identityBaseline() in middleBaseline..<restBaseline)
+
+        compose.changeState { expansion = 1f }
+        assertEquals(stripLogoCenter, logo().center.x, 0.5f)
+        assertEquals(stripTitle.left, title().left, 0.5f)
+        assertEquals(stripBaseline, identityBaseline(), 1f)
+        assertEquals(strip, bounds("player-now-playing"))
+    }
 
     @Test fun hidingControlsDropsFocusSemanticsAndKeysOnTheFirstExitFrame() {
         var visible by mutableStateOf(true)

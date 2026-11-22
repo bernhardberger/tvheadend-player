@@ -23,9 +23,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.FirstBaseline
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.ScaleFactor
 import androidx.compose.ui.platform.testTag
@@ -63,9 +67,8 @@ internal const val PlayerTopIdentityTag = "player-top-identity"
  * The passive channel identity at the top start, in the same anchor as [NowPlayingStrip]: its
  * picon (if available) and "number name" live; the recording symbol and date in playback.
  *
- * While a layer that shows [NowPlayingStrip] opens (the channel rows, or a page such as the
- * programme details), it shrinks towards the strip's size and fades, so the two read as one object
- * and never stand at full strength together. While [numberEntryShown] it fades out under the
+ * The live logo and name travel independently onto [NowPlayingStrip] as the channel rows rise.
+ * While [numberEntryShown] the identity fades out under the
  * channel number entry, which stands in its place ([PlayerTopIdentitySlot]), and back once the entry leaves.
  */
 @Composable
@@ -79,11 +82,11 @@ internal fun PlayerTopIdentity(
         if (numberEntryShown) tween(PlayerMotion.FastMs, easing = PlayerMotion.StandardAccelerate)
         else tween(PlayerMotion.ShortMs, easing = PlayerMotion.StandardDecelerate),
         label = "identity under number entry")
-    val rail = LocalRailExpansion.current
+    val rail = LocalPlayerRailHandoff.current.takeIf { content.info.recording == null }
     val page = LocalPlayerPageProgress.current
     // 0 at rest, 1 once the strip stands in for the identity.
     val morph = {
-        maxOf(rail(), ((page?.invoke() ?: 0f) * BrowseMotionPolicy.pageDownMs / IdentityPageMorphMs).coerceIn(0f, 1f))
+        ((page?.invoke() ?: 0f) * BrowseMotionPolicy.pageDownMs / IdentityPageMorphMs).coerceIn(0f, 1f)
     }
     Box(modifier) {
         Layout(
@@ -100,14 +103,14 @@ internal fun PlayerTopIdentity(
                 val spoken = identitySpoken(content)
                 // Faded out under the entry, it is not read out either; the entry speaks for itself.
                 Box(identityLayer.testTag(PlayerTopIdentityTag).then(
-                    if (numberEntryShown) Modifier.clearAndSetSemantics {}
+                    if (numberEntryShown || rail?.expanded == true) Modifier.clearAndSetSemantics {}
                     else Modifier.semantics(mergeDescendants = true) {
                         if (spoken.isNotBlank()) contentDescription = spoken
                     },
                 )) {
                     val recording = content.info.recording
                     if (recording != null) RecordingIdentityContent(content, recording)
-                    else LiveIdentityContent(content)
+                    else LiveIdentityContent(content, rail)
                 }
             },
         ) { measurables, constraints ->
@@ -156,7 +159,7 @@ internal fun PlayerTopIdentitySlot(
 
 /** The room's header band (or the clock's line, if taller), which the identity is centred on, as the strip is. */
 @Composable
-private fun HeaderBandProbe() {
+internal fun HeaderBandProbe() {
     Box(Modifier.width(0.dp).heightIn(min = TvBrowseHeaderHeight)) {
         Text("", style = MaterialTheme.typography.titleLarge, maxLines = 1,
             modifier = Modifier.width(0.dp).clearAndSetSemantics {})
@@ -182,7 +185,7 @@ private fun identitySpoken(content: PlayerChromeContent): String {
 }
 
 @Composable
-private fun LiveIdentityContent(content: PlayerChromeContent) {
+private fun LiveIdentityContent(content: PlayerChromeContent, rail: QuickZapRailState?) {
     val info = content.info
     val ink = MaterialTheme.colorScheme.onSurface
     // The chip's height even without one, so the identity keeps its place and size on every channel.
@@ -191,7 +194,9 @@ private fun LiveIdentityContent(content: PlayerChromeContent) {
         // Without a picon there is no logo slot: the name starts on the keyline and already carries
         // the number, which a number chip would only repeat.
         if (content.picon != null) {
-            IdentityPicon(content.picon, Modifier.testTag("player-top-identity-logo"))
+            IdentityPicon(content.picon, Modifier
+                .travelToStrip(rail, RailLogoTravel, logo = true)
+                .testTag("player-top-identity-logo"))
         }
         val number = info.channelNumber.toLongOrNull()
         val title = buildAnnotatedString {
@@ -201,18 +206,66 @@ private fun LiveIdentityContent(content: PlayerChromeContent) {
                     fontWeight = FontWeight.Normal, fontFeatureSettings = "tnum"), 0, it.toString().length)
             }
         }
-        Text(title,
-            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Medium),
-            color = ink, maxLines = 1, overflow = TextOverflow.Ellipsis,
-            // The identity's merged description names the channel.
-            modifier = Modifier.weight(1f, fill = false).widthIn(max = IdentityTextMaxWidth)
-                .testTag("player-top-identity-name").clearAndSetSemantics {})
-        if (content.showChannelMark) {
-            RecordingStatusIndicator(
-                DvrEntryState.RECORDING, Modifier.testTag("player-identity-recording-mark"), announceState = false,
-                textStyle = MaterialTheme.typography.headlineSmall)
+        Row(Modifier.weight(1f, fill = false).travelToStrip(rail, railTextTravel(content.picon != null)),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(IdentityTextGap)) {
+            Text(title,
+                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Medium),
+                color = ink, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                // The identity's merged description names the channel.
+                modifier = Modifier.weight(1f, fill = false).widthIn(max = IdentityTextMaxWidth)
+                    .testTag("player-top-identity-name").clearAndSetSemantics {})
+            if (content.showChannelMark) {
+                RecordingStatusIndicator(
+                    DvrEntryState.RECORDING, Modifier.testTag("player-identity-recording-mark"), announceState = false,
+                    textStyle = MaterialTheme.typography.headlineSmall)
+            }
         }
     }
+}
+
+private fun Modifier.travelToStrip(rail: QuickZapRailState?, dx: androidx.compose.ui.unit.Dp, logo: Boolean = false): Modifier {
+    if (rail == null) return this
+    return layout { measurable, constraints ->
+        val part = measurable.measure(constraints)
+        val pivotY = if (logo) part.height / 2f else part[FirstBaseline].toFloat()
+        layout(part.width, part.height) {
+            if (!logo) rail.identityBaselineFromCenter = pivotY - part.height / 2f
+            part.placeWithLayer(0, 0) {
+                val e = rail.expansion.value
+                val travelling = rail.morphIdentity
+                railIdentityTransform(rail, dx, pivotY, logo, fromStrip = false)
+                val fadeStart = StripArrival + StripHandoffWindow
+                alpha = if (travelling) ((1f - e) / (1f - fadeStart)).coerceIn(0f, 1f) else 1f - e
+                compositingStrategy = CompositingStrategy.ModulateAlpha
+            }
+        }
+    }
+}
+
+internal val RailLogoTravel get() = (NowPlayingPlateWidth - ChipWidth) / 2
+
+internal fun railTextTravel(hasPicon: Boolean) = NowPlayingPlateWidth + NowPlayingPlateGap -
+    if (hasPicon) ChipWidth + IdentityTextGap else 0.dp
+
+internal fun GraphicsLayerScope.railIdentityTransform(
+    rail: QuickZapRailState,
+    dx: androidx.compose.ui.unit.Dp,
+    pivotY: Float,
+    logo: Boolean,
+    fromStrip: Boolean,
+) {
+    if (!rail.morphIdentity) return
+    // Arrive before the crossfade, so two displaced names never compete.
+    val e = rail.expansion.value
+    val travel = if (e <= 0.75f) e
+        else (0.75f + (e - 0.75f) * 0.25f / (StripArrival - 0.75f)).coerceAtMost(1f)
+    val distance = if (fromStrip) travel - 1f else travel
+    val scale = 1f - (1f - StripIdentityScale) * travel
+    transformOrigin = TransformOrigin(if (logo) 0.5f else 0f, pivotY / size.height.coerceAtLeast(1f))
+    translationX = dx.toPx() * distance
+    if (!logo) translationY = (rail.stripBaselineFromCenter - rail.identityBaselineFromCenter) * distance
+    scaleX = if (fromStrip) scale / StripIdentityScale else scale
+    scaleY = scaleX
 }
 
 private fun recordingChannel(content: PlayerChromeContent): String? =
@@ -298,7 +351,7 @@ internal val IdentityShape = RoundedCornerShape(12.dp)
 internal val ChipWidth = 72.dp
 internal val ChipHeight = 36.dp
 
-/** The identity's share of the strip's chip: 48dp of 72dp. */
+/** The legacy details-page exit, independent of the rail handoff. */
 private const val IdentityMorphShrink = 1f / 3f
 
 /** How much of a page's opening the identity takes to give way to the strip. */

@@ -451,19 +451,19 @@ class StatusMarksCaptureTest(
 
     @Composable
     private fun Rail() {
+        val rail = rememberQuickZapRail(expanded = true)
         if (watching) {
-            PlayerPage<Unit>(details = null, railExpanded = true, nowPlaying = {
+            PlayerPage<Unit>(details = null, rail = rail, nowPlaying = {
                 NowPlayingStrip(channel.id, channel.number?.toString(), names.first(), channel.icon,
                     current.first(), captureNow, playbackIndicator = ChannelPlaybackIndicator.PLAYING)
-            }, player = { ZapContent() }) {}
+            }, player = { ZapContent(rail) }) {}
         } else {
-            ZapContent()
+            ZapContent(rail)
         }
     }
 
     @Composable
-    private fun ZapContent() {
-        val rail = rememberQuickZapRail(expanded = true)
+    private fun ZapContent(rail: QuickZapRailState) {
         val state = remember { PlayerChannelBrowserState() }
         // Focus pins to the start keyline; put the unfocused watched card on the visible side.
         val railChannels = if (otherFocus) listOf(channels[1], channels[0]) + channels.drop(2) else channels

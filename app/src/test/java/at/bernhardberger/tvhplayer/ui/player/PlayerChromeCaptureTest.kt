@@ -294,7 +294,7 @@ class PlayerChromeCaptureTest {
                             recordingChannels = setOf(ChannelId(2)),
                         ) }
                         if (railOpen) PlayerPage<Unit>(
-                            details = null, railExpanded = true,
+                            details = null, rail = rememberQuickZapRail(expanded = true),
                             nowPlaying = { ProvideArtworkSession(session) {
                                 NowPlayingStrip(lineUp[0].id, lineUp[0].number?.toString(), lineUp[0].name.orEmpty(),
                                     lineUp[0].icon, programme, now,
@@ -629,7 +629,7 @@ class PlayerChromeCaptureTest {
                     onNow.focusedId = channels.first().id
                     recent.focusedId = channels[1].id
                 } }
-                PlayerPage<Unit>(details = null, railExpanded = true,
+                PlayerPage<Unit>(details = null, rail = rememberQuickZapRail(expanded = true),
                     nowPlaying = { ProvideArtworkSession(session) { NowPlayingStrip(ChannelId(1), "101", "Ridge Earth HD", ChannelIcon.ImageCache(LOGO), programme, NOW,
                         playbackIndicator = ChannelPlaybackIndicator.PLAYING) } },
                     player = {

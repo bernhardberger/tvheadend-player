@@ -5,12 +5,6 @@ import at.bernhardberger.tvhplayer.ui.TvBrowseHeaderHeight
 import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
 import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
 import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.Easing
@@ -186,7 +180,9 @@ internal fun <T : Any> PlayerPage(
     /** Opens [details] as a dialog over the resting player page: it fades in and out, nothing travels. */
     dialog: Boolean = false,
     railHeader: (@Composable () -> Unit)? = null,
-    railExpanded: Boolean = false,
+    rail: QuickZapRailState? = null,
+    chromeIdentityVisible: Boolean = false,
+    numberEntryShown: Boolean = false,
     nowPlaying: (@Composable () -> Unit)? = null,
     player: @Composable (keepControls: Boolean) -> Unit,
     programme: @Composable (T) -> Unit,
@@ -220,16 +216,33 @@ internal fun <T : Any> PlayerPage(
     androidx.compose.runtime.SideEffect { if (open || railHeader != null) lastHeader.value = railHeader }
     val header = if (!open && (!settled || peekVisible)) railHeader ?: lastHeader.value else railHeader
     val scrim = remember { PlayerPageScrim() }
-    // The strip fades with a rail visit, including its exit and a details page opened from it; only
-    // details opened from the player bring it in with the page.
-    val stripFromRail = remember { booleanArrayOf(false) }
-    if (railExpanded || header != null) stripFromRail[0] = true else if (composed) stripFromRail[0] = false
-    val railStrip = stripFromRail[0]
+    val railExpanded = rail?.expanded == true
+    val railStrip = rail?.takeIf { it.visiting.value }
+    val previousIdentity = remember { booleanArrayOf(chromeIdentityVisible) }
+    val morphIdentity = remember(railStrip) { previousIdentity[0] }
+    androidx.compose.runtime.SideEffect {
+        previousIdentity[0] = chromeIdentityVisible
+        railStrip?.morphIdentity = morphIdentity && (railExpanded || chromeIdentityVisible)
+    }
     CompositionLocalProvider(LocalPlayerPageProgress provides readProgress, LocalPlayerPageScrim provides scrim,
-        LocalPlayerRailPeek provides railPeek) {
+        LocalPlayerRailPeek provides railPeek, LocalPlayerRailHandoff provides railStrip) {
         Box(modifier.fillMaxSize().clipToBounds()) {
             Box(Modifier.matchParentSize().testTag("player-page-scrim")
                 .playerScrim(scrim, readProgress, railHeader = header != null))
+            // The plate is beneath the travelling logo. The rail retains this
+            // layer through its exit, even when the controls and their scrim have gone.
+            if (nowPlaying != null && railStrip != null) {
+                Box(Modifier.fillMaxWidth().padding(top = TvGridVerticalMargin)) {
+                    HeaderBandProbe()
+                    Box(Modifier.matchParentSize()) {
+                        Box(Modifier.align(Alignment.CenterStart)
+                            .padding(start = TvGridHorizontalMargin).wrapContentHeight(unbounded = true)
+                            .then(if (!railExpanded || numberEntryShown) Modifier.clearAndSetSemantics {} else Modifier)
+                            .drawWithContent { if (!numberEntryShown) drawContent() }
+                            .testTag("player-now-playing-motion")) { nowPlaying() }
+                    }
+                }
+            }
             PlayerMotionFrame(leaving = open || !settled, modifier = Modifier.fillMaxSize().testTag("player-page-first")) {
                 Box(Modifier.fillMaxSize()) {
                     CompositionLocalProvider(LocalPlayerPageActive provides (!open && settled)) { player(composed) }
@@ -258,29 +271,14 @@ internal fun <T : Any> PlayerPage(
             }
             // Shared viewport layer: neither strip nor up affordance travels with either page.
             Box(Modifier.fillMaxWidth().padding(top = TvGridVerticalMargin)) {
-                // The room's header band, or the clock's actual line box if taller (font scale, font metrics).
-                Box(Modifier.width(0.dp).heightIn(min = TvBrowseHeaderHeight)) {
-                    Text("", style = MaterialTheme.typography.titleLarge, maxLines = 1,
-                        modifier = Modifier.width(0.dp).clearAndSetSemantics {})
-                }
+                HeaderBandProbe()
                 Box(Modifier.matchParentSize()) {
-                    // Over the rail the strip grows out of the live top identity's size and shrinks back into
-                    // it, at the chip's start edge, while the identity does the reverse.
-                    if (nowPlaying != null) AnimatedVisibility(
-                        visible = railExpanded || composed,
-                        enter = fadeIn(tween(if (railStrip) PlayerMotion.MediumMs else 0,
-                            easing = PlayerMotion.StandardDecelerate)) +
-                            scaleIn(tween(if (railStrip) PlayerMotion.PanelMs else 0, easing = PlayerMotion.EmphasizedDecelerate),
-                                initialScale = if (railStrip) NowPlayingFromIdentityScale else 1f, transformOrigin = StripOrigin),
-                        exit = fadeOut(tween(if (railStrip) PlayerMotion.ShortMs else 0,
-                            easing = PlayerMotion.StandardAccelerate)) +
-                            scaleOut(tween(if (railStrip) PlayerMotion.MediumMs else 0, easing = PlayerMotion.EmphasizedAccelerate),
-                                targetScale = if (railStrip) NowPlayingFromIdentityScale else 1f, transformOrigin = StripOrigin),
-                        modifier = Modifier.align(Alignment.CenterStart)
+                    if (nowPlaying != null && composed && railStrip == null) {
+                        Box(Modifier.align(Alignment.CenterStart)
                             .padding(start = TvGridHorizontalMargin).wrapContentHeight(unbounded = true)
-                            .then(if (!railStrip) Modifier.pageMotion(200..400) else Modifier)
-                            .testTag("player-now-playing-motion"),
-                    ) { nowPlaying() }
+                            .then(if (header == null) Modifier.pageMotion(200..400) else Modifier)
+                            .testTag("player-now-playing-motion")) { nowPlaying() }
+                    }
                     if (!asDialog && (composed || header != null)) PlayerDownHint(
                         stringResource(if (header != null || railExpanded) R.string.nav_channels else R.string.details_back_to_tv),
                         Modifier.align(Alignment.Center).pageMotion(300..500,
@@ -306,7 +304,3 @@ internal fun <T : Any> PlayerPage(
         }
     }
 }
-
-/** The live top identity's chip against the strip's: 64dp to 48dp. */
-private const val NowPlayingFromIdentityScale = 64f / 48f
-private val StripOrigin = TransformOrigin(0f, 0.5f)

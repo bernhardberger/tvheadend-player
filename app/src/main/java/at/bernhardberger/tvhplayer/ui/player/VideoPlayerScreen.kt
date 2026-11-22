@@ -1934,6 +1934,8 @@ fun VideoPlayerScreen(
             layerState.core.beginOpeningKeyCycle(AndroidKeyEvent.KEYCODE_DPAD_DOWN)
             if (foregroundLayer != PlayerForegroundLayer.CHANNEL_DRAWER) openChannelDrawer()
         }
+        // The page's strip and the detached rail outlive the controls' exit.
+        val quickZap = rememberQuickZapRail(expanded = layerState.channelRailPresented, detached = true)
         @Composable
         fun PlayerControls(keepControls: Boolean) {
         val previewId = visibleSeekPreview?.id
@@ -1944,11 +1946,6 @@ fun VideoPlayerScreen(
         val trackButtons = rememberPlayerTrackButtons(
             player, available = !channelFailed && playingLiveChannelId == currentChannelId)
         val controlsShown = controlsLayerShown || keepControls
-        // Composed beside the controls rather than in their layer: the closed rail's cards are not
-        // built again inside every reveal's first frame.
-        val quickZap = rememberQuickZapRail(
-            // Keep the departing rail expanded throughout its vertical step.
-            expanded = layerState.channelRailPresented, detached = true)
         PlayerChrome(
             mode = lowerChromeMode(keepControls),
             content = chromeContent(),
@@ -2100,7 +2097,9 @@ fun VideoPlayerScreen(
 
         }
         PlayerPage(
-            railExpanded = layerState.channelRailPresented,
+            rail = quickZap,
+            chromeIdentityVisible = lowerChromeMode(keepControls = false) != PlayerChromeMode.HIDDEN && !chromePanelOpen,
+            numberEntryShown = numberEntry.isNotEmpty(),
             nowPlaying = {
                 NowPlayingStrip(currentChannelId, currentChannelNumber()?.toString(), currentChannelName, currentChannel?.icon,
                     channelsVm.nowEvent(currentChannelId, nowSec), nowSec,

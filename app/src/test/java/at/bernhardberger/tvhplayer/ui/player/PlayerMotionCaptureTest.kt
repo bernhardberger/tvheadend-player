@@ -126,6 +126,50 @@ class PlayerMotionCaptureTest {
         capture("header-live")
     }
 
+    @Test
+    @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")
+    fun railIdentityHandoff() {
+        var expanded by mutableStateOf(false)
+        var sample by mutableStateOf(0f)
+        show { session ->
+            val rail = rememberQuickZapRail(expanded, detached = true)
+            LaunchedEffect(sample) { rail.expansionAnimation.snapTo(sample) }
+            ProvideArtworkSession(session) {
+                val icon = ChannelIcon.ImageCache(ArtworkId(1))
+                val browser = remember { PlayerChannelBrowserState() }
+                PlayerPage<Unit>(details = null, rail = rail, chromeIdentityVisible = true,
+                    nowPlaying = {
+                        NowPlayingStrip(ChannelId(1), "1", "Ridge Earth", icon, programme, 1_800,
+                            playbackIndicator = at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator.PLAYING)
+                    },
+                    player = {
+                        live(session, behind = false, handoff = rail)
+                        QuickZapRail(rail, channelContent = {
+                            PlayerChannelBrowser(
+                                state = browser, channels = channels, recentChannels = channels.drop(1),
+                                playingChannelId = ChannelId(1), recordingChannelIds = emptySet(),
+                                nowEvent = { programme }, nowSec = 1_800,
+                                onFocusChannel = {}, onOpenDetails = { _, _, _ -> },
+                                onPickChannel = {}, onClose = {}, active = expanded,
+                            )
+                        }, preview = {
+                            QuickZapTrayPreview(channels.first(), programme, null, 1_800,
+                                Modifier.padding(horizontal = TvGridHorizontalMargin))
+                        }, header = { PlayerChannelBrowserHint(browser, true, stringResource(R.string.all_channels)) },
+                            peeks = true, trayBleeds = true)
+                    },
+                    programme = {})
+            }
+        }
+        capture("1-rest", directory = "rail-identity", timing = "expansion=0")
+        compose.runOnIdle { expanded = true; Snapshot.sendApplyNotifications() }
+        capture("4-end", directory = "rail-identity", focus = "channel rail", timing = "expansion=1")
+        for ((name, fraction) in listOf("2-33" to 1f / 3f, "3-66" to 2f / 3f)) {
+            compose.runOnIdle { sample = fraction; Snapshot.sendApplyNotifications() }
+            capture(name, directory = "rail-identity", focus = "channel rail", timing = "expansion=$fraction")
+        }
+    }
+
     @Test fun statsStreamPathStates() {
         var diagnostics by mutableStateOf(statsLiveDiagnostics())
         var level by mutableStateOf(PlayerStatsLevel.STREAM_PATH)
@@ -594,6 +638,7 @@ class PlayerMotionCaptureTest {
         /** The channel rail below the controls, as the live player shows it. */
         rail: LivePlayerLayerState? = null,
         downHint: String? = null,
+        handoff: QuickZapRailState? = null,
     ) {
         val timeshift = AppTimeshiftState(
             available = true,
@@ -610,7 +655,8 @@ class PlayerMotionCaptureTest {
         ProvideArtworkSession(session) { PlayerChrome(
             mode = mode,
             content = PlayerChromeContent(PlayerChromeClockSec, liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, if (zapped) 2 else 1,
-                if (zapped) "Science and Nature" else "Documentary", programme, null, 1_800, ""), picon = ChannelIcon.ImageCache(ArtworkId(1))),
+                if (handoff != null) "Ridge Earth" else if (zapped) "Science and Nature" else "Documentary",
+                programme, null, 1_800, ""), picon = ChannelIcon.ImageCache(ArtworkId(1))),
             timeline = PlayerChromeTimeline.Live(
                 timeshift = timeshift,
                 nowSec = 1_800,
@@ -624,9 +670,10 @@ class PlayerMotionCaptureTest {
             entry = entry,
             panelOpen = panelOpen,
             downHint = downHint,
-            decorationCoversControls = rail?.channelDrawerOpen == true,
+            decorationCoversControls = handoff?.expanded == true || rail?.channelDrawerOpen == true,
             controlsDecoration = { _, controls ->
-                if (rail == null) controls() else {
+                if (handoff != null) QuickZapControls(handoff, peek = { 1f }, controls)
+                else if (rail == null) controls() else {
                     val browser = remember { PlayerChannelBrowserState() }
                     QuickZapPresentation(
                         expanded = rail.channelRailPresented,
@@ -692,7 +739,7 @@ class PlayerMotionCaptureTest {
             val directory = File("../captures/$directory")
             CaptureOutput.writePng(File(directory, "$name.png"), bitmap)
             CaptureOutput.writeText(File(directory, "$name.txt")) {
-                "file=$name.png\ncanvas=${bitmap.width}x${bitmap.height}\ndensity=1.0\nlocale=en\n" +
+                "file=$name.png\ncanvas=${bitmap.width}x${bitmap.height}\ndensity=${view.resources.displayMetrics.density}\nlocale=en\n" +
                     "fontScale=1.0\nfixture=PlayerMotionCaptureTest; production composables, offline fake state\n" +
                     "focus=$focus\ntiming=$timing\n"
             }
