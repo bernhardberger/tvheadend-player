@@ -134,7 +134,8 @@ internal fun GuideScreen(
 private fun rememberOpenedGuideRow(
     state: GuideState, view: GuideView, channel: GuideChannel?, dayIndex: Int, initiallyOpen: String?,
 ): Pair<String?, (String?) -> Unit> {
-    val pageKey = "${view.name}:${channel?.id}:${state.dayDates.getOrNull(dayIndex) ?: dayIndex}"
+    val pageChannel = if (view == GuideView.ByChannel) channel?.id else null
+    val pageKey = "${view.name}:$pageChannel:${state.dayDates.getOrNull(dayIndex) ?: dayIndex}"
     var openedPage by rememberSaveable { mutableStateOf(pageKey) }
     var openedId by rememberSaveable { mutableStateOf(initiallyOpen) }
     var owner by rememberSaveable { mutableStateOf(state.overviewOwner(initiallyOpen)) }

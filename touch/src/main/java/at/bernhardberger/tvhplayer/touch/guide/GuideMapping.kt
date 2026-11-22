@@ -254,7 +254,7 @@ internal class GuideMapper(
         checkpoint: () -> Unit,
     ): GuideState {
         checkpoint()
-        val scheduleIndex = rows.schedule(channels, events, clock)
+        val scheduleIndex = rows.schedule(channels, events, clock, playing)
         val days = scheduleIndex.days
         val date = selection.dateIn(days)
         val jumps = GUIDE_JUMP_TIMES.map { date.atTime(it).atZone(clock.zone).toEpochSecond() }

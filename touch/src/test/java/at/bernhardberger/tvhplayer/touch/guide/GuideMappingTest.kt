@@ -123,8 +123,16 @@ class GuideMappingTest {
         assertEquals(channels.size, state.channels.size)
         assertEquals("The first publish maps a bounded window", 8, initialRows.formattedCount)
         val tail = channels.last().id.value.toString()
-        val scrolled = overview(channels, events, GuideOverviewRows(setOf(tail), initialRows))
+        val tailRows = GuideOverviewRows(setOf(tail), initialRows)
+        val scrolled = overview(channels, events, tailRows)
         assertEquals(tail, scrolled.channels.last().programs.single().channelId)
+        val awayRows = GuideOverviewRows(previous = tailRows)
+        val away = overview(channels, events, awayRows)
+        assertEquals("The prepared tail still has its program outside the viewport", scrolled.channels.last(), away.channels.last())
+        val backRows = GuideOverviewRows(setOf(tail), awayRows)
+        val back = overview(channels, events, backRows)
+        assertEquals(scrolled.channels.last(), back.channels.last())
+        assertEquals("Returning to a prepared row does not format it again", 0, backRows.formattedCount)
     }
 
     @Test

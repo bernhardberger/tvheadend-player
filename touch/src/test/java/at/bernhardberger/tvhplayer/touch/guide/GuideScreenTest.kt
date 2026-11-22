@@ -144,6 +144,15 @@ class GuideScreenTest {
             compose.onNode(hasText("Ridge Earth") and hasAnyAncestor(head), useUnmergedTree = true).getBoundsInRoot().left,
         )
         capture("tablet-guide-overview-no-logo", TouchCanvas.TABLET)
+
+        // Removing the unrelated first channel does not change which program is open.
+        row.performClick()
+        compose.onNodeWithText(COASTAL_MILES_SYNOPSIS_START, substring = true).assertIsDisplayed()
+        compose.runOnIdle { state.value = state.value.copy(channels = state.value.channels.drop(1)) }
+        compose.onNodeWithText(COASTAL_MILES_SYNOPSIS_START, substring = true).assertIsDisplayed()
+        compose.runOnIdle { state.value = fixture.withoutLogo("ridge-earth") }
+        back()
+
         compose.onNode(head).performClick()
         compose.onNodeWithText("Sunday, November 15").assertIsDisplayed()
         compose.onNodeWithText("Six Bridges and a River That Changed Its Mind").assertIsDisplayed()
@@ -311,6 +320,17 @@ class GuideScreenTest {
         show(fixture, state = { state })
         compose.onAllNodesWithText("Coastal Miles")[0].performClick()
         compose.onNodeWithText(COASTAL_MILES_SYNOPSIS_START, substring = true).assertIsDisplayed()
+        val pending = fixture.copy(channels = fixture.channels.map { channel ->
+            if (channel.programs.any { it.title == "Coastal Miles" }) {
+                channel.copy(programs = emptyList(), overviewPending = true)
+            } else channel
+        })
+        state = pending
+        compose.onNodeWithText(COASTAL_MILES_SYNOPSIS_START, substring = true).assertDoesNotExist()
+        state = fixture
+        compose.onNodeWithText(COASTAL_MILES_SYNOPSIS_START, substring = true).assertIsDisplayed()
+        state = pending
+        compose.onNodeWithText(COASTAL_MILES_SYNOPSIS_START, substring = true).assertDoesNotExist()
         state = fixture.copy(channels = fixture.channels.map { channel ->
             channel.copy(programs = channel.programs.filterNot { it.title == "Coastal Miles" })
         })
