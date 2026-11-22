@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -40,6 +39,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -47,6 +47,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -74,13 +75,16 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.currentStateAsState
 import androidx.lifecycle.viewmodel.compose.viewModel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvhplayer.core.BrowseContextAction
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.channels.ChannelActionLabel
+import at.bernhardberger.tvhplayer.touch.channels.channelRowPrograms
 import at.bernhardberger.tvhplayer.touch.ui.DetailsBackButton
 import at.bernhardberger.tvhplayer.touch.ui.LocalArtworkModels
 import at.bernhardberger.tvhplayer.touch.ui.LocalBrowseMargin
@@ -92,9 +96,13 @@ import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 import at.bernhardberger.tvhplayer.ui.common.AppClock
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import java.time.LocalDate
+import java.time.ZoneId
 import kotlin.coroutines.CoroutineContext
+import kotlin.time.Instant
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 
 /**
  * A page or a Channels pane. The host owns a ViewModelStore for each visit, and marks the
@@ -129,7 +137,9 @@ internal fun ChannelPage(
     val scope by channels.scope.collectAsStateWithLifecycle()
     val observation by session.observation.collectAsStateWithLifecycle()
     val prepared by model.state.collectAsStateWithLifecycle()
-    val activeClock = if (active) activeGuideClock() else null
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val started = lifecycle.currentStateAsState().value.isAtLeast(Lifecycle.State.STARTED)
+    val activeClock = if (active && started) activeChannelPageClock(id, observation) else null
     val clock = activeClock ?: prepared?.first?.clock
     val input = clock?.let {
         ChannelPageInput(
@@ -138,7 +148,6 @@ internal fun ChannelPage(
         )
     }
     val context = LocalContext.current
-    val lifecycle = LocalLifecycleOwner.current.lifecycle
     LifecycleStartEffect(model) { onStopOrDispose { model.pause() } }
     DisposableEffect(model, active) {
         if (!active) model.pause()
@@ -165,6 +174,22 @@ internal fun ChannelPage(
             },
         )
     }
+}
+
+@Composable
+private fun activeChannelPageClock(id: ChannelId, observation: SessionObservation): GuideClock {
+    val snapshot = observation.epgSnapshotForDisplay
+    var nowSec by remember(id, snapshot) { mutableLongStateOf(System.currentTimeMillis() / 1000L) }
+    LaunchedEffect(id, snapshot) {
+        while (isActive) {
+            val now = Instant.fromEpochSeconds(System.currentTimeMillis() / 1000L)
+            nowSec = now.epochSeconds
+            val boundary = observation.channelRowPrograms(id, now, includeDetails = false).nextBoundary(now)
+            val nextMinute = channelPageMinute(nowSec) + CHANNEL_PAGE_MINUTE_SEC
+            delay((minOf(boundary, nextMinute) * 1000L - System.currentTimeMillis()).coerceAtLeast(1L))
+        }
+    }
+    return GuideClock(nowSec, ZoneId.systemDefault())
 }
 
 @Suppress("LongParameterList")
@@ -211,9 +236,11 @@ internal fun ChannelPageContent(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun ChannelPageHeading(channel: GuideChannel?, fallbackName: String, inPane: Boolean, onBack: () -> Unit) {
+private fun ChannelPageHeading(
+    channel: GuideChannel?, fallbackName: String, inPane: Boolean, onBack: () -> Unit,
+) {
     val heading: @Composable () -> Unit = {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
             channel?.let {
@@ -229,10 +256,15 @@ private fun ChannelPageHeading(channel: GuideChannel?, fallbackName: String, inP
         }
     }
     if (inPane) {
-        Box(
-            Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(horizontal = LocalBrowseMargin.current),
-            contentAlignment = Alignment.CenterStart,
-        ) { heading() }
+        val margin = LocalBrowseMargin.current
+        // The stock bar already reserves 16 dp before a title without navigation and 8 dp after it.
+        TopAppBar(
+            title = heading,
+            expandedHeight = 64.dp,
+            windowInsets = WindowInsets(0, 0, 0, 0),
+            colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+            contentPadding = PaddingValues(start = margin - 16.dp, end = margin - 8.dp),
+        )
     } else {
         TopAppBar(title = heading, navigationIcon = {
             DetailsBackButton(stringResource(R.string.recordings_back), onBack)
@@ -283,14 +315,16 @@ private fun ChannelSchedule(
                     if (programs == null || list == null) {
                         DayLoading()
                     } else {
-                        LaunchedEffect(initialProgramId, programs, page == selected) {
+                        LaunchedEffect(initialProgramId, programs, page == selected, state.coveragePending) {
                             if (!revealed && initialProgramId != null && page == selected) {
                                 val index = programs.indexOfFirst { it.id == initialProgramId }
                                 if (index >= 0) {
                                     if (onNow != null) outer.scrollToItem(1)
                                     list.scrollToItem(index)
+                                    revealed = true
+                                } else if (!state.coveragePending) {
+                                    revealed = true
                                 }
-                                revealed = true
                             }
                         }
                         ChannelProgramRows(programs, list, onDetails, hasWatchButton)

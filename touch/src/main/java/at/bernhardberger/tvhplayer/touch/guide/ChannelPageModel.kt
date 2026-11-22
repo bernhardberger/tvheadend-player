@@ -20,7 +20,6 @@ import at.bernhardberger.tvhplayer.core.channelContextActions
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import at.bernhardberger.tvhplayer.touch.ui.ArtworkModels
 import at.bernhardberger.tvhplayer.touch.ui.watchWays
-import at.bernhardberger.tvhplayer.ui.common.isRunning
 import at.bernhardberger.tvhplayer.ui.screens.GuideCoverageRequestOwner
 import at.bernhardberger.tvhplayer.viewmodels.ChannelScopeState
 import java.time.LocalDate
@@ -45,6 +44,7 @@ internal data class ChannelPageState(
     val loading: Boolean = true,
     val watchWays: List<BrowseContextAction> = emptyList(),
     val watchRecordingId: String? = null,
+    val coveragePending: Boolean = false,
 )
 
 internal data class ChannelPageInput(
@@ -98,7 +98,9 @@ internal class ChannelPageModel(
         day = date
         val shown = mutableState.value
         if (shown != null && date in shown.second.days) {
-            mutableState.value = shown.first to shown.second.copy(selectedDay = date, loading = false)
+            mutableState.value = shown.first to shown.second.copy(
+                selectedDay = date, loading = false, coveragePending = true,
+            )
         }
         updateMapping()
     }
@@ -150,10 +152,10 @@ internal class ChannelPageModel(
                 current.generation !== published.currentSession?.generationIdentity
             ) return
             preparedFor = current
-            mutableState.value = current to result
+            val superseded = published != current.observation
+            mutableState.value = current to if (superseded) result.copy(coveragePending = true) else result
             if (latest == current) {
                 // Coverage may settle in the same turn in which the SDK publishes the new EPG.
-                val superseded = published != current.observation
                 if (!superseded && !result.loading && result.selectedDay != work.date) day = null
                 return
             }
@@ -187,6 +189,10 @@ internal class ChannelPageModel(
 
 private fun ChannelPageInput.channel(id: ChannelId): Channel? = scope.scope.allChannels.firstOrNull { it.id == id }
 
+internal fun channelPageMinute(nowSec: Long): Long = nowSec - Math.floorMod(nowSec, CHANNEL_PAGE_MINUTE_SEC)
+
+internal const val CHANNEL_PAGE_MINUTE_SEC = 60L
+
 @Suppress("LongParameterList") // The worker's schedule snapshot, selection and previously shown days.
 private fun prepareChannelPage(
     input: ChannelPageInput,
@@ -213,13 +219,16 @@ private fun prepareChannelPage(
     val mapper = GuideMapper(
         listOf(channel), input.observation, emptyList(), clock, clock.today, texts, input.artwork, input.playingId,
     )
-    val now = events.firstOrNull { it.isRunning(clock.nowSec) }
+    val now = input.observation.eventAt(id, Instant.fromEpochSeconds(clock.nowSec))
+    val onNow = now?.let {
+        mapper.program(it).copy(timeLeft = texts.duration(it.stop.epochSeconds - channelPageMinute(clock.nowSec)))
+    }
     val shownDates = if (waiting && requested in retained) (dates + requested).distinct().sorted() else dates
     val tabs = channelDayLabels(shownDates, clock.today, context)
     val kept = retained.filterKeys { it in tabs }
     val rows = if (waiting) kept else kept + (selected to mapDayRows(events, clock, selected, mapper, checkpoint))
     val state = ChannelPageState(
-        head, now?.let(mapper::program), tabs, selected, rows, loading = waiting && selected !in kept,
+        head, onNow, tabs, selected, rows, loading = waiting && selected !in kept, coveragePending = pending,
     )
     return state.withWatch(input, now, head.id)
 }
