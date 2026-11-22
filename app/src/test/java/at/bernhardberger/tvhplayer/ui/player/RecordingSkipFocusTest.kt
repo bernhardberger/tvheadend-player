@@ -494,7 +494,7 @@ class RecordingSkipFocusTest {
                         prompt = state.action,
                         shown = state.shown,
                         bannerShown = state.bannerShown,
-                        bannerInfoBarBottomDistance = { 180 },
+                        bannerSkipBottomInset = { 180 },
                         onSkip = { state.skips += it.mark },
                         onTimeout = { state.timeouts += it.mark; state.prompt = null },
                         modifier = Modifier.align(Alignment.BottomEnd).padding(horizontal = 48.dp, vertical = 32.dp),

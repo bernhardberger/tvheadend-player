@@ -19,7 +19,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -69,7 +68,6 @@ internal fun PlayerOverlayChrome(
      * stays put.
      */
     bannerDrop: () -> Float = { 0f },
-    onInfoBarBottomDistance: (Int) -> Unit = {},
     footerContent: @Composable ColumnScope.() -> Unit,
 ) {
     // Inside the controls layer, the header comes down and the footer up as they fade in;
@@ -77,7 +75,6 @@ internal fun PlayerOverlayChrome(
     val motion = LocalPlayerControlsMotion.current
     val railExpansion = LocalRailExpansion.current
     val peekLift = LocalChannelPeekLift.current
-    val footerRunout = with(LocalDensity.current) { footerPadding.calculateTopPadding().roundToPx() }
     val viewport = LocalPlayerPageScrim.current.takeIf { motion != null }
     var footerHeight by remember { mutableIntStateOf(0) }
     SideEffect {
@@ -112,10 +109,7 @@ internal fun PlayerOverlayChrome(
                 }
                 .drawWithContent { if (railExpansion() < 1f) drawContent() }
                 .testTag("player-footer")
-                .onSizeChanged { size ->
-                    footerHeight = size.height
-                    onInfoBarBottomDistance(size.height - footerRunout)
-                }
+                .onSizeChanged { footerHeight = it.height }
                 .then(if (viewport != null) Modifier else Modifier.drawWithCache {
                     val scrim = PlayerChromeTokens.bottomScrim(size.height, this)
                     onDrawBehind { drawRect(scrim) }

@@ -442,7 +442,8 @@ fun RecordingPlayerScreen(
     LaunchedEffect(busyKey, bannerFramePresented) {
         if (bannerFramePresented) recordingPresented = true
     }
-    var bannerInfoBarBottomDistance by remember { mutableIntStateOf(0) }
+    var bannerSkipBottomInset by remember { mutableIntStateOf(0) }
+    var bannerSkipTextReserve by remember(skipPrompt?.mark?.kind) { mutableStateOf(0.dp) }
     fun currentPlayerForegroundContext() =
         PlayerForegroundContext(
             confirmationVisible = false,
@@ -734,7 +735,8 @@ fun RecordingPlayerScreen(
             // The chrome shows its pictures with the session of the recording it plays.
             ProvideArtworkSession(retainedSelection?.currentSession, targetObservation) { PlayerChrome(
                 mode = chromeMode(foregroundLayer),
-                onBannerInfoBarBottomDistance = { bannerInfoBarBottomDistance = it },
+                onBannerSkipBottomInset = { bannerSkipBottomInset = it },
+                bannerSkipTextReserve = bannerSkipTextReserve,
                 content = PlayerChromeContent(
                     clockSec = wallClockMinute(nowSec),
                     info = recordingInfoBarData(entry, channel?.number, nowSec, timelineState.playbackPositionMs,
@@ -817,11 +819,19 @@ fun RecordingPlayerScreen(
                     }, onClose = ::closeInfo)
             }
 
+            skipPrompt?.takeIf {
+                chromeMode(foregroundLayer).isBanner &&
+                    (it.mark.kind != RecordingMarkKind.PROGRAM_START || playerSettings.offerProgramStart)
+            }?.let { offer ->
+                RecordingSkipReserve(offer, Modifier.padding(end = TvGridHorizontalMargin)) {
+                    bannerSkipTextReserve = it
+                }
+            }
             RecordingSkipPrompt(
                 prompt = skipPrompt,
                 shown = foregroundLayer == PlayerForegroundLayer.SKIP_PROMPT,
                 bannerShown = chrome.bannerVisible,
-                bannerInfoBarBottomDistance = { bannerInfoBarBottomDistance },
+                bannerSkipBottomInset = { bannerSkipBottomInset },
                 onSkip = { if (session.skipRecordingAdBreak(it)) timelineState.cancelPendingSeek() },
                 onTimeout = session::dismissRecordingSkipPrompt,
                 modifier = Modifier

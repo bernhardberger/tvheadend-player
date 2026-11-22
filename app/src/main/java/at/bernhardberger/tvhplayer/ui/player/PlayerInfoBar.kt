@@ -74,6 +74,7 @@ fun PlayerInfoBar(
     contentAlpha: () -> Float = { 1f },
     lastLineEndReserve: Dp = 0.dp,
     badges: List<GlanceBadge> = emptyList(),
+    textEndReserve: Dp = 0.dp,
     identity: @Composable (Modifier) -> Unit,
 ) {
     val recorded = data.recording != null
@@ -104,7 +105,6 @@ fun PlayerInfoBar(
     val faded = Modifier.graphicsLayer { alpha = contentAlpha() }
     // Live ends on Next; a recording has none, its episode stands on the subtitle's line.
     val lastText = next.takeIf { !recorded }
-    val reserved = Modifier.reserveEnd(lastLineEndReserve)
     // Without a last row, the lowest present line leaves the distance its room.
     val reserveOn = when {
         lastText != null -> "last"
@@ -112,22 +112,24 @@ fun PlayerInfoBar(
         facts.isNotEmpty() -> "facts"
         else -> "title"
     }
+    fun lineReserve(line: String) =
+        Modifier.reserveEnd(if (reserveOn == line) maxOf(textEndReserve, lastLineEndReserve) else textEndReserve)
     // The bar speaks for itself.
     Row(modifier.height(IntrinsicSize.Min).semantics(mergeDescendants = true) { contentDescription = description },
         horizontalArrangement = Arrangement.spacedBy(TvGridGutter), verticalAlignment = Alignment.Top) {
         identity(faded)
         Column(Modifier.weight(1f).fillMaxHeight()) {
             PlayerInfoFacts(facts, badges, data.nowRecording.takeUnless { recorded }, nowRecordingState,
-                faded.then(if (reserveOn == "facts") reserved else Modifier))
+                faded.then(lineReserve("facts")))
             Spacer(Modifier.height(4.dp))
             Text(data.title, style = MaterialTheme.typography.headlineMedium, maxLines = 1,
                 overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurface,
-                modifier = faded.then(if (reserveOn == "title") reserved else Modifier)
+                modifier = faded.then(lineReserve("title"))
                     .testTag("player-info-title").clearAndSetSemantics {})
             Spacer(Modifier.height(2.dp))
             Text(subtitle.orEmpty(), style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = TvTextSecondaryAlpha),
-                modifier = faded.then(if (reserveOn == "subtitle") reserved else Modifier)
+                modifier = faded.then(lineReserve("subtitle"))
                     .then(if (subtitle != null) Modifier.testTag("player-info-subtitle") else Modifier).clearAndSetSemantics {})
             // Now above, Next on the artwork's bottom edge.
             Spacer(Modifier.weight(1f).heightIn(min = 8.dp))

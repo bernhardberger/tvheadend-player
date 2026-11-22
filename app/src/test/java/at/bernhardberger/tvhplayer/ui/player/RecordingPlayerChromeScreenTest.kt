@@ -32,6 +32,15 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isFocusable
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.foundation.layout.padding
+import at.bernhardberger.tvhplayer.core.RecordingMark
+import at.bernhardberger.tvhplayer.core.RecordingMarkKind
+import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
+import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
@@ -655,12 +664,16 @@ class RecordingPlayerChromeScreenTest {
         repeat(8) { settle() }
         assertTrue("playing without a presented frame: the Banner stays", exists("player-banner"))
         assertFalse(exists("recording-skip-prompt"))
+        fun titleBounds() = compose.onNodeWithTag("player-info-title", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val shortTitle = titleBounds()
         presentFirstFrame()
         compose.settleFrames(20, frameMillis = 16)
         val offer = compose.onNodeWithTag("recording-skip-prompt")
         offer.assertIsFocused()
         val info = compose.onNodeWithTag("player-info-bar").fetchSemanticsNode().boundsInRoot
-        assertTrue(offer.fetchSemanticsNode().boundsInRoot.bottom < info.top)
+        val pill = offer.fetchSemanticsNode().boundsInRoot
+        assertEquals("the focused pill ends at the bottom of the info bar", info.bottom, pill.bottom + pill.height * .05f, 1f)
+        assertEquals(shortTitle, titleBounds())
         compose.mainClock.advanceTimeBy(4_000)
         compose.waitForIdle()
         assertTrue("before 5000 ms after the first frame", exists("player-banner"))
@@ -670,6 +683,33 @@ class RecordingPlayerChromeScreenTest {
         assertFalse(exists("player-actions"))
         offer.assertIsFocused()
         assertTrue(offer.fetchSemanticsNode().boundsInRoot.top > info.top)
+    }
+
+    @Test
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    fun theBannerMakesRoomForSkipUntilItLeavesButControlsDoNot() {
+        val title = "A very long title that needs all of the available width in the recording player ".repeat(3)
+        positionMs = 1_000
+        screen(leadIn = true, title = title)
+        fun bounds(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        playingWithoutFrame()
+        compose.settleFrames(14, frameMillis = 16)
+        val reservedBeforeFrame = bounds("player-info-title")
+        presentFirstFrame()
+        compose.settleFrames(14, frameMillis = 16)
+        val pill = bounds("recording-skip-prompt")
+        val gap = with(compose.density) { 20.dp.toPx() }
+        assertTrue("the title ends before the focused offer",
+            bounds("player-info-title").right <= pill.left - pill.width * .05f - gap + 1)
+        assertEquals(reservedBeforeFrame, bounds("player-info-title"))
+        compose.pressKey(Key.Back, settleFrames = 14, frameMillis = 16)
+        assertFalse(exists("recording-skip-prompt"))
+        assertEquals("dismissing the offer must not change the Banner text", reservedBeforeFrame, bounds("player-info-title"))
+        compose.pressKey(Key.DirectionUp, settleFrames = 35, frameMillis = 16)
+        assertTrue(exists("player-actions"))
+        val controlsTitle = bounds("player-info-title")
+        assertTrue("controls title $controlsTitle should extend past Banner title $reservedBeforeFrame (pill $pill)",
+            controlsTitle.right > reservedBeforeFrame.right)
     }
 
     @Test fun backDismissesTheOfferBeforeTheBanner() {
@@ -981,12 +1021,25 @@ class RecordingPlayerChromeScreenTest {
     @Test fun aGrowingRecordingShowsItsLengthAndBehindLiveAndMarksOnlyItsIdentity() {
         compose.setContent {
             TVHeadendPlayerTheme {
-                RecordingChromeFixture(mode = PlayerChromeMode.BANNER, growing = true,
-                    info = fixtureRecordingInfo(growing = true, state = DvrEntryState.SCHEDULED))
+                var inset by mutableStateOf(0)
+                androidx.compose.foundation.layout.Box {
+                    RecordingChromeFixture(mode = PlayerChromeMode.BANNER, growing = true,
+                        info = fixtureRecordingInfo(growing = true, state = DvrEntryState.SCHEDULED),
+                        onBannerSkipBottomInset = { inset = it })
+                    val mark = RecordingMark(RecordingMarkKind.AD_BREAK, 900_000, 2_700_000)
+                    RecordingSkipPrompt(at.bernhardberger.tvhplayer.playback.RecordingSkipAction(mark, 2_700_000),
+                        true, {}, {}, Modifier.align(Alignment.BottomEnd)
+                            .padding(end = TvGridHorizontalMargin, bottom = TvGridVerticalMargin),
+                        bannerShown = true, bannerSkipBottomInset = { inset })
+                }
             }
         }
         compose.waitForIdle()
         assertTrue("the annotation names the distance from the recording head", texts("30:00 behind live"))
+        val distance = compose.onNodeWithText("30:00 behind live", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val pill = compose.onNodeWithTag("recording-skip-prompt").fetchSemanticsNode().boundsInRoot
+        assertTrue("the focused pill clears the distance box",
+            pill.bottom + pill.height * .05f <= distance.top - with(compose.density) { 8.dp.toPx() } + 1f)
         assertEquals("Behind live", description("player-live-state"))
         assertEquals("the length carries no recording dot", "1:00:00", endClock())
         compose.onNodeWithTag("player-info-timing-mark", useUnmergedTree = true).assertDoesNotExist()
@@ -1292,14 +1345,16 @@ class RecordingPlayerChromeScreenTest {
 
     /** [listed] false: the server never lists the recording, so the screen stays in its loading state. */
     private fun screen(onClose: () -> Unit = {}, listed: Boolean = true, refusedEntry: DvrEntry? = null,
-        settleEntry: Boolean = true, inheritedAudio: AudioTrackChoice? = null, leadIn: Boolean = false): FakeTvheadendSession {
+        settleEntry: Boolean = true, inheritedAudio: AudioTrackChoice? = null, leadIn: Boolean = false,
+        title: String = "Zeit im Bild",
+    ): FakeTvheadendSession {
         val recording = DvrEntryId(7)
         val session = FakeTvheadendSession(SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(Channel.create(ChannelId(1), name = "Documentary")))),
             epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create(listOfNotNull(refusedEntry ?: DvrEntry.create(
-                id = recording, state = DvrEntryState.COMPLETED, title = "Zeit im Bild", channelName = "Documentary",
+                id = recording, state = DvrEntryState.COMPLETED, title = title, channelName = "Documentary",
                 channelId = ChannelId(1).takeIf { inheritedAudio != null },
                 start = kotlin.time.Instant.fromEpochSeconds(1_800).takeIf { leadIn },
                 startExtraMinutes = kotlin.time.Duration.parse("2m").takeIf { leadIn },

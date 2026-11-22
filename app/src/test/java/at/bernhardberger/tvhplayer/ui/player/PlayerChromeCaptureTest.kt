@@ -4,6 +4,7 @@ import at.bernhardberger.tvhplayer.core.glanceBadges
 import at.bernhardberger.tvhplayer.core.VideoScan
 import at.bernhardberger.tvhplayer.core.RecordingMark
 import at.bernhardberger.tvhplayer.core.RecordingMarkKind
+import at.bernhardberger.tvhplayer.playback.RecordingSkipAction
 
 import androidx.compose.ui.res.stringResource
 import at.bernhardberger.tvhplayer.presentation.R
@@ -749,6 +750,11 @@ class PlayerChromeCaptureTest {
             Scene.RECORDING_SKIP_BANNER, Scene.RECORDING_SKIP_CORNER -> {
                 val growing = scene == Scene.RECORDING_GROWING
                 var infoDistance by remember { mutableStateOf(0) }
+                var skipReserve by remember { mutableStateOf(0.dp) }
+                val skip = if (scene == Scene.RECORDING_SKIP_BANNER || scene == Scene.RECORDING_SKIP_CORNER)
+                    RecordingSkipAction(RecordingMark(RecordingMarkKind.PROGRAM_START, 120_000L), 120_000L) else null
+                val title = if (scene == Scene.RECORDING_SKIP_BANNER)
+                    "The incredible journey across the country and back to the coast" else programme.title.orEmpty()
                 val position = when (scene) {
                     Scene.RECORDING_STARTING, Scene.RECORDING_STARTING_CONTROLS -> 0L
                     Scene.RECORDING_PADDING_SKIP -> 60_000L
@@ -784,7 +790,7 @@ class PlayerChromeCaptureTest {
                     },
                     growing = growing,
                     badges = glanceBadges(1080, "audio/ac3", 6, scan = VideoScan.INTERLACED),
-                    info = fixtureRecordingInfo(programme.title.orEmpty(), growing, subtitle = programme.subtitle,
+                    info = fixtureRecordingInfo(title, growing, subtitle = programme.subtitle,
                          positionMs = position, durationMs = duration, nowSec = NOW)
                          .copy(channelName = "Ridge Earth HD", channelNumber = "101"),
                     picon = LOGO,
@@ -796,14 +802,15 @@ class PlayerChromeCaptureTest {
                         else -> emptyList()
                     },
                     modifier = Modifier.align(Alignment.BottomCenter),
-                    onBannerInfoBarBottomDistance = { infoDistance = it },
+                    onBannerSkipBottomInset = if (skip != null) ({ infoDistance = it }) else null,
+                    bannerSkipTextReserve = skipReserve,
                 ) }
-                if (scene == Scene.RECORDING_SKIP_BANNER || scene == Scene.RECORDING_SKIP_CORNER) {
-                    val mark = RecordingMark(RecordingMarkKind.PROGRAM_START, 120_000L)
-                    val action = remember { at.bernhardberger.tvhplayer.playback.RecordingSkipAction(mark, mark.startMs) }
-                    RecordingSkipPrompt(action, true, {}, {},
+                if (skip != null) {
+                    val banner = scene != Scene.RECORDING_SKIP_CORNER
+                    if (banner) RecordingSkipReserve(skip, Modifier.padding(end = TvGridHorizontalMargin)) { skipReserve = it }
+                    RecordingSkipPrompt(skip, true, {}, {},
                         Modifier.align(Alignment.BottomEnd).padding(end = TvGridHorizontalMargin, bottom = TvGridVerticalMargin),
-                        bannerShown = scene == Scene.RECORDING_SKIP_BANNER, bannerInfoBarBottomDistance = { infoDistance })
+                        bannerShown = banner, bannerSkipBottomInset = { infoDistance })
                 }
             }
         }

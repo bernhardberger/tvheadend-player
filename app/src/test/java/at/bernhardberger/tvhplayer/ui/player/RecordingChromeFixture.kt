@@ -9,6 +9,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.recordingSkipAction
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
@@ -96,7 +98,8 @@ internal fun RecordingChromeFixture(
     onActionFocused: (String) -> Unit = {},
     onFocusRestored: () -> Unit = {},
     entry: PlayerControlsEntry = PlayerControlsEntry.TRAVEL,
-    onBannerInfoBarBottomDistance: (Int) -> Unit = {},
+    onBannerSkipBottomInset: ((Int) -> Unit)? = null,
+    bannerSkipTextReserve: Dp = 0.dp,
 ) {
     val settings = PlayerSettings()
     val skip = recordingSkipAction(marks, positionMs, settings).takeIf { canSeek }
@@ -148,7 +151,8 @@ internal fun RecordingChromeFixture(
         panelOpen = panelOpen,
         markerNavigation = markerNavigation,
         onSeekMarker = onSeekMarker,
-        onBannerInfoBarBottomDistance = onBannerInfoBarBottomDistance,
+        onBannerSkipBottomInset = onBannerSkipBottomInset,
+        bannerSkipTextReserve = bannerSkipTextReserve,
         modifier = modifier,
     )
     PlayerBusyIndicator(PlayerBusyStatus.BUFFERING.takeIf { buffering && !paused }, Modifier.align(Alignment.Center))

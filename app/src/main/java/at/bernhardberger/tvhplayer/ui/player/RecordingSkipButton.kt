@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.SideEffect
 import androidx.compose.animation.core.MutableTransitionState
@@ -53,16 +54,20 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.Text
 import androidx.tv.material3.Button
 import androidx.tv.material3.ButtonDefaults
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.onSizeChanged
 import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.RecordingMarkKind
 import at.bernhardberger.tvhplayer.playback.RecordingSkipAction
 import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
+import at.bernhardberger.tvhplayer.ui.TvGridGutter
 import kotlin.math.roundToInt
 
 /** Total time the Skip prompt can be shown, excluding time behind other layers. */
@@ -77,6 +82,7 @@ internal fun recordingSkipPromptShown(offered: Boolean, playing: Boolean, canSee
 internal val RecordingSkipActivationKeys = setOf(Key.DirectionCenter, Key.Enter, Key.NumPadEnter)
 
 private const val SkipFocusAllowance = 1.1f
+private const val SKIP_FOCUS_OVERHANG = (SkipFocusAllowance - 1f) / 2f
 
 internal fun recordingSkipRemainingSweep(elapsedFraction: Float): Float =
     360f * (1f - elapsedFraction.coerceIn(0f, 1f))
@@ -170,7 +176,7 @@ internal fun RecordingSkipPrompt(
     onTimeout: (RecordingSkipAction) -> Unit,
     modifier: Modifier = Modifier,
     bannerShown: Boolean = false,
-    bannerInfoBarBottomDistance: () -> Int = { 0 },
+    bannerSkipBottomInset: () -> Int = { 0 },
 ) {
     var departing by remember { mutableStateOf(prompt) }
     SideEffect { if (prompt != null) departing = prompt }
@@ -187,7 +193,8 @@ internal fun RecordingSkipPrompt(
         timeout(prompt)
     }
     val visible = prompt != null && shown
-    val bannerLift = rememberSkipBannerLift(visible, bannerShown, bannerInfoBarBottomDistance)
+    var buttonHeight by remember { mutableIntStateOf(0) }
+    val bannerLift = rememberSkipBannerLift(visible, bannerShown, bannerSkipBottomInset) { buttonHeight }
     val visibility = remember { MutableTransitionState(false) }
     SideEffect { visibility.targetState = visible }
     LaunchedEffect(prompt, visibility.isIdle, visibility.currentState) {
@@ -236,7 +243,8 @@ internal fun RecordingSkipPrompt(
                 action = presentation,
                 visible = visible,
                 elapsed = { elapsedMs / SKIP_PROMPT_MS.toFloat() },
-                modifier = Modifier.testTag("recording-skip-prompt").focusRequester(focus)
+                modifier = Modifier.testTag("recording-skip-prompt").onSizeChanged { buttonHeight = it.height }
+                    .focusRequester(focus)
                     .focusProperties { canFocus = visible }
                     .semantics { liveRegion = LiveRegionMode.Polite },
             )
@@ -244,16 +252,31 @@ internal fun RecordingSkipPrompt(
     }
 }
 
+/** Measure the same pill before it can take focus, without placing a second button. */
+@Composable
+internal fun RecordingSkipReserve(action: RecordingSkipAction, modifier: Modifier = Modifier, onReserve: (Dp) -> Unit) {
+    val density = LocalDensity.current
+    Layout(
+        content = { RecordingSkipButton({}, action, false, { 0f }) },
+        modifier = modifier,
+    ) { children, constraints ->
+        val width = children.single().measure(constraints).width
+        onReserve(with(density) { (width * (1f + SKIP_FOCUS_OVERHANG)).toDp() } + TvGridGutter)
+        layout(0, 0) {}
+    }
+}
+
 @Composable
 private fun rememberSkipBannerLift(
     visible: Boolean,
     bannerShown: Boolean,
-    infoBarBottomDistance: () -> Int,
+    bottomInset: () -> Int,
+    buttonHeight: () -> Int,
 ): () -> Float {
     val target = if (bannerShown) 1f else 0f
     val lift = remember { Animatable(target) }
     var wasVisible by remember { mutableStateOf(false) }
-    val gapFromCorner = with(LocalDensity.current) { (20.dp - TvGridVerticalMargin).toPx() }
+    val cornerInset = with(LocalDensity.current) { TvGridVerticalMargin.toPx() }
     LaunchedEffect(visible, target) {
         if (visible) {
             if (wasVisible) lift.animateTo(target,
@@ -264,8 +287,8 @@ private fun rememberSkipBannerLift(
     }
     return {
         val fraction = if (visible && !wasVisible) target else lift.value
-        val distance = infoBarBottomDistance()
-        if (distance > 0) fraction * (distance + gapFromCorner) else 0f
+        val inset = bottomInset()
+        if (inset > 0) fraction * (inset - cornerInset + buttonHeight() * SKIP_FOCUS_OVERHANG) else 0f
     }
 }
 

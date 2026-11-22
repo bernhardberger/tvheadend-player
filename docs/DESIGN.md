@@ -1091,6 +1091,10 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
   and its last line stays empty. The spoken description includes the subtitle
   and a finished recording's displayed playback end. Nothing in the info bar shows tuning or
   buffering.
+- When a recording's Banner has a Skip offer, its metadata, title, and
+  subtitle leave a 20dp gutter before the focused button. The room stays
+  reserved until that Banner leaves, even if the offer goes away first. The
+  controls use the full width.
 - The programme block groups its title and subtitle closely: 4dp from the
   metadata row to the title, 2dp from title to subtitle, and 8dp before Next.
   The metadata row's text is followed by passive compact outlined StatusBadges for resolution and declared scan type,
@@ -1423,8 +1427,10 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
   setting. Playback → Recording marks can turn off the program-start offer
   without removing Skip from the controls. The prompt takes focus after the
   first frame: OK accepts it, and Back dismisses it before the Banner.
-  It sits above the Banner's info bar and moves to the trailing bottom corner
-  as the Banner leaves.
+  At the trailing side of the Banner, the focused button ends at the info
+  bar's bottom edge for a finished recording. For a growing recording it
+  clears the behind-live box by 8dp, even when that label is not drawn. It
+  moves to the trailing bottom corner as the Banner leaves.
   Each skip prompt has 10 seconds of shown time. The countdown pauses
   behind controls or panels and while playback is paused, buffering, or
   unseekable, then resumes with the time left. The program-start offer holds

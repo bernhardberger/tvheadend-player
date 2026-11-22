@@ -23,7 +23,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Icon
@@ -50,6 +53,7 @@ import androidx.compose.ui.res.stringResource
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
 import at.bernhardberger.tvhplayer.core.timeshiftSeekbarRange
 import at.bernhardberger.tvhplayer.ui.TvSpacing4
+import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import androidx.compose.ui.graphics.Color
 import at.bernhardberger.tvhplayer.ui.components.ArtworkLogoInset
 import at.bernhardberger.tvhplayer.ui.components.ArtworkLogoPlateWidth
@@ -114,7 +118,8 @@ internal fun PlayerChrome(
      * controls kept up under the entry take no focus.
      */
     numberEntryShown: Boolean = false,
-    onBannerInfoBarBottomDistance: (Int) -> Unit = {},
+    onBannerSkipBottomInset: ((Int) -> Unit)? = null,
+    bannerSkipTextReserve: Dp = 0.dp,
 ) {
     val liveBar = rememberLiveBarPresentation(timeline as? PlayerChromeTimeline.Live)
     PlayerControlsLayer(
@@ -131,6 +136,8 @@ internal fun PlayerChrome(
     ) {
         // Leaving, the chrome keeps what it showed.
         val shown = rememberLastShown(mode.takeUnless { it == PlayerChromeMode.HIDDEN }) ?: return@PlayerControlsLayer
+        val skipReserve = if (timeline is PlayerChromeTimeline.Recording)
+            rememberBannerSkipReserve(mode, bannerSkipTextReserve) else 0.dp
         val handover = rememberBannerHandover(shown)
         val stateCell = rememberStateCellInset(shown)
         // Live sources keep the last info line clear of the behind-live label, even at the live edge.
@@ -154,6 +161,7 @@ internal fun PlayerChrome(
                     contentAlpha = contentAlpha,
                     lastLineEndReserve = lastLineEndReserve,
                     badges = content.badges,
+                    textEndReserve = skipReserve,
                 ) { faded ->
                     ProgrammeArtworkTile(content.artwork, content.picon, content.channelId,
                         content.info.channelNumber, faded, content.withoutChannel)
@@ -203,7 +211,6 @@ internal fun PlayerChrome(
             // Passive: nothing in the Banner takes focus. Without the action row its info and
             // timeline rest on the bottom safe area, one action row lower than the controls'.
             PlayerOverlayChrome(
-                onInfoBarBottomDistance = onBannerInfoBarBottomDistance,
                 headerContent = { placed ->
                     header(placed)
                     PlayerTopIdentity(content, placed, numberEntryShown = numberEntryShown)
@@ -234,12 +241,53 @@ internal fun PlayerChrome(
                         ) else PlayerPresentedLiveTimeline(requireNotNull(liveBar), content.state,
                             feedback = timeline.feedback, feedbackIsError = timeline.feedbackIsError)
                     }
-                    is PlayerChromeTimeline.Recording ->
-                        RecordingBannerTimeline(timeline, step = shown == PlayerChromeMode.BANNER_STEP, state = content.state)
+                    is PlayerChromeTimeline.Recording -> RecordingBannerWithSkipInset(
+                        timeline, shown == PlayerChromeMode.BANNER_STEP, content.state, onBannerSkipBottomInset,
+                    )
                 }
                 }
             }
         }
+        }
+    }
+}
+
+private class BannerSkipReserve(var mode: PlayerChromeMode, var width: Dp = 0.dp)
+
+/** A leaving Banner keeps its width; a new visit (or controls handover) starts over. */
+@Composable
+private fun rememberBannerSkipReserve(mode: PlayerChromeMode, width: Dp): Dp {
+    val reserve = remember { BannerSkipReserve(mode) }
+    if (mode.isBanner && !reserve.mode.isBanner || mode == PlayerChromeMode.CONTROLS) reserve.width = 0.dp
+    if (mode.isBanner) reserve.width = maxOf(reserve.width, width)
+    reserve.mode = mode
+    return reserve.width
+}
+
+@Composable
+private fun RecordingBannerWithSkipInset(
+    timeline: PlayerChromeTimeline.Recording,
+    step: Boolean,
+    state: PlayerStateCell,
+    onBottomInset: ((Int) -> Unit)?,
+) {
+    if (onBottomInset == null) {
+        RecordingBannerTimeline(timeline, step, state)
+    } else {
+        val density = LocalDensity.current
+        val distanceBoxHeight = MaterialTheme.typography.labelLarge.lineHeight
+        val bottomInset = with(density) {
+            PlayerBannerBottomPadding.roundToPx() +
+                if (timeline.growing) distanceBoxHeight.roundToPx() + TvSpacing8.roundToPx() else 0
+        }
+        Box(Modifier.layout { measurable, constraints ->
+            val child = measurable.measure(constraints)
+            layout(child.width, child.height) {
+                onBottomInset(child.height + bottomInset)
+                child.placeRelative(0, 0)
+            }
+        }) {
+            RecordingBannerTimeline(timeline, step, state)
         }
     }
 }
