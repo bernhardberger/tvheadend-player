@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="watch_options">Watch options</string>
+    <string name="watch_options_expanded">Expanded</string>
+    <string name="watch_options_collapsed">Collapsed</string>
+    <string name="watch_options_close_menu">Close menu</string>
+</resources>
