@@ -96,6 +96,8 @@ import kotlinx.coroutines.yield
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 
 private enum class Page { Frame, Connections }
 
@@ -131,11 +133,14 @@ internal fun TouchApp(
     val connect = viewModel { ConnectViewModel(session, owner) }
     val dvr = viewModel { DvrControls(session, notices) }
     val channelsCache = viewModel { ChannelsMappingCache(session) }
-    LaunchedEffect(owner, channelsCache) {
-        owner.liveProfile.collect { profileId ->
-            if (channelsCache.pageProfileId != profileId) {
+    LaunchedEffect(owner, channels, channelsCache) {
+        // The saved scope and the live connection publish independently.
+        val scopeProfile = channels.scope.map { it.profileId }.distinctUntilChanged()
+        combine(owner.liveProfile, scopeProfile, ::Pair).collect { (profileId, scopeProfileId) ->
+            if (channelsCache.pageProfileId != profileId || channelsCache.pageScopeId != scopeProfileId) {
                 channelsCache.pages.clear()
                 channelsCache.pageProfileId = profileId
+                channelsCache.pageScopeId = scopeProfileId
             }
         }
     }
@@ -353,7 +358,8 @@ private fun AppFrame(
         else -> "mapping"
     } else null)
     ChannelsPageHost(
-        state, scope, cache.session, channels, cache.pages, dvr, mappingDispatcher,
+        state, scope, cache.session, channels, cache.pages.takeIf { cache.pageScopeId == scope.profileId },
+        dvr, mappingDispatcher,
         playingId, lastWatchedId, behindLiveId, onWatch, onChannelWatch,
         { connection.reconnectNow() }, onOpenConnections, onSignIn,
     )
@@ -364,6 +370,7 @@ private class ChannelsMappingCache(val session: TvheadendSession) : ViewModel() 
     val artwork = ArtworkModels(session)
     val pages = ProgramPageStack()
     var pageProfileId: ServerProfileId? = null
+    var pageScopeId by mutableStateOf<ServerProfileId?>(null)
     var mapped by mutableStateOf<ChannelsMappingResult?>(null)
 }
 

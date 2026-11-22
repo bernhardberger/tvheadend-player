@@ -129,15 +129,20 @@ private fun ChannelsContent(
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     var revealedId by rememberSaveable { mutableStateOf<String?>(null) }
     val paneChannel = list?.takeIf { layout == ChannelsLayout.Wide }?.rows?.let { rows ->
-        rows.firstOrNull { it.id == selectedId } ?: rows.firstOrNull { it.id == lastWatchedId } ?: rows.firstOrNull()
+        rows.firstOrNull { it.id == selectedId }
+            ?: rows.firstOrNull { it.playback != null }
+            ?: rows.firstOrNull { it.id == lastWatchedId }
+            ?: rows.firstOrNull()
     }
     SideEffect {
-        if (list != null && savedTag != list.selectedTagId) {
-            scroll.requestScrollToItem(0)
-            savedTag = list.selectedTagId
-            revealedId = null
+        if (list != null) {
+            if (savedTag != list.selectedTagId) {
+                scroll.requestScrollToItem(0)
+                savedTag = list.selectedTagId
+                revealedId = null
+            }
+            if (list.rows.none { it.id == selectedId }) selectedId = null
         }
-        if (list != null && list.rows.none { it.id == selectedId }) selectedId = null
     }
     LaunchedEffect(paneChannel?.id, selectedId, list?.selectedTagId) {
         if (list == null || paneChannel == null) return@LaunchedEffect

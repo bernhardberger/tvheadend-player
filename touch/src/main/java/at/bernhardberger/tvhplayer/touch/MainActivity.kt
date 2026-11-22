@@ -126,6 +126,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun watch(channelId: String) {
+        if (!lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return
         watchRequest++
         val id = ChannelId(channelId.toLong())
         val runtime = sdk.playbackRuntime
@@ -138,15 +139,7 @@ class MainActivity : ComponentActivity() {
 
     private fun watchChannelWay(channelId: String, way: BrowseContextAction, recordingId: String?) {
         when (way) {
-            BrowseContextAction.WATCH -> watch(channelId)
-            BrowseContextAction.CONTINUE_WATCHING -> {
-                val id = ChannelId(channelId.toLong())
-                val runtime = sdk.playbackRuntime
-                if (playingChannelId(runtime.activeTarget.value, runtime.state.value) == id) {
-                    watchRequest++
-                    startActivity(PlayerActivity.intent(this, id))
-                }
-            }
+            BrowseContextAction.WATCH, BrowseContextAction.CONTINUE_WATCHING -> watch(channelId)
             BrowseContextAction.WATCH_LIVE -> watchLive(ChannelId(channelId.toLong()))
             BrowseContextAction.START_OVER, BrowseContextAction.PLAY ->
                 recordingId?.let { watchRecording(it, startOver = true) }
@@ -155,18 +148,25 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun watchLive(id: ChannelId) {
+        if (!lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return
         val runtime = sdk.playbackRuntime
-        val target = runtime.activeTarget.value
-        if ((target as? AppPlaybackTarget.Live)?.channelId != id) return
+        val target = runtime.activeTarget.value as? AppPlaybackTarget.Live
+        if (target?.channelId != id) {
+            watch(id.value.toString())
+            return
+        }
         val request = ++watchRequest
         lifecycleScope.launch {
             val result = runtime.goLive()
-            val sameRequest = request == watchRequest && runtime.activeTarget.value === target
-            if (sameRequest && result.disposition == TimeshiftCommandDisposition.ACCEPTED &&
-                lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
-                runtime.play()
-                startActivity(PlayerActivity.intent(this@MainActivity, id))
+            if (request != watchRequest || !lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return@launch
+            val current = runtime.activeTarget.value as? AppPlaybackTarget.Live
+            if (current?.channelId != id) {
+                watch(id.value.toString())
+                return@launch
             }
+            // A refused jump (or superseded target) still returns to playback as it stands.
+            if (current === target && result.disposition == TimeshiftCommandDisposition.ACCEPTED) runtime.play()
+            startActivity(PlayerActivity.intent(this@MainActivity, id))
         }
     }
 

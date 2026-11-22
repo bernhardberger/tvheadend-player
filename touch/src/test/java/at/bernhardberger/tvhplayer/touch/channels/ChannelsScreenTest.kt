@@ -127,6 +127,7 @@ class ChannelsScreenTest {
         }
         val pane = compose.onNodeWithTag("channel-pane")
         val amberRow = compose.onNode(isSelected() and hasText("Amber Stage"))
+        compose.onNode(hasClickAction() and hasText("Amber Stage")).performClick()
         amberRow.assertIsDisplayed()
         pane.assertIsDisplayed()
         capture("tablet-channels", TouchCanvas.TABLET)
@@ -210,13 +211,14 @@ class ChannelsScreenTest {
         }
         val ridge = compose.onNode(isSelected() and hasText("Ridge Earth"))
         val amber = compose.onNode(isSelected() and hasText("Amber Stage"))
+        val harbor = compose.onNode(isSelected() and hasText("Harbor Sport"))
         ridge.assertIsDisplayed()
-        compose.runOnIdle { lastWatched.value = "amber-stage" }
-        amber.assertIsDisplayed()
-        compose.onNode(hasClickAction() and hasText("Ridge Earth")).performClick()
+        compose.runOnIdle { lastWatched.value = "harbor-sport" }
         ridge.assertIsDisplayed()
 
-        compose.runOnIdle { state.value = ChannelsState.Ready(list.copy(rows = list.rows.drop(1))) }
+        compose.runOnIdle { state.value = ChannelsState.Ready(list.copy(rows = list.rows.drop(1), selectedTagId = "sport")) }
+        harbor.assertIsDisplayed()
+        compose.onNode(hasClickAction() and hasText("Amber Stage")).performClick()
         amber.assertIsDisplayed()
         compose.runOnIdle { state.value = ChannelsState.Ready(list) }
         amber.assertIsDisplayed()

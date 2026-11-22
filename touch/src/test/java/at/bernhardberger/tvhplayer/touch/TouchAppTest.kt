@@ -27,6 +27,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertCountEquals
@@ -35,6 +36,7 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasClickAction
@@ -59,6 +61,7 @@ import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import at.bernhardberger.tvheadend.sdk.android.DiscoveredTvheadendServer
@@ -117,13 +120,13 @@ import coil3.request.ErrorResult
 import coil3.request.SuccessResult
 import java.time.ZoneId
 import kotlin.time.toJavaInstant
-import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlin.time.Duration.Companion.hours
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.After
+import org.junit.Before
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -139,7 +142,13 @@ import org.robolectric.util.ReflectionHelpers
 
 /** The app's pages on the SDK's fake session and profile store: first run, the frame and Connections. */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
+@Config(
+    sdk = [34], qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi",
+    instrumentedPackages = [
+        "at.bernhardberger.tvhplayer.touch.TouchAppKt",
+        "at.bernhardberger.tvhplayer.ui.common.TimeConverterKt",
+    ],
+)
 @OptIn(TvheadendTestingApi::class)
 class TouchAppTest {
     private val motionScale = object : MotionDurationScale { override var scaleFactor = 1f }
@@ -161,11 +170,15 @@ class TouchAppTest {
     private val server = DiscoveredTvheadendServer("Tvheadend", "192.168.1.20", 9982)
     private val heading = SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading)
 
+    @Before fun setClock() {
+        assertTrue(SystemClock.setCurrentTimeMillis(FIXTURE_NOW.toEpochMilliseconds()))
+    }
+
     @After fun close() = connection.close()
 
     @Test
     fun playerAndBrowseShareTheSelectedChannelScope() {
-        val guide = ServerGuide(Clock.System.now())
+        val guide = ServerGuide(FIXTURE_NOW)
         val dependencies = module {
             single<TvheadendSession> { connection.session }
             single { connection.owner }
@@ -588,7 +601,6 @@ class TouchAppTest {
     }
 
     @Test
-    @Config(instrumentedPackages = ["at.bernhardberger.tvhplayer.touch.TouchAppKt"])
     fun channelsIgnoreEpgUpdatesOutsideTheirRowsButShowAChangedCurrentProgram() {
         val info = compose.activity.applicationInfo
         val oldFlags = info.flags
@@ -631,10 +643,6 @@ class TouchAppTest {
     }
 
     @Test
-    @Config(instrumentedPackages = [
-        "at.bernhardberger.tvhplayer.touch.TouchAppKt",
-        "at.bernhardberger.tvhplayer.ui.common.TimeConverterKt",
-    ])
     fun channelsMapAtAMinuteAndAProgrammeBoundaryButNotBetween() {
         val info = compose.activity.applicationInfo
         val oldFlags = info.flags
@@ -806,10 +814,7 @@ class TouchAppTest {
     }
 
     @Test
-    @Config(qualifiers = TABLET, instrumentedPackages = [
-        "at.bernhardberger.tvhplayer.touch.TouchAppKt",
-        "at.bernhardberger.tvhplayer.ui.common.TimeConverterKt",
-    ])
+    @Config(qualifiers = TABLET)
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun channelDetailsCoverTheWidePaneAndBackRestoresIt() {
         watchWay = { _, _, _ -> }
@@ -863,16 +868,29 @@ class TouchAppTest {
         watchWay = { id, way, _ -> returned += id to way }
         val guide = savedConnectionWithGuide(withChannelArt = true)
         val id = guide.first.id.value.toString()
-        compose.onNode(hasClickAction() and hasText(guide.first.name!!)).performClick()
+        val row = compose.onNode(hasClickAction() and hasText(guide.first.name!!))
+        val channel = compose.onNode(heading and hasText(guide.first.name!!))
+        row.performClick()
         compose.captureTouch("channels-step", "phone-channel-page-playing", TouchCanvas.PHONE)
         compose.onNodeWithContentDescription(label(SharedR.string.player_continue_watching)).performClick()
         assertEquals(listOf(id to BrowseContextAction.CONTINUE_WATCHING), returned)
 
         compose.runOnIdle { behindLive.value = id }
-        compose.onNodeWithContentDescription(label(R.string.watch_options)).performClick()
+        val menu = compose.onNodeWithContentDescription(label(R.string.watch_options))
+        val live = compose.onNode(hasClickAction() and hasText(label(SharedR.string.context_watch_live)))
+        menu.performClick()
         compose.captureTouch("channels-step", "phone-channel-page-menu-open", TouchCanvas.PHONE)
-        compose.onNode(hasClickAction() and hasText(label(SharedR.string.context_watch_live))).performClick()
+        live.performClick()
         assertEquals(id to BrowseContextAction.WATCH_LIVE, returned.last())
+
+        menu.performClick()
+        live.assertIsDisplayed()
+        back()
+        live.assertDoesNotExist()
+        channel.assertIsDisplayed()
+        back()
+        channel.assertDoesNotExist()
+        row.assertIsDisplayed()
     }
 
     @Test
@@ -916,6 +934,21 @@ class TouchAppTest {
         channel.assertIsDisplayed()
         row.assertDoesNotExist()
         compose.captureTouch("channels-step", "tablet-upright-channel-page", TouchCanvas.TABLET_UPRIGHT)
+
+        val guideTab = compose.onNode(hasClickAction() and hasText(label(R.string.nav_epg)))
+        compose.mainClock.autoAdvance = false
+        try {
+            guideTab.performSemanticsAction(SemanticsActions.OnClick)
+            compose.runOnUiThread { Snapshot.sendApplyNotifications() }
+            compose.mainClock.advanceTimeByFrame()
+            guideTab.assertIsSelected()
+            channel.assertIsDisplayed()
+            back()
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+        compose.onNode(hasClickAction() and hasText(label(R.string.nav_channels))).assertIsSelected()
+        channel.assertIsDisplayed()
         compose.onNodeWithContentDescription(label(R.string.recordings_back)).performClick()
         row.assertIsDisplayed()
         channel.assertDoesNotExist()
@@ -994,7 +1027,7 @@ class TouchAppTest {
     @Test
     fun removeEntryDismissesWhenTheRecordingGainsAFile() {
         // Failed entries without files are not in the Archive destination. Drive its actual confirmation host.
-        val guide = ServerGuide(Clock.System.now())
+        val guide = ServerGuide(FIXTURE_NOW)
         val withoutFile = guide.connected(listOf(guide.filmWithErrors(hasFile = false)))
         val withFile = guide.connected(listOf(guide.filmWithErrors(hasFile = true)))
         lateinit var dvr: DvrControls
@@ -1426,7 +1459,7 @@ class TouchAppTest {
         connection.session.publish(
             SessionObservation.create(
                 sessionState = ready().sessionState,
-                channelState = ChannelRepositoryState.Current(ServerGuide(Clock.System.now()).catalog),
+                channelState = ChannelRepositoryState.Current(ServerGuide(FIXTURE_NOW).catalog),
             ),
         )
         openGuide()
@@ -1578,12 +1611,12 @@ class TouchAppTest {
     }
 
     private fun savedConnectionWithGuide(
-        now: Instant? = null,
+        now: Instant = FIXTURE_NOW,
         withChannelArt: Boolean = false,
         mappingDispatcher: () -> CoroutineDispatcher = { Dispatchers.Main.immediate },
     ): ServerGuide {
         runBlocking { connection.store.addAnonymous(server.host, server.port, "Home server", true) }
-        val guide = ServerGuide(now ?: Clock.System.now())
+        val guide = ServerGuide(now)
         if (withChannelArt) {
             captureLogo = (guide.logo as ChannelIcon.ImageCache).artworkId
             capturePicture = guide.picture
@@ -1670,6 +1703,7 @@ class TouchAppTest {
     )
 
     private companion object {
+        val FIXTURE_NOW = Instant.parse("2027-01-16T11:31:07Z")
         const val FAILURE_MILLIS = 6_000L
         const val INFO_MILLIS = 4_000L
         const val KEYBOARD_PX = 600

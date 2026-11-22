@@ -29,7 +29,7 @@ internal fun ChannelsPageHost(
     scope: ChannelScopeState,
     session: TvheadendSession,
     channels: ChannelsViewModel,
-    pages: ProgramPageStack,
+    pages: ProgramPageStack?,
     dvr: DvrControls,
     dispatcher: CoroutineDispatcher,
     playingId: String?,
@@ -42,16 +42,16 @@ internal fun ChannelsPageHost(
     onSignIn: () -> Unit,
 ) {
     val catalog = scope.scope.allChannels
-    if (scope.channelCatalogCurrent) {
+    if (pages != null && scope.channelCatalogCurrent) {
         LaunchedEffect(pages, catalog) {
             pages.removeMissingChannels(catalog.mapTo(mutableSetOf()) { it.id.value.toString() })
         }
     }
-    val details = programDetailsForPages(pages, session, playingId, dispatcher)
+    val details = if (pages != null) programDetailsForPages(pages, session, playingId, dispatcher) else emptyMap()
     val page: @Composable (String, Modifier, Boolean, Boolean, () -> Unit) -> Unit =
         { id, modifier, inPane, active, back ->
             ChannelPage(
-                session, channels, id, back, { if (active) pages.openDetails(it) },
+                session, channels, id, back, { if (active) pages?.openDetails(it) },
                 dvr::record, dvr::cancel, dvr::stopProgram, modifier,
                 inPane = inPane, playingId = playingId, active = active, mappingDispatcher = dispatcher,
                 behindLive = behindLiveId == id, onWatch = onChannelWatch,
@@ -62,14 +62,14 @@ internal fun ChannelsPageHost(
             destination = Destination.Channels,
             destinations = Destination.entries,
             layout = guideLayout(),
-            pages = pages.pages,
+            pages = pages?.pages.orEmpty(),
             details = details,
             actions = GuideActions(
                 onWatch = onWatch, onRecord = dvr::record, onRecordOptions = null, onDay = {}, onJump = {}, onTag = {},
-                onCancel = dvr::cancel, onStop = dvr::stopProgram, onAiring = pages::openDetails,
+                onCancel = dvr::cancel, onStop = dvr::stopProgram, onAiring = { pages?.openDetails(it) },
             ),
-            onBack = pages::pop,
-            onReselect = pages::clear,
+            onBack = { pages?.pop() },
+            onReselect = { pages?.clear() },
             onShowInGuide = null,
             channelPage = { entry, active, back -> page(entry.channelId, Modifier, false, active, back) },
         ) { top, modifier ->
@@ -84,10 +84,9 @@ internal fun ChannelsPageHost(
                         onRetry = onRetry,
                         onOpenConnectionSettings = onOpenConnections,
                         onSignIn = onSignIn,
-                        onOpenChannel = { if (active) pages.openChannel(it) },
+                        onOpenChannel = { if (active) pages?.openChannel(it) },
                     ),
-                    lastWatchedId = playingId ?: lastWatchedId?.takeIf { id -> catalog.any { it.id == id } }
-                        ?.value?.toString(),
+                    lastWatchedId = lastWatchedId?.value?.toString(),
                     pane = { id, paneModifier -> page(id, paneModifier, true, active) {} },
                 )
             }
