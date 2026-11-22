@@ -89,27 +89,28 @@ internal fun ProgramPageHost(
     destination: Destination,
     destinations: List<Destination>,
     layout: GuideLayout,
-    pages: List<GuidePageKey>,
+    pageStack: ProgramPageStack,
     details: Map<GuidePageKey.Details, ProgramDetails>,
     actions: GuideActions,
-    onBack: () -> Unit,
-    onReselect: () -> Unit,
     onShowInGuide: ((ProgramDetails) -> Unit)?,
     channelPage: @Composable (GuidePageKey.Channel, Boolean, () -> Unit) -> Unit,
     modifier: Modifier = Modifier,
     browse: @Composable (Boolean, Modifier) -> Unit,
 ) {
+    val pages = pageStack.pages
     val readyPages = pages.filter { it !is GuidePageKey.Details || it in details }
     val stack = listOf(GuidePageKey.Browse) + readyPages
+    // Back cancels unmapped visits and closes what was actually shown, in one update.
+    val onBack = { pageStack.back(readyPages) }
     val canHandleBack = LocalDestinationBackEnabled.current
-    if (canHandleBack && stack.size > 1) OnDestinationReselected(destination, onReselect)
+    if (canHandleBack && pages.isNotEmpty()) OnDestinationReselected(destination, pageStack::clear)
     val render by rememberUpdatedState<@Composable (GuidePageKey, ProgramDetails?) -> Unit> { page, initial ->
         val top = page == stack.last()
         val active = top && canHandleBack
         val back = { if (active) onBack() }
         ReportFrameBarsWhen(top) {
             when (page) {
-                GuidePageKey.Browse -> ProgramBrowseFrame(layout, destinations, top, active, browse)
+                GuidePageKey.Browse -> ProgramBrowseFrame(layout, destinations, top, active, pages.isEmpty(), browse)
                 is GuidePageKey.Details -> ProgramSubpage(destination, destinations, layout) {
                     val previous = stack.getOrNull(stack.indexOf(page) - 1) as? GuidePageKey.Channel
                     ProgramDetailsEntry(
@@ -132,7 +133,7 @@ internal fun ProgramPageHost(
     }
     val scene = rememberSceneState(entries, sceneStrategies = emptyList(), onBack = onBack)
     val navigation = rememberNavigationEventState(scene)
-    NavigationBackHandler(navigation, isBackEnabled = canHandleBack && stack.size > 1, onBackCompleted = onBack)
+    NavigationBackHandler(navigation, isBackEnabled = canHandleBack && pages.isNotEmpty(), onBackCompleted = onBack)
     val forward = pageMove(forward = true)
     val backward = pageMove(forward = false)
     NavDisplay(
@@ -148,10 +149,11 @@ private fun ProgramBrowseFrame(
     destinations: List<Destination>,
     top: Boolean,
     active: Boolean,
+    noOpenPages: Boolean,
     browse: @Composable (Boolean, Modifier) -> Unit,
 ) {
     val taps = LocalDestinationReselections.current
-    CompositionLocalProvider(LocalDestinationReselections provides if (active) taps else emptyFlow()) {
+    CompositionLocalProvider(LocalDestinationReselections provides if (active && noOpenPages) taps else emptyFlow()) {
         PhoneBrowseViewport(layout.compact && destinations.size > 1, active) { browse(top, it) }
     }
 }

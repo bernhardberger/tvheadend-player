@@ -67,9 +67,8 @@ internal fun GuideDestination(
     GuideScreen(
         state = state,
         dayIndex = state.dayDates.indexOf(selection.day).coerceAtLeast(0),
-        pages = stack.pages,
+        pageStack = stack,
         details = details,
-        onCloseAllPages = stack::clear,
         onShowInGuide = stack::showInGuide,
         channelPage = { page, active, back ->
             ChannelPage(
@@ -84,7 +83,7 @@ internal fun GuideDestination(
         actions = GuideActions(
             onWatch = onWatch, onRecord = dvr::record,
             onRecordOptions = null,
-            onDetails = { if (it == null) stack.pop() else stack.openDetails(it) },
+            onDetails = { it?.let(stack::openDetails) },
             onDay = { state.dayDates.getOrNull(it)?.let(guide::selectDay) },
             onJump = { guide.selectJump(state.jumpTimes.getOrNull(it - 1)) },
             onTag = { id -> channels.selectTag(id?.let { ChannelTagId(it.toLong()) }) },
@@ -126,6 +125,18 @@ private fun projectedGuide(
         Configuration(LocalConfiguration.current), AppClock.uses24Hour, LocalArtworkModels.current,
         playingId, guide.overviewViewport.collectAsStateWithLifecycle().value,
     )
+    val stack = guide.pageStack
+    if (stack.pages.any { it is GuidePageKey.Channel }) {
+        LaunchedEffect(scope, input.generation, stack.pages) {
+            val current = channels.scope.value
+            val generation = guide.observation.value.currentSession?.generationIdentity
+            if (current.channelCatalogCurrent && generation != null &&
+                current.observation?.currentSession?.generationIdentity === generation
+            ) {
+                stack.removeMissingChannels(current.scope.allChannels.mapTo(mutableSetOf()) { it.id.value.toString() })
+            }
+        }
+    }
     SubmitGuideMapping(guide, channels, connection, input, activeClock)
     val retained = result?.takeIf { it.input.sameBrowseOwner(input) }
     val mapped = retained?.state ?: EmptyGuide

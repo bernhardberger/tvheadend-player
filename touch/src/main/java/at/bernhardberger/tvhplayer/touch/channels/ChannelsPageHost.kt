@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
@@ -57,19 +58,18 @@ internal fun ChannelsPageHost(
                 behindLive = behindLiveId == id, onWatch = onChannelWatch,
             )
         }
+    val shownPages = pages ?: remember { ProgramPageStack() }
     key(scope.profileId) {
         ProgramPageHost(
             destination = Destination.Channels,
             destinations = Destination.entries,
             layout = guideLayout(),
-            pages = pages?.pages.orEmpty(),
+            pageStack = shownPages,
             details = details,
             actions = GuideActions(
                 onWatch = onWatch, onRecord = dvr::record, onRecordOptions = null, onDay = {}, onJump = {}, onTag = {},
                 onCancel = dvr::cancel, onStop = dvr::stopProgram, onAiring = { pages?.openDetails(it) },
             ),
-            onBack = { pages?.pop() },
-            onReselect = { pages?.clear() },
             onShowInGuide = null,
             channelPage = { entry, active, back -> page(entry.channelId, Modifier, false, active, back) },
         ) { top, modifier ->

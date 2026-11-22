@@ -12,10 +12,12 @@ internal class ProgramPageStack {
         private set
 
     fun openDetails(programId: String) {
+        if ((pages.lastOrNull() as? GuidePageKey.Details)?.programId == programId) return
         pages = pages + GuidePageKey.Details(programId, nextVisit++)
     }
 
     fun openChannel(channelId: String, day: LocalDate? = null, programId: String? = null) {
+        if ((pages.lastOrNull() as? GuidePageKey.Channel)?.channelId == channelId) return
         pages = pages + GuidePageKey.Channel(channelId, day, programId, nextVisit++)
     }
 
@@ -23,7 +25,9 @@ internal class ProgramPageStack {
         openChannel(details.channelId, details.guideDay, details.id.takeIf { details.guideDay != null })
     }
 
-    fun pop() { pages = pages.dropLast(1) }
+    fun back(visiblePages: List<GuidePageKey>) {
+        pages = pages.filter { it in visiblePages }.dropLast(1)
+    }
 
     fun clear() { pages = emptyList() }
 
