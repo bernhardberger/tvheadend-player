@@ -72,8 +72,8 @@ internal data class GuideState(
     /** The picked day's or time's programs are still coming: a short wait inside the shown Guide. */
     val dayLoading: Boolean = false,
 ) {
-    val channelsHaveLogos = channels.any { hasChannelLogo(it.logo, it.logoModel) }
-    val overviewHasLogos = channels.any { it.programs.isNotEmpty() && hasChannelLogo(it.logo, it.logoModel) }
+    val channelsHaveLogos = channels.any { it.hasLogoSlot }
+    val overviewHasLogos = channels.any { (it.programs.isNotEmpty() || it.overviewHasLead) && it.hasLogoSlot }
 }
 
 /** Section 12's states of the Guide as a whole; only [Current] and [Offline] show the list. */
@@ -102,7 +102,12 @@ internal data class GuideChannel(
     val day: List<GuideProgram>? = null,
     /** The server image's model for the touch-level image composable; the fixture painter wins. */
     val logoModel: Any? = null,
-)
+    val overviewPending: Boolean = false,
+    val overviewHasLead: Boolean = false,
+    val hasUnmappedLogo: Boolean = false,
+) {
+    val hasLogoSlot get() = hasUnmappedLogo || hasChannelLogo(logo, logoModel)
+}
 
 /** No programs until [until] ("6:00 AM"), from [start]. */
 internal data class GuideGap(val start: String, val until: String)
@@ -250,6 +255,7 @@ internal class GuideActions(
     val onStop: ((programId: String) -> Unit)? = null,
     val onChannel: (String) -> Unit = {},
     val onView: (GuideView) -> Unit = {},
+    val onOverviewViewport: ((List<String>) -> Unit)? = null,
 ) {
     /** Whether there is something behind a program's [record] control. */
     fun offers(record: ProgramRecordControl?): Boolean = when (record) {

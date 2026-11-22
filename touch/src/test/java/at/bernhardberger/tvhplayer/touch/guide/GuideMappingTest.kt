@@ -1,8 +1,10 @@
 package at.bernhardberger.tvhplayer.touch.guide
 
 import at.bernhardberger.tvheadend.sdk.core.Channel
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
+import at.bernhardberger.tvheadend.sdk.core.DvrSnapshot
 import at.bernhardberger.tvheadend.sdk.core.EpgCredit
 import at.bernhardberger.tvheadend.sdk.core.EpgCreditRole
 import at.bernhardberger.tvheadend.sdk.core.EpgEpisode
@@ -111,6 +113,51 @@ class GuideMappingTest {
         assertEquals(listOf("Today"), state.days)
         assertEquals(listOf("20:15", "22:00"), state.jumps)
     }
+
+    @Test
+    fun firstOverviewFormatsOnlyTheFirstWindowOfALargeScope() {
+        val channels = (1L..3_262L).map { Channel.create(ChannelId(it), name = "Channel $it") }
+        val events = channels.map { event(it.id.value, it, Instant.fromEpochSeconds(NOW)) }
+        val initialRows = GuideOverviewRows()
+        val state = overview(channels, events, initialRows)
+        assertEquals(channels.size, state.channels.size)
+        assertEquals("The first publish maps a bounded window", 8, initialRows.formattedCount)
+        val tail = channels.last().id.value.toString()
+        val scrolled = overview(channels, events, GuideOverviewRows(setOf(tail), initialRows))
+        assertEquals(tail, scrolled.channels.last().programs.single().channelId)
+    }
+
+    @Test
+    fun changingOneOverviewChannelKeepsTheUnchangedRow() {
+        val channels = listOf(guide.first, guide.second)
+        val first = event(101L, guide.first, Instant.fromEpochSeconds(NOW))
+        val second = event(102L, guide.second, Instant.fromEpochSeconds(NOW))
+        val initialRows = GuideOverviewRows()
+        val before = overview(channels, listOf(first, second), initialRows)
+        val changed = EpgEvent.create(first.id, first.channelId, first.start, first.stop, title = "Updated programme")
+        val updatedRows = GuideOverviewRows(previous = initialRows)
+        val after = overview(channels, listOf(changed, second), updatedRows)
+        assertEquals("Updated programme", after.channels.first().programs.single().title)
+        assertSame("An unchanged channel is not remapped", before.channels[1], after.channels[1])
+        assertEquals(1, updatedRows.formattedCount)
+
+        val events = guide.snapshot.events + second
+        val beforeDvrRows = GuideOverviewRows()
+        val beforeDvr = overview(channels, events, beforeDvrRows)
+        val nextDvrRows = GuideOverviewRows(previous = beforeDvrRows)
+        val dvr = DvrSnapshot.create(entries = guide.dvr.entries + guide.scheduling(999, 2))
+        val afterDvr = overview(channels, events, nextDvrRows, dvr)
+        assertEquals(true, afterDvr.channels.first().programs[1].scheduled)
+        assertSame("An unrelated DVR update preserves the second row", beforeDvr.channels[1], afterDvr.channels[1])
+        assertEquals(1, nextDvrRows.formattedCount)
+    }
+
+    private fun overview(
+        channels: List<Channel>, events: List<EpgEvent>, rows: GuideOverviewRows, dvr: DvrSnapshot = guide.dvr,
+    ) = guideState(
+        scope(channels, channels, tagged = false, loaded = true), ConnectionUiState.Ready, false,
+        observation(EpgSnapshot.create(events), dvr), GuideSelection(), false, clock, texts, overviewRows = rows,
+    )
 
     @Test
     fun aGapEndsTheOverviewAndALaterDayGetsItsTab() {
@@ -269,9 +316,9 @@ class GuideMappingTest {
             settingsLoaded = loaded,
         )
 
-    private fun observation(snapshot: EpgSnapshot = guide.snapshot) = SessionObservation.create(
+    private fun observation(snapshot: EpgSnapshot = guide.snapshot, dvr: DvrSnapshot = guide.dvr) = SessionObservation.create(
         epgState = EpgRepositoryState.Current(snapshot),
-        dvrState = DvrRepositoryState.Current(guide.dvr),
+        dvrState = DvrRepositoryState.Current(dvr),
     )
 
     private fun event(id: Long, channel: Channel, start: Instant) = EpgEvent.create(

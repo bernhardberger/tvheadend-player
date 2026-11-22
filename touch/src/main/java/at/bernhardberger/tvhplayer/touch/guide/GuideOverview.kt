@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
@@ -39,8 +40,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -62,6 +66,8 @@ import at.bernhardberger.tvhplayer.touch.channels.RecordingBadge
 import at.bernhardberger.tvhplayer.touch.ui.channelLogoSlot
 import at.bernhardberger.tvhplayer.touch.ui.PartsLine
 import at.bernhardberger.tvhplayer.touch.ui.rememberStandalonePicture
+import at.bernhardberger.tvhplayer.touch.ui.SkeletonLines
+import at.bernhardberger.tvhplayer.touch.ui.SkeletonRow
 
 /** The day menu and the jump switch above the overview. */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -117,15 +123,21 @@ internal fun OverviewColumns(
 ) {
     val width = if (layout == GuideLayout.Wide) 264.dp else 232.dp
     LazyRow(
-        Modifier.fillMaxSize(), contentPadding = contentPadding,
+        Modifier.fillMaxSize(), state = rememberOverviewListState(channels, actions.onOverviewViewport),
+        contentPadding = contentPadding,
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         items(channels.size, key = { channels[it].id }) { index ->
             val channel = channels[index]
+            val scroll = rememberScrollState()
             Column(Modifier.width(width).fillParentMaxHeight()) {
                 ColumnHead(channel) { onChannel(channel.id) }
+                if (channel.overviewPending) {
+                    OverviewRowSkeleton(compact = false)
+                    return@Column
+                }
                 Column(
-                    Modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(bottom = 16.dp),
+                    Modifier.fillMaxHeight().verticalScroll(scroll).padding(bottom = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
                 ) {
                     channel.programs.forEachIndexed { position, program ->
@@ -299,12 +311,18 @@ internal fun OverviewRows(
     onDetails: (String) -> Unit,
     contentPadding: PaddingValues,
 ) {
-    val rows = channels.mapNotNull { channel -> channel.programs.firstOrNull()?.let { channel to it } }
+    val rows = remember(channels) { channels.filter { it.programs.isNotEmpty() || it.overviewHasLead } }
     LazyColumn(
-        Modifier.fillMaxSize(), contentPadding = contentPadding,
+        Modifier.fillMaxSize(), state = rememberOverviewListState(rows, actions.onOverviewViewport),
+        contentPadding = contentPadding,
         verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
     ) {
-        itemsIndexed(rows, key = { _, (channel, _) -> channel.id }) { index, (channel, program) ->
+        itemsIndexed(rows, key = { _, channel -> channel.id }) { index, channel ->
+            val program = channel.programs.firstOrNull()
+            if (program == null) {
+                OverviewRowSkeleton(compact = true)
+                return@itemsIndexed
+            }
             val open = program.id == openId
             val shape = segmentShape(index, rows.size)
             val picture = rememberStandalonePicture(program.still, program.stillModel)
@@ -322,19 +340,7 @@ internal fun OverviewRows(
                             model = channel.logoModel, showSlot = showLogoSlots,
                         ),
                         overlineContent = { PartsLine(listOf(channel.name, program.start)) },
-                        supportingContent = {
-                            Column {
-                                PartsLine(program.rowLine(), style = MaterialTheme.typography.bodyMedium)
-                                // Without the thumbnail its bar stands under the text to the row's end, in the
-                                // room a three-line row has there, so the row keeps the height of one with it.
-                                program.progress?.takeIf { picture == null }?.let {
-                                    ProgramBar(
-                                        it, program.recording,
-                                        Modifier.padding(top = 4.dp).fillMaxWidth().height(4.dp), program.watching,
-                                    )
-                                }
-                            }
-                        },
+                        supportingContent = { OverviewSupportingContent(program, picture != null) },
                         trailingContent = picture?.let {
                             {
                                 ProgramPicture(
@@ -359,6 +365,43 @@ internal fun OverviewRows(
             }
         }
     }
+}
+
+@Composable
+private fun OverviewSupportingContent(program: GuideProgram, hasPicture: Boolean) {
+    Column {
+        PartsLine(program.rowLine(), style = MaterialTheme.typography.bodyMedium)
+        // Without its picture, the row keeps the progress bar under the text.
+        program.progress?.takeUnless { hasPicture }?.let {
+            ProgramBar(
+                it, program.recording,
+                Modifier.padding(top = 4.dp).fillMaxWidth().height(4.dp), program.watching,
+            )
+        }
+    }
+}
+
+@Composable
+private fun rememberOverviewListState(channels: List<GuideChannel>, onViewport: ((List<String>) -> Unit)?) =
+    rememberLazyListState().also { state ->
+        val latestChannels = rememberUpdatedState(channels)
+        val emit = rememberUpdatedState(onViewport)
+        LaunchedEffect(state) {
+            snapshotFlow {
+                val rows = latestChannels.value
+                val visible = state.layoutInfo.visibleItemsInfo
+                visible.takeIf { items ->
+                    items.any { item ->
+                        rows.getOrNull(item.index)?.let { it.id == item.key && it.overviewPending } == true
+                    }
+                }?.mapNotNull { it.key as? String }
+            }.collect { ids -> if (ids != null) emit.value?.invoke(ids) }
+        }
+    }
+
+@Composable
+private fun OverviewRowSkeleton(compact: Boolean) {
+    SkeletonRow(0, 1, if (compact) 88.dp else 72.dp) { SkeletonLines(0) }
 }
 
 @Composable
