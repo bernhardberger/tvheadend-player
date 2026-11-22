@@ -356,7 +356,9 @@ class GuideScreenTest {
     @Test
     @Config(qualifiers = PHONE, instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.common.TimeConverterKt"])
     fun channelWithoutGuideDataShowsTheEmptyState() {
-        val server = ServerGuide(Instant.fromEpochMilliseconds(System.currentTimeMillis()))
+        val now = Instant.parse("2027-01-15T12:00:00Z")
+        assertTrue(SystemClock.setCurrentTimeMillis(now.toEpochMilliseconds()))
+        val server = ServerGuide(now)
         val calls = mutableListOf<Triple<String, BrowseContextAction, String?>>()
         val connection = FakeConnection()
         try {

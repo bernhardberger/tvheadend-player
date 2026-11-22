@@ -15,6 +15,7 @@ import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import at.bernhardberger.tvheadend.sdk.core.DvrMutationKind
 import at.bernhardberger.tvhplayer.notices.DvrMutationFeedback
@@ -107,6 +108,7 @@ import at.bernhardberger.tvhplayer.touch.player.liveRecordOffer
 import at.bernhardberger.tvhplayer.touch.player.playerSchedule
 import at.bernhardberger.tvhplayer.touch.player.withShownPrograms
 import at.bernhardberger.tvhplayer.touch.recordings.RecordingsViewModel
+import at.bernhardberger.tvhplayer.touch.recordings.RecordingsViewStore
 import at.bernhardberger.tvhplayer.touch.testutil.FakeConnection
 import at.bernhardberger.tvhplayer.touch.testutil.ImageLoaderRule
 import at.bernhardberger.tvhplayer.touch.testutil.MemoryPreferences
@@ -1541,7 +1543,7 @@ class TouchAppTest {
         val memory = MemoryPreferences()
         var readGate: CompletableDeferred<Unit>? = null
         var writeGate: CompletableDeferred<Unit>? = null
-        connection = FakeConnection(preferences = object : DataStore<Preferences> by memory {
+        val preferences = object : DataStore<Preferences> by memory {
             override val data = flow {
                 readGate?.await()
                 emitAll(memory.data)
@@ -1551,13 +1553,27 @@ class TouchAppTest {
                 writeGate?.await()
                 return memory.updateData(transform)
             }
-        })
+        }
+        val store = RecordingsViewStore(preferences)
+        // Replace the activity's models while the shared store and write scope stay alive.
+        val applicationScope = compose.activity.lifecycleScope
+        fun launchRecordings(viewStore: RecordingsViewStore = store) {
+            compose.runOnIdle {
+                relaunchedRecordings.value = RecordingsViewModel(connection.session, viewStore, applicationScope)
+            }
+        }
+        launchRecordings()
         val guide = savedConnectionWithGuide()
         openRecordings()
         fun options() = compose.onNodeWithContentDescription(label(R.string.recordings_view_options))
         fun choose(@StringRes page: Int, @StringRes choice: Int) {
             compose.onNodeWithText(label(page)).performClick()
             compose.onNodeWithText(label(choice)).performClick()
+        }
+        fun closeOptions() {
+            compose.runOnUiThread {
+                (ShadowDialog.getLatestDialog() as ComponentDialog).onBackPressedDispatcher.onBackPressed()
+            }
         }
         options().performClick()
         val holdWrite = CompletableDeferred<Unit>()
@@ -1566,21 +1582,26 @@ class TouchAppTest {
 
         compose.onNodeWithText(guide.diary.title!!).assertDoesNotExist()
         compose.onNodeWithText(guide.film.title!!).assertExists()
-        holdWrite.complete(Unit)
+        closeOptions()
+        compose.onNode(hasClickAction() and hasText(label(R.string.nav_channels))).performClick()
+        launchRecordings()
+        openRecordings()
+        compose.onNodeWithText(guide.diary.title!!).assertDoesNotExist()
+        options().performClick()
         choose(R.string.recordings_sort, R.string.recordings_sort_oldest)
         choose(R.string.recordings_group_by, R.string.recordings_grouping_folders)
-        compose.runOnUiThread {
-            (ShadowDialog.getLatestDialog() as ComponentDialog).onBackPressedDispatcher.onBackPressed()
-        }
+        closeOptions()
         compose.onNodeWithText("Films").assertIsDisplayed()
         compose.onNodeWithText("Docs").assertDoesNotExist()
         compose.onNode(hasClickAction() and hasText(label(R.string.nav_channels))).performClick()
 
         val holdRead = CompletableDeferred<Unit>()
         compose.runOnIdle {
+            holdWrite.complete(Unit)
             readGate = holdRead
-            relaunchedRecordings.value = connection.recordings()
         }
+        // Use a cold store here so the final launch verifies what actually reached persistence.
+        launchRecordings(RecordingsViewStore(preferences))
         openRecordings()
         val showedFlatList = compose.onAllNodes(hasText(guide.film.title!!)).fetchSemanticsNodes().isNotEmpty()
         val showedLoading = compose.onAllNodes(hasText(label(SharedR.string.recordings_loading)))
@@ -1591,6 +1612,7 @@ class TouchAppTest {
         assertTrue("Recordings should show first load while waiting for the saved view", showedLoading)
         compose.onNodeWithText("Docs").assertDoesNotExist()
         options().performClick()
+        compose.onNodeWithText(label(R.string.recordings_show_unwatched)).assertIsDisplayed()
         compose.onNodeWithText(label(R.string.recordings_sort_oldest)).assertIsDisplayed()
     }
 
