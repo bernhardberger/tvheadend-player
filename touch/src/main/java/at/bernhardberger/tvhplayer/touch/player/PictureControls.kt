@@ -22,8 +22,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.FilledTonalIconToggleButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -209,10 +209,17 @@ private fun Transport(
         ) {
             PlayerIcon(R.drawable.player_replay_ten, R.string.player_back_ten, Modifier.size(layout.skipIconSize))
         }
-        FilledIconButton(
-            onClick = { onAction(PlayerAction.TogglePlay) },
+        FilledTonalIconToggleButton(
+            checked = state.paused,
+            onCheckedChange = { onAction(PlayerAction.TogglePlay) },
+            shapes = IconButtonDefaults.toggleableShapes(),
             modifier = Modifier.size(main),
-            colors = IconButtonDefaults.filledIconButtonColors(containerColor = OnPicture, contentColor = Color.Black),
+            colors = IconButtonDefaults.filledTonalIconToggleButtonColors(
+                containerColor = DarkControl,
+                contentColor = OnPicture,
+                checkedContainerColor = OnPicture,
+                checkedContentColor = Color.Black,
+            ),
         ) {
             PlayerIcon(
                 if (state.paused) R.drawable.channels_play else R.drawable.player_pause,

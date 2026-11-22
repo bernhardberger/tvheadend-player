@@ -13,6 +13,9 @@ import android.view.WindowManager
 import android.view.inspector.WindowInspector
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.AndroidComposeTestRule
 import androidx.compose.ui.test.hasAnyDescendant
@@ -21,6 +24,7 @@ import androidx.compose.ui.test.isRoot
 import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import at.bernhardberger.tvhplayer.touch.R
 import java.io.File
 import kotlin.math.roundToInt
 import org.junit.Assert.assertEquals
@@ -31,6 +35,20 @@ enum class TouchCanvas(val qualifiers: String, val width: Int, val height: Int, 
     TABLET_UPRIGHT("en-rUS-w800dp-h1280dp-port-xhdpi", 1600, 2560, 32),
     PHONE("en-rUS-w412dp-h892dp-port-xhdpi", 824, 1784, 40),
     PHONE_LANDSCAPE("en-rUS-w892dp-h412dp-land-xhdpi", 1784, 824, 0),
+}
+
+fun AndroidComposeTestRule<*, out ComponentActivity>.capturePausedPlayer(
+    name: String,
+    canvas: TouchCanvas,
+    button: (Int) -> SemanticsNodeInteraction,
+    setPaused: (Boolean) -> Unit,
+) {
+    button(R.string.player_pause).assertIsOff()
+    runOnIdle { setPaused(true) }
+    button(R.string.player_play).assertIsOn()
+    captureTouch("review", "$name-paused", canvas)
+    runOnIdle { setPaused(false) }
+    button(R.string.player_pause).assertIsOff()
 }
 
 /**
