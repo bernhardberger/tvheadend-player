@@ -79,6 +79,7 @@ import at.bernhardberger.tvhplayer.touch.ui.FrameNotices
 import at.bernhardberger.tvhplayer.touch.ui.BottomWindowNotices
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.touch.ui.DestinationFrame
+import at.bernhardberger.tvhplayer.touch.ui.LocalDestinationBackEnabled
 import at.bernhardberger.tvhplayer.touch.guide.GuideDestination
 import at.bernhardberger.tvhplayer.touch.guide.GuideViewModel
 import at.bernhardberger.tvhplayer.touch.recordings.RecordingsDestination
@@ -162,7 +163,10 @@ internal fun TouchApp(
                 // NavDisplay can retain a scene across recompositions. Its entry must read current
                 // inputs (notably the playing IDs), even when that scene's key has not changed.
                 val frame by rememberUpdatedState<@Composable () -> Unit> {
-                    CompositionLocalProvider(LocalArtworkConnectedAt provides connectedAt) {
+                    CompositionLocalProvider(
+                        LocalArtworkConnectedAt provides connectedAt,
+                        LocalDestinationBackEnabled provides (backStack.last() == Page.Frame),
+                    ) {
                         AppDestinations(
                             channelsCache, dvr, connection, channels, recordings, guide,
                             playingId, onWatch, onPlayRecording,

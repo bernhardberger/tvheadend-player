@@ -552,6 +552,32 @@ class TouchAppTest {
         compose.onNode(heading and hasText(label(SharedR.string.server_list_title))).assertIsDisplayed()
         back()
         compose.onNodeWithText(guide.programs[2]).assertIsDisplayed()
+
+        val connections = compose.onNode(heading and hasText(label(SharedR.string.server_list_title)))
+        val openConnections = compose.onNodeWithContentDescription(label(R.string.channels_connection_settings))
+        compose.mainClock.autoAdvance = false
+        openConnections.performClick()
+        advance(64)
+        connections.assertExists()
+        compose.onNodeWithText(guide.programs[2]).assertExists()
+        back()
+        compose.mainClock.autoAdvance = true
+        connections.assertDoesNotExist()
+        compose.onNodeWithText(guide.programs[2]).assertIsDisplayed()
+
+        // A separate Back during the return now belongs to the open Channels row.
+        openConnections.performClick()
+        connections.assertIsDisplayed()
+        compose.mainClock.autoAdvance = false
+        back()
+        advance(64)
+        connections.assertExists()
+        compose.onNodeWithText(guide.programs[2]).assertExists()
+        back()
+        compose.mainClock.autoAdvance = true
+        connections.assertDoesNotExist()
+        compose.onNodeWithText(guide.programs[2]).assertDoesNotExist()
+        compose.onNode(heading and hasText(label(R.string.nav_channels))).assertIsDisplayed()
     }
 
     @Test
@@ -1238,10 +1264,16 @@ class TouchAppTest {
         compose.onNodeWithText(guide.programs[0]).assertIsDisplayed()
 
         unavailable(SessionFailure.NETWORK_UNAVAILABLE)
+        compose.mainClock.autoAdvance = false
         compose.onNode(hasClickAction() and hasText(label(R.string.channels_connection_settings))).performClick()
-        compose.onNode(heading and hasText(label(SharedR.string.server_list_title))).assertIsDisplayed()
-        connection.session.publish(guide.connected())
+        advance(64)
+        val connections = compose.onNode(heading and hasText(label(SharedR.string.server_list_title)))
+        connections.assertExists()
+        compose.onNode(heading and hasText(label(R.string.nav_epg))).assertExists()
         back()
+        compose.mainClock.autoAdvance = true
+        connections.assertDoesNotExist()
+        connection.session.publish(guide.connected())
         compose.onNode(heading and hasText(label(R.string.nav_epg))).assertIsDisplayed()
         compose.onNodeWithText(guide.programs[0]).assertIsDisplayed()
 

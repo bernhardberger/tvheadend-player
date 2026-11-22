@@ -112,7 +112,7 @@ internal val ReportFrameBarsWhen: @Composable (isTop: Boolean, content: @Composa
         )
     }
 
-/** The outgoing page stays composed during its fade but can no longer handle system Back. */
+/** Only the top page and its selected destination may handle system Back. */
 internal val LocalDestinationBackEnabled = compositionLocalOf { true }
 
 /** The shown page may collect taps on its already selected destination; events are not replayed. */
@@ -161,7 +161,8 @@ internal fun DestinationFrame(
     val select: (Destination) -> Unit = {
         if (it == selected) scope.launch { taps.emit(it) } else selected = it
     }
-    BackHandler(enabled = selected != Destination.Channels) { selected = Destination.Channels }
+    val canHandleBack = LocalDestinationBackEnabled.current
+    BackHandler(enabled = canHandleBack && selected != Destination.Channels) { selected = Destination.Channels }
     FrameShell(Modifier, Destination.entries, selected, select, bars) { padding ->
         AnimatedContent(
             targetState = selected,
@@ -177,7 +178,7 @@ internal fun DestinationFrame(
             }
             CompositionLocalProvider(
                 LocalReportFrameBars provides report,
-                LocalDestinationBackEnabled provides (destination == selected),
+                LocalDestinationBackEnabled provides (canHandleBack && destination == selected),
                 LocalDestinationReselections provides reselections,
             ) {
                 saved.SaveableStateProvider(destination) { content(destination) }
