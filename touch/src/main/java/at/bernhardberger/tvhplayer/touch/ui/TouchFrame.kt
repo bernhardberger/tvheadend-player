@@ -124,6 +124,11 @@ internal val WideBrowseMargin = 24.dp
 
 internal val LocalBrowseMargin = staticCompositionLocalOf { WideBrowseMargin }
 
+private val WindowSizeClass.hasNavigationRail: Boolean
+    get() = isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND) ||
+        (isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND) &&
+            !isHeightAtLeastBreakpoint(WindowSizeClass.HEIGHT_DP_MEDIUM_LOWER_BOUND))
+
 @Composable
 internal fun OnDestinationReselected(destination: Destination, action: suspend () -> Unit) {
     val taps = LocalDestinationReselections.current
@@ -243,10 +248,10 @@ private fun FrameShell(
     content: @Composable (PaddingValues) -> Unit,
 ) {
     val window = currentWindowAdaptiveInfoV2().windowSizeClass
-    val expanded = window.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND)
     val mediumOrWider = window.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND)
+    val hasRail = window.hasNavigationRail
 
-    val hasBottomBar = !expanded && destinations.size > 1
+    val hasBottomBar = !hasRail && destinations.size > 1
     val bottomBar = hasBottomBar && bars.navigation
     val navigation = if (hasBottomBar) updateTransition(bottomBar, label = "Bottom navigation") else null
     val barOccupiesSlot = bottomBar || navigation?.currentState == true || navigation?.isRunning == true
@@ -254,7 +259,7 @@ private fun FrameShell(
     val notices = LocalFrameNotices.current
     val browseMargin = if (mediumOrWider) WideBrowseMargin else CompactBrowseMargin
     Row(modifier.fillMaxSize()) {
-        if (expanded && bars.navigation) DestinationRail(destinations, selected, select)
+        if (hasRail && bars.navigation) DestinationRail(destinations, selected, select)
         Scaffold(
             modifier = Modifier.weight(1f),
             topBar = {

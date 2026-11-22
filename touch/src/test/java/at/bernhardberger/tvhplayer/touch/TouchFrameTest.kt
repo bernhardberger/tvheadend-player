@@ -424,6 +424,11 @@ class TouchFrameTest {
         val restoration = StateRestorationTester(compose)
         show(restoration)
         assertChannelsFrame(vertical = false)
+        compose.onNodeWithTag("browse-app-mark").assertDoesNotExist()
+        val channels = compose.onNode(destination and hasText("Channels")).fetchSemanticsNode().boundsInRoot
+        val guideItem = compose.onNode(destination and hasText("Guide")).fetchSemanticsNode().boundsInRoot
+        assertEquals("Bottom navigation items share a row", channels.top, guideItem.top)
+        assertTrue("Guide follows Channels across the bar", channels.right <= guideItem.left)
         compose.captureTouch("slice0", "phone", TouchCanvas.PHONE)
 
         selectOnTheNextFrame("Guide")

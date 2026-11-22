@@ -60,6 +60,7 @@ import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
@@ -816,12 +817,21 @@ class TouchAppTest {
         compose.onNodeWithContentDescription(label(SharedR.string.context_watch)).performClick()
         assertEquals(listOf(guide.first.id.value.toString(), guide.first.id.value.toString()), watches)
 
+        val pageBack = compose.onNodeWithContentDescription(label(R.string.recordings_back))
+        for (canvas in listOf(TouchCanvas.PHONE_LANDSCAPE, TouchCanvas.PHONE)) {
+            recreate(canvas)
+            pageBack.assertIsDisplayed()
+            compose.onNode(heading and hasText(name)).assertIsDisplayed()
+            row.assertDoesNotExist()
+            if (canvas == TouchCanvas.PHONE) navigation.assertDoesNotExist() else navigation.assertIsDisplayed()
+        }
+
         program.performClick()
         compose.onNodeWithText("About ${guide.programs[0]}").assertIsDisplayed()
         compose.onNodeWithText(label(R.string.channels_show_in_guide)).assertDoesNotExist()
         back()
         program.assertIsDisplayed()
-        compose.onNodeWithContentDescription(label(R.string.recordings_back)).performClick()
+        pageBack.performClick()
         row.assertIsDisplayed()
         navigation.assertIsDisplayed()
     }
@@ -1005,6 +1015,8 @@ class TouchAppTest {
     @Config(qualifiers = "en-rUS-w800dp-h1280dp-port-xhdpi")
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun anUprightTabletOpensAChannelPageInsteadOfAPane() {
+        val watches = mutableListOf<String>()
+        watchChannel = { watches += it }
         watchWay = { _, _, _ -> }
         val guide = savedConnectionWithGuide(withChannelArt = true)
         val channel = compose.onNode(heading and hasText(guide.first.name!!))
@@ -1064,13 +1076,40 @@ class TouchAppTest {
         row.assertIsSelected()
         channel.assertIsDisplayed()
 
-        recreate(TouchCanvas.PHONE_LANDSCAPE)
-        compose.captureTouch("channels-step", "phone-sideways-wide-channels", TouchCanvas.PHONE_LANDSCAPE)
-        recreate(TouchCanvas.PHONE_LANDSCAPE_MEDIUM)
-        compose.captureTouch("channels-step", "phone-sideways-medium-channels", TouchCanvas.PHONE_LANDSCAPE_MEDIUM)
-        row.performSemanticsAction(SemanticsActions.OnClick)
-        pageBack.assertIsDisplayed()
-        compose.captureTouch("channels-step", "phone-sideways-medium-channel-page", TouchCanvas.PHONE_LANDSCAPE_MEDIUM)
+        val channelsTab = compose.onNode(hasClickAction() and hasText(label(R.string.nav_channels)))
+        for ((canvas, width) in listOf(
+            TouchCanvas.PHONE_LANDSCAPE_MEDIUM to "medium",
+            TouchCanvas.PHONE_LANDSCAPE to "wide",
+        )) {
+            recreate(canvas)
+            guideTab.performSemanticsAction(SemanticsActions.OnClick)
+            guideTab.assertIsSelected()
+            compose.onNodeWithTag("browse-app-mark").assertIsDisplayed()
+            val channelsBounds = channelsTab.fetchSemanticsNode().boundsInRoot
+            val guideBounds = guideTab.fetchSemanticsNode().boundsInRoot
+            assertEquals("Rail items share a column", channelsBounds.left, guideBounds.left)
+            assertTrue("Guide follows Channels down the rail", guideBounds.top > channelsBounds.bottom)
+            channelsTab.performSemanticsAction(SemanticsActions.OnClick)
+            row.assertIsDisplayed()
+            channel.assertDoesNotExist()
+            compose.captureTouch("channels-step", "phone-sideways-$width-channels", canvas)
+
+            val watch = compose.onNodeWithContentDescription(
+                compose.activity.getString(R.string.channels_watch_named, guide.first.name!!),
+            )
+            watch.performSemanticsAction(SemanticsActions.OnClick)
+            assertEquals(guide.first.id.value.toString(), watches.single())
+            watches.clear()
+            row.performSemanticsAction(SemanticsActions.OnClick)
+            assertTrue("Opening a row does not tune", watches.isEmpty())
+            pageBack.assertIsDisplayed()
+            channel.assertIsDisplayed()
+            row.assertDoesNotExist()
+            guideTab.assertIsDisplayed()
+            compose.captureTouch("channels-step", "phone-sideways-$width-channel-page", canvas)
+            pageBack.performSemanticsAction(SemanticsActions.OnClick)
+            row.assertIsDisplayed()
+        }
     }
 
     @Test

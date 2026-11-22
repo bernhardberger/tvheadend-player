@@ -1,11 +1,13 @@
 package at.bernhardberger.tvhplayer.touch.channels
 
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.window.core.layout.WindowSizeClass
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
@@ -65,12 +67,12 @@ internal fun ChannelsPageHost(
             )
         }
     val shownPages = pages ?: remember { ProgramPageStack() }
-    val layout = guideLayout()
+    val channelsLayout = channelsLayout()
     key(scope.profileId) {
         ProgramPageHost(
             destination = Destination.Channels,
             destinations = Destination.entries,
-            layout = layout,
+            layout = guideLayout(),
             pageStack = shownPages,
             details = details,
             actions = GuideActions(
@@ -79,7 +81,7 @@ internal fun ChannelsPageHost(
             ),
             onShowInGuide = null,
             channelPage = { entry, active, back -> page(entry.channelId, Modifier, false, active, back) },
-            channelInPane = layout == GuideLayout.Wide,
+            channelInPane = channelsLayout == ChannelsLayout.Wide,
         ) { top, modifier ->
             val active = top && LocalDestinationBackEnabled.current
             CompositionLocalProvider(LocalChannelProgressClock provides rememberCurrentEpochSeconds()) {
@@ -97,9 +99,20 @@ internal fun ChannelsPageHost(
                     lastWatchedId = lastWatchedId?.value?.toString(),
                     openChannelId = openChannel?.channelId,
                     pane = { id, paneModifier -> page(id, paneModifier, true, active) {} },
-                    windowLayout = layout,
+                    layout = channelsLayout,
                 )
             }
         }
+    }
+}
+
+@Composable
+internal fun channelsLayout(): ChannelsLayout = when (guideLayout()) {
+    GuideLayout.Phone -> ChannelsLayout.Phone
+    GuideLayout.Upright -> ChannelsLayout.Upright
+    GuideLayout.Wide -> {
+        val window = currentWindowAdaptiveInfoV2().windowSizeClass
+        if (window.isHeightAtLeastBreakpoint(WindowSizeClass.HEIGHT_DP_MEDIUM_LOWER_BOUND)) ChannelsLayout.Wide
+        else ChannelsLayout.Upright
     }
 }

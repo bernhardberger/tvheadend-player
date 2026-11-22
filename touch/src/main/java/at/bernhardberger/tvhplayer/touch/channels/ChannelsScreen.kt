@@ -44,8 +44,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.touch.R
-import at.bernhardberger.tvhplayer.touch.guide.GuideLayout
-import at.bernhardberger.tvhplayer.touch.guide.guideLayout
 import at.bernhardberger.tvhplayer.touch.ui.Destination
 import at.bernhardberger.tvhplayer.touch.ui.ListFailure
 import at.bernhardberger.tvhplayer.touch.ui.ListMessage
@@ -64,14 +62,9 @@ internal fun ChannelsScreen(
     destinations: List<Destination> = Destination.entries,
     lastWatchedId: String? = null,
     openChannelId: String? = null,
-    windowLayout: GuideLayout = guideLayout(),
+    layout: ChannelsLayout = channelsLayout(),
     pane: @Composable (channelId: String, modifier: Modifier) -> Unit = { _, _ -> },
 ) {
-    val layout = when (windowLayout) {
-        GuideLayout.Wide -> ChannelsLayout.Wide
-        GuideLayout.Upright -> ChannelsLayout.Upright
-        GuideLayout.Phone -> ChannelsLayout.Phone
-    }
     val list = when (state) {
         is ChannelsState.Ready -> state.list
         is ChannelsState.Offline -> state.list
