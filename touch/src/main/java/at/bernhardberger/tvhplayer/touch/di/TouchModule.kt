@@ -43,6 +43,7 @@ import at.bernhardberger.tvhplayer.profiling.ProfilePlaybackTrace
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
+import at.bernhardberger.tvhplayer.settings.dataStore
 import at.bernhardberger.tvhplayer.stores.ChannelAccentStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import kotlin.time.Duration.Companion.milliseconds
@@ -57,6 +58,7 @@ import at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import at.bernhardberger.tvhplayer.touch.guide.GuideViewModel
 import at.bernhardberger.tvhplayer.touch.recordings.RecordingsViewModel
+import at.bernhardberger.tvhplayer.touch.recordings.RecordingsViewStore
 import at.bernhardberger.tvhplayer.touch.ui.withArtworkTrace
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.dsl.viewModel
@@ -187,7 +189,8 @@ val touchModule = module {
         }
         ViewModelProvider.create(get<ViewModelStore>(Channels), factory)[ChannelsViewModel::class]
     }
-    viewModel { RecordingsViewModel(session = get()) }
+    single { RecordingsViewStore(androidContext().dataStore) }
+    viewModel { RecordingsViewModel(session = get(), viewStore = get(), applicationScope = get(Application)) }
     viewModel { GuideViewModel(session = get(), savedState = get()) }
 
     // The TV's loader (AppModule): server artwork with the session, remote logos through the shared cache.

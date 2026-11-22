@@ -25,6 +25,7 @@ import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.touch.guide.GuideViewModel
 import at.bernhardberger.tvhplayer.touch.recordings.RecordingsViewModel
+import at.bernhardberger.tvhplayer.touch.recordings.RecordingsViewStore
 import at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import kotlinx.coroutines.CoroutineScope
@@ -97,8 +98,10 @@ internal class FakeConnection(
 
     fun channelTagSettings() = ChannelTagSettingsStore(preferences ?: MemoryPreferences())
 
+    private val recordingsPreferences = preferences ?: MemoryPreferences()
+
     /** The Recordings destination's state, as the composition root's view model gives it. */
-    fun recordings() = RecordingsViewModel(session)
+    fun recordings() = RecordingsViewModel(session, RecordingsViewStore(recordingsPreferences), scope)
 
     /** True when the last applied password write carried this sign-in; the values never leave the test. */
     fun savedSignIn(username: String, password: String): Boolean = writes.lastSignIn == (username to password)

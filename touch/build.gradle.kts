@@ -64,6 +64,7 @@ dependencies {
     implementation(libs.androidx.media3.ui)
     implementation(libs.androidx.media3.session)
     implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.lifecycle.viewmodel.navigation3)
     implementation(libs.androidx.navigation3.ui)
     implementation(libs.kotlinx.coroutines.android)
@@ -77,7 +78,6 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
-    testImplementation(libs.androidx.datastore.preferences)
     testImplementation(libs.tvheadend.sdk.testing) {
         version { strictly(libs.versions.tvheadend.sdk.get()) }
     }

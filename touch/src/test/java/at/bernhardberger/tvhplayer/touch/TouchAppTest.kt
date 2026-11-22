@@ -21,6 +21,7 @@ import at.bernhardberger.tvhplayer.notices.DvrMutationFeedback
 import at.bernhardberger.tvhplayer.notices.Notice
 import at.bernhardberger.tvhplayer.ui.notifications.NoticeFormatter
 import androidx.activity.ComponentActivity
+import androidx.activity.ComponentDialog
 import androidx.activity.compose.setContent
 import androidx.annotation.StringRes
 import androidx.compose.material3.MaterialTheme
@@ -64,6 +65,8 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import at.bernhardberger.tvheadend.sdk.android.DiscoveredTvheadendServer
 import at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult
 import at.bernhardberger.tvheadend.sdk.android.TvheadendDiscoveryTestFactory
@@ -100,8 +103,10 @@ import at.bernhardberger.tvhplayer.touch.player.choose
 import at.bernhardberger.tvhplayer.touch.player.liveRecordOffer
 import at.bernhardberger.tvhplayer.touch.player.playerSchedule
 import at.bernhardberger.tvhplayer.touch.player.withShownPrograms
+import at.bernhardberger.tvhplayer.touch.recordings.RecordingsViewModel
 import at.bernhardberger.tvhplayer.touch.testutil.FakeConnection
 import at.bernhardberger.tvhplayer.touch.testutil.ImageLoaderRule
+import at.bernhardberger.tvhplayer.touch.testutil.MemoryPreferences
 import at.bernhardberger.tvhplayer.touch.testutil.ServerGuide
 import at.bernhardberger.tvhplayer.touch.testutil.TouchCanvas
 import at.bernhardberger.tvhplayer.touch.testutil.TouchFixtureArt
@@ -122,12 +127,16 @@ import java.time.ZoneId
 import kotlin.time.toJavaInstant
 import kotlin.time.Instant
 import kotlin.time.Duration.Companion.hours
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.After
 import org.junit.Before
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -138,6 +147,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.shadows.ShadowDialog
 import org.robolectric.util.ReflectionHelpers
 
 /** The app's pages on the SDK's fake session and profile store: first run, the frame and Connections. */
@@ -1379,15 +1389,61 @@ class TouchAppTest {
     }
 
     @Test
-    fun aViewOptionChangesTheRecordings() {
+    fun viewOptionsApplyImmediatelyAndRestoreOnTheNextLaunch() {
+        val memory = MemoryPreferences()
+        var readGate: CompletableDeferred<Unit>? = null
+        var writeGate: CompletableDeferred<Unit>? = null
+        connection = FakeConnection(preferences = object : DataStore<Preferences> by memory {
+            override val data = flow {
+                readGate?.await()
+                emitAll(memory.data)
+            }
+
+            override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences {
+                writeGate?.await()
+                return memory.updateData(transform)
+            }
+        })
         val guide = savedConnectionWithGuide()
         openRecordings()
-        compose.onNodeWithContentDescription(label(R.string.recordings_view_options)).performClick()
-        compose.onNodeWithText(label(R.string.recordings_show)).performClick()
-        compose.onNodeWithText(label(R.string.recordings_show_unwatched)).performClick()
+        fun options() = compose.onNodeWithContentDescription(label(R.string.recordings_view_options))
+        fun choose(@StringRes page: Int, @StringRes choice: Int) {
+            compose.onNodeWithText(label(page)).performClick()
+            compose.onNodeWithText(label(choice)).performClick()
+        }
+        options().performClick()
+        val holdWrite = CompletableDeferred<Unit>()
+        compose.runOnIdle { writeGate = holdWrite }
+        choose(R.string.recordings_show, R.string.recordings_show_unwatched)
 
         compose.onNodeWithText(guide.diary.title!!).assertDoesNotExist()
         compose.onNodeWithText(guide.film.title!!).assertExists()
+        holdWrite.complete(Unit)
+        choose(R.string.recordings_sort, R.string.recordings_sort_oldest)
+        choose(R.string.recordings_group_by, R.string.recordings_grouping_folders)
+        compose.runOnUiThread {
+            (ShadowDialog.getLatestDialog() as ComponentDialog).onBackPressedDispatcher.onBackPressed()
+        }
+        compose.onNodeWithText("Films").assertIsDisplayed()
+        compose.onNodeWithText("Docs").assertDoesNotExist()
+        compose.onNode(hasClickAction() and hasText(label(R.string.nav_channels))).performClick()
+
+        val holdRead = CompletableDeferred<Unit>()
+        compose.runOnIdle {
+            readGate = holdRead
+            relaunchedRecordings.value = connection.recordings()
+        }
+        openRecordings()
+        val showedFlatList = compose.onAllNodes(hasText(guide.film.title!!)).fetchSemanticsNodes().isNotEmpty()
+        val showedLoading = compose.onAllNodes(hasText(label(SharedR.string.recordings_loading)))
+            .fetchSemanticsNodes().isNotEmpty()
+        holdRead.complete(Unit)
+        compose.onNodeWithText("Films").assertIsDisplayed()
+        assertFalse("Recordings showed the default flat list before the saved view loaded", showedFlatList)
+        assertTrue("Recordings should show first load while waiting for the saved view", showedLoading)
+        compose.onNodeWithText("Docs").assertDoesNotExist()
+        options().performClick()
+        compose.onNodeWithText(label(R.string.recordings_sort_oldest)).assertIsDisplayed()
     }
 
     /** A password connection whose saved sign-in can no longer be read; the frame asks for it. */
@@ -1639,6 +1695,7 @@ class TouchAppTest {
     }
 
     private var content: @Composable () -> Unit = {}
+    private val relaunchedRecordings = mutableStateOf<RecordingsViewModel?>(null)
     private var watchChannel: ((String) -> Unit)? = null
     private var watchWay: ((String, BrowseContextAction, String?) -> Unit)? = null
     private var playingChannel = mutableStateOf<String?>(null)
@@ -1655,7 +1712,8 @@ class TouchAppTest {
         content = {
             MaterialTheme(colorScheme = TouchDarkColors) {
                 TouchApp(
-                    connection.browseSession, connection.owner, presentation, channels, recordings, guide,
+                    connection.browseSession, connection.owner, presentation, channels,
+                    relaunchedRecordings.value ?: recordings, guide,
                     connection.noticeCenter, playingId = playingChannel.value, onWatch = watchChannel,
                     onChannelWatch = watchWay, behindLiveId = behindLive.value,
                     channelsDispatcher = mappingDispatcher(),
