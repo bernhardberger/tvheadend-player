@@ -1,6 +1,8 @@
 package at.bernhardberger.tvhplayer.touch.channels
 
 import at.bernhardberger.tvhplayer.touch.ui.programRecordControl
+import at.bernhardberger.tvhplayer.touch.ui.ProgramRecordControl
+import at.bernhardberger.tvhplayer.touch.ui.RuleSchedule
 import at.bernhardberger.tvhplayer.touch.ui.ruleSchedule
 import at.bernhardberger.tvhplayer.ui.screens.programmeRecordKeyAction
 import at.bernhardberger.tvhplayer.core.programmeArtwork
@@ -46,6 +48,8 @@ internal fun channelsState(
     artwork: ArtworkModels? = null,
     programs: List<ChannelRowPrograms>? = null,
     checkpoint: () -> Unit = {},
+    previousRows: Map<ChannelId, MappedChannelRow> = emptyMap(),
+    mappedRows: MutableMap<ChannelId, MappedChannelRow>? = null,
 ): ChannelsState {
     val browsing = scope.scope
     val current = scope.channelCatalogCurrent
@@ -70,13 +74,39 @@ internal fun channelsState(
             val mapper = RowMapper(observation, now, texts, artwork)
             val rows = browsing.visibleChannels.mapIndexed { index, channel ->
                 checkpoint()
-                mapper.row(channel, playing = channel.id.value.toString() == playingId, programs?.get(index))
+                val row = mapper.map(
+                    channel, channel.id.value.toString() == playingId, programs?.get(index), previousRows[channel.id],
+                )
+                mappedRows?.put(channel.id, row)
+                row.row
             }
             val list = ChannelList(rows, tags, selectedTagId)
             if (degraded) ChannelsState.Offline(list) else ChannelsState.Ready(list)
         }
     }
 }
+
+internal class MappedChannelRow(val row: ChannelRow, internal val inputs: ChannelRowInputs)
+
+internal data class ChannelRowInputs(
+    val programs: ChannelRowPrograms,
+    val name: String,
+    val logo: Any?,
+    val picture: Any?,
+    val playing: Boolean,
+    val recording: ChannelRecording?,
+    val runningMarks: ChannelProgramMarks?,
+    val aheadMarks: List<ChannelProgramMarks>,
+    val left: String?,
+    // The browse UI draws live progress from airing bounds. Refresh its fallback on the minute wake.
+    val progressMinute: Long?,
+)
+
+internal data class ChannelProgramMarks(
+    val scheduled: Boolean,
+    val rule: RuleSchedule?,
+    val record: ProgramRecordControl?,
+)
 
 /**
  * One channel's row outside the list, as the player's channel strip shows it; without [texts] it
@@ -89,7 +119,7 @@ internal fun channelRow(
     playing: Boolean = false,
     texts: ChannelsTexts = ChannelsTexts.TitlesOnly,
     artwork: ArtworkModels? = null,
-): ChannelRow = RowMapper(observation, now, texts, artwork).row(channel, playing)
+): ChannelRow = RowMapper(observation, now, texts, artwork).map(channel, playing).row
 
 private class RowMapper(
     private val observation: SessionObservation,
@@ -97,42 +127,71 @@ private class RowMapper(
     private val texts: ChannelsTexts,
     private val artwork: ArtworkModels?,
 ) {
+    private val remainingLabels = mutableMapOf<Long, String?>()
     private val recordingChannels by lazy {
         val entries = observation.dvrSnapshotForDisplay?.entries.orEmpty().filterNot(::recordingWasRemoved)
         activeRecordingChannelIds(entries, now.epochSeconds)
     }
 
-    fun row(channel: Channel, playing: Boolean, projected: ChannelRowPrograms? = null): ChannelRow {
+    fun map(
+        channel: Channel,
+        playing: Boolean,
+        projected: ChannelRowPrograms? = null,
+        previous: MappedChannelRow? = null,
+    ): MappedChannelRow {
         val programs = projected ?: observation.channelRowPrograms(channel.id, now)
         val running = programs.running
-        val next = programs.ahead.firstOrNull()
-        val following = programs.ahead.drop(1).map { it.program() }
+        val recording = when {
+            observation.runningRecordingForEvent(running) != null -> ChannelRecording.Program
+            channel.id in recordingChannels -> ChannelRecording.Channel
+            else -> null
+        }
+        val inputs = ChannelRowInputs(
+            programs, channel.name.orEmpty(), artwork?.logo(channel.icon, observation),
+            running?.let { artwork?.picture(programmeArtwork(it), observation) }, playing, recording,
+            running?.marks(), programs.ahead.map { it.marks() },
+            running?.let { remainingLabel(it.stop.epochSeconds - now.epochSeconds) },
+            running?.let { Math.floorDiv(now.epochSeconds, SECONDS_PER_MINUTE) },
+        )
+        return if (previous?.inputs == inputs) previous
+        else MappedChannelRow(buildRow(channel.id, inputs), inputs)
+    }
+
+    private fun buildRow(id: ChannelId, inputs: ChannelRowInputs): ChannelRow = with(inputs) {
+        val running = programs.running
+        val ahead = programs.ahead.mapIndexed { index, event -> event.program(aheadMarks[index]) }
         val details = ChannelDetails(
-            artworkModel = running?.let { artwork?.picture(programmeArtwork(it), observation) },
+            artworkModel = picture,
             episode = running?.let { texts.episode(it) },
             metadata = running?.metadata(),
             synopsis = running?.synopsis(),
-            following = following,
+            following = ahead.drop(1),
         )
-        val programRecording = observation.runningRecordingForEvent(running) != null
-        return ChannelRow(
-            id = channel.id.value.toString(),
-            name = channel.name.orEmpty(),
-            logoModel = artwork?.logo(channel.icon, observation),
-            now = running?.program(),
-            next = next?.program(),
+        ChannelRow(
+            id = id.value.toString(),
+            name = name,
+            logoModel = logo,
+            now = running?.let { it.program(requireNotNull(runningMarks)) },
+            next = ahead.firstOrNull(),
             playback = if (playing) ChannelPlayback(running?.progress(now.epochSeconds)) else null,
-            recording = when {
-                programRecording -> ChannelRecording.Program
-                channel.id in recordingChannels -> ChannelRecording.Channel
-                else -> null
-            },
+            recording = recording,
             details = details.takeIf { it != ChannelDetails() },
         )
     }
 
+    private fun remainingLabel(seconds: Long): String? {
+        if (seconds !in remainingLabels) remainingLabels[seconds] = texts.duration(seconds)
+        return remainingLabels[seconds]
+    }
+
+    private fun EpgEvent.marks() = ChannelProgramMarks(
+        scheduled = !isRunning(now.epochSeconds) && observation.isScheduled(this),
+        rule = observation.ruleSchedule(this),
+        record = programRecordControl(programmeRecordKeyAction(this, observation, now.epochSeconds)),
+    )
+
     /** A running program gives its range, time left and progress; one ahead gives its start. */
-    private fun EpgEvent.program(): ChannelProgram {
+    private fun EpgEvent.program(marks: ChannelProgramMarks): ChannelProgram {
         val nowSec = now.epochSeconds
         val running = isRunning(nowSec)
         return ChannelProgram(
@@ -140,10 +199,10 @@ private class RowMapper(
             start = texts.clock(start.epochSeconds),
             timeRange = if (running) texts.timeRange(start.epochSeconds, stop.epochSeconds) else null,
             progress = progress(nowSec).takeIf { running },
-            timeLeft = if (running) texts.duration(stop.epochSeconds - nowSec) else null,
-            scheduled = !running && observation.isScheduled(this),
-            ruleSchedule = observation.ruleSchedule(this),
-            record = programRecordControl(programmeRecordKeyAction(this, observation, nowSec)),
+            timeLeft = if (running) remainingLabel(stop.epochSeconds - nowSec) else null,
+            scheduled = marks.scheduled,
+            ruleSchedule = marks.rule,
+            record = marks.record,
             eventId = id,
             airing = (start.epochSeconds until stop.epochSeconds).takeIf { running },
         )
@@ -193,3 +252,4 @@ internal fun SessionObservation.sameProgrammeAuthority(previous: SessionObservat
 }
 
 private const val FOLLOWING_LIMIT = 3
+private const val SECONDS_PER_MINUTE = 60L
