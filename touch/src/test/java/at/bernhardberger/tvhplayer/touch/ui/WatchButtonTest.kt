@@ -7,16 +7,23 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.InputMode
+import androidx.compose.ui.input.InputModeManager
+import androidx.compose.ui.platform.LocalInputModeManager
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvheadend.sdk.core.RecordingProgressCapability
 import at.bernhardberger.tvheadend.sdk.core.TvheadendTestResultFactory
@@ -34,6 +41,7 @@ import at.bernhardberger.tvhplayer.core.channelContextActions
 import at.bernhardberger.tvhplayer.touch.testutil.ServerGuide
 import kotlin.time.Instant
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -67,13 +75,17 @@ class WatchButtonTest {
     }
 
     @Test
-    @Config(sdk = [28])
     fun oneWayPlaysImmediately() {
         val played = mutableListOf<BrowseContextAction>()
-        show(mutableStateOf(listOf(WATCH)), onWatch = { played += it })
+        val active = mutableStateOf(false)
+        show(mutableStateOf(listOf(WATCH)), active = active, onWatch = { played += it })
 
-        compose.onNodeWithContentDescription("Watch").performClick()
+        val watch = compose.onNodeWithContentDescription("Watch")
+        watch.performClick()
+        assertEquals(emptyList<BrowseContextAction>(), played)
 
+        compose.runOnIdle { active.value = true }
+        watch.performClick()
         assertEquals(listOf(WATCH), played)
         toggle().assertDoesNotExist()
     }
@@ -82,7 +94,7 @@ class WatchButtonTest {
     fun multipleWaysCloseAfterSelectionOrBack() {
         val played = mutableListOf<BrowseContextAction>()
         var hostBacks = 0
-        show(mutableStateOf(twoWays), onBack = { hostBacks++ }, onWatch = { played += it })
+        show(mutableStateOf(twoWays), keyboard = true, onBack = { hostBacks++ }, onWatch = { played += it })
 
         compose.onNodeWithText("Watch live").assertDoesNotExist()
         toggle().performClick()
@@ -93,9 +105,26 @@ class WatchButtonTest {
         compose.onNodeWithText("Watch live").assertDoesNotExist()
 
         toggle().performClick()
-        compose.onNodeWithText("Watch live").assertIsDisplayed()
+        val live = compose.onNodeWithText("Watch live")
+        live.performSemanticsAction(SemanticsActions.RequestFocus) { assertTrue("Menu item accepts keyboard focus", it()) }
+        live.assertIsFocused()
         compose.runOnIdle { compose.activity.onBackPressedDispatcher.onBackPressed() }
-        compose.onNodeWithText("Watch live").assertDoesNotExist()
+        live.assertDoesNotExist()
+        toggle().assertIsFocused()
+
+        toggle().performClick()
+        live.performSemanticsAction(SemanticsActions.RequestFocus) { assertTrue(it()) }
+        toggle().performClick()
+        live.assertDoesNotExist()
+        toggle().assertIsFocused()
+
+        toggle().performClick()
+        live.performSemanticsAction(SemanticsActions.RequestFocus) { assertTrue(it()) }
+        val closeAction = live.fetchSemanticsNode().config[SemanticsActions.CustomActions].single()
+        compose.runOnIdle { closeAction.action() }
+        live.assertDoesNotExist()
+        toggle().assertIsFocused()
+
         assertEquals(listOf(WATCH_LIVE), played)
         assertEquals(0, hostBacks)
         compose.runOnIdle { compose.activity.onBackPressedDispatcher.onBackPressed() }
@@ -131,7 +160,17 @@ class WatchButtonTest {
     @Test
     fun returningToSavedScreenDoesNotReopenMenu() {
         val shown = mutableStateOf(true)
-        show(mutableStateOf(twoWays), shown = shown)
+        val active = mutableStateOf(true)
+        show(mutableStateOf(twoWays), shown = shown, active = active)
+
+        toggle().performClick()
+        compose.onNodeWithText("Watch live").assertIsDisplayed()
+        compose.runOnIdle { active.value = false }
+        compose.onNodeWithText("Watch live").assertDoesNotExist()
+        toggle().performClick()
+        compose.onNodeWithText("Watch live").assertDoesNotExist()
+        compose.runOnIdle { active.value = true }
+        compose.onNodeWithText("Watch live").assertDoesNotExist()
 
         toggle().performClick()
         compose.onNodeWithText("Watch live").assertIsDisplayed()
@@ -146,6 +185,8 @@ class WatchButtonTest {
         ways: MutableState<List<BrowseContextAction>>,
         subject: MutableState<String> = mutableStateOf("first"),
         shown: MutableState<Boolean> = mutableStateOf(true),
+        active: MutableState<Boolean> = mutableStateOf(true),
+        keyboard: Boolean = false,
         onBack: () -> Unit = {},
         onWatch: (BrowseContextAction) -> Unit = {},
     ) {
@@ -158,12 +199,17 @@ class WatchButtonTest {
                         if (shown.value) {
                             holder.SaveableStateProvider("watch-screen") {
                                 val modifier = Modifier.align(Alignment.BottomEnd)
-                                WatchButton(
-                                    ways.value,
-                                    subject.value,
-                                    modifier = if (ways.value.size == 1) modifier.padding(16.dp) else modifier,
-                                    onWatch = onWatch,
-                                )
+                                // Robolectric key injection does not switch Compose out of touch input mode.
+                                val inputMode = if (keyboard) KeyboardInputMode else LocalInputModeManager.current
+                                CompositionLocalProvider(LocalInputModeManager provides inputMode) {
+                                    WatchButton(
+                                        ways.value,
+                                        subject.value,
+                                        modifier = if (ways.value.size == 1) modifier.padding(16.dp) else modifier,
+                                        active = active.value,
+                                        onWatch = onWatch,
+                                    )
+                                }
                             }
                         }
                     }
@@ -176,5 +222,10 @@ class WatchButtonTest {
 
     private companion object {
         val twoWays = listOf(CONTINUE_WATCHING, WATCH_LIVE)
+    }
+
+    private object KeyboardInputMode : InputModeManager {
+        override val inputMode = InputMode.Keyboard
+        override fun requestInputMode(inputMode: InputMode): Boolean = inputMode == this.inputMode
     }
 }

@@ -25,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isShiftPressed
@@ -69,7 +70,7 @@ internal fun WatchButton(
         ExtendedFloatingActionButton(
             // This stock overload clears the text slot's semantics during its expand/collapse animation.
             modifier = modifier.preferKeepClear().semantics { contentDescription = label },
-            onClick = { onWatch(onlyWay) },
+            onClick = { if (active) onWatch(onlyWay) },
             icon = { Icon(painterResource(R.drawable.channels_play), contentDescription = null) },
             text = { Text(label) },
         )
@@ -87,8 +88,12 @@ private fun WatchMenu(
     onWatch: (BrowseContextAction) -> Unit,
 ) {
     var expanded by remember(subject, active) { mutableStateOf(false) }
+    var focusedWay by remember(subject, active) { mutableStateOf<BrowseContextAction?>(null) }
     val toggleFocus = remember { FocusRequester() }
-    val close = { expanded = false }
+    val close = {
+        if (focusedWay != null) toggleFocus.requestFocus()
+        expanded = false
+    }
     val closeLabel = stringResource(R.string.watch_options_close_menu)
 
     BackHandler(enabled = active && expanded, onBack = close)
@@ -96,11 +101,19 @@ private fun WatchMenu(
     FloatingActionButtonMenu(
         modifier = modifier,
         expanded = expanded,
-        button = { WatchMenuToggle(expanded, { expanded = it }, toggleFocus) },
+        button = {
+            WatchMenuToggle(expanded, { open ->
+                if (!open) close() else if (active) expanded = true
+            }, toggleFocus)
+        },
     ) {
         ways.forEachIndexed { index, action ->
             FloatingActionButtonMenuItem(
                 modifier = Modifier
+                    .onFocusChanged {
+                        if (it.isFocused) focusedWay = action
+                        else if (focusedWay == action) focusedWay = null
+                    }
                     .semantics {
                         isTraversalGroup = true
                         if (index == ways.lastIndex) {
@@ -112,8 +125,10 @@ private fun WatchMenu(
                     }
                     .then(if (index == 0) Modifier.returnFocusToToggle(toggleFocus) else Modifier),
                 onClick = {
-                    close()
-                    onWatch(action)
+                    if (active && expanded) {
+                        expanded = false
+                        onWatch(action)
+                    }
                 },
                 icon = { Icon(painterResource(action.watchIcon()), contentDescription = null) },
                 text = { WatchLabel(action) },

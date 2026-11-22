@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
@@ -40,6 +41,7 @@ import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.getBoundsInRoot
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithText
@@ -134,9 +136,10 @@ class ChannelsScreenTest {
         val ridge = compose.onNode(
             hasText("Ridge Earth") and !hasTestTag("channel-pane"), useUnmergedTree = true,
         )
-        val watchRidge = compose.onNodeWithContentDescription("Continue watching Ridge Earth")
+        val watchRidgeLabel = "Continue watching Ridge Earth"
+        val watchRidge = compose.onNodeWithContentDescription(watchRidgeLabel)
         val ridgeLogo = compose.onNode(
-            hasTestTag("channel-logo-tile") and hasClickAction() and hasContentDescription("Continue watching Ridge Earth"),
+            hasTestTag("channel-logo-tile") and hasAnyAncestor(hasClickAction() and hasContentDescription(watchRidgeLabel)),
             useUnmergedTree = true,
         ).fetchSemanticsNode().boundsInRoot
         assertTrue("Watch is on the logo tile in Wide", ridgeLogo.contains(watchRidge.fetchSemanticsNode().boundsInRoot.center))
@@ -286,6 +289,8 @@ class ChannelsScreenTest {
         }
         val amber = compose.onNode(hasClickAction() and hasText("Amber Stage"))
         amber.assertIsDisplayed()
+        val allCount = compose.activity.resources.getQuantityString(R.plurals.channels_count, rows.size, rows.size)
+        compose.onNodeWithText(allCount).assertIsDisplayed()
         val playing = rows.single { it.playback != null }
         compose.onNodeWithContentDescription("Continue watching ${playing.name}").assertIsDisplayed()
         val playingState = SemanticsMatcher.expectValue(
@@ -330,8 +335,10 @@ class ChannelsScreenTest {
         assertTrue(nameBounds.right <= barsBounds.left && barsBounds.right <= recordingBounds.left)
         capture("phone-channels-playing-recording", TouchCanvas.PHONE)
         compose.runOnIdle { playingRecords.value = false }
-        val filter = compose.onNodeWithContentDescription(filterLabel(R.string.channels_all))
-        filter.performClick()
+        val allFilterLabel = filterLabel(R.string.channels_all)
+        val imageRole = SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Image)
+        compose.onNode(hasContentDescription(allFilterLabel) and imageRole, useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithContentDescription(allFilterLabel).performClick()
         compose.onNodeWithText("News").assertIsDisplayed()
         compose.captureTouchWindows("slice2", "phone-channels-tag-menu", TouchCanvas.PHONE)
         compose.onNodeWithText("News").performClick()

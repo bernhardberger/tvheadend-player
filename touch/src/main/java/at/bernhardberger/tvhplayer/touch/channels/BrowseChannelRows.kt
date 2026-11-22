@@ -1,6 +1,5 @@
 package at.bernhardberger.tvhplayer.touch.channels
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -18,12 +17,13 @@ import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.ListItemShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedListItem
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -61,7 +61,7 @@ internal fun BrowseChannelRows(
                 offline = offline,
                 onOpen = (onSelect ?: actions.onOpenChannel?.takeUnless { offline })?.let { open -> { open(row.id) } },
                 onPlay = play.takeIf { onSelect == null },
-                logoModifier = if (onSelect != null && play != null) WatchLogo(row, !offline, play) else Modifier,
+                onLogoPlay = play.takeIf { onSelect != null },
                 selected = row.id == selectedId,
                 selectable = onSelect != null,
             )
@@ -76,12 +76,12 @@ private fun BrowseChannelRow(
     offline: Boolean,
     onOpen: (() -> Unit)?,
     onPlay: (() -> Unit)?,
-    logoModifier: Modifier = Modifier,
+    onLogoPlay: (() -> Unit)? = null,
     selected: Boolean = false,
     selectable: Boolean = false,
 ) {
     val modifier = Modifier.fillMaxWidth().alpha(if (offline) SAVED_ROW_ALPHA else 1f)
-    val leading: @Composable () -> Unit = { BrowseChannelLogo(row, offline, logoModifier, selected) }
+    val leading: @Composable () -> Unit = { BrowseChannelLogo(row, offline, onLogoPlay, selected) }
     val trailing: (@Composable () -> Unit)? = onPlay?.let { play -> { BrowseChannelPlay(row, !offline, play) } }
     val content: @Composable () -> Unit = { BrowseChannelText(row, offline) }
     val padding = PaddingValues(horizontal = BrowseRowInset, vertical = BrowseRowVerticalPadding)
@@ -107,16 +107,23 @@ private fun BrowseChannelRow(
 }
 
 @Composable
-private fun WatchLogo(row: ChannelRow, enabled: Boolean, onPlay: () -> Unit): Modifier {
-    val label = watchLabel(row, enabled)
-    return Modifier.clip(LogoShape).clickable(enabled = enabled, role = Role.Button, onClick = onPlay)
-        .semantics { contentDescription = label }
-}
-
-@Composable
-private fun BrowseChannelLogo(row: ChannelRow, offline: Boolean, modifier: Modifier, selected: Boolean) {
+private fun BrowseChannelLogo(row: ChannelRow, offline: Boolean, onPlay: (() -> Unit)?, selected: Boolean) {
     Column(Modifier.width(BrowseTileWidth), verticalArrangement = Arrangement.spacedBy(ProgressGap)) {
-        ChannelLogoTile(row.logo, row.logoTint, modifier.size(BrowseTileWidth, BrowseTileHeight), model = row.logoModel)
+        val size = Modifier.size(BrowseTileWidth, BrowseTileHeight)
+        if (onPlay == null) {
+            ChannelLogoTile(row.logo, row.logoTint, size, model = row.logoModel)
+        } else {
+            val label = watchLabel(row, !offline)
+            Surface(
+                onClick = onPlay, enabled = !offline, shape = LogoShape, color = Color.Transparent,
+                modifier = size.semantics {
+                    role = Role.Button
+                    contentDescription = label
+                },
+            ) {
+                ChannelLogoTile(row.logo, row.logoTint, size, model = row.logoModel)
+            }
+        }
         ChannelProgress(
             row.now, row.playback.takeUnless { offline }, row.recording.takeUnless { offline }, Modifier.fillMaxWidth(),
             surfaceTrack = selected,
