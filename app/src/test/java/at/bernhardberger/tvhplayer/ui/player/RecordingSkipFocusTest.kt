@@ -434,6 +434,36 @@ class RecordingSkipFocusTest {
         assertEquals(listOf("recording-marker-target"), compose.focusedTags())
     }
 
+    @Test fun theOfferTravelsWithTheBannerButReentersAtTheCorner() {
+        val state = prompt()
+        fun top() = compose.onNodeWithTag("recording-skip-prompt").fetchSemanticsNode().boundsInRoot.top
+        compose.runOnIdle { state.bannerShown = true }
+        state.offer(ad)
+        val lifted = top()
+        compose.runOnIdle { state.bannerShown = false }
+        compose.settleFrames(5, frameMillis = 16)
+        val travelling = top()
+        compose.settleFrames(15, frameMillis = 16)
+        val corner = top()
+        assertTrue("the visible offer travels between its two resting positions", lifted < travelling && travelling < corner)
+
+        compose.runOnIdle { state.bannerShown = true }
+        compose.settleFrames(20, frameMillis = 16)
+        compose.runOnIdle { state.prompt = null }
+        compose.settleFrames(20, frameMillis = 16)
+        compose.runOnIdle { state.bannerShown = false }
+        compose.settleFrames(2, frameMillis = 16)
+        compose.runOnIdle { state.prompt = ad }
+        repeat(4) {
+            compose.settleFrames(1, frameMillis = 16)
+            if (compose.tagExists("recording-skip-prompt")) {
+                val entryRise = with(compose.density) { PlayerMotion.ChromeOffset.toPx() }
+                assertTrue("fresh offer enters at the corner, not the old lift", top() in (corner - 1)..(corner + entryRise + 1))
+            }
+        }
+        compose.onNodeWithTag("recording-skip-prompt").assertExists()
+    }
+
     private class PromptState {
         var action by mutableStateOf<RecordingSkipAction?>(null)
             private set
@@ -441,6 +471,7 @@ class RecordingSkipFocusTest {
             get() = action?.mark
             set(value) { action = value?.let { RecordingSkipAction(it, it.endMs) } }
         var shown by mutableStateOf(true)
+        var bannerShown by mutableStateOf(false)
         val skips = mutableListOf<RecordingMark>()
         val timeouts = mutableListOf<RecordingMark>()
         lateinit var offer: (RecordingMark) -> Unit
@@ -462,6 +493,8 @@ class RecordingSkipFocusTest {
                     RecordingSkipPrompt(
                         prompt = state.action,
                         shown = state.shown,
+                        bannerShown = state.bannerShown,
+                        bannerInfoBarBottomDistance = { 180 },
                         onSkip = { state.skips += it.mark },
                         onTimeout = { state.timeouts += it.mark; state.prompt = null },
                         modifier = Modifier.align(Alignment.BottomEnd).padding(horizontal = 48.dp, vertical = 32.dp),

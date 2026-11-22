@@ -462,7 +462,7 @@ fun RecordingPlayerScreen(
                 offered = skipPrompt != null && playbackAvailable,
                 playing = isPlaying,
                 canSeek = timelineState.canSeek,
-                presented = recordingPresented || bannerFramePresented,
+                presented = bannerFramePresented,
             ),
         )
     val foregroundContext = currentPlayerForegroundContext()
@@ -586,9 +586,9 @@ fun RecordingPlayerScreen(
                             else foregroundLayer to layers.optionsPage)) return@onPreviewKeyEvent true
                 val keyCode = event.nativeKeyEvent.keyCode
                 if (keyCode == AndroidKeyEvent.KEYCODE_MEDIA_RECORD) return@onPreviewKeyEvent true
-                // OK belongs to the focused prompt; everywhere else it keeps pausing.
+                // Only a fresh OK belongs to the prompt; the opening key still completes its cycle.
                 if (foregroundLayer == PlayerForegroundLayer.SKIP_PROMPT && event.key in RecordingSkipActivationKeys) {
-                    return@onPreviewKeyEvent false
+                    return@onPreviewKeyEvent layers.consumesRevealingKey(event)
                 }
                 if (markerNavigation.handle(event, markers, ::seekMarker)) {
                     chrome.onUserInteraction()

@@ -82,7 +82,7 @@ internal fun recordingSkipRemainingSweep(elapsedFraction: Float): Float =
     360f * (1f - elapsedFraction.coerceIn(0f, 1f))
 
 /**
- * The "Skip ad break" button over the hidden chrome, with its remaining time in a countdown ring.
+ * The recording Skip button, with its remaining time in a countdown ring.
  * A one-off: [PlayerActionRow] holds the
  * row's icon-only actions, and no shared component draws a labelled button over the video.
  */

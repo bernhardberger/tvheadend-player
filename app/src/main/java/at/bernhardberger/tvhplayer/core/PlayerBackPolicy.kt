@@ -21,7 +21,7 @@ enum class PlayerForegroundLayer {
     PENDING_SEEK_PREVIEW,
     DISPATCHED_SEEK_PREVIEW,
     CONTROLS,
-    /** A recording's Skip prompt over the hidden chrome. */
+    /** A recording's Skip prompt, possibly above the passive Banner. */
     SKIP_PROMPT,
     NONE,
 }
@@ -77,7 +77,7 @@ data class PlayerForegroundContext(
     /** [optionsPage] is shown as the short list of its remote key. */
     val optionsQuickList: Boolean = false,
     val scheduleVisible: Boolean = false,
-    /** A recording offers to skip the ad break it plays, with nothing else drawn over the video. */
+    /** A recording offers to skip its lead-in or current ad break. */
     val skipPromptOffered: Boolean = false,
 )
 

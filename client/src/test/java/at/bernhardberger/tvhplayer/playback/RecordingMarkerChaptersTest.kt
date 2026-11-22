@@ -122,8 +122,8 @@ class RecordingMarkerChaptersTest {
 
     @Test
     @OptIn(TvheadendTestingApi::class, ExperimentalCoroutinesApi::class)
-    fun dismissingPaddingImmediatelyOffersAnOverlappingAdBreak() = runTest {
-        for (adAlreadyDismissed in listOf(false, true)) {
+    fun dismissingOrDisablingPaddingImmediatelyOffersAnOverlappingAdBreak() = runTest {
+        for ((disable, adAlreadyDismissed) in listOf(false to false, false to true, true to false)) {
             val fixture = MarkerFixture(backgroundScope, listOf(
                 DvrCutpoint(10_000.milliseconds, 90_000.milliseconds, DvrCutpointAction.COMMERCIAL_BREAK),
             ), entry = paddedEntry(null), bindWhileGrowing = true)
@@ -139,27 +139,15 @@ class RecordingMarkerChaptersTest {
                 runCurrent()
                 val offer = requireNotNull(fixture.markers.skipPrompt.value)
                 assertEquals(RecordingMarkKind.PROGRAM_START, offer.mark.kind)
-                fixture.markers.dismissSkipPrompt(offer)
+                if (disable) {
+                    fixture.markers.applySettings(PlayerSettings(offerProgramStart = false))
+                    assertEquals(null, fixture.markers.skipPrompt.value)
+                    assertEquals(offer.mark, fixture.markers.controlsSkip.value?.mark)
+                } else fixture.markers.dismissSkipPrompt(offer)
                 runCurrent()
                 assertEquals(if (adAlreadyDismissed) null else ad.mark, fixture.markers.skipPrompt.value?.mark)
             } finally { fixture.markers.clearRecordingMarkersAndJoin() }
         }
-    }
-
-    @Test
-    @OptIn(TvheadendTestingApi::class, ExperimentalCoroutinesApi::class)
-    fun disablingTheProgramStartOfferDismissesItButKeepsTheControlsAction() = runTest {
-        val fixture = MarkerFixture(backgroundScope, entry = paddedEntry(1))
-        try {
-            fixture.response.complete(Unit)
-            fixture.markers.observeRecordingMarkersLocked(fixture.binding, fixture.entry.id)
-            runCurrent()
-            val mark = requireNotNull(fixture.markers.skipPrompt.value).mark
-            assertEquals(RecordingMarkKind.PROGRAM_START, mark.kind)
-            fixture.markers.applySettings(PlayerSettings(offerProgramStart = false))
-            assertEquals(null, fixture.markers.skipPrompt.value)
-            assertEquals(mark, fixture.markers.controlsSkip.value?.mark)
-        } finally { fixture.markers.clearRecordingMarkersAndJoin() }
     }
 
     @Test

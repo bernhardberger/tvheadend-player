@@ -215,7 +215,8 @@ class RecordingPlayerChromeScreenTest {
     }
 
     @Test fun loadingStaysUntilTheFirstFrameAndDoesNotReturnForBuffering() {
-        val server = screen(settleEntry = false)
+        positionMs = 1_000
+        val server = screen(settleEntry = false, leadIn = true)
         compose.mainClock.advanceTimeBy(800)
         compose.waitForIdle()
         assertTrue("startup uses the loading ring after admission", startingRingShown())
@@ -226,6 +227,11 @@ class RecordingPlayerChromeScreenTest {
         settle()
         assertFalse(runtime.videoPresentation.value.visible)
         assertFalse("audio-only presentation dismisses loading without a video frame", startingRingShown())
+        compose.onNodeWithTag("recording-skip-prompt").assertIsFocused()
+        publishTracks(Tracks.EMPTY)
+        assertTrue(runtime.state.value is AppPlaybackState.Playing)
+        assertFalse("without audio-only evidence or a video frame, the offer leaves", exists("recording-skip-prompt"))
+        assertFalse("the starting status stays dismissed", startingRingShown())
         compose.runOnIdle {
             forcedReady = false
             playerListeners.toList().forEach { it.onPlaybackStateChanged(Player.STATE_BUFFERING) }
@@ -678,6 +684,26 @@ class RecordingPlayerChromeScreenTest {
         assertTrue(exists("player-banner"))
         compose.pressKey(Key.Back, settleFrames = 20, frameMillis = 16)
         assertFalse(exists("player-banner"))
+    }
+
+    @Test fun resumingWithOkDrainsTheOpeningKeyBeforeTheNextPress() {
+        positionMs = 1_000
+        screen(leadIn = true)
+        playing()
+        compose.pressKey(Key.MediaPause, settleFrames = 20, frameMillis = 16)
+        assertFalse(player.playWhenReady)
+        assertFalse(exists("recording-skip-prompt"))
+        compose.onRoot().performKeyInput { keyDown(Key.DirectionCenter) }
+        compose.settleFrames(20, frameMillis = 16)
+        assertTrue(player.playWhenReady)
+        compose.onNodeWithTag("recording-skip-prompt").assertIsFocused()
+        compose.onRoot().performKeyInput { keyUp(Key.DirectionCenter) }
+        compose.settleFrames(2, frameMillis = 16)
+        assertEquals("the opening OK must not skip", 1_000L, positionMs)
+        compose.pressKey(Key.Back, settleFrames = 20, frameMillis = 16)
+        assertFalse(exists("recording-skip-prompt"))
+        compose.pressKey(Key.DirectionCenter, settleFrames = 2, frameMillis = 16)
+        assertFalse("the next OK pauses playback", player.playWhenReady)
     }
 
     @Test fun aStepQueuedAndCommittedBetweenTwoCompositionsIsAnnouncedAfresh() {
