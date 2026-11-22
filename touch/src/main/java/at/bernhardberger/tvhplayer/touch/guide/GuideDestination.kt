@@ -43,8 +43,7 @@ import java.util.Locale
 /**
  * The Guide destination of the app over the shared channel scope and the session's guide. Watch
  * plays a program on now through [onWatch], and the one on now on the [playingId] channel shows as
- * watched. Record and Cancel go through [dvr]; Record's options and Show in Guide are left out
- * until they are wired.
+ * watched. Record and Cancel go through [dvr].
  */
 @Suppress("LongParameterList") // The app's connection, its player and its pages.
 @Composable
@@ -59,6 +58,50 @@ internal fun GuideDestination(
     onOpenConnections: () -> Unit,
     onSignIn: () -> Unit,
 ) {
+    val (state, selection) = projectedGuide(guide, channels, connection, playingId)
+    val stack = guide.pageStack
+    val details = programDetailsForPages(stack, guide.session, playingId, guide.mappingDispatcher)
+    GuideScreen(
+        state = state,
+        dayIndex = state.dayDates.indexOf(selection.day).coerceAtLeast(0),
+        pages = stack.pages,
+        details = details,
+        onCloseAllPages = stack::clear,
+        onShowInGuide = stack::showInGuide,
+        channelPage = { page, active, back ->
+            ChannelPage(
+                guide.session, channels, page.channelId, back, stack::openDetails,
+                dvr::record, dvr::cancel, dvr::stopProgram,
+                initialDay = page.day, initialProgramId = page.programId, playingId = playingId,
+                active = active, acquisitionContext = guide.acquisitionContext,
+                mappingDispatcher = guide.mappingDispatcher,
+            )
+        },
+        actions = GuideActions(
+            onWatch = onWatch, onRecord = dvr::record,
+            onRecordOptions = null,
+            onDetails = { if (it == null) stack.pop() else stack.openDetails(it) },
+            onDay = { state.dayDates.getOrNull(it)?.let(guide::selectDay) },
+            onJump = { guide.selectJump(state.jumpTimes.getOrNull(it - 1)) },
+            onTag = { id -> channels.selectTag(id?.let { ChannelTagId(it.toLong()) }) },
+            onShowInGuide = null,
+            onAiring = stack::openDetails,
+            onRetry = { connection.reconnectNow() },
+            onOpenConnectionSettings = onOpenConnections,
+            onSignIn = onSignIn,
+            onCancel = dvr::cancel,
+            onStop = dvr::stopProgram,
+            onChannel = { stack.openChannel(it, state.dayDates.getOrNull(state.selectedDay)) },
+            onOverviewViewport = { guide.overviewViewport.value = it },
+        ),
+        destinations = destinations,
+    )
+}
+
+@Composable
+private fun projectedGuide(
+    guide: GuideViewModel, channels: ChannelsViewModel, connection: AppConnectionViewModel, playingId: String?,
+): Pair<GuideState, GuideSelection> {
     val presentation by connection.uiState.collectAsStateWithLifecycle()
     val scope by channels.scope.collectAsStateWithLifecycle()
     val observation by guide.observation.collectAsStateWithLifecycle()
@@ -69,7 +112,7 @@ internal fun GuideDestination(
     val clock = activeClock ?: result?.input?.clock
         ?: remember { GuideClock(Instant.now().epochSecond, ZoneId.systemDefault()) }
     val coverage = remember(
-        scope, selection.view, selection.channelId, selection.day, clock.zone, clock.today,
+        scope, selection.day, clock.zone, clock.today,
     ) {
         guideCoverage(scope, selection, clock)
     }
@@ -85,43 +128,18 @@ internal fun GuideDestination(
     val dayLoading = remember(mapped.listed, coverage, pendingVersion, observation.currentSession?.generationIdentity) {
         mapped.listed && coverage?.let(guide::isPending) == true
     }
-    val state = mapped.withCurrentDetails(selection.details, dayLoading).withSelectedDay(input, retained)
+    val state = mapped.copy(dayLoading = dayLoading)
     ArtworkFirstLoad("Guide", firstLoadWait(state, input))
     // Forget invalid choices, so they cannot silently return when a tag or the schedule changes again.
     val available = selection.availableIn(state, clock.today)
     if (state.listed && selection != available && input.changesFrom(retained?.input).isEmpty()) {
         LaunchedEffect(selection, available) { guide.reconcileSelection(selection, available) }
     }
-    GuideScreen(
-        state = state.forBrowse(selection, clock.today),
-        view = selection.view,
-        channelId = selection.channelId,
-        dayIndex = state.dayDates.indexOf(selection.day).coerceAtLeast(0),
-        onCloseAllDetails = guide::closeAllDetails,
-        actions = GuideActions(
-            onWatch = onWatch, onRecord = dvr::record,
-            onRecordOptions = null,
-            onDetails = guide::openDetails,
-            onDay = { state.dayDates.getOrNull(it)?.let(guide::selectDay) },
-            onJump = { guide.selectJump(state.jumpTimes.getOrNull(it - 1)) },
-            onTag = { id -> channels.selectTag(id?.let { ChannelTagId(it.toLong()) }) },
-            onShowInGuide = null,
-            onAiring = guide::openDetails,
-            onRetry = { connection.reconnectNow() },
-            onOpenConnectionSettings = onOpenConnections,
-            onSignIn = onSignIn,
-            onCancel = dvr::cancel,
-            onStop = dvr::stopProgram,
-            onChannel = { guide.selectPage(GuideView.ByChannel, it) },
-            onView = { guide.selectPage(it) },
-            onOverviewViewport = { guide.overviewViewport.value = it },
-        ),
-        destinations = destinations,
-    )
+    return state.forBrowse(selection, clock.today) to selection
 }
 
 @Composable
-private fun activeGuideClock(): GuideClock? {
+internal fun activeGuideClock(): GuideClock? {
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     if (!lifecycle.currentStateAsState().value.isAtLeast(Lifecycle.State.STARTED)) return null
     val nowSec = rememberDetailsEpochSeconds()
@@ -154,36 +172,18 @@ private fun SubmitGuideMapping(
     }
 }
 
-private fun GuideState.withSelectedDay(input: GuideMappingInput, result: GuideMappingResult?): GuideState {
-    if (input.selection.view != GuideView.ByChannel) return this
-    val day = input.selection.day?.takeIf { it >= input.clock.today && it in dayDates } ?: input.clock.today
-    // The kept day has no tab yet; leave the list in its loading state instead of showing today's rows.
-    val days = result?.takeUnless { input.selection.isAwaitingDay(this, input.clock.today) }?.daysFor(input).orEmpty()
-    return copy(
-        date = formatDayHeader(day, input.configuration.locales[0]),
-        retainedDays = days.mapValues { it.value.programs },
-    )
-}
-
-private fun GuideState.withCurrentDetails(visits: List<GuidePageKey.Details>, dayLoading: Boolean): GuideState =
-    if (dayLoading || details.keys.any { it !in visits }) {
-        copy(dayLoading = dayLoading, details = details.filterKeys { it in visits })
-    } else this
-
 private fun GuideSelection.isAwaitingDay(state: GuideState, today: LocalDate): Boolean =
     state.dayLoading && day != null && day > today && day !in state.dayDates
 
 // Use GuideList's loading state without removing channels from selection reconciliation.
 private fun GuideState.forBrowse(selection: GuideSelection, today: LocalDate): GuideState =
-    if (selection.view == GuideView.Overview && selection.isAwaitingDay(this, today)) {
+    if (selection.isAwaitingDay(this, today)) {
         copy(channels = emptyList())
     } else this
 
 private fun GuideSelection.availableIn(state: GuideState, today: LocalDate): GuideSelection = copy(
     day = day?.takeIf { it in state.dayDates || isAwaitingDay(state, today) },
     jump = state.jumpTimes.getOrNull(state.selectedJump - 1),
-    channelId = channelId?.takeIf { id -> state.channels.any { it.id == id } },
-    details = if (state.availability == GuideAvailability.Current) details.filter { it in state.details } else details,
 )
 
 private fun firstLoadWait(state: GuideState, input: GuideMappingInput): String? = when {

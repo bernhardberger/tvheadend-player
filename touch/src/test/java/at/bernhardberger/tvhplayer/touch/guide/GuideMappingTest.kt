@@ -95,13 +95,11 @@ class GuideMappingTest {
 
     @Test
     fun overviewRunsFromNowWithMarksAndProgress() {
-        val state = state(GuideSelection(view = GuideView.ByChannel))
+        val state = state(GuideSelection())
         val (first, second) = state.channels
 
         assertEquals(guide.programs, first.programs.map { it.title })
         val onNow = first.programs[0]
-        assertSame("overview and the channel day reuse the same mapped program", onNow, first.day?.first())
-        assertEquals("other channel days aren't mapped", null, state.channels[1].day)
         assertEquals(0.5f, onNow.progress)
         assertEquals("30m", onNow.timeLeft)
         assertEquals("07:30", onNow.start)
@@ -194,7 +192,7 @@ class GuideMappingTest {
     @Test
     fun aGapEndsTheOverviewAndALaterDayGetsItsTab() {
         val late = event(EVENT_LATE, guide.first, Instant.fromEpochSeconds(NOW) + 5.hours)
-        val tomorrow = event(EVENT_TOMORROW, guide.second, Instant.fromEpochSeconds(NOW) + 1.days)
+        val tomorrow = event(EVENT_TOMORROW, guide.second, Instant.fromEpochSeconds(NOW) + 17.hours)
         val events = guide.snapshot.events + late + tomorrow
 
         val today = state(GuideSelection(), events)
@@ -203,12 +201,10 @@ class GuideMappingTest {
         assertEquals(listOf("Today", "2027-01-16"), today.days)
 
         val next = state(
-            GuideSelection(day = LocalDate.parse("2027-01-16"), channelId = guide.second.id.value.toString(),
-                view = GuideView.ByChannel),
+            GuideSelection(day = LocalDate.parse("2027-01-16")),
             events,
         )
-        assertEquals(listOf("Tomorrow show"), next.channels[1].day?.map { it.title })
-        assertEquals(GuideGap("00:00", "08:00"), next.channels[1].gap)
+        assertEquals(GuideGap("00:00", "01:00"), next.channels[1].gap)
     }
 
     @Test
@@ -221,7 +217,7 @@ class GuideMappingTest {
         assertEquals("A passed jump returns to Now", 0, state(selection, at = pastFirstJump).selectedJump)
         assertEquals("Yesterday's jump stays expired after midnight", 0, state(selection, at = clock.copy(nowSec = NOW + DAY_SEC)).selectedJump)
 
-        val details = state(GuideSelection(details = listOf(GuidePageKey.Details("1", 0)))).details.values.single()
+        val details = checkNotNull(detailsMapper(guide.connected()).details("1"))
         assertEquals("Channel One", details.channel)
         assertEquals("About ${guide.programs[0]}", details.synopsis)
         assertEquals("07:30–08:30", details.timeRange)
@@ -253,8 +249,7 @@ class GuideMappingTest {
         val endingAtMidnight = event(EVENT_TOMORROW, guide.first, guide.now + 39.hours)
         assertEquals(listOf("Today", "2027-01-16"), state(GuideSelection(), listOf(late, endingAtMidnight)).days)
         assertEquals(listOf("Today", "2027-01-16"), state(GuideSelection(), listOf(late)).days)
-        val next = state(GuideSelection(day = LocalDate.parse("2027-01-16"), view = GuideView.ByChannel), listOf(late))
-        assertEquals(listOf("Late show"), next.channels[0].day?.map { it.title })
+        val next = state(GuideSelection(day = LocalDate.parse("2027-01-16")), listOf(late))
         assertEquals(listOf("Late show"), next.channels[0].programs.map { it.title })
     }
 
@@ -272,7 +267,7 @@ class GuideMappingTest {
         val connected = guide.connected()
         val state = guideState(
             scope(all, all, tagged = false, loaded = true), ConnectionUiState.Ready, false, connected,
-            GuideSelection(details = listOf(GuidePageKey.Details("1", 0))), false, clock, texts,
+            GuideSelection(), false, clock, texts,
             ArtworkModels(tvheadend = null),
         )
         val logo = AppArtworkSource(connected.currentSession, (guide.logo as ChannelIcon.ImageCache).artworkId)
@@ -281,7 +276,7 @@ class GuideMappingTest {
         assertEquals(logo, first.logoModel)
         assertEquals(null, second.logoModel)
         assertEquals(listOf(picture, null, null, null), first.programs.map { it.stillModel })
-        val details = state.details.values.single()
+        val details = checkNotNull(detailsMapper(connected, artwork = ArtworkModels(tvheadend = null)).details("1"))
         assertEquals(logo, details.channelLogoModel)
         assertEquals(picture, details.pictureModel)
     }
@@ -308,11 +303,12 @@ class GuideMappingTest {
         val all = listOf(guide.first, guide.second)
         fun shown(playing: String?) = guideState(
             scope(all, all, tagged = false, loaded = true), ConnectionUiState.Ready, false,
-            observation(EpgSnapshot.create(events)), GuideSelection(details = listOf(GuidePageKey.Details("1", 0))),
+            observation(EpgSnapshot.create(events)), GuideSelection(),
             false, clock, texts,
             playing = playing,
         )
-        val details = shown(playing = guide.first.id.value.toString()).details.values.single()
+        val connected = observation(EpgSnapshot.create(events))
+        val details = checkNotNull(detailsMapper(connected, guide.first.id.value.toString()).details("1"))
         assertEquals(
             listOf(
                 FactKey.Genre to "News", FactKey.Season to "2 of 3", FactKey.Episode to "7",
@@ -331,8 +327,14 @@ class GuideMappingTest {
         assertEquals(true, details.watching)
         val overview = shown(playing = guide.first.id.value.toString()).channels.first().programs
         assertEquals(listOf(true, false, false, false), overview.map { it.watching })
-        assertEquals(false, shown(playing = guide.second.id.value.toString()).details.values.single().watching)
+        assertEquals(false, detailsMapper(connected, guide.second.id.value.toString()).details("1")?.watching)
     }
+
+    private fun detailsMapper(observation: SessionObservation, playing: String? = null, artwork: ArtworkModels? = null) =
+        GuideMapper(
+            listOf(guide.first, guide.second), observation, observation.epgSnapshotForDisplay?.events.orEmpty(),
+            clock, clock.today, texts, artwork, playing,
+        )
 
     private fun state(
         selection: GuideSelection,

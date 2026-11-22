@@ -149,7 +149,7 @@ internal fun OverviewColumns(
     }
 }
 
-/** The column's head opens the channel's day in By channel. */
+/** The column's head opens the channel's page. */
 @Composable
 private fun ColumnHead(channel: GuideChannel, onClick: () -> Unit) {
     val description = stringResource(R.string.guide_open_channel, channel.name)

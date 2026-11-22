@@ -1,11 +1,13 @@
 package at.bernhardberger.tvhplayer.touch.guide
 
+import android.content.Context
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import at.bernhardberger.tvhplayer.touch.testutil.TouchFixtureArt
 import at.bernhardberger.tvhplayer.touch.ui.ProgramRecordControl
 import at.bernhardberger.tvhplayer.touch.ui.RuleSchedule
+import java.time.LocalDate
 
 // Round 37's Guide drawings: Sunday, November 15, a little after 8:45 PM.
 
@@ -63,7 +65,6 @@ private fun base(channels: List<GuideChannel>) = GuideState(
     days = listOf("Today", "Tomorrow", "Tue 17", "Wed 18", "Thu 19", "Fri 20", "Sat 21", "Sun 22"),
     date = "Sunday, November 15",
     jumps = listOf("8:15 PM", "10:00 PM"),
-    details = mapOf(GuidePageKey.Details(GLASS_HARBOR_ID, 0) to glassHarborDetails()),
 )
 
 internal const val GLASS_HARBOR_ID = "amber-stage-7:50 PM-Glass Harbor"
@@ -229,7 +230,7 @@ internal fun phoneOverviewFixture() = base(
     ),
 )
 
-/** By channel: Ridge Earth's day with Ridge Light open; Glass Drama has no guide data. */
+/** Ridge Earth's schedule with Ridge Light on now; Glass Drama has no guide data. */
 internal fun byChannelFixture(phone: Boolean = false, upright: Boolean = false): GuideState {
     val ridgeLight = program(RidgeEarth, "8:00 PM", "Ridge Light", "Documentary", "still-ridge-light", 0.78f, "S2 E3", "60m").copy(
         art = art("ridge-light"),
@@ -263,6 +264,22 @@ internal fun byChannelFixture(phone: Boolean = false, upright: Boolean = false):
     return base(
         listOf(channel(RidgeEarth, day)) + others + channel(GlassDrama, emptyList()) +
             channel(NorthlineWorld, listOf(program(NorthlineWorld, "8:00 PM", "World Briefing", "News", length = "30m"))),
+    )
+}
+
+internal fun channelPageFixture(channel: GuideChannel, context: Context): ChannelPageState {
+    val today = LocalDate.of(2026, 11, 15)
+    if (channel.programs.isEmpty()) return ChannelPageState(channel = channel, loading = false)
+    val dates = channelDayLabels((0L..7L).map(today::plusDays), today, context)
+    val upcoming = channel.programs.drop(1)
+    val later = upcoming.filter { it.section != null || it.start.endsWith("AM") }
+    return ChannelPageState(
+        channel = channel,
+        onNow = channel.programs.first(),
+        days = dates,
+        selectedDay = today,
+        retained = dates.keys.associateWith { if (it == today) upcoming else later },
+        loading = false,
     )
 }
 

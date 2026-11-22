@@ -38,7 +38,6 @@ internal data class GuideOverviewRowKey(
     val head: GuideChannel,
     val overview: List<EpgEvent>,
     val gap: Pair<Long, Long>?,
-    val day: List<EpgEvent>?,
     val marks: Map<EpgEvent, GuideOverviewMarks>,
 )
 
@@ -84,22 +83,18 @@ internal class GuideOverviewRows(
             return prepared
         }
         val oldEvents = oldKey?.marks?.keys.orEmpty().associateBy { it.id }
-        val oldPrograms = oldRow?.let { row ->
-            (row.programs + row.day.orEmpty()).associateBy { it.id }
-        }.orEmpty()
+        val oldPrograms = oldRow?.programs.orEmpty().associateBy { it.id }
         var formatted = false
         fun program(event: EpgEvent): GuideProgram {
             val existing = oldPrograms[event.id.value.toString()].takeIf { oldEvents[event.id] == event }
             if (existing == null) formatted = true
             return format(event, existing)
         }
-        val day = key.day?.associate { it.id to program(it) }
         val newRow = key.head.copy(
-            programs = key.overview.map { day?.get(it.id) ?: program(it) },
+            programs = key.overview.map(::program),
             gap = key.gap?.let { (start, stop) ->
                 if (key.gap == oldKey?.gap) oldRow?.gap else GuideGap(gapText(start), gapText(stop))
             },
-            day = day?.values?.toList(),
         )
         if (formatted || (key != oldKey && newRow != oldRow)) formattedCount++
         val row = oldRow?.takeIf { it == newRow } ?: newRow
