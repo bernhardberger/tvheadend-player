@@ -122,11 +122,9 @@ private fun ChannelsContent(
             Column(Modifier.fillMaxSize().padding(horizontal = layout.margin)) {
                 val list = state.list
                 if (!layout.tablet && list.canFilter) TagFilter(list, actions.onTag)
-                if (list.rows.isEmpty()) {
+                ChannelRows(list, layout, actions, initiallyOpenChannelId = initiallyOpenChannelId) {
                     val kind = if (list.selectedTagId == null) MessageKind.Empty else MessageKind.EmptyTag
                     ChannelsMessage(kind, actions)
-                } else {
-                    ChannelRows(list, layout, actions, initiallyOpenChannelId = initiallyOpenChannelId)
                 }
             }
         }

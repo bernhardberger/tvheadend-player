@@ -10,7 +10,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
@@ -19,8 +21,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasProgressBarRangeInfo
+import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -28,6 +32,7 @@ import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.dp
@@ -182,6 +187,87 @@ class ChannelsScreenTest {
         compose.onNodeWithText("S2 E4 • The Long Tide").assertDoesNotExist()
         compose.onNodeWithText("Amber Stage").performClick()
         compose.runOnIdle { assertEquals("amber-stage", played) }
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w1280dp-h800dp-land-xhdpi")
+    fun aKeptOpenRowFollowsItsChannelAndStaysClosedAfterRemoval() {
+        val list = channelsFixture()
+        val channels = mutableStateOf(list)
+        val visible = mutableStateOf(true)
+        showKeptChannels(channels, visible)
+        val open = compose.onNodeWithContentDescription("Show programs on Amber Stage")
+        val close = compose.onNodeWithContentDescription("Hide programs on Amber Stage")
+        open.performClick()
+
+        compose.runOnIdle { channels.value = list.copy(rows = listOf(list.rows[1], list.rows[0]) + list.rows.drop(2)) }
+        close.assertIsDisplayed()
+        compose.onNodeWithContentDescription("Hide programs on Ridge Earth").assertDoesNotExist()
+        val withoutAmber = list.rows.filterNot { it.id == "amber-stage" }
+        for (remaining in listOf(
+            list.copy(rows = withoutAmber),
+            list.copy(rows = emptyList()),
+            list.copy(rows = withoutAmber, selectedTagId = "news"),
+        )) {
+            compose.runOnIdle { visible.value = false }
+            compose.runOnIdle {
+                channels.value = remaining
+                visible.value = true
+            }
+            close.assertDoesNotExist()
+            compose.runOnIdle { channels.value = list }
+            open.assertIsDisplayed()
+            open.performClick()
+        }
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w412dp-h500dp-port-xhdpi")
+    fun keptScrollClampsAfterRemovalAndStartsAtTheTopInAnotherTag() {
+        val list = channelsFixture()
+        val channels = mutableStateOf(list)
+        val visible = mutableStateOf(true)
+        showKeptChannels(channels, visible)
+        val rows = compose.onNode(hasScrollToIndexAction())
+        val first = compose.onNodeWithText(list.rows.first().name)
+        rows.performScrollToIndex(8)
+        first.assertIsNotDisplayed()
+
+        compose.runOnIdle { channels.value = list.copy(rows = list.rows.take(2)) }
+        first.assertIsDisplayed()
+        compose.runOnIdle { channels.value = list }
+        rows.performScrollToIndex(8)
+        compose.runOnIdle { visible.value = false }
+        compose.runOnIdle { visible.value = true }
+        first.assertIsNotDisplayed()
+
+        val newTag = list.copy(rows = list.rows.filterNot { it.id == "amber-stage" }, selectedTagId = "news")
+        compose.runOnIdle { visible.value = false }
+        compose.runOnIdle {
+            channels.value = newTag
+            visible.value = true
+        }
+        first.assertIsDisplayed()
+        rows.performScrollToIndex(7)
+        first.assertIsNotDisplayed()
+        compose.runOnIdle { channels.value = list }
+        first.assertIsDisplayed()
+    }
+
+    private fun showKeptChannels(
+        channels: State<ChannelList>,
+        visible: State<Boolean>,
+    ) {
+        compose.setContent {
+            val holder = rememberSaveableStateHolder()
+            MaterialTheme(colorScheme = MobileDarkColors) {
+                if (visible.value) {
+                    holder.SaveableStateProvider("Channels") {
+                        ChannelsScreen(ChannelsState.Ready(channels.value), fixtureActions())
+                    }
+                }
+            }
+        }
     }
 
     @Test
