@@ -38,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -61,8 +62,6 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.click
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsActions
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsScreen
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsState
@@ -186,6 +185,59 @@ class TouchFrameTest {
         assertSavedList()
     }
 
+    @Test
+    @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
+    fun backDuringTheFadeDoesNotCloseTheOutgoingChannel() {
+        val channels = ChannelsState.Ready(channelsFixture())
+        val actions = ChannelsActions(onPlay = null, onTag = {}, onRetry = {}, onOpenConnectionSettings = {})
+        compose.setContent {
+            MaterialTheme {
+                DestinationFrame { current ->
+                    if (current == Destination.Channels) {
+                        ChannelsScreen(channels, actions, initiallyOpenChannelId = "amber-stage")
+                    } else {
+                        TouchFrame(initialDestination = current)
+                    }
+                }
+            }
+        }
+        val opened = compose.onNodeWithText("S2 E4 • The Long Tide")
+        opened.assertExists()
+        compose.mainClock.autoAdvance = false
+        selectOnTheNextFrame("Guide")
+        compose.onNode(destination and hasText("Guide")).assertIsSelected()
+        opened.assertExists()
+        compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        compose.mainClock.autoAdvance = true
+        compose.onNode(destination and hasText("Channels")).assertIsSelected()
+        opened.assertExists()
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
+    fun restoringFullWindowDetailsDoesNotLayOutNavigation() {
+        val restoration = StateRestorationTester(compose)
+        val heights = mutableListOf<Int>()
+        restoration.setContent {
+            MaterialTheme {
+                DestinationFrame(initialDestination = Destination.Recordings) { current ->
+                    TouchFrame(
+                        initialDestination = current,
+                        showTopBar = { false },
+                        showNavigation = { false },
+                    ) {
+                        Box(Modifier.fillMaxSize().onSizeChanged { heights += it.height })
+                    }
+                }
+            }
+        }
+        val fullHeight = compose.runOnIdle { heights.last().also { heights.clear() } }
+        restoration.emulateSavedInstanceStateRestore()
+        compose.runOnIdle {
+            assertEquals("The first restored layout must not reserve navigation space", fullHeight, heights.first())
+        }
+    }
+
     @Composable
     private fun SavedList() {
         var opened by rememberSaveable { mutableIntStateOf(0) }
@@ -235,13 +287,13 @@ class TouchFrameTest {
 
     @Test
     @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi")
-    fun compactBrowseActionsEndAtTheContentKeyline() = assertBrowseActionEnds(16.dp, compact = true)
+    fun compactBrowseActionsShareAnEndKeyline() = assertBrowseActionEnds(compact = true)
 
     @Test
     @Config(qualifiers = "en-rUS-w1280dp-h800dp-land-xhdpi")
-    fun expandedBrowseActionsEndAtTheContentKeyline() = assertBrowseActionEnds(24.dp, compact = false)
+    fun expandedBrowseActionsEndAtTheContentKeyline() = assertBrowseActionEnds(compact = false)
 
-    private fun assertBrowseActionEnds(inset: Dp, compact: Boolean) {
+    private fun assertBrowseActionEnds(compact: Boolean) {
         val channels = ChannelsState.Ready(channelsFixture())
         val guide = (if (compact) phoneOverviewFixture() else overviewFixture()).copy(details = null)
         val recordings = flatFixture()
@@ -261,15 +313,19 @@ class TouchFrameTest {
                 }
             }
         }
-        val keyline = compose.onRoot().fetchSemanticsNode().boundsInRoot.right -
-            inset.value * compose.activity.resources.displayMetrics.density
         val settingsEnd = symbolEnd(R.string.channels_connection_settings)
         compose.onNode(destination and hasText("Guide")).performClick()
         val guideEnd = buttonEnd(R.string.channels_all)
         compose.onNode(destination and hasText("Recordings")).performClick()
         val recordingsEnd = if (compact) symbolEnd(R.string.recordings_view_options)
         else buttonEnd(R.string.recordings_view_options)
-        assertEquals("Channels / Guide / Recordings", List(3) { keyline }, listOf(settingsEnd, guideEnd, recordingsEnd))
+        val keyline = if (compact) guideEnd else compose.onNodeWithTag("recordings-pane")
+            .assertIsDisplayed().fetchSemanticsNode().boundsInRoot.right
+        assertEquals(
+            "Action end: Channels / Guide / Recordings",
+            List(3) { keyline },
+            listOf(settingsEnd, guideEnd, recordingsEnd),
+        )
     }
 
     private fun symbolEnd(label: Int) = compose.onNode(

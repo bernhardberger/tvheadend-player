@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.window.core.layout.WindowSizeClass
 import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.ui.Destination
+import at.bernhardberger.tvhplayer.touch.ui.LocalDestinationBackEnabled as PageBack
 import at.bernhardberger.tvhplayer.touch.ui.OnDestinationReselected
 import at.bernhardberger.tvhplayer.touch.ui.TouchFrame
 import kotlin.math.roundToInt
@@ -102,8 +103,8 @@ internal fun RecordingsScreen(
             if (destination != Destination.Recordings) return@TouchFrame
             // Registered after the frame's own handler, so a page or a folder level takes Back first.
             val closeDetails = { picked = null }
-            BackHandler(enabled = page, onBack = closeDetails)
-            BackHandler(enabled = !page && levels.size > 1) { path = ArrayList(path.take(levels.size - 2)) }
+            BackHandler(enabled = PageBack.current and page, onBack = closeDetails)
+            BackHandler(PageBack.current and !page && levels.size > 1) { path = ArrayList(path.take(levels.size - 2)) }
             if (!listed) {
                 RecordingsStandIn(state.availability, layout, actions)
             } else if (pageItem != null) {

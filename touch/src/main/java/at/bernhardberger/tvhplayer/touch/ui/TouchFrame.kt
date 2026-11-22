@@ -49,12 +49,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
@@ -90,8 +92,16 @@ internal enum class Destination(
 
 private data class FrameBars(val top: Boolean = true, val navigation: Boolean = true)
 
+private val FrameBarsSaver = listSaver<FrameBars, Boolean>(
+    save = { listOf(it.top, it.navigation) },
+    restore = { FrameBars(top = it[0], navigation = it[1]) },
+)
+
 // The rendered destination owns its page chrome; the shell owns the navigation and notice host.
 private val LocalReportFrameBars = staticCompositionLocalOf<((FrameBars) -> Unit)?> { null }
+
+/** The outgoing page stays composed during its fade but can no longer handle system Back. */
+internal val LocalDestinationBackEnabled = compositionLocalOf { true }
 
 /** The shown page may collect taps on its already selected destination; events are not replayed. */
 internal val LocalDestinationReselections = staticCompositionLocalOf<Flow<Destination>> { emptyFlow() }
@@ -125,7 +135,7 @@ internal fun DestinationFrame(
     content: @Composable (Destination) -> Unit,
 ) {
     var selected by rememberSaveable { mutableStateOf(initialDestination) }
-    var bars by remember { mutableStateOf(FrameBars()) }
+    var bars by rememberSaveable(stateSaver = FrameBarsSaver) { mutableStateOf(FrameBars()) }
     val saved = rememberSaveableStateHolder()
     val taps = remember { MutableSharedFlow<Destination>() }
     val reselections = remember(taps) { taps.asSharedFlow() }
@@ -149,6 +159,7 @@ internal fun DestinationFrame(
             }
             CompositionLocalProvider(
                 LocalReportFrameBars provides report,
+                LocalDestinationBackEnabled provides (destination == selected),
                 LocalDestinationReselections provides reselections,
             ) {
                 saved.SaveableStateProvider(destination) { content(destination) }

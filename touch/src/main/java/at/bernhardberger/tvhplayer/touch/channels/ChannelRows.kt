@@ -4,6 +4,7 @@
 package at.bernhardberger.tvhplayer.touch.channels
 
 import at.bernhardberger.tvhplayer.touch.ui.Destination
+import at.bernhardberger.tvhplayer.touch.ui.LocalDestinationBackEnabled
 import at.bernhardberger.tvhplayer.touch.ui.ScrollToStartOnReselect
 
 import androidx.activity.compose.BackHandler
@@ -109,7 +110,10 @@ internal fun ChannelRows(
         return
     }
     scroll.ScrollToStartOnReselect(Destination.Channels)
-    BackHandler(enabled = !offline && list.rows.any { it.id == opened && it.details != null }) { openId = null }
+    BackHandler(
+        enabled = LocalDestinationBackEnabled.current && !offline &&
+            list.rows.any { it.id == opened && it.details != null },
+    ) { openId = null }
     LazyColumn(state = scroll, verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
         if (showColumnLabels) item { ColumnLabels(layout, list.hasLogos) }
         itemsIndexed(list.rows, key = { _, row -> row.id }) { index, row ->

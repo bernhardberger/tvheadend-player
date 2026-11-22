@@ -61,6 +61,7 @@ import at.bernhardberger.tvhplayer.touch.R
 import at.bernhardberger.tvhplayer.touch.channels.ChannelActionLabel
 import at.bernhardberger.tvhplayer.touch.ui.channelLogoSlot
 import at.bernhardberger.tvhplayer.touch.ui.Destination
+import at.bernhardberger.tvhplayer.touch.ui.LocalDestinationBackEnabled
 import at.bernhardberger.tvhplayer.touch.ui.LocalDestinationReselections
 import at.bernhardberger.tvhplayer.touch.ui.ListMessage
 import at.bernhardberger.tvhplayer.touch.ui.MessageKind
@@ -115,8 +116,8 @@ internal fun GuideScreen(
         }
         // Registered after the frame's own handler, so the page and an opened program take Back first.
         val closeDetails = { actions.onDetails(null) }
-        BackHandler(enabled = page, onBack = closeDetails)
-        BackHandler(enabled = !page && openId != null) { onOpen(null) }
+        BackHandler(enabled = LocalDestinationBackEnabled.current && page, onBack = closeDetails)
+        BackHandler(enabled = LocalDestinationBackEnabled.current && !page && openId != null) { onOpen(null) }
         if (details != null) {
             OnDestinationReselected(Destination.Guide) { closeDetails() }
             ProgramDetailsPage(details, layout, actions, closeDetails)
