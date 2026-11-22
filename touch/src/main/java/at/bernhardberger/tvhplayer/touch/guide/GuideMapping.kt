@@ -137,6 +137,7 @@ internal data class GuideEpgProjection(
     val days: List<LocalDate>,
     val events: Map<ChannelId?, List<EpgEvent>>,
     val details: EpgEvent?,
+    val airings: List<EpgEvent>,
 )
 
 internal fun GuideMappingInput.epgProjection(): GuideEpgProjection? {
@@ -160,7 +161,8 @@ internal fun GuideMappingInput.epgProjection(): GuideEpgProjection? {
         .filter { it.stop.epochSeconds > window.daySec.first && it.start.epochSeconds < end }
         .groupBy { it.channelId }
     val details = selection.detailsId?.toLongOrNull()?.let { id -> snapshot.events.firstOrNull { it.id.value == id } }
-    return GuideEpgProjection(days, events, details)
+    val airings = details?.let { otherAirings(it, snapshot.events, clock.nowSec, AIRINGS_LIMIT) }.orEmpty()
+    return GuideEpgProjection(days, events, details, airings)
 }
 
 /** The day tabs: today, then every later day the visible channels have programs on. */

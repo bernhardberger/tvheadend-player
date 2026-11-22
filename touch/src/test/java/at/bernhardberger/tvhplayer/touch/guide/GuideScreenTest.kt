@@ -72,11 +72,13 @@ import android.content.res.Configuration
 import at.bernhardberger.tvhplayer.ui.common.AppClock
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import kotlin.coroutines.EmptyCoroutineContext
+import kotlin.coroutines.CoroutineContext
 import kotlin.time.Instant
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
@@ -578,13 +580,32 @@ class GuideScreenTest {
         val connection = FakeConnection()
         val now = Instant.parse("2027-01-15T12:00:00Z")
         val server = ServerGuide(now)
+        val airing = EpgEvent.create(
+            EventId(800), server.second.id, Instant.parse("2027-01-15T15:00:00Z"),
+            Instant.parse("2027-01-15T16:00:00Z"), title = "Evening News",
+        )
+        val replacement = EpgEvent.create(
+            EventId(801), server.second.id, Instant.parse("2027-01-15T17:00:00Z"),
+            Instant.parse("2027-01-15T18:00:00Z"), title = "Evening News",
+        )
         try {
             assertTrue(SystemClock.setCurrentTimeMillis(now.toEpochMilliseconds()))
-            connection.session.publish(server.connected())
-            showDestination(connection) {}
+            connection.session.publish(server.connected(epg = EpgSnapshot.create(server.snapshot.events + airing)))
+            val guide = showDestination(connection) {}
+            compose.onNodeWithText("By channel").performClick()
             compose.onNodeWithText("Evening News").performClick()
             compose.onNodeWithText("Details").performClick()
             compose.onNodeWithText("Overview").assertDoesNotExist()
+            compose.onNodeWithText("Other airings of Evening News").assertExists()
+            compose.runOnIdle { connection.session.publish(server.connected()) }
+            val afterRemoval = compose.runOnIdle { guide.mapped.value?.state?.details?.otherAirings?.map { it.id } }
+            compose.runOnIdle {
+                connection.session.publish(server.connected(epg = EpgSnapshot.create(server.snapshot.events + replacement)))
+            }
+            val afterAddition = compose.runOnIdle { guide.mapped.value?.state?.details?.otherAirings?.map { it.id } }
+            assertEquals("Open Details receives removed and added airings", listOf(emptyList(), listOf("801")),
+                listOf(afterRemoval, afterAddition))
+            compose.onNodeWithText("Other airings of Evening News").assertExists()
             compose.runOnIdle {
                 connection.session.publish(server.connected(epg = EpgSnapshot.create(server.snapshot.events.drop(1))))
             }
@@ -851,6 +872,19 @@ class GuideScreenTest {
             override val lifecycle = LifecycleRegistry(this)
         }
         var shown by mutableStateOf(true)
+        val worker = StandardTestDispatcher()
+        var dispatchedPass: Job? = null
+        val dispatcher = object : CoroutineDispatcher() {
+            override fun dispatch(context: CoroutineContext, block: Runnable) {
+                dispatchedPass = context[Job]
+                worker.dispatch(context, block)
+            }
+        }
+        fun finishMapping() {
+            compose.waitForIdle()
+            worker.scheduler.runCurrent()
+            compose.waitForIdle()
+        }
         withMappingTrace {
             try {
                 assertTrue(SystemClock.setCurrentTimeMillis(now.toEpochMilliseconds()))
@@ -858,20 +892,40 @@ class GuideScreenTest {
                     owner.lifecycle.currentState = Lifecycle.State.STARTED
                     connection.session.publish(fixture.connected())
                 }
-                showDestination(connection, shown = { shown }, lifecycleOwner = owner) {}
+                val guide = showDestination(
+                    connection, shown = { shown }, mappingDispatcher = dispatcher, lifecycleOwner = owner,
+                ) {}
+                finishMapping()
                 compose.onNodeWithText("Evening News").assertIsDisplayed()
                 assertEquals(1, guideMappings())
+                val previous = guide.mapped.value
+                val publishedPass = dispatchedPass
                 compose.runOnIdle {
+                    connection.session.publish(fixture.connected(epg = fixture.refreshedEpg("Interrupted News")))
+                }
+                val interrupted = compose.runOnIdle {
+                    // Main is suspended in this pass while its worker is held on virtual time.
+                    val pass = checkNotNull(dispatchedPass)
+                    assertTrue("The new pass reached the worker dispatcher", pass !== publishedPass && pass.isActive)
                     owner.lifecycle.currentState = Lifecycle.State.CREATED
                     connection.session.publish(fixture.connected(epg = fixture.refreshedEpg("Missed News")))
+                    pass
                 }
+                finishMapping()
+                assertTrue("Stopping cancels the dispatched pass", interrupted.isCancelled)
+                assertTrue("Stopping keeps the last published result", previous === guide.mapped.value)
                 assertTrue(SystemClock.setCurrentTimeMillis(now.toEpochMilliseconds() + 5_000))
                 compose.mainClock.advanceTimeBy(5_016)
                 compose.runOnIdle {
                     connection.session.publish(fixture.connected(epg = fixture.refreshedEpg("Latest News")))
+                }
+                finishMapping()
+                compose.runOnIdle {
                     assertEquals("A stopped Guide must not map on the minute tick", 1, guideMappings())
+                    assertTrue("No abandoned result was published", previous === guide.mapped.value)
                     owner.lifecycle.currentState = Lifecycle.State.STARTED
                 }
+                finishMapping()
                 compose.onNodeWithText("Latest News").assertIsDisplayed()
                 assertEquals("Resume maps the latest data and minute together", 2, guideMappings())
                 compose.runOnIdle { shown = false }
@@ -883,6 +937,7 @@ class GuideScreenTest {
                     assertEquals("A hidden Guide does not map a new publication", 2, guideMappings())
                     shown = true
                 }
+                finishMapping()
                 compose.onNodeWithText("New News").assertIsDisplayed()
                 assertEquals("Re-entry maps the latest publication once", 3, guideMappings())
             } finally {
@@ -985,7 +1040,7 @@ class GuideScreenTest {
         mappingDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate,
         lifecycleOwner: LifecycleOwner? = null,
         onCoverage: suspend (Instant) -> Unit,
-    ) {
+    ): GuideViewModel {
         val fake = connection.session
         val session = object : TvheadendSession by fake {
             override val epgRepository = object : EpgRepository by fake.epgRepository {
@@ -1012,6 +1067,7 @@ class GuideScreenTest {
                 }
             }
         }
+        return guide
     }
 
     private fun show(
