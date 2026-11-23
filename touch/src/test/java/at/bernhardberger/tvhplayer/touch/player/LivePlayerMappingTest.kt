@@ -382,11 +382,26 @@ class LivePlayerMappingTest {
             watchLiveOutcome(false, requestActive = true, sameChannel = true, sameTarget = false, jumpAccepted = true),
         )
 
-        assertEquals(WatchLiveOutcome.Ignore, watchLiveOutcome(true, false, false, false, true))
-        assertEquals(WatchLiveOutcome.WatchAsUsual, watchLiveOutcome(true, true, false, false, true))
-        assertEquals(WatchLiveOutcome.OpenPlayer, watchLiveOutcome(true, true, true, true, false))
-        assertEquals(WatchLiveOutcome.OpenPlayer, watchLiveOutcome(true, true, true, false, true))
-        assertEquals(WatchLiveOutcome.PlayAndOpenPlayer, watchLiveOutcome(true, true, true, true, true))
+        assertEquals(
+            WatchLiveOutcome.Ignore,
+            watchLiveOutcome(true, requestActive = false, sameChannel = false, sameTarget = false, jumpAccepted = true),
+        )
+        assertEquals(
+            WatchLiveOutcome.WatchAsUsual,
+            watchLiveOutcome(true, requestActive = true, sameChannel = false, sameTarget = false, jumpAccepted = true),
+        )
+        assertEquals(
+            WatchLiveOutcome.OpenPlayer,
+            watchLiveOutcome(true, requestActive = true, sameChannel = true, sameTarget = true, jumpAccepted = false),
+        )
+        assertEquals(
+            WatchLiveOutcome.OpenPlayer,
+            watchLiveOutcome(true, requestActive = true, sameChannel = true, sameTarget = false, jumpAccepted = true),
+        )
+        assertEquals(
+            WatchLiveOutcome.PlayAndOpenPlayer,
+            watchLiveOutcome(true, requestActive = true, sameChannel = true, sameTarget = true, jumpAccepted = true),
+        )
     }
 
     @Test

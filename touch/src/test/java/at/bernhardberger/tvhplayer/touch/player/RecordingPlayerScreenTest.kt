@@ -108,6 +108,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -693,11 +694,15 @@ class RecordingPlayerScreenTest {
         val item = runtime.player.currentMediaItem
         val playWhenReady = runtime.player.playWhenReady
         val original = activity.get()
+        val playerTask = ShadowAppTask.newInstance()
+        shadowOf(playerTask).setTaskInfo(ActivityManager.RecentTaskInfo().apply {
+            baseIntent = Intent(original, PlayerActivity::class.java)
+        })
         val browseTask = ShadowAppTask.newInstance()
         shadowOf(browseTask).setTaskInfo(ActivityManager.RecentTaskInfo().apply {
             baseIntent = Intent(original, MainActivity::class.java)
         })
-        shadowOf(original.getSystemService(ActivityManager::class.java)).setAppTasks(listOf(browseTask))
+        shadowOf(original.getSystemService(ActivityManager::class.java)).setAppTasks(listOf(playerTask, browseTask))
         val sensors = shadowOf(original.getSystemService(SensorManager::class.java))
         val accelerometer = ShadowSensor.newInstance(Sensor.TYPE_ACCELEROMETER)
         sensors.addSensor(accelerometer)
@@ -728,6 +733,7 @@ class RecordingPlayerScreenTest {
         settleRoute()
         assertNull("Back into the window must move Browse forward without launching it", shadowOf(original).nextStartedActivity)
         assertTrue("Back into the window must foreground the existing Browse task", shadowOf(browseTask).hasMovedToFront())
+        assertFalse("Back into the window must not foreground the player task", shadowOf(playerTask).hasMovedToFront())
         assertEquals(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED, original.requestedOrientation)
         assertTrue(original.isInPictureInPictureMode)
         assertEquals(target, runtime.activeTarget.value)
@@ -750,7 +756,6 @@ class RecordingPlayerScreenTest {
         assertTrue(checkNotNull(launch).flags and Intent.FLAG_ACTIVITY_NEW_TASK != 0)
         // Both shadows read the same launch queue, so verify the source independently.
         assertEquals(launch, application.launch)
-        assertNull(shadowOf(player).nextStartedActivity)
         assertTrue(player.isInPictureInPictureMode)
         assertEquals(AppPlaybackTarget.Live(server.first.id), runtime.activeTarget.value)
     }

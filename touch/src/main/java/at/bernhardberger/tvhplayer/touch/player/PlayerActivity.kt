@@ -393,12 +393,16 @@ private const val SAVED_ROUTE = "player_route"
 private val PlayerBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
 
 private fun bringBrowseForward(application: Context) {
-    val browse = application.getSystemService(ActivityManager::class.java)?.appTasks?.firstOrNull {
-        it.taskInfo?.baseIntent?.component?.className == MainActivity::class.java.name
+    val tasks = application.getSystemService(ActivityManager::class.java)?.appTasks
+    val browse = try {
+        tasks?.firstOrNull {
+            it.taskInfo?.baseIntent?.component?.className == MainActivity::class.java.name
+        }?.also { it.moveToFront() }
+    } catch (_: IllegalArgumentException) {
+        // A task can be removed from Recents after it has been listed.
+        null
     }
-    if (browse != null) {
-        browse.moveToFront()
-    } else {
+    if (browse == null) {
         application.packageManager.getLaunchIntentForPackage(application.packageName)?.let(application::startActivity)
     }
 }
