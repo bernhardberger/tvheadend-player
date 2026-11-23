@@ -97,6 +97,7 @@ import at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStoreCall
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
+import at.bernhardberger.tvhplayer.core.DvrArchiveView
 import at.bernhardberger.tvhplayer.presentation.R as SharedR
 import at.bernhardberger.tvhplayer.touch.di.touchModule
 import at.bernhardberger.tvhplayer.touch.channels.ChannelsState
@@ -140,9 +141,9 @@ import kotlin.time.toJavaInstant
 import kotlin.time.Instant
 import kotlin.time.Duration.Companion.hours
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.After
@@ -1628,8 +1629,9 @@ class TouchAppTest {
         var writeGate: CompletableDeferred<Unit>? = null
         val preferences = object : DataStore<Preferences> by memory {
             override val data = flow {
+                val saved = memory.data.value
                 readGate?.await()
-                emitAll(memory.data)
+                emit(saved)
             }
 
             override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences {
@@ -1683,8 +1685,9 @@ class TouchAppTest {
             holdWrite.complete(Unit)
             readGate = holdRead
         }
-        // Use a cold store here so the final launch verifies what actually reached persistence.
-        launchRecordings(RecordingsViewStore(preferences))
+        // Use a cold store here to verify what actually reached persistence.
+        val coldStore = RecordingsViewStore(preferences)
+        launchRecordings(coldStore)
         openRecordings()
         val showedFlatList = compose.onAllNodes(hasText(guide.film.title!!)).fetchSemanticsNodes().isNotEmpty()
         val showedLoading = compose.onAllNodes(hasText(label(SharedR.string.recordings_loading)))
@@ -1697,6 +1700,24 @@ class TouchAppTest {
         options().performClick()
         compose.onNodeWithText(label(R.string.recordings_show_unwatched)).assertIsDisplayed()
         compose.onNodeWithText(label(R.string.recordings_sort_oldest)).assertIsDisplayed()
+        closeOptions()
+
+        val staleRead = CompletableDeferred<Unit>()
+        val newerWrite = CompletableDeferred<Unit>()
+        compose.runOnIdle {
+            readGate = staleRead
+            writeGate = newerWrite
+        }
+        launchRecordings(coldStore)
+        compose.onNodeWithText(label(SharedR.string.recordings_loading)).assertIsDisplayed()
+        try {
+            // Change the in-memory choice while both the stale read and the new write are blocked.
+            compose.runOnIdle { applicationScope.launch { coldStore.write(DvrArchiveView()) } }
+            staleRead.complete(Unit)
+            compose.onNodeWithText(guide.diary.title!!).assertIsDisplayed()
+        } finally {
+            newerWrite.complete(Unit)
+        }
     }
 
     /** A password connection whose saved sign-in can no longer be read; the frame asks for it. */
