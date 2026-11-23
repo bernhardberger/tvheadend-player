@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.touch.player
 
+import android.app.ActivityManager
 import android.app.PictureInPictureUiState
 import android.content.Context
 import android.content.Intent
@@ -47,6 +48,7 @@ import at.bernhardberger.tvhplayer.playback.BackgroundPlaybackNotice
 import at.bernhardberger.tvhplayer.playback.currentLivePlaybackSelection
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
+import at.bernhardberger.tvhplayer.touch.MainActivity
 import at.bernhardberger.tvhplayer.touch.channels.ChannelDetails
 import at.bernhardberger.tvhplayer.touch.channels.ChannelProgram
 import at.bernhardberger.tvhplayer.touch.channels.ChannelRow
@@ -256,9 +258,9 @@ class PlayerActivity : ComponentActivity() {
         when (outcome) {
             Leave.EnterWindowAndBrowse, Leave.StopAndBrowse -> {
                 fullScreen.release()
-                // PiP needs the player resumed, so try it before foregrounding the launcher task.
                 if (outcome == Leave.EnterWindowAndBrowse && pictureWindow.enter()) {
-                    packageManager.getLaunchIntentForPackage(packageName)?.let(::startActivity)
+                    // On Android 14, launching from the activity entering PiP puts the launched screen in the window.
+                    bringBrowseForward(applicationContext)
                 } else {
                     leave(browse = true)
                 }
@@ -389,6 +391,17 @@ private const val EXTRA_CHANNEL = "channel"
 private const val EXTRA_WATCH_INTENT = "watch_intent"
 private const val SAVED_ROUTE = "player_route"
 private val PlayerBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+
+private fun bringBrowseForward(application: Context) {
+    val browse = application.getSystemService(ActivityManager::class.java)?.appTasks?.firstOrNull {
+        it.taskInfo?.baseIntent?.component?.className == MainActivity::class.java.name
+    }
+    if (browse != null) {
+        browse.moveToFront()
+    } else {
+        application.packageManager.getLaunchIntentForPackage(application.packageName)?.let(application::startActivity)
+    }
+}
 
 private fun Intent.playerRoute(): PlayerRoute? =
     recordingRoute() ?: getLongExtra(EXTRA_CHANNEL, -1L).takeIf { it >= 0 }?.let {

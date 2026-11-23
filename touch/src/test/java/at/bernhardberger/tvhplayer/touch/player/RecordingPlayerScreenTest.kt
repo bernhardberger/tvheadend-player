@@ -2,6 +2,7 @@ package at.bernhardberger.tvhplayer.touch.player
 
 import androidx.activity.ComponentActivity
 import android.app.Activity
+import android.app.ActivityManager
 import android.app.PictureInPictureParams
 import android.content.ComponentName
 import android.content.Intent
@@ -128,6 +129,7 @@ import org.robolectric.annotation.Implements
 import org.robolectric.android.controller.ActivityController
 import org.robolectric.shadows.SensorEventBuilder
 import org.robolectric.shadows.ShadowActivity
+import org.robolectric.shadows.ShadowAppTask
 import org.robolectric.shadows.ShadowSensor
 import org.robolectric.util.ReflectionHelpers
 import java.net.InetAddress
@@ -691,6 +693,11 @@ class RecordingPlayerScreenTest {
         val item = runtime.player.currentMediaItem
         val playWhenReady = runtime.player.playWhenReady
         val original = activity.get()
+        val browseTask = ShadowAppTask.newInstance()
+        shadowOf(browseTask).setTaskInfo(ActivityManager.RecentTaskInfo().apply {
+            baseIntent = Intent(original, MainActivity::class.java)
+        })
+        shadowOf(original.getSystemService(ActivityManager::class.java)).setAppTasks(listOf(browseTask))
         val sensors = shadowOf(original.getSystemService(SensorManager::class.java))
         val accelerometer = ShadowSensor.newInstance(Sensor.TYPE_ACCELEROMETER)
         sensors.addSensor(accelerometer)
@@ -719,11 +726,33 @@ class RecordingPlayerScreenTest {
         assertTrue(item === runtime.player.currentMediaItem)
         button(R.string.player_back).performClick()
         settleRoute()
-        assertBrowseLaunched(original)
+        assertNull("Back into the window must move Browse forward without launching it", shadowOf(original).nextStartedActivity)
+        assertTrue("Back into the window must foreground the existing Browse task", shadowOf(browseTask).hasMovedToFront())
         assertEquals(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED, original.requestedOrientation)
         assertTrue(original.isInPictureInPictureMode)
         assertEquals(target, runtime.activeTarget.value)
         assertEquals(playWhenReady, runtime.player.playWhenReady)
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w412dp-h892dp-port-xhdpi", application = BrowseLaunchApplication::class)
+    fun backIntoTheWindowLaunchesMissingBrowseFromTheApplication() = withPlayerRoute(
+        live = true,
+        offerPictureInPicture = true,
+    ) { activity, runtime, server, _ ->
+        val player = activity.get()
+        val application = player.application as BrowseLaunchApplication
+        player.onBackPressedDispatcher.onBackPressed()
+        settleRoute()
+
+        val launch = shadowOf(application).nextStartedActivity
+        assertEquals(ComponentName(player, MainActivity::class.java), launch?.component)
+        assertTrue(checkNotNull(launch).flags and Intent.FLAG_ACTIVITY_NEW_TASK != 0)
+        // Both shadows read the same launch queue, so verify the source independently.
+        assertEquals(launch, application.launch)
+        assertNull(shadowOf(player).nextStartedActivity)
+        assertTrue(player.isInPictureInPictureMode)
+        assertEquals(AppPlaybackTarget.Live(server.first.id), runtime.activeTarget.value)
     }
 
     @Test
@@ -1083,6 +1112,16 @@ class RecordingPlayerScreenTest {
     private fun capture(name: String, canvas: TouchCanvas) = compose.captureTouch("slice3-player", name, canvas)
     private fun captureWindows(name: String, canvas: TouchCanvas) =
         compose.captureTouchWindows("slice3-player", name, canvas)
+}
+
+class BrowseLaunchApplication : android.app.Application() {
+    var launch: Intent? = null
+        private set
+
+    override fun startActivity(intent: Intent) {
+        launch = intent
+        super.startActivity(intent)
+    }
 }
 
 /** Accept the first request, but keep the platform mode unchanged until the transition completes. */
