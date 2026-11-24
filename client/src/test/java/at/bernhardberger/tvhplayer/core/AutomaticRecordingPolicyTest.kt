@@ -20,6 +20,7 @@ import java.time.LocalTime
 import java.time.ZoneId
 import kotlin.time.Instant
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -45,7 +46,7 @@ class AutomaticRecordingPolicyTest {
         assertNull(keyword.copy(enabled = false).previewSearchRequest())
     }
 
-    @Test fun `preview filters local weekday inclusive minute windows series and supported broadcast type`() {
+    @Test fun `preview filters local weekday inclusive minute windows series and broadcast type`() {
         val now = Instant.parse("2026-11-12T00:00:00Z")
         fun event(start: Instant = Instant.parse("2026-11-12T23:15:30Z"), isNew: Boolean? = true) =
             EpgEvent.create(EventId(1), ChannelId(3), start, Instant.parse("2026-11-13T00:15:30Z"),
@@ -69,12 +70,43 @@ class AutomaticRecordingPolicyTest {
         assertTrue(matches(draft, event(start = now)).isEmpty())
         assertEquals(1, matches(draft.copy(broadcastType = BroadcastType.NEW)).size)
         assertTrue(matches(draft.copy(broadcastType = BroadcastType.NEW), event(isNew = null)).isEmpty())
-        for (type in listOf(BroadcastType.ALL, BroadcastType.NEW, BroadcastType.NEW_OR_UNKNOWN,
-            BroadcastType.REPEAT, BroadcastType.UNKNOWN)) {
+        for (type in listOf(BroadcastType.ALL, BroadcastType.NEW)) {
             val result = draft.copy(broadcastType = type).previewMatches(
                 listOf(event), emptyList(), null, now, zone)
-            assertEquals(type !in setOf(BroadcastType.ALL, BroadcastType.NEW), result.broadcastFilterUnavailable)
+            assertEquals(false, result.broadcastFilterUnavailable)
         }
+        assertTrue(draft.copy(broadcastType = BroadcastType.UNKNOWN)
+            .previewMatches(emptyList(), emptyList(), null, now, zone).broadcastFilterUnavailable)
+    }
+
+    @Test fun `repeat preview excludes known non repeats`() =
+        assertRepeatPreview(BroadcastType.REPEAT, EventId(1))
+
+    @Test fun `new or unknown preview excludes known repeats`() =
+        assertRepeatPreview(BroadcastType.NEW_OR_UNKNOWN, EventId(2))
+
+    private fun assertRepeatPreview(type: BroadcastType, expected: EventId) {
+        val now = Instant.fromEpochSeconds(100)
+        val zone = ZoneId.of("UTC")
+        fun event(id: Long, isNew: Boolean? = null, isRepeat: Boolean? = null, channel: Long = 3) =
+            EpgEvent.create(EventId(id), ChannelId(channel), Instant.fromEpochSeconds(200), Instant.fromEpochSeconds(300),
+                title = "Episode", isNew = isNew, isRepeat = isRepeat)
+        val repeat = event(1, isNew = true, isRepeat = true)
+        val notRepeat = event(2, isRepeat = false)
+        val unknown = event(3)
+        val wrongChannel = event(4, channel = 4)
+        val draft = newAutorecDraft(AutomaticRecordingKind.KEYWORD).copy(
+            pattern = RecordingPattern("Episode"),
+            broadcastType = type,
+            channel = RecordingRuleChannel.SpecificChannel(ChannelId(3)),
+        )
+        val candidates = listOf(repeat, notRepeat, wrongChannel)
+        val known = draft.previewMatches(candidates, emptyList(), null, now, zone)
+        assertEquals("$type with known flags", listOf(expected), known.rows.map { it.eventId })
+        assertEquals("$type with known flags", false, known.broadcastFilterUnavailable)
+        val mixed = draft.previewMatches(candidates + unknown, emptyList(), null, now, zone)
+        assertEquals("$type with an unknown flag", setOf(expected, unknown.id), mixed.rows.map { it.eventId }.toSet())
+        assertEquals("$type with an unknown flag", true, mixed.broadcastFilterUnavailable)
     }
 
     @Test fun `preview merges every own upcoming entry and never predicts duplicates`() {
@@ -124,7 +156,7 @@ class AutomaticRecordingPolicyTest {
             pattern = RecordingPattern("Episode"), channel = RecordingRuleChannel.SpecificChannel(ChannelId(1)),
         )
         val entry = DvrEntry.create(DvrEntryId(1), eventId = EventId(1), autorecRuleId = ruleId,
-            start = start, stop = stop, channelId = ChannelId(1))
+            state = DvrEntryState.SCHEDULED, start = start, stop = stop, channelId = ChannelId(1))
         val event = EpgEvent.create(EventId(2), ChannelId(2), start, stop, title = "Episode")
         val newChannel = draft.copy(channel = RecordingRuleChannel.SpecificChannel(ChannelId(2)))
         val result = newChannel.previewMatches(listOf(event), listOf(entry), ruleId, now, zone, draft)
@@ -142,15 +174,25 @@ class AutomaticRecordingPolicyTest {
             assertEquals(AutorecEpisodeState.REMOVED,
                 changed.previewMatches(emptyList(), listOf(entry), ruleId, now, zone, draft).rows.single().state)
         }
-        for (isNew in listOf(false, null)) {
-            val known = EpgEvent.create(EventId(1), ChannelId(1), start, stop, isNew = isNew)
-            val unknown = DvrEntry.create(DvrEntryId(4), eventId = EventId(4), autorecRuleId = ruleId,
-                state = DvrEntryState.SCHEDULED, start = start, stop = stop, channelId = ChannelId(1))
-            val newOnly = draft.copy(broadcastType = BroadcastType.NEW).previewMatches(
-                listOf(known), listOf(entry, unknown), ruleId, now, zone, draft)
-            assertEquals(mapOf(entry.id to AutorecEpisodeState.REMOVED,
-                unknown.id to AutorecEpisodeState.SCHEDULED), newOnly.rows.associate { it.recordingId to it.state })
-            assertEquals(1, newOnly.willRecordCount)
+        val unknown = DvrEntry.create(DvrEntryId(4), eventId = EventId(4), autorecRuleId = ruleId,
+            state = DvrEntryState.SCHEDULED, start = start, stop = stop, channelId = ChannelId(1))
+        val running = DvrEntry.create(DvrEntryId(5), eventId = entry.eventId, autorecRuleId = ruleId,
+            state = DvrEntryState.RECORDING, start = start, stop = stop, channelId = ChannelId(1))
+        val unknownRepeat = EpgEvent.create(EventId(4), ChannelId(1), start, stop)
+        for ((type, isNew, isRepeat) in listOf(
+            Triple(BroadcastType.REPEAT, null, false), Triple(BroadcastType.NEW_OR_UNKNOWN, null, true),
+            Triple(BroadcastType.NEW, false, null), Triple(BroadcastType.NEW, null, null),
+        )) {
+            val nonMatching = EpgEvent.create(EventId(1), ChannelId(1), start, stop, isNew = isNew, isRepeat = isRepeat)
+            val guide = if (type == BroadcastType.NEW) listOf(nonMatching) else listOf(nonMatching, unknownRepeat)
+            val edited = draft.copy(broadcastType = type)
+            val filtered = edited.previewMatches(guide, listOf(entry, unknown), ruleId, now, zone, draft)
+            assertEquals(type.toString(), mapOf(entry.id to AutorecEpisodeState.REMOVED,
+                unknown.id to AutorecEpisodeState.SCHEDULED), filtered.rows.associate { it.recordingId to it.state })
+            assertEquals(1, filtered.willRecordCount)
+            val kept = edited.previewMatches(listOf(nonMatching), listOf(running), ruleId, now, zone, draft)
+            assertNotEquals("$type must keep a recording that has already started",
+                AutorecEpisodeState.REMOVED, kept.rows.single().state)
         }
         val renamed = draft.copy(pattern = RecordingPattern("Other"))
         val noEventId = DvrEntry.create(DvrEntryId(3), autorecRuleId = ruleId, state = DvrEntryState.SCHEDULED,
@@ -159,6 +201,17 @@ class AutomaticRecordingPolicyTest {
         assertEquals(mapOf(DvrEntryId(1) to AutorecEpisodeState.REMOVED,
             DvrEntryId(3) to AutorecEpisodeState.REMOVED), textResult.rows.associate { it.recordingId to it.state })
         assertEquals(0, textResult.willRecordCount)
+
+        val series = draft.copy(kind = AutomaticRecordingKind.SERIES, channel = RecordingRuleChannel.AllChannels,
+            seriesLinkUri = "series")
+        val repeatSeries = series.copy(broadcastType = BroadcastType.REPEAT)
+        val missingEpisode = repeatSeries.previewMatches(emptyList(), listOf(entry), ruleId, now, zone, series)
+        assertEquals(AutorecEpisodeState.SCHEDULED, missingEpisode.rows.single().state)
+        assertTrue("A broadcast edit cannot verify a kept episode missing from the title search",
+            missingEpisode.broadcastFilterUnavailable)
+        val retentionOnly = repeatSeries.copy(removal = DvrRemoval.Forever)
+        assertEquals(false, retentionOnly.previewMatches(emptyList(), listOf(entry), ruleId, now, zone,
+            baseline = repeatSeries).broadcastFilterUnavailable)
     }
 
     @Test fun `literal metacharacters round trip for title and keyword`() {

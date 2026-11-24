@@ -98,8 +98,9 @@ fun programmeAboutFacts(event: EpgEvent?, recording: DvrEntry?, resources: Resou
         event?.firstAired?.let {
             fact(R.string.details_first_aired, formatFirstAired(it.toEpochMilliseconds(), locale))
         }
-        event?.isNew?.let {
-            fact(R.string.details_broadcast, resources.getString(if (it) R.string.details_broadcast_new else R.string.details_broadcast_repeat))
+        when {
+            event?.isNew == true -> fact(R.string.details_broadcast, resources.getString(R.string.details_broadcast_new))
+            event?.isRepeat == true -> fact(R.string.details_broadcast, resources.getString(R.string.details_broadcast_repeat))
         }
         fact(R.string.details_categories, event?.categories?.map(String::trim)?.filter(String::isNotEmpty)?.distinct()?.joinToString(" • "))
         fact(R.string.details_keywords, event?.keywords?.map(String::trim)?.filter(String::isNotEmpty)?.distinct()?.joinToString(" • "))

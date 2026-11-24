@@ -74,9 +74,11 @@ fun AutorecDraft.previewSearchRequest(baseline: AutorecDraft? = null): EpgSearch
  * The caller's zone is assumed to equal the server's. Upcoming own entries are authoritative even
  * outside guide results. Unchanged matching uses only those entries; a matching edit previews their
  * replacement after saving (dvr_autorec.c:596-603,1610-1634), including removals and new guide matches.
- * HTSP exposes isNew but not is_repeat (htsp_server.c:1446-1447), so policies other than ALL/NEW
- * cannot reproduce dvr_autorec.c:230-236 and are flagged rather than silently guessed.
+ * Broadcast filtering mirrors dvr_autorec.c:230-236 when the flags are known. A missing repeat flag
+ * keeps an otherwise matching event in the preview and flags the result for repeat-based rules.
+ * Edits to those broadcast types also warn when a kept scheduled entry is missing from the search.
  */
+@Suppress("CyclomaticComplexMethod") // The warning checks the outcome of the same entry projection.
 fun AutorecDraft.previewMatches(
     events: List<EpgEvent>,
     entries: List<DvrEntry>,
@@ -109,7 +111,20 @@ fun AutorecDraft.previewMatches(
     }
     val rows = (guideRows.toList() + entryRows).sortedBy { it.start }
     val willRecord = rows.count { it.state == AutorecEpisodeState.MATCH || it.state == AutorecEpisodeState.SCHEDULED }
-    return AutorecPreviewState.Matches(rows, willRecord, broadcastType !in setOf(BroadcastType.ALL, BroadcastType.NEW))
+    val broadcastFilterUnavailable = when (broadcastType) {
+        BroadcastType.REPEAT, BroadcastType.NEW_OR_UNKNOWN -> {
+            val guideIds by lazy { events.mapTo(mutableSetOf()) { it.id } }
+            matches.any { it.isRepeat == null } ||
+                (RecordingDraftField.BROADCAST_TYPE in changed && own.asSequence().zip(entryRows.asSequence())
+                    .any { (entry, row) ->
+                        entry.state == DvrEntryState.SCHEDULED && row.state != AutorecEpisodeState.REMOVED &&
+                            entry.eventId !in guideIds
+                    })
+        }
+        BroadcastType.UNKNOWN -> true
+        else -> false
+    }
+    return AutorecPreviewState.Matches(rows, willRecord, broadcastFilterUnavailable)
 }
 
 private fun AutorecDraft.entryWillBeRemoved(
@@ -119,13 +134,15 @@ private fun AutorecDraft.entryWillBeRemoved(
     events: List<EpgEvent>,
     zone: ZoneId,
 ): Boolean {
+    // The server cancels only scheduled entries; all other entries are unlinked (dvr_autorec.c:74-88).
+    if (entry.state != DvrEntryState.SCHEDULED || changed.isEmpty()) return false
+
     // Every real update rebuilds scheduled spawns from guide events (dvr_autorec.c:1610-1631).
-    val eventlessSpawn = entry.eventId == null && entry.state == DvrEntryState.SCHEDULED
-    val knownNotNew = broadcastType == BroadcastType.NEW &&
-        events.any { it.id == entry.eventId && it.isNew != true }
+    val eventlessSpawn = entry.eventId == null
+    val broadcastExcludes = events.any { it.id == entry.eventId && broadcastType.excludesPreviewEvent(it) }
     val criteriaExclude = !enabled || !matchesChannelAndTime(entry.channelId, requireNotNull(entry.start), zone) ||
         (textMatchingChanged(changed) && entry.eventId?.let { it !in matchingIds } == true)
-    return changed.isNotEmpty() && (eventlessSpawn || knownNotNew || (matchingChanged(changed) && criteriaExclude))
+    return eventlessSpawn || broadcastExcludes || (matchingChanged(changed) && criteriaExclude)
 }
 
 private fun AutorecDraft.matchingChanged(changed: Set<RecordingDraftField>): Boolean =
@@ -146,7 +163,14 @@ private fun DvrEntry.previewState(): AutorecEpisodeState = when {
 private fun AutorecDraft.matchesPreviewEvent(event: EpgEvent, now: Instant, zone: ZoneId): Boolean {
     return enabled && event.start > now && matchesChannelAndTime(event.channelId, event.start, zone) &&
         (kind != AutomaticRecordingKind.SERIES || seriesLinkUri == event.seriesLinkUri) &&
-        (broadcastType != BroadcastType.NEW || event.isNew == true)
+        !broadcastType.excludesPreviewEvent(event)
+}
+
+private fun BroadcastType.excludesPreviewEvent(event: EpgEvent): Boolean = when (this) {
+    BroadcastType.NEW -> event.isNew != true
+    BroadcastType.REPEAT -> event.isRepeat == false
+    BroadcastType.NEW_OR_UNKNOWN -> event.isRepeat == true
+    else -> false
 }
 
 private fun AutorecDraft.matchesChannelAndTime(channelId: ChannelId?, start: Instant, zone: ZoneId): Boolean {

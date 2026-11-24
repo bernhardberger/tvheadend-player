@@ -1572,7 +1572,7 @@ class ProgrammeDetailsPageTest {
              richFacts -> EpgEvent.create(event.id, channel.id, start, event.stop, title = event.title, genre = event.genre,
                  summary = event.summary.takeUnless { noDescription }, description = event.description.takeUnless { noDescription },
                  episode = event.episode, copyrightYear = 2024,
-                firstAired = Instant.parse("2024-01-01T12:00:00Z"), isNew = false,
+                firstAired = Instant.parse("2024-01-01T12:00:00Z"), isRepeat = true,
                 categories = listOf("Nature"), keywords = listOf("Mountain", "Winter"))
             future -> EpgEvent.create(event.id, channel.id, start, event.stop, title = event.title)
             summaryOnly -> EpgEvent.create(event.id, channel.id, start, event.stop, title = event.title,

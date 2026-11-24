@@ -44,7 +44,7 @@ class DetailsFactsTest {
         val rich = EpgEvent.create(EventId(1), ChannelId(1), start, stop, genre = "Documentary",
             episode = EpgEpisode(null, null, 2, 5, 3, 10, 1, 2, "S2 E3"),
             rating = EpgRating(12, "XMLTV:FSK:12", null, null, null, 4), copyrightYear = 2024,
-            firstAired = Instant.parse("2024-01-01T12:00:00Z"), isNew = false,
+            firstAired = Instant.parse("2024-01-01T12:00:00Z"), isRepeat = true,
             categories = listOf("Nature", " ", "Nature"), keywords = listOf("Mountain", "Winter"))
         Assert.assertEquals(listOf("Genre" to "Documentary", "Season" to "2 of 5", "Episode" to "3 of 10", "Part" to "1 of 2",
             "Year" to "2024", "Age rating" to "FSK 12", "Star rating" to "4", "First aired" to "Jan 1, 2024",
@@ -52,11 +52,13 @@ class DetailsFactsTest {
             programmeAboutFacts(rich, null, resources, Locale.US))
         val sparse = EpgEvent.create(EventId(1), ChannelId(1), start, stop,
             episode = EpgEpisode(null, null, null, null, null, null, null, null, "Pilot"), isNew = true,
-            contentGenre = ContentGenre.fromContentType(0x90))
+            contentGenre = ContentGenre.fromContentType(0x90), isRepeat = true)
         Assert.assertEquals(listOf("Genre" to "Education & factual", "Episode" to "Pilot", "Broadcast" to "New"),
             programmeAboutFacts(sparse, null, resources, Locale.US))
         val bare = EpgEvent.create(EventId(1), ChannelId(1), start, stop, title = "Ridge Light")
         Assert.assertEquals(emptyList<Pair<String, String>>(), programmeAboutFacts(bare, null, resources, Locale.US))
+        val notNewOrRepeat = EpgEvent.create(EventId(1), ChannelId(1), start, stop, isNew = false, isRepeat = false)
+        Assert.assertTrue(programmeAboutFacts(notNewOrRepeat, null, resources, Locale.US).isEmpty())
         Assert.assertEquals(listOf("Short", "Long\ntext"), programmeAboutText("Short", "Long\\ntext", synopsisShownInFull = false))
         Assert.assertEquals(listOf("Long\ntext"), programmeAboutText("Short", "Long\\ntext", synopsisShownInFull = true))
         Assert.assertEquals(emptyList<String>(), programmeAboutText(" Same", "Same ", synopsisShownInFull = true))
