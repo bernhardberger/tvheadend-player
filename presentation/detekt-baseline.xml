@@ -1,0 +1,63 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>ComplexCondition:AppConnectionViewModel.kt:AppConnectionViewModel$state is SessionState.Unavailable &amp;&amp; (state.reason.recoveryDisposition == SessionRecoveryDisposition.EXPLICIT_RETRY || allowAutomaticBackoff &amp;&amp; state.reason.recoveryDisposition == SessionRecoveryDisposition.AUTOMATIC_BACKOFF)</ID>
+    <ID>CyclomaticComplexMethod:AppErrorText.kt:@StringRes fun AppErrorCondition.hintRes: Int?</ID>
+    <ID>CyclomaticComplexMethod:AppErrorText.kt:@StringRes fun AppErrorCondition.titleRes: Int</ID>
+    <ID>CyclomaticComplexMethod:AppErrorText.kt:@StringRes private fun AppErrorCondition.reasonRes: Int</ID>
+    <ID>CyclomaticComplexMethod:ChannelAccents.kt:ChannelAccents$suspend fun fillIn</ID>
+    <ID>CyclomaticComplexMethod:DetailsFacts.kt:@OptIn(ExperimentalTvheadendApi::class) @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class) fun recordingMetadataFacts: List&lt;Pair&lt;String, String&gt;&gt;</ID>
+    <ID>CyclomaticComplexMethod:DetailsFacts.kt:fun programmeAboutFacts: List&lt;Pair&lt;String, String&gt;&gt;</ID>
+    <ID>CyclomaticComplexMethod:DvrMutationActions.kt:@OptIn(ExperimentalTvheadendApi::class) suspend fun DvrMutationActions.runFolderAction: Notice.DvrFolderActionFailed?</ID>
+    <ID>CyclomaticComplexMethod:NoticeFormatter.kt:NoticeFormatter$fun format: FormattedNotice</ID>
+    <ID>CyclomaticComplexMethod:NoticeFormatter.kt:NoticeFormatter$private fun formatDvr: FormattedNotice</ID>
+    <ID>LoopWithTooManyJumpStatements:ChannelAccents.kt:ChannelAccents$for</ID>
+    <ID>LoopWithTooManyJumpStatements:ChannelsViewModel.kt:ChannelsViewModel$while</ID>
+    <ID>LoopWithTooManyJumpStatements:DvrMutationActions.kt:for</ID>
+    <ID>MagicNumber:ArtworkSample.kt:64</ID>
+    <ID>MagicNumber:ChannelAccents.kt:0xFFFFFF</ID>
+    <ID>MagicNumber:LogoInkTransformation.kt:24</ID>
+    <ID>MagicNumber:TvheadendArtworkLoader.kt:10</ID>
+    <ID>MatchingDeclarationName:StopConfirmationSentence.kt:StopConfirmationTimes</ID>
+    <ID>MatchingDeclarationName:TimeConverter.kt:AppClock</ID>
+    <ID>MaxLineLength:AppConnectionViewModel.kt:AppConnectionViewModel$allowAutomaticBackoff &amp;&amp; state.reason.recoveryDisposition == SessionRecoveryDisposition.AUTOMATIC_BACKOFF</ID>
+    <ID>MaxLineLength:ChannelAccents.kt:ChannelAccents$.</ID>
+    <ID>MaxLineLength:ChannelAccents.kt:return@withContext if (failure == null || failure == TvheadendFailure.FILE_UNAVAILABLE) NEUTRAL_ACCENT_RGB else null</ID>
+    <ID>MaxLineLength:ChannelsViewModel.kt:ChannelsViewModel$setScopeVisible(tagId, if (tagId == null) !visibility.isAllChannelsVisible() else !visibility.isTagVisible(tagId))</ID>
+    <ID>MaxLineLength:ConnectionSetupState.kt:ConnectionSetupState$SetupStep.ADDRESS -&gt; focusAddress(if (step == SetupStep.FIND_SERVER) AddressFocus.SEARCH else AddressFocus.CONTINUE)</ID>
+    <ID>MaxLineLength:DetailsFacts.kt:(</ID>
+    <ID>MaxLineLength:DetailsFacts.kt:?:</ID>
+    <ID>MaxLineLength:DetailsFacts.kt:else</ID>
+    <ID>MaxLineLength:DetailsFacts.kt:fact(R.string.details_broadcast, resources.getString(if (it) R.string.details_broadcast_new else R.string.details_broadcast_repeat))</ID>
+    <ID>MaxLineLength:DetailsFacts.kt:fact(R.string.details_categories, event?.categories?.map(String::trim)?.filter(String::isNotEmpty)?.distinct()?.joinToString(" • "))</ID>
+    <ID>MaxLineLength:DetailsFacts.kt:fact(R.string.details_keywords, event?.keywords?.map(String::trim)?.filter(String::isNotEmpty)?.distinct()?.joinToString(" • "))</ID>
+    <ID>MaxLineLength:DetailsFacts.kt:fact(R.string.details_year, (event?.copyrightYear ?: recording?.copyrightYear)?.let { formatMetadataNumber(it, locale) })</ID>
+    <ID>MaxLineLength:DetailsFacts.kt:formatTimeInterval(start.epochSeconds, stop.epochSeconds, withDate = true, locale = locale, nowSec = nowSec)</ID>
+    <ID>MaxLineLength:DetailsFacts.kt:fun</ID>
+    <ID>MaxLineLength:DetailsFacts.kt:humanLanguageName</ID>
+    <ID>MaxLineLength:DetailsFacts.kt:total?.takeIf { it &gt;= n }?.let { resources.getString(R.string.details_count_of, n.toInt(), it.toInt()) } ?: formatMetadataNumber(n, locale)</ID>
+    <ID>MaxLineLength:DvrMutationActions.kt:currentObservation.currentSession != null &amp;&amp; sourceObservation?.currentSession === currentObservation.currentSession</ID>
+    <ID>MaxLineLength:DvrMutationActions.kt:fun</ID>
+    <ID>MaxLineLength:DvrMutationActions.kt:val canModify = (current.sessionState as? SessionState.Ready)?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED</ID>
+    <ID>MaxLineLength:Epg.kt:episode.episodeNumber?.let { add(resources.getString(if (spoken) R.string.episode_number_spoken else R.string.episode_number_compact, it)) }</ID>
+    <ID>MaxLineLength:Epg.kt:episode.seasonNumber?.let { add(resources.getString(if (spoken) R.string.episode_season_spoken else R.string.episode_season_compact, it)) }</ID>
+    <ID>MaxLineLength:Epg.kt:formatShortDate(java.time.Instant.ofEpochSecond(firstAired.epochSeconds).atZone(java.time.ZoneId.systemDefault()), locale)</ID>
+    <ID>MaxLineLength:LogoInkTransformation.kt:LogoInkTransformation$val logo = if (inked == null) source else Bitmap.createBitmap(inked, source.width, source.height, Bitmap.Config.ARGB_8888)</ID>
+    <ID>MaxLineLength:NoticeFormatter.kt:NoticeFormatter$add(context.resources.getQuantityString(R.plurals.recording_notice_count, notice.count, notice.count))</ID>
+    <ID>MaxLineLength:NoticeFormatter.kt:NoticeFormatter$val name = entry.title?.trim()?.takeIf(String::isNotEmpty) ?: channel ?: context.getString(R.string.recording_notice_fallback)</ID>
+    <ID>MaxLineLength:TimeConverter.kt:/** A length as read aloud, in the configured app locale; zero units are left out, so whole minutes read without "0 seconds". */</ID>
+    <ID>MaxLineLength:TimeConverter.kt:/** The spoken form of [formatTimeInterval] for the clock times alone: built from the instants, never from display text. */</ID>
+    <ID>MaxLineLength:TimeConverter.kt:if</ID>
+    <ID>MaxLineLength:TimeConverter.kt:return</ID>
+    <ID>ReturnCount:ChannelAccents.kt:ChannelAccents$suspend fun sample: Int?</ID>
+    <ID>ReturnCount:ConnectionSetupState.kt:ConnectionSetupState$fun back: Boolean</ID>
+    <ID>ReturnCount:ConnectionSetupState.kt:internal suspend fun TvheadendSession.connectForSetup: SetupFailure?</ID>
+    <ID>ReturnCount:RemoteLogoCache.kt:RemoteLogoCache$private fun initializedGeneration: Long</ID>
+    <ID>TooGenericExceptionCaught:RemoteLogoCache.kt:RemoteLogoCache$error: Throwable</ID>
+    <ID>TooManyFunctions:ConnectionFormState.kt:ConnectionFormState</ID>
+    <ID>TooManyFunctions:ConnectionSetupState.kt:ConnectionSetupState</ID>
+    <ID>TooManyFunctions:DvrMutationActions.kt:at.bernhardberger.tvhplayer.ui.screens.DvrMutationActions.kt</ID>
+    <ID>TooManyFunctions:TimeConverter.kt:at.bernhardberger.tvhplayer.ui.common.TimeConverter.kt</ID>
+  </CurrentIssues>
+</SmellBaseline>

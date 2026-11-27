@@ -85,13 +85,16 @@ printf '    Visual capture matrix: %s (use --visual-captures to include it)\n' "
 # JVM plus Robolectric forks plus lint analysis exceeded the 8 GiB build slice.
 gradle_common=("${gradle_arguments[@]}" "-Ptvhplayer.captureTests=$capture_tests" --console=plain --no-scan)
 printf '==> Detekt production and test policy checks\n'
-./gradlew :app:detekt :app:detektTests :client:detekt :client:detektTests "${gradle_common[@]}"
+./gradlew :app:detekt :app:detektTests :client:detekt :client:detektTests \
+    :presentation:detekt :presentation:detektTests "${gradle_common[@]}"
 ./gradlew \
-    :client:compileDebugUnitTestSources :decoder-ffmpeg:compileDebugUnitTestSources \
+    :client:compileDebugUnitTestSources :presentation:compileDebugUnitTestSources \
+    :decoder-ffmpeg:compileDebugUnitTestSources \
     :app:compilePlayDebugUnitTestSources :app:compilePlayDebugAndroidTestKotlin \
     "${gradle_common[@]}"
 ./gradlew \
-    :client:testDebugUnitTest :decoder-ffmpeg:testDebugUnitTest :app:testPlayDebugUnitTest :appliance:testDebugUnitTest \
+    :client:testDebugUnitTest :presentation:testDebugUnitTest :decoder-ffmpeg:testDebugUnitTest \
+    :app:testPlayDebugUnitTest :appliance:testDebugUnitTest \
     "${gradle_common[@]}"
 
 printf '==> Companion updater loopback E2E\n'
