@@ -57,6 +57,7 @@ import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
+import at.bernhardberger.tvheadend.sdk.core.dvrSnapshotForDisplay
 import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvhplayer.presentation.R
@@ -80,6 +81,10 @@ import at.bernhardberger.tvhplayer.core.playerControlsAutoHideEligible
 import at.bernhardberger.tvhplayer.core.playerForegroundLayer
 import at.bernhardberger.tvhplayer.core.recordingRetryCommand
 import at.bernhardberger.tvhplayer.core.RecordingMarkKind
+import at.bernhardberger.tvhplayer.core.RecordingPlayNextPolicy
+import at.bernhardberger.tvhplayer.core.recordingPlayNextBoundaries
+import at.bernhardberger.tvhplayer.core.recordingPlayNextOffer
+import at.bernhardberger.tvhplayer.core.recordingPlayNextTrigger
 import at.bernhardberger.tvhplayer.core.recordingPlayerAlert
 import at.bernhardberger.tvhplayer.core.recordingFailureDetail
 import at.bernhardberger.tvhplayer.playback.AppPlaybackFailureReason
@@ -87,6 +92,7 @@ import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import at.bernhardberger.tvhplayer.playback.currentRecordingPlaybackSelection
+import at.bernhardberger.tvhplayer.playback.RecordingPlayNextPress
 import at.bernhardberger.tvhplayer.data.ConnectionState
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
@@ -117,6 +123,8 @@ fun RecordingPlayerScreen(
     onShowGuide: (at.bernhardberger.tvheadend.sdk.core.ChannelId, at.bernhardberger.tvheadend.sdk.core.EpgEvent?) -> Unit = { _, _ -> },
     statsStore: at.bernhardberger.tvhplayer.di.PlayerStatsStore = koinInject(),
     playerSettingsStore: PlayerSettingsStore = koinInject(),
+    playNextPending: Boolean = false,
+    onPlayNext: (RecordingPlayNextPress, () -> Unit) -> Unit = { _, _ -> },
 ) {
     val playerSettings by playerSettingsStore.playerSettings.collectAsStateWithLifecycle(PlayerSettings())
     val playerClose = rememberPlayerClose(onClose)
@@ -232,6 +240,50 @@ fun RecordingPlayerScreen(
     }
     val nowSec = timelineState.nowEpochSec
     val isPlaying = timelineState.isPlaying
+    val playNextPolicy = session.recordingPlayNextPolicy(retainedSelection)
+    var playNextCrossing by remember(playNextPolicy) {
+        mutableStateOf(playNextPolicy?.crossing ?: RecordingPlayNextPolicy.Crossing.BEFORE)
+    }
+    val playNextTrigger = recordingPlayNextTrigger(marks, durationMs.takeIf { it > 0 }, growing)
+    val actualPosition = timelineState.playbackPositionMs
+    val nearEnd = playbackAvailable && playNextTrigger != null && actualPosition >= playNextTrigger &&
+        (growing || durationMs <= 0 || actualPosition < durationMs) && playbackState != AppPlaybackState.Finished
+    LaunchedEffect(playNextPolicy, playNextTrigger, actualPosition) {
+        playNextPolicy?.let {
+            it.update(playNextTrigger, actualPosition)
+            playNextCrossing = it.crossing
+        }
+    }
+    val playNextCrossingId = playNextPolicy?.crossingId ?: 0
+    val playNext = if (nearEnd && playNextCrossing.action && retainedSelection?.currentSession === currentSession &&
+        retainedSelection != null && activeTarget == AppPlaybackTarget.Recording(recordingId)
+    ) {
+        val (positions, openStarts) = remember(observation, recordingId) {
+            recordingPlayNextBoundaries(observation.dvrEntry(recordingId), observation.dvrSnapshotForDisplay?.entries.orEmpty())
+        }
+        val reachedAt = session.recordingBroadcastTime(retainedSelection, actualPosition)
+        val now = kotlin.time.Instant.fromEpochSeconds(nowSec)
+        val positionBucket = reachedAt?.let { positions.binarySearch(it).let { i -> if (i >= 0) i + 1 else -i - 1 } }
+        val clockBucket = openStarts.binarySearch(now).let { if (it >= 0) it + 1 else -it - 1 }
+        // Playhead polls only search the boundary index. Scanning offers is limited to
+        // observation or eligibility changes, and the runtime checks again on activation.
+        remember(playNextPolicy, playNextCrossingId, observation, recordingId, positionBucket, clockBucket,
+            openStarts.isNotEmpty() && reachedAt != null && reachedAt < now) {
+            recordingPlayNextOffer(observation, recordingId, reachedAt, now)
+        }
+    } else null
+    val playNextPrompt = playNext?.takeIf { playNextCrossing.corner }
+    fun playNextNow() {
+        if (playNextPending) return
+        val selection = retainedSelection ?: return
+        val policy = playNextPolicy?.takeIf { it.action } ?: return
+        val shown = playNext ?: return
+        val press = session.captureRecordingPlayNextPress(selection, shown) ?: return
+        onPlayNext(press) {
+            policy.withdraw()
+            playNextCrossing = policy.crossing
+        }
+    }
     val lastPlayedStore: LastPlayedChannelStore = koinInject()
     val playingRecording by rememberUpdatedState(isPlaying && activeTarget == AppPlaybackTarget.Recording(recordingId))
     LaunchedEffect(recordingId, retainedSelection?.currentSession, lastPlayedStore) {
@@ -461,7 +513,7 @@ fun RecordingPlayerScreen(
             seekPreviewPhase = timelineState.seekPreviewPhase(chrome.controlsVisible),
             controlsVisible = chrome.controlsVisible && playbackAvailable,
             skipPromptOffered = recordingSkipPromptShown(
-                offered = skipPrompt != null && playbackAvailable,
+                offered = (skipPrompt != null || (!playNextPending && playNextPrompt != null)) && playbackAvailable,
                 playing = isPlaying,
                 canSeek = timelineState.canSeek,
                 presented = bannerFramePresented,
@@ -470,6 +522,14 @@ fun RecordingPlayerScreen(
     val foregroundContext = currentPlayerForegroundContext()
     val seekPreviewPhase = foregroundContext.seekPreviewPhase
     val foregroundLayer = playerForegroundLayer(foregroundContext)
+    // Keep Play next focused through ordinary Left/Right feedback. The seek Banner still
+    // shows the step, and the ad-skip prompt keeps its existing foreground priority.
+    val showPlayNext = skipPrompt == null && playNextPrompt != null && foregroundContext.skipPromptOffered &&
+        when (foregroundLayer) {
+            PlayerForegroundLayer.SKIP_PROMPT, PlayerForegroundLayer.PENDING_SEEK_PREVIEW,
+            PlayerForegroundLayer.DISPATCHED_SEEK_PREVIEW -> true
+            else -> false
+        }
     // What the chrome draws. A quick step's preview plays inside the Banner and holds it up even
     // after its timer ran out; the Banner is drawn only with playback available.
     fun chromeMode(layer: PlayerForegroundLayer): PlayerChromeMode {
@@ -543,7 +603,7 @@ fun RecordingPlayerScreen(
             chrome.onUserInteraction()
             return@handle
         }
-        val action = playerBackAction(
+        val action = if (showPlayNext) PlayerBackAction.DISMISS_SKIP_PROMPT else playerBackAction(
             surface = PlayerSurface.RECORDING,
             context = currentPlayerForegroundContext(),
             // Back hides a Banner only when one is drawn: not while the recording still loads.
@@ -556,13 +616,20 @@ fun RecordingPlayerScreen(
             PlayerBackAction.CANCEL_PENDING_SEEK -> timelineState.cancelPendingSeek()
             PlayerBackAction.DISMISS_SEEK_FEEDBACK ->
                 timelineState.dismissDispatchedFeedback()
-            PlayerBackAction.DISMISS_SKIP_PROMPT ->
-                skipPrompt?.let(session::dismissRecordingSkipPrompt)
+            PlayerBackAction.DISMISS_SKIP_PROMPT -> {
+                if (skipPrompt != null) skipPrompt?.let(session::dismissRecordingSkipPrompt)
+                else if (playNextPrompt != null) {
+                    playNextPolicy?.let {
+                        it.dismiss()
+                        playNextCrossing = it.crossing
+                    }
+                }
+            }
             else -> Unit
         }
     }
 
-    PlayerRootFocusEffect(foregroundLayer, rootFocus)
+    PlayerRootFocusEffect(if (showPlayNext) PlayerForegroundLayer.SKIP_PROMPT else foregroundLayer, rootFocus)
 
 
     PlayerBackHandler(handlePlaybackBack)
@@ -589,7 +656,9 @@ fun RecordingPlayerScreen(
                 val keyCode = event.nativeKeyEvent.keyCode
                 if (keyCode == AndroidKeyEvent.KEYCODE_MEDIA_RECORD) return@onPreviewKeyEvent true
                 // Only a fresh OK belongs to the prompt; the opening key still completes its cycle.
-                if (foregroundLayer == PlayerForegroundLayer.SKIP_PROMPT && event.key in RecordingSkipActivationKeys) {
+                if ((foregroundLayer == PlayerForegroundLayer.SKIP_PROMPT || showPlayNext) &&
+                    event.key in RecordingSkipActivationKeys
+                ) {
                     return@onPreviewKeyEvent layers.consumesRevealingKey(event)
                 }
                 if (markerNavigation.handle(event, markers, ::seekMarker)) {
@@ -738,6 +807,7 @@ fun RecordingPlayerScreen(
                 mode = chromeMode(foregroundLayer),
                 onBannerSkipBottomInset = { bannerSkipBottomInset = it },
                 bannerSkipTextReserve = bannerSkipTextReserve,
+                liftCornerAboveInfoBar = showPlayNext,
                 content = PlayerChromeContent(
                     clockSec = wallClockMinute(nowSec),
                     info = recordingInfoBarData(entry, channel?.number, nowSec, timelineState.playbackPositionMs,
@@ -786,6 +856,10 @@ fun RecordingPlayerScreen(
                                 }
                             },
                         )
+                    },
+                    playNext = playNext?.takeUnless { playNextPending }?.let { offer ->
+                        PlayerSkipAction(offer.entry.id to playNextCrossingId,
+                            stringResource(R.string.recording_play_next), ::playNextNow)
                     },
                 ),
                 entry = chrome.controlsEntry,
@@ -838,6 +912,23 @@ fun RecordingPlayerScreen(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(end = TvGridHorizontalMargin, bottom = TvGridVerticalMargin),
+            )
+            RecordingPlayNextPrompt(
+                offer = playNextPrompt,
+                shown = showPlayNext,
+                observation = observation,
+                nowSec = { nowSec },
+                bannerShown = chromeMode(foregroundLayer).isBanner,
+                bannerBottomInset = { bannerSkipBottomInset },
+                onTimeout = {
+                    playNextPolicy?.let {
+                        it.expire()
+                        playNextCrossing = it.crossing
+                    }
+                },
+                onPlay = ::playNextNow,
+                crossingId = playNextCrossingId,
+                modifier = Modifier.align(Alignment.BottomEnd),
             )
 
         }

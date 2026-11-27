@@ -29,6 +29,7 @@ import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.ApplianceLaunchTarget
 import at.bernhardberger.tvhplayer.core.MainStartupPlaybackOutcome
 import at.bernhardberger.tvhplayer.data.ConnectionState
+import at.bernhardberger.tvhplayer.playback.RecordingPlayNextPress
 import at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.ui.components.ContentContainer
 import at.bernhardberger.tvhplayer.ui.player.RecordingPlayerScreen
@@ -362,9 +363,13 @@ internal fun RecordingPlayerRouteContent(
     onClose: () -> Unit,
     onShowGuide: (ChannelId, at.bernhardberger.tvheadend.sdk.core.EpgEvent?) -> Unit,
     onOpenConnectionSettings: () -> Unit,
+    playNextPending: Boolean,
+    onPlayNext: (RecordingPlayNextPress, () -> Unit) -> Unit,
 ) {
     if (contentAllowed) {
         RecordingPlayerScreen(
+            playNextPending = playNextPending,
+            onPlayNext = onPlayNext,
             onShowGuide = onShowGuide,
             targetAspect = targetAspect,
             recordingId = recordingId,

@@ -56,6 +56,8 @@ class NoticeFormatter(private val context: Context) {
             context.getString(R.string.server_sign_in_rejected, notice.name),
             icon = AppNoticeIcon.SIGN_IN_REJECTED)
         is Notice.AutomaticAdBreakSkip -> FormattedNotice(context.getString(R.string.recording_ad_break_skipped))
+        Notice.RecordingPlaybackStartFailed -> FormattedNotice(
+            context.getString(R.string.recording_playback_start_failed), icon = AppNoticeIcon.WARNING)
         is Notice.Dvr -> formatDvr(notice, now)
         is Notice.DvrActionFailed -> formatRecordingFailure(notice)
         is Notice.DvrRuleActionFailed -> formatAutomaticRecordingFailure(notice)

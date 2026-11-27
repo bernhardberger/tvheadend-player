@@ -16,7 +16,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -24,6 +27,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
@@ -120,6 +124,7 @@ internal fun PlayerChrome(
     numberEntryShown: Boolean = false,
     onBannerSkipBottomInset: ((Int) -> Unit)? = null,
     bannerSkipTextReserve: Dp = 0.dp,
+    liftCornerAboveInfoBar: Boolean = false,
 ) {
     val liveBar = rememberLiveBarPresentation(timeline as? PlayerChromeTimeline.Live)
     PlayerControlsLayer(
@@ -146,6 +151,7 @@ internal fun PlayerChrome(
             is PlayerChromeTimeline.Recording -> timeline.growing
         }
         val lastLineEndReserve = if (liveEnd) liveDistanceReserve() else 0.dp
+        var bannerInfoHeight by remember { mutableIntStateOf(0) }
         val header: @Composable (Modifier) -> Unit = {
             PlayerChromeHeader(content.clockSec, it.testTag("player-header"))
         }
@@ -157,7 +163,11 @@ internal fun PlayerChrome(
                 // at its top edge, Next on its bottom edge at font scale 1.0.
                 PlayerInfoBar(
                     data = content.info,
-                    modifier = Modifier.testTag("player-info-bar"),
+                    modifier = Modifier.testTag("player-info-bar").then(
+                        if (shown.isBanner && liftCornerAboveInfoBar)
+                            Modifier.onSizeChanged { bannerInfoHeight = it.height }
+                        else Modifier,
+                    ),
                     contentAlpha = contentAlpha,
                     lastLineEndReserve = lastLineEndReserve,
                     badges = content.badges,
@@ -242,7 +252,12 @@ internal fun PlayerChrome(
                             feedback = timeline.feedback, feedbackIsError = timeline.feedbackIsError)
                     }
                     is PlayerChromeTimeline.Recording -> RecordingBannerWithSkipInset(
-                        timeline, shown == PlayerChromeMode.BANNER_STEP, content.state, onBannerSkipBottomInset,
+                        timeline, shown == PlayerChromeMode.BANNER_STEP, content.state,
+                        onBannerSkipBottomInset?.let { report ->
+                            { timelineInset: Int ->
+                                report(timelineInset + if (liftCornerAboveInfoBar) bannerInfoHeight else 0)
+                            }
+                        },
                     )
                 }
                 }

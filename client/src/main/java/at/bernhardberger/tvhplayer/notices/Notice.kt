@@ -61,6 +61,11 @@ sealed interface Notice {
         override val severity = NoticeSeverity.INFO
     }
 
+    data object RecordingPlaybackStartFailed : Notice {
+        override val key = "recording-playback-start-failed"
+        override val severity = NoticeSeverity.FAILURE
+    }
+
     data class Dvr(
         val kind: DvrChangeKind,
         val entry: DvrEntry,

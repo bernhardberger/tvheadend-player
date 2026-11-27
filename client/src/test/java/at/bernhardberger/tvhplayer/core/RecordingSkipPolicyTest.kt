@@ -1,7 +1,10 @@
 package at.bernhardberger.tvhplayer.core
 
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrCutpoint
 import at.bernhardberger.tvheadend.sdk.core.DvrCutpointAction
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvhplayer.settings.AdBreakMode
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.SkipLanding
@@ -10,6 +13,67 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class RecordingSkipPolicyTest {
+    @Test fun playNextCrossesTheProgrammeEndMarkEvenWhenGrowing() {
+        val policy = RecordingPlayNextPolicy()
+        val marks = listOf(RecordingMark(RecordingMarkKind.PROGRAM_END, 70_000))
+        val trigger = recordingPlayNextTrigger(marks, 120_000, growing = true)
+        assertEquals(70_000L, trigger)
+        policy.update(trigger, 69_999)
+        assertFalse(policy.corner)
+        policy.update(trigger, 70_000)
+        assertTrue(policy.corner)
+    }
+
+    @Test fun playNextExpiryLeavesTheEndCountdownArmed() {
+        val policy = RecordingPlayNextPolicy()
+        policy.update(70_000, 70_000)
+        policy.expire()
+        assertFalse(policy.corner)
+        assertTrue(policy.action)
+        assertFalse(policy.dismissed)
+    }
+
+    @Test fun playNextDismissalSurvivesWithdrawingTheAction() {
+        val policy = RecordingPlayNextPolicy()
+        policy.update(70_000, 71_000)
+        policy.dismiss()
+        assertFalse(policy.corner)
+        assertTrue(policy.action)
+        assertTrue(policy.dismissed)
+        policy.withdraw()
+        assertFalse(policy.action)
+        assertTrue(policy.dismissed)
+    }
+
+    @Test fun seekingBeforeTheTriggerClearsTheDismissalAndRearmsPlayNext() {
+        val policy = RecordingPlayNextPolicy()
+        policy.update(70_000, 71_000)
+        policy.dismiss()
+        policy.update(70_000, 69_000)
+        assertFalse(policy.dismissed)
+        policy.update(70_000, 70_000)
+        assertTrue(policy.corner)
+    }
+
+    @Test fun playNextFallbackRequiresAKnownEndThatIsNotGrowing() {
+        assertEquals(90_000L, recordingPlayNextTrigger(emptyList(), 120_000, growing = false))
+        assertNull(recordingPlayNextTrigger(emptyList(), 120_000, growing = true))
+        assertNull(recordingPlayNextTrigger(emptyList(), null, growing = false))
+    }
+
+    @Test fun playNextUsesOnlyTheFirstOfferAndOnlyForAChainOrNextEpisode() {
+        val entry = DvrEntry.create(DvrEntryId(1))
+        val chain = RecordingEndOffer.Recording(entry, RecordingEndKind.CHAIN_PART, RecordingEndStart.FromBeginning)
+        val next = chain.copy(kind = RecordingEndKind.NEXT_EPISODE)
+        val other = chain.copy(kind = RecordingEndKind.OTHER_EPISODE)
+        val live = RecordingEndOffer.WatchLive(ChannelId(1), null)
+
+        assertEquals(chain, recordingPlayNextOffer(listOf(chain, next)))
+        assertEquals(next, recordingPlayNextOffer(listOf(next)))
+        assertNull(recordingPlayNextOffer(listOf(other, next)))
+        assertNull(recordingPlayNextOffer(listOf(live)))
+    }
+
     @Test fun turningOffProgramStartLeavesTheControlsActionAndLetsAnOverlappingAdAppear() {
         val start = RecordingMark(RecordingMarkKind.PROGRAM_START, 60_000)
         val ad = RecordingMark(RecordingMarkKind.AD_BREAK, 0, 55_000)

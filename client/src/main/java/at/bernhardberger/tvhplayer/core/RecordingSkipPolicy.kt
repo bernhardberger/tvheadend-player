@@ -6,6 +6,46 @@ import at.bernhardberger.tvhplayer.settings.AdBreakMode
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.SkipLanding
 
+fun recordingPlayNextTrigger(marks: List<RecordingMark>, durationMs: Long?, growing: Boolean): Long? =
+    marks.firstOrNull { it.kind == RecordingMarkKind.PROGRAM_END }?.startMs
+        ?: durationMs?.takeIf { !growing && it > 0 }?.let { (it - 30_000).coerceAtLeast(0) }
+
+fun recordingPlayNextOffer(offers: List<RecordingEndOffer>): RecordingEndOffer.Recording? =
+    (offers.firstOrNull() as? RecordingEndOffer.Recording)?.takeIf {
+        it.kind == RecordingEndKind.CHAIN_PART || it.kind == RecordingEndKind.NEXT_EPISODE
+    }
+
+class RecordingPlayNextPolicy {
+    enum class Crossing(val corner: Boolean = false, val action: Boolean = false, val dismissed: Boolean = false) {
+        BEFORE, OFFERED(true, true), EXPIRED(action = true),
+        DISMISSED(action = true, dismissed = true), WITHDRAWN, WITHDRAWN_AFTER_DISMISSAL(dismissed = true),
+    }
+
+    // Compose writes crossing; the serialized runtime can read its dismissal at EOF.
+    @Volatile var crossing = Crossing.BEFORE
+        private set
+    var crossingId = 0
+        private set
+    val corner get() = crossing.corner
+    val action get() = crossing.action
+    val dismissed get() = crossing.dismissed
+
+    fun update(triggerMs: Long?, positionMs: Long) {
+        if (triggerMs == null) return // No observed boundary to cross or seek back through.
+        if (positionMs < triggerMs) crossing = Crossing.BEFORE
+        else if (crossing == Crossing.BEFORE) {
+            crossingId++
+            crossing = Crossing.OFFERED
+        }
+    }
+
+    fun expire() { if (crossing == Crossing.OFFERED) crossing = Crossing.EXPIRED }
+    fun dismiss() { if (crossing == Crossing.OFFERED) crossing = Crossing.DISMISSED }
+    fun withdraw() {
+        if (crossing.action) crossing = if (dismissed) Crossing.WITHDRAWN_AFTER_DISMISSAL else Crossing.WITHDRAWN
+    }
+}
+
 /** [automaticAdSkip] is the ad break an automatic skip jumped over. */
 data class RecordingSkipDecision(val seekToMs: Long? = null, val automaticAdSkip: RecordingMark? = null)
 

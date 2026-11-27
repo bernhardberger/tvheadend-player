@@ -88,6 +88,8 @@ internal fun PlayerActionRow(
     audioFocus: FocusRequester? = null,
     skip: PlayerSkipAction? = null,
     skipFocus: FocusRequester? = null,
+    playNext: PlayerSkipAction? = null,
+    playNextFocus: FocusRequester? = null,
 ) {
     val playPause = stringResource(if (paused) R.string.play else R.string.pause)
     val settings = stringResource(R.string.nav_settings)
@@ -110,7 +112,9 @@ internal fun PlayerActionRow(
     val playbackEnd = if (onRecord == null) 2 else 3
     val endStart = actions[playbackEnd].tag
     val skipPresses = remember { mutableMapOf<Key, Any>() }
-    val skipFocused = remember { mutableStateOf(false) }
+    val focusedOffer = remember { mutableStateOf<Any?>(null) }
+    val skipIdentity = skip?.let { "recording-skip" to it.identity }
+    val nextIdentity = playNext?.let { "recording-play-next" to it.identity }
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -125,7 +129,8 @@ internal fun PlayerActionRow(
                     }
                     KeyEventType.KeyUp -> {
                         val pressed = skipPresses[event.key]
-                        if (pressed != null && (!skipFocused.value || pressed !== skip?.identity)) {
+                        if (pressed != null && (pressed != focusedOffer.value ||
+                                (pressed != skipIdentity && pressed != nextIdentity))) {
                             skipPresses.remove(event.key)
                             true
                         } else false
@@ -136,15 +141,19 @@ internal fun PlayerActionRow(
         horizontalArrangement = Arrangement.spacedBy(TvOverlayActionGap),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        val rowActions = if (skip == null) actions else actions.toMutableList().apply {
-            add(playbackEnd, PlayerAction("recording-skip", skip.label, null, skip.onClick, skipFocus))
+        val rowActions = if (skip == null && playNext == null) actions else actions.toMutableList().apply {
+            // Both follow Stop; ad-break Skip keeps priority over Play next.
+            playNext?.let { add(playbackEnd, PlayerAction("recording-play-next", it.label, null, it.onClick, playNextFocus)) }
+            skip?.let { add(playbackEnd, PlayerAction("recording-skip", it.label, null, it.onClick, skipFocus)) }
         }
         rowActions.forEach { action ->
             key(action.tag) {
                 if (action.tag == endStart) Spacer(Modifier.weight(1f))
                 PlayerActionButton(
                     action, recordState, pauseUnavailableReason, scheduleAvailable,
-                    onActionFocused, onInteraction, skip, skipPresses, skipFocused,
+                    onActionFocused, onInteraction,
+                    if (action.tag == "recording-play-next") nextIdentity else skipIdentity,
+                    skipPresses, focusedOffer,
                 )
             }
         }
@@ -159,9 +168,9 @@ private fun PlayerActionButton(
     scheduleAvailable: Boolean,
     onActionFocused: (String) -> Unit,
     onInteraction: () -> Unit,
-    skip: PlayerSkipAction?,
+    offerIdentity: Any?,
     skipPresses: MutableMap<Key, Any>,
-    skipFocused: MutableState<Boolean>,
+    focusedOffer: MutableState<Any?>,
 ) {
     val action = playerAction.onClick ?: return
     val tag = playerAction.tag
@@ -178,7 +187,7 @@ private fun PlayerActionButton(
     val icon = playerAction.icon
     if (icon == null) {
         PlayerRowSkipButton(
-            playerAction.label, requireNotNull(skip).identity, onClick, actionModifier, skipPresses, skipFocused,
+            playerAction.label, requireNotNull(offerIdentity), onClick, actionModifier, skipPresses, focusedOffer,
         )
     } else {
         PlayerRowIconButton(
@@ -230,7 +239,7 @@ private fun PlayerRowSkipButton(
     onClick: () -> Unit,
     modifier: Modifier,
     skipPresses: MutableMap<Key, Any>,
-    skipFocused: MutableState<Boolean>,
+    focusedOffer: MutableState<Any?>,
 ) {
     Button(
         onClick = onClick,
@@ -240,14 +249,17 @@ private fun PlayerRowSkipButton(
         ),
         contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
         modifier = modifier.height(TvIconButtonSize)
-            .onFocusChanged { skipFocused.value = it.isFocused }
+            .onFocusChanged {
+                if (it.isFocused) focusedOffer.value = identity
+                else if (focusedOffer.value == identity) focusedOffer.value = null
+            }
             .onPreviewKeyEvent { event ->
                 if (event.key !in RecordingSkipActivationKeys) false else when (event.type) {
                     KeyEventType.KeyDown -> {
                         if (event.nativeKeyEvent.repeatCount == 0) skipPresses[event.key] = identity
-                        skipPresses[event.key] !== identity
+                        skipPresses[event.key] != identity
                     }
-                    KeyEventType.KeyUp -> skipPresses.remove(event.key) !== identity
+                    KeyEventType.KeyUp -> skipPresses.remove(event.key) != identity
                     else -> false
                 }
             },

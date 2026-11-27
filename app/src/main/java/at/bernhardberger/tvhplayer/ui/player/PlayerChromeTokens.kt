@@ -1,9 +1,14 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.ui.TvOverlayFooterGradientRunout
 
@@ -11,6 +16,43 @@ internal object PlayerChromeTokens {
     val chipShape = RoundedCornerShape(4.dp)
     /** Behind a chip's text over a picture or video: the kit's 60% scrim step. */
     val chipScrim = Color.Black.copy(alpha = 0.60f)
+    val playNextBottomInset = 35.dp
+    val playNextBannerGap = 18.dp
+    private val playNextScrimRunout = 60.dp
+
+    /** The resting scrim reaches the viewport edges; a lifted scrim fades out above the Banner. */
+    fun DrawScope.drawPlayNextScrim(opacity: Float, bannerTop: Float?, rise: Int) {
+        val runout = playNextScrimRunout.toPx()
+        val dark = chipScrim.copy(alpha = chipScrim.alpha * opacity)
+        val clear = Color.Transparent
+        val width = size.width + runout
+        val restingBottom = size.height + runout
+        val bottom = bannerTop?.coerceAtMost(restingBottom) ?: restingBottom
+        if (bottom <= 0f) return
+        val bottomFade = if (bottom < restingBottom) {
+            (bottom - (size.height - rise)).coerceIn(8.dp.toPx(), runout).coerceAtMost(bottom)
+        } else 0f
+        val height = bottom - bottomFade
+        scale(scaleX = if (layoutDirection == LayoutDirection.Ltr) 1f else -1f, scaleY = 1f) {
+            drawRect(dark, size = Size(width, height))
+            drawRect(Brush.horizontalGradient(listOf(clear, dark), startX = -runout, endX = 0f),
+                topLeft = Offset(-runout, 0f), size = Size(runout, height))
+            drawRect(Brush.verticalGradient(listOf(clear, dark), startY = -runout, endY = 0f),
+                topLeft = Offset(0f, -runout), size = Size(width, runout))
+            drawRect(Brush.radialGradient(listOf(dark, clear), center = Offset.Zero, radius = runout),
+                topLeft = Offset(-runout, -runout), size = Size(runout, runout))
+            if (bottomFade > 0f) {
+                drawRect(Brush.verticalGradient(listOf(dark, clear), startY = height, endY = bottom),
+                    topLeft = Offset(0f, height), size = Size(width, bottomFade))
+                // Continue both fades through the bottom-start corner without a visible seam.
+                val corner = Offset(0f, height)
+                scale(scaleX = 1f, scaleY = bottomFade / runout, pivot = corner) {
+                    drawRect(Brush.radialGradient(listOf(dark, clear), center = corner, radius = runout),
+                        topLeft = Offset(-runout, height), size = Size(runout, runout))
+                }
+            }
+        }
+    }
     val heroShape = RoundedCornerShape(12.dp)
     val chipHeight = 24.dp
     val identityWidth = 128.dp

@@ -13,8 +13,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.focus.focusRequester
@@ -27,15 +31,19 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotFocused
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionObservation
 import at.bernhardberger.tvhplayer.core.RecordingEndKind
 import at.bernhardberger.tvhplayer.core.RecordingEndOffer
 import at.bernhardberger.tvhplayer.core.RecordingEndStart
+import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
 import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
@@ -48,6 +56,7 @@ import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 import at.bernhardberger.tvhplayer.ui.components.TwoColumnDialog
 import at.bernhardberger.tvhplayer.ui.components.TwoColumnDialogButton
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -59,6 +68,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
 import java.util.TimeZone
+import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
@@ -99,17 +109,42 @@ class RecordingEndScreenTest {
     }
 
     @Test fun removingFirstPreservesShownTimeAndFocusAcrossHiding() {
+        val preHideMs = 4_000L
+        val remainingMs = EndCountdownMs - preHideMs
         show()
-        compose.settleFrames(1, 4_000)
+        compose.settleFrames(1, preHideMs)
         compose.changeState { shown.value = false }
-        compose.settleFrames(1, 12_000)
+        compose.settleFrames(1, EndCountdownMs + 200)
         compose.changeState { offers.value = listOf(second, live); shown.value = true }
         compose.settleFrames(3)
         card(0).assertIsFocused()
-        compose.settleFrames(1, 4_000)
+        compose.settleFrames(1, remainingMs - 1_000)
         compose.runOnIdle { assertEquals(emptyList<RecordingEndOffer>(), played) }
-        compose.settleFrames(1, 2_000)
+        compose.settleFrames(1, 1_000 + 200L)
         compose.runOnIdle { assertEquals(listOf(second), played) }
+    }
+
+    @Test fun playNextReplacementUsesOnlyTheRemainingTimeForTheCrossing() {
+        val candidate = mutableStateOf<RecordingEndOffer.Recording?>(first)
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                RecordingPlayNextPrompt(
+                    offer = candidate.value, shown = true, observation = SessionObservation.create(),
+                    nowSec = { 1_700_000_000 }, bannerShown = false, bannerBottomInset = { 0 },
+                    onTimeout = { candidate.value = null }, onPlay = {},
+                )
+            }
+        }
+        compose.settleFrames(3)
+        val prompt = compose.onNodeWithTag("recording-play-next-prompt").assertIsFocused()
+        val remainingMs = 1_000L
+        compose.settleFrames(1, SKIP_PROMPT_MS - remainingMs)
+        compose.changeState { candidate.value = second }
+        compose.settleFrames(3)
+        prompt.assertIsFocused()
+        compose.settleFrames(1, remainingMs + 200)
+        prompt.assertDoesNotExist()
     }
 
     @Test fun navigationStopsAtEdgesAndMenuBackRestoresFocus() {
@@ -210,8 +245,91 @@ class RecordingEndScreenCaptureTest {
     @Test fun twoOffers() = capture("E4-2-offers", 2)
     @Test fun fourOffers() = capture("E4-4-offers", 4)
     @Test fun stress() = capture("E4-stress", 4, stress = true)
+    @Test fun playNextCorner() = capturePlayNext("P1-focused", banner = false)
+    @Test fun playNextCornerWithBanner() = capturePlayNext("P1-with-banner", banner = true)
 
     private fun capture(name: String, count: Int, stress: Boolean = false) {
+        val (view, focus) = render(stress) { ended, cards, observation, _, now ->
+            RecordingEndScreen(ended, cards.take(count), observation, "Recordings", true, {}, {}, { _, _ -> },
+                nowSec = { now.epochSeconds })
+        }
+        val card = compose.onNodeWithTag("recording-end-card-0").assertIsFocused()
+        compose.runOnIdle { write(view, 'B', "$name-focused") }
+        compose.changeState { focus.clearFocus(force = true) }
+        compose.settleFrames(3)
+        card.assertIsNotFocused()
+        compose.runOnIdle { write(view, 'B', "$name-unfocused") }
+    }
+
+    private fun capturePlayNext(name: String, banner: Boolean) {
+        val showCard = mutableStateOf(true)
+        val (view) = render { ended, cards, observation, channel, now ->
+            var inset by remember { mutableIntStateOf(0) }
+            if (banner) PlayerChrome(
+                mode = PlayerChromeMode.BANNER,
+                content = PlayerChromeContent(now.epochSeconds, recordingInfoBarData(
+                    DvrEntry.create(ended.id, title = "Harbor Cup Final: FC Harbor – Riverside",
+                        channelId = ended.channelId, start = now - 59.minutes, stop = now + 1.minutes),
+                    channel.number, now.epochSeconds, 3_540_000L, 3_600_000L, false),
+                    picon = channel.icon, channelId = channel.id),
+                timeline = PlayerChromeTimeline.Recording(3_540_000L, 3_600_000L),
+                actions = PlayerChromeActions(active = false),
+                onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {},
+                onInteraction = {}, onBannerSkipBottomInset = { inset = it },
+                liftCornerAboveInfoBar = true,
+            )
+            RecordingPlayNextPrompt(
+                offer = cards.first() as RecordingEndOffer.Recording, shown = showCard.value,
+                observation = observation, nowSec = { now.epochSeconds }, onTimeout = {}, onPlay = {},
+                modifier = Modifier.align(Alignment.BottomEnd),
+                bannerShown = banner, bannerBottomInset = { inset },
+            )
+        }
+        val card = compose.onNodeWithTag("recording-play-next-prompt").assertIsFocused()
+        compose.settleFrames(16)
+        val safeBottom = compose.onRoot().getUnclippedBoundsInRoot().bottom - TvGridVerticalMargin
+        assertTrue("The focused card stays inside the bottom safe area",
+            card.getUnclippedBoundsInRoot().bottom <= safeBottom)
+        if (banner) {
+            val info = compose.onNodeWithTag("player-info-bar").getUnclippedBoundsInRoot()
+            assertTrue("The corner card sits above the Banner information",
+                card.getUnclippedBoundsInRoot().bottom + 16.dp <= info.top)
+            // Compare the same Banner pixels, including antialiased glyphs, over the same still.
+            val left = (info.left.value * 2).roundToInt()
+            val top = (info.top.value * 2).roundToInt()
+            val width = (info.right.value * 2).roundToInt() - left
+            val height = (info.bottom.value * 2).roundToInt() - top
+            fun bannerPixels(bitmap: Bitmap) = IntArray(width * height).also {
+                bitmap.getPixels(it, 0, width, left, top, width, height)
+            }
+            val withCard = compose.runOnIdle { snapshot(view) }
+            try {
+                compose.changeState { showCard.value = false }
+                compose.settleFrames(16)
+                val changed = compose.runOnIdle {
+                    val withoutCard = snapshot(view)
+                    try {
+                        val before = bannerPixels(withCard)
+                        val after = bannerPixels(withoutCard)
+                        before.indices.count { before[it] != after[it] }
+                    } finally {
+                        withoutCard.recycle()
+                    }
+                }
+                assertEquals("The corner scrim changes Banner pixels", 0, changed)
+                CaptureOutput.writePng(File("../artifacts/review-32-sliceC/captures/$name.png"), withCard)
+            } finally {
+                withCard.recycle()
+            }
+        } else compose.runOnIdle { write(view, 'C', name) }
+    }
+
+    private fun render(
+        stress: Boolean = false,
+        content: @androidx.compose.runtime.Composable androidx.compose.foundation.layout.BoxScope.(
+            DvrEntry, List<RecordingEndOffer>, SessionObservation, Channel, Instant,
+        ) -> Unit,
+    ): Pair<View, FocusManager> {
         val now = Instant.parse("2026-11-27T16:52:00Z")
         val logo = ArtworkId(1)
         val art = ArtworkId(2)
@@ -242,7 +360,7 @@ class RecordingEndScreenCaptureTest {
             RecordingEndOffer.Recording(next, RecordingEndKind.NEXT_EPISODE, RecordingEndStart.Resume(760.seconds)),
             RecordingEndOffer.Recording(other, RecordingEndKind.OTHER_EPISODE, RecordingEndStart.FromBeginning),
             RecordingEndOffer.WatchLive(channel.id, null),
-        ).take(count)
+        )
         val observation = SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(
                 streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
@@ -261,26 +379,21 @@ class RecordingEndScreenCaptureTest {
                 TVHeadendPlayerTheme { ProvideArtworkSession(session, observation) {
                     Box(Modifier.fillMaxSize()) {
                         Image(still, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                        RecordingEndScreen(ended, cards, observation, "Recordings", true, {}, {}, { _, _ -> },
-                            nowSec = { now.epochSeconds })
+                        content(ended, cards, observation, channel, now)
                     }
                 } }
             }
         }
         compose.settleFrames(10)
-        val card = compose.onNodeWithTag("recording-end-card-0")
-        card.assertIsFocused()
-        compose.runOnIdle { write(view, "$name-focused") }
-        compose.changeState { focus.clearFocus(force = true) }
-        compose.settleFrames(3)
-        card.assertIsNotFocused()
-        compose.runOnIdle { write(view, "$name-unfocused") }
+        return view to focus
     }
 
-    private fun write(view: View, name: String) {
-        val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
-        view.draw(Canvas(bitmap))
-        CaptureOutput.writePng(File("../artifacts/review-32-sliceB/captures/$name.png"), bitmap)
+    private fun snapshot(view: View): Bitmap =
+        Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888).also { view.draw(Canvas(it)) }
+
+    private fun write(view: View, slice: Char, name: String) {
+        val bitmap = snapshot(view)
+        CaptureOutput.writePng(File("../artifacts/review-32-slice$slice/captures/$name.png"), bitmap)
         bitmap.recycle()
     }
 }

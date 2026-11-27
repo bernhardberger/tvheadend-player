@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -63,6 +64,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.currentStateAsState
 import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.core.RecordingMarkKind
 import at.bernhardberger.tvhplayer.playback.RecordingSkipAction
@@ -100,11 +104,26 @@ private fun RecordingSkipButton(
     elapsed: () -> Float,
     modifier: Modifier = Modifier,
 ) {
-    // A key-up can only activate the same visible offer that received key-down.
-    val pressed = remember(action, visible) { mutableSetOf<Key>() }
     Button(
         onClick = onSkip,
-        modifier = modifier.heightIn(min = 40.dp).semantics { role = Role.Button }.onPreviewKeyEvent { event ->
+        modifier = modifier.heightIn(min = 40.dp).semantics { role = Role.Button }
+            .recordingPromptActivation(action, visible),
+        contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
+    ) {
+        SkipCountdown(LocalContentColor.current, elapsed)
+        Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+        val label = if (action?.mark?.kind == RecordingMarkKind.PROGRAM_START) {
+            R.string.skip_to_program_start
+        } else R.string.skip_ad_break
+        Text(stringResource(label), maxLines = 1, softWrap = false)
+    }
+}
+
+@Composable
+internal fun Modifier.recordingPromptActivation(identity: Any?, visible: Boolean): Modifier {
+    // A key-up can only activate the same visible offer that received key-down.
+    val pressed = remember(identity, visible) { mutableSetOf<Key>() }
+    return onPreviewKeyEvent { event ->
             if (event.key !in RecordingSkipActivationKeys) return@onPreviewKeyEvent false
             if (!visible) return@onPreviewKeyEvent true
             when (event.type) {
@@ -115,15 +134,6 @@ private fun RecordingSkipButton(
                 KeyEventType.KeyUp -> !pressed.remove(event.key)
                 else -> false
             }
-        },
-        contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
-    ) {
-        SkipCountdown(LocalContentColor.current, elapsed)
-        Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-        val label = if (action?.mark?.kind == RecordingMarkKind.PROGRAM_START) {
-            R.string.skip_to_program_start
-        } else R.string.skip_ad_break
-        Text(stringResource(label), maxLines = 1, softWrap = false)
     }
 }
 
@@ -183,26 +193,60 @@ internal fun RecordingSkipPrompt(
     bannerShown: Boolean = false,
     bannerSkipBottomInset: () -> Int = { 0 },
 ) {
+    RecordingCornerPrompt(prompt, shown, onTimeout, modifier, bannerShown, bannerSkipBottomInset) {
+        presentation, visible, elapsed, buttonModifier ->
+        RecordingSkipButton(
+            onSkip = { prompt?.takeIf { visible }?.let(onSkip) },
+            action = presentation,
+            visible = visible,
+            elapsed = elapsed,
+            modifier = buttonModifier.testTag("recording-skip-prompt"),
+        )
+    }
+}
+
+@Composable
+internal fun <T : Any> RecordingCornerPrompt(
+    prompt: T?,
+    shown: Boolean,
+    onTimeout: (T) -> Unit,
+    modifier: Modifier = Modifier,
+    bannerShown: Boolean = false,
+    bannerSkipBottomInset: () -> Int = { 0 },
+    identity: (T) -> Any = { it },
+    countdownKey: Any? = null,
+    playNext: Boolean = false,
+    content: @Composable (T, Boolean, () -> Float, Modifier) -> Unit,
+) {
     var departing by remember { mutableStateOf(prompt) }
     SideEffect { if (prompt != null) departing = prompt }
     // Clearing the offer must not replace the presentation still leaving the screen.
     val presentation = prompt ?: departing
-    var elapsedMs by remember(presentation) { mutableLongStateOf(0L) }
+    val promptKey = prompt?.let(identity)
+    val timerKey = countdownKey ?: presentation?.let(identity)
+    var elapsedMs by remember(timerKey) { mutableLongStateOf(0L) }
     val timeout by rememberUpdatedState(onTimeout)
-    LaunchedEffect(prompt, shown) {
-        if (prompt == null || !shown) return@LaunchedEffect
+    val latestPrompt by rememberUpdatedState(prompt)
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val lifecycleState by lifecycle.currentStateAsState()
+    val visible = prompt != null && shown
+    LaunchedEffect(timerKey, visible, lifecycleState) {
+        if (!visible || !lifecycleState.isAtLeast(Lifecycle.State.RESUMED)) return@LaunchedEffect
         // Frame time, so the prompt's time does not follow the animator duration scale.
         val start = withFrameMillis { it } - elapsedMs
         if (elapsedMs >= SKIP_PROMPT_MS) return@LaunchedEffect
-        while (elapsedMs < SKIP_PROMPT_MS) elapsedMs = withFrameMillis { it } - start
-        timeout(prompt)
+        while (elapsedMs < SKIP_PROMPT_MS) {
+            val frame = withFrameMillis { it }
+            if (!lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) return@LaunchedEffect
+            elapsedMs = frame - start
+        }
+        latestPrompt?.let(timeout)
     }
-    val visible = prompt != null && shown
     var buttonHeight by remember { mutableIntStateOf(0) }
-    val bannerLift = rememberSkipBannerLift(visible, bannerShown, bannerSkipBottomInset) { buttonHeight }
+    val bannerLift = rememberSkipBannerLift(visible, bannerShown, bannerSkipBottomInset, playNext) { buttonHeight }
     val visibility = remember { MutableTransitionState(false) }
     SideEffect { visibility.targetState = visible }
-    LaunchedEffect(prompt, visibility.isIdle, visibility.currentState) {
+    LaunchedEffect(promptKey, visibility.isIdle, visibility.currentState) {
         if (prompt == null && visibility.isIdle && !visibility.currentState) departing = null
     }
     val rise = with(LocalDensity.current) { PlayerMotion.ChromeOffset.roundToPx() }
@@ -232,6 +276,22 @@ internal fun RecordingSkipPrompt(
         }
         // The two extra pixels leave one antialiasing pixel per edge; the rise fits below it.
         Box((if (visible) Modifier else Modifier.clearAndSetSemantics {})
+            .then(if (playNext) Modifier.drawBehind {
+                // Outside the fading graphics layer so its bounds don't clip the scrim runout.
+                val lift = bannerLift()
+                val offset = travel.value.roundToInt() - lift
+                val bannerTop = if (bannerShown || lift > 0f) {
+                    val inset = bannerSkipBottomInset()
+                    if (inset <= 0) return@drawBehind
+                    // The draw box extends below the unscaled anchor for focus growth and travel.
+                    val anchorHeight = ((size.height - 2 - rise) / SkipFocusAllowance).roundToInt()
+                    val topOverhang = (size.height.toInt() - rise - anchorHeight) / 2
+                    PlayerChromeTokens.playNextBottomInset.toPx() + anchorHeight + topOverhang - inset - offset
+                } else null
+                translate(top = offset) {
+                    with(PlayerChromeTokens) { drawPlayNextScrim(opacity.value, bannerTop, rise) }
+                }
+            } else Modifier)
             .graphicsLayer {
                 alpha = opacity.value
                 translationY = travel.value.roundToInt() - bannerLift()
@@ -243,16 +303,14 @@ internal fun RecordingSkipPrompt(
                 layout(width, height) { child.placeRelative((width - child.width) / 2, (height - rise - child.height) / 2) }
             },
         ) {
-            RecordingSkipButton(
-                onSkip = { prompt?.takeIf { visible }?.let(onSkip) },
-                action = presentation,
-                visible = visible,
-                elapsed = { elapsedMs / SKIP_PROMPT_MS.toFloat() },
-                modifier = Modifier.testTag("recording-skip-prompt").onSizeChanged { buttonHeight = it.height }
+            presentation?.let {
+                content(it, visible, { elapsedMs / SKIP_PROMPT_MS.toFloat() },
+                    Modifier.onSizeChanged { buttonHeight = it.height }
                     .focusRequester(focus)
                     .focusProperties { canFocus = visible }
                     .semantics { liveRegion = LiveRegionMode.Polite },
-            )
+                )
+            }
         }
     }
 }
@@ -279,12 +337,16 @@ private fun rememberSkipBannerLift(
     visible: Boolean,
     bannerShown: Boolean,
     bottomInset: () -> Int,
+    playNext: Boolean,
     buttonHeight: () -> Int,
 ): () -> Float {
     val target = if (bannerShown) 1f else 0f
     val lift = remember { Animatable(target) }
     var wasVisible by remember { mutableStateOf(false) }
-    val cornerInset = with(LocalDensity.current) { TvGridVerticalMargin.toPx() }
+    val cornerInset = with(LocalDensity.current) {
+        if (playNext) (PlayerChromeTokens.playNextBottomInset - PlayerChromeTokens.playNextBannerGap).toPx()
+        else TvGridVerticalMargin.toPx()
+    }
     LaunchedEffect(visible, target) {
         if (visible) {
             if (wasVisible) lift.animateTo(target,

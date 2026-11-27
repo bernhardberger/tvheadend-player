@@ -150,6 +150,7 @@ internal data class PlayerChromeActions(
     val restoreFocus: String? = null,
     val tracks: PlayerTrackButtons = PlayerTrackButtons(),
     val skip: PlayerSkipAction? = null,
+    val playNext: PlayerSkipAction? = null,
 )
 
 internal data class PlayerSkipAction(val identity: Any, val label: String, val onClick: () -> Unit)

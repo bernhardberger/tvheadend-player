@@ -7,6 +7,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.*
+import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
@@ -35,7 +37,7 @@ import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.common.*
 import at.bernhardberger.tvhplayer.ui.components.*
 
-private const val EndCountdownMs = 10_000L
+internal const val EndCountdownMs = 10_000L
 private val OfferWidth = 384.dp
 private val OfferHeight = 81.dp
 private val OfferImageWidth = 144.dp
@@ -269,6 +271,7 @@ private fun RecordingEndCard(
     onLongClick: (() -> Unit)?,
     titleStyle: TextStyle,
     modifier: Modifier,
+    corner: Boolean = false,
 ) {
     val recording = (offer as? RecordingEndOffer.Recording)?.entry
     val channel = when (offer) {
@@ -294,6 +297,9 @@ private fun RecordingEndCard(
                 ProgrammeArtwork(recording?.let(::recordingArtwork) ?: event?.let(::programmeArtwork), channel?.icon, progress = null,
                     modifier = Modifier.fillMaxSize(), takenCorners = OfferArtworkTakenCorners)
                 if (offer is RecordingEndOffer.Recording) RecordingEndProgress(offer, nowSec)
+                if (corner && recording?.let(::recordingIsRunning) == true) {
+                    RecordingBadge(recording.state, Modifier.align(Alignment.TopEnd).padding(6.dp), compact = true)
+                }
             }
         },
         title = {
@@ -312,22 +318,61 @@ private fun RecordingEndCard(
                 Modifier.fillMaxHeight().padding(start = OfferTextPadding),
                 verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterVertically),
             ) {
-                Text(title, style = titleStyle, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                if (corner) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        countdown?.let { SkipCountdown(color, it, ringSize = 14.dp, drawSkipIcon = false) }
+                        Text(stringResource(R.string.recording_up_next), style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+                Text(title, style = titleStyle, maxLines = if (corner) 1 else 2, overflow = TextOverflow.Ellipsis)
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    countdown?.let { SkipCountdown(color, it, ringSize = 14.dp, drawSkipIcon = false) }
+                    if (!corner) countdown?.let { SkipCountdown(color, it, ringSize = 14.dp, drawSkipIcon = false) }
                     Text(action, style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp, lineHeight = 15.sp),
                         maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                if (facts.isNotBlank()) {
+                if (corner || facts.isNotBlank()) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        if (running) RecordingStatusIndicator(recording.state, announceState = false, size = 8.dp)
-                        Text(facts, style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, lineHeight = 14.sp),
+                        if (!corner && running) RecordingStatusIndicator(recording.state, announceState = false, size = 8.dp)
+                        Text(if (corner) stringResource(R.string.recording_play_next_hint) else facts,
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, lineHeight = 14.sp),
                             color = LocalContentColor.current.copy(alpha = .8f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }
         },
     )
+}
+
+@Composable
+internal fun RecordingPlayNextPrompt(
+    offer: RecordingEndOffer.Recording?,
+    shown: Boolean,
+    observation: SessionObservation,
+    nowSec: () -> Long,
+    bannerShown: Boolean,
+    bannerBottomInset: () -> Int,
+    onTimeout: () -> Unit,
+    onPlay: () -> Unit,
+    modifier: Modifier = Modifier,
+    crossingId: Int = 0,
+) {
+    RecordingCornerPrompt(
+        prompt = offer, shown = shown, onTimeout = { onTimeout() },
+        modifier = modifier.padding(end = TvGridHorizontalMargin, bottom = PlayerChromeTokens.playNextBottomInset),
+        bannerShown = bannerShown, bannerSkipBottomInset = bannerBottomInset,
+        identity = { it.entry.id to crossingId },
+        countdownKey = crossingId,
+        playNext = true,
+    ) { candidate, visible, elapsed, cardModifier ->
+            RecordingEndCard(
+                candidate, candidate.entry.title.orEmpty(), observation, nowSec, elapsed,
+                onClick = { if (visible) onPlay() }, onLongClick = null,
+                titleStyle = MaterialTheme.typography.titleSmall,
+                modifier = cardModifier.testTag("recording-play-next-prompt")
+                    .recordingPromptActivation(candidate.entry.id to crossingId, visible),
+                corner = true,
+            )
+    }
 }
 
 @Composable

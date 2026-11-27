@@ -127,6 +127,7 @@ internal fun PlayerChromeControls(
     val timelineFocus = remember { FocusRequester() }
     val stopFocus = remember { FocusRequester() }
     val skipFocus = remember { FocusRequester() }
+    val playNextFocus = remember { FocusRequester() }
     val seekable = when (timeline) {
         is PlayerChromeTimeline.Live -> timeline.timeshift.available && (timeline.timeshift.timingKnown || previewing)
         is PlayerChromeTimeline.Recording -> timeline.canSeek && recordingRange != null
@@ -186,12 +187,14 @@ internal fun PlayerChromeControls(
         // The Audio button goes with its choice (zap pending, failure, fewer tracks); its neighbour Info takes over.
         "player-audio" -> if (actions.tracks.audio != null) audioFocus else infoFocus
         "recording-skip" -> if (actions.skip != null) skipFocus else initialFocus
+        "recording-play-next" -> if (actions.playNext != null) playNextFocus else initialFocus
         else -> null
     }
     val pageActive = LocalPlayerPageActive.current
     val audioShown = actions.tracks.audio != null
     val skipShown = actions.skip != null
-    LaunchedEffect(actions.active, restoreFocus, seekable, pausable, pageActive, audioShown, skipShown) {
+    val playNextShown = actions.playNext != null
+    LaunchedEffect(actions.active, restoreFocus, seekable, pausable, pageActive, audioShown, skipShown, playNextShown) {
         if (actions.active && pageActive) {
             val target = when (restoreFocus) {
                 null -> null
@@ -202,6 +205,7 @@ internal fun PlayerChromeControls(
                 "player-settings" -> settingsFocus
                 "player-stop" -> stopFocus
                 "recording-skip" -> if (skipShown) skipFocus else initialFocus
+                "recording-play-next" -> if (playNextShown) playNextFocus else initialFocus
                 "player-record" -> if (onRecord != null) recordFocus else pauseFocus
                 "player-seekbar" -> timelineFocus.takeIf { timelineFocusable }
                 else -> initialFocus
@@ -246,6 +250,7 @@ internal fun PlayerChromeControls(
         "player-schedule" -> scheduleFocus
         "player-audio" -> if (actions.tracks.audio != null) audioFocus else infoFocus
         "recording-skip" -> if (skipShown) skipFocus else pauseFocus
+        "recording-play-next" -> if (playNextShown) playNextFocus else pauseFocus
         else -> pauseFocus
     }
     // The decoration follows the action row, which fades in last when taken over from the Banner.
@@ -453,6 +458,8 @@ internal fun PlayerChromeControls(
             recordState = recordState,
             skip = actions.skip,
             skipFocus = skipFocus,
+            playNext = actions.playNext,
+            playNextFocus = playNextFocus,
             onInfo = onInfo,
             onSchedule = onSchedule,
             scheduleAvailable = scheduleAvailable,

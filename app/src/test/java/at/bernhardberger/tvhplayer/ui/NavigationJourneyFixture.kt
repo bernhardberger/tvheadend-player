@@ -1,46 +1,71 @@
-@file:androidx.media3.common.util.UnstableApi
-@file:OptIn(at.bernhardberger.tvheadend.sdk.testing.FakePlaybackApi::class,
-    at.bernhardberger.tvheadend.sdk.playback.SubscriptionInfrastructureApi::class)
+@file:UnstableApi
+@file:OptIn(FakePlaybackApi::class, SubscriptionInfrastructureApi::class)
 
 package at.bernhardberger.tvhplayer.ui
 
 import android.app.Application
+import android.os.Bundle
+import android.os.SystemClock
+import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedDispatcher
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.saveable.LocalSaveableStateRegistry
+import androidx.compose.runtime.saveable.SaveableStateRegistry
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
+import androidx.compose.ui.test.junit4.AndroidComposeTestRule
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.StateRestorationTester
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.*
+import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.MediaSource
+import androidx.media3.exoplayer.source.SilenceMediaSource
+import androidx.media3.exoplayer.source.WrappingMediaSource
+import androidx.navigation3.runtime.NavBackStack
+import androidx.savedstate.serialization.decodeFromSavedState
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult
 import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider
+import at.bernhardberger.tvheadend.sdk.media3.TvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendPlaybackCoordinator
+import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
+import at.bernhardberger.tvheadend.sdk.playback.SubscriptionInfrastructureApi
+import at.bernhardberger.tvheadend.sdk.playback.SubscriptionOpener
 import at.bernhardberger.tvheadend.sdk.testing.*
 import at.bernhardberger.tvhplayer.core.*
 import at.bernhardberger.tvhplayer.notices.*
-import at.bernhardberger.tvhplayer.testutil.leaveTouchModeBeforeComposing
 import at.bernhardberger.tvhplayer.playback.*
 import at.bernhardberger.tvhplayer.settings.*
 import at.bernhardberger.tvhplayer.stores.*
-import at.bernhardberger.tvhplayer.viewmodels.*
-import at.bernhardberger.tvhplayer.ui.components.LocalBrowsePreparationContext
+import at.bernhardberger.tvhplayer.testutil.leaveTouchModeBeforeComposing
+import at.bernhardberger.tvhplayer.testutil.observePlayerListeners
+import at.bernhardberger.tvhplayer.testutil.playerStatsTestModule
 import at.bernhardberger.tvhplayer.testutil.pressKey
 import at.bernhardberger.tvhplayer.testutil.settleFrames
-import kotlin.coroutines.EmptyCoroutineContext
-import kotlin.coroutines.CoroutineContext
+import at.bernhardberger.tvhplayer.ui.components.LocalBrowsePreparationContext
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyMode
-import at.bernhardberger.tvheadend.sdk.playback.SubscriptionOpener
+import at.bernhardberger.tvhplayer.viewmodels.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
+import kotlinx.serialization.serializer
 import org.koin.compose.KoinIsolatedContext
 import org.koin.core.module.dsl.viewModel
+import org.koin.core.qualifier.named
 import org.koin.dsl.koinApplication
 import org.koin.dsl.module
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
+import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
 /** Offline AppRoot fixture shared by Guide and Home return journeys. */
@@ -51,13 +76,14 @@ internal class NavigationJourneyFixture(
     private val context = ApplicationProvider.getApplicationContext<Application>()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private lateinit var player: ExoPlayer
-    private val playerListeners = mutableListOf<androidx.media3.common.Player.Listener>()
+    private lateinit var coordinator: TvheadendPlaybackCoordinator
+    private val playerListeners = mutableListOf<Player.Listener>()
     fun presentFirstFrame() {
         compose.runOnIdle {
             recordingEnded = false
             recordingPresented = true
             playerListeners.toList().forEach {
-                it.onPlaybackStateChanged(androidx.media3.common.Player.STATE_READY)
+                it.onPlaybackStateChanged(Player.STATE_READY)
                 it.onIsPlayingChanged(true)
                 it.onRenderedFirstFrame()
             }
@@ -65,16 +91,83 @@ internal class NavigationJourneyFixture(
         settle()
     }
     private lateinit var session: FakeTvheadendSession
+    val playbackNotices = NoticeCenter({ 0L }) { NoticeContext(0, null) }
     lateinit var runtime: AppPlaybackRuntime
         private set
     private var recordingEnded = false
+    private var simulatedRecordingPositionMs: Long? = null
+    val recordingPosition: Long get() = runtime.player.currentPosition
+    // The observed seek is only the fallback when the recovery-seek offset was not pending at install.
+    val recordingStartOffset get() = lastRecordingStartOffset ?: lastRecordingSeekMs?.milliseconds
     var endNextRecordingAtInstall = false
     private var recordingPresented = false
+    var recordingInstalls = 0
+        private set
     private var holdCoordinator = false
+    private var lastRecordingSeekMs: Long? = null
+    private var lastRecordingStartOffset: Duration? = null
+    private var beforeRecordingPause: (() -> Unit)? = null
     private val heldCoordinatorWork = mutableListOf<Runnable>()
     val playbackCommandHeld: Boolean get() = heldCoordinatorWork.isNotEmpty()
 
     fun holdPlaybackCommands() = compose.runOnIdle { holdCoordinator = true }
+
+    fun holdPlaybackCommandsBeforeAdmission() {
+        holdPlaybackCommands()
+        // The recording has no timeshift, but this round trip holds the runtime serializer
+        // without changing the installed target or its viewing intent.
+        compose.runOnIdle { scope.launch(start = CoroutineStart.UNDISPATCHED) { runtime.goLive() } }
+        settle()
+        compose.runOnIdle { check(playbackCommandHeld) }
+    }
+
+    fun queuePlayNextDuringPause(
+        press: () -> Unit,
+        advanceTo: Long? = null,
+        removeOffer: DvrEntryId? = null,
+        updateOffer: ((DvrEntry) -> DvrEntry)? = null,
+    ) {
+        compose.runOnIdle {
+            beforeRecordingPause = {
+                press()
+                if (advanceTo != null) simulatedRecordingPositionMs = advanceTo
+                if (removeOffer != null || updateOffer != null) {
+                    val current = session.observation.value
+                    session.publish(SessionObservation.create(current.sessionState, current.channelState, current.epgState,
+                        DvrRepositoryState.Current(DvrSnapshot.create(
+                            current.dvrSnapshotForDisplay!!.entries.filterNot { it.id == removeOffer }
+                                .map { updateOffer?.invoke(it) ?: it })),
+                        recordingProgressCapability = RecordingProgressCapability.SUPPORTED))
+                }
+            }
+            runtime.setSessionPlayWhenReady(false) { true }
+        }
+        settle()
+    }
+
+    fun queuePlayNextAndSystemStopDuringPause() {
+        compose.runOnIdle {
+            val selection = requireNotNull(runtime.recordingSelection.value)
+            beforeRecordingPause = {
+                val shown = requireNotNull(recordingPlayNextOffer(
+                    session.observation.value, selection.recordingId,
+                    runtime.recordingBroadcastTime(selection, recordingPosition), Clock.System.now(),
+                ))
+                val press = requireNotNull(runtime.captureRecordingPlayNextPress(selection, shown))
+                scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                    runtime.playRecordingNext(press) { false }
+                }
+                runtime.stopFromSession { true }
+            }
+            runtime.setSessionPlayWhenReady(false) { true }
+        }
+        settle()
+    }
+
+    fun retryRecording() {
+        compose.runOnIdle { scope.launch { runtime.retryRecording() } }
+        settle()
+    }
 
     fun releasePlaybackCommands() = compose.runOnIdle { releaseCoordinatorWork() }
 
@@ -86,9 +179,14 @@ internal class NavigationJourneyFixture(
     fun finishRecording() {
         compose.runOnIdle {
             recordingEnded = true
-            playerListeners.toList().forEach { it.onPlaybackStateChanged(androidx.media3.common.Player.STATE_ENDED) }
+            playerListeners.toList().forEach { it.onPlaybackStateChanged(Player.STATE_ENDED) }
         }
         settle()
+    }
+
+    fun advanceRecordingTo(positionMs: Long, settleAfter: Boolean = true) {
+        compose.runOnIdle { simulatedRecordingPositionMs = positionMs }
+        if (settleAfter) settle()
     }
 
     fun rejectNextRecording() {
@@ -114,11 +212,18 @@ internal class NavigationJourneyFixture(
         settle()
     }
 
-    lateinit var back: androidx.activity.OnBackPressedDispatcher
+    lateinit var back: OnBackPressedDispatcher
         private set
     val guidePosition = GuidePositionStore()
     var playerVisible = false
         private set
+    private lateinit var navState: SaveableStateRegistry
+
+    fun topRoute(): AppNavKey = compose.runOnIdle {
+        navState.performSave().values.flatten().filterIsInstance<Bundle>()
+            .mapNotNull { runCatching { decodeFromSavedState(serializer<NavBackStack<AppNavKey>>(), it) }.getOrNull() }
+            .single().last()
+    }
     var startupKeyMode: MainStartupKeyMode = MainStartupKeyMode.Inactive
         private set
     val launchRequests = ApplianceLaunchRequests()
@@ -152,10 +257,14 @@ internal class NavigationJourneyFixture(
         key(Key.Enter)
     }
 
+    @OptIn(TvheadendTestingApi::class, ExperimentalTvheadendApi::class)
     fun app(withRecording: Boolean = false, emptyEpg: Boolean = false, scheduled: List<DvrEntry> = emptyList(), autoStartPlayback: Boolean = false,
         guideEntry: Boolean = false, emptyChannels: Boolean = false, driveRecordingEnd: Boolean = false,
-        autoContinue: Boolean = false) {
-        val now = kotlin.time.Clock.System.now().epochSeconds
+        autoContinue: Boolean = false, programmeEndMs: Long? = null, recordingStart: Instant? = null,
+        warmPlaybackMode: WarmPlaybackMode? = null) {
+        val now = Clock.System.now().epochSeconds
+        val fileStart = recordingStart ?: Instant.fromEpochSeconds(now - 7200)
+        val programmeStop = fileStart + (programmeEndMs ?: 3_600_000L).milliseconds
         val catalog = ChannelCatalog.create((1..if (emptyChannels) 0L else if (withRecording) 8L else 3L).map {
             Channel.create(ChannelId(it), name = "Name $it", number = it)
         })
@@ -176,8 +285,12 @@ internal class NavigationJourneyFixture(
                 DvrEntry.create(id = DvrEntryId(7), eventId = EventId(66), channelId = ChannelId(6),
                     state = DvrEntryState.COMPLETED, title = "Recorded programme",
                     autorecRuleId = if (driveRecordingEnd) AutorecRuleId("journey") else null,
-                    start = if (driveRecordingEnd) Instant.fromEpochSeconds(now - 7200) else null,
-                    stop = if (driveRecordingEnd) Instant.fromEpochSeconds(now - 3600) else null),
+                    start = fileStart.takeIf { driveRecordingEnd },
+                    stop = programmeStop.takeIf { driveRecordingEnd },
+                    stopExtraMinutes = programmeEndMs?.let { 1.minutes },
+                    files = if (recordingStart != null) listOf(TvheadendTestResultFactory.recordingFile(
+                        serverPath = "original.ts", start = fileStart, stop = programmeStop,
+                    )) else emptyList()),
             ) else emptyList()) + scheduled)),
         )).apply {
             if (autoStartPlayback) scriptLivePlaybackSuccess(SubscriptionOpener { _, _, _ -> awaitCancellation() })
@@ -185,39 +298,70 @@ internal class NavigationJourneyFixture(
             if (withRecording) scriptRecordingPlaybackSuccess()
         }
         val settings = PlayerSettingsStore(InMemoryData())
-        if (driveRecordingEnd) runBlocking { settings.setContinueAutomatically(autoContinue) }
-        val profiles = AppProfileOwner(session, FakeServerProfileStore(ServerProfileReadResult.anonymous(at.bernhardberger.tvheadend.sdk.core.ServerProfileId.generate(), server.host, server.htspPort)),
+        if (driveRecordingEnd) runBlocking {
+            settings.setContinueAutomatically(autoContinue)
+            warmPlaybackMode?.let { settings.setWarmPlaybackMode(it) }
+        }
+        val profiles = AppProfileOwner(session, FakeServerProfileStore(ServerProfileReadResult.anonymous(ServerProfileId.generate(), server.host, server.htspPort)),
             settings, Dispatchers.IO, readProfileForEditing = { ServerProfileEditReadResult.Missing })
         scope.launch { profiles.run() }
         player = ExoPlayer.Builder(context).build()
-        val observedPlayer = at.bernhardberger.tvhplayer.testutil.observePlayerListeners(player, playerListeners)
+        val observedPlayer = observePlayerListeners(player, playerListeners)
         val playbackPlayer = if (!driveRecordingEnd) observedPlayer else object : ExoPlayer by observedPlayer {
             override fun getPlaybackState(): Int = when {
-                recordingEnded -> androidx.media3.common.Player.STATE_ENDED
-                recordingPresented -> androidx.media3.common.Player.STATE_READY
+                recordingEnded -> Player.STATE_ENDED
+                recordingPresented -> Player.STATE_READY
                 else -> observedPlayer.playbackState
             }
 
             override fun isPlaying() = !recordingEnded && (recordingPresented || observedPlayer.isPlaying)
 
-            private fun silence(source: androidx.media3.exoplayer.source.MediaSource) =
-                object : androidx.media3.exoplayer.source.WrappingMediaSource(
-                    androidx.media3.exoplayer.source.SilenceMediaSource(3_600_000_000L),
+            override fun pause() {
+                beforeRecordingPause?.also { beforeRecordingPause = null }?.invoke()
+                observedPlayer.pause()
+            }
+
+            override fun getCurrentPosition() = simulatedRecordingPositionMs ?: observedPlayer.currentPosition
+
+            override fun seekTo(positionMs: Long) {
+                lastRecordingSeekMs = positionMs
+                if (simulatedRecordingPositionMs != null) simulatedRecordingPositionMs = positionMs
+                observedPlayer.seekTo(positionMs)
+            }
+
+            override fun getDuration() = if (simulatedRecordingPositionMs != null) 3_600_000L else observedPlayer.duration
+
+            override fun isCurrentMediaItemSeekable() =
+                simulatedRecordingPositionMs != null || observedPlayer.isCurrentMediaItemSeekable
+
+            override fun isCommandAvailable(command: Int) =
+                (simulatedRecordingPositionMs != null &&
+                    command == Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM) ||
+                    observedPlayer.isCommandAvailable(command)
+
+            private fun silence(source: MediaSource) =
+                object : WrappingMediaSource(
+                    SilenceMediaSource(3_600_000_000L),
                 ) {
                     override fun getMediaItem() = source.mediaItem
                 }.also {
+                    recordingInstalls++
+                    lastRecordingSeekMs = null
+                    // The SDK publishes this installation's offset before calling setMediaSource.
+                    lastRecordingStartOffset = coordinator.pendingRecordingRecoveryPosition.value
                     recordingPresented = false
+                    simulatedRecordingPositionMs = null
                     recordingEnded = endNextRecordingAtInstall
                     endNextRecordingAtInstall = false
                 }
 
-            override fun setMediaSource(source: androidx.media3.exoplayer.source.MediaSource) =
+            override fun setMediaSource(source: MediaSource) =
                 observedPlayer.setMediaSource(silence(source))
 
-            override fun setMediaSource(source: androidx.media3.exoplayer.source.MediaSource, resetPosition: Boolean) =
+            override fun setMediaSource(source: MediaSource, resetPosition: Boolean) =
                 observedPlayer.setMediaSource(silence(source), resetPosition)
 
-            override fun setMediaSource(source: androidx.media3.exoplayer.source.MediaSource, startPositionMs: Long) =
+            override fun setMediaSource(source: MediaSource, startPositionMs: Long) =
                 observedPlayer.setMediaSource(silence(source), startPositionMs)
         }
         val coordinatorScope = if (!driveRecordingEnd) scope else CoroutineScope(
@@ -229,16 +373,16 @@ internal class NavigationJourneyFixture(
                 }
             },
         )
-        val coordinator = createTvheadendPlaybackCoordinator(playbackPlayer).also { it.launchIn(coordinatorScope) }
+        coordinator = createTvheadendPlaybackCoordinator(playbackPlayer).also { it.launchIn(coordinatorScope) }
         runtime = AppPlaybackRuntime(playbackPlayer, session, coordinator, settings, profiles, scope,
             TvheadendAudioOutputProvider(context), PlaybackAudioFocus.None, PlaybackRuntimePolicy.fromPlayerSettings(),
-            noticeCenter = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) { at.bernhardberger.tvhplayer.notices.NoticeContext(0, null) })
-        val notices = NoticeCenter(android.os.SystemClock::elapsedRealtime) {
+            noticeCenter = playbackNotices)
+        val notices = NoticeCenter(SystemClock::elapsedRealtime) {
             NoticeContext(profiles.configurationGeneration.value, session.observation.value.currentSession?.generationIdentity)
         }
         val dependencies = module {
-            includes(at.bernhardberger.tvhplayer.testutil.playerStatsTestModule())
-            single<CoroutineScope>(qualifier = org.koin.core.qualifier.named("application")) { scope }
+            includes(playerStatsTestModule())
+            single<CoroutineScope>(qualifier = named("application")) { scope }
             single<TvheadendSession> { session }
             single { runtime }
             single { profiles }
@@ -256,12 +400,13 @@ internal class NavigationJourneyFixture(
             viewModel { SettingsStorageViewModel(session.cache, get(), ChannelAccentStore()) {} }
             viewModel { SettingsPlayerViewModel(get(), get(), get(), get(), get()) }
         }
-        if (guideEntry) launchRequests.request(at.bernhardberger.tvhplayer.core.ApplianceEntryDestination.GUIDE)
+        if (guideEntry) launchRequests.request(ApplianceEntryDestination.GUIDE)
         launchRequests.requestStartup(autoStartPlayback)
         // A TV is not in touch mode: only then does a view hand focus over as it attaches.
         @Suppress("UNCHECKED_CAST")
-        (compose as androidx.compose.ui.test.junit4.AndroidComposeTestRule<*, androidx.activity.ComponentActivity>).leaveTouchModeBeforeComposing()
+        (compose as AndroidComposeTestRule<*, ComponentActivity>).leaveTouchModeBeforeComposing()
         restoration.setContent {
+            navState = requireNotNull(LocalSaveableStateRegistry.current)
             DisposableEffect(Unit) {
                 onDispose {
                     if (guideOnNextDispose) {
@@ -273,7 +418,7 @@ internal class NavigationJourneyFixture(
             CompositionLocalProvider(LocalBrowsePreparationContext provides EmptyCoroutineContext) {
                 KoinIsolatedContext(koinApplication { modules(dependencies) }) {
                     TVHeadendPlayerTheme {
-                        back = requireNotNull(androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
+                        back = requireNotNull(LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
                         AppRoot(startupState = MainStartupState.Ready(server, autoStartPlayback = autoStartPlayback),
                             runtimeServerSettings = server, applianceLaunchRequests = launchRequests,
                             onPlayerVisibilityChanged = { playerVisible = it }, onRequestExit = {},
@@ -331,7 +476,7 @@ internal class NavigationJourneyFixture(
      */
     fun viewRefocusesWithNothingFocused() {
         compose.runOnUiThread {
-            val activity = (compose as androidx.compose.ui.test.junit4.AndroidComposeTestRule<*, androidx.activity.ComponentActivity>).activity
+            val activity = (compose as AndroidComposeTestRule<*, ComponentActivity>).activity
             fun find(group: android.view.ViewGroup): android.view.View? {
                 for (i in 0 until group.childCount) {
                     val child = group.getChildAt(i)

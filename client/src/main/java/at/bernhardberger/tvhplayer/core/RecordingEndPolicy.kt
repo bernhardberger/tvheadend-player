@@ -2,12 +2,16 @@ package at.bernhardberger.tvhplayer.core
 
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
+import at.bernhardberger.tvheadend.sdk.core.SessionObservation
+import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.nanoseconds
 import kotlin.time.Instant
 
 enum class RecordingEndKind { CHAIN_PART, NEXT_EPISODE, OTHER_EPISODE }
@@ -38,7 +42,7 @@ sealed interface RecordingEndOffer {
  * where to continue, or proves overlap when a finished recording has no known end.
  * Use one session observation for the entries, EPG and [admission]. Play must revalidate its target.
  * Only [RecordingEndOffer.Recording] can be an automatic target; a corner offer uses only chain
- * parts or the next episode and can recalculate at the actual broadcast time when accepted.
+ * parts or the next episode and revalidates the displayed choice at the captured press time.
  */
 fun recordingEndOffers(
     ended: DvrEntry,
@@ -54,7 +58,7 @@ fun recordingEndOffers(
     val lastStop = ended.files?.lastOrNull()?.stop
     val recordingEnd = if (endedIsRunning && endedAt != null) maxOf(lastStop ?: endedAt, endedAt)
         else lastStop ?: recordingPaddedStop(ended)
-    val latestStart = recordingEnd?.plus(2.minutes)
+    val latestStart = recordingEnd?.plus(chainGap)
     val playable = recordings.mapNotNull { entry ->
         if (entry.id == ended.id || sameRecordingBroadcast(ended, entry, epgEvent)) return@mapNotNull null
         val targetAdmission = admission(entry)
@@ -126,6 +130,45 @@ fun recordingEndOffers(
 }
 
 private const val MAX_RECORDING_END_OFFERS = 4
+private val chainGap = 2.minutes
+
+@OptIn(ExperimentalTvheadendApi::class)
+fun recordingPlayNextOffer(
+    observation: SessionObservation,
+    recordingId: DvrEntryId,
+    reachedAt: Instant?,
+    now: Instant,
+): RecordingEndOffer.Recording? = observation.dvrEntry(recordingId)?.let { ended ->
+    recordingPlayNextOffer(recordingEndOffers(ended, reachedAt,
+        observation.dvrSnapshotForDisplay?.entries.orEmpty().filterNot(::recordingWasRemoved),
+        observation::event, observation::recordingPlaybackAdmission, null, now))
+}
+
+/**
+ * Sorted playhead and wall-clock boundaries at which a cached Play next offer may change.
+ * A growing file without a reported stop additionally requires the playhead to be behind now.
+ */
+fun recordingPlayNextBoundaries(
+    ended: DvrEntry?,
+    recordings: List<DvrEntry>,
+): Pair<List<Instant>, List<Instant>> {
+    val channel = ended?.channelId ?: return emptyList<Instant>() to emptyList()
+    val openStarts = mutableListOf<Instant>()
+    val positions = buildList {
+        for (entry in recordings) {
+            if (entry.id == ended.id || entry.channelId != channel || entry.state == DvrEntryState.MISSED) continue
+            val file = entry.files?.lastOrNull() ?: continue
+            val start = recordingEndFileStart(entry) ?: continue
+            // File start is also the boundary for the continuation hint.
+            add(start + 1.nanoseconds)
+            if (recordingIsRunning(ended)) add(start - chainGap)
+            val stop = file.stop ?: if (!recordingIsRunning(entry)) recordingPaddedStop(entry) else null
+            if (stop != null) add(stop)
+            else if (recordingIsRunning(entry)) openStarts.add(start + 1.nanoseconds)
+        }
+    }
+    return positions.distinct().sorted() to openStarts.distinct().sorted()
+}
 
 /** Tvheadend opens the last listed file, not a concatenation of all file observations. */
 fun recordingEndFileStart(entry: DvrEntry): Instant? {

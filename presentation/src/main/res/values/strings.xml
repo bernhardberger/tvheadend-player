@@ -433,6 +433,7 @@
     <string name="recording_end_continue_at">From %1$s, where you stopped</string>
     <string name="recording_end_resume_at">Resume at %1$s</string>
     <string name="recording_end_from_beginning">From the beginning</string>
+    <string name="recording_up_next">Up next</string>
     <string name="recording_end_recording_facts">Recording · %1$s</string>
     <string name="home_all_scheduled">All scheduled</string>
     <string name="context_mark_watched">Mark as watched</string>
@@ -951,6 +952,9 @@
     <string name="recording_play_from_beginning">Play from beginning</string>
     <string name="recording_still_recording">Still recording</string>
     <string name="recording_duration_unavailable">Duration unavailable</string>
+    <string name="recording_playback_start_failed">Couldn’t play the next recording</string>
+    <string name="recording_play_next">Play next</string>
+    <string name="recording_play_next_hint">OK continue · BACK dismiss</string>
     <string name="recording_timeline_status_description">Elapsed %1$s. %2$s.</string>
     <string name="recording_seek_preview_description">%1$s, target %2$s. %3$s.</string>
     <string name="recording_known_duration">Total %1$s</string>

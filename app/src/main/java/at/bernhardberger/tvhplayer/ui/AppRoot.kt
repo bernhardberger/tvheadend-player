@@ -640,6 +640,7 @@ fun AppRoot(
     var recordingEnd by remember { mutableStateOf<RecordingEndSession?>(null) }
     var endStart by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     var recordingEndOrigin by remember { mutableStateOf<AppNavKey?>(null) }
+    var playNextStart by remember { mutableStateOf<Pair<RecordingPlayerKey, kotlinx.coroutines.Job>?>(null) }
     val finishedRecording by playbackRuntime.finishedRecording.collectAsStateWithLifecycle()
     val stoppedRecordingEnd by playbackRuntime.stoppedRecordingEnd.collectAsStateWithLifecycle()
     val activityKeyCycles = at.bernhardberger.tvhplayer.ui.startup.LocalMainStartupKeyCycleOwner.current
@@ -816,7 +817,10 @@ fun AppRoot(
     LaunchedEffect(currentDestination != null, isPlayer, warmPlaybackMode, playbackRuntime) {
         val endOrigin = recordingEndOrigin
         recordingEndOrigin = null
-        if (!isPlayer && endOrigin != null && endOrigin == currentDestination) {
+        if (playNextStart != null) {
+            // The pending handoff fences both replacement retirement and any deferred
+            // Off cleanup of the original. A generic stop could race a newer selection.
+        } else if (!isPlayer && endOrigin != null && endOrigin == currentDestination) {
             // The end screen owns a fenced stop. Do not queue a second, unfenced browse stop.
         } else if (currentDestination != null && shouldStopPlaybackWhileBrowsing(isPlayer, warmPlaybackMode)) {
             // An accepted stop outlives route/setting changes; entry waits before reading the target.
@@ -964,6 +968,9 @@ fun AppRoot(
         if (playbackObservation.currentSession !== end.session) closeRecordingEnd(end)
     }
     LaunchedEffect(currentDestination) {
+        playNextStart?.let { (route, job) ->
+            if (backStack.none { it === route }) job.cancel()
+        }
         if (recordingEndOrigin != currentDestination) recordingEndOrigin = null
         if (recordingEnd?.route != currentDestination) {
             endStart?.cancel()
@@ -1598,7 +1605,8 @@ fun AppRoot(
                             val mutationInFlight = remember { mutableStateOf<DvrMutationAction?>(null) }
                             val now = at.bernhardberger.tvhplayer.ui.common.rememberCurrentEpochSeconds()
                             RecordingEndScreen(end.ended, offers, playbackObservation, stringResource(origin),
-                                autoContinue = autoContinue, shown = contentAllowed, starting = endStart != null,
+                                autoContinue = autoContinue && !end.finished.playNextDismissed,
+                                shown = contentAllowed, starting = endStart != null,
                                 suppressUntilUp = (activityKeyCycles ?: endKeyCycles)::consumeUntilUp,
                                 onClose = { closeRecordingEnd(end) },
                                 onPlay = playOffer,
@@ -1650,6 +1658,31 @@ fun AppRoot(
                             },
                             onOpenConnectionSettings = {
                                 navigateTopLevel(SettingsKey(SettingsSection.CONNECTION))
+                            },
+                            playNextPending = playNextStart?.first === destination,
+                            onPlayNext = next@{ press, onAccepted ->
+                                if (backStack.lastOrNull() !== destination || playNextStart != null) return@next
+                                val job = playbackSelectionScope.launch(start = kotlinx.coroutines.CoroutineStart.LAZY) {
+                                    try {
+                                        playbackRuntime.playRecordingNext(press, shouldStopOriginInBrowse = {
+                                            backStack.none { it === destination } && shouldStopPlaybackWhileBrowsing(
+                                                isPlayerRoute = backStack.lastOrNull().let { it is LivePlayerKey || it is RecordingPlayerKey },
+                                                mode = warmPlaybackMode,
+                                            )
+                                        }, onAccepted = onAccepted) swap@{ offer ->
+                                            val index = backStack.indexOfLast { it === destination }
+                                            if (index < 0) return@swap false
+                                            backStack[index] = recordingPlayerKey(offer.entry.id,
+                                                if (offer.start is RecordingEndStart.Resume) RecordingPlaybackStart.RESUME
+                                                else RecordingPlaybackStart.START_OVER)
+                                            true
+                                        }
+                                    } finally {
+                                        if (playNextStart?.first === destination) playNextStart = null
+                                    }
+                                }
+                                playNextStart = destination to job
+                                job.start()
                             },
                         )
                         }
