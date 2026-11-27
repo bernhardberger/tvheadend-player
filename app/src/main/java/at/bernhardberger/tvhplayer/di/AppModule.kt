@@ -6,6 +6,7 @@ package at.bernhardberger.tvhplayer.di
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
+import at.bernhardberger.tvheadend.sdk.android.TvheadendElapsedTimeSource
 import at.bernhardberger.tvheadend.sdk.android.TvheadendServerProfileStore
 import at.bernhardberger.tvheadend.sdk.core.createTvheadendSession
 import at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider
@@ -95,6 +96,7 @@ val appModule = module {
         val session = createTvheadendSession(
             GUIDE_EPG_COVERAGE_POLICY,
             appMetadataCachePolicy(cacheRoot),
+            elapsedTimeSource = TvheadendElapsedTimeSource,
         )
         val playerSettings = get<PlayerSettingsStore>()
         val profileOwner = AppProfileOwner(
