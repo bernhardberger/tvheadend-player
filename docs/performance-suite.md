@@ -104,6 +104,9 @@ group tab after a fresh launch; `drawer-warm` starts there after a complete tour
 in the same process. Settings journeys start on the named root row. Each Channels
 layout is selected manually through View options; scrolling starts on its first
 card/row. Player journeys start with the passive banner and controls hidden.
+The `first-*` journeys measure the first presses of a process: force-stop the app,
+tune one channel and let it settle before each run. `rows-zap` zaps once, to the
+next channel in the rows; check that channel is fine to play before the run.
 
 The script snapshots only `dumpsys gfxinfo <package>` and subtracts cumulative
 CPU/GPU histogram bins. It never resets HWUI counters, dumps the UI, captures
@@ -117,7 +120,8 @@ it is not identical to AndroidX's activity-recreation warm start. These histogra
 are not startup latency metrics and exclude SurfaceView video motion quality.
 
 `--trace JOURNEY` sends `build/perf/evidence/pf.cfg` on stdin to
-`perfetto --txt -c - -o …` (file input is unsuitable on this TV). That local config
+`perfetto --txt -c - -o /data/misc/perfetto-traces/…` (file input is unsuitable on
+this TV, and its perfetto cannot write to `/data/local/tmp`). That local config
 must exist, or use `--trace-config PATH` with an equivalent bounded config. The
 script extends only `duration_ms` in memory when a journey needs more time,
 pulls the trace beside the JSON, and removes its own remote trace file. No config

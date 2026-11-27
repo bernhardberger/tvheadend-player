@@ -42,6 +42,12 @@ JOURNEYS = {
     + [("DPAD_RIGHT", 0.4)] * 12 + [("DPAD_LEFT", 0.4)] * 12
     + [("BACK", 1.0), ("BACK", 2.0)],
     "player-zap": [("CHANNEL_UP", 2.5), ("CHANNEL_DOWN", 2.5)] * 5,
+    # The controls auto-hide after 5 s, so each press after the first starts from the bare player again.
+    "first-up": [("DPAD_UP", 7.0)] * 3,
+    "first-down": [("DPAD_DOWN", 7.0)] * 3,
+    # Down, Down opens the channel rows; Back closes them to the action row, Back hides the controls.
+    "first-rows": [("DPAD_DOWN", 1.5), ("DPAD_DOWN", 3.0), ("BACK", 1.5), ("BACK", 4.0)] * 3,
+    "rows-zap": [("DPAD_DOWN", 1.5), ("DPAD_DOWN", 3.0), ("DPAD_RIGHT", 1.5), ("DPAD_CENTER", 10.0)],
 }
 
 PRECONDITIONS = {
@@ -64,6 +70,10 @@ PRECONDITIONS = {
     "controls": "Settled playback; passive banner and controls hidden.",
     "rail": "Settled playback; passive banner and controls hidden; enough channels for scrolling.",
     "player-zap": "Settled playback, controls hidden; two playable adjacent channels.",
+    "first-up": "Fresh process, one channel tuned and settled; no Up/Down pressed yet; banner and controls hidden.",
+    "first-down": "Fresh process, one channel tuned and settled; no Up/Down pressed yet; banner and controls hidden.",
+    "first-rows": "Fresh process, one channel tuned and settled; rows not yet opened; banner and controls hidden.",
+    "rows-zap": "Settled playback on channel 1, banner and controls hidden; the next channel in the rows is playable.",
 }
 
 
@@ -141,7 +151,7 @@ def main():
 
     args_serial = args.serial
     trace = None
-    remote_trace = f"/data/local/tmp/player-perf-{stamp}.perfetto-trace"
+    remote_trace = f"/data/misc/perfetto-traces/player-perf-{stamp}.perfetto-trace"
     if args.journey == "cold-start":
         adb("shell", "am", "force-stop", PACKAGE)
     try:
