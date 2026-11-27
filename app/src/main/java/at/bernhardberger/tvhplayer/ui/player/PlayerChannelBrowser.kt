@@ -93,7 +93,7 @@ internal fun PlayerChannelBrowser(
     playingChannelId: ChannelId?,
     recordingChannelIds: Set<ChannelId>,
     nowEvent: (ChannelId) -> EpgEvent?,
-    nowSec: Long,
+    nowSec: () -> Long,
     active: Boolean,
     onFocusChannel: (ChannelId) -> Unit,
     onPickChannel: (Channel) -> Unit,

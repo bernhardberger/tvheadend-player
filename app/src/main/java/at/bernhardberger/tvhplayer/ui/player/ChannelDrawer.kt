@@ -19,6 +19,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import at.bernhardberger.tvhplayer.ui.components.LocalTabOwner
 import at.bernhardberger.tvhplayer.ui.components.rememberTabListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.structuralEqualityPolicy
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -83,7 +85,7 @@ fun ChannelDrawer(
     recordingChannelIds: Set<ChannelId>,
     nowEvent: (ChannelId) -> EpgEvent?,
     active: Boolean = true,
-    nowSec: Long = System.currentTimeMillis() / 1000L,
+    nowSec: () -> Long = { System.currentTimeMillis() / 1000L },
     onFocusChannel: (ChannelId) -> Unit,
     onPickChannel: (Channel) -> Unit,
     onCloseDrawer: (Int?) -> Unit,
@@ -243,7 +245,9 @@ fun ChannelDrawer(
                 // Details consume the opening release. Retire the native Card's held-click state
                 // when input ownership leaves, without replacing the remembered row or viewport.
                 androidx.compose.runtime.key(ownsInput()) {
-                val event = nowEvent(channel.id)
+                val event = remember(nowEvent, channel.id) {
+                    derivedStateOf(structuralEqualityPolicy()) { nowEvent(channel.id) }
+                }.value
                 CompactZapCard(
                     channel = channel,
                     number = ChannelNavigation.numberForId(ids, numbers, channel.id),
@@ -262,9 +266,12 @@ fun ChannelDrawer(
                         }
                     },
                     onLongClick = onLongClickChannel?.let { open -> {
-                        if (ownsInput()) nowEvent(channel.id)?.takeIf {
-                            it.start.epochSeconds <= nowSec && nowSec < it.stop.epochSeconds
-                        }?.let { open(channel, it) }
+                        if (ownsInput()) {
+                            val now = nowSec()
+                            nowEvent(channel.id)?.takeIf {
+                                it.start.epochSeconds <= now && now < it.stop.epochSeconds
+                            }?.let { open(channel, it) }
+                        }
                     } },
                     modifier = Modifier
                         .width(CompactZapCardWidth)

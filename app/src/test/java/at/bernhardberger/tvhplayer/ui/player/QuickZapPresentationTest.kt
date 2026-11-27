@@ -2,6 +2,7 @@ package at.bernhardberger.tvhplayer.ui.player
 
 import at.bernhardberger.tvhplayer.testutil.pressKey
 import at.bernhardberger.tvhplayer.testutil.changeState
+import at.bernhardberger.tvhplayer.testutil.settleFrames
 import at.bernhardberger.tvhplayer.ui.TvCardFocusedScale
 import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
 import android.app.Application
@@ -23,6 +24,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -79,6 +81,8 @@ import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
+import at.bernhardberger.tvhplayer.ui.components.LiveViewerPosition
+import at.bernhardberger.tvhplayer.ui.components.LocalLivePosition
 import coil3.ImageLoader
 import coil3.map.Mapper
 import coil3.request.Options
@@ -700,24 +704,37 @@ class QuickZapPresentationTest {
 
     @Test fun detachedRailIsBuiltOnceAndOutlivesHiddenControls() {
         var controls by mutableStateOf(false)
+        var settledTuneToken by mutableStateOf<Pair<Long, Long?>?>(null)
+        // Not state: a stopped window pauses the frame clock, so this change cannot recompose anything.
+        var stopped = false
+        var starts = 0
+        var now by mutableStateOf(100L)
+        val viewer = mutableStateOf(LiveViewerPosition(ChannelId(2), 85L))
+        var railViewerEpoch: Long? = null
+        lateinit var railClock: () -> Long
         var built = 0
         var disposed = 0
         var draws = 0
         compose.setContent {
             view = LocalView.current
-            // Open, so the probe draws without a channel row to peek with.
-            val rail = rememberQuickZapRail(expanded = true, detached = true)
+            val rail = rememberQuickZapRail(expanded = controls, detached = true)
             Box(Modifier.fillMaxSize()) {
                 PlayerControlsLayer(visible = controls, modalVisible = false) {
                     QuickZapControls(rail, peek = null, controls = {})
                 }
-                QuickZapRail(rail, preview = {}, visible = controls, channelContent = {
-                    androidx.compose.runtime.DisposableEffect(Unit) {
-                        built++
-                        onDispose { disposed++ }
-                    }
-                    Box(Modifier.fillMaxWidth().height(100.dp).drawBehind { draws++ })
-                })
+                CompositionLocalProvider(LocalLivePosition provides viewer) {
+                    QuickZapRail(rail, preview = {}, visible = controls, peeks = true,
+                        settledTuneToken = { if (stopped) null else settledTuneToken?.let { it to starts } }, channelContent = {
+                        railClock = rail.clock { now }
+                        val viewerEpoch = LocalLivePosition.current?.value?.epochSec
+                        SideEffect { railViewerEpoch = viewerEpoch }
+                        androidx.compose.runtime.DisposableEffect(Unit) {
+                            built++
+                            onDispose { disposed++ }
+                        }
+                        Box(Modifier.fillMaxWidth().height(100.dp).drawBehind { draws++ })
+                    })
+                }
             }
         }
         fun draw() {
@@ -726,21 +743,57 @@ class QuickZapPresentationTest {
             view.draw(Canvas(bitmap))
             bitmap.recycle()
         }
+        compose.mainClock.advanceTimeBy(1_050)
+        assertEquals("not built before the tune and cover settle", 0, built)
+        compose.changeState { settledTuneToken = 1L to 1L }
+        compose.settleFrames(1, frameMillis = 500)
+        compose.changeState { settledTuneToken = 1L to 2L }
+        compose.settleFrames(1, frameMillis = 550)
+        assertEquals("a replacement presentation gets its own idle delay", 0, built)
+        compose.changeState { settledTuneToken = null }
+        compose.settleFrames(1, frameMillis = 550)
+        assertEquals("revoking eligibility cancels the pending build", 0, built)
+        compose.changeState { settledTuneToken = 1L to 3L }
+        compose.settleFrames(1, frameMillis = 500)
+        starts++
+        compose.settleFrames(1, frameMillis = 600)
+        assertEquals("a restart within the wait does not let the old timer build", 0, built)
+        compose.changeState { settledTuneToken = 1L to 4L }
+        compose.settleFrames(1, frameMillis = 500)
+        stopped = true
+        compose.settleFrames(1, frameMillis = 600)
+        assertEquals("a stopped screen does not build when the wait ends", 0, built)
+        stopped = false
+        compose.changeState { settledTuneToken = 1L to 2L }
+        compose.settleFrames(1, frameMillis = 750)
+        assertEquals("re-eligibility starts a fresh idle delay", 0, built)
+        compose.settleFrames(1, frameMillis = 300)
         draw()
-        assertEquals("not built behind the player before the controls first show", 0, built)
+        assertEquals("the settled rail is built without showing controls", 1, built)
+        assertEquals("the prebuilt rail does not draw", 0, draws)
+        compose.runOnIdle { now = 101 }
+        compose.runOnIdle { assertEquals("the hidden clock is frozen", 100L, railClock()) }
         compose.runOnIdle { controls = true }
         draw()
         assertEquals(1, built)
         assertTrue("the rail draws with the controls", draws > 0)
+        compose.runOnIdle { assertEquals("the hosted clock catches up", 101L, railClock()) }
         compose.runOnIdle { controls = false }
         compose.mainClock.advanceTimeBy(1_000)
         draw()
         val hiddenDraws = draws
         draw()
         assertEquals("the hidden rail does not draw", hiddenDraws, draws)
-        compose.runOnIdle { controls = true }
+        compose.runOnIdle { now = 102 }
+        compose.runOnIdle { viewer.value = viewer.value.copy(epochSec = 86L) }
+        compose.runOnIdle { assertEquals("the hidden viewer position is held", 85L, railViewerEpoch) }
+        compose.runOnIdle {
+            assertEquals("the hidden clock holds the last shown time", 101L, railClock())
+            controls = true
+        }
         draw()
         assertEquals("the next reveal reuses the rail", 1 to 0, built to disposed)
+        assertEquals("the reveal uses the latest viewer position", 86L, railViewerEpoch)
         assertTrue(draws > hiddenDraws)
     }
 
@@ -748,6 +801,8 @@ class QuickZapPresentationTest {
     private fun detachedRail(
         controls: () -> Boolean,
         expanded: () -> Boolean = { true },
+        peeks: Boolean = false,
+        settledTuneToken: () -> Any? = { null },
         channelContent: @Composable () -> Unit = {},
     ): QuickZapRailState {
         lateinit var rail: QuickZapRailState
@@ -758,10 +813,27 @@ class QuickZapPresentationTest {
                 PlayerControlsLayer(visible = controls(), modalVisible = false) {
                     QuickZapControls(rail, peek = null, controls = {})
                 }
-                QuickZapRail(rail, preview = {}, visible = controls(), channelContent = channelContent)
+                QuickZapRail(rail, preview = {}, visible = controls(), peeks = peeks,
+                    settledTuneToken = settledTuneToken, channelContent = channelContent)
             }
         }
         return rail
+    }
+
+    @Test fun detachedRailRevealedBeforeThePrebuildDeadlineMountsInTheReveal() {
+        var controls by mutableStateOf(false)
+        var built = 0
+        detachedRail({ controls }, { false }, peeks = true, settledTuneToken = { 1L to 1L }, channelContent = {
+            androidx.compose.runtime.DisposableEffect(Unit) {
+                built++
+                onDispose { }
+            }
+        })
+        compose.settleFrames(1, frameMillis = 500)
+        assertEquals("still waiting for the deadline", 0, built)
+        compose.changeState { controls = true }
+        compose.settleFrames(1, frameMillis = 100)
+        assertEquals("the first press builds the rail itself", 1, built)
     }
 
     @Test fun detachedRailOpenedTogetherWithTheControlsStandsOpen() {
@@ -975,7 +1047,7 @@ class QuickZapPresentationTest {
                                     channels = catalog, selectedId = playing, playingChannelId = playing,
                                     playbackIndicator = indicator,
                                     recordingChannelIds = setOf(ChannelId(4)), nowEvent = { if (it == ChannelId(5)) null else event(it) },
-                                    active = layers.channelDrawerOpen, nowSec = 900,
+                                    active = layers.channelDrawerOpen, nowSec = { 900 },
                                     // As the player's rows keep it: a list that starts at the first card.
                                     browserState = if (peek) remember { PlayerChannelCollectionState() } else null,
                                     onFocusChannel = {}, onPickChannel = {

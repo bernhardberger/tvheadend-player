@@ -870,7 +870,7 @@ class PlayerFooterLayoutTest {
                                         )
                                     },
                                     active = false,
-                                    nowSec = 1_800,
+                                    nowSec = { 1_800 },
                                     onFocusChannel = {},
                                     onPickChannel = {},
                                     onCloseDrawer = {},

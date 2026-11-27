@@ -475,7 +475,7 @@ class StatusMarksCaptureTest(
         QuickZapRail(rail,
             channelContent = {
                 PlayerChannelBrowser(state, railChannels, emptyList(), viewer, recordingIds,
-                    { id -> current.firstOrNull { it.channelId == id } }, captureNow, true,
+                    { id -> current.firstOrNull { it.channelId == id } }, { captureNow }, true,
                     { selected = it }, {}, { _, _, _ -> }, {},
                     runningRecordingForEvent = observation::runningRecordingForEvent)
             },

@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import android.content.res.Configuration
+import android.util.LruCache
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,20 +20,30 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFontFamilyResolver
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontSynthesis
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.ui.common.AppClock
 import at.bernhardberger.tvhplayer.ui.common.clockWidthSamples
+import java.util.Locale
 import kotlin.math.roundToInt
 
 /** Gap between an endpoint label box and the track. */
@@ -49,6 +61,21 @@ enum class TimelineKind { LIVE, RECORDING }
 @Immutable
 internal data class TimelineEndpointWidths(val leading: Dp, val trailing: Dp, val distance: Dp)
 
+private data class TimelineEndpointWidthKey(
+    val kind: TimelineKind,
+    val configuration: Configuration,
+    val locale: Locale,
+    val uses24Hour: Boolean,
+    val style: TextStyle,
+    val density: Density,
+    val direction: LayoutDirection,
+    val resolver: FontFamily.Resolver,
+    val typeface: Any,
+    val distance: String,
+)
+
+private val timelineEndpointWidths = LruCache<TimelineEndpointWidthKey, TimelineEndpointWidths>(4)
+
 /** Clear space the info block's last line keeps before live TV's distance. */
 internal val DistanceTextGap = 16.dp
 
@@ -65,13 +92,25 @@ internal fun rememberTimelineEndpointWidths(kind: TimelineKind): TimelineEndpoin
     val style = timelineLabelStyle()
     val density = LocalDensity.current
     val distance = stringResource(R.string.timeshift_behind_live, "8:88:88")
-    val clockSamples = clockWidthSamples(uses24Hour = AppClock.uses24Hour)
-    return remember(kind, measurer, style, density, distance, clockSamples) {
-        fun width(text: String): Dp = with(density) {
-            measurer.measure(text, style, softWrap = false, maxLines = 1, density = density).size.width.toDp()
+    val locale = Locale.getDefault()
+    val uses24Hour = AppClock.uses24Hour
+    val resolver = LocalFontFamilyResolver.current
+    val typeface = resolver.resolve(
+        style.fontFamily, style.fontWeight ?: FontWeight.Normal, style.fontStyle ?: FontStyle.Normal,
+        style.fontSynthesis ?: FontSynthesis.All,
+    ).value
+    val key = TimelineEndpointWidthKey(kind, Configuration(LocalConfiguration.current), locale, uses24Hour,
+        style, density, LocalLayoutDirection.current, resolver, typeface, distance)
+    return remember(key) {
+        timelineEndpointWidths[key] ?: run {
+            fun width(text: String): Dp = with(density) {
+                measurer.measure(text, style, softWrap = false, maxLines = 1, density = density).size.width.toDp()
+            }
+            val clock = if (kind == TimelineKind.LIVE) clockWidthSamples(locale, uses24Hour).maxOf(::width)
+                else width("8:88:88")
+            TimelineEndpointWidths(leading = clock, trailing = clock, distance = width(distance))
+                .also { timelineEndpointWidths.put(key, it) }
         }
-        val clock = if (kind == TimelineKind.LIVE) clockSamples.maxOf(::width) else width("8:88:88")
-        TimelineEndpointWidths(leading = clock, trailing = clock, distance = width(distance))
     }
 }
 

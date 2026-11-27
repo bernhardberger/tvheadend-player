@@ -971,15 +971,15 @@ class PlayerChromeCaptureTest {
                     channelContent = {
                         if (peek && tray == null && browser == null) ProvideArtworkSession(session) {
                             PlayerChannelBrowser(peekRows, peekChannels, peekChannels.drop(1), peekChannels[0].id, emptySet(),
-                                peekEvent ?: railEvent, nowSec, false, {}, {}, { _, _, _ -> }, {})
+                                peekEvent ?: railEvent, { nowSec }, false, {}, {}, { _, _, _ -> }, {})
                         }
                         else if (browser != null) ProvideArtworkSession(session) { PlayerChannelBrowser(browser, peekChannels, if (emptyRecent) emptyList() else peekChannels.drop(1),
                             peekChannels[0].id, recordingChannels, peekEvent ?: railEvent,
-                            nowSec, true, { railFocus = it }, {}, { _, _, _ -> }, {}) }
+                            { nowSec }, true, { railFocus = it }, {}, { _, _, _ -> }, {}) }
                         else if (tray != null) ProvideArtworkSession(session) { ChannelDrawer(
                             channels = peekChannels, selectedId = ChannelId(1), playingChannelId = ChannelId(1),
                             recordingChannelIds = recordingChannels, nowEvent = peekEvent ?: railEvent,
-                            active = true, nowSec = nowSec,
+                            active = true, nowSec = { nowSec },
                             onFocusChannel = { railFocus = it }, onPickChannel = {}, onCloseDrawer = {},
                         ) }
                     },

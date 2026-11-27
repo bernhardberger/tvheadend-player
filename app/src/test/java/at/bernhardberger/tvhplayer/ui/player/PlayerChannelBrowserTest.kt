@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import at.bernhardberger.tvheadend.sdk.core.Channel
@@ -39,6 +40,7 @@ class PlayerChannelBrowserTest {
     private var shown by mutableStateOf(true)
     private var active by mutableStateOf(true)
     private var playback by mutableStateOf(ChannelPlaybackIndicator.PLAYING)
+    private var now by mutableStateOf(50L)
     private var channels by mutableStateOf((1L..16L).map { Channel.create(ChannelId(it), name = "Channel $it", number = it) })
     private var recent by mutableStateOf(channels.drop(1).reversed())
     private val picks = mutableListOf<ChannelId>()
@@ -51,9 +53,14 @@ class PlayerChannelBrowserTest {
                 Column(Modifier.fillMaxSize()) {
                     if (shown) {
                         PlayerChannelBrowser(state, channels, recent, ChannelId(1), emptySet(),
-                            { id -> if (events) EpgEvent.create(EventId(id.value), id, Instant.fromEpochSeconds(1),
-                                Instant.fromEpochSeconds(100), title = "Programme ${id.value}") else null },
-                            50, active, {}, { picks += it.id }, { channel, _, _ -> details += channel.id },
+                            { id -> if (!events) null else if (now < 100) {
+                                EpgEvent.create(EventId(id.value), id, Instant.fromEpochSeconds(1),
+                                    Instant.fromEpochSeconds(100), title = "Programme ${id.value}")
+                            } else {
+                                EpgEvent.create(EventId(100 + id.value), id, Instant.fromEpochSeconds(100),
+                                    Instant.fromEpochSeconds(200), title = "Next programme ${id.value}")
+                            } },
+                            { now }, active, {}, { picks += it.id }, { channel, _, _ -> details += channel.id },
                             { closes += it }, channelsTitle = "Sport", playbackIndicator = playback)
                         PlayerChannelBrowserHint(state, recent.isNotEmpty(), "Sport", Modifier.testTag("hint"))
                     }
@@ -64,6 +71,25 @@ class PlayerChannelBrowserTest {
     }
 
     private fun focused(id: Long) = compose.onNodeWithTag("player-channel-card-$id").assertIsFocused()
+
+    @Test fun currentProgrammeMinutesAndProgressFollowTheClock() {
+        now = 10L
+        screen()
+        fun progress() = compose.onNodeWithTag("player-channel-1-progress", useUnmergedTree = true)
+            .fetchSemanticsNode().config[SemanticsProperties.ProgressBarRangeInfo].current
+        fun minutes() = compose.onNodeWithTag("player-channel-1-left", useUnmergedTree = true)
+            .fetchSemanticsNode().config[SemanticsProperties.Text]
+        val initialProgress = progress()
+        val initialMinutes = minutes()
+        compose.runOnIdle { now++ }
+        assertTrue(progress() > initialProgress)
+        assertEquals(initialMinutes, minutes())
+        compose.runOnIdle { now = 40 }
+        assertNotEquals(initialMinutes, minutes())
+        compose.runOnIdle { now = 100 }
+        compose.onNodeWithText("Next programme 1", useUnmergedTree = true).assertExists()
+        assertEquals(0f, progress(), 0f)
+    }
 
     @Test fun rowsReopenDirectlyOnTheirIndependentCardAndViewport() {
         screen()

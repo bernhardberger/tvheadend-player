@@ -353,7 +353,7 @@ class CardGlowRoomTest {
                                 expanded = true,
                                 channelContent = {
                                     PlayerChannelBrowser(state, channels, if (recent) channels.drop(1) else emptyList(),
-                                        channels[0].id, emptySet(), { null }, 0L, true, {}, {}, { _, _, _ -> }, {})
+                                        channels[0].id, emptySet(), { null }, { 0L }, true, {}, {}, { _, _, _ -> }, {})
                                 },
                                 preview = {},
                                 controls = {},

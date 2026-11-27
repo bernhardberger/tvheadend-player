@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.components
 
+import android.content.res.Configuration
+import android.util.LruCache
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -12,15 +14,23 @@ import androidx.compose.ui.layout.MeasureScope
 import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFontFamilyResolver
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontSynthesis
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.unit.constrainWidth
 import androidx.compose.ui.unit.dp
@@ -52,6 +62,23 @@ internal const val WALL_CLOCK_TAG = "wall-clock"
 /** From the time's baseline to the date's: the date sits close under the time. */
 private val WallClockBaselineStep = 16.sp
 
+private data class WallClockWidthKey(
+    val configuration: Configuration,
+    val zone: ZoneId,
+    val uses24Hour: Boolean,
+    val timeStyle: TextStyle,
+    val dateStyle: TextStyle,
+    val meridiem: SpanStyle,
+    val density: Density,
+    val direction: LayoutDirection,
+    val resolver: FontFamily.Resolver,
+    val timeTypeface: Any,
+    val dateTypeface: Any,
+)
+
+// The player header leaves composition with the controls. Keep only the recent environments.
+private val wallClockWidths = LruCache<WallClockWidthKey, Int>(4)
+
 /**
  * The passive wall clock of the browse headers and the player header: the time over the date,
  * end-aligned in a width reserved for the widest time and date of the locale, so its neighbours
@@ -62,7 +89,8 @@ private val WallClockBaselineStep = 16.sp
  */
 @Composable
 fun WallClock(nowSec: () -> Long, modifier: Modifier = Modifier) {
-    val locale = LocalConfiguration.current.locales[0]
+    val configuration = LocalConfiguration.current
+    val locale = configuration.locales[0]
     val density = LocalDensity.current
     val minuteSec by remember(nowSec) { derivedStateOf { Math.floorDiv(nowSec(), 60L) * 60L } }
     val uses24Hour = AppClock.uses24Hour
@@ -71,18 +99,28 @@ fun WallClock(nowSec: () -> Long, modifier: Modifier = Modifier) {
     // In 12-hour time the day period is one type step smaller and quieter; the digits keep the size.
     val meridiem = SpanStyle(fontSize = MaterialTheme.typography.titleMedium.fontSize, color = TvTextColors.secondary)
     val markers = remember(locale) { meridiemMarkers(locale) }
-    val timeText = formatClock(Instant.ofEpochSecond(minuteSec).atZone(ZoneId.systemDefault()), locale, uses24Hour)
+    val zone = ZoneId.systemDefault()
+    val timeText = formatClock(Instant.ofEpochSecond(minuteSec).atZone(zone), locale, uses24Hour)
     val date = formatRecordingDate(minuteSec, dateOnly = true, locale = locale, nowSec = minuteSec)
     val measurer = rememberTextMeasurer()
-    val widthPx = remember(locale, uses24Hour, timeStyle, dateStyle, meridiem, density, measurer) {
-        val times = clockWidthSamples(locale, uses24Hour).map {
-            measurer.measure(styledClock(it, markers, meridiem), timeStyle, maxLines = 1, softWrap = false).size.width
+    val resolver = LocalFontFamilyResolver.current
+    fun typeface(style: TextStyle) = resolver.resolve(
+        style.fontFamily, style.fontWeight ?: FontWeight.Normal, style.fontStyle ?: FontStyle.Normal,
+        style.fontSynthesis ?: FontSynthesis.All,
+    ).value
+    val key = WallClockWidthKey(Configuration(configuration), zone, uses24Hour, timeStyle, dateStyle,
+        meridiem, density, LocalLayoutDirection.current, resolver, typeface(timeStyle), typeface(dateStyle))
+    val widthPx = remember(key) {
+        wallClockWidths[key] ?: run {
+            val times = clockWidthSamples(locale, uses24Hour).map {
+                measurer.measure(styledClock(it, markers, meridiem), timeStyle, maxLines = 1, softWrap = false).size.width
+            }
+            val dates = wallClockDateSamples().map {
+                measurer.measure(formatRecordingDate(it, dateOnly = true, locale = locale, nowSec = it), dateStyle,
+                    maxLines = 1, softWrap = false).size.width
+            }
+            ceil((times + dates).max().toDouble()).toInt().also { wallClockWidths.put(key, it) }
         }
-        val dates = wallClockDateSamples().map {
-            measurer.measure(formatRecordingDate(it, dateOnly = true, locale = locale, nowSec = it), dateStyle,
-                maxLines = 1, softWrap = false).size.width
-        }
-        ceil((times + dates).max().toDouble()).toInt()
     }
     val description = "$timeText, $date"
     Layout(

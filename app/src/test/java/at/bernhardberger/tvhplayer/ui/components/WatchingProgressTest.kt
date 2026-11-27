@@ -709,7 +709,7 @@ class WatchingProgressTest {
                                     Modifier.padding(48.dp), indicator.value,
                                     programmeAt = { at -> previousEvent.takeIf {
                                         surface != "zap-no-history" && at >= it.start.epochSeconds && at < it.stop.epochSeconds } })
-                                "card" -> CompactZapCard(channel, 101, event, now, indicator.value, false, {},
+                                "card" -> CompactZapCard(channel, 101, event, { now }, indicator.value, false, {},
                                     Modifier.padding(48.dp).width(196.dp))
                                 "channel-row" -> ChannelRow(number = 101, name = channel.name.orEmpty(), programTitle = event.title.orEmpty(),
                                     programme = event, nowSec = now, piconPath = picon, playbackIndicator = indicator.value,

@@ -18,10 +18,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.structuralEqualityPolicy
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -47,6 +49,8 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.ui.common.formatDurationMinutes
+import at.bernhardberger.tvhplayer.ui.common.isRunning
+import at.bernhardberger.tvhplayer.ui.common.progress
 import at.bernhardberger.tvhplayer.core.programmeArtwork
 import at.bernhardberger.tvhplayer.core.programmeArtworkModel
 import at.bernhardberger.tvhplayer.images.LogoHaloTransformation
@@ -78,7 +82,7 @@ internal fun CompactZapCard(
     channel: Channel,
     number: Long?,
     event: EpgEvent?,
-    nowSec: Long,
+    nowSec: () -> Long,
     playbackIndicator: ChannelPlaybackIndicator,
     channelRecording: Boolean,
     onClick: () -> Unit,
@@ -93,7 +97,14 @@ internal fun CompactZapCard(
     programmeRecording: DvrEntry? = null,
 ) {
     val contextMenu = rememberBrowseContextMenuTrigger(onLongClick, menuKey = menuKey)
-    val currentEvent = event?.takeIf { it.start.epochSeconds <= nowSec && nowSec < it.stop.epochSeconds }
+    val currentEvent = remember(event, nowSec) {
+        derivedStateOf(structuralEqualityPolicy()) {
+            event?.takeIf {
+                val now = nowSec()
+                it.start.epochSeconds <= now && now < it.stop.epochSeconds
+            }
+        }
+    }.value
     // The programme leads unless the card is channel-led; without one, the channel does.
     val programme = currentEvent?.title?.takeIf { it.isNotBlank() }
     val titleIsChannel = channelLed || programme == null
@@ -216,9 +227,12 @@ internal fun CompactZapCard(
                             .testTag("$tag-${if (programme != null && !channelLed) "identity" else "now"}"),
                     )
                     if (!channelLed && programme != null && currentEvent != null) {
+                        val minutes = remember(currentEvent, nowSec) {
+                            derivedStateOf(structuralEqualityPolicy()) { minutesLeft(currentEvent, nowSec()) }
+                        }.value
                         Text(
                             " • " + stringResource(R.string.player_minutes_left,
-                                formatDurationMinutes(minutesLeft(currentEvent, nowSec), LocalResources.current)),
+                                formatDurationMinutes(minutes, LocalResources.current)),
                             maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.testTag("$tag-left"),
                         )
@@ -227,11 +241,21 @@ internal fun CompactZapCard(
             }
         },
         description = {
-            val progress = programmeProgress(currentEvent, nowSec)
-            if (progress != null) {
+            val viewer = currentEvent?.let { liveViewerPosition(it.channelId) }
+            // currentEvent already runs at the wall clock. Only a located viewer can be
+            // watching a different event; an unlocated shifted viewer keeps the strip blank.
+            val watching = currentEvent != null && currentEvent.channelId == LocalWatchingChannel.current &&
+                LocalWatchingIndicator.current.isPlayingItem &&
+                (viewer?.epochSec?.let(currentEvent::isRunning) ?: true)
+            if (currentEvent != null && (!watching || viewer == null || viewer.epochSec != null)) {
                 ProgressStrip(
-                    progress = progress,
-                    color = progressColor(watchingIndicator(currentEvent, nowSec).isPlayingItem, recording != null),
+                    progress = {
+                        // The callback can run before recomposition swaps the event.
+                        val wall = nowSec()
+                        if (wall < currentEvent.start.epochSeconds || wall >= currentEvent.stop.epochSeconds) null
+                        else currentEvent.progress(viewer?.epochSec?.takeIf { watching } ?: wall)
+                    },
+                    color = progressColor(watching, recording != null),
                     height = TvCompactProgressStripHeight,
                     modifier = Modifier.fillMaxWidth().testTag("$tag-progress"),
                 )

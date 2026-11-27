@@ -2033,7 +2033,8 @@ fun VideoPlayerScreen(
             // The rows' saved logos are those of the observation their scope was resolved from.
             channelContent = { ProvideArtworkSession(currentSession, channelScope.observation) {
                 // Read in the rail, so the controls' show and hide do not recompose the whole player.
-                val railNowSec = quickZap.clock(nowSec)
+                val liveClock = remember(timelineState) { { timelineState.nowEpochSec } }
+                val railNowSec = quickZap.clock(liveClock)
                 PlayerChannelBrowser(
                     state = channelBrowser,
                     channels = channels,
@@ -2042,7 +2043,7 @@ fun VideoPlayerScreen(
                     playbackIndicator = channelIndicator(),
                     recordingChannelIds = recordingChannelIds,
                     nowSec = railNowSec,
-                    nowEvent = { id -> observation.eventAt(id, kotlin.time.Instant.fromEpochSeconds(railNowSec)) },
+                    nowEvent = { id -> observation.eventAt(id, kotlin.time.Instant.fromEpochSeconds(railNowSec())) },
                     runningRecordingForEvent = observation::runningRecordingForEvent,
                     onFocusChannel = { selectedId = it },
                     onPickChannel = { onPickChannel(it) },
@@ -2082,6 +2083,15 @@ fun VideoPlayerScreen(
             },
             peeks = channels.isNotEmpty(),
             visible = controlsShown && !chromePanelOpen,
+            // Unlike the chrome, the rail can warm while invisible, once this tune's
+            // video is visible and the startup cover no longer owns the surface.
+            settledTuneToken = {
+                // screenStarts: a stop and restart under the same tune is a new wait.
+                Triple(liveRequestToken, videoPresentation.epoch, screenStarts).takeIf {
+                    contentAllowed && screenActive && confirmedPlayingChannelId != null && videoPresentation.visible &&
+                        playbackState is AppPlaybackState.Playing && busyStatus == null
+                }
+            },
         )
         // Full recovery and the unavailable message replace even an exiting ring.
         if (!busyBlocked) PlayerBusyIndicator(busyStatus, Modifier.align(Alignment.Center), cover = videoPresentation)

@@ -148,7 +148,7 @@ class PlayerMotionCaptureTest {
                             PlayerChannelBrowser(
                                 state = browser, channels = channels, recentChannels = channels.drop(1),
                                 playingChannelId = ChannelId(1), recordingChannelIds = emptySet(),
-                                nowEvent = { programme }, nowSec = 1_800,
+                                nowEvent = { programme }, nowSec = { 1_800 },
                                 onFocusChannel = {}, onOpenDetails = { _, _, _ -> },
                                 onPickChannel = {}, onClose = {}, active = expanded,
                             )
@@ -688,7 +688,7 @@ class PlayerMotionCaptureTest {
                             ProvideArtworkSession(session) { PlayerChannelBrowser(
                                 state = browser, channels = channels, recentChannels = channels.drop(1),
                                 playingChannelId = ChannelId(1), recordingChannelIds = emptySet(),
-                                nowEvent = { programme }, nowSec = 1_800,
+                                nowEvent = { programme }, nowSec = { 1_800 },
                                 onFocusChannel = {}, onOpenDetails = { _, _, _ -> },
                                 onPickChannel = {}, onClose = {}, active = rail.channelDrawerOpen,
                             ) }

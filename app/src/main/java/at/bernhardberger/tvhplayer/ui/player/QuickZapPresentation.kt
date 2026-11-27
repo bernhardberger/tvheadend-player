@@ -21,11 +21,13 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
@@ -42,6 +44,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy
+import at.bernhardberger.tvhplayer.ui.components.HoldWatching
+import kotlinx.coroutines.delay
 
 /**
  * One motion value coordinates the departing footer and the rail rising beneath it, as one
@@ -117,15 +121,17 @@ internal fun rememberQuickZapRail(expanded: Boolean, detached: Boolean = false):
 }
 
 /**
- * [nowSec] while the controls are composed; otherwise the time they last showed, so a hidden
- * detached rail's cards do not recompose every second. Read it in the rail's content, not
- * beside the rail, so the controls' show and hide recompose only that content.
+ * A stable clock: read live time while hosted, otherwise the last committed sample.
+ * A hidden rail never subscribes to live clock changes.
  */
 @Composable
-internal fun QuickZapRailState.clock(nowSec: Long): Long {
-    val shownAt = remember { longArrayOf(nowSec) }
-    if (hosted) shownAt[0] = nowSec
-    return shownAt[0]
+internal fun QuickZapRailState.clock(nowSec: () -> Long): () -> Long {
+    val shownAt = remember(this, nowSec) { mutableLongStateOf(Snapshot.withoutReadObservation(nowSec)) }
+    if (hosted) {
+        val now = nowSec()
+        SideEffect { shownAt.longValue = now }
+    }
+    return remember(this, nowSec) { { if (hosted) nowSec() else shownAt.longValue } }
 }
 
 /** The controls beneath the rail, in their layer: their footer gives way as the rail rises. */
@@ -190,6 +196,7 @@ internal fun QuickZapRail(
     header: (@Composable () -> Unit)? = null,
     peeks: Boolean = false,
     visible: Boolean = true,
+    settledTuneToken: () -> Any? = { null },
 ) {
     val expanded = rail.expanded
     val expansion = rail.expansion
@@ -214,18 +221,26 @@ internal fun QuickZapRail(
     val pageProgress = LocalPlayerPageProgress.current
     val leavingPage by remember(pageProgress) { derivedStateOf { (pageProgress?.invoke() ?: 0f) > 0f } }
     // Leaves with the controls, as the content of their layer does.
-    val leaving = rail.detached && rail.hosted && !visible
-    val active = rail.hosted && !leaving
-    // Built with the controls' first show, not with the player behind its startup cover.
-    val built = remember { booleanArrayOf(false) }
-    if (rail.hosted) built[0] = true
+    val leaving = rail.detached && hosted && !visible
+    val active = hosted && !leaving
+    var built by remember(rail) { mutableStateOf(false) }
+    if (hosted && !built) SideEffect { built = true }
+    val tuneToken = settledTuneToken()
+    if (rail.detached && peeks && !hosted && !built && tuneToken != null) {
+        LaunchedEffect(tuneToken) {
+            delay(1_000L)
+            // A stopped window pauses the frame clock, so nothing recomposes to cancel this effect;
+            // the eligibility is read again from its state before committing.
+            if (settledTuneToken() == tuneToken) built = true
+        }
+    }
     Box(
         Modifier.fillMaxSize().clipToBounds().onSizeChanged { rail.viewportHeight = it.height }
             .then(if (rail.detached) Modifier
                 .graphicsLayer { alpha = if (rail.hosted) rail.layerAlpha() else 0f }
                 .drawWithContent { if (rail.hosted) drawContent() } else Modifier),
     ) {
-        if (!built[0] || !shown && !expanded && channelPeek == null) return@Box
+        if ((!hosted && !built) || !shown && !expanded && channelPeek == null) return@Box
         PlayerMotionFrame(leaving = leaving, modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
             Column(
                 Modifier.fillMaxWidth()
@@ -283,7 +298,13 @@ internal fun QuickZapRail(
                         // The closed rail only peeks: it takes no focus and is not read out.
                         .focusProperties { if (!expanded || !active) canFocus = false }
                         .then(if (expanded && active) Modifier else Modifier.clearAndSetSemantics { }),
-                ) { CompositionLocalProvider(LocalChannelPeek provides channelPeek) { channelContent() } }
+                ) {
+                    // A hidden rail keeps the watching presentation it last showed instead of ticking with
+                    // playback; the reveal resumes live in the frame the controls are hosted.
+                    HoldWatching(held = !hosted) {
+                        CompositionLocalProvider(LocalChannelPeek provides channelPeek) { channelContent() }
+                    }
+                }
             }
         }
         if (header != null) Box(

@@ -316,14 +316,14 @@ class TvFocusArrivalLookTest {
 
     private fun shelf(channels: () -> List<Channel>) = host {
         Column(Modifier.fillMaxSize()) {
-            ChannelDrawer(channels(), null, null, recordingChannelIds = emptySet(), nowEvent = { null }, nowSec = NOW,
+            ChannelDrawer(channels(), null, null, recordingChannelIds = emptySet(), nowEvent = { null }, nowSec = { NOW },
                 onFocusChannel = {}, onPickChannel = {}, onCloseDrawer = {})
         }
     }
 
     private fun browser(state: PlayerChannelBrowserState, recent: () -> List<Channel>) = host {
         Column(Modifier.fillMaxSize()) {
-            PlayerChannelBrowser(state, CHANNELS, recent(), null, emptySet(), { null }, NOW, true, {}, {}, { _, _, _ -> }, {},
+            PlayerChannelBrowser(state, CHANNELS, recent(), null, emptySet(), { null }, { NOW }, true, {}, {}, { _, _, _ -> }, {},
                 channelsTitle = "Sport")
         }
     }
