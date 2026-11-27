@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.6
+
+### Recordings
+
+- Program details say *Broadcast: Repeat* only when the guide marks the program as a repeat. Before, every program not marked new counted as a repeat. With no mark either way, the line is left out.
+- The preview of an automatic recording now shows what *Repeats only* and *New or unknown* will record, as Tvheadend decides it. It warns only when the guide doesn't say which programs are repeats.
+
 ## 0.5.5
 
 ### Player
