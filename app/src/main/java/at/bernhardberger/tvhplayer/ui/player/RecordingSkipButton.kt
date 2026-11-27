@@ -215,6 +215,8 @@ internal fun <T : Any> RecordingCornerPrompt(
     bannerSkipBottomInset: () -> Int = { 0 },
     identity: (T) -> Any = { it },
     countdownKey: Any? = null,
+    initialElapsedMs: () -> Long = { 0L },
+    onElapsed: (Long) -> Unit = {},
     playNext: Boolean = false,
     content: @Composable (T, Boolean, () -> Float, Modifier) -> Unit,
 ) {
@@ -224,7 +226,8 @@ internal fun <T : Any> RecordingCornerPrompt(
     val presentation = prompt ?: departing
     val promptKey = prompt?.let(identity)
     val timerKey = countdownKey ?: presentation?.let(identity)
-    var elapsedMs by remember(timerKey) { mutableLongStateOf(0L) }
+    var elapsedMs by remember(timerKey) { mutableLongStateOf(initialElapsedMs()) }
+    val retainElapsed by rememberUpdatedState(onElapsed)
     val timeout by rememberUpdatedState(onTimeout)
     val latestPrompt by rememberUpdatedState(prompt)
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -239,6 +242,7 @@ internal fun <T : Any> RecordingCornerPrompt(
             val frame = withFrameMillis { it }
             if (!lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) return@LaunchedEffect
             elapsedMs = frame - start
+            retainElapsed(elapsedMs)
         }
         latestPrompt?.let(timeout)
     }

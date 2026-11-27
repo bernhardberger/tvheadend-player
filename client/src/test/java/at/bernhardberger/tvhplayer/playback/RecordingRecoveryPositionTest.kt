@@ -34,6 +34,7 @@ import androidx.media3.exoplayer.source.MediaLoadData
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.exoplayer.source.SampleStream
+import androidx.media3.exoplayer.source.SilenceMediaSource
 import androidx.media3.exoplayer.source.WrappingMediaSource
 import androidx.media3.extractor.Extractor
 import androidx.media3.extractor.ExtractorInput
@@ -279,6 +280,29 @@ class RecordingRecoveryPositionTest {
         awaitCurrent { cleanup.isCompleted }
         assertTrue(cleanup.await())
         assertEquals(AppPlaybackState.Idle, runtime.state.value)
+    }
+
+    @Test fun aWatchLiveCommitLeavesNoRecordingRecoveryPosition() = exercise {
+        play(FIRST)
+        failAtTwentyMinutes()
+        val originalLength = media.lengthMs
+        media.lengthMs = 2_000
+        assertTrue(runtime.retryRecording()?.isStarted == true)
+        awaitPlayback { player.playbackState == Player.STATE_ENDED }
+        driver.settle(player)
+        val finished = requireNotNull(runtime.finishedRecording.value)
+
+        media.lengthMs = originalLength
+        val offer = scope.async {
+            runtime.playRecordingEndOffer(finished, RecordingEndOffer.WatchLive(ChannelId(1), null)) { true }
+        }
+        awaitMain { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(1)) }
+        // This fixture substitutes the live transport. The runtime's commit, not the
+        // fake stream's presentation, is the boundary at which recovery must be forgotten.
+        offer.cancelAndJoin()
+
+        assertTrue(runtime.retryRecording()?.isStarted == true)
+        assertEventuallyNear(0)
     }
 
     private fun exerciseGrowing(block: suspend Fixture.() -> Unit) = runTest(timeout = 120.seconds) {
@@ -613,6 +637,52 @@ class RecordingRecoveryPositionTest {
         assertEventuallyNear(0L)
     }
 
+    @Test fun retryBeforeTheContinuationCanSeekKeepsTheBroadcastTime() = exercise {
+        val at = RECORDING_START + 12.minutes
+        media.seekable = false
+        session.publish(recordings(listOf(FIRST), bookmark = null, files = listOf(
+            DvrRecordingFile.create(fileId = 1, start = RECORDING_START, stop = RECORDING_START + 30.minutes),
+        )))
+        val install = scope.async { runtime.playRecording(selection(FIRST), RecordingEndStart.AtTime(at)) }
+        awaitCurrent { install.isCompleted }
+        assertTrue(install.await()?.isStarted == true)
+        // The first file has not presented the offset. The replacement opens a later file.
+        media.failFromByte = byteAt(2_000)
+        awaitReadFailure()
+        awaitCurrent { runtime.state.value is AppPlaybackState.Failed }
+        media.failFromByte = Long.MAX_VALUE
+        val laterStart = RECORDING_START + 4.minutes
+        session.publish(recordings(listOf(FIRST), bookmark = null, files = listOf(
+            DvrRecordingFile.create(fileId = 2, start = laterStart, stop = laterStart + 30.minutes),
+        )))
+        assertTrue(runtime.retryRecording()?.isStarted == true)
+        assertEquals(8.minutes, coordinator.pendingRecordingRecoveryPosition.value)
+
+        session.replaceGeneration(recordings(listOf(FIRST), bookmark = null, files = listOf(
+            DvrRecordingFile.create(fileId = 2, start = laterStart, stop = laterStart + 30.minutes),
+        )))
+        assertTrue(restore(FIRST)?.isStarted == true)
+        assertEquals(selection(FIRST), runtime.recordingSelection.value)
+        assertNull(coordinator.pendingRecordingRecoveryPosition.value)
+    }
+
+    @Test fun retryAfterTheContinuationPresentsResumesWherePlaybackStood() = exercise {
+        session.publish(recordings(listOf(FIRST), bookmark = null, files = listOf(
+            DvrRecordingFile.create(fileId = 1, start = RECORDING_START, stop = RECORDING_START + 30.minutes),
+        )))
+        val offset = 12.minutes
+        val install = scope.async {
+            runtime.playRecording(selection(FIRST), RecordingEndStart.AtTime(RECORDING_START + offset))
+        }
+        awaitCurrent { install.isCompleted }
+        assertTrue(install.await()?.isStarted == true)
+        assertEventuallyNear(offset.inWholeMilliseconds)
+        assertNull(coordinator.pendingRecordingRecoveryPosition.value)
+        failAtTwentyMinutes()
+        assertTrue(runtime.retryRecording()?.isStarted == true)
+        assertEventuallyNear(TWENTY_MINUTES)
+    }
+
     @Test fun aNewPlayAfterStopStartsPerTheViewersChoice() = exercise {
         play(FIRST)
         failAtTwentyMinutes()
@@ -887,11 +957,18 @@ class RecordingRecoveryPositionTest {
         // The fake server has no playable file. Substitute its media periods, not the SDK's
         // prepare/release lifecycle: the SDK uses that lifecycle to identify stale player errors.
         val coordinator = createTvheadendPlaybackCoordinator(if (realRecording != null) player else object : ExoPlayer by player {
+            private fun testSource(source: MediaSource): MediaSource =
+                if (source.mediaItem.localConfiguration != null) media.source(source)
+                else object : WrappingMediaSource(SilenceMediaSource(5_000_000)) {
+                    // Live uses a transport-backed media item with no URI for a progressive source.
+                    override fun getMediaItem() = source.mediaItem
+                }
+
             override fun setMediaSource(mediaSource: MediaSource) {
-                player.setMediaSource(media.source(mediaSource))
+                player.setMediaSource(testSource(mediaSource))
             }
             override fun setMediaSource(mediaSource: MediaSource, startPositionMs: Long) {
-                player.setMediaSource(media.source(mediaSource), startPositionMs)
+                player.setMediaSource(testSource(mediaSource), startPositionMs)
             }
         }, workDispatcher = work).also { it.launchIn(scope) }
 

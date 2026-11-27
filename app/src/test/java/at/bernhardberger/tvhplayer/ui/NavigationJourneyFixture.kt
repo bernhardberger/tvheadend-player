@@ -67,6 +67,7 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
+import kotlinx.coroutines.flow.emitAll
 
 /** Offline AppRoot fixture shared by Guide and Home return journeys. */
 internal class NavigationJourneyFixture(
@@ -91,6 +92,23 @@ internal class NavigationJourneyFixture(
         settle()
     }
     private lateinit var session: FakeTvheadendSession
+    private lateinit var playbackSettingsData: InMemoryData
+
+    fun holdNewPlaybackSettingsReads() = compose.runOnIdle {
+        playbackSettingsData.readGate = kotlinx.coroutines.CompletableDeferred()
+    }
+
+    val playbackSettingsReadHeld get() = playbackSettingsData.readHeld
+
+    fun releasePlaybackSettingsReads() = compose.runOnIdle {
+        playbackSettingsData.readGate?.complete(Unit)
+        playbackSettingsData.readGate = null
+    }
+
+    fun replaceRecordingSession() = compose.runOnIdle {
+        session.replaceGeneration(session.observation.value)
+        session.scriptRecordingPlaybackSuccess()
+    }
     val playbackNotices = NoticeCenter({ 0L }) { NoticeContext(0, null) }
     lateinit var runtime: AppPlaybackRuntime
         private set
@@ -101,6 +119,7 @@ internal class NavigationJourneyFixture(
     val recordingStartOffset get() = lastRecordingStartOffset ?: lastRecordingSeekMs?.milliseconds
     var endNextRecordingAtInstall = false
     private var recordingPresented = false
+    var offerNow = NOW
     var recordingInstalls = 0
         private set
     private var holdCoordinator = false
@@ -125,18 +144,20 @@ internal class NavigationJourneyFixture(
         press: () -> Unit,
         advanceTo: Long? = null,
         removeOffer: DvrEntryId? = null,
-        updateOffer: ((DvrEntry) -> DvrEntry)? = null,
+        bookmarkOffer: Pair<DvrEntryId, Duration>? = null,
     ) {
         compose.runOnIdle {
             beforeRecordingPause = {
                 press()
                 if (advanceTo != null) simulatedRecordingPositionMs = advanceTo
-                if (removeOffer != null || updateOffer != null) {
+                if (removeOffer != null || bookmarkOffer != null) {
                     val current = session.observation.value
                     session.publish(SessionObservation.create(current.sessionState, current.channelState, current.epgState,
                         DvrRepositoryState.Current(DvrSnapshot.create(
                             current.dvrSnapshotForDisplay!!.entries.filterNot { it.id == removeOffer }
-                                .map { updateOffer?.invoke(it) ?: it })),
+                                .map { entry ->
+                                    bookmarkOffer?.let { (id, position) -> entry.withBookmark(id, position) } ?: entry
+                                })),
                         recordingProgressCapability = RecordingProgressCapability.SUPPORTED))
                 }
             }
@@ -151,7 +172,7 @@ internal class NavigationJourneyFixture(
             beforeRecordingPause = {
                 val shown = requireNotNull(recordingPlayNextOffer(
                     session.observation.value, selection.recordingId,
-                    runtime.recordingBroadcastTime(selection, recordingPosition), Clock.System.now(),
+                    runtime.recordingBroadcastTime(selection, recordingPosition), runtime.recordingOffersNow(),
                 ))
                 val press = requireNotNull(runtime.captureRecordingPlayNextPress(selection, shown))
                 scope.launch(start = CoroutineStart.UNDISPATCHED) {
@@ -191,6 +212,11 @@ internal class NavigationJourneyFixture(
 
     fun rejectNextRecording() {
         session.scriptRecordingPlaybackFailure(PlaybackBindingResult.TargetUnavailable)
+    }
+
+    fun resumeRecordingForPrompt() {
+        compose.runOnIdle { runtime.setSessionPlayWhenReady(true) { true } }
+        settle()
     }
 
     fun retirePlayback() {
@@ -262,7 +288,7 @@ internal class NavigationJourneyFixture(
         guideEntry: Boolean = false, emptyChannels: Boolean = false, driveRecordingEnd: Boolean = false,
         autoContinue: Boolean = false, programmeEndMs: Long? = null, recordingStart: Instant? = null,
         warmPlaybackMode: WarmPlaybackMode? = null) {
-        val now = Clock.System.now().epochSeconds
+        val now = NOW.epochSeconds
         val fileStart = recordingStart ?: Instant.fromEpochSeconds(now - 7200)
         val programmeStop = fileStart + (programmeEndMs ?: 3_600_000L).milliseconds
         val catalog = ChannelCatalog.create((1..if (emptyChannels) 0L else if (withRecording) 8L else 3L).map {
@@ -297,7 +323,8 @@ internal class NavigationJourneyFixture(
             else scriptLivePlaybackSuccess()
             if (withRecording) scriptRecordingPlaybackSuccess()
         }
-        val settings = PlayerSettingsStore(InMemoryData())
+        playbackSettingsData = InMemoryData()
+        val settings = PlayerSettingsStore(playbackSettingsData)
         if (driveRecordingEnd) runBlocking {
             settings.setContinueAutomatically(autoContinue)
             warmPlaybackMode?.let { settings.setWarmPlaybackMode(it) }
@@ -314,7 +341,8 @@ internal class NavigationJourneyFixture(
                 else -> observedPlayer.playbackState
             }
 
-            override fun isPlaying() = !recordingEnded && (recordingPresented || observedPlayer.isPlaying)
+            override fun isPlaying() = !recordingEnded &&
+                (recordingPresented && observedPlayer.playWhenReady || observedPlayer.isPlaying)
 
             override fun pause() {
                 beforeRecordingPause?.also { beforeRecordingPause = null }?.invoke()
@@ -376,7 +404,9 @@ internal class NavigationJourneyFixture(
         coordinator = createTvheadendPlaybackCoordinator(playbackPlayer).also { it.launchIn(coordinatorScope) }
         runtime = AppPlaybackRuntime(playbackPlayer, session, coordinator, settings, profiles, scope,
             TvheadendAudioOutputProvider(context), PlaybackAudioFocus.None, PlaybackRuntimePolicy.fromPlayerSettings(),
-            noticeCenter = playbackNotices)
+            noticeCenter = playbackNotices, clock = object : Clock {
+                override fun now() = offerNow
+            })
         val notices = NoticeCenter(SystemClock::elapsedRealtime) {
             NoticeContext(profiles.configurationGeneration.value, session.observation.value.currentSession?.generationIdentity)
         }
@@ -493,11 +523,24 @@ internal class NavigationJourneyFixture(
         settle()
     }
 
+    fun recordings() = session.observation.value.dvrSnapshotForDisplay!!.entries
+
+    fun updateRecordingBookmark(id: DvrEntryId, position: Duration?) {
+        publishRecordings(recordings().map { it.withBookmark(id, position) })
+    }
+
+    // The SDK fixture factory is public; DvrEntry's generated copy is not.
+    private fun DvrEntry.withBookmark(id: DvrEntryId, position: Duration?): DvrEntry =
+        if (this.id != id) this else DvrEntry.create(id, title = title, state = state,
+            channelId = channelId, eventId = eventId, autorecRuleId = autorecRuleId,
+            start = start, stop = stop, files = files, playPosition = position)
+
     fun publishRecordings(entries: List<DvrEntry>) {
         compose.runOnIdle {
             val current = session.observation.value
             session.publish(SessionObservation.create(current.sessionState, current.channelState, current.epgState,
-                DvrRepositoryState.Current(DvrSnapshot.create(entries))))
+                DvrRepositoryState.Current(DvrSnapshot.create(entries)),
+                recordingProgressCapability = RecordingProgressCapability.SUPPORTED))
         }
         compose.waitForIdle()
     }
@@ -506,14 +549,24 @@ internal class NavigationJourneyFixture(
         compose.settleFrames(10, 100)
     }
 
-    private companion object {
+    companion object {
         val AIRS_FROM = Instant.parse("2000-01-01T00:00:00Z")
+        val NOW = Instant.parse("2026-11-27T20:00:00Z")
         val AIRS_UNTIL = Instant.parse("2100-01-01T00:00:00Z")
     }
 
     private class InMemoryData : DataStore<Preferences> {
         val state = MutableStateFlow(emptyPreferences())
-        override val data: Flow<Preferences> get() = state
+        var readGate: kotlinx.coroutines.CompletableDeferred<Unit>? = null
+        var readHeld = false
+            private set
+        override val data: Flow<Preferences> = kotlinx.coroutines.flow.flow {
+            readGate?.let {
+                readHeld = true
+                try { it.await() } finally { readHeld = false }
+            }
+            emitAll(state)
+        }
         override suspend fun updateData(transform: suspend (Preferences) -> Preferences) =
             transform(state.value).also { state.value = it }
     }

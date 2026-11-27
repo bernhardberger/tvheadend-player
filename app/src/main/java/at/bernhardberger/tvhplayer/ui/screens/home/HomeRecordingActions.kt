@@ -38,6 +38,7 @@ internal fun HomeRecordingActions(
     endHasContinuationTime: Boolean = false,
     endWatchSupport: String? = null,
     onPlayEndDefault: () -> Unit = {},
+    endWatchLiveEligible: Boolean = false,
 ) {
     val opening = remember { observation }
     val frameOwner = LocalTabOwner.current
@@ -61,7 +62,9 @@ internal fun HomeRecordingActions(
     val channel = opened.channelId?.let(observation::channel)
     val closeBehindPlayer = rememberCloseBehindPlayer()
     val pending = rememberPlayerEntryPending()
-    val watchLive: (() -> Unit)? = if (recordingIsRunning(opened) && channel != null && capability != null) ({
+    val watchLive: (() -> Unit)? = if (channel != null && capability != null &&
+        (if (endStart == null) recordingIsRunning(opened) else endWatchLiveEligible)
+    ) ({
         if (owner?.isCurrent != false && session.observation.value.currentSession === capability) {
             closeBehindPlayer(onClose); onWatchChannel(channel.id, channel.name.orEmpty())
         }
@@ -91,7 +94,7 @@ internal fun HomeRecordingActions(
             mutations, notices, scope, onPlayRecording = { selection, start ->
                 if (owner?.isCurrent != false) { closeBehindPlayer(onClose); onPlay(selection, start) }
             }, onClose = onClose,
-            onWatchChannel = { id, name ->
+            onWatchChannel = if (endStart != null && !endWatchLiveEligible) null else { id, name ->
                 if (owner?.isCurrent != false) { closeBehindPlayer(onClose); onWatchChannel(id, name) }
             },
             onShowGuide = onShowGuide,

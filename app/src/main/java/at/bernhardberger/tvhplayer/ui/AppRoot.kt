@@ -64,9 +64,6 @@ import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
-import at.bernhardberger.tvheadend.sdk.core.DvrEntry
-import at.bernhardberger.tvhplayer.ui.screens.DvrMutationAction
-import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
 import at.bernhardberger.tvhplayer.core.ApplianceLaunchRequests
@@ -94,9 +91,7 @@ import at.bernhardberger.tvhplayer.core.serverSettingsForRuntime
 import at.bernhardberger.tvhplayer.core.showGlobalNavigationRail
 import at.bernhardberger.tvhplayer.core.RecordingFinishedAction
 import at.bernhardberger.tvhplayer.core.RecordingEndOffer
-import at.bernhardberger.tvhplayer.core.RecordingEndStart
 import at.bernhardberger.tvhplayer.core.recordingEndOffers
-import at.bernhardberger.tvhplayer.core.recordingPlaybackOffered
 import at.bernhardberger.tvhplayer.core.recordingWasRemoved
 import at.bernhardberger.tvhplayer.core.recordingFinishedAction
 import at.bernhardberger.tvhplayer.core.shouldMountPersistentPlayerSurface
@@ -107,16 +102,9 @@ import at.bernhardberger.tvhplayer.settings.WarmPlaybackMode
 import at.bernhardberger.tvhplayer.data.ConnectionState
 import at.bernhardberger.tvhplayer.playback.SurfaceFrameRateRequest
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
-import at.bernhardberger.tvhplayer.playback.FinishedRecording
-import at.bernhardberger.tvhplayer.playback.RecordingEndOutcome
 import at.bernhardberger.tvhplayer.playback.currentLivePlaybackSelection
 import at.bernhardberger.tvhplayer.playback.currentRecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.presentation.R
-import at.bernhardberger.tvhplayer.ui.player.RecordingEndScreen
-import at.bernhardberger.tvhplayer.ui.player.recordingEndActionLabel
-import at.bernhardberger.tvhplayer.ui.screens.ChannelContextMenu
-import at.bernhardberger.tvhplayer.ui.screens.home.HomeRecordingActions
-import kotlin.time.Clock
 import at.bernhardberger.tvhplayer.ui.startup.rememberColdStart
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
@@ -475,14 +463,6 @@ internal fun performMainStartupAction(
     }
 }
 
-private data class RecordingEndSession(
-    val route: RecordingPlayerKey,
-    val session: CurrentSessionObservation,
-    val ended: DvrEntry,
-    val offers: List<RecordingEndOffer>,
-    val finished: FinishedRecording,
-)
-
 @OptIn(ExperimentalTvheadendApi::class)
 @Composable
 fun AppRoot(
@@ -637,10 +617,13 @@ fun AppRoot(
     val browseSteps = remember { BrowseChannelStepHandoff() }
     val playbackOrchestrator = remember { AppRootPlaybackOrchestrator() }
     val playerSettingsStore: PlayerSettingsStore = koinInject()
-    var recordingEnd by remember { mutableStateOf<RecordingEndSession?>(null) }
-    var endStart by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    val recordingEndState = remember { mutableStateOf<RecordingEndSession?>(null) }
+    var recordingEnd by recordingEndState
+    val endStartState = remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    var endStart by endStartState
     var recordingEndOrigin by remember { mutableStateOf<AppNavKey?>(null) }
-    var playNextStart by remember { mutableStateOf<Pair<RecordingPlayerKey, kotlinx.coroutines.Job>?>(null) }
+    val playNextStartState = remember { mutableStateOf<Pair<RecordingPlayerKey, kotlinx.coroutines.Job>?>(null) }
+    val playNextStart by playNextStartState
     val finishedRecording by playbackRuntime.finishedRecording.collectAsStateWithLifecycle()
     val stoppedRecordingEnd by playbackRuntime.stoppedRecordingEnd.collectAsStateWithLifecycle()
     val activityKeyCycles = at.bernhardberger.tvhplayer.ui.startup.LocalMainStartupKeyCycleOwner.current
@@ -817,7 +800,7 @@ fun AppRoot(
     LaunchedEffect(currentDestination != null, isPlayer, warmPlaybackMode, playbackRuntime) {
         val endOrigin = recordingEndOrigin
         recordingEndOrigin = null
-        if (playNextStart != null) {
+        if (playNextStart != null || recordingEnd?.let { it.route != currentDestination } == true) {
             // The pending handoff fences both replacement retirement and any deferred
             // Off cleanup of the original. A generic stop could race a newer selection.
         } else if (!isPlayer && endOrigin != null && endOrigin == currentDestination) {
@@ -945,15 +928,18 @@ fun AppRoot(
     }
 
     val visibleRecordingEnd = recordingEnd?.takeIf { it.route == currentDestination }
-    fun closeRecordingEnd(end: RecordingEndSession, stop: Boolean = true, explicit: Boolean = false) {
-        val current = recordingEnd?.takeIf { it.finished === end.finished && backStack.lastOrNull() == it.route } ?: return
+    fun closeRecordingEnd(end: RecordingEndSession, stop: Boolean = true, explicit: Boolean = false, pop: Boolean = true) {
+        val current = recordingEnd?.takeIf { it.finished === end.finished &&
+            (!pop || backStack.lastOrNull() == it.route) } ?: return
         val pending = endStart
         pending?.cancel()
         endStart = null
         recordingEnd = null
-        backStack.popNavigation()
-        recordingEndOrigin = backStack.lastOrNull()
-        recordingPlayerReturnToGuide = backStack.lastOrNull() == GuideKey
+        if (pop) {
+            backStack.popNavigation()
+            recordingEndOrigin = backStack.lastOrNull()
+            recordingPlayerReturnToGuide = backStack.lastOrNull() == GuideKey
+        }
         if (stop) playbackSelectionScope.launch {
             pending?.join()
             playbackRuntime.stopRecordingEnd(current.finished, explicit)
@@ -972,11 +958,7 @@ fun AppRoot(
             if (backStack.none { it === route }) job.cancel()
         }
         if (recordingEndOrigin != currentDestination) recordingEndOrigin = null
-        if (recordingEnd?.route != currentDestination) {
-            endStart?.cancel()
-            endStart = null
-            recordingEnd = null
-        }
+        recordingEnd?.takeIf { it.route != currentDestination }?.let { closeRecordingEnd(it, pop = false) }
     }
     LaunchedEffect(finishedRecording, currentDestination, playbackState) {
         if (visibleRecordingEnd != null) return@LaunchedEffect
@@ -1000,9 +982,10 @@ fun AppRoot(
         val owner = finished.selection.currentSession
         val ended = observation.dvrEntry(finishedId)
         val offers = if (route != null && observation.currentSession === owner && ended != null) {
-            val now = Clock.System.now()
+            val now = playbackRuntime.recordingOffersNow()
             recordingEndOffers(ended, finished.reachedAt, observation.dvrSnapshotForDisplay?.entries.orEmpty()
-                .filterNot(::recordingWasRemoved), observation::event, observation::recordingPlaybackAdmission,
+                .filterNot { it.id == finished.rejectedPlayNext || recordingWasRemoved(it) },
+                observation::event, observation::recordingPlaybackAdmission,
                 ended.channelId?.let { observation.eventAt(it, now) }, now)
         } else emptyList()
         when (
@@ -1531,160 +1514,49 @@ fun AppRoot(
                     entry<RecordingPlayerKey> { destination ->
                         val end = visibleRecordingEnd?.takeIf { it.route == destination }
                         if (end != null) {
-                            val offers = if (playbackObservation.currentSession !== end.session) emptyList()
-                                else end.offers.filter { offer ->
-                                    when (offer) {
-                                        is RecordingEndOffer.Recording -> playbackObservation.dvrEntry(offer.entry.id)
-                                            ?.takeUnless(::recordingWasRemoved)?.let {
-                                                recordingPlaybackOffered(playbackObservation.recordingPlaybackAdmission(it))
-                                            } == true
-                                        is RecordingEndOffer.WatchLive -> playbackObservation.channel(offer.channelId) != null
-                                    }
-                                }
-                            LaunchedEffect(end, offers) {
-                                if (offers.isNotEmpty() && offers != end.offers && recordingEnd === end) {
-                                    recordingEnd = end.copy(offers = offers)
-                                }
-                            }
-                            val origin = when (backStack.getOrNull(backStack.lastIndex - 1)) {
-                                ChannelsKey -> R.string.nav_channels
-                                GuideKey -> R.string.nav_epg
-                                RecordingsKey -> R.string.nav_recordings
-                                is SettingsKey -> R.string.nav_settings
-                                else -> R.string.nav_home
-                            }
-                            val playOffer: (RecordingEndOffer) -> Unit = play@{ offer ->
-                                    val opening = recordingEnd?.takeIf { it.route == end.route } ?: return@play
-                                    if (endStart != null) return@play
-                                    val job = playbackSelectionScope.launch(start = kotlinx.coroutines.CoroutineStart.LAZY) {
-                                        try {
-                                            // The handoff holds the runtime's intent lock; do not call back into the runtime here.
-                                            val outcome = playbackRuntime.playRecordingEndOffer(opening.finished, offer) presented@{
-                                                if (recordingEnd?.finished !== opening.finished ||
-                                                    backStack.lastOrNull() != end.route
-                                                ) return@presented false
-                                                recordingEnd = null
-                                                backStack.popNavigation()
-                                                backStack.pushTransient(when (offer) {
-                                                    is RecordingEndOffer.Recording -> recordingPlayerKey(offer.entry.id,
-                                                        if (offer.start is RecordingEndStart.Resume) RecordingPlaybackStart.RESUME
-                                                        else RecordingPlaybackStart.START_OVER)
-                                                    is RecordingEndOffer.WatchLive -> LivePlayerKey(offer.channelId.value,
-                                                        tvheadendSession.observation.value.channel(offer.channelId)?.name.orEmpty())
-                                                })
-                                                true
-                                            }
-                                            val currentEnd = recordingEnd?.takeIf { it.finished === opening.finished } ?: return@launch
-                                            if (backStack.lastOrNull() != end.route) return@launch
-                                            when (outcome) {
-                                                RecordingEndOutcome.PRESENTED -> Unit
-                                                RecordingEndOutcome.FAILED -> recordingEnd = currentEnd.copy(
-                                                    offers = currentEnd.offers.filterNot {
-                                                        when (offer) {
-                                                            is RecordingEndOffer.Recording ->
-                                                                (it as? RecordingEndOffer.Recording)?.entry?.id == offer.entry.id
-                                                            is RecordingEndOffer.WatchLive ->
-                                                                (it as? RecordingEndOffer.WatchLive)?.channelId == offer.channelId
-                                                        }
-                                                    },
-                                                )
-                                                RecordingEndOutcome.SUPERSEDED -> closeRecordingEnd(currentEnd)
-                                            }
-                                        } finally {
-                                            if (endStart === coroutineContext[kotlinx.coroutines.Job]) endStart = null
-                                        }
-                                    }
-                                    endStart = job
-                                    job.start()
-                            }
-                            val showGuide: (ChannelId, at.bernhardberger.tvheadend.sdk.core.EpgEvent?) -> Unit = { channel, event ->
-                                closeRecordingEnd(end)
-                                guideChannelRequest = PlayerReturnFocus(channel, channel, event?.id, event?.start?.epochSeconds)
-                                navigateTopLevel(GuideKey)
-                            }
-                            val mutationInFlight = remember { mutableStateOf<DvrMutationAction?>(null) }
-                            val now = at.bernhardberger.tvhplayer.ui.common.rememberCurrentEpochSeconds()
-                            RecordingEndScreen(end.ended, offers, playbackObservation, stringResource(origin),
-                                autoContinue = autoContinue && !end.finished.playNextDismissed,
-                                shown = contentAllowed, starting = endStart != null,
+                            RecordingEndRoute(
+                                end, recordingEndState, endStartState, backStack, playbackObservation,
+                                tvheadendSession, playbackRuntime, playbackSelectionScope,
+                                autoContinue = autoContinue, shown = contentAllowed,
                                 suppressUntilUp = (activityKeyCycles ?: endKeyCycles)::consumeUntilUp,
-                                onClose = { closeRecordingEnd(end) },
-                                onPlay = playOffer,
-                                menu = { offer, dismiss ->
-                                    when (offer) {
-                                        is RecordingEndOffer.Recording -> HomeRecordingActions(
-                                            offer.entry, playbackObservation, contextMenu = true, nowSec = now(),
-                                            onPlay = { _, start ->
-                                                dismiss()
-                                                playOffer(offer.copy(start = when (start) {
-                                                    RecordingPlaybackStart.RESUME -> RecordingEndStart.Resume(
-                                                        (offer.start as? RecordingEndStart.Resume)?.position
-                                                            ?: kotlin.time.Duration.ZERO)
-                                                    RecordingPlaybackStart.START_OVER -> RecordingEndStart.FromBeginning
-                                                }))
-                                            },
-                                            onWatchChannel = { id, _ -> dismiss(); playOffer(RecordingEndOffer.WatchLive(id, null)) },
-                                            onShowGuide = showGuide,
-                                            onReturnToRecording = { _, _ -> false },
-                                            onClose = dismiss, endStart = offer.start,
-                                            endHasContinuationTime = offer.displayContinuationTime != null,
-                                            endWatchSupport = recordingEndActionLabel(offer),
-                                            onPlayEndDefault = { playOffer(offer) },
+                                close = { closeRecordingEnd(it) },
+                                showGuide = { channel, event ->
+                                    closeRecordingEnd(end)
+                                    guideChannelRequest = PlayerReturnFocus(channel, channel, event?.id, event?.start?.epochSeconds)
+                                    navigateTopLevel(GuideKey)
+                                },
+                            )
+                        } else if (backStack.any { it === destination }) {
+                            RecordingPlayerRouteContent(
+                                onShowGuide = { channelId, programme ->
+                                    guideChannelRequest = PlayerReturnFocus(channelId, channelId,
+                                        programme?.id, programme?.start?.epochSeconds)
+                                    navigateTopLevel(GuideKey)
+                                },
+                                targetAspect = targetAspect,
+                                contentAllowed = contentAllowed,
+                                recordingId = DvrEntryId(destination.recordingId),
+                                playbackStart = destination.start.toPlaybackStart(),
+                                connectionState = connectionState,
+                                onReconnect = appVm::reconnectNow,
+                                onClose = {
+                                    backStack.popNavigation()
+                                    recordingPlayerReturnToGuide = backStack.lastOrNull() == GuideKey
+                                },
+                                onOpenConnectionSettings = {
+                                    navigateTopLevel(SettingsKey(SettingsSection.CONNECTION))
+                                },
+                                playNextPending = playNextStart?.first === destination,
+                                onPlayNext = { press, onAccepted ->
+                                    launchRecordingPlayNext(destination, press, onAccepted, playNextStartState,
+                                        backStack, playbackRuntime, playbackSelectionScope) {
+                                        backStack.none { it === destination } && shouldStopPlaybackWhileBrowsing(
+                                            isPlayerRoute = backStack.lastOrNull().let { it is LivePlayerKey || it is RecordingPlayerKey },
+                                            mode = warmPlaybackMode,
                                         )
-                                        is RecordingEndOffer.WatchLive -> ChannelContextMenu(offer.channelId, playbackObservation,
-                                            nowSecProvider = now, mutationScope = playbackSelectionScope,
-                                            mutationInFlight = mutationInFlight,
-                                            onPlay = { _, _ -> dismiss(); playOffer(offer) },
-                                            onShowGuide = showGuide, onClose = dismiss)
                                     }
                                 },
                             )
-                        } else {
-                        RecordingPlayerRouteContent(
-                            onShowGuide = { channelId, programme ->
-                                guideChannelRequest = PlayerReturnFocus(channelId, channelId,
-                                    programme?.id, programme?.start?.epochSeconds)
-                                navigateTopLevel(GuideKey)
-                            },
-                            targetAspect = targetAspect,
-                            contentAllowed = contentAllowed,
-                            recordingId = DvrEntryId(destination.recordingId),
-                            playbackStart = destination.start.toPlaybackStart(),
-                            connectionState = connectionState,
-                            onReconnect = appVm::reconnectNow,
-                            onClose = {
-                                backStack.popNavigation()
-                                recordingPlayerReturnToGuide = backStack.lastOrNull() == GuideKey
-                            },
-                            onOpenConnectionSettings = {
-                                navigateTopLevel(SettingsKey(SettingsSection.CONNECTION))
-                            },
-                            playNextPending = playNextStart?.first === destination,
-                            onPlayNext = next@{ press, onAccepted ->
-                                if (backStack.lastOrNull() !== destination || playNextStart != null) return@next
-                                val job = playbackSelectionScope.launch(start = kotlinx.coroutines.CoroutineStart.LAZY) {
-                                    try {
-                                        playbackRuntime.playRecordingNext(press, shouldStopOriginInBrowse = {
-                                            backStack.none { it === destination } && shouldStopPlaybackWhileBrowsing(
-                                                isPlayerRoute = backStack.lastOrNull().let { it is LivePlayerKey || it is RecordingPlayerKey },
-                                                mode = warmPlaybackMode,
-                                            )
-                                        }, onAccepted = onAccepted) swap@{ offer ->
-                                            val index = backStack.indexOfLast { it === destination }
-                                            if (index < 0) return@swap false
-                                            backStack[index] = recordingPlayerKey(offer.entry.id,
-                                                if (offer.start is RecordingEndStart.Resume) RecordingPlaybackStart.RESUME
-                                                else RecordingPlaybackStart.START_OVER)
-                                            true
-                                        }
-                                    } finally {
-                                        if (playNextStart?.first === destination) playNextStart = null
-                                    }
-                                }
-                                playNextStart = destination to job
-                                job.start()
-                            },
-                        )
                         }
                     }
                 },

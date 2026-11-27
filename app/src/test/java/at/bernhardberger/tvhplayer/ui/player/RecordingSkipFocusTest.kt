@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -41,6 +42,10 @@ import at.bernhardberger.tvhplayer.core.RecordingMark
 import at.bernhardberger.tvhplayer.core.RecordingMarkKind
 import at.bernhardberger.tvhplayer.presentation.R
 import androidx.test.core.app.ApplicationProvider
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.test.assertTextEquals
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.playback.RecordingSkipAction
@@ -302,6 +307,26 @@ class RecordingSkipFocusTest {
         assertEquals(listOf(ad), state.timeouts)
     }
 
+    @Test fun thePromptClockPausesBelowResumed() {
+        lateinit var owner: LifecycleOwner
+        compose.runOnUiThread {
+            owner = object : LifecycleOwner {
+                override val lifecycle = LifecycleRegistry(this).apply { currentState = Lifecycle.State.RESUMED }
+            }
+        }
+        val state = prompt(owner = owner)
+        compose.changeState { state.prompt = ad }
+        compose.mainClock.advanceTimeBy(2_000L)
+        compose.changeState { (owner.lifecycle as LifecycleRegistry).currentState = Lifecycle.State.STARTED }
+        compose.mainClock.advanceTimeBy(SKIP_PROMPT_MS)
+        assertTrue(state.timeouts.isEmpty())
+        compose.changeState { (owner.lifecycle as LifecycleRegistry).currentState = Lifecycle.State.RESUMED }
+        compose.mainClock.advanceTimeBy(SKIP_PROMPT_MS - 4_000L)
+        assertTrue(state.timeouts.isEmpty())
+        compose.mainClock.advanceTimeBy(2_500L)
+        assertEquals(listOf(ad), state.timeouts)
+    }
+
     @Test fun theOfferStandsBackWhilePausedBufferingOrUnseekable() {
         assertTrue(recordingSkipPromptShown(offered = true, playing = true, canSeek = true, presented = true))
         for ((state, input) in mapOf(
@@ -480,27 +505,29 @@ class RecordingSkipFocusTest {
         var contentColor: Int = 0
     }
 
-    private fun prompt(background: Color = Color.Black): PromptState {
+    private fun prompt(background: Color = Color.Black, owner: LifecycleOwner? = null): PromptState {
         val state = PromptState()
         compose.mainClock.autoAdvance = false
         compose.setContent {
             state.view = LocalView.current
-            TVHeadendPlayerTheme {
-                state.containerColor = MaterialTheme.colorScheme.inverseSurface.toArgb()
-                state.contentColor = MaterialTheme.colorScheme.inverseOnSurface.toArgb()
-                val root = remember { FocusRequester() }
-                Box(Modifier.fillMaxSize().background(background).focusRequester(root).focusable()) {
-                    RecordingSkipPrompt(
-                        prompt = state.action,
-                        shown = state.shown,
-                        bannerShown = state.bannerShown,
-                        bannerSkipBottomInset = { 180 },
-                        onSkip = { state.skips += it.mark },
-                        onTimeout = { state.timeouts += it.mark; state.prompt = null },
-                        modifier = Modifier.align(Alignment.BottomEnd).padding(horizontal = 48.dp, vertical = 32.dp),
-                    )
+            CompositionLocalProvider(LocalLifecycleOwner provides (owner ?: LocalLifecycleOwner.current)) {
+                TVHeadendPlayerTheme {
+                    state.containerColor = MaterialTheme.colorScheme.inverseSurface.toArgb()
+                    state.contentColor = MaterialTheme.colorScheme.inverseOnSurface.toArgb()
+                    val root = remember { FocusRequester() }
+                    Box(Modifier.fillMaxSize().background(background).focusRequester(root).focusable()) {
+                        RecordingSkipPrompt(
+                            prompt = state.action,
+                            shown = state.shown,
+                            bannerShown = state.bannerShown,
+                            bannerSkipBottomInset = { 180 },
+                            onSkip = { state.skips += it.mark },
+                            onTimeout = { state.timeouts += it.mark; state.prompt = null },
+                            modifier = Modifier.align(Alignment.BottomEnd).padding(horizontal = 48.dp, vertical = 32.dp),
+                        )
+                    }
+                    LaunchedEffect(Unit) { root.requestFocus() }
                 }
-                LaunchedEffect(Unit) { root.requestFocus() }
             }
         }
         compose.settleFrames(20)

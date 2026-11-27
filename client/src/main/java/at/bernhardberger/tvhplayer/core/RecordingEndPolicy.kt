@@ -8,6 +8,7 @@ import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
+import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
@@ -21,6 +22,10 @@ sealed interface RecordingEndStart {
     data class Resume(val position: Duration) : RecordingEndStart
     data class AtTime(val at: Instant) : RecordingEndStart
 }
+
+/** The fallback start mode; an [RecordingEndStart.AtTime] also carries a broadcast instant. */
+fun RecordingEndStart.toPlaybackStart(): RecordingPlaybackStart =
+    if (this is RecordingEndStart.Resume) RecordingPlaybackStart.RESUME else RecordingPlaybackStart.START_OVER
 
 sealed interface RecordingEndOffer {
     data class Recording(val entry: DvrEntry, val kind: RecordingEndKind, val start: RecordingEndStart) : RecordingEndOffer {
@@ -107,26 +112,47 @@ fun recordingEndOffers(
         addAll(chain)
         next?.let { add(it.copy(kind = RecordingEndKind.NEXT_EPISODE)) }
         addAll(related.asReversed().asSequence().map { it.second }.filter { it.entry.id != next?.entry?.id }.take(2))
-        if (endedAt != null && !endedIsRunning && channel != null && recordingEnd != null &&
-            now - recordingEnd in Duration.ZERO..3.minutes
-        ) {
-            val onAir = liveEvent?.takeIf { (it.channelId == null || it.channelId == channel) && now >= it.start && now < it.stop }
-            if (none { offer ->
-                offer is RecordingEndOffer.Recording && with(offer.entry) {
-                    if (onAir != null) {
-                        eventId == onAir.id || id == onAir.dvrEntryId ||
-                            (channelId == channel && start == onAir.start && stop == onAir.stop)
-                    } else {
-                        val airing = eventId?.let(epgEvent)
-                        val airingStart = airing?.start ?: start
-                        val airingStop = airing?.stop ?: stop
-                        (airing?.channelId ?: channelId) == channel && airingStart != null && airingStop != null &&
-                            now >= airingStart && now < airingStop
-                    }
-                }
-            }) add(RecordingEndOffer.WatchLive(channel, onAir))
-        }
+        recordingEndWatchLive(ended, endedAt, filterIsInstance<RecordingEndOffer.Recording>(),
+            epgEvent, liveEvent, now)?.let(::add)
     }.take(MAX_RECORDING_END_OFFERS)
+}
+
+fun recordingEndWatchLive(
+    ended: DvrEntry,
+    endedAt: Instant?,
+    recordings: List<RecordingEndOffer.Recording>,
+    epgEvent: (EventId) -> EpgEvent?,
+    liveEvent: EpgEvent?,
+    now: Instant,
+): RecordingEndOffer.WatchLive? {
+    if (endedAt == null || recordingIsRunning(ended)) return null
+    val channel = ended.channelId ?: return null
+    val stop = ended.files?.lastOrNull()?.stop ?: recordingPaddedStop(ended) ?: return null
+    if (now - stop !in Duration.ZERO..3.minutes) return null
+    val onAir = liveEvent?.takeIf { (it.channelId == null || it.channelId == channel) && now >= it.start && now < it.stop }
+    val alreadyOffered = recordings.any { offer ->
+        val entry = offer.entry
+        if (onAir != null) {
+            entry.eventId == onAir.id || entry.id == onAir.dvrEntryId ||
+                (entry.channelId == channel && entry.start == onAir.start && entry.stop == onAir.stop)
+        } else {
+            val airing = entry.eventId?.let(epgEvent)
+            val start = airing?.start ?: entry.start
+            val end = airing?.stop ?: entry.stop
+            (airing?.channelId ?: entry.channelId) == channel && start != null && end != null && now >= start && now < end
+        }
+    }
+    return if (alreadyOffered) null else RecordingEndOffer.WatchLive(channel, onAir)
+}
+
+fun RecordingEndOffer.Recording.withCurrentAdmission(
+    currentEntry: DvrEntry,
+    admission: RecordingPlaybackAdmission?,
+): RecordingEndOffer.Recording? {
+    if (recordingWasRemoved(currentEntry) || !recordingPlaybackOffered(admission)) return null
+    val currentStart = if (kind == RecordingEndKind.CHAIN_PART) start
+        else offeredResumePosition(admission)?.let(RecordingEndStart::Resume) ?: RecordingEndStart.FromBeginning
+    return copy(entry = currentEntry, start = currentStart)
 }
 
 private const val MAX_RECORDING_END_OFFERS = 4

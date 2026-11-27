@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.saveable.rememberSerializable
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
+import at.bernhardberger.tvhplayer.presentation.R
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.serializer
 
@@ -71,6 +72,16 @@ internal enum class SettingsSection {
 internal enum class RecordingStartMode {
     RESUME,
     START_OVER,
+}
+
+internal fun recordingEndOriginTitle(origin: AppNavKey?): Int = when (origin) {
+    ChannelsKey -> R.string.nav_channels
+    GuideKey -> R.string.nav_epg
+    RecordingsKey -> R.string.nav_recordings
+    is SettingsKey -> R.string.nav_settings
+    is LivePlayerKey -> R.string.player_live_tv_surface
+    is RecordingPlayerKey -> R.string.player_recording_surface
+    HomeKey, null -> R.string.nav_home
 }
 
 internal val AppNavKey.destination: AppDestination

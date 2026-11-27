@@ -81,6 +81,7 @@ import at.bernhardberger.tvhplayer.core.playerControlsAutoHideEligible
 import at.bernhardberger.tvhplayer.core.playerForegroundLayer
 import at.bernhardberger.tvhplayer.core.recordingRetryCommand
 import at.bernhardberger.tvhplayer.core.RecordingMarkKind
+import at.bernhardberger.tvhplayer.core.RecordingEndStart
 import at.bernhardberger.tvhplayer.core.RecordingPlayNextPolicy
 import at.bernhardberger.tvhplayer.core.recordingPlayNextBoundaries
 import at.bernhardberger.tvhplayer.core.recordingPlayNextOffer
@@ -262,15 +263,18 @@ fun RecordingPlayerScreen(
             recordingPlayNextBoundaries(observation.dvrEntry(recordingId), observation.dvrSnapshotForDisplay?.entries.orEmpty())
         }
         val reachedAt = session.recordingBroadcastTime(retainedSelection, actualPosition)
-        val now = kotlin.time.Instant.fromEpochSeconds(nowSec)
+        val now = session.recordingOffersNow()
         val positionBucket = reachedAt?.let { positions.binarySearch(it).let { i -> if (i >= 0) i + 1 else -i - 1 } }
         val clockBucket = openStarts.binarySearch(now).let { if (it >= 0) it + 1 else -it - 1 }
         // Playhead polls only search the boundary index. Scanning offers is limited to
         // observation or eligibility changes, and the runtime checks again on activation.
-        remember(playNextPolicy, playNextCrossingId, observation, recordingId, positionBucket, clockBucket,
+        val candidate = remember(playNextPolicy, playNextCrossingId, observation, recordingId, positionBucket, clockBucket,
             openStarts.isNotEmpty() && reachedAt != null && reachedAt < now) {
             recordingPlayNextOffer(observation, recordingId, reachedAt, now)
         }
+        if (candidate?.start is RecordingEndStart.AtTime && reachedAt != null)
+            candidate.copy(start = RecordingEndStart.AtTime(reachedAt))
+        else candidate
     } else null
     val playNextPrompt = playNext?.takeIf { playNextCrossing.corner }
     fun playNextNow() {
@@ -928,6 +932,8 @@ fun RecordingPlayerScreen(
                 },
                 onPlay = ::playNextNow,
                 crossingId = playNextCrossingId,
+                initialElapsedMs = { playNextPolicy?.elapsedShownMs ?: 0L },
+                onElapsed = { playNextPolicy?.recordShownTime(playNextCrossingId, it) },
                 modifier = Modifier.align(Alignment.BottomEnd),
             )
 

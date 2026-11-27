@@ -355,6 +355,8 @@ internal fun RecordingPlayNextPrompt(
     onPlay: () -> Unit,
     modifier: Modifier = Modifier,
     crossingId: Int = 0,
+    initialElapsedMs: () -> Long = { 0L },
+    onElapsed: (Long) -> Unit = {},
 ) {
     RecordingCornerPrompt(
         prompt = offer, shown = shown, onTimeout = { onTimeout() },
@@ -362,6 +364,8 @@ internal fun RecordingPlayNextPrompt(
         bannerShown = bannerShown, bannerSkipBottomInset = bannerBottomInset,
         identity = { it.entry.id to crossingId },
         countdownKey = crossingId,
+        initialElapsedMs = initialElapsedMs,
+        onElapsed = onElapsed,
         playNext = true,
     ) { candidate, visible, elapsed, cardModifier ->
             RecordingEndCard(

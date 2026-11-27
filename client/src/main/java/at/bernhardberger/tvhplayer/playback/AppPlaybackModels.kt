@@ -83,12 +83,13 @@ class FinishedRecording internal constructor(
     val selection: RecordingPlaybackSelection,
     val reachedAt: Instant?,
     val playNextDismissed: Boolean,
+    val rejectedPlayNext: DvrEntryId?,
     internal val intent: Long,
     internal val stopSequence: Long,
     internal val epoch: Long,
 )
 
-enum class RecordingEndOutcome { PRESENTED, FAILED, SUPERSEDED }
+enum class RecordingEndOutcome { PRESENTED, FAILED, STALE, SUPERSEDED }
 
 fun currentLivePlaybackSelection(
     observation: SessionObservation,

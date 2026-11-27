@@ -6,6 +6,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.core.AutorecRuleId
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
@@ -25,14 +26,17 @@ import at.bernhardberger.tvheadend.sdk.core.TvheadendTestResultFactory
 import at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackRecoveryReason
 import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
+import at.bernhardberger.tvhplayer.core.ApplianceEntryDestination
 import at.bernhardberger.tvhplayer.core.recordingPlayNextTrigger
 import at.bernhardberger.tvhplayer.notices.Notice
 import at.bernhardberger.tvhplayer.playback.AppPlaybackFailureReason
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection
+import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.settings.ServerSettings
 import at.bernhardberger.tvhplayer.settings.WarmPlaybackMode
+import at.bernhardberger.tvhplayer.ui.common.formatClock
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -45,7 +49,7 @@ import org.robolectric.ParameterizedRobolectricTestRunner
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
@@ -76,6 +80,78 @@ class RecordingPlaybackRouteTest {
         fixture.finishRecording()
         compose.onNodeWithTag("recording-end-card-0").assertIsFocused()
         compose.playAndPresentOffer(fixture)
+    }
+
+    @Test fun anExpiredWatchLiveCardCannotTune() {
+        compose.openRecording(fixture, liveWindow = true)
+        fixture.finishRecording()
+        val card = compose.onNodeWithTag("recording-end-card-0").assertIsFocused()
+        compose.mainClock.autoAdvance = false
+        compose.runOnIdle { fixture.offerNow += 4.minutes }
+        card.performSemanticsAction(SemanticsActions.OnClick)
+        fixture.settle()
+        assertEquals(RecordingsKey, fixture.topRoute())
+    }
+
+    @Test fun anEndCardRefreshesItsBookmarkWithoutResettingItsFocus() {
+        openRecording(8, autoContinue = true)
+        fixture.finishRecording()
+        compose.mainClock.autoAdvance = false
+        val card = compose.onNodeWithTag("recording-end-card-0").assertIsFocused()
+        fixture.updateRecordingBookmark(DvrEntryId(8), 2.minutes)
+        fixture.settle()
+        card.assertIsFocused()
+        val label = ApplicationProvider.getApplicationContext<Application>()
+            .getString(R.string.recording_end_resume_at, "2:00")
+        compose.onNodeWithText(label, useUnmergedTree = true).assertExists()
+    }
+
+    @Test fun aPlayNextContinuationLabelFollowsThePlayheadWithinTheSameOffer() {
+        openRecording(8, chain = true, programmeEndMs = 58.minutes.inWholeMilliseconds,
+            chainFileStart = 58.minutes)
+        compose.mainClock.autoAdvance = false
+        fixture.advanceRecordingTo((58.minutes + 45.seconds).inWholeMilliseconds)
+        val nextPosition = nearEnd
+        fixture.advanceRecordingTo(nextPosition)
+        val expected = NavigationJourneyFixture.NOW - 120.minutes + nextPosition.milliseconds
+        val label = ApplicationProvider.getApplicationContext<Application>()
+            .getString(R.string.recording_end_continue_at, formatClock(expected.epochSeconds))
+        compose.onNodeWithText(label, useUnmergedTree = true).assertExists()
+    }
+
+    @Test fun theEndScreenNamesTheTransientPlayerItReturnsTo() {
+        assertEquals(R.string.player_live_tv_surface, recordingEndOriginTitle(LivePlayerKey(6, "Live")))
+        assertEquals(R.string.player_recording_surface, recordingEndOriginTitle(RecordingPlayerKey(7)))
+    }
+
+    @Test fun aHeldEndOfferCannotInstallTheSameIdFromAnotherSession() {
+        openRecording(8)
+        fixture.finishRecording()
+        compose.mainClock.autoAdvance = false
+        fixture.holdNewPlaybackSettingsReads()
+        try {
+            compose.onNodeWithTag("recording-end-card-0").performSemanticsAction(SemanticsActions.OnClick)
+            compose.mainClock.advanceTimeUntil(2_000) { fixture.playbackSettingsReadHeld }
+            fixture.replaceRecordingSession()
+        } finally {
+            fixture.releasePlaybackSettingsReads()
+        }
+        fixture.settle()
+        compose.runOnIdle { assertEquals(1, fixture.recordingInstalls) }
+    }
+
+    @Test fun anExternalGuideRequestRetiresThePendingEndOfferWithoutPoppingGuide() {
+        openRecording(8, warmPlaybackMode = WarmPlaybackMode.ON)
+        fixture.finishRecording()
+        compose.onNodeWithTag("recording-end-card-0").performSemanticsAction(SemanticsActions.OnClick)
+        fixture.settle()
+        compose.runOnIdle {
+            assertEquals(AppPlaybackTarget.Recording(DvrEntryId(8)), fixture.runtime.activeTarget.value)
+            fixture.launchRequests.request(ApplianceEntryDestination.GUIDE)
+        }
+        fixture.settle()
+        assertEquals(GuideKey, fixture.topRoute())
+        compose.runOnIdle { assertNull(fixture.runtime.activeTarget.value) }
     }
 
     @Test fun backDismissesPlayNextAndDisarmsTheRecordingEndCountdown() {
@@ -129,6 +205,7 @@ class RecordingPlaybackRouteTest {
         compose.onNodeWithTag("recording-play-next-prompt").assertDoesNotExist()
         compose.runOnIdle {
             assertEquals(AppPlaybackTarget.Recording(DvrEntryId(7)), fixture.runtime.activeTarget.value)
+            assertTrue(fixture.runtime.player.playWhenReady)
             assertEquals(Notice.RecordingPlaybackStartFailed,
                 fixture.playbackNotices.state.value.pending.single().notice)
         }
@@ -142,6 +219,36 @@ class RecordingPlaybackRouteTest {
             assertEquals(starts + 1, fixture.recordingInstalls)
             assertEquals(AppPlaybackTarget.Recording(DvrEntryId(7)), fixture.runtime.activeTarget.value)
         }
+    }
+
+    @Test fun rejectedPlayNextIsNotRetriedByTheEndScreenCountdown() {
+        openRecording(8, 9, autoContinue = true)
+        compose.mainClock.autoAdvance = false
+        fixture.advanceRecordingTo(nearEnd)
+        fixture.rejectNextRecording()
+        fixture.key(Key.DirectionCenter)
+        fixture.finishRecording()
+        compose.onNodeWithTag("recording-end-card-0").assertIsFocused()
+        compose.onNodeWithText("Other episode 9").assertExists()
+        compose.onNodeWithText("Other episode 8").assertDoesNotExist()
+    }
+
+    @Test fun warmReturnUsesOnlyTheRemainingPlayNextTime() {
+        openRecording(8, warmPlaybackMode = WarmPlaybackMode.ON)
+        compose.mainClock.autoAdvance = false
+        fixture.advanceRecordingTo(nearEnd)
+        compose.onNodeWithTag("recording-play-next-prompt").assertIsFocused()
+        compose.mainClock.advanceTimeBy(6_000)
+        compose.runOnIdle { fixture.launchRequests.request(ApplianceEntryDestination.RECORDINGS) }
+        fixture.settle()
+        assertEquals(RecordingsKey, fixture.topRoute())
+        compose.mainClock.advanceTimeBy(6_000)
+        fixture.focus("recording-list-entry-7")
+        fixture.key(Key.DirectionCenter)
+        fixture.settle()
+        compose.onNodeWithTag("recording-play-next-prompt").assertExists()
+        compose.mainClock.advanceTimeBy(4_300)
+        compose.onNodeWithTag("recording-play-next-prompt").assertDoesNotExist()
     }
 
     @Test fun backBeforePlayNextPresentsRetiresOnlyTheReplacement() {
@@ -238,6 +345,27 @@ class RecordingPlaybackRouteTest {
         }
     }
 
+    @Test fun aHeldPlayNextRetryCannotInstallTheSameIdFromAnotherSession() {
+        openRecording(8, chain = true)
+        startHeldPlayNext()
+        val installs = fixture.recordingInstalls
+        fixture.retirePlayback()
+        fixture.holdNewPlaybackSettingsReads()
+        try {
+            compose.onNodeWithTag("tv-recovery-primary").performSemanticsAction(SemanticsActions.OnClick)
+            compose.mainClock.advanceTimeUntil(2_000) { fixture.playbackSettingsReadHeld }
+            fixture.replaceRecordingSession()
+        } finally {
+            fixture.releasePlaybackSettingsReads()
+        }
+        fixture.settle()
+        compose.runOnIdle {
+            // The screen can restore in the new session, but it must not inherit the old owner's offset.
+            assertEquals(installs + 1, fixture.recordingInstalls)
+            assertNull(fixture.recordingStartOffset)
+        }
+    }
+
     @Test fun playNextWaitsForPresentationThenShowsTheChainAtThePressTime() {
         openRecording(8, chain = true)
         val press = preparePlayNextPress()
@@ -267,6 +395,7 @@ class RecordingPlaybackRouteTest {
             assertEquals(AppPlaybackTarget.Recording(DvrEntryId(7)), fixture.runtime.activeTarget.value)
             assertTrue(fixture.playbackNotices.state.value.pending.isEmpty())
         }
+        fixture.resumeRecordingForPrompt()
         compose.onNodeWithText("Other episode 9").assertExists()
     }
 
@@ -274,17 +403,37 @@ class RecordingPlaybackRouteTest {
         openRecording(8, 9)
         val press = preparePlayNextPress()
         compose.onNodeWithText("Other episode 8").assertExists()
-        fixture.queuePlayNextDuringPause(press, updateOffer = { entry ->
-            if (entry.id != DvrEntryId(8)) entry
-            else DvrEntry.create(entry.id, title = entry.title, state = entry.state,
-                autorecRuleId = entry.autorecRuleId, start = entry.start, stop = entry.stop, playPosition = 2.minutes)
-        })
+        fixture.queuePlayNextDuringPause(press, bookmarkOffer = DvrEntryId(8) to 2.minutes)
         compose.runOnIdle {
             assertEquals(1, fixture.recordingInstalls)
             assertEquals(AppPlaybackTarget.Recording(DvrEntryId(7)), fixture.runtime.activeTarget.value)
             assertTrue(fixture.playbackNotices.state.value.pending.isEmpty())
         }
+        fixture.resumeRecordingForPrompt()
         compose.onNodeWithText("Resume at", substring = true, useUnmergedTree = true).assertExists()
+    }
+
+    @Test fun playNextDoesNotInstallWhenItsBookmarkIsClearedAfterAcceptance() {
+        openRecording(8)
+        fixture.updateRecordingBookmark(DvrEntryId(8), 12.minutes)
+        val press = preparePlayNextPress()
+        fixture.holdNewPlaybackSettingsReads()
+        try {
+            compose.runOnIdle(press)
+            compose.mainClock.advanceTimeUntil(2_000) { fixture.playbackSettingsReadHeld }
+            fixture.updateRecordingBookmark(DvrEntryId(8), null)
+            fixture.finishRecording()
+        } finally {
+            fixture.releasePlaybackSettingsReads()
+        }
+        fixture.settle()
+        compose.runOnIdle {
+            assertEquals(1, fixture.recordingInstalls)
+            assertEquals(AppPlaybackTarget.Recording(DvrEntryId(7)), fixture.runtime.activeTarget.value)
+            assertTrue(fixture.playbackNotices.state.value.pending.isEmpty())
+        }
+        compose.onNodeWithTag("recording-end-card-0").assertExists()
+        compose.onNodeWithText("Other episode 8", useUnmergedTree = true).assertExists()
     }
 
     private fun preparePlayNextPress(): () -> Unit {
@@ -306,10 +455,19 @@ class RecordingPlaybackRouteTest {
     @Test fun warmReturnDoesNotOfferTheDismissedCrossingAgain() {
         openRecording(8, autoContinue = true)
         compose.mainClock.autoAdvance = false
+        compose.mainClock.advanceTimeUntil(6_000) {
+            compose.onAllNodes(hasTestTag("player-banner") or hasTestTag("player-stop"))
+                .fetchSemanticsNodes().isEmpty()
+        }
         fixture.advanceRecordingTo(nearEnd)
         compose.onNodeWithTag("recording-play-next-prompt").assertIsFocused()
         fixture.backKeyCycle()
+        compose.onNodeWithTag("recording-play-next-prompt").assertDoesNotExist()
+        compose.onNodeWithTag("player-banner").assertDoesNotExist()
+        compose.onNodeWithTag("player-stop").assertDoesNotExist()
+        assertTrue(fixture.topRoute() is RecordingPlayerKey)
         fixture.backKeyCycle()
+        assertEquals(RecordingsKey, fixture.topRoute())
         compose.onNodeWithTag("recording-list-entry-7").assertExists()
         fixture.focus("recording-list-entry-7")
         fixture.key(Key.DirectionCenter)
@@ -414,8 +572,9 @@ class RecordingPlaybackRouteTest {
     private fun openRecording(
         vararg offers: Long, autoContinue: Boolean = false, chain: Boolean = false, programmeEndMs: Long? = null,
         shortChain: Boolean = false, warmPlaybackMode: WarmPlaybackMode? = null,
+        chainFileStart: Duration = chainStart,
     ) = compose.openRecording(fixture, *offers, autoContinue = autoContinue, chain = chain, programmeEndMs = programmeEndMs,
-        shortChain = shortChain, warmPlaybackMode = warmPlaybackMode)
+        shortChain = shortChain, warmPlaybackMode = warmPlaybackMode, chainFileStart = chainFileStart)
 
     @Test fun warmRecordingRequiresMatchingTargetSelectionAndCurrentSession() {
         val current = requireNotNull(SessionObservation.create(
@@ -528,11 +687,13 @@ private fun ComposeContentTestRule.openRecording(
     programmeEndMs: Long? = null,
     shortChain: Boolean = false,
     warmPlaybackMode: WarmPlaybackMode? = null,
+    liveWindow: Boolean = false,
+    chainFileStart: Duration = chainStart,
 ) {
-    val origin = Instant.fromEpochSeconds(Clock.System.now().epochSeconds) - 120.minutes
-    val start = origin + if (chain) chainStart else 80.minutes
+    val origin = NavigationJourneyFixture.NOW - if (liveWindow) 60.minutes else 120.minutes
+    val start = origin + if (chain) chainFileStart else 80.minutes
     fixture.app(withRecording = true, driveRecordingEnd = true, autoContinue = autoContinue, programmeEndMs = programmeEndMs,
-        recordingStart = origin.takeIf { chain }, warmPlaybackMode = warmPlaybackMode,
+        recordingStart = origin.takeIf { chain || liveWindow }, warmPlaybackMode = warmPlaybackMode,
         scheduled = offers.mapIndexed { index, id ->
             DvrEntry.create(DvrEntryId(id), state = DvrEntryState.COMPLETED, title = "Other episode $id",
                 channelId = if (chain) ChannelId(6) else null,

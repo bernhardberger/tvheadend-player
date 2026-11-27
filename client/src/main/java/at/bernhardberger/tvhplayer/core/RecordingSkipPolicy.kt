@@ -2,6 +2,7 @@ package at.bernhardberger.tvhplayer.core
 
 import at.bernhardberger.tvheadend.sdk.core.DvrCutpoint
 import at.bernhardberger.tvheadend.sdk.core.DvrCutpointAction
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvhplayer.settings.AdBreakMode
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.SkipLanding
@@ -26,6 +27,10 @@ class RecordingPlayNextPolicy {
         private set
     var crossingId = 0
         private set
+    var elapsedShownMs = 0L
+        private set
+    var rejectedEntry: DvrEntryId? = null
+        private set
     val corner get() = crossing.corner
     val action get() = crossing.action
     val dismissed get() = crossing.dismissed
@@ -35,12 +40,17 @@ class RecordingPlayNextPolicy {
         if (positionMs < triggerMs) crossing = Crossing.BEFORE
         else if (crossing == Crossing.BEFORE) {
             crossingId++
+            elapsedShownMs = 0
             crossing = Crossing.OFFERED
         }
     }
 
     fun expire() { if (crossing == Crossing.OFFERED) crossing = Crossing.EXPIRED }
     fun dismiss() { if (crossing == Crossing.OFFERED) crossing = Crossing.DISMISSED }
+    fun recordShownTime(id: Int, elapsedMs: Long) {
+        if (id == crossingId) elapsedShownMs = elapsedMs
+    }
+    fun reject(entry: DvrEntryId) { rejectedEntry = entry }
     fun withdraw() {
         if (crossing.action) crossing = if (dismissed) Crossing.WITHDRAWN_AFTER_DISMISSAL else Crossing.WITHDRAWN
     }

@@ -47,6 +47,7 @@ internal class PlaybackPresentationPublisher(
     private val activeTargetEpoch: () -> Long?,
     private val targetInstallationInProgress: () -> Boolean,
     private val publishPlayerErrorFromPlayer: () -> Unit,
+    private val onPlayerPresented: () -> Unit,
     private val elapsedRealtime: () -> Long,
     private val stallRecoveries: () -> Int,
     private val freshDecoderPerZap: () -> Boolean,
@@ -606,6 +607,7 @@ internal class PlaybackPresentationPublisher(
                         isPlaying = player.isPlaying,
                     )
                 }
+                if (_state.value.presented) onPlayerPresented()
             }
             publishDiagnosticsUnderAccessLock()
             endChannelStartIfAudioPlaying()
@@ -624,6 +626,7 @@ internal class PlaybackPresentationPublisher(
                 playbackState = player.playbackState,
                 isPlaying = player.isPlaying,
             )
+            if (_state.value.presented) onPlayerPresented()
             publishDiagnosticsUnderAccessLock()
             endChannelStartIfAudioPlaying()
         }
