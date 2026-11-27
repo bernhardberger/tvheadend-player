@@ -56,6 +56,17 @@ class PlayerSettingsStoreTest {
     }
 
     @Test
+    fun continueAutomaticallyDefaultsOnAndPersists() = runTest {
+        val dataStore = InMemoryPreferencesDataStore()
+        val store = PlayerSettingsStore(dataStore)
+        assertTrue(store.playerSettings.first().continueAutomatically)
+        for (enabled in listOf(false, true)) {
+            store.setContinueAutomatically(enabled)
+            assertEquals(enabled, PlayerSettingsStore(dataStore).playerSettings.first().continueAutomatically)
+        }
+    }
+
+    @Test
     fun warmPlaybackDefaultsOnAndPersistsEveryChoice() = runTest {
         val dataStore = InMemoryPreferencesDataStore()
         val store = PlayerSettingsStore(dataStore)

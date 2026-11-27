@@ -301,7 +301,7 @@ internal fun settingsPlayerLevels(navigation: DepthNavigationState, vm: Settings
     val ui by vm.ui.collectAsStateWithLifecycle()
     return listOf(
         settingsPlayerLevel(ui, vm::onTimeshiftEnabledChanged, vm::onAutoStartPlaybackChanged, vm::onTunnelingEnabledChanged,
-            vm::onSkipCutsChanged, vm::onOfferProgramStartChanged),
+            vm::onSkipCutsChanged, vm::onOfferProgramStartChanged, vm::onContinueAutomaticallyChanged),
         settingsAudioLevel(ui, vm::onAudioPassthroughEnabledChanged, vm::onAudioDescriptionChanged),
         settingsAdBreaksLevel(ui.adBreakMode) { vm.onAdBreakModeChanged(it); navigation.pop() },
         settingsSkipLandingLevel(ui.skipLanding) { vm.onSkipLandingChanged(it); navigation.pop() },
@@ -319,6 +319,7 @@ internal fun settingsPlayerLevel(
     onTunnelingEnabledChanged: (Boolean) -> Unit = {},
     onSkipCutsChanged: (Boolean) -> Unit = {},
     onOfferProgramStartChanged: (Boolean) -> Unit = {},
+    onContinueAutomaticallyChanged: (Boolean) -> Unit = {},
 ): DepthLevel {
     val profilesStatus = streamProfilesStatus(ui.profiles, ui.connected)
     return settingsLevel(SettingsSection.PLAYER.name, stringResource(R.string.settings_player), listOf(
@@ -334,6 +335,9 @@ internal fun settingsPlayerLevel(
             if (ui.timeshiftEnabled) keepChannelLabel(ui.keepChannelMinutes)
                 else stringResource(R.string.keep_channel_needs_timeshift, stringResource(R.string.timeshift_setting)),
             child = KEEP_CHANNEL_LEVEL.takeIf { ui.timeshiftEnabled }, enabled = ui.timeshiftEnabled),
+        settingsRow("continue-automatically", stringResource(R.string.continue_automatically),
+            supporting = stringResource(R.string.continue_automatically_description), checked = ui.continueAutomatically,
+            onClick = { onContinueAutomaticallyChanged(!ui.continueAutomatically) }),
     ) + settingsRecordingMarksRows(ui, onSkipCutsChanged, onOfferProgramStartChanged) + listOf(
         settingsRow(STREAM_PROFILE_LEVEL, stringResource(R.string.profile),
             profilesStatus ?: streamProfileLabel(ui.profiles, ui.selectedProfileId),

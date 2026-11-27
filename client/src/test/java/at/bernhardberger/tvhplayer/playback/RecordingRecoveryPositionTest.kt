@@ -48,6 +48,7 @@ import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvheadend.sdk.media3.*
 import at.bernhardberger.tvheadend.sdk.playback.*
 import at.bernhardberger.tvheadend.sdk.testing.*
+import at.bernhardberger.tvhplayer.core.RecordingEndStart
 import at.bernhardberger.tvhplayer.core.recordingErrorCondition
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore
@@ -531,6 +532,33 @@ class RecordingRecoveryPositionTest {
         awaitMain { player.isCurrentMediaItemSeekable }
         settleMain()
         assertTrue("after a new play: ${player.currentPosition}", player.currentPosition < ONE_MINUTE)
+    }
+
+    @Test fun aContinuationUsesTheCurrentLastFileAndNotTheBookmark() = exercise(bookmark = 5.minutes) {
+        media.seekable = false
+        val start = RecordingEndStart.AtTime(RECORDING_START + 12.minutes)
+        suspend fun install(start: RecordingEndStart) {
+            val install = scope.async { runtime.playRecording(selection(FIRST), start) }
+            awaitCurrent { install.isCompleted }
+            assertTrue(install.await()?.isStarted == true)
+        }
+        val owedPositions = listOf(4.minutes, 13.minutes).map { rollover ->
+            val lastStart = RECORDING_START + rollover
+            session.publish(recordings(listOf(FIRST), 5.minutes, files = listOf(
+                DvrRecordingFile.create(fileId = 1, start = RECORDING_START, stop = lastStart),
+                DvrRecordingFile.create(fileId = 2, start = lastStart, stop = lastStart + 30.minutes),
+            )))
+            install(start)
+            coordinator.pendingRecordingRecoveryPosition.value
+        }
+        assertEquals(listOf(8.minutes, null), owedPositions)
+        awaitUnseekablePlayback()
+
+        media.openSeeking()
+        install(RecordingEndStart.Resume(5.minutes))
+        assertEventuallyNear(5.minutes.inWholeMilliseconds)
+        install(RecordingEndStart.FromBeginning)
+        assertEventuallyNear(0L)
     }
 
     @Test fun aNewPlayAfterStopStartsPerTheViewersChoice() = exercise {

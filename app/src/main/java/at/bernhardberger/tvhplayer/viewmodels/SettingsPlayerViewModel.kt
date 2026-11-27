@@ -49,6 +49,7 @@ data class SettingsPlayerUiState(
     val skipCuts: Boolean = true,
     val offerProgramStart: Boolean = true,
     val skipLanding: SkipLanding = SkipLanding.END,
+    val continueAutomatically: Boolean = true,
 )
 
 class SettingsPlayerViewModel(
@@ -85,6 +86,7 @@ class SettingsPlayerViewModel(
             skipCuts = settings.skipCuts,
             offerProgramStart = settings.offerProgramStart,
             skipLanding = settings.skipLanding,
+            continueAutomatically = settings.continueAutomatically,
         )
     }.combine(
         combine(settingsStore.startupBufferLearning, profileOwner.startupBufferIdentity()) { learning, identity ->
@@ -171,6 +173,10 @@ class SettingsPlayerViewModel(
 
     fun onOfferProgramStartChanged(enabled: Boolean) {
         viewModelScope.launch { settingsStore.setOfferProgramStart(enabled) }
+    }
+
+    fun onContinueAutomaticallyChanged(enabled: Boolean) {
+        viewModelScope.launch { settingsStore.setContinueAutomatically(enabled) }
     }
 
     fun onSkipLandingChanged(landing: SkipLanding) {

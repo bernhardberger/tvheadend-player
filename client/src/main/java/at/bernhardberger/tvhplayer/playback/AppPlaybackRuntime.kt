@@ -40,7 +40,9 @@ import at.bernhardberger.tvheadend.sdk.media3.TvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvheadend.sdk.playback.LiveSubscriptionPriority
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssue
+import at.bernhardberger.tvhplayer.core.RecordingEndStart
 import at.bernhardberger.tvhplayer.core.RecordingFailureDetail
+import at.bernhardberger.tvhplayer.core.recordingEndFileStart
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.FrameRateSwitching
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
@@ -50,6 +52,7 @@ import java.io.IOException
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Instant
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -976,7 +979,22 @@ class AppPlaybackRuntime(
 
     suspend fun playRecording(
         selection: RecordingPlaybackSelection,
+        start: RecordingEndStart,
+    ): PlaybackTargetResult? = when (start) {
+        RecordingEndStart.FromBeginning -> playRecording(selection, RecordingPlaybackStart.START_OVER)
+        is RecordingEndStart.Resume -> playRecording(selection, RecordingPlaybackStart.RESUME)
+        is RecordingEndStart.AtTime -> playRecording(selection, RecordingPlaybackStart.START_OVER, start.at)
+    }
+
+    suspend fun playRecording(
+        selection: RecordingPlaybackSelection,
         start: RecordingPlaybackStart,
+    ): PlaybackTargetResult? = playRecording(selection, start, continueAt = null)
+
+    private suspend fun playRecording(
+        selection: RecordingPlaybackSelection,
+        start: RecordingPlaybackStart,
+        continueAt: Instant?,
     ): PlaybackTargetResult? {
         val request = playbackRequests.incrementAndGet()
         return serializeViewerStart(request, onClosed = { PlaybackTargetResult.SHUT_DOWN }) {
@@ -984,7 +1002,7 @@ class AppPlaybackRuntime(
             forgetRecordingRecoveryLocked()
             val startEpoch = presentationEpoch.snapshot()
             try {
-                playRecordingLocked(selection.recordingId, start, requestedSelection = selection)
+                playRecordingLocked(selection.recordingId, start, requestedSelection = selection, continueAt = continueAt)
             } finally {
                 settleCancelledStartLocked(startEpoch, request)
             }
@@ -1260,6 +1278,7 @@ class AppPlaybackRuntime(
         requestedSelection: RecordingPlaybackSelection? = null,
         playWhenReady: Boolean = true,
         continueReleased: Boolean = false,
+        continueAt: Instant? = null,
         canInstall: () -> Boolean = { true },
     ): PlaybackTargetResult? {
         if (!targetCommands.isOpen()) return PlaybackTargetResult.SHUT_DOWN
@@ -1362,7 +1381,18 @@ class AppPlaybackRuntime(
                                 fallbackStart = start,
                             )
                         } else {
-                            coordinator.setRecordingTarget(binding.binding, start)
+                            // A recording may have rolled over to another file since the offer was built.
+                            // A rollover after this read but before the server's fileOpen isn't detectable here.
+                            val offset = continueAt?.let { at ->
+                                val observation = session.observation.value
+                                if (observation.currentSession !== selection.currentSession) {
+                                    return@installTargetForPresentation PlaybackTargetResult.NOT_READY
+                                }
+                                observation.dvrEntry(recordingId)?.let(::recordingEndFileStart)
+                                    ?.let { at - it }?.takeIf { it.isFinite() && it.isPositive() }
+                            }
+                            if (offset != null) coordinator.setRecordingTarget(binding.binding, position = offset)
+                            else coordinator.setRecordingTarget(binding.binding, start)
                         }
                     }
                     PlaybackBindingResult.ObservationExpired -> {

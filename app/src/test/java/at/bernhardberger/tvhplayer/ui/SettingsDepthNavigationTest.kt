@@ -264,8 +264,11 @@ class SettingsDepthNavigationTest {
     @Test fun timeshiftAccessibilityCheckedStateTracksCenterAndReentry() =
         switchAccessibilityCheckedStateTracksCenterAndReentry("timeshift", downCount = 2)
 
+    @Test fun continueAutomaticallyAccessibilityCheckedStateTracksCenterAndReentry() =
+        switchAccessibilityCheckedStateTracksCenterAndReentry("continue-automatically", downCount = 4)
+
     @Test fun tunnelingAccessibilityCheckedStateTracksCenterAndReentry() =
-        switchAccessibilityCheckedStateTracksCenterAndReentry("tunneling", downCount = 12)
+        switchAccessibilityCheckedStateTracksCenterAndReentry("tunneling", downCount = 13)
 
     @Test fun passthroughAccessibilityCheckedStateTracksCenterAndReentry() =
         switchAccessibilityCheckedStateTracksCenterAndReentry("audio-passthrough", 2, SettingsSection.AUDIO)
@@ -327,7 +330,8 @@ class SettingsDepthNavigationTest {
         rowId: String, downCount: Int, section: SettingsSection = SettingsSection.PLAYER,
     ) {
         var ui by mutableStateOf(SettingsPlayerUiState(autoStartPlayback = false, timeshiftEnabled = false,
-            tunnelingEnabled = false, audioPassthroughEnabled = false, audioDescription = false))
+            tunnelingEnabled = false, audioPassthroughEnabled = false, audioDescription = false,
+            continueAutomatically = false))
         var visibility by mutableStateOf(ChannelScopeVisibility(configured = true,
             allChannelsVisible = rowId != "all-channels", visibleTagIds = setOf(ChannelTagId(2))))
         compose.setContent {
@@ -341,6 +345,7 @@ class SettingsDepthNavigationTest {
                             settingsPlayerLevel(ui,
                                 onTimeshiftEnabledChanged = { ui = ui.copy(timeshiftEnabled = it) },
                                 onAutoStartPlaybackChanged = { ui = ui.copy(autoStartPlayback = it) },
+                                onContinueAutomaticallyChanged = { ui = ui.copy(continueAutomatically = it) },
                                 onTunnelingEnabledChanged = {
                                     ui = ui.copy(tunnelingEnabled = it, tunnelingFallbackActive = false)
                                 }),
@@ -979,7 +984,7 @@ class SettingsDepthNavigationTest {
             }
         }
         press(Key.DirectionCenter)
-        repeat(8) { press(Key.DirectionDown) }
+        repeat(9) { press(Key.DirectionDown) }
         val row = "Stream profile"
         compose.onNode(isFocused() and hasText(row) and hasText("pass")).assertIsEnabled()
         press(Key.DirectionCenter)
