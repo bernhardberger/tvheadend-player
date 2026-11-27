@@ -106,6 +106,8 @@ import at.bernhardberger.tvhplayer.ui.screens.recordings.recordingTimeRange
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeArtwork
 import at.bernhardberger.tvhplayer.ui.components.ProvideAppArtwork
 import at.bernhardberger.tvhplayer.ui.components.RecordingKeepUntilLevel
+import at.bernhardberger.tvhplayer.ui.components.TwoColumnDialog
+import at.bernhardberger.tvhplayer.ui.components.TwoColumnDialogButton
 import at.bernhardberger.tvhplayer.viewmodels.resolveChannelScopeState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotSame
@@ -492,6 +494,33 @@ class BrowseContextMenuScreenTest {
         val content = compose.onNodeWithTag("two-column-content").getUnclippedBoundsInRoot()
         assertEquals(content.top.value, actions.top.value, 0.5f)
         assertEquals(270f, (content.top.value + maxOf(content.bottom.value, actions.bottom.value)) / 2f, 0.5f)
+    }
+
+    @Test fun widerDialogKeepsColumnsTopAlignedInContentCenteredContainer() {
+        val wider = androidx.compose.runtime.mutableStateOf(false)
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                TwoColumnDialog("Playback", "Choose what plays next.", {},
+                    contentWidth = if (wider.value) 844.dp else 700.dp,
+                    leadingWidth = if (wider.value) 360.dp else 340.dp,
+                    actionsWidth = if (wider.value) 384.dp else 268.dp) {
+                    TwoColumnDialogButton("First", {})
+                    TwoColumnDialogButton("Second", {})
+                    TwoColumnDialogButton("Third", {})
+                }
+            }
+        }
+        compose.waitForIdle()
+        assertTwoColumnContainerCentred()
+        val defaultLeading = compose.onNodeWithTag("two-column-content").getUnclippedBoundsInRoot()
+        val defaultTrailing = compose.onNodeWithTag("two-column-actions").getUnclippedBoundsInRoot()
+        compose.runOnIdle { wider.value = true }
+        assertTwoColumnContainerCentred()
+        val leading = compose.onNodeWithTag("two-column-content").getUnclippedBoundsInRoot()
+        val trailing = compose.onNodeWithTag("two-column-actions").getUnclippedBoundsInRoot()
+        assertTrue(leading.right < trailing.left)
+        assertTrue(leading.right - leading.left > defaultLeading.right - defaultLeading.left)
+        assertTrue(trailing.right - trailing.left > defaultTrailing.right - defaultTrailing.left)
     }
 
     @Test fun programmeDescriptionJoinsEpisodeAndSummaryOnSeparateLines() {

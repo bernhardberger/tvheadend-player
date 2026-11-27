@@ -34,6 +34,10 @@ internal fun HomeRecordingActions(
     onShowGuide: (ChannelId, EpgEvent?) -> Unit,
     onReturnToRecording: (DvrEntryId, () -> Unit) -> Boolean,
     onClose: () -> Unit,
+    endStart: RecordingEndStart? = null,
+    endHasContinuationTime: Boolean = false,
+    endWatchSupport: String? = null,
+    onPlayEndDefault: () -> Unit = {},
 ) {
     val opening = remember { observation }
     val frameOwner = LocalTabOwner.current
@@ -98,6 +102,19 @@ internal fun HomeRecordingActions(
     } else if (menu) {
         val canModify = capability != null && (observation.sessionState as? SessionState.Ready)
             ?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
+        val actions = recordingContextActions(opened, admission, canModify, canWatchChannel = watchLive != null,
+            ruleAvailable = observation.recordingRuleAvailable(opened),
+            playing = endStart == null && capability != null && at.bernhardberger.tvhplayer.ui.warmRecordingId(
+                LocalWatchingTarget.current, LocalRecordingPlaybackSelection.current, observation.currentSession) == opened.id)
+        val endActions = if (endStart == null) actions else buildList {
+            add(BrowseContextAction.WATCH)
+            if (endStart is RecordingEndStart.Resume || endHasContinuationTime)
+                add(BrowseContextAction.START_OVER)
+            if (endStart !is RecordingEndStart.Resume && offeredResumePosition(admission) != null)
+                add(BrowseContextAction.RESUME)
+            addAll(actions.filterNot { it in listOf(BrowseContextAction.WATCH, BrowseContextAction.PLAY,
+                BrowseContextAction.RESUME, BrowseContextAction.START_OVER) })
+        }
         BrowseContextMenu(
             title = opened.title.orEmpty(),
             channel = channel?.let { channelTitleText(it.number, it.name.orEmpty()) } ?: opened.channelName.orEmpty(),
@@ -130,10 +147,8 @@ internal fun HomeRecordingActions(
                 }
             },
             playbackIndicator = watchingIndicator(opened.id),
-            actions = recordingContextActions(opened, admission, canModify, canWatchChannel = watchLive != null,
-                ruleAvailable = observation.recordingRuleAvailable(opened),
-                playing = capability != null && at.bernhardberger.tvhplayer.ui.warmRecordingId(
-                    LocalWatchingTarget.current, LocalRecordingPlaybackSelection.current, observation.currentSession) == opened.id),
+            actions = endActions,
+            watchSupport = endWatchSupport,
             modifier = Modifier.onPreviewKeyEvent { pending() || mutationBusy || editingRule },
             onClose = onClose,
             backEnabled = pendingMutation == null && !mutationBusy && !editingRule,
@@ -146,7 +161,9 @@ internal fun HomeRecordingActions(
                         else onClose()
                     }
                     BrowseContextAction.CONTINUE_WATCHING -> onReturnToRecording(opened.id) { closeBehindPlayer(onClose) }
-                    BrowseContextAction.WATCH, BrowseContextAction.RESUME -> play(RecordingPlaybackStart.RESUME)
+                    BrowseContextAction.WATCH -> if (endStart == null) play(RecordingPlaybackStart.RESUME)
+                        else { onClose(); onPlayEndDefault() }
+                    BrowseContextAction.RESUME -> play(RecordingPlaybackStart.RESUME)
                     BrowseContextAction.PLAY, BrowseContextAction.START_OVER -> play(RecordingPlaybackStart.START_OVER)
                     BrowseContextAction.WATCH_LIVE -> watchLive?.invoke()
                     BrowseContextAction.EDIT_RULE -> {

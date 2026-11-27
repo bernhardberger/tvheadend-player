@@ -32,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
@@ -46,6 +47,7 @@ import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.MaterialTheme
@@ -73,6 +75,10 @@ internal fun TwoColumnDialog(
     leading: (@Composable ColumnScope.() -> Unit)? = null,
     itemCardLayout: Boolean = false,
     dismissLevel: Boolean = false,
+    contentWidth: Dp = 700.dp,
+    leadingWidth: Dp = if (itemCardLayout) 268.dp else 340.dp,
+    actionsWidth: Dp = TwoColumnActionWidth,
+    backgroundColor: Color = MaterialTheme.colorScheme.background,
     actions: @Composable ColumnScope.() -> Unit,
 ) {
     var openingReleasePending by remember { mutableStateOf(true) }
@@ -101,7 +107,7 @@ internal fun TwoColumnDialog(
             onDispose { layering?.details?.remove(pageKey) }
         }
         Box(modifier.browseDetailsViewport().fillMaxSize().graphicsLayer { this.alpha = opacity.value }
-            .background(MaterialTheme.colorScheme.background)
+            .background(backgroundColor)
             .semantics { dialog(); paneTitle = title }
             .onPreviewKeyEvent { event ->
                 if (closing || onPreviewKeyEvent(event)) return@onPreviewKeyEvent true
@@ -118,10 +124,10 @@ internal fun TwoColumnDialog(
             }.focusGroup().padding(horizontal = 58.dp, vertical = 28.dp),
             contentAlignment = Alignment.Center) {
             // Kit Two Column: the container is centred on screen, its columns are top-aligned inside it.
-            Row(Modifier.width(700.dp), horizontalArrangement = Arrangement.SpaceBetween,
+            Row(Modifier.width(contentWidth), horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Top) {
                 CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
-                    Column(Modifier.width(if (itemCardLayout) 268.dp else 340.dp).testTag("two-column-content"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(Modifier.width(leadingWidth).testTag("two-column-content"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         if (leading != null) leading() else {
                             Text(title, style = MaterialTheme.typography.headlineMedium,
                                 color = MaterialTheme.colorScheme.onSurface, maxLines = 3,
@@ -131,7 +137,7 @@ internal fun TwoColumnDialog(
                         }
                     }
                 }
-                Column(Modifier.width(TwoColumnActionWidth).testTag("two-column-actions"),
+                Column(Modifier.width(actionsWidth).testTag("two-column-actions"),
                     verticalArrangement = Arrangement.spacedBy(12.dp), content = actions)
             }
         }

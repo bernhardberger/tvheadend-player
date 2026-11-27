@@ -76,7 +76,10 @@ internal class PictureLoad {
     /** The first of the picture's places whose corner nothing else on the card has [taken]. */
     fun logoPlace(taken: Set<ArtworkLogoCorner> = emptySet()): ArtworkLogoPlace =
         logoPlaces?.firstOrNull { it.corner !in taken }
-            ?: ArtworkLogoPlace(ArtworkLogoCorner.BOTTOM_START, ArtworkLogoGround.SHADE)
+            ?: ArtworkLogoPlace(
+                ArtworkLogoCorner.entries.firstOrNull { it !in taken } ?: ArtworkLogoCorner.BOTTOM_START,
+                ArtworkLogoGround.SHADE,
+            )
 
     fun onSuccess(state: AsyncImagePainter.State.Success) {
         // Known with the picture, so the logo never jumps after it shows.

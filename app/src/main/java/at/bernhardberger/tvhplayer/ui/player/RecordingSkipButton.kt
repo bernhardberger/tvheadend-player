@@ -128,8 +128,13 @@ private fun RecordingSkipButton(
 }
 
 @Composable
-private fun SkipCountdown(color: Color, elapsed: () -> Float) {
-    Box(Modifier.size(20.dp).testTag("recording-skip-countdown").drawBehind {
+internal fun SkipCountdown(
+    color: Color,
+    elapsed: () -> Float,
+    ringSize: Dp = 20.dp,
+    drawSkipIcon: Boolean = true,
+) {
+    Box(Modifier.size(ringSize).testTag("recording-skip-countdown").drawBehind {
         val stroke = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
         val inset = stroke.width / 2f
         drawCircle(color.copy(alpha = color.alpha * .2f), radius = size.minDimension / 2f - inset, style = stroke)
@@ -140,7 +145,7 @@ private fun SkipCountdown(color: Color, elapsed: () -> Float) {
             topLeft = Offset(inset, inset), size = Size(size.width - stroke.width, size.height - stroke.width), style = stroke,
         )
     }, contentAlignment = Alignment.Center) {
-        Box(Modifier.size(13.dp * (8.5f / 12.5f), 8.5.dp).drawBehind {
+        if (drawSkipIcon) Box(Modifier.size(13.dp * (8.5f / 12.5f), 8.5.dp).drawBehind {
             val triangleWidth = 9.5.dp.toPx() * (8.5f / 12.5f)
             val gap = 1.dp.toPx() * (8.5f / 12.5f)
             val barWidth = 2.5.dp.toPx() * (8.5f / 12.5f)

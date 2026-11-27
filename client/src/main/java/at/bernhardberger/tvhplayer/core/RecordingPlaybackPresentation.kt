@@ -6,14 +6,17 @@ enum class RecordingFinishedAction {
     NONE,
     STOP,
     STOP_AND_CLOSE_PLAYER,
+    SHOW_END_SCREEN,
 }
 
 fun recordingFinishedAction(
     recordingFinished: Boolean,
     activeRecordingId: DvrEntryId?,
     recordingPlayerVisible: Boolean,
+    hasOffers: Boolean = false,
 ): RecordingFinishedAction = when {
     !recordingFinished || activeRecordingId == null -> RecordingFinishedAction.NONE
+    recordingPlayerVisible && hasOffers -> RecordingFinishedAction.SHOW_END_SCREEN
     recordingPlayerVisible -> RecordingFinishedAction.STOP_AND_CLOSE_PLAYER
     else -> RecordingFinishedAction.STOP
 }

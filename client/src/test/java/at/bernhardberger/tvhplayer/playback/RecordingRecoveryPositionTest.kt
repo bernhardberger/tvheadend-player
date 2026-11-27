@@ -48,6 +48,7 @@ import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvheadend.sdk.media3.*
 import at.bernhardberger.tvheadend.sdk.playback.*
 import at.bernhardberger.tvheadend.sdk.testing.*
+import at.bernhardberger.tvhplayer.core.RecordingEndOffer
 import at.bernhardberger.tvhplayer.core.RecordingEndStart
 import at.bernhardberger.tvhplayer.core.recordingErrorCondition
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
@@ -56,6 +57,7 @@ import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import java.io.FileNotFoundException
 import java.io.IOException
 import java.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 import kotlinx.coroutines.*
@@ -219,7 +221,7 @@ class RecordingRecoveryPositionTest {
         playGrowing()
         appendGrowing()
         requireNotNull(realRecording).finish()
-        session.publish(growingObservation(completed = true))
+        session.publish(growingObservation(completed = true, rolledOver = true))
 
         advancePlayback(15_000)
         awaitMain { player.playbackState == Player.STATE_ENDED }
@@ -227,6 +229,56 @@ class RecordingRecoveryPositionTest {
 
         assertNoRecordingFailure()
         assertEquals(Player.STATE_ENDED, player.playbackState)
+        val end = RECORDING_START + player.currentPosition.milliseconds
+        assertEquals(end, runtime.finishedRecording.value?.reachedAt)
+        val finishedEpoch = runtime.videoPresentation.value.epoch
+        runtime.onAppBackgrounded()
+        awaitMain { player.currentMediaItem == null }
+        runtime.onAppForegrounded()
+        driver.settle(player)
+        assertNull("a finished recording must not reopen", player.currentMediaItem)
+        assertEquals(finishedEpoch, runtime.videoPresentation.value.epoch)
+        assertEquals(AppPlaybackState.Finished, runtime.state.value)
+        assertEquals(end, runtime.finishedRecording.value?.reachedAt)
+    }
+
+    @Test fun oldRecordingEndCleanupCannotStopANewerTarget() = exercise {
+        media.lengthMs = 2_000
+        play(FIRST)
+        awaitPlayback { player.playbackState == Player.STATE_ENDED }
+        driver.settle(player)
+        val finished = requireNotNull(runtime.finishedRecording.value)
+
+        play(SECOND)
+        val cleanup = scope.async { runtime.stopRecordingEnd(finished) }
+        awaitCurrent { cleanup.isCompleted }
+
+        assertFalse(cleanup.await())
+        assertEquals(AppPlaybackTarget.Recording(SECOND), runtime.activeTarget.value)
+    }
+
+    @Test fun dismissingARejectedWatchLiveOfferClearsTheTargetlessFailure() = exercise {
+        media.lengthMs = 2_000
+        play(FIRST)
+        awaitPlayback { player.playbackState == Player.STATE_ENDED }
+        driver.settle(player)
+        val finished = requireNotNull(runtime.finishedRecording.value)
+        session.scriptLivePlaybackFailure(PlaybackBindingResult.TargetUnavailable)
+
+        val offer = scope.async {
+            runtime.playRecordingEndOffer(finished, RecordingEndOffer.WatchLive(ChannelId(1), null)) {
+                error("A rejected tune must not present")
+            }
+        }
+        awaitCurrent { offer.isCompleted }
+        assertEquals(RecordingEndOutcome.FAILED, offer.await())
+        assertNull(runtime.activeTarget.value)
+        assertTrue(runtime.state.value is AppPlaybackState.Failed)
+
+        val cleanup = scope.async { runtime.stopRecordingEnd(finished) }
+        awaitCurrent { cleanup.isCompleted }
+        assertTrue(cleanup.await())
+        assertEquals(AppPlaybackState.Idle, runtime.state.value)
     }
 
     private fun exerciseGrowing(block: suspend Fixture.() -> Unit) = runTest(timeout = 120.seconds) {
@@ -629,7 +681,13 @@ class RecordingRecoveryPositionTest {
             }
             assertEquals(playing && granted, player.playWhenReady)
             assertEquals(AppPlaybackTarget.Recording(FIRST), runtime.activeTarget.value)
-            if (playing && granted) assertEventuallyNear(position) else assertFalse(player.isPlaying)
+            if (playing && granted) {
+                assertEventuallyNear(position)
+                advancePlayback(player.duration - player.currentPosition)
+                awaitPlayback { player.playbackState == Player.STATE_ENDED }
+                driver.settle(player)
+                assertEquals(selection(FIRST), runtime.finishedRecording.value?.selection)
+            } else assertFalse(player.isPlaying)
             if (!granted) assertTrue(runtime.hasAudioInterruption)
             if (!playing) {
                 awaitPlayback { coordinator.pendingRecordingRecoveryPosition.value == null }
@@ -856,12 +914,15 @@ class RecordingRecoveryPositionTest {
         private val growingStates = mutableListOf<AppPlaybackState>()
 
         @OptIn(TvheadendTestingApi::class)
-        fun growingObservation(completed: Boolean = false) = recordings(
+        fun growingObservation(completed: Boolean = false, rolledOver: Boolean = false) = recordings(
             listOf(FIRST), null, if (completed) DvrEntryState.COMPLETED else DvrEntryState.RECORDING,
             progressSupported = true,
             files = listOf(TvheadendTestResultFactory.recordingFile(fileId = 1, serverPath = "synthetic.ts",
                 start = RECORDING_START, stop = if (completed) RECORDING_START + 12.seconds else null,
-                sizeBytes = requireNotNull(realRecording).sizeBytes)),
+                sizeBytes = requireNotNull(realRecording).sizeBytes)) + if (rolledOver) listOf(
+                    TvheadendTestResultFactory.recordingFile(fileId = 2, serverPath = "later.ts",
+                        start = RECORDING_START + 12.seconds, stop = RECORDING_START + 13.seconds, sizeBytes = 1),
+                ) else emptyList(),
         )
 
         suspend fun playGrowing() {

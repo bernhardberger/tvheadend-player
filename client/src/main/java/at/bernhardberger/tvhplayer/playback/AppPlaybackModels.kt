@@ -10,6 +10,7 @@ import at.bernhardberger.tvheadend.sdk.media3.PlaybackRecoveryReason
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult
 import at.bernhardberger.tvheadend.sdk.playback.LiveSubscriptionDiagnostics
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssue
+import kotlin.time.Instant
 
 sealed interface AppPlaybackState {
     data object Idle : AppPlaybackState
@@ -63,6 +64,17 @@ data class RecordingPlaybackSelection(
     val currentSession: CurrentSessionObservation,
     val recordingId: DvrEntryId,
 )
+
+/** One natural end of one installed recording, not a projection of current playback state. */
+class FinishedRecording internal constructor(
+    val selection: RecordingPlaybackSelection,
+    val reachedAt: Instant?,
+    internal val intent: Long,
+    internal val stopSequence: Long,
+    internal val epoch: Long,
+)
+
+enum class RecordingEndOutcome { PRESENTED, FAILED, SUPERSEDED }
 
 fun currentLivePlaybackSelection(
     observation: SessionObservation,

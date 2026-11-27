@@ -42,7 +42,7 @@ sealed interface RecordingEndOffer {
  */
 fun recordingEndOffers(
     ended: DvrEntry,
-    endedAt: Instant,
+    endedAt: Instant?,
     recordings: List<DvrEntry>,
     epgEvent: (EventId) -> EpgEvent?,
     admission: (DvrEntry) -> RecordingPlaybackAdmission?,
@@ -52,7 +52,8 @@ fun recordingEndOffers(
     val channel = ended.channelId
     val endedIsRunning = recordingIsRunning(ended)
     val lastStop = ended.files?.lastOrNull()?.stop
-    val recordingEnd = if (endedIsRunning) maxOf(lastStop ?: endedAt, endedAt) else lastStop ?: recordingPaddedStop(ended)
+    val recordingEnd = if (endedIsRunning && endedAt != null) maxOf(lastStop ?: endedAt, endedAt)
+        else lastStop ?: recordingPaddedStop(ended)
     val latestStart = recordingEnd?.plus(2.minutes)
     val playable = recordings.mapNotNull { entry ->
         if (entry.id == ended.id || sameRecordingBroadcast(ended, entry, epgEvent)) return@mapNotNull null
@@ -60,7 +61,7 @@ fun recordingEndOffers(
         if (!recordingPlaybackOffered(targetAdmission)) return@mapNotNull null
         entry to targetAdmission
     }
-    val chainCandidates = if (channel == null) emptyList() else playable.mapNotNull { (entry, _) ->
+    val chainCandidates = if (channel == null || endedAt == null) emptyList() else playable.mapNotNull { (entry, _) ->
         if (entry.channelId != channel || entry.state == DvrEntryState.MISSED) return@mapNotNull null
         val start = recordingEndFileStart(entry) ?: return@mapNotNull null
         val file = entry.files?.lastOrNull() ?: return@mapNotNull null
@@ -102,7 +103,7 @@ fun recordingEndOffers(
         addAll(chain)
         next?.let { add(it.copy(kind = RecordingEndKind.NEXT_EPISODE)) }
         addAll(related.asReversed().asSequence().map { it.second }.filter { it.entry.id != next?.entry?.id }.take(2))
-        if (!endedIsRunning && channel != null && recordingEnd != null &&
+        if (endedAt != null && !endedIsRunning && channel != null && recordingEnd != null &&
             now - recordingEnd in Duration.ZERO..3.minutes
         ) {
             val onAir = liveEvent?.takeIf { (it.channelId == null || it.channelId == channel) && now >= it.start && now < it.stop }
@@ -127,7 +128,7 @@ fun recordingEndOffers(
 private const val MAX_RECORDING_END_OFFERS = 4
 
 /** Tvheadend opens the last listed file, not a concatenation of all file observations. */
-internal fun recordingEndFileStart(entry: DvrEntry): Instant? {
+fun recordingEndFileStart(entry: DvrEntry): Instant? {
     val files = entry.files ?: return null
     return files.lastOrNull()?.start ?: if (files.size == 1) recordingPaddedStart(entry) else null
 }

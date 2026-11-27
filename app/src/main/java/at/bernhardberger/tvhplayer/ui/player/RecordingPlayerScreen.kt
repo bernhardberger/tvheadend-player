@@ -121,7 +121,7 @@ fun RecordingPlayerScreen(
     val playerSettings by playerSettingsStore.playerSettings.collectAsStateWithLifecycle(PlayerSettings())
     val playerClose = rememberPlayerClose(onClose)
     // First, before the route restore: a user stop since the last intent closes the screen.
-    val screenEntry = rememberPlayerEntry(session::enterPlayerScreen, playerClose)
+    val screenEntry = rememberPlayerEntry({ session.enterPlayerScreen(recordingId = recordingId) }, playerClose)
     val connectionAvailable = connectionState is ConnectionState.Connected
     val scope = rememberCoroutineScope()
     val mutations = remember(tvheadendSession.dvrRepository) {

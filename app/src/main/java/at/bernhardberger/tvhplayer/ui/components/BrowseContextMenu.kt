@@ -85,6 +85,7 @@ internal fun BrowseContextMenu(
     onKeepUntilBack: () -> Unit = {},
     /** The playing item's mark, drawn as Continue watching's icon. */
     playbackIndicator: ChannelPlaybackIndicator = ChannelPlaybackIndicator.NONE,
+    watchSupport: String? = null,
     artwork: @Composable () -> Unit,
 ) {
     val requesters = remember { BrowseContextAction.entries.associateWith { FocusRequester() } }
@@ -126,7 +127,8 @@ internal fun BrowseContextMenu(
                             down = actions.getOrNull(index + 1)?.let(requesters::get) ?: FocusRequester.Cancel
                             left = FocusRequester.Cancel; right = FocusRequester.Cancel
                         },
-                    subtitle = keepUntilSupport?.takeIf { action == BrowseContextAction.KEEP_UNTIL }
+                    subtitle = watchSupport?.takeIf { action == BrowseContextAction.WATCH }
+                        ?: keepUntilSupport?.takeIf { action == BrowseContextAction.KEEP_UNTIL }
                         ?: contextActionSupport(action, recordingKind)?.let { stringResource(it) }
                         ?: resumePositionMs?.takeIf { action == BrowseContextAction.RESUME && it > 0 }
                         ?.let { stringResource(at.bernhardberger.tvhplayer.presentation.R.string.context_resume_from,
