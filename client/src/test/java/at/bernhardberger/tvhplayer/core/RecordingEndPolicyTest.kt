@@ -68,6 +68,33 @@ class RecordingEndPolicyTest {
     }
 
     @Test
+    fun earlierPaddedPartsAreNotChainOffersForTheMatchOrAtFileEnd() {
+        fun clock(hour: Int, minute: Int, second: Int = 0) = (hour * 3_600 + minute * 60 + second).toLong()
+        val rule = AutorecRuleId("match")
+        val preMatch = recording(1, clock(18, 25), clock(18, 45), rule = rule,
+            state = DvrEntryState.RECORDING, files = listOf(TvheadendTestResultFactory.recordingFile(
+                fileId = 1, serverPath = "pre-match.ts", start = at(clock(18, 13, 30)),
+            )))
+        val firstHalf = recording(2, clock(18, 45), clock(19, 34), rule = rule,
+            fileStart = clock(18, 33, 30), fileStop = clock(20, 34))
+        val halfTime = recording(3, clock(19, 43), clock(19, 45), rule = rule,
+            fileStart = clock(19, 31, 30), fileStop = clock(20, 45))
+        val secondHalf = recording(4, clock(19, 45), clock(20, 30), rule = rule,
+            fileStart = clock(19, 33, 30), fileStop = clock(21, 30))
+        val analysis = recording(5, clock(20, 30), clock(21, 15), rule = rule,
+            fileStart = clock(20, 18, 30), fileStop = clock(22, 15))
+        val now = at(clock(23, 0))
+        val samples = listOf(at(clock(19, 34)), at(clock(20, 34)))
+        val results = samples.map { reached -> offers(preMatch, firstHalf, halfTime, secondHalf, analysis,
+            finished = firstHalf, reached = reached, now = now) }
+        val expected = listOf(halfTime.id, secondHalf.id, analysis.id)
+        assertEquals("chain at programme stop and EOF", samples.map { expected },
+            results.map { offers -> offers.filterIsInstance<RecordingEndOffer.Recording>()
+                .filter { it.kind == RecordingEndKind.CHAIN_PART }.map { it.entry.id } })
+        assertEquals(samples.map { chain(halfTime, RecordingEndStart.AtTime(it)) }, results.map(::recordingPlayNextOffer))
+    }
+
+    @Test
     fun runningEndedPartUsesTheReachedTimeWhenTheLastFileStopIsMissingOrStale() {
         val next = recording(2, 2_120, 3_000)
         val tooLate = recording(3, 2_121, 3_000)
@@ -106,6 +133,14 @@ class RecordingEndPolicyTest {
             recording(9, 1_000, 2_000, event = null, fileStart = 1_005, fileStop = 2_100),
             valid, lookup = mapOf(event.id to event)::get,
         ))
+        for (airing in listOf(null, ended.start)) {
+            val candidate = recording(11, airing?.epochSeconds, 3_000, fileStart = 1_950)
+            assertEquals("DVR airing $airing is not strictly later",
+                listOf(chain(valid, RecordingEndStart.AtTime(at(2_000)))), offers(candidate, valid))
+            val resolved = EpgEvent.create(requireNotNull(candidate.eventId), candidate.channelId, at(1_975), at(3_000))
+            assertEquals(listOf(chain(candidate, RecordingEndStart.AtTime(at(2_000)))),
+                offers(candidate, lookup = mapOf(resolved.id to resolved)::get))
+        }
     }
 
     @Test
@@ -308,12 +343,12 @@ class RecordingEndPolicyTest {
 
     private fun recording(
         id: Long,
-        start: Long,
+        start: Long?,
         stop: Long?,
         channel: ChannelId? = ChannelId(1),
         event: EventId? = EventId(id),
         rule: AutorecRuleId? = null,
-        fileStart: Long = start,
+        fileStart: Long = requireNotNull(start),
         state: DvrEntryState = DvrEntryState.COMPLETED,
         fileStop: Long? = stop,
         startExtra: Duration? = null,
@@ -322,7 +357,7 @@ class RecordingEndPolicyTest {
         playCount: Long? = null,
         resume: Duration? = null,
     ) = DvrEntry.create(DvrEntryId(id), channelId = channel, eventId = event, autorecRuleId = rule,
-        start = at(start), stop = stop?.let(::at), startExtraMinutes = startExtra, stopExtraMinutes = stopExtra,
+        start = start?.let(::at), stop = stop?.let(::at), startExtraMinutes = startExtra, stopExtraMinutes = stopExtra,
         files = files, state = state,
         playCount = playCount, playPosition = resume)
 

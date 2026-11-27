@@ -113,7 +113,6 @@ import at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
-import kotlin.time.Duration.Companion.seconds
 import at.bernhardberger.tvhplayer.data.ConnectionState
 import at.bernhardberger.tvhplayer.presentation.R
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
@@ -151,6 +150,10 @@ import kotlinx.coroutines.flow.first
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 
 /**
  * The production recording screen's chrome follows live's key model: a passive Banner on entry,
@@ -799,7 +802,8 @@ class RecordingPlayerChromeScreenTest {
 
     @Test fun resumingWithOkDrainsTheOpeningKeyBeforeTheNextPress() {
         positionMs = 1_000
-        screen(leadIn = true)
+        val leadIn = 11.minutes + 30.seconds
+        screen(leadIn = true, configuredLeadIn = 12.minutes, observedLeadIn = leadIn)
         playing()
         compose.pressKey(Key.MediaPause, settleFrames = 20, frameMillis = 16)
         assertFalse(player.playWhenReady)
@@ -815,7 +819,8 @@ class RecordingPlayerChromeScreenTest {
         compose.onRoot().performKeyInput { keyUp(Key.DirectionCenter) }
         compose.settleFrames(2, frameMillis = 16)
         assertEquals("the opening OK must not skip", 1_000L, positionMs)
-        compose.pressKey(Key.Back, settleFrames = 20, frameMillis = 16)
+        compose.pressKey(Key.DirectionCenter, settleFrames = 20, frameMillis = 16)
+        assertEquals("a fresh OK skips to the programme start in the installed file", leadIn.inWholeMilliseconds, positionMs)
         assertFalse(exists("recording-skip-prompt"))
         compose.pressKey(Key.DirectionCenter, settleFrames = 2, frameMillis = 16)
         assertFalse("the next OK pauses playback", player.playWhenReady)
@@ -1427,11 +1432,15 @@ class RecordingPlayerChromeScreenTest {
     }
 
     /** [listed] false: the server never lists the recording, so the screen stays in its loading state. */
+    @OptIn(TvheadendTestingApi::class)
     private fun screen(onClose: () -> Unit = {}, listed: Boolean = true, refusedEntry: DvrEntry? = null,
         settleEntry: Boolean = true, inheritedAudio: AudioTrackChoice? = null, leadIn: Boolean = false, adBreak: Boolean = false,
         title: String = "Zeit im Bild",
+        configuredLeadIn: Duration = 2.minutes,
+        observedLeadIn: Duration? = null,
     ): FakeTvheadendSession {
         val recording = DvrEntryId(7)
+        val programmeStart = Instant.fromEpochSeconds(1_800)
         val session = FakeTvheadendSession(SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(Channel.create(ChannelId(1), name = "Documentary")))),
@@ -1439,8 +1448,11 @@ class RecordingPlayerChromeScreenTest {
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create(listOfNotNull(refusedEntry ?: DvrEntry.create(
                 id = recording, state = DvrEntryState.COMPLETED, title = title, channelName = "Documentary",
                 channelId = ChannelId(1).takeIf { inheritedAudio != null },
-                start = kotlin.time.Instant.fromEpochSeconds(1_800).takeIf { leadIn },
-                startExtraMinutes = kotlin.time.Duration.parse("2m").takeIf { leadIn },
+                start = programmeStart.takeIf { leadIn },
+                startExtraMinutes = configuredLeadIn.takeIf { leadIn },
+                files = observedLeadIn?.let { listOf(TvheadendTestResultFactory.recordingFile(
+                    fileId = 1, serverPath = "/rec/programme.mkv", start = programmeStart - it,
+                )) }.orEmpty(),
             ).takeIf { listed }))),
         )).apply { scriptRecordingPlaybackSuccess() }
         val playbackSession = if (adBreak) sessionWithAdBreak(session) else session

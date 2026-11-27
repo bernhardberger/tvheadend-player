@@ -86,6 +86,7 @@ import at.bernhardberger.tvhplayer.core.RecordingPlayNextPolicy
 import at.bernhardberger.tvhplayer.core.recordingPlayNextBoundaries
 import at.bernhardberger.tvhplayer.core.recordingPlayNextOffer
 import at.bernhardberger.tvhplayer.core.recordingPlayNextTrigger
+import at.bernhardberger.tvhplayer.core.recordingProgramMarks
 import at.bernhardberger.tvhplayer.core.recordingPlayerAlert
 import at.bernhardberger.tvhplayer.core.recordingFailureDetail
 import at.bernhardberger.tvhplayer.playback.AppPlaybackFailureReason
@@ -222,10 +223,12 @@ fun RecordingPlayerScreen(
     val displayDurationMs = timelineState.displayDurationMs
     // The marks of the recording this screen plays, while it can be sought by them.
     val canSeekMarks = timelineState.canSeek && retainedSelection != null && retainedSelection.currentSession === currentSession
-    val programMarks = remember(entry, durationMs, canSeekMarks) {
-        if (canSeekMarks) entry?.let {
-            at.bernhardberger.tvhplayer.core.recordingProgramMarks(it, durationMs)
-        }.orEmpty() else emptyList()
+    val fileOrigin = retainedSelection?.let { session.recordingBroadcastTime(it, 0L) }
+    val markEntry = if (canSeekMarks) observation.dvrEntry(recordingId) else null
+    val programMarks = remember(markEntry, durationMs, fileOrigin) {
+        markEntry?.let {
+            recordingProgramMarks(it, durationMs, fileOrigin)
+        }.orEmpty()
     }
     val marks = remember(recordingMarks, programMarks, canSeekMarks) {
         if (!canSeekMarks) emptyList()

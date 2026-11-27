@@ -173,6 +173,49 @@ class RecordingPlaybackRouteTest {
         compose.onNodeWithTag("recording-end-countdown").assertDoesNotExist()
     }
 
+    @OptIn(TvheadendTestingApi::class)
+    @Test fun aListStartedRecordingOffersPlayNextAtProgrammeEndAfterHiddenSeeks() {
+        val fileStart = NavigationJourneyFixture.NOW - 120.minutes
+        val programmeLeadIn = 11.minutes + 30.seconds
+        val programmeEnd = programmeLeadIn + 45.minutes
+        val rule = AutorecRuleId("programme-crossing")
+        fun match(stop: Duration) = DvrEntry.create(DvrEntryId(17), channelId = ChannelId(6), autorecRuleId = rule,
+            state = DvrEntryState.COMPLETED, title = "Match",
+            start = fileStart + programmeLeadIn, stop = fileStart + stop,
+            startExtraMinutes = 12.minutes, stopExtraMinutes = 60.minutes,
+            files = listOf(TvheadendTestResultFactory.recordingFile(
+                serverPath = "match.ts", start = fileStart, stop = fileStart + programmeEnd + 60.minutes)))
+        val original = match(programmeEnd + 30.seconds)
+        val next = DvrEntry.create(DvrEntryId(18), channelId = ChannelId(6), autorecRuleId = rule,
+            state = DvrEntryState.COMPLETED, title = "Post-match",
+            start = fileStart + programmeEnd, stop = fileStart + programmeEnd + 45.minutes,
+            files = listOf(TvheadendTestResultFactory.recordingFile(serverPath = "post-match.ts",
+                start = fileStart + programmeEnd - programmeLeadIn, stop = fileStart + programmeEnd + 45.minutes)))
+        fixture.app(withRecording = true, driveRecordingEnd = true, scheduled = listOf(original, next))
+        compose.onNodeWithTag("nav-recordings").performSemanticsAction(SemanticsActions.OnClick)
+        compose.playFromRecordings(fixture, original.id.value)
+
+        compose.mainClock.autoAdvance = false
+        fixture.publishRecordings(fixture.recordings().map { if (it.id == original.id) match(programmeEnd) else it })
+        val beforeSeeking = (programmeEnd - 70.seconds).inWholeMilliseconds
+        fixture.advanceRecordingTo(beforeSeeking)
+        compose.onNodeWithTag("player-stop").assertDoesNotExist()
+        repeat(2) { fixture.key(Key.DirectionRight) }
+        compose.runOnIdle {
+            assertTrue(fixture.recordingPosition in (beforeSeeking + 1) until programmeEnd.inWholeMilliseconds)
+        }
+        val prompt = compose.onNodeWithTag("recording-play-next-prompt")
+        prompt.assertDoesNotExist()
+        // The real playhead crosses the scheduled stop, rather than seeking onto the mark.
+        fixture.advanceRecordingTo((programmeEnd + 2.seconds).inWholeMilliseconds)
+        prompt.assertIsFocused()
+        // Left goes below the origin-based mark and re-arms the next crossing.
+        fixture.key(Key.DirectionLeft)
+        prompt.assertDoesNotExist()
+        fixture.advanceRecordingTo((programmeEnd + 2.seconds).inWholeMilliseconds)
+        prompt.assertIsFocused()
+    }
+
     @Test fun expiredPlayNextDoesNotPlayAndLeavesTheEndCountdownArmed() {
         openRecording(8, autoContinue = true)
         compose.mainClock.autoAdvance = false

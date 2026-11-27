@@ -295,6 +295,8 @@ class AppPlaybackRuntime(
     val recordingControlsSkip = recordingMarkers.controlsSkip
     @Volatile
     private var activeTargetEpoch: Long? = null
+    // Capture once per fresh file install, even if it is growing. With no observed start,
+    // a single file can use the padded start; an unknown multi-file origin stays unknown.
     @Volatile private var recordingFileOrigin: Instant? = null
     // The policy reference is read and replaced under intentLock; its crossing is volatile.
     private var playNextPolicy = RecordingPlayNextPolicy()
@@ -1863,6 +1865,7 @@ class AppPlaybackRuntime(
                         requireNotNull(installedBinding),
                         selection.recordingId,
                         continuesTarget = preservesMarkerHistory,
+                        fileOrigin = recordingFileOrigin,
                     )
                     presentation.publishStarting()
                     presentation.beginTargetPresentationLocked(

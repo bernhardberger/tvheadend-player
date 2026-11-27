@@ -45,7 +45,12 @@ class RecordingMarkerPolicyTest {
             startExtraMinutes = pre?.minutes, stopExtraMinutes = post?.minutes)
         val start = RecordingMark(RecordingMarkKind.PROGRAM_START, 120_000)
         val end = RecordingMark(RecordingMarkKind.PROGRAM_END, 720_000)
-        assertEquals(listOf(start, end), recordingProgramMarks(entry(), 900_000))
+        for ((originSeconds, adjustmentMs) in listOf(850L to 30_000L, 910L to -30_000L, null to 0L)) {
+            assertEquals("file origin $originSeconds", listOf(
+                RecordingMark(RecordingMarkKind.PROGRAM_START, start.startMs + adjustmentMs),
+                RecordingMark(RecordingMarkKind.PROGRAM_END, end.startMs + adjustmentMs),
+            ), recordingProgramMarks(entry(), 900_000, originSeconds?.let(Instant::fromEpochSeconds)))
+        }
         assertEquals(listOf(start), recordingProgramMarks(entry(), 720_000))
         assertEquals(emptyList<RecordingMark>(), recordingProgramMarks(entry(), 120_000))
         assertEquals(emptyList<RecordingMark>(), recordingProgramMarks(entry(), 0))

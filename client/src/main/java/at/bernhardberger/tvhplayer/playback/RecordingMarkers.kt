@@ -44,6 +44,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.yield
 import kotlin.time.Duration
+import kotlin.time.Instant
 
 /** Identity belongs to this action on this installed target, not to the metadata revision. */
 class RecordingSkipAction(val mark: RecordingMark, internal val landingMs: Long)
@@ -84,11 +85,12 @@ internal class RecordingMarkers(
     private var skipPolicy = RecordingSkipPolicy()
     private var settings = PlayerSettings()
     private var recordingId: DvrEntryId? = null
+    private var fileOrigin: Instant? = null
     private var programMarks = emptyList<RecordingMark>()
     private fun currentProgramMarks(): List<RecordingMark> =
         recordingId?.let { session.observation.value.dvrEntry(it) }
             ?.takeIf { it.startExtraMinutes?.isPositive() == true }
-            ?.let { recordingProgramMarks(it, player.duration) }
+            ?.let { recordingProgramMarks(it, player.duration, fileOrigin) }
             .orEmpty().filter { it.kind == RecordingMarkKind.PROGRAM_START }
     private fun policyMarks(): List<RecordingMark> = marks.value + programMarks
     private var savedVolume: Float? = null
@@ -370,6 +372,7 @@ internal class RecordingMarkers(
         _controlsSkip.value = null
         _currentAdBreak.value = null
         recordingId = null
+        fileOrigin = null
         programMarks = emptyList()
         mediaItem = null
         markerQuery.use(null)
@@ -404,9 +407,11 @@ internal class RecordingMarkers(
         binding: PlaybackBinding.Recording,
         recordingId: DvrEntryId,
         continuesTarget: Boolean = false,
+        fileOrigin: Instant? = null,
     ) {
         clearRecordingMarkers(preserveHistory = continuesTarget)
         this.recordingId = recordingId
+        this.fileOrigin = fileOrigin
         markerQuery.use(binding)
         mediaItem = player.currentMediaItem
         // Tracks may already have arrived synchronously during installation.

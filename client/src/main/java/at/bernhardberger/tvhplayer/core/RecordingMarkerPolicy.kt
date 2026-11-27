@@ -3,12 +3,17 @@ package at.bernhardberger.tvhplayer.core
 import at.bernhardberger.tvheadend.sdk.core.DvrCutpoint
 import at.bernhardberger.tvheadend.sdk.core.DvrCutpointAction
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import kotlin.time.Instant
 
 enum class RecordingMarkKind { AD_BREAK, CUT, CHAPTER, PROGRAM_START, PROGRAM_END }
 
-/** Scheduled programme boundaries relative to the padded recording start, never outside verified content. */
-fun recordingProgramMarks(recording: DvrEntry, verifiedDurationMs: Long): List<RecordingMark> {
-    val origin = recordingPaddedStart(recording) ?: return emptyList()
+/** Scheduled programme boundaries on the installed file's timebase, with padded start as a fallback. */
+fun recordingProgramMarks(
+    recording: DvrEntry,
+    verifiedDurationMs: Long,
+    fileOrigin: Instant? = null,
+): List<RecordingMark> {
+    val origin = fileOrigin ?: recordingPaddedStart(recording) ?: return emptyList()
     return buildList {
         if (recording.startExtraMinutes?.isPositive() == true) {
             recording.start?.let { start ->

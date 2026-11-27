@@ -45,6 +45,7 @@ sealed interface RecordingEndOffer {
  * Measure the chain gap from the stop of [ended]'s last file, or its padded stop if unavailable.
  * A still-running [ended] uses at least [endedAt] for the gap. Otherwise [endedAt] determines
  * where to continue, or proves overlap when a finished recording has no known end.
+ * Overlapping files are only chain parts if their programme airs after [ended]'s programme.
  * Use one session observation for the entries, EPG and [admission]. Play must revalidate its target.
  * Only [RecordingEndOffer.Recording] can be an automatic target; a corner offer uses only chain
  * parts or the next episode and revalidates the displayed choice at the captured press time.
@@ -59,6 +60,8 @@ fun recordingEndOffers(
     now: Instant,
 ): List<RecordingEndOffer> {
     val channel = ended.channelId
+    val endedEvent = ended.eventId?.let(epgEvent)
+    val endedAiring = endedEvent?.start ?: ended.start
     val endedIsRunning = recordingIsRunning(ended)
     val lastStop = ended.files?.lastOrNull()?.stop
     val recordingEnd = if (endedIsRunning && endedAt != null) maxOf(lastStop ?: endedAt, endedAt)
@@ -70,8 +73,10 @@ fun recordingEndOffers(
         if (!recordingPlaybackOffered(targetAdmission)) return@mapNotNull null
         entry to targetAdmission
     }
-    val chainCandidates = if (channel == null || endedAt == null) emptyList() else playable.mapNotNull { (entry, _) ->
+    val chainCandidates = if (channel == null || endedAt == null || endedAiring == null) emptyList() else playable.mapNotNull { (entry, _) ->
         if (entry.channelId != channel || entry.state == DvrEntryState.MISSED) return@mapNotNull null
+        val airing = entry.eventId?.let(epgEvent)?.start ?: entry.start ?: return@mapNotNull null
+        if (airing <= endedAiring) return@mapNotNull null
         val start = recordingEndFileStart(entry) ?: return@mapNotNull null
         val file = entry.files?.lastOrNull() ?: return@mapNotNull null
         val stop = file.stop ?: (if (recordingIsRunning(entry)) now else recordingPaddedStop(entry))
@@ -89,10 +94,8 @@ fun recordingEndOffers(
     }
     if (chain.size == MAX_RECORDING_END_OFFERS) return chain
 
-    val endedEvent = ended.eventId?.let(epgEvent)
     val rule = ended.autorecRuleId
     val series = endedEvent?.seriesLinkUri?.takeIf(String::isNotBlank)
-    val endedAiring = endedEvent?.start ?: ended.start
     val related = if (rule == null && series == null) emptyList() else playable.mapNotNull { (entry, admission) ->
         if (chain.any { it.entry.id == entry.id || sameRecordingBroadcast(it.entry, entry, epgEvent) }) {
             return@mapNotNull null
