@@ -546,10 +546,15 @@ def playback_sessions(text: str, package_name: str) -> list[dict[str, str]]:
                     session[target] = match[1]
         description = re.fullmatch(r"metadata:.*?description=(.*)", stripped)
         if description:
-            # MediaDescription's dump is title, subtitle, description; omit description.
+            # MediaDescription's dump is title, subtitle, description; omit description. A programme
+            # subtitle may itself contain ", ": the subtitle is then whatever stands between the title
+            # and a null description, and is left out when a description makes the split ambiguous.
             parts = description[1].split(", ")
-            if len(parts) == 3:
-                for key, value in zip(("title", "subtitle"), parts[:2]):
+            if len(parts) >= 3:
+                fields = {"title": parts[0]}
+                if len(parts) == 3 or parts[-1] == "null":
+                    fields["subtitle"] = ", ".join(parts[1:-1])
+                for key, value in fields.items():
                     if value != "null":
                         session[key] = value
     return sessions

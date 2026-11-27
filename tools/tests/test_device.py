@@ -436,6 +436,11 @@ class OperatorShortcutsTest(unittest.TestCase):
         self.assertEqual(len(sessions), 2)
         self.assertEqual(sessions[0]["state"], "99")
         self.assertEqual(sessions[1], {"active": "true"})
+        comma = "S (userId=0)\n  package=selected.player\n  metadata: size=2, description={}\n"
+        self.assertEqual(DEVICE["playback_sessions"](comma.format("ORF1 HD, Slowly, he said, null"), "selected.player"),
+                         [{"title": "ORF1 HD", "subtitle": "Slowly, he said"}])
+        self.assertEqual(DEVICE["playback_sessions"](comma.format("ORF1 HD, Slowly, he said, Text"), "selected.player"),
+                         [{"title": "ORF1 HD"}])
 
     def test_status_composition_and_mismatch_exit(self):
         for mismatch, no_frames in ((False, False), (True, False), (False, True)):
