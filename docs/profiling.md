@@ -74,7 +74,11 @@ Inside the tunnel, after the usual exact-target identity check:
    ```
 
    A full run of all three can exceed 20 minutes. One journey can be repeated on
-   its own with `-e class …PlayerBaselineProfile#startup02Autostart`.
+   its own with `-e class …PlayerBaselineProfile#startup02Autostart`. The
+   recording journey plays the first recording it reaches in the Archive; add
+   `-e archiveEntry "<text>"` to move down to the first row, folder or
+   recording, whose text contains it instead, for example when the Archive
+   starts with a recording in progress.
 3. Require each of the three named tests to report status code 0, plus
    `OK (n tests)`; an ADB exit status alone is insufficient. Then
    `adb pull "$DIR"` and force-stop both packages.

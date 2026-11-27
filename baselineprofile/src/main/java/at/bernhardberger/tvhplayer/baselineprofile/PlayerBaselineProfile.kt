@@ -199,11 +199,13 @@ class PlayerBaselineProfile {
         } else return
         key(KeyEvent.KEYCODE_DPAD_DOWN)
         key(KeyEvent.KEYCODE_DPAD_UP)
+        // A named row keeps the journey off whatever the server lists first, such as a recording in progress.
+        InstrumentationRegistry.getArguments().getString("archiveEntry")?.let { focusArchiveEntry(it) }
         val entry = By.res(Pattern.compile("recording-list-entry-\\d+"))
         // An empty Archive has no rows. Folder and recording rows keep focus in depth-active.
         repeat(8) {
             val pane = device.findObject(active)
-            val recording = pane?.findObject(entry)
+            val recording = pane?.findObject(By.copy(entry).focused(true)) ?: pane?.findObject(entry)
             if (recording != null) {
                 focusToward(By.res(recording.resourceName), KeyEvent.KEYCODE_DPAD_DOWN)
                 key(KeyEvent.KEYCODE_MENU)
@@ -233,6 +235,20 @@ class PlayerBaselineProfile {
             }, ReadyTimeout))
         }
         assertTrue("Archive folders must lead to recording rows", false)
+    }
+
+    private fun MacrobenchmarkScope.focusArchiveEntry(name: String) {
+        // A folder or recording row; it merges its text or keeps it on a child, depending on its semantics.
+        val label = Pattern.compile(".*" + Pattern.quote(name) + ".*", Pattern.DOTALL)
+        val row = By.res("depth-active").hasDescendant(By.focused(true).text(label))
+        val child = By.res("depth-active").hasDescendant(By.focused(true).hasDescendant(By.text(label)))
+        repeat(60) {
+            if (has(row) || has(child)) return
+            val previous = device.findObject(By.focused(true))?.resourceName
+            key(KeyEvent.KEYCODE_DPAD_DOWN)
+            device.wait({ previous == null || !has(By.res(previous).focused(true)) }, FocusTimeout)
+        }
+        assertTrue("Archive row $name must be reachable", false)
     }
 
     private fun MacrobenchmarkScope.homeToChannels() {
