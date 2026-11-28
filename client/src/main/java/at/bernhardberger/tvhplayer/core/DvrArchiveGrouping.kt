@@ -123,8 +123,7 @@ enum class DvrArchiveSort {
  */
 private fun DvrArchiveFolder.arranged(sort: DvrArchiveSort, lastGroup: String?): DvrArchiveFolder {
     val collator = Collator.getInstance().apply { strength = Collator.SECONDARY }
-    val newest = compareByDescending<DvrEntry> { it.start?.epochSeconds ?: Long.MIN_VALUE }
-    val recordingOrder = archiveRecordingOrder(sort, collator, newest)
+    val recordingOrder = archiveRecordingOrder(sort, collator)
     fun DvrArchiveFolder.sorted(): DvrArchiveFolder {
         val children = folders.map { it.sorted() }
         val summaries = when (sort) {
@@ -158,11 +157,11 @@ private class TitleOrder(private val collator: Collator, private val descending:
     }
 }
 
-private fun archiveRecordingOrder(
+internal fun archiveRecordingOrder(
     sort: DvrArchiveSort,
-    collator: Collator,
-    newest: Comparator<DvrEntry>,
+    collator: Collator = Collator.getInstance().apply { strength = Collator.SECONDARY },
 ): Comparator<DvrEntry> {
+    val newest = compareByDescending<DvrEntry> { it.start?.epochSeconds ?: Long.MIN_VALUE }
     return when (sort) {
         DvrArchiveSort.NEWEST -> newest
         // Without a known start, title or size a recording comes last in both directions.
