@@ -1838,6 +1838,24 @@ fun VideoPlayerScreen(
         !(startupOutcomeDelivered && startupTarget != null && initialStartupTarget == startupTarget)) {
         return
     }
+    /**
+     * Identifies the bound tune eligible for chrome warmup. Direct runtime reads (flow values
+     * and the stopped-intent lookup) aren't Compose state; cancellation relies on re-reading them.
+     */
+    val tuneWarmupToken = {
+        val target = activeTarget as? AppPlaybackTarget.Live
+        val epoch = videoPresentation.epoch
+        val intent = liveIntent
+        val pending = requestedLiveSelection
+        val allowed = contentAllowed && screenActive && screenEntry != null && !playerClose.requested
+        // The runtime publishes this target and epoch when the tune binds, before the first frame.
+        val bound = target?.channelId == currentChannelId && epoch != 0L &&
+            playbackRuntime.activeTarget.value == target && playbackRuntime.videoPresentation.value.epoch == epoch
+        val ownsTune = pending == null || (intent != null &&
+            playbackRuntime.installedLiveTargetEpoch(pending, intent) == epoch)
+        val stopped = intent != null && playbackRuntime.isPlaybackIntentStopped(intent)
+        Triple(liveRequestToken, epoch, screenStarts).takeIf { allowed && bound && ownsTune && !stopped }
+    }
     @Composable
     fun PlayerContent() {
     val rootModifier = playerRootModifier()
@@ -1940,24 +1958,6 @@ fun VideoPlayerScreen(
         }
         // The page's strip and the detached rail outlive the controls' exit.
         val quickZap = rememberQuickZapRail(expanded = layerState.channelRailPresented, detached = true)
-        /**
-         * Identifies the bound tune eligible for chrome warmup. Direct runtime reads (flow values
-         * and the stopped-intent lookup) aren't Compose state; cancellation relies on re-reading them.
-         */
-        val tuneWarmupToken = {
-            val target = activeTarget as? AppPlaybackTarget.Live
-            val epoch = videoPresentation.epoch
-            val intent = liveIntent
-            val pending = requestedLiveSelection
-            val allowed = contentAllowed && screenActive && screenEntry != null && !playerClose.requested
-            // The runtime publishes this target and epoch when the tune binds, before the first frame.
-            val bound = target?.channelId == currentChannelId && epoch != 0L &&
-                playbackRuntime.activeTarget.value == target && playbackRuntime.videoPresentation.value.epoch == epoch
-            val ownsTune = pending == null || (intent != null &&
-                playbackRuntime.installedLiveTargetEpoch(pending, intent) == epoch)
-            val stopped = intent != null && playbackRuntime.isPlaybackIntentStopped(intent)
-            Triple(liveRequestToken, epoch, screenStarts).takeIf { allowed && bound && ownsTune && !stopped }
-        }
         @Composable
         fun PlayerControls(keepControls: Boolean) {
         val previewId = visibleSeekPreview?.id
