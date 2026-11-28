@@ -48,6 +48,11 @@ JOURNEYS = {
     # Down, Down opens the channel rows; Back closes them to the action row, Back hides the controls.
     "first-rows": [("DPAD_DOWN", 1.5), ("DPAD_DOWN", 3.0), ("BACK", 1.5), ("BACK", 4.0)] * 3,
     "rows-zap": [("DPAD_DOWN", 1.5), ("DPAD_DOWN", 3.0), ("DPAD_RIGHT", 1.5), ("DPAD_CENTER", 10.0)],
+    # Tune from Home and stay on the bare player: the first picture and whatever the player builds meanwhile.
+    "tune-open": [("DPAD_CENTER", 20.0)],
+    # The first Down soon after a tune, as after autostart: during the banner, and just after it.
+    "tune-down-4": [("DPAD_CENTER", 4.0), ("DPAD_DOWN", 4.0), ("BACK", 2.0)],
+    "tune-down-8": [("DPAD_CENTER", 8.0), ("DPAD_DOWN", 4.0), ("BACK", 2.0)],
 }
 
 PRECONDITIONS = {
@@ -74,6 +79,9 @@ PRECONDITIONS = {
     "first-down": "Fresh process, one channel tuned and settled; no Up/Down pressed yet; banner and controls hidden.",
     "first-rows": "Fresh process, one channel tuned and settled; rows not yet opened; banner and controls hidden.",
     "rows-zap": "Settled playback on channel 1, banner and controls hidden; the next channel in the rows is playable.",
+    "tune-open": "Fresh process on Home with the Recent channels card of a playable channel focused; nothing playing.",
+    "tune-down-4": "Fresh process on Home with the Recent channels card of a playable channel focused; nothing playing.",
+    "tune-down-8": "Fresh process on Home with the Recent channels card of a playable channel focused; nothing playing.",
 }
 
 
