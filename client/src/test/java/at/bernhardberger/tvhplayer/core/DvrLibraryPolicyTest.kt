@@ -64,18 +64,23 @@ class DvrLibraryPolicyTest {
 
     @Test fun recordingNowFolderListsRunningRecordingsOnlyAtTheFoldersRootWhileSwitchedOn() {
         val path = listOf("Sport")
-        val running = entry(1, DvrEntryState.RECORDING, 100, path)
-        val root = buildDvrArchive(listOf(running, entry(2, DvrEntryState.COMPLETED, 50, path)))
+        val early = entry(1, DvrEntryState.RECORDING, 100, path, title = "Bravo")
+        val late = entry(2, DvrEntryState.RECORDING_ERROR, 300, path, title = "Alpha")
+        val untitled = entry(3, DvrEntryState.RECORDING, 200, emptyList())
+        val completed = entry(4, DvrEntryState.COMPLETED, 50, path)
+        val root = buildDvrArchive(listOf(early, late, untitled, completed))
         val folders = DvrArchiveView(grouping = DvrArchiveGrouping.FOLDERS)
 
         assertTrue(DvrArchiveView().recordingNowFolder)
-        assertEquals(listOf(running), root.recordingNowEntries(folders))
+        assertEquals(listOf(late.id, untitled.id, early.id), root.recordingNowEntries(folders).map { it.id })
+        assertEquals(listOf(early, untitled, late), root.recordingNowEntries(folders.copy(sort = DvrArchiveSort.OLDEST)))
+        assertEquals(listOf(late, early, untitled), root.recordingNowEntries(folders.copy(sort = DvrArchiveSort.NAME)))
         assertTrue(root.recordingNowEntries(folders.copy(recordingNowFolder = false)).isEmpty())
         assertTrue(root.folderAt(path)!!.recordingNowEntries(folders).isEmpty())
         DvrArchiveGrouping.entries.filter { it != DvrArchiveGrouping.FOLDERS }.forEach {
             assertTrue("$it", root.recordingNowEntries(folders.copy(grouping = it)).isEmpty())
         }
-        assertTrue(buildDvrArchive(listOf(entry(3, DvrEntryState.COMPLETED, 10, path))).recordingNowEntries(folders).isEmpty())
+        assertTrue(buildDvrArchive(listOf(completed)).recordingNowEntries(folders).isEmpty())
     }
 
     @Test fun runningListIsFlatAscendingWithUnknownStartsLast() {
@@ -356,6 +361,6 @@ class DvrLibraryPolicyTest {
                 else -> null
             })
 
-    private fun entry(id: Long, state: DvrEntryState, start: Long, folder: List<String>?) =
-        DvrEntry.create(DvrEntryId(id), state = state, start = Instant.fromEpochSeconds(start), folder = folder)
+    private fun entry(id: Long, state: DvrEntryState, start: Long, folder: List<String>?, title: String? = null) =
+        DvrEntry.create(DvrEntryId(id), state = state, start = Instant.fromEpochSeconds(start), folder = folder, title = title)
 }

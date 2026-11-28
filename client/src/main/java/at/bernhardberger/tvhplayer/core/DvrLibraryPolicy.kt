@@ -104,12 +104,12 @@ fun DvrArchiveFolder.runningRecordings(): List<DvrEntry> =
 
 /**
  * What the Recording now folder at the top of the Folders root lists: the running recordings below
- * [this] root, oldest start first. Other groupings, deeper folders and a view that turned the folder
- * off have none, and without a running recording there is no folder.
+ * [this] root in the order chosen by [DvrArchiveView.sort]. Other groupings, deeper folders and a
+ * view that turned the folder off have none, and without a running recording there is no folder.
  */
 fun DvrArchiveFolder.recordingNowEntries(view: DvrArchiveView): List<DvrEntry> =
     if (view.grouping == DvrArchiveGrouping.FOLDERS && view.recordingNowFolder && path.isEmpty()) {
-        runningRecordings()
+        descendantRecordings().filter(::recordingIsRunning).sortedWith(archiveRecordingOrder(view.sort))
     } else {
         emptyList()
     }
