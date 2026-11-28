@@ -113,6 +113,35 @@ internal fun PlayerControlsLayer(
     val appear = remember(currentProgress) {
         derivedStateOf { currentProgress.value.value }
     }
+    val layerAlpha = rememberControlsLayerAlpha(transition, appear, freshEntry, modalVisible)
+    val viewport = LocalPlayerPageScrim.current
+    val fade = transition.animateShown(
+        tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard),
+        tween(if (modalVisible) PlayerMotion.FastMs else PlayerMotion.MediumMs, easing = PlayerMotion.StandardAccelerate),
+        "viewport-chrome",
+    )
+    DisposableEffect(viewport, fade, appear) {
+        viewport?.alpha = { fade.value * appear.value }
+        onDispose { viewport?.alpha = { 0f } }
+    }
+    val motion = remember(transition, appear, visibility) { PlayerControlsMotion(transition, appear, visibility) }
+    PlayerMotionFrame(leaving = !shown, modifier = modifier.graphicsLayer { alpha = layerAlpha() },
+        dropFocusToSink = !hidden) {
+        CompositionLocalProvider(
+            LocalPlayerControlsMotion provides motion,
+            LocalPlayerControlsEntry provides showEntry,
+            LocalPlayerControlsAlpha provides layerAlpha,
+        ) { content(hidden) }
+    }
+}
+
+@Composable
+private fun rememberControlsLayerAlpha(
+    transition: Transition<EnterExitState>,
+    appear: State<Float>,
+    freshEntry: Boolean,
+    modalVisible: Boolean,
+): () -> Float {
     // An exit accelerates; a reveal that interrupts it recovers from its current alpha.
     val exitFade = transition.animateFloat(
         transitionSpec = {
@@ -127,17 +156,7 @@ internal fun PlayerControlsLayer(
         },
         label = "controls-exit",
     ) { if (it == EnterExitState.PostExit) 0f else 1f }
-    val viewport = LocalPlayerPageScrim.current
-    val fade = transition.animateShown(
-        tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard),
-        tween(if (modalVisible) PlayerMotion.FastMs else PlayerMotion.MediumMs, easing = PlayerMotion.StandardAccelerate),
-        "viewport-chrome",
-    )
-    DisposableEffect(viewport, fade, appear) {
-        viewport?.alpha = { fade.value * appear.value }
-        onDispose { viewport?.alpha = { 0f } }
-    }
-    val layerAlpha = remember {
+    return remember {
         {
             when (transition.targetState) {
                 EnterExitState.PreEnter -> 0f
@@ -145,14 +164,5 @@ internal fun PlayerControlsLayer(
                 EnterExitState.PostExit -> exitFade.value
             }
         }
-    }
-    val motion = remember(transition, appear, visibility) { PlayerControlsMotion(transition, appear, visibility) }
-    PlayerMotionFrame(leaving = !shown, modifier = modifier.graphicsLayer { alpha = layerAlpha() },
-        dropFocusToSink = !hidden) {
-        CompositionLocalProvider(
-            LocalPlayerControlsMotion provides motion,
-            LocalPlayerControlsEntry provides showEntry,
-            LocalPlayerControlsAlpha provides layerAlpha,
-        ) { content(hidden) }
     }
 }

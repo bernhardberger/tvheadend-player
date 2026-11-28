@@ -239,7 +239,9 @@ internal fun QuickZapRail(
             .then(if (rail.detached) Modifier
                 .graphicsLayer { alpha = if (rail.hosted) rail.layerAlpha() else 0f } else Modifier),
     ) {
-        if (!built || !shown && !expanded && channelPeek == null) return@Box
+        if (!built) return@Box
+        val trayVisibleOrPeeking = shown || expanded || channelPeek != null
+        if (!trayVisibleOrPeeking) return@Box
         PlayerMotionFrame(leaving = leaving, modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
             dropFocusToSink = hosted) {
             Column(

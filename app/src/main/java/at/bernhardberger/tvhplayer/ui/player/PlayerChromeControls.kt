@@ -149,7 +149,8 @@ internal fun PlayerChromeControls(
     var timingUnavailable by remember(identity) { mutableStateOf(false) }
     LaunchedEffect(identity, pausable, seekable, hidden) {
         timingUnavailable = false
-        if (!hidden && live != null && pausable && !seekable) {
+        val waitingForLiveTiming = live != null && pausable && !seekable
+        if (!hidden && waitingForLiveTiming) {
             kotlinx.coroutines.delay(1_500L)
             timingUnavailable = true
         }

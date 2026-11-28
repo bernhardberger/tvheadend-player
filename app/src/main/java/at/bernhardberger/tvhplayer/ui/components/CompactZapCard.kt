@@ -247,7 +247,8 @@ internal fun CompactZapCard(
             val watching = currentEvent != null && currentEvent.channelId == LocalWatchingChannel.current &&
                 LocalWatchingIndicator.current.isPlayingItem &&
                 (viewer?.epochSec?.let(currentEvent::isRunning) ?: true)
-            if (currentEvent != null && (!watching || viewer == null || viewer.epochSec != null)) {
+            val viewerPositionUnknown = viewer != null && viewer.epochSec == null
+            if (currentEvent != null && !(watching && viewerPositionUnknown)) {
                 ProgressStrip(
                     progress = {
                         // The callback can run before recomposition swaps the event.

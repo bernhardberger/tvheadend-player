@@ -113,7 +113,9 @@ fun WallClock(nowSec: () -> Long, modifier: Modifier = Modifier) {
     val widthPx = remember(key) {
         wallClockWidths[key] ?: run {
             val times = clockWidthSamples(locale, uses24Hour).map {
-                measurer.measure(styledClock(it, markers, meridiem), timeStyle, maxLines = 1, softWrap = false).size.width
+                measurer.measure(
+                    styledClock(it, markers, meridiem), timeStyle, maxLines = 1, softWrap = false,
+                ).size.width
             }
             val dates = wallClockDateSamples().map {
                 measurer.measure(formatRecordingDate(it, dateOnly = true, locale = locale, nowSec = it), dateStyle,

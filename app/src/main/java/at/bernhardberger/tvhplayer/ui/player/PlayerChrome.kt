@@ -205,7 +205,9 @@ internal fun PlayerChrome(
         CompositionLocalProvider(LocalStateCellInset provides stateCell) {
         if (shown == PlayerChromeMode.CONTROLS) {
             val topIdentity = remember(content, numberEntryShown) {
-                @Composable { placed: Modifier -> PlayerTopIdentity(content, placed, numberEntryShown = numberEntryShown) }
+                @Composable { placed: Modifier ->
+                    PlayerTopIdentity(content, placed, numberEntryShown = numberEntryShown)
+                }
             }
             PlayerChromeControls(
                 timeline = timeline,
