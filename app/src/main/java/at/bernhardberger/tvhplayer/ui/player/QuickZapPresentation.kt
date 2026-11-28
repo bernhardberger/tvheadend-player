@@ -19,6 +19,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -45,7 +46,6 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy
 import at.bernhardberger.tvhplayer.ui.components.HoldWatching
-import kotlinx.coroutines.delay
 
 /**
  * One motion value coordinates the departing footer and the rail rising beneath it, as one
@@ -81,7 +81,7 @@ internal fun QuickZapPresentation(
  *
  * A [detached] rail is composed apart from the controls, outside their layer, so the closed rail's
  * cards outlive a hidden layer instead of being built again inside every reveal's first frame.
- * While the controls are composed it draws at their layer's alpha; without them it stands hidden,
+ * While the controls are shown or leaving it draws at their layer's alpha; otherwise it is hidden,
  * takes no focus and is not read out.
  */
 internal class QuickZapRailState(
@@ -102,7 +102,7 @@ internal class QuickZapRailState(
     internal var viewportHeight by mutableIntStateOf(0)
     internal var railHeight by mutableIntStateOf(0)
 
-    /** The controls are composed: entering, up, or leaving. */
+    /** The controls are entering, up, or leaving (not retained at idle). */
     internal var hosted by mutableStateOf(!detached)
     /** The action row's emphasis, set by the controls; read only while drawing. */
     internal var emphasis by mutableStateOf<() -> Float>({ 1f })
@@ -121,18 +121,21 @@ internal fun rememberQuickZapRail(expanded: Boolean, detached: Boolean = false):
 }
 
 /**
- * A stable clock: read live time while hosted, otherwise the last committed sample.
- * A hidden rail never subscribes to live clock changes.
+ * A stable clock: read live time while active, otherwise the last committed sample.
+ * An inactive rail never subscribes to live clock changes.
  */
 @Composable
 internal fun QuickZapRailState.clock(nowSec: () -> Long): () -> Long {
     val shownAt = remember(this, nowSec) { mutableLongStateOf(Snapshot.withoutReadObservation(nowSec)) }
-    if (hosted) {
+    val active by rememberUpdatedState(LocalQuickZapRailActive.current)
+    if (active) {
         val now = nowSec()
         SideEffect { shownAt.longValue = now }
     }
-    return remember(this, nowSec) { { if (hosted) nowSec() else shownAt.longValue } }
+    return remember(this, nowSec) { { if (active) nowSec() else shownAt.longValue } }
 }
+
+internal val LocalQuickZapRailActive = compositionLocalOf { true }
 
 /** The controls beneath the rail, in their layer: their footer gives way as the rail rises. */
 @Composable
@@ -148,13 +151,16 @@ internal fun QuickZapControls(
     val viewport = LocalPlayerPageScrim.current
     val scrim = viewport ?: remember { PlayerPageScrim().apply { alpha = { 1f } } }
     val layerAlpha = LocalPlayerControlsAlpha.current
+    val hidden = LocalPlayerControlsMotion.current?.hidden == true
+    val previewTop = remember(rail) { { (rail.viewportHeight - rail.railHeight).toFloat() } }
+    val expansion = remember(rail) { rail.expansion::value }
     SideEffect {
         // The denser rail scrim starts at the rail's top.
-        scrim.previewTop = { (rail.viewportHeight - rail.railHeight).toFloat() }
-        scrim.expansion = rail.expansion::value
+        scrim.previewTop = previewTop
+        scrim.expansion = expansion
         rail.emphasis = peek ?: { 1f }
         rail.layerAlpha = layerAlpha
-        rail.hosted = true
+        rail.hosted = !hidden
     }
     DisposableEffect(scrim) { onDispose { scrim.expansion = { 0f } } }
     DisposableEffect(rail) { onDispose { rail.hosted = false } }
@@ -221,27 +227,21 @@ internal fun QuickZapRail(
     val pageProgress = LocalPlayerPageProgress.current
     val leavingPage by remember(pageProgress) { derivedStateOf { (pageProgress?.invoke() ?: 0f) > 0f } }
     // Leaves with the controls, as the content of their layer does.
-    val leaving = rail.detached && hosted && !visible
-    val active = hosted && !leaving
-    var built by remember(rail) { mutableStateOf(false) }
-    if (hosted && !built) SideEffect { built = true }
-    val tuneToken = settledTuneToken()
-    if (rail.detached && peeks && !hosted && !built && tuneToken != null) {
-        LaunchedEffect(tuneToken) {
-            delay(1_000L)
-            // A stopped window pauses the frame clock, so nothing recomposes to cancel this effect;
-            // the eligibility is read again from its state before committing.
-            if (settledTuneToken() == tuneToken) built = true
-        }
+    val leaving = rail.detached && !visible
+    val active = !rail.detached || visible
+    val watching = active && LocalPlayerPageActive.current
+    val built = key(rail) {
+        rememberSettledBuild(hosted) { if (rail.detached && peeks) settledTuneToken() else null }
     }
     Box(
         Modifier.fillMaxSize().clipToBounds().onSizeChanged { rail.viewportHeight = it.height }
+            // Keep the display list recordable even when the layer itself is transparent.
             .then(if (rail.detached) Modifier
-                .graphicsLayer { alpha = if (rail.hosted) rail.layerAlpha() else 0f }
-                .drawWithContent { if (rail.hosted) drawContent() } else Modifier),
+                .graphicsLayer { alpha = if (rail.hosted) rail.layerAlpha() else 0f } else Modifier),
     ) {
-        if ((!hosted && !built) || !shown && !expanded && channelPeek == null) return@Box
-        PlayerMotionFrame(leaving = leaving, modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
+        if (!built || !shown && !expanded && channelPeek == null) return@Box
+        PlayerMotionFrame(leaving = leaving, modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
+            dropFocusToSink = hosted) {
             Column(
                 Modifier.fillMaxWidth()
                     .then(if (trayBleeds) Modifier.padding(top = TvGridVerticalMargin + TvBrowseHeaderHeight) else Modifier)
@@ -285,7 +285,9 @@ internal fun QuickZapRail(
                     contentAlignment = Alignment.BottomStart,
                 ) {
                     // Not while only peeking: a held preview of the last card would cross-fade in as the rail rises.
-                    if (expanded || shown) preview()
+                    if (expanded || shown) HoldWatching(held = !watching) {
+                        CompositionLocalProvider(LocalQuickZapRailActive provides watching, content = preview)
+                    }
                 }
                 // Leaves entirely above the viewport, further and so faster than the headline rising beneath it.
                 Box(
@@ -301,8 +303,9 @@ internal fun QuickZapRail(
                 ) {
                     // A hidden rail keeps the watching presentation it last showed instead of ticking with
                     // playback; the reveal resumes live in the frame the controls are hosted.
-                    HoldWatching(held = !hosted) {
-                        CompositionLocalProvider(LocalChannelPeek provides channelPeek) { channelContent() }
+                    HoldWatching(held = !watching) {
+                        CompositionLocalProvider(LocalChannelPeek provides channelPeek,
+                            LocalQuickZapRailActive provides watching, content = channelContent)
                     }
                 }
             }

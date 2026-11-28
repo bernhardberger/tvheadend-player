@@ -7,9 +7,9 @@ import at.bernhardberger.tvhplayer.di.PlayerStatsLevel
 
 import androidx.compose.ui.test.requestFocus
 import at.bernhardberger.tvhplayer.testutil.focusedTags
-import at.bernhardberger.tvhplayer.testutil.tagExists
 import at.bernhardberger.tvhplayer.testutil.pressKey
 import at.bernhardberger.tvhplayer.testutil.settleFrames
+import at.bernhardberger.tvhplayer.testutil.tagExists
 import at.bernhardberger.tvhplayer.testutil.holdBack
 import at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore
 import at.bernhardberger.tvhplayer.settings.AudioChoice
@@ -1368,8 +1368,7 @@ class RecordingPlayerChromeScreenTest {
         settle()
     }
 
-    private fun exists(tag: String) =
-        compose.tagExists(tag)
+    private fun exists(tag: String) = compose.tagExists(tag, useUnmergedTree = false)
 
     private fun endClock(): String = compose.onNodeWithTag("player-end-clock", useUnmergedTree = true).fetchSemanticsNode()
         .config[SemanticsProperties.Text].joinToString { it.text }

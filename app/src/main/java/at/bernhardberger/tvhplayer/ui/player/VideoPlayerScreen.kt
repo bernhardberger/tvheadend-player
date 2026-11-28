@@ -883,17 +883,22 @@ fun VideoPlayerScreen(
         val expiredText = stringResource(R.string.timeshift_target_expired)
         val replacedText = stringResource(R.string.timeshift_target_replaced)
         val uncertainText = stringResource(R.string.timeshift_seek_uncertain)
-        return { deltaMs ->
-            if (!automatic) timelineState.stopScrub()
-            timelineState.queueRelativeSeek(
-                state = effectiveTimeshiftState,
-                requestedDeltaMs = deltaMs,
-                unavailableText = timeshiftUnavailableText,
-                expiredText = expiredText,
-                replacedText = replacedText,
-                uncertainText = uncertainText,
-                seekContent = videoPlayerViewModel::seekTimeshift,
-            )
+        val latestTimeshift by rememberUpdatedState(effectiveTimeshiftState)
+        return remember(automatic, timelineState, videoPlayerViewModel,
+            timeshiftUnavailableText, expiredText, replacedText, uncertainText,
+        ) {
+            { deltaMs ->
+                if (!automatic) timelineState.stopScrub()
+                timelineState.queueRelativeSeek(
+                    state = latestTimeshift,
+                    requestedDeltaMs = deltaMs,
+                    unavailableText = timeshiftUnavailableText,
+                    expiredText = expiredText,
+                    replacedText = replacedText,
+                    uncertainText = uncertainText,
+                    seekContent = videoPlayerViewModel::seekTimeshift,
+                )
+            }
         }
     }
     val queueTimeshiftSeek = timeshiftSeekAction()
@@ -1838,7 +1843,6 @@ fun VideoPlayerScreen(
     val rootModifier = playerRootModifier()
     val onPickChannel: (Channel) -> Boolean = { tuneChannel(it, 0L) }
     val onTogglePause = { dispatchPlaybackAction(MediaPlaybackAction.TOGGLE) }
-    val onSeek: (Long) -> Unit = { queueTimeshiftSeek(it) }
     val onRecoveryRetry: (PlaybackRetryCommand) -> Unit = { dispatchRecoveryRetry(it) }
     val chromeLayer = playerChromeLayer(foregroundContext)
     // The digits shown in the top identity's place; empty while another layer covers the entry.
@@ -1936,6 +1940,13 @@ fun VideoPlayerScreen(
         }
         // The page's strip and the detached rail outlive the controls' exit.
         val quickZap = rememberQuickZapRail(expanded = layerState.channelRailPresented, detached = true)
+        val settledTuneToken = {
+            // A stop and restart under the same tune is a new wait.
+            Triple(liveRequestToken, videoPresentation.epoch, screenStarts).takeIf {
+                contentAllowed && screenActive && confirmedPlayingChannelId != null && videoPresentation.visible &&
+                    playbackState is AppPlaybackState.Playing && busyStatus == null
+            }
+        }
         @Composable
         fun PlayerControls(keepControls: Boolean) {
         val previewId = visibleSeekPreview?.id
@@ -1946,6 +1957,15 @@ fun VideoPlayerScreen(
         val trackButtons = rememberPlayerTrackButtons(
             player, available = !channelFailed && playingLiveChannelId == currentChannelId)
         val controlsShown = controlsLayerShown || keepControls
+        val peeks = channels.isNotEmpty()
+        val controlsDecoration = remember(quickZap, peeks) {
+            @Composable { actionsAlpha: () -> Float, controls: @Composable () -> Unit ->
+                // Below the controls, the rail's cards hint at what Down opens.
+                QuickZapControls(quickZap, peek = actionsAlpha.takeIf { peeks }, controls = controls)
+            }
+        }
+        val latestRecord by rememberUpdatedState<() -> Unit> { recordProgramme(infoEvent, fromControl = true) }
+        val onRecord = remember { { latestRecord() } }
         PlayerChrome(
             mode = lowerChromeMode(keepControls),
             content = chromeContent(),
@@ -1996,10 +2016,10 @@ fun VideoPlayerScreen(
             modifier = Modifier.align(Alignment.BottomCenter),
             onTogglePause = onTogglePause,
             onPauseUnavailable = { showPauseUnavailable() },
-            onSeek = onSeek,
+            onSeek = queueTimeshiftSeek,
             onCommitSeek = timelineState::commitPendingSeek,
             onStop = stopAndClose,
-            onRecord = { recordProgramme(infoEvent, fromControl = true) },
+            onRecord = onRecord,
             recordState = infoEvent?.let(observation::dvrEntryForEvent)?.takeUnless(::recordingWasRemoved)
                 ?.state?.takeIf { it in LiveRecordStates },
             onInfo = {
@@ -2023,17 +2043,46 @@ fun VideoPlayerScreen(
             onDownFromActions = openRailFromActions,
             downHint = stringResource(R.string.nav_channels),
             decorationCoversControls = channelRailOpen,
-            controlsDecoration = { actionsAlpha, controls ->
-                // Below the controls, the rail's cards hint at what Down opens.
-                QuickZapControls(quickZap, peek = actionsAlpha.takeIf { channels.isNotEmpty() }, controls = controls)
-            },
+            controlsDecoration = controlsDecoration,
+            settledTuneToken = settledTuneToken,
         )
+        val liveClock = remember(timelineState) { { timelineState.nowEpochSec } }
+        val railPreview = remember(quickZap, liveClock, observation, channels, channelBrowser) {
+            @Composable {
+                val previewNowSec = quickZap.clock(liveClock)()
+                val active = LocalQuickZapRailActive.current
+                val selectedChannel = if (active) {
+                    val id = selectedId
+                    remember(channels, id) { channels.firstOrNull { it.id == id } }
+                } else null
+                val scrolling = rememberLastShown(if (active) channelBrowser.scrolling else null) ?: false
+                val previewObservation = rememberLastShown(observation.takeIf { active }) ?: observation
+                val data = rememberLastShown(remember(previewObservation, selectedChannel, previewNowSec, active) {
+                    if (active) {
+                        val at = kotlin.time.Instant.fromEpochSeconds(previewNowSec)
+                        Triple(
+                            selectedChannel,
+                            selectedChannel?.let { previewObservation.eventAt(it.id, at) },
+                            selectedChannel?.let { previewObservation.nextEvent(it.id, at) },
+                        )
+                    } else null
+                })
+                val (previewChannel, previewEvent, previewNext) = data ?: Triple(null, null, null)
+                QuickZapTrayPreview(previewChannel,
+                    previewEvent,
+                    previewNext,
+                    previewNowSec,
+                    Modifier.padding(horizontal = at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin),
+                    scrolling = scrolling,
+                    nextRecording = previewObservation.nextRecordingForEvent(previewNext),
+                    nowRecording = previewObservation.runningRecordingForEvent(previewEvent))
+            }
+        }
         QuickZapRail(
             quickZap,
             // The rows' saved logos are those of the observation their scope was resolved from.
             channelContent = { ProvideArtworkSession(currentSession, channelScope.observation) {
                 // Read in the rail, so the controls' show and hide do not recompose the whole player.
-                val liveClock = remember(timelineState) { { timelineState.nowEpochSec } }
                 val railNowSec = quickZap.clock(liveClock)
                 PlayerChannelBrowser(
                     state = channelBrowser,
@@ -2064,34 +2113,10 @@ fun VideoPlayerScreen(
             } },
             trayBleeds = recentChannels.isNotEmpty(),
             header = { PlayerChannelBrowserHint(channelBrowser, recentChannels.isNotEmpty(), channelsTitle()) },
-            preview = {
-                val previewChannel = channels.firstOrNull { it.id == selectedId }
-                val previewNext = previewChannel?.let {
-                    observation.nextEvent(it.id, kotlin.time.Instant.fromEpochSeconds(nowSec))
-                }
-                val previewEvent = previewChannel?.let {
-                    observation.eventAt(it.id, kotlin.time.Instant.fromEpochSeconds(nowSec))
-                }
-                QuickZapTrayPreview(previewChannel,
-                    previewEvent,
-                    previewNext,
-                    nowSec,
-                    Modifier.padding(horizontal = at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin),
-                    scrolling = channelBrowser.scrolling,
-                    nextRecording = observation.nextRecordingForEvent(previewNext),
-                    nowRecording = observation.runningRecordingForEvent(previewEvent))
-            },
-            peeks = channels.isNotEmpty(),
+            preview = railPreview,
+            peeks = peeks,
             visible = controlsShown && !chromePanelOpen,
-            // Unlike the chrome, the rail can warm while invisible, once this tune's
-            // video is visible and the startup cover no longer owns the surface.
-            settledTuneToken = {
-                // screenStarts: a stop and restart under the same tune is a new wait.
-                Triple(liveRequestToken, videoPresentation.epoch, screenStarts).takeIf {
-                    contentAllowed && screenActive && confirmedPlayingChannelId != null && videoPresentation.visible &&
-                        playbackState is AppPlaybackState.Playing && busyStatus == null
-                }
-            },
+            settledTuneToken = settledTuneToken,
         )
         // Full recovery and the unavailable message replace even an exiting ring.
         if (!busyBlocked) PlayerBusyIndicator(busyStatus, Modifier.align(Alignment.Center), cover = videoPresentation)

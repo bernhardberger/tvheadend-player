@@ -4,7 +4,6 @@ import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
 import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
 import at.bernhardberger.tvhplayer.ui.TvIconButtonSize
 import androidx.compose.animation.EnterExitState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -77,11 +76,12 @@ internal fun PlayerOverlayChrome(
     val peekLift = LocalChannelPeekLift.current
     val viewport = LocalPlayerPageScrim.current.takeIf { motion != null }
     var footerHeight by remember { mutableIntStateOf(0) }
+    val scrimFooterHeight = remember { { footerHeight.toFloat() } }
     SideEffect {
-        viewport?.footerHeight = { footerHeight.toFloat() }
+        viewport?.footerHeight = scrimFooterHeight
     }
     val travels = LocalPlayerControlsEntry.current == PlayerControlsEntry.TRAVEL
-    val entering = motion?.animateEnterAfterFirstFrames(tween(PlayerMotion.MediumMs, easing = PlayerMotion.EmphasizedDecelerate))
+    val entering = motion?.appear
     fun GraphicsLayerScope.enterFrom(offset: Dp) {
         if (travels && entering != null && motion.transition.targetState == EnterExitState.Visible) {
             translationY = offset.toPx() * (1f - entering.value)

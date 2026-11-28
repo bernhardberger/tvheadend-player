@@ -8,9 +8,9 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import at.bernhardberger.tvhplayer.testutil.focusedTags
-import at.bernhardberger.tvhplayer.testutil.tagExists
 import at.bernhardberger.tvhplayer.testutil.pressKey
 import at.bernhardberger.tvhplayer.testutil.settleFrames
+import at.bernhardberger.tvhplayer.testutil.tagExists
 import android.app.Application
 import android.view.KeyEvent as AndroidKeyEvent
 import androidx.compose.runtime.CompositionLocalProvider
@@ -602,7 +602,7 @@ abstract class LivePlayerChromeFixture {
                 assertNotNull("the held row keeps its state", liveState())
             }
             if (!exists("player-actions")) key(Key.DirectionDown)
-            assertTrue("controls retain the row", exists("player-timeline-track"))
+            assertTrue("controls retain the row", exists("player-timeline-track", useUnmergedTree = true))
             assertNotNull("controls retain the live state", liveState())
             if (!pauseDuringTune) {
                 assertScreenProgramme(channel, "controls after timing notice delay")
@@ -812,8 +812,8 @@ abstract class LivePlayerChromeFixture {
         settleFrames()
     }
 
-    protected fun exists(tag: String) =
-        compose.tagExists(tag)
+    protected fun exists(tag: String, useUnmergedTree: Boolean = false) =
+        compose.tagExists(tag, useUnmergedTree = useUnmergedTree)
 
     /** The closed rail stays composed to peek, cleared from what accessibility reads; the merged tree respects that. */
     protected fun railOpen() = compose.onAllNodes(hasTestTag("player-channel-browser")).fetchSemanticsNodes().isNotEmpty()

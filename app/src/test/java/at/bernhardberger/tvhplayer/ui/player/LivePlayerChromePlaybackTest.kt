@@ -104,8 +104,8 @@ class LivePlayerChromePlaybackTest : LivePlayerChromeFixture() {
         publishInfoRecording(DvrEntryState.RECORDING, linked = false)
         assertTrue(description(PlayerTopIdentityTag).contains(channelRecording))
         assertFalse(description("player-info-bar").contains(programmeRecording))
-        assertTrue(exists("player-identity-recording-mark"))
-        assertFalse(exists("player-info-timing-mark"))
+        assertTrue(exists("player-identity-recording-mark", useUnmergedTree = true))
+        assertFalse(exists("player-info-timing-mark", useUnmergedTree = true))
 
         val now = System.currentTimeMillis() / 1_000
         val untitled = EpgEvent.create(EventId(11), ChannelId(1), Instant.fromEpochSeconds(now - 1_800),
@@ -117,7 +117,7 @@ class LivePlayerChromePlaybackTest : LivePlayerChromeFixture() {
         assertTrue("the programme placeholder keeps its own timing badge", mark.right < time.left)
         assertFalse(description(PlayerTopIdentityTag).contains(channelRecording))
         assertTrue(description("player-info-bar").contains(programmeRecording))
-        assertFalse(exists("player-identity-recording-mark"))
+        assertFalse(exists("player-identity-recording-mark", useUnmergedTree = true))
     }
 
     @Test fun liveScrubTicksAndCommitsAtLiveEdge() = timeshiftPlaying(mapPosition = true) { pauses ->
@@ -412,7 +412,7 @@ class LivePlayerChromePlaybackTest : LivePlayerChromeFixture() {
             for (direction in listOf(Key.DirectionUp, Key.DirectionDown, Key.DirectionLeft, Key.DirectionRight)) {
                 press(direction)
                 assertTrue("$direction moved focus into the controls: ${focused()}", focused().none { it in controls })
-                assertTrue("the controls stay up under the entry", exists("player-actions"))
+                assertTrue("the controls stay up under the entry", exists("player-actions", useUnmergedTree = true))
                 assertFalse("$direction opened the channel rail", exists("player-now-playing"))
             }
             // Nor can an accessibility service move focus into them.

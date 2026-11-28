@@ -10,6 +10,7 @@ import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.Transition
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Box
@@ -168,7 +169,14 @@ internal fun AnimatedVisibilityScope.animateShown(
     enter: FiniteAnimationSpec<Float>,
     exit: FiniteAnimationSpec<Float>,
     label: String,
-): State<Float> = transition.animateFloat(
+): State<Float> = transition.animateShown(enter, exit, label)
+
+@Composable
+internal fun Transition<EnterExitState>.animateShown(
+    enter: FiniteAnimationSpec<Float>,
+    exit: FiniteAnimationSpec<Float>,
+    label: String,
+): State<Float> = animateFloat(
     transitionSpec = { if (targetState == EnterExitState.Visible) enter else exit },
     label = label,
 ) { if (it == EnterExitState.Visible) 1f else 0f }
@@ -179,12 +187,15 @@ internal fun AnimatedVisibilityScope.animateShown(
  * timed from the state change was used up by then, so the controls jumped into place.
  */
 @Composable
-internal fun AnimatedVisibilityScope.animateEnterAfterFirstFrames(enter: AnimationSpec<Float>): State<Float> {
-    val visible = transition.targetState == EnterExitState.Visible
-    val progress = remember {
-        Animatable(if (visible && transition.currentState == EnterExitState.Visible) 1f else 0f)
+internal fun Transition<EnterExitState>.animateEnterAfterFirstFrames(
+    visit: Any?,
+    enter: AnimationSpec<Float>,
+): State<Float> {
+    val visible = targetState == EnterExitState.Visible
+    val progress = remember(visit) {
+        Animatable(if (visit == null && visible && currentState == EnterExitState.Visible) 1f else 0f)
     }
-    LaunchedEffect(visible) {
+    LaunchedEffect(visible, progress) {
         if (!visible) return@LaunchedEffect
         withFrameNanos { }
         withFrameNanos { }
@@ -199,6 +210,9 @@ internal fun AnimatedVisibilityScope.animateEnterAfterFirstFrames(enter: Animati
  * first exit frame, so the successor or the player root can take it without waiting
  * for the animation and no key reaches a disappearing control.
  *
+ * A frame retained at alpha zero sets [dropFocusToSink] to false after exit, removing the sink
+ * without reopening focus or semantics to its descendants.
+ *
  * With [restoreFocusOnReturn], content that stops leaving before it is removed takes back the
  * focus it dropped, on the item that had it; for a shell whose own entry focus already ran.
  */
@@ -207,6 +221,7 @@ internal fun PlayerMotionFrame(
     leaving: Boolean,
     modifier: Modifier = Modifier,
     restoreFocusOnReturn: Boolean = false,
+    dropFocusToSink: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     val sink = remember { FocusRequester() }
@@ -226,7 +241,7 @@ internal fun PlayerMotionFrame(
         if (restoreFocusOnReturn) {
             Box(Modifier.focusRequester(contentFocus).focusRestorer().focusGroup(), propagateMinConstraints = true) { content() }
         } else content()
-        Box(
+        if (dropFocusToSink) Box(
             Modifier
                 .matchParentSize()
                 .onFocusChanged { focus.sinkFocused = it.isFocused }
@@ -241,7 +256,7 @@ internal fun PlayerMotionFrame(
                 .focusTarget(),
         )
     }
-    if (leaving) {
+    if (leaving && dropFocusToSink) {
         // Read in composition so focus that still arrives while leaving drops again; checked again
         // when applied, as content returning in the same frame may already have taken it back.
         val strayFocus = focus.within && !focus.sinkFocused
@@ -251,7 +266,7 @@ internal fun PlayerMotionFrame(
                 sink.requestFocus()
             }
         }
-    } else if (focus.dropped) {
+    } else if (!leaving && focus.dropped) {
         SideEffect {
             focus.dropped = false
             contentFocus.requestFocus()

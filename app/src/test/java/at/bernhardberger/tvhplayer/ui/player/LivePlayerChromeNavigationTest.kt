@@ -6,12 +6,16 @@ package at.bernhardberger.tvhplayer.ui.player
 
 import android.app.Application
 import android.view.KeyEvent as AndroidKeyEvent
+import androidx.compose.runtime.Composer
+import androidx.compose.runtime.CompositionTracer
+import androidx.compose.runtime.InternalComposeTracingApi
 import androidx.compose.ui.input.key.Key
 import at.bernhardberger.tvhplayer.testutil.assertMainSettled
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isFocused
@@ -24,6 +28,7 @@ import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.pressKey
 import at.bernhardberger.tvhplayer.testutil.pressBack
+import at.bernhardberger.tvhplayer.testutil.settleFrames
 import androidx.media3.common.Tracks
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.Channel
@@ -38,7 +43,9 @@ import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
+import at.bernhardberger.tvheadend.sdk.playback.SubscriptionEvent
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionCall
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
@@ -311,9 +318,55 @@ class LivePlayerChromeNavigationTest : LivePlayerChromeFixture() {
                 exists("channel-schedule-panel") || railOpen())
             key(Key.Back)
             assertEquals("origin restored for $shortcut", controls, exists("player-pause"))
-            if (!controls) key(Key.DirectionDown)
+            if (!controls) {
+                compose.onNode(isFocused() and hasContentDescription(liveTvSurface), useUnmergedTree = true)
+                    .assertExists("Back from the overlay returns focus to the bare player")
+                key(Key.DirectionUp)
+            }
             compose.onNodeWithTag(if (controls && shortcut == Key.Info) "player-info" else "player-pause").assertIsFocused()
             key(Key.Back)
+        }
+    }
+
+    @OptIn(InternalComposeTracingApi::class)
+    @Test fun autoHideFromTheActionRowReturnsToTheRootAndConsumesTheNextUp() = timeshiftPlaying(mapPosition = true) { pauses ->
+        key(Key.DirectionDown)
+        compose.onNodeWithTag("player-pause").assertIsFocused()
+        compose.mainClock.advanceTimeBy(5_000L)
+        settle()
+        assertFalse(exists("player-pause"))
+        compose.onNode(isFocused() and hasContentDescription(liveTvSurface), useUnmergedTree = true)
+            .assertExists("auto-hide returns focus to the bare player")
+
+        var screenCompositions = 0
+        var controlsCompositions = 0
+        Composer.setTracer(object : CompositionTracer {
+            override fun isTraceInProgress() = true
+            override fun traceEventEnd() = Unit
+            override fun traceEventStart(key: Int, dirty1: Int, dirty2: Int, info: String) {
+                when (info.substringBefore(" (").substringAfterLast('.')) {
+                    "VideoPlayerScreen" -> screenCompositions++
+                    "PlayerChromeControls" -> controlsCompositions++
+                }
+            }
+        })
+        try {
+            val before = sampleTimeshift()
+            runTest(subscriptionDispatcher) {
+                timeshiftConnection.emit(SubscriptionEvent.Timeshift(61_000_000L, 0L, 0L, 61_000_000L, null, null))
+            }
+            compose.settleFrames(1, frameMillis = 300)
+            assertTrue("the fixture supplies a changed timeshift sample", before != sampleTimeshift())
+            assertTrue("the sample reaches the screen", screenCompositions > 0)
+            assertEquals("a hidden timeshift tick must skip the controls scope", 0, controlsCompositions)
+
+            val changes = pauses.toList()
+            key(Key.DirectionUp)
+            compose.onNodeWithTag("player-pause").assertIsFocused()
+            assertEquals("Up reveals controls without activating Pause", changes, pauses)
+            assertTrue("the tracer sees the controls scope on reveal", controlsCompositions > 0)
+        } finally {
+            Composer.setTracer(null)
         }
     }
 

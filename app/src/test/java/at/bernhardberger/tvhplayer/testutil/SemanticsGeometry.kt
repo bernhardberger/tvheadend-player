@@ -7,8 +7,8 @@ import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.onNodeWithTag
 
-internal fun ComposeContentTestRule.tagExists(tag: String) =
-    onAllNodes(hasTestTag(tag), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+internal fun ComposeContentTestRule.tagExists(tag: String, useUnmergedTree: Boolean = true) =
+    onAllNodes(hasTestTag(tag), useUnmergedTree = useUnmergedTree).fetchSemanticsNodes().isNotEmpty()
 
 internal fun ComposeContentTestRule.focusedTags(): List<String> =
     onAllNodes(isFocused(), useUnmergedTree = true).fetchSemanticsNodes()

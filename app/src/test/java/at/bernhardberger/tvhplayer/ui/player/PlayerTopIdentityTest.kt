@@ -111,7 +111,7 @@ class PlayerTopIdentityTest {
         for (mode in listOf(PlayerChromeMode.CONTROLS, PlayerChromeMode.BANNER, PlayerChromeMode.HIDDEN)) {
             compose.runOnIdle { shownMode = mode; numberEntry = "12"; numberTarget = ChannelNumberTarget.Channel("12", "Twelve", null) }
             compose.settleFrames(20)
-            if (mode == PlayerChromeMode.HIDDEN) assertFalse("hidden chrome has no identity", compose.tagExists(PlayerTopIdentityTag))
+            if (mode == PlayerChromeMode.HIDDEN) compose.onNodeWithTag(PlayerTopIdentityTag).assertDoesNotExist()
             else assertEquals("$mode: the identity under the entry is not read out", null, identityDescription())
             val entry = compose.tagBounds("number-entry")
             assertEquals("$mode: the entry starts where the identity does", identity.left, entry.left, 0.5f)

@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -803,6 +804,8 @@ class QuickZapPresentationTest {
         expanded: () -> Boolean = { true },
         peeks: Boolean = false,
         settledTuneToken: () -> Any? = { null },
+        preview: @Composable () -> Unit = {},
+        livePosition: State<LiveViewerPosition>? = null,
         channelContent: @Composable () -> Unit = {},
     ): QuickZapRailState {
         lateinit var rail: QuickZapRailState
@@ -813,8 +816,10 @@ class QuickZapPresentationTest {
                 PlayerControlsLayer(visible = controls(), modalVisible = false) {
                     QuickZapControls(rail, peek = null, controls = {})
                 }
-                QuickZapRail(rail, preview = {}, visible = controls(), peeks = peeks,
-                    settledTuneToken = settledTuneToken, channelContent = channelContent)
+                CompositionLocalProvider(LocalLivePosition provides livePosition) {
+                    QuickZapRail(rail, preview = preview, visible = controls(), peeks = peeks,
+                        settledTuneToken = settledTuneToken, channelContent = channelContent)
+                }
             }
         }
         return rail
@@ -877,7 +882,12 @@ class QuickZapPresentationTest {
         var controls by mutableStateOf(true)
         val card = FocusRequester()
         var focused = false
-        detachedRail({ controls }) {
+        val viewer = mutableStateOf(LiveViewerPosition(ChannelId(2), 85L))
+        var previewEpoch: Long? = null
+        detachedRail({ controls }, preview = {
+            val epoch = LocalLivePosition.current?.value?.epochSec
+            SideEffect { previewEpoch = epoch }
+        }, channelContent = {
             Box(
                 Modifier.height(48.dp).fillMaxWidth()
                     .testTag("rail-card")
@@ -886,7 +896,7 @@ class QuickZapPresentationTest {
                     .onFocusChanged { focused = it.isFocused }
                     .focusable(),
             )
-        }
+        }, livePosition = viewer)
         fun requestFocus() {
             compose.runOnIdle { card.requestFocus() }
             compose.waitForIdle()
@@ -903,6 +913,9 @@ class QuickZapPresentationTest {
         compose.onNodeWithTag("rail-card").assertDoesNotExist()
         requestFocus()
         assertFalse("and takes none while it leaves", focused)
+        compose.changeState { viewer.value = viewer.value.copy(epochSec = 86L) }
+        compose.mainClock.advanceTimeByFrame()
+        assertEquals("the inactive expanded preview holds watching position", 85L, previewEpoch)
 
         compose.mainClock.autoAdvance = true
         compose.waitForIdle()
@@ -912,6 +925,7 @@ class QuickZapPresentationTest {
 
         compose.runOnIdle { controls = true }
         compose.waitForIdle()
+        assertEquals("the returning expanded preview uses current position", 86L, previewEpoch)
         compose.onNodeWithTag("rail-card").assertExists()
         requestFocus()
         assertTrue("the next reveal's rail takes focus again", focused)

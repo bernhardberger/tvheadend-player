@@ -4,11 +4,14 @@ import at.bernhardberger.tvhplayer.di.PlayerStatsLevel
 
 import at.bernhardberger.tvhplayer.testutil.drawnBrightness
 import at.bernhardberger.tvhplayer.testutil.changeState
+import at.bernhardberger.tvhplayer.testutil.pressKey
+import at.bernhardberger.tvhplayer.testutil.settleFrames
 import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvhplayer.ui.components.PlaybackOptionsOverlayFrame
 
 import android.app.Application
 import android.view.View
+import androidx.compose.animation.EnterExitState
 import androidx.compose.foundation.focusable
 import androidx.tv.material3.MaterialTheme
 import androidx.compose.ui.graphics.Color
@@ -274,30 +277,136 @@ class PlayerMotionTest {
     @Test fun hidingControlsDropsFocusSemanticsAndKeysOnTheFirstExitFrame() {
         var visible by mutableStateOf(true)
         val probe = FocusProbe()
-        var composed = false
+        var mounts = 0
+        var disposals = 0
+        var frameFocused = false
+        lateinit var view: View
         compose.setContent {
+            view = LocalView.current
             TVHeadendPlayerTheme {
-                PlayerControlsLayer(visible = visible, modalVisible = false) {
-                    DisposableEffect(Unit) { composed = true; onDispose { composed = false } }
+                PlayerControlsLayer(visible = visible, modalVisible = false,
+                    modifier = Modifier.onFocusChanged { frameFocused = it.hasFocus }) {
+                    DisposableEffect(Unit) { mounts++; onDispose { disposals++ } }
                     probe.Target("controls-action")
                 }
             }
         }
         compose.waitForIdle()
-        compose.onNodeWithTag("controls-action").assertIsFocused()
+        val action = compose.onNodeWithTag("controls-action").assertIsFocused()
+        val area = action.fetchSemanticsNode().boundsInRoot
+        val shown = compose.drawnBrightness(view, area)
+        assertTrue(shown > 0f)
 
         compose.mainClock.autoAdvance = false
         compose.changeState { visible = false }
         compose.mainClock.advanceTimeByFrame()
 
-        assertTrue("controls still fade out", composed)
+        assertEquals("controls still fade out", 0, disposals)
+        assertTrue("the exiting controls still draw", compose.drawnBrightness(view, area) > 0f)
         assertFalse("the leaving action keeps focus", probe.focused)
         compose.onNodeWithTag("controls-action").assertDoesNotExist()
         compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
         assertEquals(0, probe.activations)
 
+        compose.settleFrames(1, PlayerMotion.MediumMs + 64L)
+        assertEquals("hidden controls draw nothing", 0f, compose.drawnBrightness(view, area), 0f)
+        assertFalse("the idle frame must release its focus sink", frameFocused)
+        assertEquals("hidden controls must retain their composition", 0, disposals)
+        compose.pressKey(Key.DirectionDown)
+        compose.pressKey(Key.DirectionCenter)
+        assertFalse("focus entered the hidden controls", probe.focused)
+        assertEquals(0, probe.activations)
+        compose.onNodeWithTag("controls-action").assertDoesNotExist()
+
+        compose.changeState { visible = true }
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithTag("controls-action").assertExists()
+        assertEquals("the controls were mounted again on reveal", 1, mounts)
+    }
+
+    @Test fun theRevealOnTheSettledExitFrameStartsTransparent() {
+        var closing by mutableStateOf(false)
+        var motion by mutableStateOf<PlayerControlsMotion?>(null)
+        var didReopen by mutableStateOf(false)
+        lateinit var view: View
+        compose.setContent {
+            view = LocalView.current
+            // Feed back the completed exit before any idle composition can reset the entry.
+            val reopened = didReopen || motion?.transition?.currentState == EnterExitState.PostExit
+            androidx.compose.runtime.SideEffect { if (reopened) didReopen = true }
+            PlayerControlsLayer(visible = !closing || reopened, modalVisible = false) {
+                val current = requireNotNull(LocalPlayerControlsMotion.current)
+                androidx.compose.runtime.SideEffect { motion = current }
+                Box(Modifier.size(48.dp).background(Color.White))
+            }
+        }
+        compose.waitForIdle()
+        val area = Rect(0f, 0f, 48f, 48f)
+        assertTrue(compose.drawnBrightness(view, area) > 0f)
+        compose.mainClock.autoAdvance = false
+        compose.changeState { closing = true }
+        repeat(2) { compose.mainClock.advanceTimeByFrame() }
+        compose.mainClock.advanceTimeBy(PlayerMotion.MediumMs - 32L)
+        val firstVisitFrames = buildList {
+            repeat(7) {
+                compose.mainClock.advanceTimeByFrame()
+                if (didReopen && size < 2) {
+                    add(compose.drawnBrightness(view, area))
+                }
+            }
+        }
+        assertEquals("sample the settled-exit reveal", 2, firstVisitFrames.size)
+        assertEquals("a fresh entry cannot show the previous visit's ink", listOf(0f, 0f), firstVisitFrames)
+    }
+
+    @Test fun theInitialHiddenControlsDoNotBuildUntilNeeded() {
+        var visible by mutableStateOf(false)
+        var mounts = 0
+        compose.setContent {
+            PlayerControlsLayer(visible = visible, modalVisible = false) {
+                DisposableEffect(Unit) { mounts++; onDispose {} }
+            }
+        }
+        compose.waitForIdle()
+        assertEquals("opening the player does not build hidden controls", 0, mounts)
+        compose.changeState { visible = true }
+        compose.waitForIdle()
+        assertEquals(1, mounts)
+    }
+
+    @Test fun theInitialHiddenControlsWaitForOneUninterruptedSettledTune() {
+        var token by mutableStateOf<Int?>(1)
+        var mounts = 0
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            PlayerControlsLayer(visible = false, modalVisible = false, settledTuneToken = { token }) {
+                DisposableEffect(Unit) { mounts++; onDispose {} }
+            }
+        }
+        compose.waitForIdle()
+
+        compose.mainClock.advanceTimeBy(900, ignoreFrameDuration = true)
+        assertEquals("the first tune has not settled long enough", 0, mounts)
+        compose.changeState { token = 2 }
+        compose.mainClock.advanceTimeBy(160)
+        compose.waitForIdle()
+        assertEquals("a different tune cannot finish the first tune's wait", 0, mounts)
+
+        compose.changeState { token = null }
         compose.mainClock.advanceTimeBy(1_000)
-        assertFalse(composed)
+        compose.waitForIdle()
+        assertEquals("losing eligibility cancels prebuild", 0, mounts)
+
+        compose.changeState { token = 3 }
+        compose.mainClock.advanceTimeByFrame()
+        compose.waitForIdle()
+        compose.mainClock.advanceTimeBy(900, ignoreFrameDuration = true)
+        assertEquals("the eligible tune still has to wait the full second", 0, mounts)
+        compose.mainClock.advanceTimeBy(100, ignoreFrameDuration = true)
+        // The wait has elapsed; let Compose apply the resulting mount.
+        compose.mainClock.advanceTimeByFrame()
+        compose.waitForIdle()
+        assertEquals("one uninterrupted second builds the hidden controls", 1, mounts)
     }
 
     @Test fun closingOptionsHandsFocusAndKeysToSettingsWhileThePanelFades() {
@@ -929,7 +1038,11 @@ class PlayerMotionTest {
         ))
         var bannerVisible by mutableStateOf(false)
         var mode = PlayerChromeMode.HIDDEN
+        lateinit var view: View
+        var chromeFooter = Rect.Zero
+        var chromeClock = Rect.Zero
         compose.setContent {
+            view = LocalView.current
             TVHeadendPlayerTheme {
                 Box(Modifier.fillMaxSize()) {
                     // The live screen's derivation of the chrome mode and the entry's digits.
@@ -956,6 +1069,15 @@ class PlayerMotionTest {
             compose.waitForIdle()
             assertEquals(expected, mode)
             val chrome = expected != PlayerChromeMode.HIDDEN
+            if (expected == PlayerChromeMode.CONTROLS) {
+                chromeFooter = compose.onNodeWithTag("player-footer", useUnmergedTree = true)
+                    .fetchSemanticsNode().boundsInRoot
+                // At the right of the header, outside the channel-number overlay.
+                chromeClock = compose.onNodeWithTag("player-top-cluster", useUnmergedTree = true)
+                    .fetchSemanticsNode().boundsInRoot
+                assertTrue("sample an area painted by the controls", compose.drawnBrightness(view, chromeFooter) > 0f)
+                assertTrue("sample an area painted by the clock", compose.drawnBrightness(view, chromeClock) > 0f)
+            }
             val header = if (chrome) headerTop() else null
             val identity = if (chrome) compose.onNodeWithTag(PlayerTopIdentityTag, useUnmergedTree = true)
                 .fetchSemanticsNode().boundsInRoot else null
@@ -971,7 +1093,11 @@ class PlayerMotionTest {
                         assertEquals("$expected typed=$typed frame $frame: the identity stayed in place", identity,
                             compose.onNodeWithTag(PlayerTopIdentityTag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot)
                     } else {
-                        compose.onNodeWithTag("player-header", useUnmergedTree = true).assertDoesNotExist()
+                        compose.onNodeWithTag("player-header").assertDoesNotExist()
+                        assertEquals("digits cannot paint the hidden clock on frame $frame", 0f,
+                            compose.drawnBrightness(view, chromeClock), 0f)
+                        assertEquals("digits cannot paint the hidden footer on frame $frame", 0f,
+                            compose.drawnBrightness(view, chromeFooter), 0f)
                     }
                 }
                 // The plate recedes over its whole exit.
@@ -1229,6 +1355,7 @@ class PlayerMotionTest {
             Box(
                 Modifier
                     .size(48.dp)
+                    .background(Color.White)
                     .testTag(tag)
                     .focusRequester(requester)
                     .onFocusChanged { focused = it.isFocused }

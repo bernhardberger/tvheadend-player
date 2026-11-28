@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.withFrameNanos
@@ -70,7 +71,7 @@ import kotlinx.coroutines.launch
  * Revealed from the hidden player the Banner fades in, and the controls travel in or, on a zap
  * ([entry] FADE), fade in, both once their first frames are drawn. The controls taken over from the
  * Banner keep its header and info bar where they rest and raise them by the action row, which fades
- * in underneath. Hidden chrome is not composed.
+ * in underneath. Idle chrome keeps the controls mounted with their last rendered data.
  *
  * @param panelOpen a panel covers the chrome: the chrome leaves quickly and returns once it closes.
  * @param controlsDecoration hosts the controls, such as live's quick-zap rail; it receives the
@@ -120,39 +121,71 @@ internal fun PlayerChrome(
     numberEntryShown: Boolean = false,
     onBannerSkipBottomInset: ((Int) -> Unit)? = null,
     bannerSkipTextReserve: Dp = 0.dp,
+    settledTuneToken: () -> Any? = { null },
 ) {
-    val liveBar = rememberLiveBarPresentation(timeline as? PlayerChromeTimeline.Live)
+    val visible = mode != PlayerChromeMode.HIDDEN && !panelOpen
     PlayerControlsLayer(
         visible = mode != PlayerChromeMode.HIDDEN,
         modalVisible = panelOpen,
         modifier = modifier,
-        // Taken when the chrome appears. Only the Banner hands over; revealed from the hidden
-        // player, controls meant to take the Banner over travel in like any reveal.
+        // Only the Banner hands over; a reveal from idle travels in like any reveal.
         entry = when {
             mode.isBanner -> PlayerControlsEntry.FADE
             entry == PlayerControlsEntry.FROM_BANNER -> PlayerControlsEntry.TRAVEL
             else -> entry
         },
-    ) {
-        // Leaving, the chrome keeps what it showed.
-        val shown = rememberLastShown(mode.takeUnless { it == PlayerChromeMode.HIDDEN }) ?: return@PlayerControlsLayer
-        val skipReserve = if (timeline is PlayerChromeTimeline.Recording)
+        settledTuneToken = settledTuneToken,
+    ) { hidden ->
+        val held = remember { ChromeFrame(content, timeline, actions) }
+        SideEffect {
+            if (visible) {
+                held.content = content
+                held.timeline = timeline
+                held.actions = actions
+            }
+        }
+        // Reinitialize only the timeline's position animation on reveal. Its layout and focus nodes
+        // stay mounted, but the first frame must use today's position rather than animating from idle.
+        val visit = rememberLastShown(remember(visible) { Any() }.takeIf { visible })
+        val rendered = if (visible) timeline else held.timeline
+        val shownTimeline = remember(rendered, visit) {
+            when (rendered) {
+                is PlayerChromeTimeline.Live -> rendered.copy(motionKey = rendered.motionKey to visit)
+                is PlayerChromeTimeline.Recording -> rendered.copy(motionKey = rendered.motionKey to visit)
+            }
+        }
+        val shownContent = if (visible) content else held.content
+        val baseActions = if (visible) actions else held.actions
+        val shownActions = remember(visible, baseActions) {
+            if (visible) baseActions else baseActions.copy(active = false)
+        }
+        val baseLiveBar = rememberLiveBarPresentation(rendered as? PlayerChromeTimeline.Live)
+        val liveBar = remember(baseLiveBar, visit) {
+            baseLiveBar?.copy(motionKey = baseLiveBar.motionKey to visit)
+        }
+        // Keep the outgoing Banner through its fade; then warm what Up/Down will actually open.
+        val last = rememberLastShown(mode.takeIf { visible })
+        val shown = if (hidden) PlayerChromeMode.CONTROLS else last ?: PlayerChromeMode.CONTROLS
+        val content = shownContent
+        val timeline = shownTimeline
+        val skipReserve = if (!hidden && timeline is PlayerChromeTimeline.Recording)
             rememberBannerSkipReserve(mode, bannerSkipTextReserve) else 0.dp
-        val handover = rememberBannerHandover(shown)
-        val stateCell = rememberStateCellInset(shown)
+        val handover = rememberBannerHandover(if (hidden) PlayerChromeMode.HIDDEN else shown)
+        val stateCell = rememberStateCellInset(shown, hidden)
         // Live sources keep the last info line clear of the behind-live label, even at the live edge.
         val liveEnd = when (timeline) {
             is PlayerChromeTimeline.Live -> true
             is PlayerChromeTimeline.Recording -> timeline.growing
         }
         val lastLineEndReserve = if (liveEnd) liveDistanceReserve() else 0.dp
-        val header: @Composable (Modifier) -> Unit = {
-            PlayerChromeHeader(content.clockSec, it.testTag("player-header"))
+        val clockSec = content.clockSec
+        val header = remember(clockSec) {
+            @Composable { placed: Modifier -> PlayerChromeHeader(clockSec, placed.testTag("player-header")) }
         }
         // One chrome for every source: the channel at the top, the info bar leading with the programme's
         // artwork, and the [timelineRow] the full width below it.
-        val infoBar: @Composable (contentAlpha: () -> Float, programmeFocus: Modifier, timelineRow: @Composable () -> Unit) -> Unit =
-            { contentAlpha, programmeFocus, timelineRow ->
+        val infoBar = remember(content, lastLineEndReserve, skipReserve) {
+            @Composable { contentAlpha: () -> Float, _: Modifier, timelineRow: @Composable () -> Unit ->
                 // The artwork card, then the text from its top: now (title, time and metadata, subtitle)
                 // at its top edge, Next on its bottom edge at font scale 1.0.
                 PlayerInfoBar(
@@ -168,13 +201,19 @@ internal fun PlayerChrome(
                 }
                 timelineRow()
             }
+        }
         CompositionLocalProvider(LocalStateCellInset provides stateCell) {
         if (shown == PlayerChromeMode.CONTROLS) {
+            val topIdentity = remember(content, numberEntryShown) {
+                @Composable { placed: Modifier -> PlayerTopIdentity(content, placed, numberEntryShown = numberEntryShown) }
+            }
             PlayerChromeControls(
                 timeline = timeline,
                 liveBar = liveBar,
-                actions = actions,
-                identity = content.info.channelNumber to content.info.channelName,
+                actions = shownActions,
+                identity = remember(content.info.channelNumber, content.info.channelName) {
+                    content.info.channelNumber to content.info.channelName
+                },
                 header = header,
                 infoBar = infoBar,
                 state = content.state,
@@ -198,14 +237,12 @@ internal fun PlayerChrome(
                 onFocusRestored = onFocusRestored,
                 onDownFromActions = onDownFromActions,
                 // Number entry owns input: the controls it keeps up take no focus.
-                covered = decorationCoversControls || numberEntryShown,
+                covered = !visible || decorationCoversControls || numberEntryShown,
                 decoration = controlsDecoration,
                 markerNavigation = markerNavigation,
                 onSeekMarker = onSeekMarker,
                 downHint = downHint,
-                topIdentity = { placed ->
-                    PlayerTopIdentity(content, placed, numberEntryShown = numberEntryShown)
-                },
+                topIdentity = topIdentity,
             )
         } else {
             // Passive: nothing in the Banner takes focus. Without the action row its info and
@@ -251,6 +288,12 @@ internal fun PlayerChrome(
         }
     }
 }
+
+private class ChromeFrame(
+    var content: PlayerChromeContent,
+    var timeline: PlayerChromeTimeline,
+    var actions: PlayerChromeActions,
+)
 
 private class BannerSkipReserve(var mode: PlayerChromeMode, var width: Dp = 0.dp)
 
@@ -302,6 +345,7 @@ private class ModeHistory(var previous: PlayerChromeMode, var handovers: Int = 0
 private fun rememberBannerHandover(mode: PlayerChromeMode): BannerHandover {
     val history = remember { ModeHistory(mode) }
     if (history.previous != mode) {
+        if (mode == PlayerChromeMode.HIDDEN) history.handovers = 0
         if (history.previous.isBanner && mode == PlayerChromeMode.CONTROLS) history.handovers++
         history.previous = mode
     }
@@ -325,10 +369,11 @@ private fun rememberBannerHandover(mode: PlayerChromeMode): BannerHandover {
  * each other over, in the footer's rise timing, and only then.
  */
 @Composable
-private fun rememberStateCellInset(mode: PlayerChromeMode): StateCellInset {
+private fun rememberStateCellInset(mode: PlayerChromeMode, hidden: Boolean): StateCellInset {
     val controls = mode == PlayerChromeMode.CONTROLS
-    val fraction = remember { Animatable(if (controls) 0f else 1f) }
-    LaunchedEffect(controls) {
+    // Warm the controls in their resting layout, but a Banner opened from idle starts in its own.
+    val fraction = remember(hidden) { Animatable(if (controls) 0f else 1f) }
+    LaunchedEffect(controls, fraction) {
         val target = if (controls) 0f else 1f
         if (fraction.value == target) return@LaunchedEffect
         // The new layout's first frames must not use the motion up.

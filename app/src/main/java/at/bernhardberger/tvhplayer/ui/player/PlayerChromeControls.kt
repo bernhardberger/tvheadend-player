@@ -145,10 +145,11 @@ internal fun PlayerChromeControls(
         LivePauseAvailability.OFF -> stringResource(R.string.pause_timeshift_off)
         else -> null
     }?.takeUnless { pausable }
+    val hidden = LocalPlayerControlsMotion.current?.hidden == true
     var timingUnavailable by remember(identity) { mutableStateOf(false) }
-    LaunchedEffect(identity, pausable, seekable) {
+    LaunchedEffect(identity, pausable, seekable, hidden) {
         timingUnavailable = false
-        if (live != null && pausable && !seekable) {
+        if (!hidden && live != null && pausable && !seekable) {
             kotlinx.coroutines.delay(1_500L)
             timingUnavailable = true
         }
@@ -156,8 +157,8 @@ internal fun PlayerChromeControls(
     // The action row's entry is Play/Pause: where a reveal lands and where Down from the timeline leads.
     val initialFocus = pauseFocus
     var focusInitialized by remember { mutableStateOf(false) }
-    var lastFocusedControl by remember { mutableStateOf<String?>(null) }
-    var relocatingKey by remember { mutableStateOf<Key?>(null) }
+    var lastFocusedControl by remember(hidden) { mutableStateOf<String?>(null) }
+    var relocatingKey by remember(hidden) { mutableStateOf<Key?>(null) }
     var timelineFocused by remember { mutableStateOf(false) }
     val repeatInterval = remember { mutableStateOf<Int?>(null) }
     val settlingHold = remember { mutableStateOf(false) }
@@ -226,7 +227,7 @@ internal fun PlayerChromeControls(
     }
     if (recording != null) {
         // Closing the markers returns focus to the timeline; a later reveal starts on Pause.
-        val restorationBaseline = remember { markerNavigation.restoration }
+        val restorationBaseline = remember(hidden) { markerNavigation.restoration }
         LaunchedEffect(markerNavigation.restoration) {
             if (markerNavigation.restoration > restorationBaseline && actions.active) {
                 if (seekable) timelineFocus.requestFocus() else initialFocus.requestFocus()
@@ -237,7 +238,7 @@ internal fun PlayerChromeControls(
         }
     }
     // Down from the timeline returns to the action last focused.
-    var lastAction by remember { mutableStateOf("player-pause") }
+    var lastAction by remember(hidden) { mutableStateOf("player-pause") }
     val actionFocus = when (lastAction) {
         "player-stop" -> stopFocus
         "player-record" -> if (onRecord != null) recordFocus else pauseFocus
