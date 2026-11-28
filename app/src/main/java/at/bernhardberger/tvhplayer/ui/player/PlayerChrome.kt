@@ -121,7 +121,7 @@ internal fun PlayerChrome(
     numberEntryShown: Boolean = false,
     onBannerSkipBottomInset: ((Int) -> Unit)? = null,
     bannerSkipTextReserve: Dp = 0.dp,
-    settledTuneToken: () -> Any? = { null },
+    tuneWarmupToken: (() -> Any?)? = null,
 ) {
     val visible = mode != PlayerChromeMode.HIDDEN && !panelOpen
     PlayerControlsLayer(
@@ -134,7 +134,7 @@ internal fun PlayerChrome(
             entry == PlayerControlsEntry.FROM_BANNER -> PlayerControlsEntry.TRAVEL
             else -> entry
         },
-        settledTuneToken = settledTuneToken,
+        tuneWarmupToken = tuneWarmupToken ?: { null },
     ) { hidden ->
         val held = remember { ChromeFrame(content, timeline, actions) }
         SideEffect {
@@ -166,53 +166,50 @@ internal fun PlayerChrome(
         // Keep the outgoing Banner through its fade; then warm what Up/Down will actually open.
         val last = rememberLastShown(mode.takeIf { visible })
         val shown = if (hidden) PlayerChromeMode.CONTROLS else last ?: PlayerChromeMode.CONTROLS
-        val content = shownContent
-        val timeline = shownTimeline
-        val skipReserve = if (!hidden && timeline is PlayerChromeTimeline.Recording)
+        val skipReserve = if (!hidden && shownTimeline is PlayerChromeTimeline.Recording)
             rememberBannerSkipReserve(mode, bannerSkipTextReserve) else 0.dp
         val handover = rememberBannerHandover(if (hidden) PlayerChromeMode.HIDDEN else shown)
         val stateCell = rememberStateCellInset(shown, hidden)
-        // Live sources keep the last info line clear of the behind-live label, even at the live edge.
-        val liveEnd = when (timeline) {
-            is PlayerChromeTimeline.Live -> true
-            is PlayerChromeTimeline.Recording -> timeline.growing
-        }
-        val lastLineEndReserve = if (liveEnd) liveDistanceReserve() else 0.dp
-        val clockSec = content.clockSec
-        val header = remember(clockSec) {
-            @Composable { placed: Modifier -> PlayerChromeHeader(clockSec, placed.testTag("player-header")) }
-        }
-        // One chrome for every source: the channel at the top, the info bar leading with the programme's
-        // artwork, and the [timelineRow] the full width below it.
-        val infoBar = remember(content, lastLineEndReserve, skipReserve) {
-            @Composable { contentAlpha: () -> Float, _: Modifier, timelineRow: @Composable () -> Unit ->
-                // The artwork card, then the text from its top: now (title, time and metadata, subtitle)
-                // at its top edge, Next on its bottom edge at font scale 1.0.
-                PlayerInfoBar(
-                    data = content.info,
-                    modifier = Modifier.testTag("player-info-bar"),
-                    contentAlpha = contentAlpha,
-                    lastLineEndReserve = lastLineEndReserve,
-                    badges = content.badges,
-                    textEndReserve = skipReserve,
-                ) { faded ->
-                    ProgrammeArtworkTile(content.artwork, content.picon, content.channelId,
-                        content.info.channelNumber, faded, content.withoutChannel)
-                }
-                timelineRow()
-            }
-        }
+        val behindBanner = shown.isBanner
+        val buildControls = if (tuneWarmupToken == null) !behindBanner
+            else rememberChromeBuild(!behindBanner, tuneToken = tuneWarmupToken)
         CompositionLocalProvider(LocalStateCellInset provides stateCell) {
-        if (shown == PlayerChromeMode.CONTROLS) {
+        if (buildControls) {
+            // The retained body does not read the Banner's ticks. Refresh from the current
+            // snapshot on the first frame that exposes it, including a Banner handover.
+            val backdrop = remember { ControlsSnapshot() }
+            val heldControls = backdrop.frame
+            val frame = if (behindBanner && heldControls != null) heldControls else {
+                val controlsTimeline = remember(shownTimeline, handover, tuneWarmupToken == null) {
+                    if (tuneWarmupToken != null && shownTimeline is PlayerChromeTimeline.Live)
+                        shownTimeline.copy(motionKey = shownTimeline.motionKey to handover) else shownTimeline
+                }
+                val controlsBar = remember(liveBar, handover, tuneWarmupToken == null) {
+                    if (tuneWarmupToken == null) liveBar else liveBar?.copy(motionKey = liveBar.motionKey to handover)
+                }
+                val current = remember(shownContent, controlsTimeline, shownActions, controlsBar) {
+                    ControlsFrame(shownContent, controlsTimeline, shownActions, controlsBar)
+                }
+                SideEffect { backdrop.frame = current }
+                current
+            }
+            val content = frame.content
+            val timeline = frame.timeline
+            val header = rememberChromeHeader(content.clockSec)
+            val infoBar = rememberChromeInfoBar(content, timeline, skipReserve)
             val topIdentity = remember(content, numberEntryShown) {
                 @Composable { placed: Modifier ->
                     PlayerTopIdentity(content, placed, numberEntryShown = numberEntryShown)
                 }
             }
+            val frameActions = remember(frame.actions, behindBanner) {
+                if (behindBanner) frame.actions.copy(active = false) else frame.actions
+            }
+            PlayerControlsBehindBanner(tuneWarmupToken != null, behindBanner) {
             PlayerChromeControls(
                 timeline = timeline,
-                liveBar = liveBar,
-                actions = shownActions,
+                liveBar = frame.liveBar,
+                actions = frameActions,
                 identity = remember(content.info.channelNumber, content.info.channelName) {
                     content.info.channelNumber to content.info.channelName
                 },
@@ -239,14 +236,20 @@ internal fun PlayerChrome(
                 onFocusRestored = onFocusRestored,
                 onDownFromActions = onDownFromActions,
                 // Number entry owns input: the controls it keeps up take no focus.
-                covered = !visible || decorationCoversControls || numberEntryShown,
+                covered = !visible || behindBanner || decorationCoversControls || numberEntryShown,
                 decoration = controlsDecoration,
                 markerNavigation = markerNavigation,
                 onSeekMarker = onSeekMarker,
                 downHint = downHint,
                 topIdentity = topIdentity,
             )
-        } else {
+            }
+        }
+        if (behindBanner) {
+            val content = shownContent
+            val timeline = shownTimeline
+            val header = rememberChromeHeader(content.clockSec)
+            val infoBar = rememberChromeInfoBar(content, timeline, skipReserve)
             // Passive: nothing in the Banner takes focus. Without the action row its info and
             // timeline rest on the bottom safe area, one action row lower than the controls'.
             PlayerOverlayChrome(
@@ -290,6 +293,49 @@ internal fun PlayerChrome(
         }
     }
 }
+
+@Composable
+private fun rememberChromeHeader(clockSec: Long): @Composable (Modifier) -> Unit =
+    remember(clockSec) {
+        @Composable { placed: Modifier -> PlayerChromeHeader(clockSec, placed.testTag("player-header")) }
+    }
+
+@Composable
+private fun rememberChromeInfoBar(
+    content: PlayerChromeContent,
+    timeline: PlayerChromeTimeline,
+    skipReserve: Dp,
+): @Composable (() -> Float, Modifier, @Composable () -> Unit) -> Unit {
+    // Live sources keep the last info line clear of the behind-live label, even at the live edge.
+    val liveEnd = timeline is PlayerChromeTimeline.Live ||
+        (timeline as? PlayerChromeTimeline.Recording)?.growing == true
+    val lastLineEndReserve = if (liveEnd) liveDistanceReserve() else 0.dp
+    return remember(content, lastLineEndReserve, skipReserve) {
+        @Composable { contentAlpha: () -> Float, _: Modifier, timelineRow: @Composable () -> Unit ->
+            PlayerInfoBar(
+                data = content.info,
+                modifier = Modifier.testTag("player-info-bar"),
+                contentAlpha = contentAlpha,
+                lastLineEndReserve = lastLineEndReserve,
+                badges = content.badges,
+                textEndReserve = skipReserve,
+            ) { faded ->
+                ProgrammeArtworkTile(content.artwork, content.picon, content.channelId,
+                    content.info.channelNumber, faded, content.withoutChannel)
+            }
+            timelineRow()
+        }
+    }
+}
+
+private class ControlsFrame(
+    val content: PlayerChromeContent,
+    val timeline: PlayerChromeTimeline,
+    val actions: PlayerChromeActions,
+    val liveBar: LiveBarPresentation?,
+)
+
+private class ControlsSnapshot(var frame: ControlsFrame? = null)
 
 private class ChromeFrame(
     var content: PlayerChromeContent,

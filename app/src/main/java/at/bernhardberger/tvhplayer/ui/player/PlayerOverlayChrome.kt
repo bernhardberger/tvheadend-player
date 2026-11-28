@@ -75,10 +75,11 @@ internal fun PlayerOverlayChrome(
     val railExpansion = LocalRailExpansion.current
     val peekLift = LocalChannelPeekLift.current
     val viewport = LocalPlayerPageScrim.current.takeIf { motion != null }
+    val behindBanner = LocalControlsBehindBanner.current
     var footerHeight by remember { mutableIntStateOf(0) }
     val scrimFooterHeight = remember { { footerHeight.toFloat() } }
     SideEffect {
-        viewport?.footerHeight = scrimFooterHeight
+        if (!behindBanner) viewport?.footerHeight = scrimFooterHeight
     }
     val travels = LocalPlayerControlsEntry.current == PlayerControlsEntry.TRAVEL
     val entering = motion?.appear

@@ -24,6 +24,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFontFamilyResolver
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
@@ -92,7 +93,7 @@ internal fun rememberTimelineEndpointWidths(kind: TimelineKind): TimelineEndpoin
     val style = timelineLabelStyle()
     val density = LocalDensity.current
     val distance = stringResource(R.string.timeshift_behind_live, "8:88:88")
-    val locale = Locale.getDefault()
+    val locale = LocalLocale.current.platformLocale
     val uses24Hour = AppClock.uses24Hour
     val resolver = LocalFontFamilyResolver.current
     val typeface = resolver.resolve(

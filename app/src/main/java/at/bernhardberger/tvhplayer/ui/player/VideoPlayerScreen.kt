@@ -1940,12 +1940,23 @@ fun VideoPlayerScreen(
         }
         // The page's strip and the detached rail outlive the controls' exit.
         val quickZap = rememberQuickZapRail(expanded = layerState.channelRailPresented, detached = true)
-        val settledTuneToken = {
-            // A stop and restart under the same tune is a new wait.
-            Triple(liveRequestToken, videoPresentation.epoch, screenStarts).takeIf {
-                contentAllowed && screenActive && confirmedPlayingChannelId != null && videoPresentation.visible &&
-                    playbackState is AppPlaybackState.Playing && busyStatus == null
-            }
+        /**
+         * Identifies the bound tune eligible for chrome warmup. Direct runtime reads (flow values
+         * and the stopped-intent lookup) aren't Compose state; cancellation relies on re-reading them.
+         */
+        val tuneWarmupToken = {
+            val target = activeTarget as? AppPlaybackTarget.Live
+            val epoch = videoPresentation.epoch
+            val intent = liveIntent
+            val pending = requestedLiveSelection
+            val allowed = contentAllowed && screenActive && screenEntry != null && !playerClose.requested
+            // The runtime publishes this target and epoch when the tune binds, before the first frame.
+            val bound = target?.channelId == currentChannelId && epoch != 0L &&
+                playbackRuntime.activeTarget.value == target && playbackRuntime.videoPresentation.value.epoch == epoch
+            val ownsTune = pending == null || (intent != null &&
+                playbackRuntime.installedLiveTargetEpoch(pending, intent) == epoch)
+            val stopped = intent != null && playbackRuntime.isPlaybackIntentStopped(intent)
+            Triple(liveRequestToken, epoch, screenStarts).takeIf { allowed && bound && ownsTune && !stopped }
         }
         @Composable
         fun PlayerControls(keepControls: Boolean) {
@@ -2044,7 +2055,7 @@ fun VideoPlayerScreen(
             downHint = stringResource(R.string.nav_channels),
             decorationCoversControls = channelRailOpen,
             controlsDecoration = controlsDecoration,
-            settledTuneToken = settledTuneToken,
+            tuneWarmupToken = tuneWarmupToken,
         )
         val liveClock = remember(timelineState) { { timelineState.nowEpochSec } }
         val railPreview = remember(quickZap, liveClock, observation, channels, channelBrowser) {
@@ -2116,7 +2127,7 @@ fun VideoPlayerScreen(
             preview = railPreview,
             peeks = peeks,
             visible = controlsShown && !chromePanelOpen,
-            settledTuneToken = settledTuneToken,
+            tuneWarmupToken = tuneWarmupToken,
         )
         // Full recovery and the unavailable message replace even an exiting ring.
         if (!busyBlocked) PlayerBusyIndicator(busyStatus, Modifier.align(Alignment.Center), cover = videoPresentation)

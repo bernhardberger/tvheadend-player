@@ -370,6 +370,23 @@ class LivePlayerChromeNavigationTest : LivePlayerChromeFixture() {
         }
     }
 
+    @Test fun leavingTheActionRowForAQuickStepBannerReturnsFocusToLiveVideo() = timeshiftPlaying(mapPosition = true) { pauses ->
+        key(Key.DirectionDown)
+        compose.onNodeWithTag("player-pause").assertIsFocused()
+        // Start the quick step while the action row is still exiting, not after it settles.
+        press(Key.Back)
+        press(Key.DirectionLeft)
+        assertTrue(exists("player-banner"))
+        assertTrue(exists("timeshift-seek-preview"))
+        compose.onNode(isFocused() and hasContentDescription(liveTvSurface), useUnmergedTree = true).assertExists()
+        assertTrue("no retained control has focus", focused().isEmpty())
+
+        val changes = pauses.toList()
+        key(Key.DirectionUp)
+        compose.onNodeWithTag("player-pause").assertIsFocused()
+        assertEquals("Up reveals controls without activating Pause", changes, pauses)
+    }
+
     @Test fun bareInfoCoveredByGuideOrSelfClosingLeavesNoReturnFocus() {
         screen()
         key(Key.Info)

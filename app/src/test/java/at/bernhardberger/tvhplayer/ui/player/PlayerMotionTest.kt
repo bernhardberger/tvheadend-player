@@ -374,39 +374,27 @@ class PlayerMotionTest {
         assertEquals(1, mounts)
     }
 
-    @Test fun theInitialHiddenControlsWaitForOneUninterruptedSettledTune() {
+    @Test fun theInitialHiddenControlsBuildWithinAFewFramesOfAnAdmittedTune() {
         var token by mutableStateOf<Int?>(1)
+        var stopped = false
         var mounts = 0
         compose.mainClock.autoAdvance = false
         compose.setContent {
-            PlayerControlsLayer(visible = false, modalVisible = false, settledTuneToken = { token }) {
+            PlayerControlsLayer(visible = false, modalVisible = false, tuneWarmupToken = { token.takeUnless { stopped } }) {
                 DisposableEffect(Unit) { mounts++; onDispose {} }
             }
         }
         compose.waitForIdle()
 
-        compose.mainClock.advanceTimeBy(900, ignoreFrameDuration = true)
-        assertEquals("the first tune has not settled long enough", 0, mounts)
-        compose.changeState { token = 2 }
-        compose.mainClock.advanceTimeBy(160)
-        compose.waitForIdle()
-        assertEquals("a different tune cannot finish the first tune's wait", 0, mounts)
+        // Deliver the awaiter's frame, but not the recomposition that can mount the body.
+        compose.settleFrames(1, frameMillis = 16)
+        compose.runOnIdle { stopped = true }
+        compose.settleFrames(4, frameMillis = 16)
+        assertEquals("stopping after the wait but before mount must cancel warmup", 0, mounts)
 
-        compose.changeState { token = null }
-        compose.mainClock.advanceTimeBy(1_000)
-        compose.waitForIdle()
-        assertEquals("losing eligibility cancels prebuild", 0, mounts)
-
-        compose.changeState { token = 3 }
-        compose.mainClock.advanceTimeByFrame()
-        compose.waitForIdle()
-        compose.mainClock.advanceTimeBy(900, ignoreFrameDuration = true)
-        assertEquals("the eligible tune still has to wait the full second", 0, mounts)
-        compose.mainClock.advanceTimeBy(100, ignoreFrameDuration = true)
-        // The wait has elapsed; let Compose apply the resulting mount.
-        compose.mainClock.advanceTimeByFrame()
-        compose.waitForIdle()
-        assertEquals("one uninterrupted second builds the hidden controls", 1, mounts)
+        compose.changeState { stopped = false; token = 2 }
+        compose.settleFrames(4, frameMillis = 16)
+        assertEquals("the eligible tune builds hidden controls during loading", 1, mounts)
     }
 
     @Test fun closingOptionsHandsFocusAndKeysToSettingsWhileThePanelFades() {

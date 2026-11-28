@@ -145,7 +145,8 @@ internal fun PlayerChromeControls(
         LivePauseAvailability.OFF -> stringResource(R.string.pause_timeshift_off)
         else -> null
     }?.takeUnless { pausable }
-    val hidden = LocalPlayerControlsMotion.current?.hidden == true
+    val behindBanner = LocalControlsBehindBanner.current
+    val hidden = LocalPlayerControlsMotion.current?.hidden == true || behindBanner
     var timingUnavailable by remember(identity) { mutableStateOf(false) }
     LaunchedEffect(identity, pausable, seekable, hidden) {
         timingUnavailable = false
@@ -389,11 +390,18 @@ internal fun PlayerChromeControls(
         // The info bar rests right above the timeline. A seek label or feedback paints over the
         // bar, so the bar fades out meanwhile instead of anything moving.
         val statusTextShown = if (seekable) previewing || seekFeedback != null else scheduleFeedback != null
-        val infoAlpha by animateFloatAsState(if (statusTextShown) 0f else 1f,
-            tween(PlayerMotion.ShortMs, easing = PlayerMotion.Standard), label = "player-info-bar-seek")
+        val targetInfoAlpha = if (statusTextShown) 0f else 1f
+        // Recreate only the animation on handoff, with its initial value already at the target.
+        val infoAlpha = if (behindBanner) {
+            remember(targetInfoAlpha) { { targetInfoAlpha } }
+        } else {
+            val animated = animateFloatAsState(targetInfoAlpha,
+                tween(PlayerMotion.ShortMs, easing = PlayerMotion.Standard), label = "player-info-bar-seek")
+            remember(animated) { { animated.value } }
+        }
         val barStatus = if (previewing) live.barStatus(state, window = live.programmeWindow)
             else rememberPlayerBarStatus(state, liveBar?.end).takeIf { live.liveAvailable }
-        infoBar({ infoAlpha }, Modifier) {
+        infoBar(infoAlpha, Modifier) {
         if (seekable) {
             PlaybackSeekbar(
                 range = timeshiftSeekbarRange(timeshiftState).let { range ->

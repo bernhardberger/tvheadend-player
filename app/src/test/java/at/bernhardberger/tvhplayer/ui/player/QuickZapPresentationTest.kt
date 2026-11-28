@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.key
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
@@ -705,7 +706,8 @@ class QuickZapPresentationTest {
 
     @Test fun detachedRailIsBuiltOnceAndOutlivesHiddenControls() {
         var controls by mutableStateOf(false)
-        var settledTuneToken by mutableStateOf<Pair<Long, Long?>?>(null)
+        var controlsGeneration by mutableStateOf(0)
+        var tuneWarmupToken by mutableStateOf<Int?>(null)
         // Not state: a stopped window pauses the frame clock, so this change cannot recompose anything.
         var stopped = false
         var starts = 0
@@ -713,24 +715,38 @@ class QuickZapPresentationTest {
         val viewer = mutableStateOf(LiveViewerPosition(ChannelId(2), 85L))
         var railViewerEpoch: Long? = null
         lateinit var railClock: () -> Long
+        var controlsBuiltAt: Long? = null
+        var railBuiltAt: Long? = null
         var built = 0
         var disposed = 0
         var draws = 0
+        compose.mainClock.autoAdvance = false
+        val readTune = {
+            val tune = tuneWarmupToken
+            if (stopped) null else tune?.let { it to starts }
+        }
         compose.setContent {
             view = LocalView.current
             val rail = rememberQuickZapRail(expanded = controls, detached = true)
             Box(Modifier.fillMaxSize()) {
-                PlayerControlsLayer(visible = controls, modalVisible = false) {
-                    QuickZapControls(rail, peek = null, controls = {})
+                key(controlsGeneration) {
+                    PlayerControlsLayer(visible = controls, modalVisible = false, tuneWarmupToken = readTune) {
+                        androidx.compose.runtime.DisposableEffect(Unit) {
+                            controlsBuiltAt = compose.mainClock.currentTime
+                            onDispose { }
+                        }
+                        QuickZapControls(rail, peek = null, controls = {})
+                    }
                 }
                 CompositionLocalProvider(LocalLivePosition provides viewer) {
                     QuickZapRail(rail, preview = {}, visible = controls, peeks = true,
-                        settledTuneToken = { if (stopped) null else settledTuneToken?.let { it to starts } }, channelContent = {
+                        tuneWarmupToken = readTune, channelContent = {
                         railClock = rail.clock { now }
                         val viewerEpoch = LocalLivePosition.current?.value?.epochSec
                         SideEffect { railViewerEpoch = viewerEpoch }
                         androidx.compose.runtime.DisposableEffect(Unit) {
                             built++
+                            railBuiltAt = compose.mainClock.currentTime
                             onDispose { disposed++ }
                         }
                         Box(Modifier.fillMaxWidth().height(100.dp).drawBehind { draws++ })
@@ -744,34 +760,41 @@ class QuickZapPresentationTest {
             view.draw(Canvas(bitmap))
             bitmap.recycle()
         }
-        compose.mainClock.advanceTimeBy(1_050)
-        assertEquals("not built before the tune and cover settle", 0, built)
-        compose.changeState { settledTuneToken = 1L to 1L }
-        compose.settleFrames(1, frameMillis = 500)
-        compose.changeState { settledTuneToken = 1L to 2L }
-        compose.settleFrames(1, frameMillis = 550)
-        assertEquals("a replacement presentation gets its own idle delay", 0, built)
-        compose.changeState { settledTuneToken = null }
-        compose.settleFrames(1, frameMillis = 550)
+        compose.waitForIdle()
+        assertEquals("not built before a live tune is admitted", 0, built)
+        compose.changeState { tuneWarmupToken = 1 }
+        compose.settleFrames(1, frameMillis = 16)
+        compose.changeState { tuneWarmupToken = 2 }
+        compose.settleFrames(1, frameMillis = 16)
+        assertEquals("a replacement tune gets its own warm-up frames", 0, built)
+        compose.changeState { tuneWarmupToken = null }
+        compose.settleFrames(2, frameMillis = 16)
         assertEquals("revoking eligibility cancels the pending build", 0, built)
-        compose.changeState { settledTuneToken = 1L to 3L }
-        compose.settleFrames(1, frameMillis = 500)
+        compose.changeState { tuneWarmupToken = 3 }
+        compose.settleFrames(1, frameMillis = 16)
         starts++
-        compose.settleFrames(1, frameMillis = 600)
-        assertEquals("a restart within the wait does not let the old timer build", 0, built)
-        compose.changeState { settledTuneToken = 1L to 4L }
-        compose.settleFrames(1, frameMillis = 500)
+        compose.settleFrames(2, frameMillis = 16)
+        assertEquals("a restart within the wait does not let the old tune build", 0, built)
+        compose.changeState { tuneWarmupToken = 4 }
+        compose.settleFrames(1, frameMillis = 16)
         stopped = true
-        compose.settleFrames(1, frameMillis = 600)
+        compose.settleFrames(2, frameMillis = 16)
         assertEquals("a stopped screen does not build when the wait ends", 0, built)
-        stopped = false
-        compose.changeState { settledTuneToken = 1L to 2L }
-        compose.settleFrames(1, frameMillis = 750)
-        assertEquals("re-eligibility starts a fresh idle delay", 0, built)
-        compose.settleFrames(1, frameMillis = 300)
+        compose.changeState { stopped = false; tuneWarmupToken = 5 }
+        // Deliver the rail wait's last frame but not the mount composition.
+        compose.settleFrames(3, frameMillis = 16)
+        compose.runOnIdle { stopped = true }
+        compose.settleFrames(4, frameMillis = 16)
+        assertEquals("stopping after the wait but before mount must cancel rail warmup", 0, built)
+        // Give the next tune a cold controls layer as well, to compare both mounts on one tune.
+        controlsBuiltAt = null
+        compose.changeState { stopped = false; tuneWarmupToken = 6; controlsGeneration++ }
+        compose.settleFrames(4, frameMillis = 16)
         draw()
-        assertEquals("the settled rail is built without showing controls", 1, built)
+        assertEquals("the rail warms up in a later frame during loading", 1, built)
+        assertTrue("controls warm up first, in a different frame", requireNotNull(controlsBuiltAt) < requireNotNull(railBuiltAt))
         assertEquals("the prebuilt rail does not draw", 0, draws)
+        compose.mainClock.autoAdvance = true
         compose.runOnIdle { now = 101 }
         compose.runOnIdle { assertEquals("the hidden clock is frozen", 100L, railClock()) }
         compose.runOnIdle { controls = true }
@@ -803,7 +826,7 @@ class QuickZapPresentationTest {
         controls: () -> Boolean,
         expanded: () -> Boolean = { true },
         peeks: Boolean = false,
-        settledTuneToken: () -> Any? = { null },
+        tuneWarmupToken: () -> Any? = { null },
         preview: @Composable () -> Unit = {},
         livePosition: State<LiveViewerPosition>? = null,
         channelContent: @Composable () -> Unit = {},
@@ -818,26 +841,28 @@ class QuickZapPresentationTest {
                 }
                 CompositionLocalProvider(LocalLivePosition provides livePosition) {
                     QuickZapRail(rail, preview = preview, visible = controls(), peeks = peeks,
-                        settledTuneToken = settledTuneToken, channelContent = channelContent)
+                        tuneWarmupToken = tuneWarmupToken, channelContent = channelContent)
                 }
             }
         }
         return rail
     }
 
-    @Test fun detachedRailRevealedBeforeThePrebuildDeadlineMountsInTheReveal() {
+    @Test fun detachedRailRevealedBeforeItsWarmupMountsInTheReveal() {
         var controls by mutableStateOf(false)
         var built = 0
-        detachedRail({ controls }, { false }, peeks = true, settledTuneToken = { 1L to 1L }, channelContent = {
+        compose.mainClock.autoAdvance = false
+        var token by mutableStateOf<Int?>(null)
+        detachedRail({ controls }, { false }, peeks = true, tuneWarmupToken = { token }, channelContent = {
             androidx.compose.runtime.DisposableEffect(Unit) {
                 built++
                 onDispose { }
             }
         })
-        compose.settleFrames(1, frameMillis = 500)
-        assertEquals("still waiting for the deadline", 0, built)
-        compose.changeState { controls = true }
-        compose.settleFrames(1, frameMillis = 100)
+        compose.waitForIdle()
+        assertEquals("still waiting for the warm-up frame", 0, built)
+        compose.changeState { token = 1; controls = true }
+        compose.settleFrames(2, frameMillis = 16)
         assertEquals("the first press builds the rail itself", 1, built)
     }
 

@@ -438,13 +438,13 @@ abstract class LivePlayerChromeFixture {
                 val phase = "${if (zap) "zap" else "entry"} frame ${frame++}"
                 assertEquals("$phase: the live-start state", "Live", liveState())
                 assertFalse("$phase: no distance at the live edge", exists("player-distance"))
-                val info = compose.onNodeWithTag("player-info-bar").fetchSemanticsNode()
+                val info = chromeNode("player-info-bar").fetchSemanticsNode()
                     .config[SemanticsProperties.ContentDescription].joinToString(" ")
                 assertTrue("$phase: current programme: $info", info.contains(title))
                 assertTrue("$phase: Next: $info", info.contains(next))
                 if (zap) assertFalse("$phase: never the previous programme: $info", info.contains("Now showing"))
-                val track = compose.onNodeWithTag("player-timeline-track", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-                val fill = compose.onNodeWithTag("player-timeline-fill", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+                val track = chromeNode("player-timeline-track").fetchSemanticsNode().boundsInRoot
+                val fill = chromeNode("player-timeline-fill").fetchSemanticsNode().boundsInRoot
                 assertEquals("$phase: only the new schedule's coordinates", fraction, (fill.right - track.left) / track.width, 0.03f)
                 assertTrue("$phase: schedule end clock", exists("player-end-clock"))
             }
@@ -643,24 +643,24 @@ abstract class LivePlayerChromeFixture {
     }
 
     protected fun assertUnknownProgramme() {
-        val info = compose.onNodeWithTag("player-info-bar").fetchSemanticsNode().config
+        val info = chromeNode("player-info-bar").fetchSemanticsNode().config
             .getOrElse(SemanticsProperties.ContentDescription) { emptyList() }.joinToString(" ")
         assertTrue("unknown playback does not claim the airing programme: $info", info.contains("No program information"))
         assertFalse("unknown playback has no Next: $info", info.contains("Next 1") || info.contains("Next 2"))
     }
 
     protected fun assertScreenProgramme(channel: Long, phase: String) {
-        val info = compose.onNodeWithTag("player-info-bar").fetchSemanticsNode().config
+        val info = chromeNode("player-info-bar").fetchSemanticsNode().config
             .getOrElse(SemanticsProperties.ContentDescription) { emptyList() }.joinToString(" ")
         assertTrue("$phase: current programme: $info", info.contains("Current $channel"))
         assertTrue("$phase: next programme: $info", info.contains("Next $channel"))
         assertNotNull("$phase: the live-start state is not unknown", liveState())
-        val track = compose.onNodeWithTag("player-timeline-track", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        val fills = compose.onAllNodes(hasTestTag("player-timeline-fill") or hasTestTag("player-timeline-interactive-fill"),
-            useUnmergedTree = true).fetchSemanticsNodes()
+        val track = chromeNode("player-timeline-track").fetchSemanticsNode().boundsInRoot
+        val fillMatcher = hasTestTag("player-timeline-fill") or hasTestTag("player-timeline-interactive-fill")
+        val fills = compose.onAllNodes(presentedChrome(fillMatcher), useUnmergedTree = true).fetchSemanticsNodes()
         assertTrue("$phase: fill never drops", fills.isNotEmpty())
         assertEquals("$phase: no axis slide", 0.75f, (fills.maxOf { it.boundsInRoot.right } - track.left) / track.width, 0.03f)
-        val title = compose.onNodeWithTag("player-info-title", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val title = chromeNode("player-info-title").fetchSemanticsNode().boundsInRoot
         val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
         compose.runOnIdle { view.draw(Canvas(bitmap)) }
         var brightest = 0
@@ -671,12 +671,19 @@ abstract class LivePlayerChromeFixture {
         assertTrue("$phase: title painted, not only in semantics", brightest > 128)
     }
 
+    // The unmerged tree exposes retained layout. With the Banner up, ignore the controls it masks.
+    private fun presentedChrome(matcher: SemanticsMatcher) = if (exists("player-banner")) {
+        matcher and !hasAnyAncestor(hasTestTag("player-zap-controls"))
+    } else matcher
+
+    protected fun chromeNode(tag: String) = compose.onNode(presentedChrome(hasTestTag(tag)), useUnmergedTree = true)
+
     protected fun description(tag: String): String =
-        compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode()
+        chromeNode(tag).fetchSemanticsNode()
             .config[SemanticsProperties.ContentDescription].joinToString()
 
     /** The state live TV announces, live or behind live; null while unknown. */
-    protected fun liveState(): String? = compose.onNodeWithTag("player-live-state", useUnmergedTree = true).fetchSemanticsNode()
+    protected fun liveState(): String? = chromeNode("player-live-state").fetchSemanticsNode()
         .config.getOrNull(SemanticsProperties.ContentDescription)?.joinToString()
 
     protected fun texts(tag: String): String =

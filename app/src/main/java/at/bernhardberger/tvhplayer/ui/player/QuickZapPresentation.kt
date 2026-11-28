@@ -151,9 +151,10 @@ internal fun QuickZapControls(
     val viewport = LocalPlayerPageScrim.current
     val scrim = viewport ?: remember { PlayerPageScrim().apply { alpha = { 1f } } }
     val layerAlpha = LocalPlayerControlsAlpha.current
-    val hidden = LocalPlayerControlsMotion.current?.hidden == true
+    val behindBanner = LocalControlsBehindBanner.current
+    val hidden = LocalPlayerControlsMotion.current?.hidden == true || behindBanner
     val previewTop = remember(rail) { { (rail.viewportHeight - rail.railHeight).toFloat() } }
-    val expansion = remember(rail) { rail.expansion::value }
+    val expansion = remember(rail, behindBanner) { { if (behindBanner) 0f else rail.expansion.value } }
     SideEffect {
         // The denser rail scrim starts at the rail's top.
         scrim.previewTop = previewTop
@@ -202,7 +203,7 @@ internal fun QuickZapRail(
     header: (@Composable () -> Unit)? = null,
     peeks: Boolean = false,
     visible: Boolean = true,
-    settledTuneToken: () -> Any? = { null },
+    tuneWarmupToken: () -> Any? = { null },
 ) {
     val expanded = rail.expanded
     val expansion = rail.expansion
@@ -231,7 +232,8 @@ internal fun QuickZapRail(
     val active = !rail.detached || visible
     val watching = active && LocalPlayerPageActive.current
     val built = key(rail) {
-        rememberSettledBuild(hosted) { if (rail.detached && peeks) settledTuneToken() else null }
+        // Warm the larger detached tray one frame after the controls.
+        rememberChromeBuild(hosted, warmupFrames = 2) { if (rail.detached && peeks) tuneWarmupToken() else null }
     }
     Box(
         Modifier.fillMaxSize().clipToBounds().onSizeChanged { rail.viewportHeight = it.height }

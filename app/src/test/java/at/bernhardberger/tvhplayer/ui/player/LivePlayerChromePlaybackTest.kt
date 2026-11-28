@@ -112,8 +112,8 @@ class LivePlayerChromePlaybackTest : LivePlayerChromeFixture() {
             Instant.fromEpochSeconds(now + 3_600), title = "")
         publishInfoRecording(DvrEntryState.RECORDING, eventOverride = untitled)
         assertTrue(description("player-info-bar").contains(context.getString(R.string.no_epg)))
-        val mark = compose.onNodeWithTag("player-info-timing-mark", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        val time = compose.onNodeWithTag("player-info-programme", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val mark = chromeNode("player-info-timing-mark").fetchSemanticsNode().boundsInRoot
+        val time = chromeNode("player-info-programme").fetchSemanticsNode().boundsInRoot
         assertTrue("the programme placeholder keeps its own timing badge", mark.right < time.left)
         assertFalse(description(PlayerTopIdentityTag).contains(channelRecording))
         assertTrue(description("player-info-bar").contains(programmeRecording))
@@ -132,10 +132,10 @@ class LivePlayerChromePlaybackTest : LivePlayerChromeFixture() {
         compose.pressKey(Key.MediaRewind, settleFrames = 2, frameMillis = 16)
         repeat(2) { compose.pressKey(Key.MediaRewind, settleFrames = 2, frameMillis = 16) }
         assertTrue(description("timeshift-seek-preview").contains(context.getString(R.string.player_scrub_backward, 8)))
-        val first = compose.onNodeWithTag("player-timeline-fill", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.width
+        val first = chromeNode("player-timeline-fill").fetchSemanticsNode().boundsInRoot.width
         compose.settleFrames(40, frameMillis = 16)
         assertTrue("the automatic target moves backward while playback stays paused",
-            compose.onNodeWithTag("player-timeline-fill", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.width < first)
+            chromeNode("player-timeline-fill").fetchSemanticsNode().boundsInRoot.width < first)
         assertFalse(pauses.last())
         compose.pressKey(Key.DirectionDown, settleFrames = 2, frameMillis = 16)
         compose.pressKey(Key.MediaRewind, settleFrames = 2, frameMillis = 16)

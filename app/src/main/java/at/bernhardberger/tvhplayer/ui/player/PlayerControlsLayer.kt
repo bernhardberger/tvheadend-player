@@ -23,9 +23,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
-import kotlinx.coroutines.delay
+import androidx.compose.ui.semantics.hideFromAccessibility
+import androidx.compose.ui.semantics.semantics
 
 /** The controls layer's visibility, so the shared chrome can move its header and footer in. */
 internal val LocalPlayerControlsMotion = staticCompositionLocalOf<PlayerControlsMotion?> { null }
@@ -51,26 +53,47 @@ internal val LocalPlayerControlsEntry = compositionLocalOf { PlayerControlsEntry
 /** The controls layer's alpha as drawn, for what draws apart from the layer but in step with it. */
 internal val LocalPlayerControlsAlpha = staticCompositionLocalOf<() -> Float> { { 1f } }
 
-/** Build once on demand or after a full second of uninterrupted warm-up eligibility. */
+/** Controls are being prepared underneath a passive live Banner. */
+internal val LocalControlsBehindBanner = compositionLocalOf { false }
+
 @Composable
-internal fun rememberSettledBuild(required: Boolean, settledToken: () -> Any?): Boolean {
-    var built by remember { mutableStateOf(false) }
-    if (!built) {
-        if (required) {
-            SideEffect { built = true }
-        } else {
-            val token = settledToken()
-            val readToken by rememberUpdatedState(settledToken)
-            if (token != null) {
-                LaunchedEffect(token) {
-                    delay(1_000L)
-                    // Eligibility may change while the window's frame clock is paused.
-                    if (readToken() == token) built = true
-                }
-            }
+internal fun PlayerControlsBehindBanner(retain: Boolean, behindBanner: Boolean, content: @Composable () -> Unit) {
+    if (!retain) {
+        content()
+    } else {
+        val mask = if (behindBanner) Modifier.semantics { hideFromAccessibility() } else Modifier
+        PlayerMotionFrame(
+            leaving = behindBanner,
+            modifier = mask.graphicsLayer { alpha = if (behindBanner) 0f else 1f },
+            dropFocusToSink = false,
+        ) {
+            CompositionLocalProvider(LocalControlsBehindBanner provides behindBanner, content = content)
         }
     }
-    return required || built
+}
+
+/** Build once on demand or on a later frame of the same admitted tune. */
+@Composable
+internal fun rememberChromeBuild(
+    required: Boolean,
+    warmupFrames: Int = 1,
+    tuneToken: () -> Any?,
+): Boolean {
+    var built by remember { mutableStateOf(false) }
+    if (built) return true
+    val token = if (required) null else tuneToken()
+    var readyToken by remember(token, warmupFrames) { mutableStateOf<Any?>(null) }
+    val readToken by rememberUpdatedState(tuneToken)
+    if (token != null) {
+        LaunchedEffect(token, warmupFrames) {
+            repeat(warmupFrames) { withFrameNanos {} }
+            if (readToken() == token) readyToken = token
+        }
+    }
+    // The wait only makes this tune a candidate. Eligibility can change before the mount.
+    val mount = required || (token != null && readyToken == token)
+    if (mount) SideEffect { built = true }
+    return mount
 }
 
 /**
@@ -87,14 +110,14 @@ internal fun PlayerControlsLayer(
     modalVisible: Boolean,
     modifier: Modifier = Modifier,
     entry: PlayerControlsEntry = PlayerControlsEntry.TRAVEL,
-    settledTuneToken: () -> Any? = { null },
+    tuneWarmupToken: () -> Any? = { null },
     content: @Composable (hidden: Boolean) -> Unit,
 ) {
     val shown = visible && !modalVisible
     val visibility = remember {
         MutableTransitionState(if (shown) EnterExitState.Visible else EnterExitState.PreEnter)
     }
-    if (!rememberSettledBuild(shown, settledTuneToken)) return
+    if (!rememberChromeBuild(shown, tuneToken = tuneWarmupToken)) return
     // Taken when the layer turns shown and kept until it turns hidden.
     val showEntry = remember(shown) { entry }
     val freshEntry = remember(shown) { shown && visibility.isIdle && visibility.currentState != EnterExitState.Visible }
