@@ -194,7 +194,7 @@ class LivePlayerServerWaitTest {
         compose.onRoot().performKeyInput { keyUp(Key.DirectionCenter) }
         compose.settleFrames(10)
         assertEquals(0, unconsumed)
-        assertEquals(0, compose.onAllNodes(hasTestTag("player-actions"), useUnmergedTree = true).fetchSemanticsNodes().size)
+        compose.onNodeWithTag("player-actions").assertDoesNotExist()
     }
 
     @Test fun channelStartupConsumesKeysExceptSystemAndBack() {

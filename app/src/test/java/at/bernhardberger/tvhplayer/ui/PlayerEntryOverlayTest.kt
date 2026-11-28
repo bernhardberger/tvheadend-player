@@ -342,7 +342,7 @@ class PlayerEntryOverlayTest {
         settle()
         compose.onNodeWithTag("player-page-first", useUnmergedTree = true).assertExists()
         assertEquals(0, unconsumedCenterUps)
-        assertEquals(0, compose.onAllNodes(hasTestTag("player-actions"), useUnmergedTree = true).fetchSemanticsNodes().size)
+        compose.onNodeWithTag("player-actions").assertDoesNotExist()
         compose.runOnIdle {
             assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
             assertEquals(bindings, session.calls.count { it == FakeSessionCall.BIND_LIVE_PLAYBACK })
