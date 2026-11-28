@@ -179,7 +179,7 @@ class ChannelShelfCompositionTest {
                         selectedId = ChannelId(2), playingChannelId = ChannelId(1),
                         recordingChannelIds = emptySet(),
                         nowEvent = { if (it == ChannelId(1)) event(programmeTitle) else null },
-                        nowSec = 900,
+                        nowSec = { 900L },
                         onFocusChannel = {}, onPickChannel = { picks++ }, onCloseDrawer = { closes++ },
                     )
                 }

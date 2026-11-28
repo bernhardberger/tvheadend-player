@@ -193,7 +193,7 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
                                 },
                                 selectedId = ChannelId(2), playingChannelId = ChannelId(12), recordingChannelIds = setOf(ChannelId(12)),
                              nowEvent = { if (scenario == "shelf-missing") null else programme(long = scenario == "shelf-long") },
-                                 nowSec = 1_783_020_600L,
+                                 nowSec = { 1_783_020_600L },
                                  onFocusChannel = {}, onPickChannel = {}, onCloseDrawer = {},
                             ) }
                         }) },
